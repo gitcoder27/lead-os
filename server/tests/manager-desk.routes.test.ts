@@ -1040,7 +1040,7 @@ describe("manager desk routes", () => {
       jiraKey: "PROJ-221",
       title: "Coordinate review follow-up",
       state: "planned",
-      note: null,
+      note: "Developer-owned note",
     });
 
     const targetDay = await db
@@ -1050,7 +1050,7 @@ describe("manager desk routes", () => {
     expect(targetDay[0]?.developerAccountId).toBe("dev-2");
   });
 
-  it("rejects clearing the assignee on linked delegated work", async () => {
+  it("clears the assignee on linked delegated work and removes it from the team board", async () => {
     const app = createTestApp();
     const cookie = await loginCookie("manager", "secret123");
 
@@ -1065,6 +1065,12 @@ describe("manager desk routes", () => {
       },
     });
 
+    const linkedBefore = await db
+      .select()
+      .from(teamTrackerItems)
+      .where(eq(teamTrackerItems.managerDeskItemId, created.body.id));
+    expect(linkedBefore).toHaveLength(1);
+
     const cleared = await invoke(app, {
       method: "PATCH",
       url: `/api/manager-desk/items/${created.body.id}`,
@@ -1074,16 +1080,16 @@ describe("manager desk routes", () => {
       },
     });
 
-    expect(cleared.status).toBe(409);
-    expect(cleared.body?.error).toBe(
-      "Linked delegated tasks must be removed from your desk or cancelled explicitly"
-    );
+    expect(cleared.status).toBe(200);
+    expect(cleared.body?.assignee).toBeUndefined();
+    expect(cleared.body?.delegatedExecution).toBeUndefined();
+    expect(cleared.body?.status).toBe("inbox");
 
     const trackerRows = await db
       .select()
       .from(teamTrackerItems)
       .where(eq(teamTrackerItems.managerDeskItemId, created.body.id));
-    expect(trackerRows).toHaveLength(1);
+    expect(trackerRows).toHaveLength(0);
   });
 
   it("rejects patching linked delegated work to cancelled without the dedicated cancel action", async () => {

@@ -58,12 +58,12 @@ export function DrawerPrimaryFields({
               disabled: developer.availability?.state === 'inactive',
             }))}
             onChange={(value) => onAssigneeChange(value || null)}
-            disabled={readOnly || hasLinkedWork}
-            emptyLabel={hasLinkedWork ? undefined : 'Unassigned'}
+            disabled={readOnly}
+            emptyLabel="Unassigned"
           />
           {hasLinkedWork && assigneeId && (
             <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Assignee is locked while delegated work is active.
+              Delegated on the team board — reassigning moves it, Unassigned removes it.
             </p>
           )}
           {selectedDev?.availability?.state === 'inactive' && (

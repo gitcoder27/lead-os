@@ -556,16 +556,6 @@ export class ManagerDeskService {
         "Linked delegated tasks must be cancelled with the dedicated cancel action"
       );
     }
-    if (
-      linkedTrackerContext &&
-      updates.assigneeDeveloperAccountId !== undefined &&
-      updates.assigneeDeveloperAccountId === null
-    ) {
-      throw new HttpError(
-        409,
-        "Linked delegated tasks must be removed from your desk or cancelled explicitly"
-      );
-    }
 
     const nextPlannedStartAt =
       updates.plannedStartAt !== undefined ? updates.plannedStartAt : existing.plannedStartAt;
@@ -638,6 +628,11 @@ export class ManagerDeskService {
       throw new Error(`Manager desk day ${updatedItem.dayId} was not found`);
     }
 
+    // Reassignment recreates the linked tracker row — carry the dev's note over.
+    const trackerNote = linkedTrackerContext
+      ? (await this.getTrackerNotesByManagerDeskItemIds([itemId], normalizedWorkspaceId)).get(itemId) ?? null
+      : undefined;
+
     await this.syncTrackerAssignment(
       itemId,
       updatedItem.assigneeDeveloperAccountId,
@@ -645,7 +640,7 @@ export class ManagerDeskService {
       updatedItem.title,
       updatedLinks,
       updatedItem.status as ManagerDeskStatus,
-      undefined,
+      trackerNote,
       normalizedWorkspaceId
     );
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);

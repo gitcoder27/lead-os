@@ -849,6 +849,49 @@ describe('ManagerDeskPage', () => {
     );
   });
 
+  it('keeps the owner field editable while delegated work is active', () => {
+    currentMockDay = {
+      ...mockDayResponse,
+      items: mockDayResponse.items.map((item) =>
+        item.id === 1
+          ? {
+              ...item,
+              delegatedExecution: {
+                trackerItemId: 88,
+                state: 'in_progress' as const,
+                updatedAt: '2026-03-08T09:15:00Z',
+              },
+            }
+          : item,
+      ),
+    };
+
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Open Analyze root cause for DEF-241$/i }));
+
+    const assigneeSelect = screen.getByLabelText('Assignee');
+    expect(assigneeSelect).not.toBeDisabled();
+    expect(within(assigneeSelect).getByRole('option', { name: 'Unassigned' })).toBeInTheDocument();
+    expect(screen.getByText(/Delegated on the team board/i)).toBeInTheDocument();
+
+    fireEvent.change(assigneeSelect, { target: { value: 'bob-2' } });
+    expect(mockUpdateMutate).toHaveBeenCalledWith(
+      { itemId: 1, assigneeDeveloperAccountId: 'bob-2' },
+      expect.anything(),
+    );
+
+    fireEvent.change(assigneeSelect, { target: { value: '' } });
+    expect(mockUpdateMutate).toHaveBeenCalledWith(
+      { itemId: 1, assigneeDeveloperAccountId: null },
+      expect.anything(),
+    );
+  });
+
   it('shows a compact Jira snapshot for linked issues in the drawer', () => {
     render(
       <TestWrapper>

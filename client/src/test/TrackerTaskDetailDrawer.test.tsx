@@ -47,15 +47,17 @@ vi.mock('@/components/manager-desk/ItemDetailDrawer', () => ({
     ariaLabel,
     topSlot,
     placeholder,
+    stacked,
   }: {
     item: { title: string } | null;
     open: boolean;
     ariaLabel?: string;
     topSlot?: ReactNode;
     placeholder?: ReactNode;
+    stacked?: boolean;
   }) =>
     open ? (
-      <div role="dialog" aria-label={ariaLabel}>
+      <div role="dialog" aria-label={ariaLabel} data-stacked={stacked ? 'true' : undefined}>
         {item ? <div>{item.title}</div> : placeholder}
         {topSlot}
       </div>
@@ -295,5 +297,167 @@ describe('TrackerTaskDetailDrawer', () => {
 
     expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Loading task detail')).not.toBeInTheDocument();
+  });
+
+  it('renders a back-to-developer control and stacked layer for linked detail when backTo is provided', () => {
+    mockUseTrackerSharedTaskDetail.mockReturnValue({
+      data: {
+        date: '2026-03-14',
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        lifecycle: 'manager_desk_linked',
+        managerDeskItem: {
+          id: 110,
+          dayId: 1,
+          title: 'Fix login bug',
+          kind: 'action',
+          category: 'analysis',
+          status: 'planned',
+          priority: 'high',
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+          links: [],
+        },
+        trackerItem: {
+          id: 10,
+          dayId: 1,
+          managerDeskItemId: 110,
+          lifecycle: 'manager_desk_linked',
+          itemType: 'jira',
+          title: 'Fix login bug',
+          state: 'planned',
+          position: 0,
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const onClose = vi.fn();
+    render(
+      <TrackerTaskDetailDrawer
+        trackerItemId={10}
+        initialManagerDeskItemId={110}
+        backTo="Alice Smith"
+        onClose={onClose}
+      />
+    );
+
+    expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toHaveAttribute('data-stacked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /back to alice smith/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a back-to-developer control on the tracker-only drawer when backTo is provided', () => {
+    mockUseTrackerSharedTaskDetail.mockReturnValue({
+      data: {
+        date: '2026-03-14',
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        lifecycle: 'tracker_only',
+        trackerItem: {
+          id: 10,
+          dayId: 1,
+          lifecycle: 'tracker_only',
+          itemType: 'custom',
+          title: 'Review pull request',
+          state: 'planned',
+          position: 0,
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const onClose = vi.fn();
+    render(
+      <TrackerTaskDetailDrawer
+        trackerItemId={10}
+        initialManagerDeskItemId={null}
+        backTo="Alice Smith"
+        onClose={onClose}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /back to alice smith/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the back control when there is no developer panel to return to', () => {
+    mockUseTrackerSharedTaskDetail.mockReturnValue({
+      data: {
+        date: '2026-03-14',
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        lifecycle: 'tracker_only',
+        trackerItem: {
+          id: 10,
+          dayId: 1,
+          lifecycle: 'tracker_only',
+          itemType: 'custom',
+          title: 'Review pull request',
+          state: 'planned',
+          position: 0,
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <TrackerTaskDetailDrawer
+        trackerItemId={10}
+        initialManagerDeskItemId={null}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /back to/i })).not.toBeInTheDocument();
+  });
+
+  it('closes the tracker-only drawer on Escape', () => {
+    mockUseTrackerSharedTaskDetail.mockReturnValue({
+      data: {
+        date: '2026-03-14',
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        lifecycle: 'tracker_only',
+        trackerItem: {
+          id: 10,
+          dayId: 1,
+          lifecycle: 'tracker_only',
+          itemType: 'custom',
+          title: 'Review pull request',
+          state: 'planned',
+          position: 0,
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const onClose = vi.fn();
+    render(
+      <TrackerTaskDetailDrawer
+        trackerItemId={10}
+        initialManagerDeskItemId={null}
+        onClose={onClose}
+      />
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

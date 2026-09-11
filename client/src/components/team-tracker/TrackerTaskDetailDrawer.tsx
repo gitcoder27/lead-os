@@ -1,4 +1,5 @@
-import { AlertTriangle, ArrowUpRight, Loader2, X } from 'lucide-react';
+import { useEffect } from 'react';
+import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, X } from 'lucide-react';
 import { ItemDetailDrawer } from '@/components/manager-desk/ItemDetailDrawer';
 import {
   useCancelDelegatedManagerDeskTask,
@@ -16,12 +17,14 @@ import { RelatedIssueChips } from './RelatedIssueChips';
 interface TrackerTaskDetailDrawerProps {
   trackerItemId: number | null;
   initialManagerDeskItemId: number | null;
+  backTo?: string;
   onClose: () => void;
 }
 
 export function TrackerTaskDetailDrawer({
   trackerItemId,
   initialManagerDeskItemId,
+  backTo,
   onClose,
 }: TrackerTaskDetailDrawerProps) {
   const { addToast } = useToast();
@@ -50,6 +53,7 @@ export function TrackerTaskDetailDrawer({
       <TrackerOnlyDrawer
         detail={detail}
         isOpen={isOpen}
+        backTo={backTo}
         onClose={onClose}
         isPromoting={promoteItem.isPending}
         onPromote={() => {
@@ -72,6 +76,7 @@ export function TrackerTaskDetailDrawer({
       onClose={onClose}
       ariaLabel="Team Tracker task detail"
       showLinkedIssueDescription={false}
+      stacked
       onUpdate={(managerDeskItemId, updates) =>
         updateManagerDeskItem.mutate({ itemId: managerDeskItemId, ...updates })
       }
@@ -86,18 +91,21 @@ export function TrackerTaskDetailDrawer({
       }
       isCancelDelegatedPending={cancelDelegated.isPending}
       topSlot={
-        detail ? (
-          <TrackerTaskExecutionPanel
-            developer={detail.developer}
-            item={detail.trackerItem}
-            isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
-            onSetCurrent={(id) => setCurrentItem.mutate(id)}
-            onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
-            onUpdateNote={(id, note) =>
-              updateTrackerItem.mutateAsync({ itemId: id, note }).then(() => undefined)
-            }
-          />
-        ) : null
+        <>
+          <BackToDeveloperRow label={backTo} onBack={onClose} className="px-4 pt-3 md:px-5" />
+          {detail ? (
+            <TrackerTaskExecutionPanel
+              developer={detail.developer}
+              item={detail.trackerItem}
+              isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
+              onSetCurrent={(id) => setCurrentItem.mutate(id)}
+              onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
+              onUpdateNote={(id, note) =>
+                updateTrackerItem.mutateAsync({ itemId: id, note }).then(() => undefined)
+              }
+            />
+          ) : null}
+        </>
       }
       placeholder={
         <TrackerTaskDetailPlaceholder
@@ -116,6 +124,7 @@ export function TrackerTaskDetailDrawer({
 function TrackerOnlyDrawer({
   detail,
   isOpen,
+  backTo,
   onClose,
   isPromoting,
   onPromote,
@@ -124,12 +133,20 @@ function TrackerOnlyDrawer({
 }: {
   detail: NonNullable<ReturnType<typeof useTrackerSharedTaskDetail>['data']>;
   isOpen: boolean;
+  backTo?: string;
   onClose: () => void;
   isPromoting: boolean;
   onPromote: () => void;
   updateTrackerItem: ReturnType<typeof useUpdateTrackerItem>;
   setCurrentItem: ReturnType<typeof useSetCurrentItem>;
 }) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const item = detail.trackerItem;
@@ -213,6 +230,7 @@ function TrackerOnlyDrawer({
 
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 md:px-5 space-y-4">
+          <BackToDeveloperRow label={backTo} onBack={onClose} />
           <TrackerTaskExecutionPanel
             developer={dev}
             item={item}
@@ -257,6 +275,35 @@ function TrackerOnlyDrawer({
         </div>
       </aside>
     </>
+  );
+}
+
+// ── Back row (stacked over a developer panel) ───────────
+
+function BackToDeveloperRow({
+  label,
+  onBack,
+  className,
+}: {
+  label?: string;
+  onBack: () => void;
+  className?: string;
+}) {
+  if (!label) return null;
+
+  return (
+    <div className={className}>
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-medium transition-colors hover:brightness-125"
+        style={{ color: 'var(--text-secondary)' }}
+        aria-label={`Back to ${label}`}
+      >
+        <ArrowLeft size={13} />
+        <span className="truncate">Back to {label}</span>
+      </button>
+    </div>
   );
 }
 

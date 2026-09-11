@@ -384,16 +384,23 @@ vi.mock('@/components/team-tracker/TrackerTaskDetailDrawer', () => ({
   TrackerTaskDetailDrawer: ({
     trackerItemId,
     initialManagerDeskItemId,
+    backTo,
     onClose,
   }: {
     trackerItemId: number | null;
     initialManagerDeskItemId: number | null;
+    backTo?: string;
     onClose: () => void;
   }) =>
     trackerItemId === null ? null : (
       <div role="dialog" aria-label="Team Tracker task detail">
         <span>{`Shared task detail for item ${trackerItemId}`}</span>
         {initialManagerDeskItemId !== null ? <span>{`Shared manager task ${initialManagerDeskItemId}`}</span> : null}
+        {backTo ? (
+          <button type="button" onClick={onClose}>
+            {`Back to ${backTo}`}
+          </button>
+        ) : null}
         <button type="button" onClick={onClose}>
           Close shared task detail
         </button>
@@ -1123,6 +1130,62 @@ describe('TeamTrackerPage', () => {
 
     expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toBeInTheDocument();
     expect(screen.getByText('Shared task detail for item 11')).toBeInTheDocument();
+  });
+
+  it('keeps the developer drawer mounted under the task detail and returns to it on close', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    expect(screen.getByRole('dialog', { name: /bob jones developer details/i })).toBeInTheDocument();
+
+    const taskRow = screen.getAllByText('Code review').at(-1)?.closest('[role="button"]');
+    expect(taskRow).not.toBeNull();
+    fireEvent.click(taskRow!);
+
+    expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /bob jones developer details/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to bob jones/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /close shared task detail/i }));
+
+    expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /bob jones developer details/i })).toBeInTheDocument();
+  });
+
+  it('returns to the developer drawer via the task detail back control', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    const taskRow = screen.getAllByText('Code review').at(-1)?.closest('[role="button"]');
+    fireEvent.click(taskRow!);
+
+    fireEvent.click(screen.getByRole('button', { name: /back to bob jones/i }));
+
+    expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /bob jones developer details/i })).toBeInTheDocument();
+  });
+
+  it('opens task detail from the board without a developer panel to return to', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    switchTrackerLens(/team/i);
+    fireEvent.click(screen.getByText('Fix login bug'));
+
+    expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /back to/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /developer details/i })).not.toBeInTheDocument();
   });
 
   it('edits a planned task title from the developer drawer without opening task detail', () => {

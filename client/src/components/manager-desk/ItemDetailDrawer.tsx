@@ -27,6 +27,7 @@ interface ItemDetailDrawerProps {
   ariaLabel?: string;
   showLinkedIssueDescription?: boolean;
   placeholder?: ReactNode;
+  stacked?: boolean;
 }
 
 export function ItemDetailDrawer({
@@ -44,6 +45,7 @@ export function ItemDetailDrawer({
   topSlot,
   ariaLabel = 'Manager Desk item detail',
   placeholder,
+  stacked = false,
 }: ItemDetailDrawerProps) {
   useEffect(() => {
     if (!open) return;
@@ -61,7 +63,7 @@ export function ItemDetailDrawer({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-40"
+          className={`workspace-shell-backdrop fixed inset-x-0 bottom-0 ${stacked ? 'z-[70]' : 'z-40'}`}
           style={{ background: 'rgba(2, 6, 23, 0.46)', backdropFilter: 'blur(3px)' }}
           onClick={onClose}
         />
@@ -71,7 +73,7 @@ export function ItemDetailDrawer({
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="workspace-shell-drawer fixed right-0 z-50 flex w-full max-w-2xl flex-col overflow-hidden"
+          className={`workspace-shell-drawer fixed right-0 ${stacked ? 'z-[71]' : 'z-50'} flex w-full max-w-2xl flex-col overflow-hidden`}
           style={{
             background: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border)',

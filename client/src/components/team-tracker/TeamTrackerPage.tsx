@@ -187,7 +187,6 @@ function useTeamTrackerWorkflow({
   );
 
   const handleOpenTaskDetail = useCallback((itemId: number, managerDeskItemId?: number) => {
-    setDrawerAccountId(undefined);
     setSelectedTask({ trackerItemId: itemId, managerDeskItemId });
   }, []);
 
@@ -573,6 +572,7 @@ export function TeamTrackerPage({
       <TrackerTaskDetailDrawer
         trackerItemId={workflow.selectedTask?.trackerItemId ?? null}
         initialManagerDeskItemId={workflow.selectedTask?.managerDeskItemId ?? null}
+        backTo={workflow.drawerDay?.developer.displayName}
         onClose={() => workflow.setSelectedTask(null)}
       />
       <AvailabilityDialog

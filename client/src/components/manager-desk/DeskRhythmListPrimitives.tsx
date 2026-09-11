@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import { DeskItemCard } from './DeskItemCard';
 import { getCardVariant } from './UnifiedDeskListPrimitives';
@@ -97,27 +98,70 @@ function ContinuedPill({ count, onClick }: { count: number; onClick?: () => void
   );
 }
 
-export function SectionTitle({ section }: { section: DeskRhythmSection }) {
+export function SectionTitle({
+  section,
+  open,
+  onToggle,
+  itemsId,
+}: {
+  section: DeskRhythmSection;
+  open?: boolean;
+  onToggle?: () => void;
+  itemsId?: string;
+}) {
   const isActive = section.tone === 'active';
   const isDecision = section.tone === 'decision';
+  const iconBadge = (
+    <span
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+      style={{
+        background: isActive
+          ? 'rgba(6,182,212,0.12)'
+          : isDecision
+          ? 'color-mix(in srgb, var(--md-accent-glow) 58%, transparent)'
+          : section.quiet
+          ? 'transparent'
+          : 'color-mix(in srgb, var(--bg-secondary) 82%, transparent)',
+        color: isActive ? 'var(--accent)' : isDecision ? 'var(--md-accent)' : 'var(--text-secondary)',
+        border: section.quiet ? '1px solid var(--border)' : '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
+      }}
+    >
+      {section.icon}
+    </span>
+  );
+
+  if (onToggle) {
+    return (
+      <h3
+        className="min-w-0 flex-1 text-[14px] font-semibold leading-none tracking-[-0.01em]"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={itemsId}
+          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left outline-none transition-[background-color,color] duration-150 hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] focus-visible:ring-1 focus-visible:ring-[color:var(--md-accent)]"
+          style={{ font: 'inherit', color: 'inherit' }}
+        >
+          {iconBadge}
+          <span className="min-w-0 truncate">{section.title}</span>
+          <span aria-hidden="true" className="inline-flex shrink-0">
+            <CountPill value={section.items.length} subtle={section.quiet} />
+          </span>
+          <ChevronRight
+            size={12}
+            className="ml-auto shrink-0 transition-transform duration-150"
+            style={{ color: 'var(--text-muted)', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}
+          />
+        </button>
+      </h3>
+    );
+  }
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-        style={{
-          background: isActive
-            ? 'rgba(6,182,212,0.12)'
-            : isDecision
-            ? 'color-mix(in srgb, var(--md-accent-glow) 58%, transparent)'
-            : section.quiet
-            ? 'transparent'
-            : 'color-mix(in srgb, var(--bg-secondary) 82%, transparent)',
-          color: isActive ? 'var(--accent)' : isDecision ? 'var(--md-accent)' : 'var(--text-secondary)',
-          border: section.quiet ? '1px solid var(--border)' : '1px solid color-mix(in srgb, var(--border) 70%, transparent)',
-        }}
-      >
-        {section.icon}
-      </span>
+      {iconBadge}
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="text-[14px] font-semibold leading-none tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>

@@ -1129,6 +1129,34 @@ describe('ManagerDeskPage', () => {
     expect(screen.getByLabelText('Desk pulse')).toBeInTheDocument();
   });
 
+  it('collapses and expands desk rhythm sections, expanded by default', () => {
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    const triageToggle = screen.getByRole('button', { name: 'Needs triage' });
+    const plannedToggle = screen.getByRole('button', { name: 'Planned' });
+    expect(triageToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(plannedToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByText('Quick inbox thought').length).toBeGreaterThan(0);
+
+    fireEvent.click(triageToggle);
+
+    expect(triageToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Quick inbox thought')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Needs triage' })).toBeInTheDocument();
+    // Other sections stay expanded.
+    expect(plannedToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByText('Waiting on QA feedback').length).toBeGreaterThan(0);
+
+    fireEvent.click(triageToggle);
+
+    expect(triageToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByText('Quick inbox thought').length).toBeGreaterThan(0);
+  });
+
   it('reveals carried-over items through the continued counts and marks them on cards', () => {
     currentMockDay = {
       ...mockDayResponse,

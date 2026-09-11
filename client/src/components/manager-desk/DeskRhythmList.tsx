@@ -1,3 +1,5 @@
+import { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Archive, CheckCircle2, Inbox, ListChecks, Play } from 'lucide-react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import { UnifiedEmptyState } from './UnifiedDeskListPrimitives';
@@ -7,6 +9,7 @@ import {
   SectionTitle,
   type DeskRhythmSection,
 } from './DeskRhythmListPrimitives';
+import { MANAGER_DESK_MOTION_EASE } from './motion';
 
 interface Props {
   items: ManagerDeskItem[];
@@ -34,6 +37,20 @@ export function DeskRhythmList({
   const sections = buildDeskRhythmSections(items);
   const activeSections = sections.filter((section) => !section.quiet && section.items.length > 0);
   const quietSections = sections.filter((section) => section.quiet);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    () => new Set(sections.filter((section) => section.defaultOpen === false).map((section) => section.key)),
+  );
+  const toggleSection = useCallback((key: string) => {
+    setCollapsedSections((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
   const title = viewMode === 'planning' ? 'Scheduled work' : viewMode === 'history' ? 'Desk snapshot' : 'Today';
   const metrics = buildDeskSignalMetrics(sections);
 
@@ -68,6 +85,8 @@ export function DeskRhythmList({
                     selectedItemId={selectedItemId}
                     readOnly={readOnly}
                     viewDate={viewDate}
+                    collapsed={collapsedSections.has(section.key)}
+                    onToggle={() => toggleSection(section.key)}
                     onSelect={onSelect}
                     onStatusChange={onStatusChange}
                   />
@@ -94,6 +113,8 @@ function DeskRhythmSectionView({
   selectedItemId,
   readOnly,
   viewDate,
+  collapsed,
+  onToggle,
   onSelect,
   onStatusChange,
 }: {
@@ -101,6 +122,8 @@ function DeskRhythmSectionView({
   selectedItemId: number | null;
   readOnly: boolean;
   viewDate: string;
+  collapsed: boolean;
+  onToggle: () => void;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
 }) {
@@ -108,12 +131,28 @@ function DeskRhythmSectionView({
     return null;
   }
 
+  const itemsId = `desk-rhythm-section-${section.key}-items`;
+
   return (
     <section>
       <div className="pb-2">
-        <SectionTitle section={section} />
+        <SectionTitle section={section} open={!collapsed} onToggle={onToggle} itemsId={itemsId} />
       </div>
-      <SectionItems section={section} selectedItemId={selectedItemId} readOnly={readOnly} viewDate={viewDate} onSelect={onSelect} onStatusChange={onStatusChange} />
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            key="items"
+            id={itemsId}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: MANAGER_DESK_MOTION_EASE }}
+            style={{ overflow: 'hidden' }}
+          >
+            <SectionItems section={section} selectedItemId={selectedItemId} readOnly={readOnly} viewDate={viewDate} onSelect={onSelect} onStatusChange={onStatusChange} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

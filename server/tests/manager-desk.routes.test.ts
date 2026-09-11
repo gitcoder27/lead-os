@@ -1641,6 +1641,61 @@ describe("manager desk routes", () => {
     expect(repeat.body).toEqual({ created: 0 });
   });
 
+  it("carry-forward removes the item from today's live desk until its new day", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager", "secret123");
+
+    const created = await invoke(app, {
+      method: "POST",
+      url: "/api/manager-desk/items",
+      headers: { cookie },
+      body: {
+        date: "2026-03-08",
+        title: "Push this to tomorrow",
+        status: "planned",
+      },
+    });
+
+    const before = await invoke(app, {
+      method: "GET",
+      url: "/api/manager-desk?date=2026-03-08",
+      headers: { cookie },
+    });
+    expect(before.body?.items.some((item: { id: number }) => item.id === created.body.id)).toBe(true);
+
+    const carryForward = await invoke(app, {
+      method: "POST",
+      url: "/api/manager-desk/carry-forward",
+      headers: { cookie },
+      body: {
+        fromDate: "2026-03-08",
+        toDate: "2026-03-09",
+        itemIds: [created.body.id],
+      },
+    });
+    expect(carryForward.status).toBe(200);
+    expect(carryForward.body).toEqual({ created: 1 });
+
+    const todayAfter = await invoke(app, {
+      method: "GET",
+      url: "/api/manager-desk?date=2026-03-08",
+      headers: { cookie },
+    });
+    expect(todayAfter.status).toBe(200);
+    expect(todayAfter.body?.viewMode).toBe("live");
+    expect(todayAfter.body?.items.some((item: { id: number }) => item.id === created.body.id)).toBe(false);
+
+    const nextDay = await invoke(app, {
+      method: "GET",
+      url: "/api/manager-desk?date=2026-03-09",
+      headers: { cookie },
+    });
+    expect(nextDay.status).toBe(200);
+    expect(nextDay.body?.items).toEqual([
+      expect.objectContaining({ id: created.body.id, originDate: "2026-03-09" }),
+    ]);
+  });
+
   it("carry-forward preserves overnight time spans relative to the target day", async () => {
     const app = createTestApp();
     const cookie = await loginCookie("manager", "secret123");

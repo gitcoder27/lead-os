@@ -954,6 +954,55 @@ describe("team tracker routes", () => {
     expect(linkedItem?.managerDeskItemId).toBe(sourceManagerItem.id);
   });
 
+  it("POST /api/team-tracker/carry-forward moves the linked desk item's day and survives later desk edits", async () => {
+    const sourceManagerItem = await managerDeskService.createItem("manager-1", {
+      date: "2026-03-06",
+      title: "Delegated review",
+      status: "planned",
+      assigneeDeveloperAccountId: "dev-1",
+    });
+
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "POST",
+      url: "/api/team-tracker/carry-forward",
+      body: {
+        fromDate: "2026-03-06",
+        toDate: "2026-03-07",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ carried: 1 });
+
+    const targetDeskDay = await managerDeskService.getDay("manager-1", "2026-03-07");
+    const movedItem = targetDeskDay.items.find((item) => item.id === sourceManagerItem.id);
+    expect(movedItem?.originDate).toBe("2026-03-07");
+
+    // A later desk edit must not snap the delegated tracker item back to the old date.
+    await managerDeskService.updateItem("manager-1", sourceManagerItem.id, {
+      title: "Delegated review (renamed)",
+    });
+
+    const board = await trackerService.getBoard("2026-03-07");
+    const devDay = board.developers.find(
+      (developerDay) => developerDay.developer.accountId === "dev-1"
+    )!;
+    const linkedItem = devDay.plannedItems.find(
+      (item) => item.managerDeskItemId === sourceManagerItem.id
+    );
+    expect(linkedItem?.title).toBe("Delegated review (renamed)");
+
+    const oldBoard = await trackerService.getBoard("2026-03-06");
+    const oldDevDay = oldBoard.developers.find(
+      (developerDay) => developerDay.developer.accountId === "dev-1"
+    );
+    const snappedBack = (oldDevDay?.plannedItems ?? []).some(
+      (item) => item.managerDeskItemId === sourceManagerItem.id
+    ) || oldDevDay?.currentItem?.managerDeskItemId === sourceManagerItem.id;
+    expect(snappedBack).toBe(false);
+  });
+
   it("POST /api/team-tracker/carry-forward supports partial selection by tracker item id", async () => {
     await seedIssue();
     const trackerOnly = await trackerService.addItem("dev-1", "2026-03-06", {

@@ -5,6 +5,7 @@ import { Briefcase, CalendarClock, History } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import {
   useCancelDelegatedManagerDeskTask,
+  useCarryForwardManagerDesk,
   useCreateManagerDeskItem,
   useDeleteManagerDeskItem,
   useManagerDesk,
@@ -13,6 +14,7 @@ import {
 import type { ManagerDeskItem, ManagerDeskViewMode } from '@/types/manager-desk';
 import { EmptyDay } from './EmptyDay';
 import { ItemDetailDrawer } from './ItemDetailDrawer';
+import { RescheduleItemDialog } from './RescheduleItemDialog';
 import { ManagerDeskCommandBar } from './ManagerDeskCommandBar';
 import { ManagerDeskHeader } from './ManagerDeskHeader';
 import { ManagerDeskWorkspace } from './ManagerDeskWorkspace';
@@ -60,6 +62,8 @@ export function ManagerDeskPage({
   const updateItem = useUpdateManagerDeskItem(date);
   const deleteItem = useDeleteManagerDeskItem(date);
   const cancelDelegated = useCancelDelegatedManagerDeskTask(date);
+  const carryForward = useCarryForwardManagerDesk(date);
+  const [rescheduleItem, setRescheduleItem] = useState<ManagerDeskItem | null>(null);
 
   const viewMode = day?.viewMode ?? 'live';
   const readOnly = viewMode === 'history';
@@ -207,6 +211,33 @@ export function ManagerDeskPage({
     [addToast, cancelDelegated, readOnly],
   );
 
+  const handleOpenReschedule = useCallback(() => {
+    if (selectedItem) {
+      setRescheduleItem(selectedItem);
+    }
+  }, [selectedItem]);
+
+  const handleConfirmReschedule = useCallback(
+    (toDate: string) => {
+      if (!rescheduleItem) return;
+      carryForward.mutate(
+        { fromDate: rescheduleItem.originDate, toDate, itemIds: [rescheduleItem.id] },
+        {
+          onSuccess: (result) => {
+            setRescheduleItem(null);
+            if (result.created > 0) {
+              addToast(`Moved to ${format(parseISO(toDate), 'EEE, MMM d')}`, 'success');
+            } else {
+              addToast('Item could not be moved to that date', 'info');
+            }
+          },
+          onError: (err) => addToast(err.message, 'error'),
+        },
+      );
+    },
+    [addToast, carryForward, rescheduleItem],
+  );
+
   if (error) {
     return (
       <div className="flex h-full items-center justify-center p-4">
@@ -333,8 +364,19 @@ export function ManagerDeskPage({
         onDelete={handleDeleteItem}
         onCancelDelegatedTask={handleCancelDelegatedTask}
         isCancelDelegatedPending={cancelDelegated.isPending}
+        onCarryForward={readOnly ? undefined : handleOpenReschedule}
+        isCarryForwardPending={carryForward.isPending}
         topSlot={<DrawerModeNote viewMode={viewMode} date={date} />}
       />
+
+      {rescheduleItem && (
+        <RescheduleItemDialog
+          item={rescheduleItem}
+          isPending={carryForward.isPending}
+          onConfirm={handleConfirmReschedule}
+          onClose={() => setRescheduleItem(null)}
+        />
+      )}
     </div>
   );
 }

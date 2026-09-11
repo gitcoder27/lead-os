@@ -183,7 +183,7 @@ function getMoreActions(
     actions.push(statusAction(item, 'backlog', 'Move to later', <Archive size={11} />, 'neutral', onUpdate));
   }
 
-  if (onCarryForward) {
+  if (onCarryForward && item.status !== 'backlog') {
     actions.push({
       label: isCarryForwardPending ? 'Carrying...' : 'Carry forward',
       icon: <ArrowRight size={11} />,

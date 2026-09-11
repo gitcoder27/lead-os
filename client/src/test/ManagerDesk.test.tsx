@@ -735,6 +735,28 @@ describe('ManagerDeskPage', () => {
     );
   });
 
+  it('carries an item to a later day from the detail drawer', () => {
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Open Analyze root cause for DEF-241$/i }));
+    const drawer = screen.getByRole('dialog', { name: /manager desk item detail/i });
+    fireEvent.click(within(drawer).getByRole('button', { name: /carry forward analyze root cause/i }));
+
+    const rescheduleDialog = screen.getByRole('dialog', { name: /^carry forward$/i });
+    const dateInput = rescheduleDialog.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2026-03-10' } });
+    fireEvent.click(within(rescheduleDialog).getByRole('button', { name: /^carry forward$/i }));
+
+    expect(mockCarryForwardMutate).toHaveBeenCalledWith(
+      { fromDate: '2026-03-08', toDate: '2026-03-10', itemIds: [1] },
+      expect.anything(),
+    );
+  });
+
   it('moves started work to later from the row actions menu', () => {
     currentMockDay = {
       ...mockDayResponse,

@@ -929,12 +929,36 @@ export class ManagerDeskService {
       return 0;
     }
 
+    const targetDay = await this.ensureDay(managerAccountId, params.toDate, normalizedWorkspaceId);
+    const trackerNotesByItemId = await this.getTrackerNotesByManagerDeskItemIds(uniqueIds, normalizedWorkspaceId);
+    const now = nowIso();
     let moved = 0;
     for (const itemId of uniqueIds) {
       const item = await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
       if (!isOpenStatus(item.status as ManagerDeskStatus)) {
         continue;
       }
+
+      const sourceDay = await this.getDayById(item.dayId, normalizedWorkspaceId);
+      const sourceDate = sourceDay?.date ?? params.fromDate;
+      const rebasedPlannedStartAt =
+        rebaseTimestampToTargetDate(item.plannedStartAt, sourceDate, params.toDate) ?? null;
+      const rebasedPlannedEndAt =
+        rebaseTimestampToTargetDate(item.plannedEndAt, sourceDate, params.toDate) ?? null;
+      const rebasedFollowUpAt =
+        rebaseTimestampToTargetDate(item.followUpAt, sourceDate, params.toDate) ?? null;
+      this.assertTimeRange(rebasedPlannedStartAt, rebasedPlannedEndAt);
+
+      await db
+        .update(managerDeskItems)
+        .set({
+          dayId: targetDay.id,
+          plannedStartAt: rebasedPlannedStartAt,
+          plannedEndAt: rebasedPlannedEndAt,
+          followUpAt: rebasedFollowUpAt,
+          updatedAt: now,
+        })
+        .where(eq(managerDeskItems.id, itemId));
 
       const links = await this.getNormalizedLinksByItemId(itemId, normalizedWorkspaceId);
       await this.syncTrackerAssignment(
@@ -944,9 +968,10 @@ export class ManagerDeskService {
         item.title,
         links,
         item.status as ManagerDeskStatus,
-        undefined,
+        trackerNotesByItemId.get(itemId) ?? null,
         normalizedWorkspaceId
       );
+      await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
       moved += 1;
     }
 
@@ -1250,7 +1275,9 @@ export class ManagerDeskService {
         return true;
       }
       if (isOpenStatus(item.status)) {
-        return true;
+        // Open work stays on the desk until done or dropped — but an item
+        // carried to a future day is scheduled, not today's work.
+        return item.originDate <= date;
       }
       return isoDatePart(item.completedAt) === date;
     });

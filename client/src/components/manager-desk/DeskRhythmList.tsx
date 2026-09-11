@@ -14,8 +14,10 @@ interface Props {
   selectedItemId: number | null;
   readOnly: boolean;
   viewMode: 'live' | 'history' | 'planning';
+  viewDate: string;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
+  onShowCarried?: () => void;
 }
 
 export function DeskRhythmList({
@@ -24,8 +26,10 @@ export function DeskRhythmList({
   selectedItemId,
   readOnly,
   viewMode,
+  viewDate,
   onSelect,
   onStatusChange,
+  onShowCarried,
 }: Props) {
   const sections = buildDeskRhythmSections(items);
   const activeSections = sections.filter((section) => !section.quiet && section.items.length > 0);
@@ -47,6 +51,7 @@ export function DeskRhythmList({
         count={items.length}
         continuedOpenCount={continuedOpenCount}
         showCount={false}
+        onShowCarried={onShowCarried}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 md:px-4">
@@ -62,6 +67,7 @@ export function DeskRhythmList({
                     section={section}
                     selectedItemId={selectedItemId}
                     readOnly={readOnly}
+                    viewDate={viewDate}
                     onSelect={onSelect}
                     onStatusChange={onStatusChange}
                   />
@@ -75,6 +81,7 @@ export function DeskRhythmList({
             sections={sections}
             continuedOpenCount={continuedOpenCount}
             viewMode={viewMode}
+            onShowCarried={onShowCarried}
           />
         </div>
       </div>
@@ -86,12 +93,14 @@ function DeskRhythmSectionView({
   section,
   selectedItemId,
   readOnly,
+  viewDate,
   onSelect,
   onStatusChange,
 }: {
   section: DeskRhythmSection;
   selectedItemId: number | null;
   readOnly: boolean;
+  viewDate: string;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
 }) {
@@ -104,7 +113,7 @@ function DeskRhythmSectionView({
       <div className="pb-2">
         <SectionTitle section={section} />
       </div>
-      <SectionItems section={section} selectedItemId={selectedItemId} readOnly={readOnly} onSelect={onSelect} onStatusChange={onStatusChange} />
+      <SectionItems section={section} selectedItemId={selectedItemId} readOnly={readOnly} viewDate={viewDate} onSelect={onSelect} onStatusChange={onStatusChange} />
     </section>
   );
 }
@@ -113,12 +122,14 @@ function SectionItems({
   section,
   selectedItemId,
   readOnly,
+  viewDate,
   onSelect,
   onStatusChange,
 }: {
   section: DeskRhythmSection;
   selectedItemId: number | null;
   readOnly: boolean;
+  viewDate: string;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
 }) {
@@ -130,6 +141,7 @@ function SectionItems({
           item={item}
           selected={item.id === selectedItemId}
           readOnly={readOnly}
+          viewDate={viewDate}
           onSelect={onSelect}
           onStatusChange={onStatusChange}
         />
@@ -168,11 +180,15 @@ export function DeskSignalRail({
   sections,
   continuedOpenCount,
   viewMode,
+  carriedActive = false,
+  onShowCarried,
 }: {
   metrics: Array<{ label: string; value: number; tone: 'active' | 'decision' | 'calm' }>;
   sections: DeskRhythmSection[];
   continuedOpenCount: number;
   viewMode: 'live' | 'history' | 'planning';
+  carriedActive?: boolean;
+  onShowCarried?: () => void;
 }) {
   const nextPrompt = getNextDeskPrompt(sections, viewMode);
 
@@ -211,14 +227,24 @@ export function DeskSignalRail({
             <div className="text-[9px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
               Carried
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
+            <button
+              type="button"
+              onClick={onShowCarried}
+              disabled={!onShowCarried}
+              aria-pressed={carriedActive}
+              title="Show open items continued from earlier days"
+              className="mt-2 flex w-full items-baseline gap-2 rounded-md px-1 py-0.5 text-left transition-[background-color,color] duration-150 enabled:hover:-translate-y-px"
+              style={{
+                background: carriedActive ? 'color-mix(in srgb, var(--md-accent-glow) 45%, transparent)' : 'transparent',
+              }}
+            >
               <span className="font-mono text-[18px] font-semibold tabular-nums" style={{ color: 'var(--md-accent)' }}>
                 {continuedOpenCount}
               </span>
               <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
                 from earlier
               </span>
-            </div>
+            </button>
           </div>
         )}
       </div>

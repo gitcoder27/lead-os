@@ -11,10 +11,12 @@ const quickFilters: Array<{ key: ManagerDeskQuickFilter; label: string }> = [
   { key: 'planned', label: 'Planned' },
   { key: 'backlog', label: 'Later' },
   { key: 'done', label: 'Done' },
+  { key: 'carried', label: 'Carried' },
 ];
 
 interface Props {
   items: ManagerDeskItem[];
+  viewDate: string;
   searchQuery: string;
   quickFilter: ManagerDeskQuickFilter;
   defaultQuickFilter: ManagerDeskQuickFilter;
@@ -36,6 +38,7 @@ interface Props {
 
 export function ManagerDeskCommandBar({
   items,
+  viewDate,
   searchQuery,
   quickFilter,
   defaultQuickFilter,
@@ -90,31 +93,37 @@ export function ManagerDeskCommandBar({
             role="group"
             aria-label="Manager Desk map"
           >
-            {quickFilters.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onQuickFilterChange(key)}
-                className="flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
-                style={{
-                  background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent-glow) 82%, var(--bg-tertiary) 18%)' : 'transparent',
-                  borderColor: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 46%, transparent)' : 'transparent',
-                  color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-secondary)',
-                }}
-                aria-pressed={quickFilter === key}
-              >
-                <span>{label}</span>
-                <span
-                  className="rounded px-1 font-mono text-[11px] font-semibold tabular-nums"
+            {quickFilters.map(({ key, label }) => {
+              const count = getQuickFilterCount(items, key, viewDate);
+              if (key === 'carried' && count === 0 && quickFilter !== 'carried') {
+                return null;
+              }
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onQuickFilterChange(key)}
+                  className="flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
                   style={{
-                    background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 14%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)',
-                    color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-muted)',
+                    background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent-glow) 82%, var(--bg-tertiary) 18%)' : 'transparent',
+                    borderColor: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 46%, transparent)' : 'transparent',
+                    color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-secondary)',
                   }}
+                  aria-pressed={quickFilter === key}
                 >
-                  {getQuickFilterCount(items, key)}
-                </span>
-              </button>
-            ))}
+                  <span>{label}</span>
+                  <span
+                    className="rounded px-1 font-mono text-[11px] font-semibold tabular-nums"
+                    style={{
+                      background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 14%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)',
+                      color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex min-w-0 flex-[1_1_230px] items-stretch gap-1.5 lg:max-w-[340px]">

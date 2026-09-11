@@ -17,8 +17,10 @@ interface Props {
   selectedItemId: number | null;
   readOnly?: boolean;
   viewMode: 'live' | 'history' | 'planning';
+  viewDate: string;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
+  onShowCarried?: () => void;
 }
 
 export function UnifiedDeskList({
@@ -29,8 +31,10 @@ export function UnifiedDeskList({
   selectedItemId,
   readOnly = false,
   viewMode,
+  viewDate,
   onSelect,
   onStatusChange,
+  onShowCarried,
 }: Props) {
   if (quickFilter === 'all') {
     return (
@@ -40,8 +44,10 @@ export function UnifiedDeskList({
         selectedItemId={selectedItemId}
         readOnly={readOnly}
         viewMode={viewMode}
+        viewDate={viewDate}
         onSelect={onSelect}
         onStatusChange={onStatusChange}
+        onShowCarried={onShowCarried}
       />
     );
   }
@@ -55,8 +61,10 @@ export function UnifiedDeskList({
       selectedItemId={selectedItemId}
       readOnly={readOnly}
       viewMode={viewMode}
+      viewDate={viewDate}
       onSelect={onSelect}
       onStatusChange={onStatusChange}
+      onShowCarried={onShowCarried}
     />
   );
 }
@@ -69,8 +77,10 @@ function SingleLensList({
   selectedItemId,
   readOnly,
   viewMode,
+  viewDate,
   onSelect,
   onStatusChange,
+  onShowCarried,
 }: Props) {
   const copy = lensCopy[quickFilter];
   const visibleTitle = viewMode === 'planning' && quickFilter === 'planned' ? 'Scheduled work' : copy.title;
@@ -100,6 +110,7 @@ function SingleLensList({
                     item={item}
                     selected={item.id === selectedItemId}
                     readOnly={readOnly ?? false}
+                    viewDate={viewDate}
                     onSelect={onSelect}
                     onStatusChange={onStatusChange}
                   />
@@ -112,6 +123,8 @@ function SingleLensList({
             sections={pulseSections}
             continuedOpenCount={continuedOpenCount}
             viewMode={viewMode}
+            carriedActive={quickFilter === 'carried'}
+            onShowCarried={onShowCarried}
           />
         </div>
       </div>

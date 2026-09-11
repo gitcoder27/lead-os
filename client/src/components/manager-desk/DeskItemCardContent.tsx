@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import * as Popover from '@radix-ui/react-popover';
+import { format, parseISO } from 'date-fns';
 import { CheckCircle2, MoreHorizontal, XCircle } from 'lucide-react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import {
@@ -25,13 +26,15 @@ interface Props {
   isDone: boolean;
   isOverdue: boolean;
   readOnly: boolean;
+  viewDate?: string;
   onStatusChange?: (status: ManagerDeskStatus) => void;
 }
 
-export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly, onStatusChange }: Props) {
+export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly, viewDate, onStatusChange }: Props) {
   const KindIcon = kindIcons[item.kind];
   const dateSignal = useMemo(() => getDateSignal(item, isOverdue), [item, isOverdue]);
   const sourceSignal = useMemo(() => getSourceSignal(item), [item]);
+  const continuedSignal = useMemo(() => getContinuedSignal(item, viewDate), [item, viewDate]);
   const executionSignal = useExecutionSignal(item);
   const primaryAction = getPrimaryQuickAction(item);
   const secondaryActions = getSecondaryQuickActions(item);
@@ -42,6 +45,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
     statusSignal,
     showPriority ? PRIORITY_LABELS[item.priority] : null,
     dateSignal?.label,
+    continuedSignal,
     showSource ? sourceSignal.label : null,
     executionSignal,
     item.assignee?.displayName,
@@ -179,6 +183,9 @@ function getMetaColor(meta: string, item: ManagerDeskItem, dateLabel?: string) {
   if (dateLabel === meta && meta.startsWith('Overdue')) {
     return 'var(--danger)';
   }
+  if (meta.startsWith('Continued from')) {
+    return 'color-mix(in srgb, var(--md-accent) 82%, var(--text-secondary))';
+  }
   return 'var(--text-secondary)';
 }
 
@@ -262,6 +269,15 @@ function useExecutionSignal(item: ManagerDeskItem) {
     if (exec.state === 'dropped') return 'Dev dropped';
     return null;
   }, [exec]);
+}
+
+function getContinuedSignal(item: ManagerDeskItem, viewDate?: string) {
+  if (!viewDate || !(item.originDate < viewDate)) return null;
+  try {
+    return `Continued from ${format(parseISO(item.originDate), 'MMM d')}`;
+  } catch {
+    return 'Continued from earlier';
+  }
 }
 
 function getSourceSignal(item: ManagerDeskItem) {

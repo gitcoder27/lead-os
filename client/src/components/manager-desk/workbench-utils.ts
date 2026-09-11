@@ -18,7 +18,8 @@ export type ManagerDeskQuickFilter =
   | 'planned'
   | 'inbox'
   | 'backlog'
-  | 'done';
+  | 'done'
+  | 'carried';
 
 const priorityWeight = { critical: 0, high: 1, medium: 2, low: 3 };
 const statusWeight = { in_progress: 0, planned: 1, waiting: 2, inbox: 3, backlog: 4, done: 5, cancelled: 6 };
@@ -79,7 +80,8 @@ export function filterItems(
   items: ManagerDeskItem[],
   searchQuery: string,
   quickFilter: ManagerDeskQuickFilter,
-  filters: ManagerDeskFilterState
+  filters: ManagerDeskFilterState,
+  date: string
 ) {
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -103,6 +105,8 @@ export function filterItems(
         return isLaterItem(item);
       case 'done':
         return isCompleted(item);
+      case 'carried':
+        return isOpenWork(item) && item.originDate < date;
       default:
         return true;
     }
@@ -152,12 +156,12 @@ export function getInitialSelection(items: ManagerDeskItem[]) {
   return getOpenItems(items)[0] ?? items[0] ?? null;
 }
 
-export function getQuickFilterCount(items: ManagerDeskItem[], quickFilter: ManagerDeskQuickFilter) {
+export function getQuickFilterCount(items: ManagerDeskItem[], quickFilter: ManagerDeskQuickFilter, date: string) {
   if (quickFilter === 'all') {
     return items.length;
   }
 
-  return filterItems(items, '', quickFilter, { kind: null, category: null, status: null }).length;
+  return filterItems(items, '', quickFilter, { kind: null, category: null, status: null }, date).length;
 }
 
 export function isInboxItem(item: ManagerDeskItem | null) {

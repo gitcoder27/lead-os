@@ -83,13 +83,13 @@ export function ManagerDeskPage({
   }, [day?.createdThatDayItems, day?.items, historySubview, viewMode]);
 
   const filteredItems = useMemo(
-    () => filterItems(sourceItems, searchQuery, quickFilter, filters),
-    [sourceItems, searchQuery, quickFilter, filters],
+    () => filterItems(sourceItems, searchQuery, quickFilter, filters, date),
+    [sourceItems, searchQuery, quickFilter, filters, date],
   );
   const listItems = useMemo(() => sortForWorkbench(filteredItems), [filteredItems]);
   const pulseItems = useMemo(
-    () => sortForWorkbench(filterItems(sourceItems, searchQuery, getDefaultQuickFilter(), filters)),
-    [filters, searchQuery, sourceItems],
+    () => sortForWorkbench(filterItems(sourceItems, searchQuery, getDefaultQuickFilter(), filters, date)),
+    [filters, searchQuery, sourceItems, date],
   );
   const continuedOpenItems = useMemo(() => getContinuedOpenItems(sourceItems, date), [date, sourceItems]);
   const selectedItem = useMemo(
@@ -128,6 +128,10 @@ export function ManagerDeskPage({
     setSearchQuery('');
     setFilters(defaultFilters);
     setQuickFilter(getDefaultQuickFilter());
+  }, []);
+
+  const handleShowCarried = useCallback(() => {
+    setQuickFilter('carried');
   }, []);
 
   const handleSelectItem = useCallback((item: ManagerDeskItem) => {
@@ -279,6 +283,7 @@ export function ManagerDeskPage({
         commandBar={
           <ManagerDeskCommandBar
             items={sourceItems}
+            viewDate={date}
             searchQuery={searchQuery}
             quickFilter={quickFilter}
             defaultQuickFilter={getDefaultQuickFilter()}
@@ -344,8 +349,10 @@ export function ManagerDeskPage({
                     selectedItemId={selectedItemId}
                     readOnly={readOnly}
                     viewMode={viewMode}
+                    viewDate={date}
                     onSelect={handleSelectItem}
                     onStatusChange={readOnly ? undefined : (itemId, status) => handleUpdateItem(itemId, { status })}
+                    onShowCarried={handleShowCarried}
                   />
                 </motion.div>
               )}

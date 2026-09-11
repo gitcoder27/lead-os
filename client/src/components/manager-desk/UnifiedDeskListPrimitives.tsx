@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Archive, CheckCircle2, Inbox, ListChecks } from 'lucide-react';
+import { Archive, CheckCircle2, History, Inbox, ListChecks } from 'lucide-react';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import type { ManagerDeskQuickFilter } from './workbench-utils';
 
@@ -33,6 +33,11 @@ export const lensCopy: Record<ManagerDeskQuickFilter, { title: string; subtitle:
     title: 'Done',
     subtitle: 'Resolved work for the current lens.',
     empty: 'No completed work matches this view.',
+  },
+  carried: {
+    title: 'Carried over',
+    subtitle: 'Open work that continued from earlier days.',
+    empty: 'Nothing continued from earlier days.',
   },
 };
 
@@ -84,6 +89,8 @@ export function UnifiedEmptyState({
     ? Inbox
     : quickFilter === 'backlog'
     ? Archive
+    : quickFilter === 'carried'
+    ? History
     : ListChecks;
 
   return (

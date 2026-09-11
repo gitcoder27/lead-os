@@ -286,6 +286,7 @@ describe('ManagerDeskPage', () => {
     expect(screen.queryByRole('button', { name: /^waiting \d+$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /needs attention/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /done 1/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /carried \d+/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /filters/i })).toBeInTheDocument();
   });
 
@@ -1083,6 +1084,69 @@ describe('ManagerDeskPage', () => {
 
     expect(screen.getByText('Nothing is in motion right now.')).toBeInTheDocument();
     expect(screen.getByLabelText('Desk pulse')).toBeInTheDocument();
+  });
+
+  it('reveals carried-over items through the continued counts and marks them on cards', () => {
+    currentMockDay = {
+      ...mockDayResponse,
+      items: [
+        mockItem({ id: 10, title: 'Follow up on review escalation', originDate: '2026-03-06', status: 'planned' }),
+        mockItem({ id: 11, title: 'Stale triage note', originDate: '2026-03-07', status: 'inbox' }),
+        mockItem({ id: 12, title: 'Fresh capture today', originDate: '2026-03-08', status: 'inbox' }),
+        mockItem({ id: 13, title: 'Closed earlier item', originDate: '2026-03-06', status: 'done' }),
+      ],
+    };
+
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    // Card markers distinguish carried items in the default rhythm view.
+    expect(screen.getAllByText('Continued from Mar 6').length).toBe(1);
+    expect(screen.getAllByText('Continued from Mar 7').length).toBe(1);
+    const freshCard = screen.getByRole('button', { name: /^Open Fresh capture today$/i });
+    expect(within(freshCard).queryByText(/Continued from/)).not.toBeInTheDocument();
+
+    // The command bar chip and the header pill expose the same open carried set.
+    expect(screen.getByRole('button', { name: /carried 2/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /show the 2 open items continued from earlier days/i }));
+
+    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument();
+    expect(screen.getAllByText('Follow up on review escalation').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Stale triage note').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Fresh capture today')).not.toBeInTheDocument();
+    expect(screen.queryByText('Closed earlier item')).not.toBeInTheDocument();
+
+    // The pulse rail count reflects the same lens and marks itself active.
+    const rail = screen.getByLabelText('Desk pulse');
+    const railCarried = within(rail).getByRole('button', { name: /from earlier/i, hidden: true });
+    expect(railCarried).toHaveAttribute('aria-pressed', 'true');
+    expect(within(railCarried).getByText('2')).toBeInTheDocument();
+  });
+
+  it('activates the carried lens from the pulse rail count', () => {
+    currentMockDay = {
+      ...mockDayResponse,
+      items: [
+        mockItem({ id: 10, title: 'Follow up on review escalation', originDate: '2026-03-06', status: 'planned' }),
+        mockItem({ id: 12, title: 'Fresh capture today', originDate: '2026-03-08', status: 'inbox' }),
+      ],
+    };
+
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    const rail = screen.getByLabelText('Desk pulse');
+    fireEvent.click(within(rail).getByRole('button', { name: /from earlier/i, hidden: true }));
+
+    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument();
+    expect(screen.getAllByText('Follow up on review escalation').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Fresh capture today')).not.toBeInTheDocument();
   });
 
   it('shows filter button and toggles filter bar', () => {

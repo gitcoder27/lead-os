@@ -15,6 +15,7 @@ interface Props {
   variant?: DeskItemVariant;
   selected?: boolean;
   readOnly?: boolean;
+  viewDate?: string;
 }
 
 export function DeskItemCard({
@@ -24,6 +25,7 @@ export function DeskItemCard({
   variant = 'default',
   selected = false,
   readOnly = false,
+  viewDate,
 }: Props) {
   const isDone = item.status === 'done' || item.status === 'cancelled';
   const isOverdue = useMemo(() => getIsOverdue(item), [item]);
@@ -70,6 +72,7 @@ export function DeskItemCard({
         isDone={isDone}
         isOverdue={isOverdue}
         readOnly={readOnly}
+        viewDate={viewDate}
         onStatusChange={onStatusChange}
       />
     </motion.div>

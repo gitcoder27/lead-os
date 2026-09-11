@@ -22,6 +22,7 @@ export function DeskRhythmHeader({
   metrics,
   showCount = true,
   showSubtitle = false,
+  onShowCarried,
 }: {
   title: string;
   subtitle?: string;
@@ -30,6 +31,7 @@ export function DeskRhythmHeader({
   metrics?: Array<{ label: string; value: number; tone?: 'active' | 'decision' | 'calm' }>;
   showCount?: boolean;
   showSubtitle?: boolean;
+  onShowCarried?: () => void;
 }) {
   return (
     <div className="px-3 py-2.5 md:px-4">
@@ -41,17 +43,7 @@ export function DeskRhythmHeader({
             </h2>
             {showCount && typeof count === 'number' ? <CountPill value={count} /> : null}
             {continuedOpenCount ? (
-              <span
-                className="inline-flex h-5 items-center rounded-md border px-1.5 text-[11px] font-medium"
-                title={`${continuedOpenCount} open ${continuedOpenCount === 1 ? 'item has' : 'items have'} continued from earlier days.`}
-                style={{
-                  borderColor: 'rgba(217,169,78,0.18)',
-                  background: 'color-mix(in srgb, var(--md-accent-glow) 26%, transparent)',
-                  color: 'color-mix(in srgb, var(--md-accent) 82%, var(--text-secondary))',
-                }}
-              >
-                {continuedOpenCount} from earlier
-              </span>
+              <ContinuedPill count={continuedOpenCount} onClick={onShowCarried} />
             ) : null}
           </div>
           {showSubtitle && subtitle ? (
@@ -69,6 +61,39 @@ export function DeskRhythmHeader({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ContinuedPill({ count, onClick }: { count: number; onClick?: () => void }) {
+  const label = `${count} open ${count === 1 ? 'item has' : 'items have'} continued from earlier days.`;
+  const className = `inline-flex h-5 items-center rounded-md border px-1.5 text-[11px] font-medium${
+    onClick ? ' transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]' : ''
+  }`;
+  const style = {
+    borderColor: 'rgba(217,169,78,0.18)',
+    background: 'color-mix(in srgb, var(--md-accent-glow) 26%, transparent)',
+    color: 'color-mix(in srgb, var(--md-accent) 82%, var(--text-secondary))',
+  };
+
+  if (!onClick) {
+    return (
+      <span className={className} title={label} style={style}>
+        {count} from earlier
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={className}
+      title={`${label} Show them.`}
+      style={style}
+      aria-label={`Show the ${count} open ${count === 1 ? 'item' : 'items'} continued from earlier days`}
+    >
+      {count} from earlier
+    </button>
   );
 }
 
@@ -109,12 +134,14 @@ export function DeskCardRow({
   item,
   selected,
   readOnly,
+  viewDate,
   onSelect,
   onStatusChange,
 }: {
   item: ManagerDeskItem;
   selected: boolean;
   readOnly: boolean;
+  viewDate?: string;
   onSelect: (item: ManagerDeskItem) => void;
   onStatusChange?: (itemId: number, status: ManagerDeskStatus) => void;
 }) {
@@ -126,6 +153,7 @@ export function DeskCardRow({
       variant={getCardVariant(item)}
       selected={selected}
       readOnly={readOnly}
+      viewDate={viewDate}
     />
   );
 }

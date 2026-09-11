@@ -310,6 +310,7 @@ function buildMockBoard(): TeamTrackerBoardResponse {
 
 let mockBoard: TeamTrackerBoardResponse = buildMockBoard();
 let mockBoardQueryState = {
+  isLoading: false,
   isError: false,
   error: null as Error | null,
   isFetching: false,
@@ -318,7 +319,7 @@ let mockBoardQueryState = {
 vi.mock('@/hooks/useTeamTracker', () => ({
   useTeamTracker: () => ({
     data: mockBoard,
-    isLoading: false,
+    isLoading: mockBoardQueryState.isLoading,
     isError: mockBoardQueryState.isError,
     error: mockBoardQueryState.error,
     isFetching: mockBoardQueryState.isFetching,
@@ -418,6 +419,7 @@ vi.mock('framer-motion', async () => {
 });
 
 import { TeamTrackerPage } from '@/components/team-tracker/TeamTrackerPage';
+import { ROSTER_GRID } from '@/components/team-tracker/TrackerRosterBoard';
 
 function clickDeveloperRow(name: string) {
   const target = screen
@@ -439,6 +441,7 @@ describe('TeamTrackerPage', () => {
     vi.setSystemTime(new Date('2026-03-07T12:00:00.000Z'));
     mockBoard = buildMockBoard();
     mockBoardQueryState = {
+      isLoading: false,
       isError: false,
       error: null,
       isFetching: false,
@@ -1186,6 +1189,41 @@ describe('TeamTrackerPage', () => {
     expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /back to/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /developer details/i })).not.toBeInTheDocument();
+  });
+
+  it('shares the roster grid template across the header, rows, and loading skeleton', () => {
+    mockBoardQueryState.isLoading = true;
+    const { unmount } = render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    const skeletonRows = Array.from(document.querySelectorAll('div')).filter((el) =>
+      el.className.includes('grid-cols-[')
+    );
+    expect(skeletonRows.length).toBeGreaterThan(0);
+    skeletonRows.forEach((el) => expect(el.className).toContain(ROSTER_GRID));
+    unmount();
+
+    mockBoardQueryState.isLoading = false;
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    const header = screen.getByText('Current work').parentElement;
+    expect(header?.className).toContain(ROSTER_GRID);
+
+    const devRow = screen
+      .getAllByRole('button')
+      .find((element) => element.textContent?.includes('Bob Jones'));
+    expect(devRow?.className).toContain(ROSTER_GRID);
+
+    // Header and rows must declare the same column gap or the tracks drift out of alignment
+    expect(header?.className).toContain('gap-3');
+    expect(devRow?.className).toContain('gap-3');
   });
 
   it('edits a planned task title from the developer drawer without opening task detail', () => {

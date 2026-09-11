@@ -17,7 +17,7 @@ import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { TrackerSummaryStrip } from './TrackerSummaryStrip';
 import { TrackerBoardToolbar } from './TrackerBoardToolbar';
 import { InactiveDeveloperTray } from './InactiveDeveloperTray';
-import { TrackerRosterBoard } from './TrackerRosterBoard';
+import { ROSTER_GRID, TrackerRosterBoard } from './TrackerRosterBoard';
 import { TeamTrackerViewSwitcher, type TeamTrackerLens } from './TeamTrackerViewSwitcher';
 import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
 import { AvailabilityDialog } from './AvailabilityDialog';
@@ -644,7 +644,7 @@ function TeamTrackerSkeleton() {
   return (
     <div className="mx-auto max-w-[1600px] overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="grid gap-3 border-b px-3 py-3 md:grid-cols-[minmax(190px,1.05fr)_minmax(220px,1.35fr)_minmax(150px,0.9fr)_64px_minmax(110px,0.72fr)_minmax(210px,1.08fr)_52px]" style={{ borderColor: 'var(--border)' }}>
+        <div key={index} className={`grid gap-3 border-b px-3 py-3 ${ROSTER_GRID}`} style={{ borderColor: 'var(--border)' }}>
           {Array.from({ length: 7 }).map((__, cellIndex) => (
             <div
               key={cellIndex}

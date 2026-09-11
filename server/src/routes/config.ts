@@ -27,6 +27,7 @@ const configSchema = z.object({
     jiraApiToken: z.string().trim().min(1).optional(),
     syncIntervalMs: z.number().int().positive().default(300000),
     staleThresholdHours: z.number().int().positive().default(48),
+    jiraAutoSyncEnabled: z.boolean().optional(),
     backupEnabled: z.boolean().optional(),
     backupIntervalMinutes: z.number().int().positive().optional(),
     backupRetentionDays: z.number().int().positive().optional(),
@@ -163,6 +164,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const jiraApiToken = await getConfiguredJiraToken(workspaceId);
       const syncIntervalMs = Number((await getConfigValue(workspaceId, "sync_interval_ms")) ?? "300000");
       const staleThresholdHours = Number((await getConfigValue(workspaceId, "stale_threshold_hours")) ?? "48");
+      const jiraAutoSyncEnabled = await settings.getJiraAutoSyncEnabled(workspaceId);
       const backupEnabled = await settings.getBackupEnabled(workspaceId);
       const backupIntervalMinutes = await settings.getBackupIntervalMinutes(workspaceId);
       const backupRetentionDays = await settings.getBackupRetentionDays(workspaceId);
@@ -194,6 +196,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         jiraApiToken: jiraApiToken ? "****" : "",
         syncIntervalMs,
         staleThresholdHours,
+        jiraAutoSyncEnabled,
         backupEnabled,
         backupIntervalMinutes,
         backupRetentionDays,
@@ -240,6 +243,9 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       }
       await upsertConfig(workspaceId, "sync_interval_ms", String(syncIntervalMs));
       await upsertConfig(workspaceId, "stale_threshold_hours", String(staleThresholdHours));
+      if (req.body.jiraAutoSyncEnabled !== undefined) {
+        await upsertConfig(workspaceId, "jira_auto_sync_enabled", String(req.body.jiraAutoSyncEnabled));
+      }
       if (req.body.jiraSyncScopeMode !== undefined) {
         await upsertConfig(workspaceId, "jira_sync_scope_mode", jiraSyncScopeMode);
       }
@@ -279,9 +285,12 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       }
 
       const token = req.body.jiraApiToken ?? tokenForLookup;
-      if (syncEngine && req.body.jiraBaseUrl && req.body.jiraEmail && req.body.jiraProjectKey && token) {
+      const hasJiraConnection = Boolean(req.body.jiraBaseUrl && req.body.jiraEmail && req.body.jiraProjectKey && token);
+      if (syncEngine && (hasJiraConnection || req.body.jiraAutoSyncEnabled !== undefined)) {
         await syncEngine.start();
-        void syncEngine.syncNow(workspaceId);
+        if (hasJiraConnection && (await settings.getJiraAutoSyncEnabled(workspaceId))) {
+          void syncEngine.syncNow(workspaceId);
+        }
       }
       if (backupService) {
         await backupService.start();
@@ -359,6 +368,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       jiraAspenSeverityField: z.string().optional(),
       managerJiraAccountId: z.string().trim().optional(),
       jiraApiToken: z.string().trim().optional(),
+      jiraAutoSyncEnabled: z.boolean().optional(),
     }),
     params: z.any().optional(),
     query: z.any().optional(),
@@ -367,7 +377,8 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
   router.put("/settings", validate(settingsSchema), async (req, res, next) => {
     try {
       const workspaceId = req.auth!.user.workspaceId;
-      let shouldRestartSync = false;
+      let shouldResync = false;
+      let shouldRestartScheduler = false;
       const jiraBaseUrl = req.body.jiraBaseUrl?.trim();
       const jiraEmail = req.body.jiraEmail?.trim();
       const jiraProjectKey = req.body.jiraProjectKey?.trim();
@@ -376,18 +387,18 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       if (jiraBaseUrl) {
         validateJiraBaseUrl(jiraBaseUrl);
         await upsertConfig(workspaceId, "jira_base_url", jiraBaseUrl);
-        shouldRestartSync = true;
+        shouldResync = true;
       }
       if (jiraEmail) {
         if (!z.string().email().safeParse(jiraEmail).success) {
           throw new HttpError(400, "Jira email must be valid");
         }
         await upsertConfig(workspaceId, "jira_email", jiraEmail);
-        shouldRestartSync = true;
+        shouldResync = true;
       }
       if (jiraProjectKey) {
         await upsertConfig(workspaceId, "jira_project_key", jiraProjectKey);
-        shouldRestartSync = true;
+        shouldResync = true;
       }
       if (req.body.jiraSyncScopeMode !== undefined) {
         await upsertConfig(workspaceId, "jira_sync_scope_mode", jiraSyncScopeMode);
@@ -405,7 +416,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         const trimmedToken = req.body.jiraApiToken.trim();
         if (trimmedToken) {
           await storeJiraApiToken(trimmedToken, workspaceId);
-          shouldRestartSync = true;
+          shouldResync = true;
         }
       }
       if ("managerJiraAccountId" in req.body) {
@@ -417,16 +428,22 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         }
         await deleteConfigValue(workspaceId, "jira_lead_account_id");
       }
-      if (syncEngine && shouldRestartSync) {
-        const [baseUrl, email, project, token] = await Promise.all([
-          settings.getJiraBaseUrl(workspaceId),
-          settings.getJiraEmail(workspaceId),
-          settings.getJiraProjectKey(workspaceId),
-          settings.getJiraToken(workspaceId),
-        ]);
-        if (baseUrl && email && project && token) {
-          await syncEngine.start();
-          void syncEngine.syncNow(workspaceId);
+      if (req.body.jiraAutoSyncEnabled !== undefined) {
+        await upsertConfig(workspaceId, "jira_auto_sync_enabled", String(req.body.jiraAutoSyncEnabled));
+        shouldRestartScheduler = true;
+      }
+      if (syncEngine && (shouldResync || shouldRestartScheduler)) {
+        await syncEngine.start();
+        if (shouldResync && (await settings.getJiraAutoSyncEnabled(workspaceId))) {
+          const [baseUrl, email, project, token] = await Promise.all([
+            settings.getJiraBaseUrl(workspaceId),
+            settings.getJiraEmail(workspaceId),
+            settings.getJiraProjectKey(workspaceId),
+            settings.getJiraToken(workspaceId),
+          ]);
+          if (baseUrl && email && project && token) {
+            void syncEngine.syncNow(workspaceId);
+          }
         }
       }
       res.json({ success: true });

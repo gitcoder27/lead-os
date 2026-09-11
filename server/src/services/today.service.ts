@@ -40,6 +40,7 @@ import { logger } from "../utils/logger";
 type SyncStatusSource = {
   getLastSyncLog: (workspaceId?: string) => Promise<{ completedAt: string | null; status: string; issuesSynced: number; errorMessage: string | null } | undefined>;
   getRuntimeStatus: (workspaceId?: string) => { status: "idle" | "syncing" | "error"; errorMessage?: string };
+  isAutoSyncEnabled?: (workspaceId?: string) => Promise<boolean>;
 };
 
 type TodayCacheEntry = {
@@ -443,9 +444,10 @@ export class TodayService {
       return undefined;
     }
 
-    const [latest, runtime] = await Promise.all([
+    const [latest, runtime, autoSyncEnabled] = await Promise.all([
       this.syncStatusSource.getLastSyncLog(workspaceId),
       Promise.resolve(this.syncStatusSource.getRuntimeStatus(workspaceId)),
+      this.syncStatusSource.isAutoSyncEnabled?.(workspaceId) ?? Promise.resolve(true),
     ]);
     const status = runtime.status === "syncing" || runtime.status === "error"
       ? runtime.status
@@ -458,6 +460,7 @@ export class TodayService {
       status,
       issuesSynced: latest?.issuesSynced,
       errorMessage: runtime.errorMessage ?? latest?.errorMessage ?? undefined,
+      autoSyncEnabled,
     };
   }
 }

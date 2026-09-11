@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Header } from '@/components/layout/Header';
 import { QuickActionsProvider } from '@/context/QuickActionsContext';
@@ -173,5 +173,57 @@ describe('Header', () => {
 
     expect(resizeObserverDisconnect).toHaveBeenCalledTimes(1);
     expect(document.documentElement.style.getPropertyValue('--app-header-height')).toBe('');
+  });
+
+  it('shows the last sync time while Jira auto-sync is enabled', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { status: 'idle', lastSyncedAt: '2026-09-08T09:00:00.000Z', autoSyncEnabled: true },
+    });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+
+    expect(screen.getByText(/Synced/)).toBeInTheDocument();
+  });
+
+  it('shows the sync-off state instead of the last sync time when auto-sync is disabled', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { status: 'idle', lastSyncedAt: '2026-09-08T09:00:00.000Z', autoSyncEnabled: false },
+    });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+
+    expect(screen.getByText('Sync off')).toBeInTheDocument();
+    expect(screen.queryByText(/Synced/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /manual sync/i })).toBeEnabled();
+  });
+
+  it('still surfaces a sync error when auto-sync is disabled', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { status: 'error', errorMessage: 'Jira authentication failed (401)', autoSyncEnabled: false },
+    });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+
+    expect(screen.getByText('Sync issue')).toBeInTheDocument();
+    expect(screen.queryByText('Sync off')).not.toBeInTheDocument();
+    expect(screen.getByTitle(/Jira authentication failed \(401\)/)).toBeInTheDocument();
+  });
+
+  it('advances the relative sync label over time without new sync data', () => {
+    vi.useFakeTimers();
+    try {
+      const syncedAt = new Date(Date.now() - 60_000).toISOString();
+      useSyncStatusMock.mockReturnValue({
+        data: { status: 'idle', lastSyncedAt: syncedAt, autoSyncEnabled: true },
+      });
+
+      render(<Header activeView="work" onViewChange={vi.fn()} />);
+      expect(screen.getByText('Synced 1 minute ago')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(61_000);
+      });
+
+      expect(screen.getByText('Synced 2 minutes ago')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

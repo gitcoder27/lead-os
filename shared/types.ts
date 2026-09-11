@@ -194,6 +194,7 @@ export interface SyncStatus {
   status: "idle" | "syncing" | "error";
   issuesSynced?: number;
   errorMessage?: string;
+  autoSyncEnabled?: boolean;
 }
 
 // ── Today cockpit types ─────────────────────────────────
@@ -402,6 +403,7 @@ export interface DashboardConfig {
   jiraApiToken: string;
   syncIntervalMs: number;
   staleThresholdHours: number;
+  jiraAutoSyncEnabled: boolean;
   backupEnabled: boolean;
   backupIntervalMinutes: number;
   backupRetentionDays: number;

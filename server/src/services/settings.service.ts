@@ -12,6 +12,7 @@ import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "./workspace.service"
 import type { JiraSyncScopeMode } from "shared/types";
 
 export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
+export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
 export const DEFAULT_STALE_THRESHOLD_HOURS = 48;
 export const DEFAULT_TEAM_TRACKER_STALE_THRESHOLD_HOURS = 4;
 export const DEFAULT_TEAM_TRACKER_NO_CURRENT_THRESHOLD_HOURS = 2;
@@ -93,6 +94,10 @@ export class SettingsService {
 
   async getSyncIntervalMs(workspaceId?: string): Promise<number> {
     return this.getPositiveIntegerConfig("sync_interval_ms", DEFAULT_SYNC_INTERVAL_MS, workspaceId);
+  }
+
+  async getJiraAutoSyncEnabled(workspaceId?: string): Promise<boolean> {
+    return this.getBooleanConfig("jira_auto_sync_enabled", DEFAULT_JIRA_AUTO_SYNC_ENABLED, workspaceId);
   }
 
   async getStaleThresholdHours(workspaceId?: string): Promise<number> {

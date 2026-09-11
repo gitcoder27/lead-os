@@ -32,6 +32,10 @@ export class SyncEngine {
 
   async start(): Promise<void> {
     this.stop();
+    if (!(await this.isAutoSyncEnabled())) {
+      logger.info("Jira auto-sync is disabled; sync scheduler not started");
+      return;
+    }
     const syncIntervalMs = await this.getSchedulerIntervalMs();
     this.task = setInterval(() => {
       void this.syncAllWorkspaces();
@@ -43,6 +47,10 @@ export class SyncEngine {
       clearInterval(this.task);
     }
     this.task = undefined;
+  }
+
+  async isAutoSyncEnabled(workspaceId?: string): Promise<boolean> {
+    return this.settings.getJiraAutoSyncEnabled(workspaceId);
   }
 
   getRuntimeStatus(workspaceId?: string): { status: "idle" | "syncing" | "error"; errorMessage?: string } {
@@ -58,6 +66,9 @@ export class SyncEngine {
     const results: SyncResult[] = [];
 
     for (const workspaceId of workspaceIds) {
+      if (!(await this.isAutoSyncEnabled(workspaceId))) {
+        continue;
+      }
       results.push(await this.syncNow(workspaceId));
     }
 
@@ -169,6 +180,10 @@ export class SyncEngine {
           .where(eq(syncLog.id, logId));
       }
 
+      logger.info(
+        { workspaceId: normalizedWorkspaceId, issuesSynced: jiraIssues.length + reconciledCount },
+        "Jira sync completed"
+      );
       this.lastStatusByWorkspace.set(normalizedWorkspaceId, "idle");
       this.lastErrorByWorkspace.delete(normalizedWorkspaceId);
       return { status: "success", issuesSynced: jiraIssues.length + reconciledCount, startedAt, completedAt };

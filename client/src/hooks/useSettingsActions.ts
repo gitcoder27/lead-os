@@ -126,12 +126,13 @@ export function useSaveSettingsConfig() {
       jiraBaseUrl?: string;
       jiraEmail?: string;
       jiraProjectKey?: string;
-      jiraSyncScopeMode: JiraSyncScopeMode;
-      jiraSyncJql: string;
-      jiraDevDueDateField: string;
-      jiraAspenSeverityField: string;
-      managerJiraAccountId: string;
+      jiraSyncScopeMode?: JiraSyncScopeMode;
+      jiraSyncJql?: string;
+      jiraDevDueDateField?: string;
+      jiraAspenSeverityField?: string;
+      managerJiraAccountId?: string;
       jiraApiToken?: string;
+      jiraAutoSyncEnabled?: boolean;
     }) => api.put('/config/settings', payload),
   });
 }

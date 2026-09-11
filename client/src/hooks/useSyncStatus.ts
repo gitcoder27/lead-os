@@ -15,6 +15,7 @@ export function useSyncStatus(options?: UseSyncStatusOptions) {
     queryKey: ['syncStatus', authScopeKey],
     queryFn: () => api.get('/sync/status'),
     refetchInterval: enabled ? 10_000 : false,
+    refetchIntervalInBackground: true,
     enabled,
   });
 }

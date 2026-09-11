@@ -18,6 +18,7 @@ describe("SyncEngine", () => {
   it("schedules syncs using the persisted interval", async () => {
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 120_000),
+      getJiraAutoSyncEnabled: vi.fn(async () => true),
       getJiraBaseUrl: vi.fn(async () => undefined),
       getJiraEmail: vi.fn(async () => undefined),
       getJiraProjectKey: vi.fn(async () => undefined),
@@ -34,6 +35,73 @@ describe("SyncEngine", () => {
     expect(syncSpy).toHaveBeenCalledTimes(1);
 
     engine.stop();
+  });
+
+  it("does not schedule syncs when auto-sync is disabled", async () => {
+    const settings = {
+      getSyncIntervalMs: vi.fn(async () => 120_000),
+      getJiraAutoSyncEnabled: vi.fn(async () => false),
+      getJiraBaseUrl: vi.fn(async () => "https://example.atlassian.net"),
+      getJiraEmail: vi.fn(async () => "lead@example.com"),
+      getJiraProjectKey: vi.fn(async () => "AM"),
+      getJiraToken: vi.fn(async () => "token"),
+    };
+    const engine = new SyncEngine(settings as any);
+    const syncSpy = vi.spyOn(engine, "syncAllWorkspaces").mockResolvedValue([]);
+
+    await engine.start();
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(syncSpy).not.toHaveBeenCalled();
+
+    engine.stop();
+  });
+
+  it("skips auto-sync for workspaces that disabled it while still syncing the rest", async () => {
+    const engine = new SyncEngine({
+      getJiraAutoSyncEnabled: vi.fn(async (workspaceId?: string) => workspaceId !== "workspace-b"),
+    } as any);
+    const syncableSpy = vi.spyOn(engine, "getSyncableWorkspaceIds").mockResolvedValue(["workspace-a", "workspace-b"]);
+    const syncNowSpy = vi.spyOn(engine, "syncNow").mockResolvedValue({
+      status: "success",
+      issuesSynced: 0,
+      startedAt: "2026-03-12T09:30:00.000Z",
+      completedAt: "2026-03-12T09:30:00.000Z",
+    });
+
+    const results = await engine.syncAllWorkspaces();
+
+    expect(syncableSpy).toHaveBeenCalled();
+    expect(syncNowSpy).toHaveBeenCalledTimes(1);
+    expect(syncNowSpy).toHaveBeenCalledWith("workspace-a");
+    expect(results).toHaveLength(1);
+  });
+
+  it("still allows manual syncNow when auto-sync is disabled", async () => {
+    const jiraClient = {
+      getCurrentUser: vi.fn(async () => ({ accountId: "sync-user", displayName: "Sync User" })),
+      searchIssues: vi.fn(async () => []),
+    };
+    const settings = {
+      getSyncIntervalMs: vi.fn(async () => 60_000),
+      getJiraAutoSyncEnabled: vi.fn(async () => false),
+      getJiraBaseUrl: vi.fn(async () => "https://example.atlassian.net"),
+      getJiraEmail: vi.fn(async () => "lead@example.com"),
+      getJiraProjectKey: vi.fn(async () => "AM"),
+      getJiraToken: vi.fn(async () => "token"),
+      getJiraSyncJql: vi.fn(async () => "project = AM"),
+      getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
+      getManagerJiraAccountId: vi.fn(async () => ""),
+      getJiraDevDueDateField: vi.fn(async () => undefined),
+      getJiraAspenSeverityField: vi.fn(async () => undefined),
+      createJiraClient: vi.fn(async () => jiraClient),
+    };
+    const engine = new SyncEngine(settings as any);
+
+    const result = await engine.syncNow();
+
+    expect(result.status).toBe("success");
+    expect(jiraClient.searchIssues).toHaveBeenCalledTimes(1);
   });
 
   it("restores dismissed out-of-team issues when they return to team scope", async () => {
@@ -302,6 +370,7 @@ describe("SyncEngine", () => {
     };
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 60_000),
+      getJiraAutoSyncEnabled: vi.fn(async () => true),
       getJiraBaseUrl: vi.fn(async () => "https://example.atlassian.net"),
       getJiraEmail: vi.fn(async () => "lead@example.com"),
       getJiraProjectKey: vi.fn(async () => "AM"),
@@ -369,6 +438,7 @@ describe("SyncEngine", () => {
     const configured = new Set(["workspace-a", "workspace-b"]);
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 60_000),
+      getJiraAutoSyncEnabled: vi.fn(async () => true),
       getJiraBaseUrl: vi.fn(async (workspaceId: string) => configured.has(workspaceId) ? "https://example.atlassian.net" : undefined),
       getJiraEmail: vi.fn(async (workspaceId: string) => configured.has(workspaceId) ? `${workspaceId}@example.com` : undefined),
       getJiraProjectKey: vi.fn(async (workspaceId: string) => configured.has(workspaceId) ? "AM" : undefined),

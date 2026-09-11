@@ -398,6 +398,33 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('toggles Jira auto-sync off immediately from the Sync Scope screen', async () => {
+    mockPut.mockResolvedValue({ success: true });
+
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /sync scope/i }));
+    const toggle = await screen.findByRole('switch', { name: /toggle jira auto-sync/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith('/config/settings', { jiraAutoSyncEnabled: false });
+    });
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
+    expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'success',
+      title: 'Auto-sync disabled',
+    }));
+  });
+
   it('adds selected team members and triggers an immediate sync', async () => {
     mockMutateAsync.mockResolvedValue({ status: 'success', issuesSynced: 4, startedAt: '', completedAt: '' });
 

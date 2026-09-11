@@ -81,6 +81,8 @@ export function SettingsPage() {
 
   const [jql, setJql] = useState('');
   const [syncScopeMode, setSyncScopeMode] = useState<JiraSyncScopeMode>(DEFAULT_SYNC_SCOPE_MODE);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [savingAutoSync, setSavingAutoSync] = useState(false);
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
   const [jiraEmail, setJiraEmail] = useState('');
   const [jiraProjectKey, setJiraProjectKey] = useState('');
@@ -177,11 +179,35 @@ export function SettingsPage() {
       setJiraProjectKey(config.jiraProjectKey || '');
       setJql(config.jiraSyncJql || '');
       setSyncScopeMode(config.jiraSyncScopeMode || DEFAULT_SYNC_SCOPE_MODE);
+      setAutoSyncEnabled(config.jiraAutoSyncEnabled ?? true);
       setDevDueDateField(config.jiraDevDueDateField || 'customfield_10128');
       setAspenSeverityField(config.jiraAspenSeverityField || '');
       setManagerJiraAccountId(config.managerJiraAccountId || '');
     }
   }, [config]);
+
+  const handleToggleAutoSync = async (nextEnabled: boolean) => {
+    const previous = autoSyncEnabled;
+    setAutoSyncEnabled(nextEnabled);
+    setSavingAutoSync(true);
+    try {
+      await saveSettingsConfig({ jiraAutoSyncEnabled: nextEnabled });
+      await refetchConfig();
+      await queryClient.invalidateQueries({ queryKey: ['syncStatus'] });
+      addToast({
+        type: 'success',
+        title: nextEnabled ? 'Auto-sync enabled' : 'Auto-sync disabled',
+        message: nextEnabled
+          ? 'LeadOS will refresh Jira issues on its regular schedule again.'
+          : 'Scheduled Jira syncs are off. Use the refresh button for manual syncs.',
+      });
+    } catch (err) {
+      setAutoSyncEnabled(previous);
+      addToast({ type: 'error', title: 'Failed to update auto-sync', message: err instanceof Error ? err.message : 'Unable to save settings' });
+    } finally {
+      setSavingAutoSync(false);
+    }
+  };
 
   const handleCreateUser = async () => {
     if (!newUsername.trim() || !newDisplayName.trim() || !newPassword.trim()) return;
@@ -308,6 +334,7 @@ export function SettingsPage() {
         jiraDevDueDateField: devDueDateField,
         jiraAspenSeverityField: aspenSeverityField,
         managerJiraAccountId: managerJiraAccountId.trim(),
+        jiraAutoSyncEnabled: autoSyncEnabled,
         ...(trimmedToken ? { jiraApiToken: trimmedToken } : {}),
       });
       if (trimmedToken) {
@@ -730,7 +757,7 @@ export function SettingsPage() {
 
   const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
     connection: { title: 'Jira Connection', description: 'Review the active workspace and set the lead manager identity.' },
-    sync: { title: 'Sync Scope', description: 'Define the base defect query and map custom Jira fields.' },
+    sync: { title: 'Sync Scope', description: 'Control scheduled Jira syncs, the base defect query, and custom field mapping.' },
     team: { title: 'Team Members', description: 'Manage tracked developers for workload, routing, and sync scope.' },
     tags: { title: 'Defect Tags', description: 'Review the shared tag library and safely remove labels.' },
     maintenance: { title: 'Data Maintenance', description: 'Preview and run rare cleanup resets for Manager Desk and Team Tracker.' },
@@ -739,7 +766,7 @@ export function SettingsPage() {
 
   const navItems: Array<{ id: SectionId; icon: ReactNode; label: string; status: string | null; sv: 'success' | 'warning' | 'muted' }> = [
     { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl ? 'success' : 'muted' },
-    { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: jql ? syncScopeLabel : 'No query', sv: jql ? 'muted' : 'warning' },
+    { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: !autoSyncEnabled ? 'muted' : jql ? 'muted' : 'warning' },
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
     { id: 'maintenance', icon: <AlertTriangle size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
@@ -1159,6 +1186,54 @@ export function SettingsPage() {
               {/* ── SYNC SCOPE ────── */}
               {activeSection === 'sync' ? (
                 <div className="max-w-[720px] space-y-7">
+                  {/* Auto sync */}
+                  <div>
+                    <SettingsGroupLabel>Auto Sync</SettingsGroupLabel>
+                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                      When enabled, LeadOS refreshes Jira issues automatically on a schedule. Turn it off if you only
+                      track people and daily work here — no Jira calls are made until you run a manual sync.
+                    </p>
+                    <div
+                      className="flex items-center justify-between gap-4 rounded-xl px-3.5 py-3"
+                      style={{ background: 'var(--settings-input-bg)', border: 'var(--settings-inset-border)' }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          Scheduled Jira sync
+                        </p>
+                        <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                          {autoSyncEnabled
+                            ? 'On — Jira issues refresh automatically.'
+                            : 'Off — manual sync only, via the refresh button.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={autoSyncEnabled}
+                        aria-label="Toggle Jira auto-sync"
+                        disabled={savingAutoSync}
+                        onClick={() => void handleToggleAutoSync(!autoSyncEnabled)}
+                        className="relative h-6 w-11 shrink-0 rounded-full transition-colors duration-150 disabled:opacity-50"
+                        style={{
+                          background: autoSyncEnabled ? 'var(--accent)' : 'var(--bg-tertiary)',
+                          border: autoSyncEnabled ? '1px solid var(--accent)' : '1px solid var(--border-strong)',
+                        }}
+                      >
+                        <span
+                          className="absolute top-1/2 -translate-y-1/2 rounded-full transition-all duration-150"
+                          style={{
+                            left: autoSyncEnabled ? 'calc(100% - 21px)' : '3px',
+                            width: '18px',
+                            height: '18px',
+                            background: autoSyncEnabled ? '#fff' : 'var(--text-secondary)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                          }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Scope mode */}
                   <div>
                     <SettingsGroupLabel>Scope Mode</SettingsGroupLabel>

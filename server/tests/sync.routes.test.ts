@@ -50,4 +50,20 @@ describe("sync routes", () => {
       completedAt: now,
     });
   });
+
+  it("reports autoSyncEnabled in the sync status payload", async () => {
+    const app = createTestApp({
+      getLastSyncLog: vi.fn(async () => undefined),
+      getRuntimeStatus: vi.fn(() => ({ status: "idle" as const, errorMessage: undefined })),
+      isAutoSyncEnabled: vi.fn(async () => false),
+    });
+
+    const res = await invoke(app, { method: "GET", url: "/api/sync/status" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      status: "idle",
+      autoSyncEnabled: false,
+    });
+  });
 });

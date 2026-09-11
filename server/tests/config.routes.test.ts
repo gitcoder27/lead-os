@@ -396,6 +396,35 @@ ORDER BY updated DESC`);
     expect(map["jira_dev_due_date_field"]).toBe("customfield_10020");
   });
 
+  it("PUT /api/config/settings persists the auto-sync toggle and GET reports it", async () => {
+    const app = createTestApp();
+
+    const initialRes = await invoke(app, { method: "GET", url: "/api/config" });
+    expect(initialRes.status).toBe(200);
+    expect(initialRes.body?.jiraAutoSyncEnabled).toBe(true);
+
+    const disableRes = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/settings",
+      body: { jiraAutoSyncEnabled: false },
+    });
+    expect(disableRes.status).toBe(200);
+    expect(disableRes.body?.success).toBe(true);
+
+    const disabledRes = await invoke(app, { method: "GET", url: "/api/config" });
+    expect(disabledRes.body?.jiraAutoSyncEnabled).toBe(false);
+
+    const enableRes = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/settings",
+      body: { jiraAutoSyncEnabled: true },
+    });
+    expect(enableRes.status).toBe(200);
+
+    const enabledRes = await invoke(app, { method: "GET", url: "/api/config" });
+    expect(enabledRes.body?.jiraAutoSyncEnabled).toBe(true);
+  });
+
   it("POST /api/config/test can use the saved encrypted Jira token", async () => {
     await storeJiraApiToken("saved-token");
 

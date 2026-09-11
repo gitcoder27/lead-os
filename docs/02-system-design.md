@@ -405,6 +405,7 @@ CREATE INDEX idx_issues_flagged ON issues(flagged);
 | `jira_project_key` | Jira project key | — |
 | `jira_lead_account_id` | Lead's Jira account ID | — |
 | `sync_interval_ms` | Sync interval in milliseconds | `300000` (5 min) |
+| `jira_auto_sync_enabled` | Enables the scheduled Jira sync; when `false`, no Jira API calls are made except manual syncs | `true` |
 | `stale_threshold_hours` | Hours before an issue is considered stale | `48` |
 
 > **Note:** `jira_api_token` is stored in an environment variable (`JIRA_API_TOKEN`), never in the database.

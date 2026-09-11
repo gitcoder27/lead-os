@@ -1,6 +1,6 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus } from 'lucide-react';
+import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
@@ -30,18 +30,32 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
   const { data: sync } = useSyncStatus({ enabled: activeView !== 'today' });
   const triggerSync = useTriggerSync();
   const headerRef = useRef<HTMLElement | null>(null);
+  const [, setTimeTick] = useState(0);
+
+  useEffect(() => {
+    // Relative sync timestamps only change on re-render; tick even when sync data is unchanged.
+    const timer = window.setInterval(() => setTimeTick((tick) => tick + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const isSyncing = sync?.status === 'syncing' || triggerSync.isPending;
   const hasError = sync?.status === 'error';
-  const syncLabel = hasError
+  const autoSyncOff = sync?.autoSyncEnabled === false;
+  const syncLabel = isSyncing
+    ? 'Syncing…'
+    : hasError
     ? 'Sync issue'
+    : autoSyncOff
+    ? 'Sync off'
     : sync?.lastSyncedAt
     ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
     : activeView === 'today'
     ? 'Status in Today'
     : 'Not synced';
-  const syncTitle = hasError && sync?.errorMessage
-    ? `Sync issue: ${sync.errorMessage}`
+  const syncTitle = hasError
+    ? `Sync issue${sync?.errorMessage ? `: ${sync.errorMessage}` : ''}${autoSyncOff ? ' Jira auto-sync is off; manual sync is still available.' : ''}`
+    : autoSyncOff
+    ? 'Jira auto-sync is off. Manual sync is still available; turn it back on in Settings → Sync Scope.'
     : sync?.lastSyncedAt
     ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
     : activeView === 'today'
@@ -146,21 +160,25 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
               style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
               title={syncTitle}
             >
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{
-                  background: hasError
-                    ? 'var(--danger)'
-                    : isSyncing
-                    ? 'var(--warning)'
-                    : 'var(--success)',
-                  boxShadow: hasError
-                    ? '0 0 10px var(--danger)'
-                    : isSyncing
-                    ? '0 0 10px var(--warning)'
-                    : '0 0 10px var(--success)',
-                }}
-              />
+              {autoSyncOff && !isSyncing && !hasError ? (
+                <CloudOff size={13} style={{ color: 'var(--text-muted)' }} />
+              ) : (
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{
+                    background: hasError
+                      ? 'var(--danger)'
+                      : isSyncing
+                      ? 'var(--warning)'
+                      : 'var(--success)',
+                    boxShadow: hasError
+                      ? '0 0 10px var(--danger)'
+                      : isSyncing
+                      ? '0 0 10px var(--warning)'
+                      : '0 0 10px var(--success)',
+                  }}
+                />
+              )}
               <div className="min-w-0">
                 <div className="truncate font-mono text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                   {syncLabel}

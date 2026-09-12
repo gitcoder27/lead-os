@@ -39,7 +39,7 @@ const GROUPS: TeamTrackerBoardGroupBy[] = ['none', 'status', 'attention_state'];
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-function isValidIsoDate(value: string): boolean {
+export function isValidIsoDate(value: string): boolean {
   if (!DATE_PATTERN.test(value)) {
     return false;
   }
@@ -135,4 +135,8 @@ export function deskDateFromParams(params: URLSearchParams): string | undefined 
 
 export function deskDateToSearch(date: string | undefined): string {
   return buildSearch({ date });
+}
+
+export function notesDateFromParams(params: URLSearchParams): string | undefined {
+  return dateParam(params, 'date');
 }

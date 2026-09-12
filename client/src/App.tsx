@@ -14,13 +14,16 @@ import {
   dashboardFilterStateFromParams,
   dashboardFilterStateToParams,
   deskDateFromParams,
+  isValidIsoDate,
+  notesDateFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
 } from '@/lib/view-params';
+import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import type { TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
-export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'my-day' | 'settings';
+export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'notes' | 'my-day' | 'settings';
 export type LegacyAppView = 'dashboard' | 'team-tracker' | 'manager-desk';
 export type AppView = CanonicalAppView | LegacyAppView;
 export type ActiveAppView = AppView | 'not-found';
@@ -33,6 +36,7 @@ const loadMyDayPage = () => import('@/components/my-day/MyDayPage');
 const loadLoginPage = () => import('@/components/my-day/LoginPage');
 const loadManagerDeskPage = () => import('@/components/manager-desk');
 const loadManagerMemoryPage = () => import('@/components/manager-memory');
+const loadNotesPage = () => import('@/components/notes/NotesPage');
 const loadSettingsPage = () => import('@/components/settings/SettingsPanel');
 
 const TeamTrackerPage = lazy(async () => {
@@ -70,6 +74,11 @@ const ManagerMemoryPage = lazy(async () => {
   return { default: module.ManagerMemoryPage };
 });
 
+const NotesPage = lazy(async () => {
+  const module = await loadNotesPage();
+  return { default: module.NotesPage };
+});
+
 const SettingsPage = lazy(async () => {
   const module = await loadSettingsPage();
   return { default: module.SettingsPage };
@@ -88,6 +97,7 @@ function pathToView(pathname: string): ResolvedAppView {
   if (pathname === '/desk' || pathname === '/desk/' || pathname === '/manager-desk' || pathname === '/manager-desk/') return 'desk';
   if (pathname === '/follow-ups' || pathname === '/follow-ups/' || pathname === '/followups' || pathname === '/followups/') return 'follow-ups';
   if (pathname === '/meetings' || pathname === '/meetings/' || pathname === '/meeting' || pathname === '/meeting/') return 'meetings';
+  if (pathname === '/notes' || pathname === '/notes/') return 'notes';
   if (pathname === '/work' || pathname === '/work/' || pathname === '/dashboard' || pathname === '/dashboard/') return 'work';
   if (pathname === '/today' || pathname === '/today/' || pathname === '/' || pathname === '') return 'today';
   if (pathname === '/settings' || pathname === '/settings/') return 'settings';
@@ -102,6 +112,7 @@ function viewToPath(view: AppView): string {
   if (canonicalView === 'desk') return '/desk';
   if (canonicalView === 'follow-ups') return '/follow-ups';
   if (canonicalView === 'meetings') return '/meetings';
+  if (canonicalView === 'notes') return '/notes';
   if (canonicalView === 'work') return '/work';
   if (canonicalView === 'settings') return '/settings';
   return '/';
@@ -131,6 +142,9 @@ function preloadView(view: AppView) {
     case 'follow-ups':
     case 'meetings':
       void loadManagerMemoryPage();
+      break;
+    case 'notes':
+      void loadNotesPage();
       break;
     case 'settings':
       void loadSettingsPage();
@@ -383,6 +397,11 @@ function AppContent() {
       ? deskDateFromParams(new URLSearchParams(window.location.search))
       : undefined,
   );
+  const [notesDate, setNotesDate] = useState<string>(() =>
+    pathToView(window.location.pathname) === 'notes'
+      ? notesDateFromParams(new URLSearchParams(window.location.search)) ?? getLocalIsoDate()
+      : getLocalIsoDate(),
+  );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
   const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; nonce: number }>({ nonce: 0 });
   const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; nonce: number }>(() => ({
@@ -409,6 +428,9 @@ function AppContent() {
     const nextView = canonicalizeView(view);
     clearTodayTargets();
     setDeskDateParam(undefined);
+    if (nextView === 'notes') {
+      setNotesDate(getLocalIsoDate());
+    }
     preloadView(nextView);
     setActiveView(nextView);
     navigateToView(nextView, {
@@ -419,6 +441,8 @@ function AppContent() {
           ? teamBoardQuery
             ? teamBoardQueryToParams(teamBoardQuery)
             : undefined
+          : nextView === 'notes'
+          ? { date: getLocalIsoDate() }
           : undefined,
     });
   }, [clearTodayTargets, dashboardFilterState, teamBoardQuery]);
@@ -435,6 +459,23 @@ function AppContent() {
     navigateToView('work', { params: dashboardFilterStateToParams(nextFilterState) });
   }, [clearTodayTargets]);
 
+  const handleOpenNotes = useCallback((date?: string) => {
+    const next = date && isValidIsoDate(date) ? date : getLocalIsoDate();
+    clearTodayTargets();
+    setNotesDate(next);
+    preloadView('notes');
+    setActiveView('notes');
+    navigateToView('notes', { params: { date: next } });
+  }, [clearTodayTargets]);
+
+  const handleNotesDateChange = useCallback((date: string) => {
+    if (!isValidIsoDate(date)) {
+      return;
+    }
+    setNotesDate(date);
+    navigateToView('notes', { params: { date } });
+  }, []);
+
   const handleOpenTodayTarget = useCallback((target: TodayActionTarget) => {
     if (target.view === 'work') {
       const nextFilterState: DashboardFilterState = {
@@ -449,6 +490,11 @@ function AppContent() {
       preloadView('work');
       setActiveView('work');
       navigateToView('work', { params: dashboardFilterStateToParams(nextFilterState) });
+      return;
+    }
+
+    if (target.view === 'notes') {
+      handleOpenNotes(target.date);
       return;
     }
 
@@ -483,7 +529,7 @@ function AppContent() {
     const nextView = canonicalizeView(target.view as AppView);
     setActiveView(nextView);
     navigateToView(nextView);
-  }, [dashboardFilterState]);
+  }, [dashboardFilterState, handleOpenNotes]);
 
   const replaceView = useCallback((view: AppView) => {
     const nextView = canonicalizeView(view);
@@ -505,6 +551,9 @@ function AppContent() {
       if (nextView === 'team') {
         setTeamBoardQuery(teamBoardQueryFromParams(params));
         setTeamBoardQueryNonce((nonce) => nonce + 1);
+      }
+      if (nextView === 'notes') {
+        setNotesDate(notesDateFromParams(params) ?? getLocalIsoDate());
       }
       replaceLegacyPathIfNeeded();
     };
@@ -591,8 +640,9 @@ function AppContent() {
     () => ({
       openCapture,
       openCommandPalette: () => setPaletteOpen(true),
+      openNotes: handleOpenNotes,
     }),
-    [openCapture],
+    [openCapture, handleOpenNotes],
   );
 
   useEffect(() => {
@@ -703,7 +753,21 @@ function AppContent() {
     return (
       <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
         <Suspense fallback={<PanelLoading />}>
-          <ManagerMemoryPage mode={activeView} onViewChange={handleViewChange} />
+          <ManagerMemoryPage mode={activeView} onViewChange={handleViewChange} onOpenTarget={handleOpenTodayTarget} />
+        </Suspense>
+      </WorkspaceShell>
+    );
+  }
+
+  if (activeView === 'notes') {
+    return (
+      <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
+        <Suspense fallback={<PanelLoading />}>
+          <NotesPage
+            date={notesDate}
+            onDateChange={handleNotesDateChange}
+            onOpenTarget={handleOpenTodayTarget}
+          />
         </Suspense>
       </WorkspaceShell>
     );
@@ -747,7 +811,7 @@ function AppContent() {
   );
   };
 
-  const defaultCaptureTarget = activeView === 'team' ? 'team-tracker' : 'manager-desk';
+  const defaultCaptureTarget = activeView === 'team' ? 'team-tracker' : activeView === 'notes' ? 'notes' : 'manager-desk';
 
   return (
     <QuickActionsProvider value={quickActions}>
@@ -757,6 +821,7 @@ function AppContent() {
           onClose={() => setCaptureOpen(false)}
           onOpenManagerDesk={() => handleViewChange('desk')}
           onOpenTeamTracker={() => handleViewChange('team')}
+          onOpenNotes={(targetDate) => handleOpenNotes(targetDate)}
           context={{ ...captureContext, defaultTarget: captureContext.defaultTarget ?? defaultCaptureTarget }}
         />
       )}

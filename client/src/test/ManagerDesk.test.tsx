@@ -184,6 +184,15 @@ vi.mock('@/context/AuthContext', () => ({
     login: vi.fn(),
     logout: vi.fn(),
   }),
+  useAuthScopeKey: () => 'ws:mgr:manager:',
+}));
+
+let mockNoteSources: { itemId: number; noteId: number; date: string }[] = [];
+
+vi.mock('@/hooks/useDailyNotes', () => ({
+  useDailyNoteSources: (ids: number[]) => ({
+    data: mockNoteSources.filter((source) => ids.includes(source.itemId)),
+  }),
 }));
 
 vi.mock('@/context/ThemeContext', () => ({
@@ -257,6 +266,7 @@ describe('ManagerDeskPage', () => {
     mockCarryForwardContextData.isFetching = false;
     mockCarryForwardContextData.isError = false;
     mockCarryForwardContextData.refetch.mockReset();
+    mockNoteSources = [];
     try { window.sessionStorage.clear(); } catch { /* noop */ }
   });
 
@@ -1319,6 +1329,28 @@ describe('ManagerDeskPage', () => {
     expect(screen.getByText(/historical record stays easy to inspect/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Start Analyze root cause for DEF-241$/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Item title')).toHaveAttribute('readonly');
+  });
+
+  it('still shows the private note source link on a read-only historical item', () => {
+    currentMockDay = {
+      ...mockDayResponse,
+      viewMode: 'history',
+      createdThatDayItems: [],
+    };
+    mockNoteSources = [{ itemId: 1, noteId: 9, date: '2026-03-05' }];
+
+    render(
+      <TestWrapper>
+        <ManagerDeskPage />
+      </TestWrapper>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Open Analyze root cause for DEF-241$/i }));
+
+    expect(screen.getByLabelText('Item title')).toHaveAttribute('readonly');
+    const link = screen.getByRole('link', { name: 'Open source note from 2026-03-05' });
+    expect(link).toHaveAttribute('href', '/notes?date=2026-03-05');
+    expect(link).toHaveTextContent('Source: Mar 5 notes');
   });
 
   it('shows a lighter planning banner for future dates', () => {

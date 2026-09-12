@@ -6,13 +6,16 @@ import {
   type ManagerMemoryLane,
   type ManagerMemoryMode,
 } from '@/lib/manager-memory';
+import { NotesSourceLink } from '@/components/notes/NotesSourceLink';
+import type { DailyNoteSource } from '@/types';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 
 interface MemoryListProps {
   mode: ManagerMemoryMode;
   items: ManagerDeskItem[];
   onStatusChange: (itemId: number, status: ManagerDeskStatus) => void;
-  onOpenDesk: () => void;
+  onOpenDesk: (item: ManagerDeskItem) => void;
+  noteSources?: Map<number, DailyNoteSource>;
 }
 
 const followUpLanes: Array<{ id: ManagerMemoryLane; label: string }> = [
@@ -30,7 +33,7 @@ const meetingLanes: Array<{ id: ManagerMemoryLane; label: string }> = [
   { id: 'closed', label: 'Closed' },
 ];
 
-export function MemoryList({ mode, items, onStatusChange, onOpenDesk }: MemoryListProps) {
+export function MemoryList({ mode, items, onStatusChange, onOpenDesk, noteSources }: MemoryListProps) {
   const lanes = mode === 'follow-ups' ? followUpLanes : meetingLanes;
 
   if (items.length === 0) {
@@ -76,6 +79,7 @@ export function MemoryList({ mode, items, onStatusChange, onOpenDesk }: MemoryLi
                   hasTopBorder={index > 0}
                   onStatusChange={onStatusChange}
                   onOpenDesk={onOpenDesk}
+                  noteSource={noteSources?.get(item.id)}
                 />
               ))}
             </div>
@@ -92,12 +96,14 @@ function MemoryRow({
   hasTopBorder,
   onStatusChange,
   onOpenDesk,
+  noteSource,
 }: {
   mode: ManagerMemoryMode;
   item: ManagerDeskItem;
   hasTopBorder: boolean;
   onStatusChange: (itemId: number, status: ManagerDeskStatus) => void;
-  onOpenDesk: () => void;
+  onOpenDesk: (item: ManagerDeskItem) => void;
+  noteSource?: DailyNoteSource;
 }) {
   const isClosed = isClosedMemoryItem(item);
   const primaryTime = mode === 'follow-ups' ? item.followUpAt : item.plannedStartAt;
@@ -121,6 +127,7 @@ function MemoryRow({
               <span className="truncate">{item.nextAction}</span>
             </span>
           ) : null}
+          {noteSource ? <NotesSourceLink source={noteSource} /> : null}
         </div>
       </div>
 
@@ -158,7 +165,7 @@ function MemoryRow({
         ) : null}
         <button
           type="button"
-          onClick={onOpenDesk}
+          onClick={() => onOpenDesk(item)}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors hover:bg-[var(--memory-hover)]"
           style={{ color: 'var(--memory-accent)' }}
         >

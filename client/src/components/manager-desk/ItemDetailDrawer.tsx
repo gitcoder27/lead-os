@@ -5,6 +5,7 @@ import {
   useRemoveManagerDeskLink,
 } from '@/hooks/useManagerDesk';
 import type { ManagerDeskItem, ManagerDeskUpdateItemPayload } from '@/types/manager-desk';
+import { NotesItemSource } from '@/components/notes/NotesItemSource';
 import { DrawerHeader } from './DrawerHeader';
 import { DrawerPrimaryFields } from './DrawerPrimaryFields';
 import { DrawerProperties } from './DrawerProperties';
@@ -163,6 +164,7 @@ function DrawerContent({
       />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {topSlot}
+        <NotesItemSource itemId={item.id} />
         <DrawerPrimaryFields
           item={item}
           date={date}

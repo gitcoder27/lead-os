@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '@/App';
 
 const useBootstrapStateMock = vi.fn();
@@ -89,6 +89,10 @@ vi.mock('@/components/manager-desk', () => ({
 
 vi.mock('@/components/manager-memory', () => ({
   ManagerMemoryPage: ({ mode }: { mode: 'follow-ups' | 'meetings' }) => <div>{mode === 'follow-ups' ? 'Follow-ups loaded' : 'Meetings loaded'}</div>,
+}));
+
+vi.mock('@/components/notes/NotesPage', () => ({
+  NotesPage: ({ date }: { date: string }) => <div>Notes loaded {date}</div>,
 }));
 
 vi.mock('@/components/settings/SettingsPanel', () => ({
@@ -278,6 +282,82 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('Meetings loaded')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/meetings');
+  });
+
+  it('renders the Notes workspace for authenticated managers on /notes', async () => {
+    window.history.pushState(null, '', '/notes?date=2026-09-12');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText(/Notes loaded 2026-09-12/)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/notes');
+  });
+
+  it('falls back to today for an invalid notes date', async () => {
+    window.history.pushState(null, '', '/notes?date=not-a-date');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+
+    const today = new Date();
+    const expected = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(await screen.findByText(new RegExp(`Notes loaded ${expected}`))).toBeInTheDocument();
+  });
+
+  it('restores the notes date on browser back/forward', async () => {
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    window.history.pushState(null, '', '/notes?date=2026-09-10');
+    render(<App />);
+    expect(await screen.findByText(/Notes loaded 2026-09-10/)).toBeInTheDocument();
+
+    act(() => {
+      window.history.pushState(null, '', '/notes?date=2026-09-11');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    expect(await screen.findByText(/Notes loaded 2026-09-11/)).toBeInTheDocument();
+  });
+
+  it('redirects developers away from /notes', async () => {
+    window.history.pushState(null, '', '/notes');
+    useAuthMock.mockReturnValue({
+      user: { role: 'developer', developerAccountId: 'dev-1' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/my-day');
+    });
+    expect(screen.queryByText(/Notes loaded/)).not.toBeInTheDocument();
   });
 
   it('renders a not-found state for unknown manager routes without rewriting the URL', async () => {

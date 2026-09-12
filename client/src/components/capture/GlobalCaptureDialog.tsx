@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Briefcase, CalendarDays, Users, X, Zap } from 'lucide-react';
+import { Briefcase, CalendarDays, NotebookPen, Users, X, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { getLocalIsoDate } from '@/lib/utils';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { DeskCaptureForm } from './DeskCaptureForm';
+import { NoteCaptureForm } from './NoteCaptureForm';
 import { TrackerCaptureForm } from './TrackerCaptureForm';
 
-export type CaptureTarget = 'manager-desk' | 'team-tracker';
+export type CaptureTarget = 'manager-desk' | 'team-tracker' | 'notes';
 
 const STORAGE_KEY = 'dcc-capture-target';
 
@@ -27,12 +28,13 @@ export interface GlobalCaptureContext {
 const TARGETS: { id: CaptureTarget; label: string; Icon: typeof Briefcase }[] = [
   { id: 'manager-desk', label: 'Desk', Icon: Briefcase },
   { id: 'team-tracker', label: 'Team', Icon: Users },
+  { id: 'notes', label: 'Notes', Icon: NotebookPen },
 ];
 
 function loadTarget(storageKey: string): CaptureTarget {
   try {
     const v = localStorage.getItem(storageKey);
-    if (v === 'team-tracker') return 'team-tracker';
+    if (v === 'team-tracker' || v === 'notes') return v;
   } catch {
     /* ignore */
   }
@@ -43,6 +45,7 @@ interface GlobalCaptureDialogProps {
   onClose: () => void;
   onOpenManagerDesk?: () => void;
   onOpenTeamTracker?: () => void;
+  onOpenNotes?: (date?: string) => void;
   context?: GlobalCaptureContext;
 }
 
@@ -50,6 +53,7 @@ export function GlobalCaptureDialog({
   onClose,
   onOpenManagerDesk,
   onOpenTeamTracker,
+  onOpenNotes,
   context,
 }: GlobalCaptureDialogProps) {
   const storageKey = useScopedStorageKey(STORAGE_KEY);
@@ -59,6 +63,7 @@ export function GlobalCaptureDialog({
   const formattedDate = useMemo(() => format(parseISO(date), 'EEEE, MMM d'), [date]);
 
   const isDesk = target === 'manager-desk';
+  const isTracker = target === 'team-tracker';
 
   useEffect(() => {
     if (storageKeyRef.current !== storageKey) {
@@ -98,11 +103,15 @@ export function GlobalCaptureDialog({
 
   const accentBorder = isDesk
     ? 'color-mix(in srgb, var(--md-accent) 16%, var(--border-strong) 84%)'
-    : 'color-mix(in srgb, var(--accent) 22%, var(--border-strong) 78%)';
+    : isTracker
+      ? 'color-mix(in srgb, var(--accent) 22%, var(--border-strong) 78%)'
+      : 'var(--border-strong)';
 
   const headerGradient = isDesk
     ? 'linear-gradient(135deg, color-mix(in srgb, var(--md-accent-glow) 60%, transparent) 0%, transparent 50%)'
-    : 'linear-gradient(135deg, color-mix(in srgb, var(--accent-glow) 60%, transparent) 0%, transparent 64%)';
+    : isTracker
+      ? 'linear-gradient(135deg, color-mix(in srgb, var(--accent-glow) 60%, transparent) 0%, transparent 64%)'
+      : 'none';
 
   if (typeof document === 'undefined') return null;
 
@@ -158,12 +167,14 @@ export function GlobalCaptureDialog({
               <div
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl transition-colors duration-300"
                 style={{
-                  background: isDesk ? 'var(--md-accent-glow)' : 'var(--accent-glow)',
-                  color: isDesk ? 'var(--md-accent)' : 'var(--accent)',
+                  background: isDesk ? 'var(--md-accent-glow)' : isTracker ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
+                  color: isDesk ? 'var(--md-accent)' : isTracker ? 'var(--accent)' : 'var(--text-secondary)',
                   border: `1px solid ${
                     isDesk
                       ? 'rgba(217,169,78,0.28)'
-                      : 'color-mix(in srgb, var(--accent) 28%, transparent)'
+                      : isTracker
+                        ? 'color-mix(in srgb, var(--accent) 28%, transparent)'
+                        : 'var(--border)'
                   }`,
                 }}
               >
@@ -181,12 +192,16 @@ export function GlobalCaptureDialog({
                   style={{
                     background: isDesk
                       ? 'rgba(217,169,78,0.1)'
-                      : 'color-mix(in srgb, var(--accent) 10%, transparent)',
-                    color: isDesk ? 'var(--md-accent)' : 'var(--accent)',
+                      : isTracker
+                        ? 'color-mix(in srgb, var(--accent) 10%, transparent)'
+                        : 'var(--bg-tertiary)',
+                    color: isDesk ? 'var(--md-accent)' : isTracker ? 'var(--accent)' : 'var(--text-secondary)',
                     border: `1px solid ${
                       isDesk
                         ? 'rgba(217,169,78,0.18)'
-                        : 'color-mix(in srgb, var(--accent) 18%, transparent)'
+                        : isTracker
+                          ? 'color-mix(in srgb, var(--accent) 18%, transparent)'
+                          : 'var(--border)'
                     }`,
                   }}
                 >
@@ -226,7 +241,9 @@ export function GlobalCaptureDialog({
                     color: active
                       ? t.id === 'manager-desk'
                         ? 'var(--md-accent)'
-                        : 'var(--accent)'
+                        : t.id === 'notes'
+                          ? 'var(--text-primary)'
+                          : 'var(--accent)'
                       : 'var(--text-muted)',
                   }}
                 >
@@ -238,11 +255,15 @@ export function GlobalCaptureDialog({
                         background:
                           t.id === 'manager-desk'
                             ? 'var(--md-accent-glow)'
-                            : 'var(--accent-glow)',
+                            : t.id === 'notes'
+                              ? 'var(--bg-elevated)'
+                              : 'var(--accent-glow)',
                         border: `1px solid ${
                           t.id === 'manager-desk'
                             ? 'rgba(217,169,78,0.22)'
-                            : 'color-mix(in srgb, var(--accent) 22%, transparent)'
+                            : t.id === 'notes'
+                              ? 'var(--border)'
+                              : 'color-mix(in srgb, var(--accent) 22%, transparent)'
                         }`,
                       }}
                       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
@@ -267,7 +288,7 @@ export function GlobalCaptureDialog({
               onOpenManagerDesk={onOpenManagerDesk}
               context={context}
             />
-          ) : (
+          ) : isTracker ? (
             <TrackerCaptureForm
               key="tracker"
               date={date}
@@ -275,6 +296,14 @@ export function GlobalCaptureDialog({
               onClose={onClose}
               onOpenTeamTracker={onOpenTeamTracker}
               context={context}
+            />
+          ) : (
+            <NoteCaptureForm
+              key={`${storageKey}:notes`}
+              date={date}
+              formattedDate={formattedDate}
+              onClose={onClose}
+              onOpenNotes={onOpenNotes}
             />
           )}
         </AnimatePresence>

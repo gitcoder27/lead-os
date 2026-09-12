@@ -1,5 +1,6 @@
 import { and, desc, eq, like, or } from "drizzle-orm";
 import type {
+  DailyNoteSummary,
   GlobalSearchCheckInItem,
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
@@ -16,6 +17,7 @@ import {
   teamTrackerDays,
 } from "../db/schema";
 import { isVisibleWorkIssue } from "./issue-rules";
+import { DailyNotesService } from "./daily-notes.service";
 import { SettingsService } from "./settings.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
@@ -24,6 +26,7 @@ const ISSUE_LIMIT = 6;
 const DESK_ITEM_LIMIT = 6;
 const CHECK_IN_LIMIT = 6;
 const DEVELOPER_LIMIT = 4;
+const NOTE_LIMIT = 6;
 
 // Wildcard characters are treated as separators so user input can never turn
 // into a broad "%" scan; the wrapped pattern stays a literal substring match.
@@ -36,7 +39,10 @@ function containsPattern(query: string): string {
 }
 
 export class SearchService {
-  constructor(private readonly settings = new SettingsService()) {}
+  constructor(
+    private readonly settings = new SettingsService(),
+    private readonly dailyNotes = new DailyNotesService()
+  ) {}
 
   async search(rawQuery: string, workspaceId?: string, managerAccountId?: string): Promise<GlobalSearchResponse> {
     const query = sanitizeQuery(rawQuery);
@@ -46,6 +52,7 @@ export class SearchService {
       deskItems: [],
       checkIns: [],
       developers: [],
+      notes: [],
     };
 
     if (query.length < MIN_QUERY_LENGTH) {
@@ -55,11 +62,12 @@ export class SearchService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const pattern = containsPattern(query);
 
-    const [issueItems, deskItems, checkIns, developerItems] = await Promise.all([
+    const [issueItems, deskItems, checkIns, developerItems, noteItems] = await Promise.all([
       this.searchIssues(normalizedWorkspaceId, pattern),
       this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
       this.searchCheckIns(normalizedWorkspaceId, pattern),
       this.searchDevelopers(normalizedWorkspaceId, pattern),
+      this.searchNotes(normalizedWorkspaceId, managerAccountId, query),
     ]);
 
     return {
@@ -68,7 +76,20 @@ export class SearchService {
       deskItems,
       checkIns,
       developers: developerItems,
+      notes: noteItems,
     };
+  }
+
+  private async searchNotes(
+    workspaceId: string,
+    managerAccountId: string | undefined,
+    query: string
+  ): Promise<DailyNoteSummary[]> {
+    if (!managerAccountId) {
+      return [];
+    }
+    const result = await this.dailyNotes.list(managerAccountId, { q: query, limit: NOTE_LIMIT }, workspaceId);
+    return result.notes;
   }
 
   private async searchIssues(workspaceId: string, pattern: string): Promise<GlobalSearchIssueItem[]> {

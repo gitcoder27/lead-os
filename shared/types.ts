@@ -250,7 +250,7 @@ export type TodayActionGroup = "now" | "next" | "later";
 
 export interface TodayActionTarget {
   type: TodayActionTargetType;
-  view: "work" | "team" | "desk" | "follow-ups" | "meetings" | "settings";
+  view: "work" | "team" | "desk" | "follow-ups" | "meetings" | "notes" | "settings";
   issueKey?: string;
   relatedIssueKeys?: string[];
   developerAccountId?: string;
@@ -1008,6 +1008,7 @@ export interface GlobalSearchResponse {
   deskItems: GlobalSearchDeskItem[];
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
+  notes?: DailyNoteSummary[];
 }
 
 export interface WorkSavedView {
@@ -1088,4 +1089,63 @@ export interface ManagerDeskCarryForwardPayload {
   fromDate: string;
   toDate: string;
   itemIds?: number[];
+}
+
+export interface DailyNoteSummary {
+  id: number;
+  date: string;
+  title: string;
+  excerpt: string;
+  updatedAt: string;
+}
+
+export interface DailyNote extends DailyNoteSummary {
+  body: string;
+  revision: number;
+  createdAt: string;
+}
+
+export interface DailyNoteFollowUp {
+  itemId: number;
+  date: string;
+  title: string;
+  status: ManagerDeskStatus;
+  followUpAt?: string;
+}
+
+export interface DailyNoteResponse {
+  note: DailyNote | null;
+  followUps: DailyNoteFollowUp[];
+}
+
+export interface DailyNotesResponse {
+  notes: DailyNoteSummary[];
+  nextCursor: string | null;
+}
+
+export interface SaveDailyNotePayload {
+  body: string;
+  revision: number;
+}
+
+export interface AppendDailyNotePayload {
+  text: string;
+  requestId: string;
+}
+
+export interface CreateDailyNoteFollowUpPayload {
+  date: string;
+  title: string;
+  followUpAt: string;
+  requestId: string;
+}
+
+export interface DailyNoteSource {
+  itemId: number;
+  noteId: number;
+  date: string;
+}
+
+export interface DailyNoteSourcesResponse {
+  sources: DailyNoteSource[];
 }

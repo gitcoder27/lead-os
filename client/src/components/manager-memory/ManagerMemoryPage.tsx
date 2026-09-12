@@ -8,6 +8,7 @@ import {
   useManagerDesk,
   useUpdateManagerDeskItem,
 } from '@/hooks/useManagerDesk';
+import { useDailyNoteSources } from '@/hooks/useDailyNotes';
 import {
   buildMemoryStats,
   filterMemoryItems,
@@ -15,6 +16,7 @@ import {
   type ManagerMemoryMode,
 } from '@/lib/manager-memory';
 import { getLocalIsoDate } from '@/lib/utils';
+import type { DailyNoteSource, TodayActionTarget } from '@/types';
 import type { ManagerDeskCreateItemPayload, ManagerDeskStatus } from '@/types/manager-desk';
 import { MemoryComposer } from './MemoryComposer';
 import { MemoryList } from './MemoryList';
@@ -23,6 +25,7 @@ import { MemoryError, MemorySkeleton } from './MemoryStates';
 interface ManagerMemoryPageProps {
   mode: ManagerMemoryMode;
   onViewChange: (view: AppView) => void;
+  onOpenTarget?: (target: TodayActionTarget) => void;
 }
 
 const pageCopy = {
@@ -44,7 +47,7 @@ const pageCopy = {
   },
 } as const;
 
-export function ManagerMemoryPage({ mode, onViewChange }: ManagerMemoryPageProps) {
+export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerMemoryPageProps) {
   const today = getLocalIsoDate();
   const { addToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +60,28 @@ export function ManagerMemoryPage({ mode, onViewChange }: ManagerMemoryPageProps
   const allItems = useMemo(() => filterMemoryItems(mode, day.data?.items ?? []), [day.data?.items, mode]);
   const visibleItems = useMemo(() => searchMemoryItems(allItems, searchQuery), [allItems, searchQuery]);
   const stats = useMemo(() => buildMemoryStats(mode, allItems), [allItems, mode]);
+  const itemIds = useMemo(() => allItems.map((item) => item.id), [allItems]);
+  const noteSourcesQuery = useDailyNoteSources(itemIds);
+  const noteSources = useMemo(() => {
+    const map = new Map<number, DailyNoteSource>();
+    for (const source of noteSourcesQuery.data ?? []) {
+      map.set(source.itemId, source);
+    }
+    return map;
+  }, [noteSourcesQuery.data]);
+
+  const handleOpenDesk = (item: (typeof allItems)[number]) => {
+    if (onOpenTarget) {
+      onOpenTarget({
+        type: 'manager_desk_item',
+        view: 'desk',
+        managerDeskItemId: item.id,
+        date: item.originDate,
+      });
+      return;
+    }
+    onViewChange('desk');
+  };
 
   const handleCreate = (payload: ManagerDeskCreateItemPayload) => {
     createItem.mutate(payload, {
@@ -149,7 +174,8 @@ export function ManagerMemoryPage({ mode, onViewChange }: ManagerMemoryPageProps
               mode={mode}
               items={visibleItems}
               onStatusChange={handleStatusChange}
-              onOpenDesk={() => onViewChange('desk')}
+              onOpenDesk={handleOpenDesk}
+              noteSources={noteSources}
             />
           )}
         </div>

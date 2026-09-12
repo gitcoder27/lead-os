@@ -14,6 +14,11 @@ const searchQuerySchema = z.object({
 export function createSearchRouter(searchService: SearchService): Router {
   const router = Router();
 
+  router.use((_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store");
+    next();
+  });
+
   router.get("/", validate(searchQuerySchema), async (req, res, next) => {
     try {
       const results = await searchService.search(

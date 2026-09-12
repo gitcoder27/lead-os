@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AuthProvider, getAuthScopeKey, useAuth } from '@/context/AuthContext';
+import { readDailyNoteDraft, writeDailyNoteDraft } from '@/lib/daily-note-drafts';
 import type { AuthUser } from '@/types';
 
 const apiMocks = vi.hoisted(() => ({
@@ -99,5 +100,22 @@ describe('AuthProvider cache isolation', () => {
 
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
     await waitFor(() => expect(queryClient.getQueryCache().getAll()).toHaveLength(0));
+  });
+
+  it('clears daily note drafts for the previous auth scope on logout', async () => {
+    const queryClient = createQueryClient();
+
+    renderAuthProbe(queryClient);
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+
+    const scope = getAuthScopeKey(managerA);
+    writeDailyNoteDraft(scope, '2026-04-28', { body: 'unsynced', baseBody: '', revision: 0 });
+    expect(readDailyNoteDraft(scope, '2026-04-28')).not.toBeNull();
+
+    fireEvent.click(screen.getByText('Logout'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
+
+    expect(readDailyNoteDraft(scope, '2026-04-28')).toBeNull();
   });
 });

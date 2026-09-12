@@ -19,6 +19,7 @@ import { createManagerDeskRouter } from "./routes/manager-desk";
 import { createManagerActionsRouter } from "./routes/manager-actions";
 import { createTodayRouter } from "./routes/today";
 import { createSearchRouter } from "./routes/search";
+import { createNotesRouter } from "./routes/notes";
 import { createWorkSavedViewsRouter } from "./routes/work";
 import { requireAdmin, requireManager } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
@@ -27,6 +28,7 @@ import { AutomationService } from "./services/automation.service";
 import { AuthService } from "./services/auth.service";
 import { BackupService } from "./services/backup.service";
 import { IssueService } from "./services/issue.service";
+import { DailyNotesService } from "./services/daily-notes.service";
 import { ManagerDeskService } from "./services/manager-desk.service";
 import { MyDayService } from "./services/my-day.service";
 import { WorkloadService } from "./services/workload.service";
@@ -96,11 +98,15 @@ export interface AppServices {
   todayService: TodayService;
   searchService: SearchService;
   workSavedViewsService: WorkSavedViewsService;
+  dailyNotesService?: DailyNotesService;
 }
 
 export function createApp(services: AppServices) {
   const app = express();
+  app.use("/api/notes", express.json({ limit: "512kb" }));
   app.use(express.json());
+
+  const dailyNotesService = services.dailyNotesService ?? new DailyNotesService(services.managerDeskService);
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -145,6 +151,7 @@ export function createApp(services: AppServices) {
     createManagerDeskRouter(services.managerDeskService, services.authService)
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
+  app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(
     "/api/work",
     requireManager(services.authService),

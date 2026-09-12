@@ -22,6 +22,7 @@ function invalidateDeskDependentViews(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['manager-desk', 'task-detail'] });
   qc.invalidateQueries({ queryKey: ['team-tracker'] });
   qc.invalidateQueries({ queryKey: ['workload'] });
+  qc.invalidateQueries({ queryKey: ['daily-notes'] });
 }
 
 // ── Day query ───────────────────────────────────────────

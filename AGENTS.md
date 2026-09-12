@@ -37,6 +37,7 @@ Canonical routes:
 - `/desk`: Manager Desk for capture, planning, decisions, linked people, and linked Jira issues.
 - `/follow-ups`: focused manager follow-up workflow backed by the Manager Desk data model.
 - `/meetings`: lightweight meeting notes/actions workflow backed by the Manager Desk data model.
+- `/notes`: manager-private daily scratchpad (`?date=YYYY-MM-DD`), served by `/api/notes`; never part of Manager Desk or Today data.
 - `/settings`: Jira config, field discovery, team membership, app users, backups, and workspace maintenance.
 - `/my-day`: developer-only daily workspace for current, planned, completed, and dropped work plus check-ins.
 
@@ -57,6 +58,7 @@ Feature folders under `client/src/components/`:
 - `my-day/`: developer workspace and shared login screen.
 - `manager-desk/`: Desk workspace, item drawer, rhythm lists, carry-forward, linked issue/developer workflows.
 - `manager-memory/`: Follow-ups and Meetings views.
+- `notes/`: private daily Notes workspace (sidebar history, editor, follow-up creation).
 - `capture/`: global capture dialogs and capture forms.
 - `palette/`: Cmd+K command palette and global search results.
 - `settings/`, `setup/`: configuration, maintenance, users, bootstrap, onboarding.

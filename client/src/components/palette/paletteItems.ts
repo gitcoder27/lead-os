@@ -1,5 +1,7 @@
+import { format, parseISO } from 'date-fns';
 import type { AppView } from '@/App';
 import type {
+  DailyNoteSummary,
   GlobalSearchCheckInItem,
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
@@ -7,8 +9,9 @@ import type {
   TodayActionTarget,
 } from '@/types';
 import { KIND_LABELS } from '@/types/manager-desk';
+import { isValidIsoDate } from '@/lib/view-params';
 
-export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'checkins' | 'developers';
+export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'checkins' | 'developers' | 'notes';
 
 export interface PaletteItem {
   id: string;
@@ -21,7 +24,7 @@ export interface PaletteItem {
   /** Navigation targets handed to the app's shared target handler. */
   target?: TodayActionTarget;
   /** Non-navigation actions the palette host executes (capture, sync, quick add). */
-  actionId?: 'capture' | 'sync' | 'quick-add-desk';
+  actionId?: 'capture' | 'capture-note' | 'sync' | 'quick-add-desk';
 }
 
 export interface PaletteGroup {
@@ -37,6 +40,7 @@ const NAVIGATION_COMMANDS: Array<{ view: AppView; title: string; keywords?: stri
   { view: 'desk', title: 'Go to Desk', keywords: 'manager planning', targetView: 'desk' },
   { view: 'follow-ups', title: 'Go to Follow-ups', keywords: 'promises reminders', targetView: 'follow-ups' },
   { view: 'meetings', title: 'Go to Meetings', keywords: 'actions minutes', targetView: 'meetings' },
+  { view: 'notes', title: 'Go to Notes', keywords: 'scratchpad journal private writing', targetView: 'notes' },
   { view: 'settings', title: 'Go to Settings', keywords: 'config jira users backups', targetView: 'settings' },
 ];
 
@@ -56,10 +60,18 @@ export function buildQuickActions(): PaletteItem[] {
     {
       id: 'action-capture',
       group: 'actions',
-      title: 'Capture a note',
+      title: 'Quick capture',
       description: 'Desk or Team quick capture',
-      keywords: 'new note follow-up meeting task add',
+      keywords: 'capture quick add desk team task follow-up meeting',
       actionId: 'capture',
+    },
+    {
+      id: 'action-capture-note',
+      group: 'actions',
+      title: 'New note',
+      description: "Add to today's private scratchpad",
+      keywords: 'note scratchpad journal private write capture',
+      actionId: 'capture-note',
     },
     {
       id: 'action-sync',
@@ -172,11 +184,23 @@ export function developerToPaletteItem(developer: GlobalSearchDeveloperItem, ind
   };
 }
 
+export function noteToPaletteItem(note: DailyNoteSummary, index: number): PaletteItem {
+  const dateLabel = isValidIsoDate(note.date) ? format(parseISO(note.date), 'MMM d') : note.date;
+  return {
+    id: `note-${note.id}-${index}`,
+    group: 'notes',
+    title: note.title || 'Daily note',
+    description: note.excerpt ? `${dateLabel} · ${note.excerpt}` : dateLabel,
+    target: { type: 'view', view: 'notes', date: note.date },
+  };
+}
+
 export function buildResultGroups(results: {
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
+  notes?: DailyNoteSummary[];
 }): PaletteGroup[] {
   const groups: PaletteGroup[] = [
     {
@@ -198,6 +222,11 @@ export function buildResultGroups(results: {
       id: 'developers',
       label: 'Developers',
       items: results.developers.map(developerToPaletteItem),
+    },
+    {
+      id: 'notes',
+      label: 'Notes',
+      items: (results.notes ?? []).map(noteToPaletteItem),
     },
   ];
   return groups.filter((group) => group.items.length > 0);

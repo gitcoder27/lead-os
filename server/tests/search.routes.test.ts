@@ -67,6 +67,7 @@ describe("GET /api/search", () => {
       deskItems: [],
       checkIns: [],
       developers: [],
+      notes: [],
     });
   });
 

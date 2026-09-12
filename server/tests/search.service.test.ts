@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
 import {
   configTable,
+  dailyNotes,
   developers,
   issues,
   managerDeskDays,
@@ -76,6 +77,23 @@ async function seedDeskItem(
   return item!;
 }
 
+async function seedNote(options: { body: string; managerAccountId: string; date?: string; workspaceId?: string }) {
+  const [note] = await db
+    .insert(dailyNotes)
+    .values({
+      workspaceId: options.workspaceId ?? "default",
+      managerAccountId: options.managerAccountId,
+      date: options.date ?? "2026-03-07",
+      body: options.body,
+      revision: 1,
+      createdAt: "2026-03-07T00:00:00.000Z",
+      updatedAt: "2026-03-07T09:00:00.000Z",
+    })
+    .returning();
+
+  return note!;
+}
+
 async function seedCheckIn(options: { summary: string; developerAccountId?: string; date?: string; workspaceId?: string }) {
   const [day] = await db
     .insert(teamTrackerDays)
@@ -134,7 +152,7 @@ describe("SearchService.search", () => {
 
     const result = await searchService.search("p");
 
-    expect(result).toEqual({ query: "p", issues: [], deskItems: [], checkIns: [], developers: [] });
+    expect(result).toEqual({ query: "p", issues: [], deskItems: [], checkIns: [], developers: [], notes: [] });
   });
 
   it("matches issues by key, summary, and assignee name", async () => {
@@ -281,6 +299,29 @@ describe("SearchService.search", () => {
     expect(result.issues).toHaveLength(1);
     expect(result.deskItems).toHaveLength(0);
     expect(result.checkIns).toHaveLength(0);
+  });
+
+  it("returns notes scoped to the requesting manager and workspace", async () => {
+    await seedNote({ body: "payment retro scratchpad", managerAccountId: "manager-a" });
+    await seedNote({ body: "payment notes from another manager", managerAccountId: "manager-b" });
+    await seedNote({ body: "payment notes in another workspace", managerAccountId: "manager-a", workspaceId: "other" });
+
+    const result = await searchService.search("payment", "default", "manager-a");
+
+    expect(result.notes).toHaveLength(1);
+    expect(result.notes?.[0]).toMatchObject({
+      date: "2026-03-07",
+      title: "payment retro scratchpad",
+    });
+    expect(result.notes?.[0]).not.toHaveProperty("body");
+  });
+
+  it("returns no notes when the manager account is absent", async () => {
+    await seedNote({ body: "payment retro scratchpad", managerAccountId: "manager-a" });
+
+    const result = await searchService.search("payment", "default");
+
+    expect(result.notes).toEqual([]);
   });
 
   it("treats LIKE wildcards in the query as literals", async () => {

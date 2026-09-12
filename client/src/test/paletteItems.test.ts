@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { GlobalSearchCheckInItem, GlobalSearchDeskItem, GlobalSearchDeveloperItem, GlobalSearchIssueItem } from '@/types';
+import type { DailyNoteSummary, GlobalSearchCheckInItem, GlobalSearchDeskItem, GlobalSearchDeveloperItem, GlobalSearchIssueItem } from '@/types';
 import {
   buildNavigationCommands,
   buildQuickActions,
@@ -10,6 +10,7 @@ import {
   developerToPaletteItem,
   filterCommands,
   issueToPaletteItem,
+  noteToPaletteItem,
   placeQuickAddItem,
   QUICK_ADD_MIN_QUERY_LENGTH,
 } from '@/components/palette/paletteItems';
@@ -49,6 +50,14 @@ const developer: GlobalSearchDeveloperItem = {
   accountId: 'dev-1',
   displayName: 'Alice Smith',
   email: 'alice@example.com',
+};
+
+const dailyNote: DailyNoteSummary = {
+  id: 9,
+  date: '2026-03-08',
+  title: 'Retro prep thoughts',
+  excerpt: 'Draft agenda for Thursday retro',
+  updatedAt: '2026-03-08T09:00:00.000Z',
 };
 
 describe('palette item builders', () => {
@@ -94,6 +103,15 @@ describe('palette item builders', () => {
     expect(item.description).toBe('alice@example.com');
   });
 
+  it('maps a note summary to the notes day target', () => {
+    const item = noteToPaletteItem(dailyNote, 0);
+
+    expect(item.target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08' });
+    expect(item.title).toBe('Retro prep thoughts');
+    expect(item.description).toContain('Mar 8');
+    expect(item.description).toContain('Draft agenda');
+  });
+
   it('builds result groups with only non-empty groups', () => {
     const groups = buildResultGroups({
       issues: [issue],
@@ -104,6 +122,19 @@ describe('palette item builders', () => {
 
     expect(groups.map((group) => group.id)).toEqual(['issues', 'checkins']);
   });
+
+  it('includes a notes group when note results are present', () => {
+    const groups = buildResultGroups({
+      issues: [],
+      deskItems: [],
+      checkIns: [],
+      developers: [],
+      notes: [dailyNote],
+    });
+
+    expect(groups.map((group) => group.id)).toEqual(['notes']);
+    expect(groups[0].items[0].target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08' });
+  });
 });
 
 describe('palette commands', () => {
@@ -111,9 +142,10 @@ describe('palette commands', () => {
     const navigation = buildNavigationCommands();
     const commands = [...navigation, ...buildQuickActions()];
 
-    expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(7);
-    expect(navigation.filter((command) => command.target).length).toBe(6);
+    expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(8);
+    expect(navigation.filter((command) => command.target).length).toBe(7);
     expect(commands.some((command) => command.actionId === 'capture')).toBe(true);
+    expect(commands.some((command) => command.actionId === 'capture-note')).toBe(true);
     expect(commands.some((command) => command.actionId === 'sync')).toBe(true);
     expect(navigation.map((command) => command.view)).toEqual([
       'today',
@@ -122,6 +154,7 @@ describe('palette commands', () => {
       'desk',
       'follow-ups',
       'meetings',
+      'notes',
       'settings',
     ]);
   });
@@ -141,15 +174,15 @@ describe('palette commands', () => {
   it('ranks title matches above keyword-only matches', () => {
     const commands = [...buildNavigationCommands(), ...buildQuickActions()];
 
-    expect(filterCommands(commands, 'note')[0].id).toBe('action-capture');
+    expect(filterCommands(commands, 'note')[0].id).toBe('nav-notes');
     expect(filterCommands(commands, 'capture')[0].id).toBe('action-capture');
   });
 
   it('no longer lets Desk or Meetings hijack capture and note keywords', () => {
     const commands = [...buildNavigationCommands(), ...buildQuickActions()];
 
-    expect(filterCommands(commands, 'note').map((command) => command.id)).toEqual(['action-capture']);
-    expect(filterCommands(commands, 'capture').map((command) => command.id)).toEqual(['action-capture']);
+    expect(filterCommands(commands, 'note').map((command) => command.id)).toEqual(['nav-notes', 'action-capture-note']);
+    expect(filterCommands(commands, 'capture').map((command) => command.id)).toEqual(['action-capture', 'action-capture-note']);
   });
 });
 

@@ -4,6 +4,7 @@ import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDia
 export interface QuickActionsValue {
   openCapture: (context?: GlobalCaptureContext) => void;
   openCommandPalette: () => void;
+  openNotes?: (date?: string) => void;
 }
 
 const QuickActionsContext = createContext<QuickActionsValue>({

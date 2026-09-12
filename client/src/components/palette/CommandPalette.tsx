@@ -7,6 +7,7 @@ import {
   CalendarClock,
   ClipboardList,
   MessageSquare,
+  NotebookPen,
   Plus,
   RefreshCw,
   Search,
@@ -48,8 +49,10 @@ const ACTION_ICONS: Record<string, typeof Sunrise> = {
   'nav-desk': Briefcase,
   'nav-follow-ups': CalendarClock,
   'nav-meetings': Video,
+  'nav-notes': NotebookPen,
   'nav-settings': Settings,
   'action-capture': Plus,
+  'action-capture-note': NotebookPen,
   'action-sync': RefreshCw,
   'quick-add-desk': Plus,
 };
@@ -59,6 +62,7 @@ const RESULT_ICONS: Record<string, typeof Bug> = {
   desk: ClipboardList,
   checkins: MessageSquare,
   developers: User,
+  notes: NotebookPen,
 };
 
 const GROUP_LABELS: Record<string, string> = {
@@ -67,6 +71,7 @@ const GROUP_LABELS: Record<string, string> = {
   desk: 'Desk items & follow-ups',
   checkins: 'Check-ins',
   developers: 'Developers',
+  notes: 'Notes',
 };
 
 export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandPaletteProps) {
@@ -98,6 +103,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           deskItems: searchQuery.data?.deskItems ?? [],
           checkIns: searchQuery.data?.checkIns ?? [],
           developers: searchQuery.data?.developers ?? [],
+          notes: searchQuery.data?.notes ?? [],
         }).flatMap((group) => group.items)
       : [];
     return placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query));
@@ -142,6 +148,11 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
       if (item.actionId === 'capture') {
         onClose();
         openCapture();
+        return;
+      }
+      if (item.actionId === 'capture-note') {
+        onClose();
+        openCapture({ defaultTarget: 'notes' });
         return;
       }
       if (item.actionId === 'sync') {

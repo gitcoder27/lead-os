@@ -5,6 +5,7 @@ import {
   dashboardFilterStateToSearch,
   deskDateFromParams,
   deskDateToSearch,
+  notesDateFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToSearch,
 } from '@/lib/view-params';
@@ -69,5 +70,14 @@ describe('desk date serialization', () => {
     expect(deskDateFromParams(paramsFromSearch('?date=2026-03-07'))).toBe('2026-03-07');
     expect(deskDateFromParams(paramsFromSearch('?date=yesterday'))).toBeUndefined();
     expect(deskDateFromParams(paramsFromSearch('?date=2026-13-99'))).toBeUndefined();
+  });
+});
+
+describe('notes date serialization', () => {
+  it('returns a valid ISO date and rejects invalid values', () => {
+    expect(notesDateFromParams(paramsFromSearch('?date=2026-09-12'))).toBe('2026-09-12');
+    expect(notesDateFromParams(paramsFromSearch('?date=2026-02-30'))).toBeUndefined();
+    expect(notesDateFromParams(paramsFromSearch('?date=tomorrow'))).toBeUndefined();
+    expect(notesDateFromParams(paramsFromSearch('?other=1'))).toBeUndefined();
   });
 });

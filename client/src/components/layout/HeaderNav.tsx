@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Briefcase, CalendarDays, ClipboardList, ExternalLink, Home, MoreHorizontal, type LucideIcon, Users } from 'lucide-react';
+import { Bell, Briefcase, CalendarDays, ClipboardList, ExternalLink, Home, MoreHorizontal, NotebookPen, type LucideIcon, Users } from 'lucide-react';
 import type { ActiveAppView, AppView } from '@/App';
 import { WorkspaceNavLink } from '@/components/layout/WorkspaceNavLink';
 
@@ -13,7 +13,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const closeMoreTimeoutRef = useRef<number | null>(null);
-  const moreIsActive = activeView === 'follow-ups' || activeView === 'meetings';
+  const moreIsActive = activeView === 'follow-ups' || activeView === 'meetings' || activeView === 'notes';
 
   const clearCloseMoreTimeout = () => {
     if (closeMoreTimeoutRef.current === null) {
@@ -155,6 +155,18 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
                     }}
                     newTabHref="/follow-ups"
                     newTabLabel="Open Follow-ups in new tab"
+                  />
+                  <MoreMenuItem
+                    label="Notes"
+                    icon={NotebookPen}
+                    active={activeView === 'notes'}
+                    accentColor="var(--accent)"
+                    onClick={() => {
+                      onViewChange('notes');
+                      closeMore();
+                    }}
+                    newTabHref="/notes"
+                    newTabLabel="Open Notes in new tab"
                   />
                   <MoreMenuItem
                     label="Meetings"

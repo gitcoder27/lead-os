@@ -81,8 +81,10 @@ describe('Header', () => {
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
 
     expect(screen.getByText('Follow-ups')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
     expect(screen.getByText('Meetings')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /open follow-ups in new tab/i })).toHaveAttribute('href', '/follow-ups');
+    expect(screen.getByRole('link', { name: /open notes in new tab/i })).toHaveAttribute('href', '/notes');
     expect(screen.getByRole('link', { name: /open meetings in new tab/i })).toHaveAttribute('href', '/meetings');
     expect(screen.queryByText('My Day')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();

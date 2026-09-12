@@ -229,6 +229,11 @@ body::after {
   background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
 }
 
+.notes-capture-textarea:focus-visible {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 .memory-input::placeholder {
   color: var(--text-placeholder);
   opacity: 1;

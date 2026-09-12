@@ -290,3 +290,44 @@ export const managerDeskItemHistory = sqliteTable("manager_desk_item_history", {
   snapshotJson: text("snapshot_json").notNull(),
   recordedAt: text("recorded_at").notNull(),
 });
+
+export const dailyNotes = sqliteTable("daily_notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  date: text("date").notNull(),
+  body: text("body").notNull(),
+  revision: integer("revision").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_daily_notes_owner_date").on(table.workspaceId, table.managerAccountId, table.date),
+]);
+
+export const dailyNoteCaptures = sqliteTable("daily_note_captures", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  noteId: integer("note_id").notNull().references(() => dailyNotes.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_daily_note_captures_owner_request").on(table.workspaceId, table.managerAccountId, table.requestId),
+  index("idx_daily_note_captures_note").on(table.noteId),
+]);
+
+export const dailyNoteFollowUps = sqliteTable("daily_note_follow_ups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  noteId: integer("note_id").notNull().references(() => dailyNotes.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").notNull().references(() => managerDeskItems.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_daily_note_follow_ups_item").on(table.itemId),
+  uniqueIndex("idx_daily_note_follow_ups_owner_request").on(table.workspaceId, table.managerAccountId, table.requestId),
+  index("idx_daily_note_follow_ups_note").on(table.noteId),
+]);

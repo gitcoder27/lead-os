@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalCaptureDialog } from '@/components/capture/GlobalCaptureDialog';
 import { TestWrapper } from './wrapper';
+import type * as scopedStorageModule from '@/lib/scoped-storage';
+import type * as authContextModule from '@/context/AuthContext';
 
 // ── Mocks ───────────────────────────────────────────────
 
@@ -59,6 +61,27 @@ vi.mock('@/hooks/useTeamTrackerMutations', () => ({
   }),
 }));
 
+const mockNoteAppendMutate = vi.fn();
+let scopedStorageKey = CAPTURE_TARGET_STORAGE_KEY;
+let noteDraftScope = 'ws-1:manager-a:manager:';
+
+vi.mock('@/hooks/useDailyNotes', () => ({
+  useAppendDailyNote: () => ({
+    mutate: mockNoteAppendMutate,
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/lib/scoped-storage', async (importOriginal) => {
+  const mod = await importOriginal<typeof scopedStorageModule>();
+  return { ...mod, useScopedStorageKey: () => scopedStorageKey };
+});
+
+vi.mock('@/context/AuthContext', async (importOriginal) => {
+  const mod = await importOriginal<typeof authContextModule>();
+  return { ...mod, useAuthScopeKey: () => noteDraftScope };
+});
+
 vi.mock('@/components/JiraIssueLink', () => ({
   JiraIssueLink: ({ children, ...props }: Record<string, unknown>) => (
     <a {...props}>{children as React.ReactNode}</a>
@@ -86,6 +109,9 @@ describe('GlobalCaptureDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    scopedStorageKey = CAPTURE_TARGET_STORAGE_KEY;
+    noteDraftScope = 'ws-1:manager-a:manager:';
   });
 
   it('renders with segmented control showing both targets', () => {
@@ -342,5 +368,57 @@ describe('GlobalCaptureDialog', () => {
 
     fireEvent.click(screen.getByText('+ Add note'));
     expect(screen.getByPlaceholderText('Context, handoff detail, or priority reason…')).toBeInTheDocument();
+  });
+
+  it('switches to the Notes target and appends via the notes mutation', async () => {
+    renderDialog({ onOpenNotes: vi.fn() });
+
+    fireEvent.click(screen.getByText('Notes'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Added to your private daily note')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('Quick note'), { target: { value: 'capture this thought' } });
+    fireEvent.click(screen.getByRole('button', { name: /add to note/i }));
+
+    expect(mockNoteAppendMutate).toHaveBeenCalledTimes(1);
+    expect(mockNoteAppendMutate.mock.calls[0][0]).toMatchObject({
+      text: 'capture this thought',
+    });
+    expect(mockNoteAppendMutate.mock.calls[0][0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('opens the Notes target directly when requested by context', async () => {
+    renderDialog({ context: { defaultTarget: 'notes' }, onOpenNotes: vi.fn() });
+
+    await waitFor(() => {
+      expect(screen.getByText('Added to your private daily note')).toBeInTheDocument();
+    });
+  });
+
+  it('does not leak held note text when the auth scope changes', async () => {
+    const onClose = vi.fn();
+    const renderView = () => (
+      <TestWrapper>
+        <GlobalCaptureDialog onClose={onClose} context={{ defaultTarget: 'notes' }} />
+      </TestWrapper>
+    );
+    const { rerender } = render(renderView());
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Quick note')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Quick note'), {
+      target: { value: 'private text from the previous manager' },
+    });
+
+    scopedStorageKey = 'lead-os:ws-2:manager-b:dcc-capture-target';
+    noteDraftScope = 'ws-2:manager-b:manager:';
+    rerender(renderView());
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Quick note')).toHaveValue('');
+    });
   });
 });

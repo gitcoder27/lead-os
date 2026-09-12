@@ -287,6 +287,41 @@ CREATE TABLE IF NOT EXISTS manager_desk_item_history (
   recorded_at        TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS daily_notes (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL,
+  manager_account_id TEXT NOT NULL,
+  date               TEXT NOT NULL,
+  body               TEXT NOT NULL,
+  revision           INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS daily_note_captures (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL,
+  manager_account_id TEXT NOT NULL,
+  note_id            INTEGER NOT NULL,
+  request_id         TEXT NOT NULL,
+  payload_hash       TEXT NOT NULL,
+  created_at         TEXT NOT NULL,
+  FOREIGN KEY (note_id) REFERENCES daily_notes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS daily_note_follow_ups (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL,
+  manager_account_id TEXT NOT NULL,
+  note_id            INTEGER NOT NULL,
+  item_id            INTEGER NOT NULL,
+  request_id         TEXT NOT NULL,
+  payload_hash       TEXT NOT NULL,
+  created_at         TEXT NOT NULL,
+  FOREIGN KEY (note_id) REFERENCES daily_notes(id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id) REFERENCES manager_desk_items(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_app_users_username ON app_users(username);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace ON app_users(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace_dev_account ON app_users(workspace_id, developer_account_id);
@@ -314,6 +349,12 @@ CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_issue_key ON manager
 CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_developer_account_id ON manager_desk_links(workspace_id, developer_account_id);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_item_recorded ON manager_desk_item_history(workspace_id, item_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_manager_recorded ON manager_desk_item_history(workspace_id, manager_account_id, recorded_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_captures_owner_request ON daily_note_captures(workspace_id, manager_account_id, request_id);
+CREATE INDEX IF NOT EXISTS idx_daily_note_captures_note ON daily_note_captures(note_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_follow_ups_item ON daily_note_follow_ups(item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_follow_ups_owner_request ON daily_note_follow_ups(workspace_id, manager_account_id, request_id);
+CREATE INDEX IF NOT EXISTS idx_daily_note_follow_ups_note ON daily_note_follow_ups(note_id);
 `;
 
 const alterStatements = [
@@ -499,6 +540,9 @@ const workspaceOwnedTables = [
   "manager_desk_items",
   "manager_desk_links",
   "manager_desk_item_history",
+  "daily_notes",
+  "daily_note_captures",
+  "daily_note_follow_ups",
 ];
 
 function tableExists(sqlite: BetterSqlite3.Database, tableName: string): boolean {

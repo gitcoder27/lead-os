@@ -11,6 +11,7 @@ const mockRefetch = vi.fn();
 let mockDay: ManagerDeskDayResponse | undefined;
 let mockDayError: Error | null = null;
 let mockDayLoading = false;
+let mockNoteSources: { itemId: number; noteId: number; date: string }[] = [];
 
 const baseItem = (overrides: Partial<ManagerDeskItem>): ManagerDeskItem => ({
   id: overrides.id ?? 1,
@@ -49,6 +50,10 @@ vi.mock('@/hooks/useManagerDesk', () => ({
   useUpdateManagerDeskItem: () => ({ mutate: mockUpdateMutate, isPending: false }),
 }));
 
+vi.mock('@/hooks/useDailyNotes', () => ({
+  useDailyNoteSources: (ids: number[]) => ({ data: mockNoteSources.filter((s) => ids.includes(s.itemId)) }),
+}));
+
 function renderMemory(mode: 'follow-ups' | 'meetings') {
   return render(<ManagerMemoryPage mode={mode} onViewChange={vi.fn()} />);
 }
@@ -63,6 +68,7 @@ describe('ManagerMemoryPage', () => {
     mockRefetch.mockReset();
     mockDayError = null;
     mockDayLoading = false;
+    mockNoteSources = [];
     mockDay = {
       date: '2026-04-28',
       viewMode: 'live',
@@ -171,5 +177,45 @@ describe('ManagerMemoryPage', () => {
     expect(screen.getByText('Desk read failed')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('renders a private note source link only for owned associations', () => {
+    mockNoteSources = [{ itemId: 1, noteId: 42, date: '2026-04-27' }];
+
+    renderMemory('follow-ups');
+
+    const link = screen.getByRole('link', { name: 'Open source note from 2026-04-27' });
+    expect(link).toHaveAttribute('href', '/notes?date=2026-04-27');
+    expect(link).toHaveTextContent('Source: Apr 27 notes');
+    expect(screen.getAllByText(/Source: .* notes/)).toHaveLength(1);
+  });
+
+  it('opens the exact desk item when an onOpenTarget handler is provided', () => {
+    const onOpenTarget = vi.fn();
+
+    render(
+      <ManagerMemoryPage mode="follow-ups" onViewChange={vi.fn()} onOpenTarget={onOpenTarget} />,
+    );
+
+    const row = screen.getByText('Check in with QA').closest('article')!;
+    fireEvent.click(within(row).getByRole('button', { name: /^Desk$/ }));
+
+    expect(onOpenTarget).toHaveBeenCalledWith({
+      type: 'manager_desk_item',
+      view: 'desk',
+      managerDeskItemId: 1,
+      date: '2026-04-28',
+    });
+  });
+
+  it('falls back to onViewChange when no onOpenTarget handler is provided', () => {
+    const onViewChange = vi.fn();
+
+    render(<ManagerMemoryPage mode="follow-ups" onViewChange={onViewChange} />);
+
+    const row = screen.getByText('Check in with QA').closest('article')!;
+    fireEvent.click(within(row).getByRole('button', { name: /^Desk$/ }));
+
+    expect(onViewChange).toHaveBeenCalledWith('desk');
   });
 });

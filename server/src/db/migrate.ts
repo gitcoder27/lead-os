@@ -322,6 +322,16 @@ CREATE TABLE IF NOT EXISTS daily_note_follow_ups (
   FOREIGN KEY (item_id) REFERENCES manager_desk_items(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS user_nav_preferences (
+  workspace_id       TEXT NOT NULL DEFAULT 'default',
+  manager_account_id TEXT NOT NULL,
+  top_nav            TEXT NOT NULL,
+  more_nav           TEXT NOT NULL,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, manager_account_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_app_users_username ON app_users(username);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace ON app_users(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace_dev_account ON app_users(workspace_id, developer_account_id);
@@ -543,6 +553,7 @@ const workspaceOwnedTables = [
   "daily_notes",
   "daily_note_captures",
   "daily_note_follow_ups",
+  "user_nav_preferences",
 ];
 
 function tableExists(sqlite: BetterSqlite3.Database, tableName: string): boolean {

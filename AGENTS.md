@@ -14,7 +14,7 @@ TypeScript monorepo with three npm workspaces:
 
 - `client/`: React + Vite SPA. Entry points: `src/main.tsx`, `src/App.tsx`.
 - `server/`: Express + SQLite backend. Runtime entry: `src/index.ts`; app factory: `src/app.ts`.
-- `shared/`: cross-layer contracts in `shared/types.ts`.
+- `shared/`: cross-layer contracts in `shared/types.ts`. The committed `shared/types.js` is a CommonJS build artifact the server and its tests resolve at runtime — if runtime exports (constants, functions) are added to `types.ts`, regenerate it with `npx tsc shared/types.ts --outDir shared --module commonjs --target es2022 --strict --skipLibCheck --esModuleInterop --noUncheckedIndexedAccess`. The client aliases `shared/types` to the `.ts` source in `vite.config.ts`/`vitest.config.ts`, so it always sees live exports; type-only additions need no regeneration.
 
 Supporting folders:
 

@@ -7,6 +7,7 @@ const useThemeMock = vi.fn();
 const useAuthMock = vi.fn();
 const useSyncStatusMock = vi.fn();
 const useTriggerSyncMock = vi.fn();
+const useNavPreferencesMock = vi.fn();
 
 vi.mock('@/context/ThemeContext', () => ({
   useTheme: () => useThemeMock(),
@@ -22,6 +23,11 @@ vi.mock('@/hooks/useSyncStatus', () => ({
 
 vi.mock('@/hooks/useTriggerSync', () => ({
   useTriggerSync: () => useTriggerSyncMock(),
+}));
+
+vi.mock('@/hooks/useNavPreferences', () => ({
+  useNavPreferences: () => useNavPreferencesMock(),
+  useSaveNavPreferences: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/components/capture/GlobalCaptureDialog', () => ({
@@ -63,6 +69,9 @@ describe('Header', () => {
       mutate: vi.fn(),
       isPending: false,
     });
+    useNavPreferencesMock.mockReturnValue({
+      preferences: { topNav: ['work', 'team', 'desk'], moreNav: ['follow-ups', 'notes', 'meetings'] },
+    });
   });
 
   it('keeps settings out of the main navigation while exposing the top-right gear for managers', () => {
@@ -100,6 +109,62 @@ describe('Header', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
     expect(screen.getByRole('link', { name: /open meetings in new tab/i })).toHaveAttribute('href', '/meetings');
+  });
+
+  it('renders a customized layout with promoted pages and reordered chips', () => {
+    useNavPreferencesMock.mockReturnValue({
+      preferences: { topNav: ['notes', 'work', 'team', 'desk'], moreNav: ['follow-ups', 'meetings'] },
+    });
+    render(<Header activeView="notes" onViewChange={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Workspace navigation' });
+    expect(nav.textContent).toContain('Notes');
+    const notesIndex = nav.textContent?.indexOf('Notes') ?? -1;
+    const workIndex = nav.textContent?.indexOf('Work') ?? -1;
+    expect(notesIndex).toBeGreaterThan(-1);
+    expect(notesIndex).toBeLessThan(workIndex);
+
+    fireEvent.click(screen.getByRole('button', { name: /more/i }));
+    expect(screen.getByRole('menuitem', { name: 'Follow-ups' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Meetings' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Notes' })).not.toBeInTheDocument();
+  });
+
+  it('moves demoted pages into the More menu and hides More when empty', () => {
+    useNavPreferencesMock.mockReturnValue({
+      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk', 'follow-ups', 'meetings'] },
+    });
+    const { unmount } = render(<Header activeView="today" onViewChange={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Workspace navigation' });
+    expect(nav.textContent).not.toContain('Work');
+    expect(nav.textContent).not.toContain('Desk');
+
+    fireEvent.click(screen.getByRole('button', { name: /more/i }));
+    expect(screen.getByRole('menuitem', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Desk' })).toBeInTheDocument();
+    unmount();
+
+    useNavPreferencesMock.mockReturnValue({
+      preferences: { topNav: ['work', 'team', 'desk', 'follow-ups', 'notes', 'meetings'], moreNav: [] },
+    });
+    render(<Header activeView="today" onViewChange={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
+    expect(screen.getByText('Meetings')).toBeInTheDocument();
+  });
+
+  it('keeps the fixed Work and Team layout for non-manager users', () => {
+    useAuthMock.mockReturnValue({ user: { role: 'developer' } });
+    useNavPreferencesMock.mockReturnValue({
+      preferences: { topNav: ['notes', 'meetings'], moreNav: ['work', 'team', 'desk', 'follow-ups'] },
+    });
+    render(<Header activeView="today" onViewChange={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Workspace navigation' });
+    expect(nav.textContent).toContain('Work');
+    expect(nav.textContent).toContain('Team');
+    expect(nav.textContent).not.toContain('Notes');
+    expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
   });
 
   it('opens the secondary workspace menu on hover', () => {

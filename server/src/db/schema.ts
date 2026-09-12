@@ -331,3 +331,14 @@ export const dailyNoteFollowUps = sqliteTable("daily_note_follow_ups", {
   uniqueIndex("idx_daily_note_follow_ups_owner_request").on(table.workspaceId, table.managerAccountId, table.requestId),
   index("idx_daily_note_follow_ups_note").on(table.noteId),
 ]);
+
+export const userNavPreferences = sqliteTable("user_nav_preferences", {
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  topNav: text("top_nav").notNull(),
+  moreNav: text("more_nav").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  primaryKey({ name: "pk_user_nav_preferences_workspace_manager", columns: [table.workspaceId, table.managerAccountId] }),
+]);

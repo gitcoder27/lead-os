@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Briefcase, CalendarDays, ClipboardList, ExternalLink, Home, MoreHorizontal, NotebookPen, type LucideIcon, Users } from 'lucide-react';
+import { ExternalLink, Home, MoreHorizontal, type LucideIcon } from 'lucide-react';
 import type { ActiveAppView, AppView } from '@/App';
 import { WorkspaceNavLink } from '@/components/layout/WorkspaceNavLink';
+import { useNavPreferences } from '@/hooks/useNavPreferences';
+import { NAV_PAGE_META } from '@/lib/nav-pages';
+import type { NavPageId } from '@/types';
+
+// Developers keep the fixed lean layout; only managers can customize the nav.
+const DEVELOPER_TOP_NAV: NavPageId[] = ['work', 'team'];
 
 interface HeaderNavProps {
   activeView?: ActiveAppView;
@@ -13,7 +19,10 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const closeMoreTimeoutRef = useRef<number | null>(null);
-  const moreIsActive = activeView === 'follow-ups' || activeView === 'meetings' || activeView === 'notes';
+  const { preferences } = useNavPreferences();
+  const topPages = isManager ? preferences.topNav : DEVELOPER_TOP_NAV;
+  const morePages = isManager ? preferences.moreNav : [];
+  const moreIsActive = morePages.some((id) => Boolean(activeView && NAV_PAGE_META[id].matches.includes(activeView)));
 
   const clearCloseMoreTimeout = () => {
     if (closeMoreTimeoutRef.current === null) {
@@ -54,12 +63,22 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
       if (moreRef.current?.contains(target)) {
         return;
       }
-      closeMore();
+      if (closeMoreTimeoutRef.current !== null) {
+        window.clearTimeout(closeMoreTimeoutRef.current);
+        closeMoreTimeoutRef.current = null;
+      }
+      setMoreOpen(false);
     };
 
     window.addEventListener('mousedown', handleOutsideClick);
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, [moreOpen]);
+
+  useEffect(() => {
+    if (morePages.length === 0) {
+      setMoreOpen(false);
+    }
+  }, [morePages.length]);
 
   useEffect(() => {
     return () => {
@@ -82,109 +101,77 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
         newTabHref="/"
         newTabLabel="Open Today in new tab"
       />
-      <WorkspaceNavLink
-        label="Work"
-        icon={ClipboardList}
-        active={activeView === 'work' || activeView === 'dashboard'}
-        accentColor="var(--accent)"
-        onClick={() => onViewChange('work')}
-        newTabHref="/work"
-        newTabLabel="Open Work in new tab"
-      />
-      <WorkspaceNavLink
-        label="Team"
-        icon={Users}
-        active={activeView === 'team' || activeView === 'team-tracker'}
-        accentColor="var(--accent)"
-        onClick={() => onViewChange('team')}
-        newTabHref="/team"
-        newTabLabel="Open Team in new tab"
-      />
-      {isManager && (
-        <>
+      {topPages.map((id) => {
+        const meta = NAV_PAGE_META[id];
+        return (
           <WorkspaceNavLink
-            label="Desk"
-            icon={Briefcase}
-            active={activeView === 'desk' || activeView === 'manager-desk'}
-            accentColor="var(--md-accent)"
-            onClick={() => onViewChange('desk')}
-            newTabHref="/desk"
-            newTabLabel="Open Desk in new tab"
+            key={id}
+            label={meta.label}
+            icon={meta.icon}
+            active={Boolean(activeView && meta.matches.includes(activeView))}
+            accentColor={meta.accentColor}
+            onClick={() => onViewChange(meta.view)}
+            newTabHref={meta.href}
+            newTabLabel={`Open ${meta.label} in new tab`}
           />
-          <div
-            className="relative"
-            ref={moreRef}
-            onMouseEnter={openMore}
-            onMouseLeave={scheduleCloseMore}
+        );
+      })}
+      {isManager && morePages.length > 0 && (
+        <div
+          className="relative"
+          ref={moreRef}
+          onMouseEnter={openMore}
+          onMouseLeave={scheduleCloseMore}
+        >
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            className="flex h-8 min-w-[48px] items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-medium transition-colors"
+            style={{
+              background: moreIsActive ? 'var(--bg-elevated)' : 'transparent',
+              color: moreIsActive ? 'var(--accent)' : 'var(--text-muted)',
+              boxShadow: moreIsActive ? 'var(--soft-shadow)' : 'none',
+            }}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+            aria-label="More workspaces"
           >
-            <button
-              type="button"
-              onClick={() => setMoreOpen((open) => !open)}
-              className="flex h-8 min-w-[48px] items-center justify-center gap-1.5 rounded-lg px-3 text-[12px] font-medium transition-colors"
-              style={{
-                background: moreIsActive ? 'var(--bg-elevated)' : 'transparent',
-                color: moreIsActive ? 'var(--accent)' : 'var(--text-muted)',
-                boxShadow: moreIsActive ? 'var(--soft-shadow)' : 'none',
-              }}
-              aria-expanded={moreOpen}
-              aria-haspopup="menu"
-              aria-label="More workspaces"
-            >
-              <MoreHorizontal size={13} className="shrink-0" />
-              <span className="hidden sm:inline">More</span>
-            </button>
+            <MoreHorizontal size={13} className="shrink-0" />
+            <span className="hidden sm:inline">More</span>
+          </button>
 
-            {moreOpen && (
-              <div className="absolute right-0 top-full z-[320] w-48 pt-1.5">
-                <div
-                  role="menu"
-                  className="overflow-hidden rounded-xl border p-1 shadow-2xl"
-                  style={{
-                    borderColor: 'var(--border)',
-                    background: 'color-mix(in srgb, var(--bg-secondary) 96%, transparent)',
-                  }}
-                >
-                  <MoreMenuItem
-                    label="Follow-ups"
-                    icon={Bell}
-                    active={activeView === 'follow-ups'}
-                    accentColor="var(--warning)"
-                    onClick={() => {
-                      onViewChange('follow-ups');
-                      closeMore();
-                    }}
-                    newTabHref="/follow-ups"
-                    newTabLabel="Open Follow-ups in new tab"
-                  />
-                  <MoreMenuItem
-                    label="Notes"
-                    icon={NotebookPen}
-                    active={activeView === 'notes'}
-                    accentColor="var(--accent)"
-                    onClick={() => {
-                      onViewChange('notes');
-                      closeMore();
-                    }}
-                    newTabHref="/notes"
-                    newTabLabel="Open Notes in new tab"
-                  />
-                  <MoreMenuItem
-                    label="Meetings"
-                    icon={CalendarDays}
-                    active={activeView === 'meetings'}
-                    accentColor="var(--accent)"
-                    onClick={() => {
-                      onViewChange('meetings');
-                      closeMore();
-                    }}
-                    newTabHref="/meetings"
-                    newTabLabel="Open Meetings in new tab"
-                  />
-                </div>
+          {moreOpen && (
+            <div className="absolute right-0 top-full z-[320] w-48 pt-1.5">
+              <div
+                role="menu"
+                className="overflow-hidden rounded-xl border p-1 shadow-2xl"
+                style={{
+                  borderColor: 'var(--border)',
+                  background: 'color-mix(in srgb, var(--bg-secondary) 96%, transparent)',
+                }}
+              >
+                {morePages.map((id) => {
+                  const meta = NAV_PAGE_META[id];
+                  return (
+                    <MoreMenuItem
+                      key={id}
+                      label={meta.label}
+                      icon={meta.icon}
+                      active={Boolean(activeView && meta.matches.includes(activeView))}
+                      accentColor={meta.accentColor}
+                      onClick={() => {
+                        onViewChange(meta.view);
+                        closeMore();
+                      }}
+                      newTabHref={meta.href}
+                      newTabLabel={`Open ${meta.label} in new tab`}
+                    />
+                  );
+                })}
               </div>
-            )}
-          </div>
-        </>
+            </div>
+          )}
+        </div>
       )}
     </nav>
   );

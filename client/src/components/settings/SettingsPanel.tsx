@@ -23,6 +23,7 @@ import {
   Tag,
   Globe,
   Pencil,
+  PanelTop,
   X,
 } from 'lucide-react';
 import { useConfig } from '@/hooks/useConfig';
@@ -50,10 +51,11 @@ import {
 } from '@/hooks/useSettingsActions';
 import { TagManagementSection } from '@/components/settings/TagManagementSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
+import { NavigationSection } from '@/components/settings/NavigationSection';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
-type SectionId = 'connection' | 'sync' | 'team' | 'tags' | 'maintenance' | 'access';
+type SectionId = 'navigation' | 'connection' | 'sync' | 'team' | 'tags' | 'maintenance' | 'access';
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
 const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_assignees';
 
@@ -756,6 +758,7 @@ export function SettingsPage() {
   const syncScopeLabel = syncScopeMode === 'base_query' ? 'Base query' : 'Team assignees';
 
   const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
+    navigation: { title: 'Navigation', description: 'Choose which pages stay in the top bar and arrange their order.' },
     connection: { title: 'Jira Connection', description: 'Review the active workspace and set the lead manager identity.' },
     sync: { title: 'Sync Scope', description: 'Control scheduled Jira syncs, the base defect query, and custom field mapping.' },
     team: { title: 'Team Members', description: 'Manage tracked developers for workload, routing, and sync scope.' },
@@ -765,6 +768,7 @@ export function SettingsPage() {
   };
 
   const navItems: Array<{ id: SectionId; icon: ReactNode; label: string; status: string | null; sv: 'success' | 'warning' | 'muted' }> = [
+    { id: 'navigation', icon: <PanelTop size={13} />, label: 'Navigation', status: null, sv: 'muted' },
     { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl ? 'success' : 'muted' },
     { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: !autoSyncEnabled ? 'muted' : jql ? 'muted' : 'warning' },
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
@@ -953,6 +957,11 @@ export function SettingsPage() {
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               className="flex-1 overflow-y-auto px-5 py-4"
             >
+
+              {/* ── NAVIGATION ────── */}
+              {activeSection === 'navigation' ? (
+                <NavigationSection />
+              ) : null}
 
               {/* ── CONNECTION ────── */}
               {activeSection === 'connection' ? (

@@ -20,6 +20,7 @@ import { createManagerActionsRouter } from "./routes/manager-actions";
 import { createTodayRouter } from "./routes/today";
 import { createSearchRouter } from "./routes/search";
 import { createNotesRouter } from "./routes/notes";
+import { createPreferencesRouter } from "./routes/preferences";
 import { createWorkSavedViewsRouter } from "./routes/work";
 import { requireAdmin, requireManager } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
@@ -31,6 +32,7 @@ import { IssueService } from "./services/issue.service";
 import { DailyNotesService } from "./services/daily-notes.service";
 import { ManagerDeskService } from "./services/manager-desk.service";
 import { MyDayService } from "./services/my-day.service";
+import { NavPreferencesService } from "./services/nav-preferences.service";
 import { WorkloadService } from "./services/workload.service";
 import { SearchService } from "./services/search.service";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
@@ -99,6 +101,7 @@ export interface AppServices {
   searchService: SearchService;
   workSavedViewsService: WorkSavedViewsService;
   dailyNotesService?: DailyNotesService;
+  navPreferencesService?: NavPreferencesService;
 }
 
 export function createApp(services: AppServices) {
@@ -107,6 +110,7 @@ export function createApp(services: AppServices) {
   app.use(express.json());
 
   const dailyNotesService = services.dailyNotesService ?? new DailyNotesService(services.managerDeskService);
+  const navPreferencesService = services.navPreferencesService ?? new NavPreferencesService();
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -152,6 +156,11 @@ export function createApp(services: AppServices) {
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
+  app.use(
+    "/api/preferences",
+    requireManager(services.authService),
+    createPreferencesRouter(navPreferencesService)
+  );
   app.use(
     "/api/work",
     requireManager(services.authService),

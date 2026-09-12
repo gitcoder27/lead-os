@@ -18,7 +18,10 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
-        'shared/types': path.resolve(__dirname, '../shared/types'),
+        // Point at the .ts source: the committed shared/types.js is a CommonJS
+        // artifact for the server, and its named exports can't flow through
+        // `export *` in dev mode.
+        'shared/types': path.resolve(__dirname, '../shared/types.ts'),
       },
     },
     build: {

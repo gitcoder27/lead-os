@@ -15,6 +15,7 @@ import { AuthService } from "./services/auth.service";
 import { DailyNotesService } from "./services/daily-notes.service";
 import { ManagerDeskService } from "./services/manager-desk.service";
 import { MyDayService } from "./services/my-day.service";
+import { NavPreferencesService } from "./services/nav-preferences.service";
 import { WorkloadService } from "./services/workload.service";
 import { TagService } from "./services/tag.service";
 import { TeamTrackerService } from "./services/team-tracker.service";
@@ -81,6 +82,7 @@ async function bootstrap(): Promise<void> {
   const managerDeskService = new ManagerDeskService(teamTrackerService);
   const todayService = new TodayService(issueService, teamTrackerService, managerDeskService, syncEngine);
   const dailyNotesService = new DailyNotesService(managerDeskService);
+  const navPreferencesService = new NavPreferencesService();
   const searchService = new SearchService(settingsService, dailyNotesService);
   const workSavedViewsService = new WorkSavedViewsService();
 
@@ -100,6 +102,7 @@ async function bootstrap(): Promise<void> {
     searchService,
     workSavedViewsService,
     dailyNotesService,
+    navPreferencesService,
   });
 
   await backupService.initialize();

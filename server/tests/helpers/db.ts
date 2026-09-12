@@ -13,6 +13,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM daily_note_follow_ups;
     DELETE FROM daily_note_captures;
     DELETE FROM daily_notes;
+    DELETE FROM user_nav_preferences;
     DELETE FROM manager_desk_item_history;
     DELETE FROM manager_desk_links;
     DELETE FROM manager_desk_items;

@@ -1149,3 +1149,80 @@ export interface DailyNoteSource {
 export interface DailyNoteSourcesResponse {
   sources: DailyNoteSource[];
 }
+
+// ── Navigation preferences ────────────────────────────
+
+export type NavPageId = "work" | "team" | "desk" | "follow-ups" | "notes" | "meetings";
+
+export interface NavPreferences {
+  topNav: NavPageId[];
+  moreNav: NavPageId[];
+}
+
+export const NAV_PAGE_IDS: readonly NavPageId[] = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
+
+export const DEFAULT_NAV_PREFERENCES: NavPreferences = {
+  topNav: ["work", "team", "desk"],
+  moreNav: ["follow-ups", "notes", "meetings"],
+};
+
+export interface NavPreferencesResponse {
+  preferences: NavPreferences;
+}
+
+export type SaveNavPreferencesPayload = NavPreferences;
+
+const NAV_PAGE_ID_SET: ReadonlySet<string> = new Set(NAV_PAGE_IDS);
+
+export function isNavPageId(value: unknown): value is NavPageId {
+  return typeof value === "string" && NAV_PAGE_ID_SET.has(value);
+}
+
+/**
+ * Leniently rebuild preferences from stored/cached lists: keeps known pages in
+ * their zones, drops unknown ids, and appends never-seen pages to the More menu
+ * so new pages surface without a migration.
+ */
+export function sanitizeNavPreferences(topNav: unknown, moreNav: unknown): NavPreferences {
+  const top = Array.isArray(topNav) ? topNav : [];
+  const more = Array.isArray(moreNav) ? moreNav : [];
+  const seen = new Set<NavPageId>();
+  const nextTop: NavPageId[] = [];
+  const nextMore: NavPageId[] = [];
+
+  for (const id of top) {
+    if (isNavPageId(id) && !seen.has(id)) {
+      seen.add(id);
+      nextTop.push(id);
+    }
+  }
+  for (const id of more) {
+    if (isNavPageId(id) && !seen.has(id)) {
+      seen.add(id);
+      nextMore.push(id);
+    }
+  }
+  for (const id of NAV_PAGE_IDS) {
+    if (!seen.has(id)) {
+      nextMore.push(id);
+    }
+  }
+
+  return { topNav: nextTop, moreNav: nextMore };
+}
+
+/** Strict check: a complete partition of every page across the two zones. */
+export function isCompleteNavPreferences(value: unknown): value is NavPreferences {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const prefs = value as NavPreferences;
+  if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav)) {
+    return false;
+  }
+  const combined = [...prefs.topNav, ...prefs.moreNav];
+  if (combined.length !== NAV_PAGE_IDS.length || combined.some((id) => !isNavPageId(id))) {
+    return false;
+  }
+  return new Set(combined).size === combined.length;
+}

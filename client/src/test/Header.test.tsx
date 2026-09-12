@@ -111,12 +111,12 @@ describe('Header', () => {
 
   it('shows the manager action inbox across manager views', () => {
     const { rerender } = render(
-      <Header activeView="work" onViewChange={vi.fn()} onDashboardAlertClick={vi.fn()} />
+      <Header activeView="work" onViewChange={vi.fn()} />
     );
 
     expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
 
-    rerender(<Header activeView="team" onViewChange={vi.fn()} onDashboardAlertClick={vi.fn()} />);
+    rerender(<Header activeView="team" onViewChange={vi.fn()} />);
 
     expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
   });

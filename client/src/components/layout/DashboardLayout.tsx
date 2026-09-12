@@ -13,7 +13,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWorkSavedViewState } from '@/hooks/useWorkSavedViewState';
 import { useToast } from '@/context/ToastContext';
 import { useWorkload } from '@/hooks/useWorkload';
-import type { Alert, FilterType, ManagerActionTarget } from '@/types';
+import type { FilterType, ManagerActionTarget } from '@/types';
 import type { AppView } from '@/App';
 import { DEFAULT_DASHBOARD_FILTER_STATE, type DashboardFilterState } from './dashboard-state';
 
@@ -400,14 +400,6 @@ export function DashboardLayout({
     closePanel();
   }, [closePanel]);
 
-  const handleAlertClick = useCallback((alert: Alert) => {
-    if (alert.issueKey) {
-      openIssue(alert.issueKey);
-    } else if (alert.developerAccountId) {
-      setFilterState((prev) => ({ ...prev, activeDeveloper: alert.developerAccountId }));
-    }
-  }, [openIssue, setFilterState]);
-
   useEffect(() => {
     if (!shouldClearHighlightedIssueOnInteraction || selectedIssueKey || !highlightedIssueKey) {
       return;
@@ -492,7 +484,6 @@ export function DashboardLayout({
         onOpenMobileSidebar={isCompact ? () => setMobileSidebarOpen(true) : undefined}
         activeView={activeView}
         onViewChange={onViewChange}
-        onDashboardAlertClick={handleAlertClick}
         onOpenActionTarget={onOpenActionTarget}
         captureContext={selectedIssueKey ? { issue: { jiraKey: selectedIssueKey } } : undefined}
       />

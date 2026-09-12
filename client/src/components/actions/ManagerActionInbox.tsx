@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import * as Popover from '@radix-ui/react-popover';
 import {
   AlertTriangle,
+  Ban,
   BellRing,
   CalendarClock,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   Loader2,
   MessageSquare,
@@ -14,12 +16,17 @@ import {
   Sparkles,
   Target,
   Users,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { useManagerActions } from '@/hooks/useManagerActions';
 import { useTodayActions } from '@/hooks/useTodayActions';
+import { useAlerts, useDismissAlerts } from '@/hooks/useAlerts';
+import { useToast } from '@/context/ToastContext';
 import { getLocalIsoDate } from '@/lib/utils';
 import type {
+  Alert,
+  FilterType,
   ManagerActionCommand,
   ManagerActionItem,
   ManagerActionTarget,
@@ -82,6 +89,21 @@ export function ManagerActionInbox({
   const actions = managerActions.data?.actions ?? [];
   const urgentCount = managerActions.data?.urgentCount ?? 0;
   const actionRunner = useTodayActions({ date, onOpenTarget, onViewChange });
+  const { addToast } = useToast();
+  const alertsQuery = useAlerts({ enabled });
+  const dismissAlerts = useDismissAlerts();
+
+  const signals = useMemo(() => {
+    const alerts = alertsQuery.data ?? [];
+    const shownIssueKeys = new Set(actions.map((item) => item.target.issueKey).filter(Boolean));
+    const shownDeveloperIds = new Set(actions.map((item) => item.target.developerAccountId).filter(Boolean));
+    return alerts.filter(
+      (alert) =>
+        (alert.issueKey ? !shownIssueKeys.has(alert.issueKey) : true) &&
+        (alert.developerAccountId ? !shownDeveloperIds.has(alert.developerAccountId) : true)
+    );
+  }, [actions, alertsQuery.data]);
+  const attentionCount = urgentCount + signals.length;
   const pendingTargetKey = useMemo(
     () => (actionRunner.isPending ? targetKey(actionRunner.pendingTarget) : undefined),
     [actionRunner.isPending, actionRunner.pendingTarget],
@@ -135,6 +157,28 @@ export function ManagerActionInbox({
   const openTarget = (target: ManagerActionTarget) => {
     setOpen(false);
     onOpenTarget(target);
+  };
+
+  const runDismiss = (alertIds: string[]) => {
+    dismissAlerts.mutate(
+      { alertIds },
+      {
+        onError: () => {
+          addToast({
+            type: 'error',
+            title: 'Failed to update alerts',
+            message: 'The alert list could not be updated. Please try again.',
+          });
+        },
+      },
+    );
+  };
+
+  const clearSignals = () => {
+    if (signals.length === 0) {
+      return;
+    }
+    runDismiss(signals.map((alert) => alert.id));
   };
 
   const dialogLayer = typeof document === 'undefined'
@@ -198,15 +242,15 @@ export function ManagerActionInbox({
               background: open ? 'var(--bg-elevated)' : 'transparent',
               boxShadow: open ? 'var(--soft-shadow)' : 'none',
             }}
-            title={urgentCount > 0 ? `${urgentCount} manager actions` : 'Manager actions'}
+            title={attentionCount > 0 ? `${attentionCount} need attention` : 'Manager actions'}
             aria-label="Manager actions"
           >
             {managerActions.isFetching ? (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
             ) : (
-              <Sparkles size={16} style={{ color: urgentCount > 0 ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              <Sparkles size={16} style={{ color: attentionCount > 0 ? 'var(--accent)' : 'var(--text-secondary)' }} />
             )}
-            {urgentCount > 0 ? (
+            {attentionCount > 0 ? (
               <span
                 className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none"
                 style={{
@@ -215,7 +259,7 @@ export function ManagerActionInbox({
                   boxShadow: '0 0 0 2px var(--bg-secondary)',
                 }}
               >
-                {urgentCount > 9 ? '9+' : urgentCount}
+                {attentionCount > 9 ? '9+' : attentionCount}
               </span>
             ) : null}
           </button>
@@ -260,20 +304,56 @@ export function ManagerActionInbox({
             <div className="max-h-[min(64vh,520px)] overflow-auto py-1.5">
               {managerActions.isLoading ? (
                 <InboxSkeleton />
-              ) : managerActions.isError ? (
-                <InboxEmpty title="Queue unavailable" detail="Retry from Today." />
-              ) : actions.length === 0 ? (
-                <InboxEmpty title="Clear" detail="No manager actions right now." />
               ) : (
-                actions.map((item) => (
-                  <ManagerActionInboxRow
-                    key={item.id}
-                    item={item}
-                    isPending={pendingTargetKey === targetKey(item.target)}
-                    onOpenTarget={openTarget}
-                    onRunCommand={runCommand}
-                  />
-                ))
+                <>
+                  {managerActions.isError ? (
+                    <InboxEmpty title="Queue unavailable" detail="Retry from Today." />
+                  ) : actions.length === 0 && signals.length === 0 ? (
+                    <InboxEmpty title="Clear" detail="No manager actions right now." />
+                  ) : (
+                    actions.map((item) => (
+                      <ManagerActionInboxRow
+                        key={item.id}
+                        item={item}
+                        isPending={pendingTargetKey === targetKey(item.target)}
+                        onOpenTarget={openTarget}
+                        onRunCommand={runCommand}
+                      />
+                    ))
+                  )}
+                  {signals.length > 0 ? (
+                    <div className="mt-1 border-t pt-1.5" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center justify-between px-3 py-1">
+                        <span
+                          className="text-[10.5px] font-semibold uppercase tracking-[0.1em]"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Attention signals
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearSignals}
+                          disabled={dismissAlerts.isPending}
+                          className="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      {signals.map((alert) => (
+                        <SignalRow
+                          key={alert.id}
+                          alert={alert}
+                          onOpen={() => {
+                            setOpen(false);
+                            onOpenTarget(signalTarget(alert));
+                          }}
+                          onDismiss={() => runDismiss([alert.id])}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           </Popover.Content>
@@ -404,6 +484,92 @@ function SnoozeActions({
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const signalMeta = {
+  overdue: { icon: AlertTriangle, label: 'Overdue' },
+  stale: { icon: Clock3, label: 'Stale' },
+  blocked: { icon: Ban, label: 'Blocked' },
+  idle_developer: { icon: Users, label: 'No work today' },
+  high_priority_not_started: { icon: AlertTriangle, label: 'High priority' },
+} satisfies Record<Alert['type'], { icon: LucideIcon; label: string }>;
+
+const signalFilterByType: Partial<Record<Alert['type'], FilterType>> = {
+  overdue: 'overdue',
+  blocked: 'blocked',
+  stale: 'stale',
+  high_priority_not_started: 'highPriority',
+};
+
+function signalTarget(alert: Alert): ManagerActionTarget {
+  if (alert.issueKey) {
+    return {
+      type: 'issue',
+      view: 'work',
+      issueKey: alert.issueKey,
+      filter: signalFilterByType[alert.type],
+    };
+  }
+  return {
+    type: 'developer',
+    view: 'team',
+    developerAccountId: alert.developerAccountId,
+  };
+}
+
+function SignalRow({
+  alert,
+  onOpen,
+  onDismiss,
+}: {
+  alert: Alert;
+  onOpen: () => void;
+  onDismiss: () => void;
+}) {
+  const meta = signalMeta[alert.type];
+  const Icon = meta.icon;
+  const tone = actionTone(alert.severity === 'high' ? 'critical' : 'warning');
+  const detail = [meta.label, alert.issueKey ?? alert.developerName].filter(Boolean).join(' · ');
+
+  return (
+    <div
+      className="mx-1.5 grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
+      style={{ boxShadow: 'inset 0 -1px 0 color-mix(in srgb, var(--border) 42%, transparent)' }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex h-7 w-7 items-center justify-center rounded-md"
+        style={{ background: tone.bg, color: tone.color, border: `1px solid ${tone.border}` }}
+        aria-label={`Open ${meta.label} signal`}
+      >
+        <Icon size={14} />
+      </button>
+
+      <button type="button" onClick={onOpen} className="min-w-0 text-left">
+        <span className="block truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {alert.message}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {detail}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDismiss();
+        }}
+        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-elevated)]"
+        style={{ color: 'var(--text-muted)' }}
+        aria-label={`Dismiss ${meta.label} signal`}
+        title="Dismiss signal"
+      >
+        <X size={13} />
+      </button>
     </div>
   );
 }

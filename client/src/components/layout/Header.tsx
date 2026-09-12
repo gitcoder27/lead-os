@@ -8,7 +8,7 @@ import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { formatRelativeTime } from '@/lib/utils';
 import type { ActiveAppView, AppView } from '@/App';
-import type { Alert, ManagerActionTarget } from '@/types';
+import type { ManagerActionTarget } from '@/types';
 import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
@@ -18,7 +18,6 @@ interface HeaderProps {
   onOpenMobileSidebar?: () => void;
   activeView?: ActiveAppView;
   onViewChange?: (view: AppView) => void;
-  onDashboardAlertClick?: (alert: Alert) => void;
   onOpenActionTarget?: (target: ManagerActionTarget) => void;
   captureContext?: GlobalCaptureContext;
 }

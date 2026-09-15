@@ -4,6 +4,7 @@ import type {
   AssistantChatRequest,
   AssistantConversation,
   AssistantConversationDetail,
+  AssistantMemory,
   AssistantMessage,
   AssistantRole,
   AssistantStreamEvent,
@@ -318,6 +319,18 @@ export class AssistantService {
     await db.delete(assistantConversations).where(eq(assistantConversations.id, conversation.id));
   }
 
+  async listMemories(auth: AssistantAuth): Promise<AssistantMemory[]> {
+    return this.deps.memoryService.list(auth.managerAccountId, auth.workspaceId);
+  }
+
+  async deleteMemory(auth: AssistantAuth, memoryId: number): Promise<void> {
+    await this.deps.memoryService.remove(auth.managerAccountId, memoryId, auth.workspaceId);
+  }
+
+  async clearMemories(auth: AssistantAuth): Promise<void> {
+    await this.deps.memoryService.clear(auth.managerAccountId, auth.workspaceId);
+  }
+
   private async assertConfigured(workspaceId: string): Promise<ResolvedAiAssistantConfig> {
     const config = await this.configService.getResolvedConfig(normalizeWorkspaceId(workspaceId));
     if (!config.enabled || !config.apiKey) {
@@ -492,8 +505,17 @@ export class AssistantService {
     currentView?: string,
     style?: ResolvedAiAssistantConfig["responseStyle"],
     pageParams?: Record<string, string>,
-    autoConfirm?: boolean
+    autoConfirm?: boolean,
+    customInstructions?: string
   ): Promise<string> {
+    let memories: string[] | undefined;
+    try {
+      memories = (await this.deps.memoryService.list(auth.managerAccountId, auth.workspaceId)).map(
+        (memory) => memory.text
+      );
+    } catch (error) {
+      logger.warn({ err: error }, "Assistant memory load failed; continuing without memories");
+    }
     let contextCard: AssistantContextCard | undefined;
     try {
       const today = await this.deps.todayService.getToday(auth.managerAccountId, date, auth.workspaceId);
@@ -523,6 +545,8 @@ export class AssistantService {
       contextCard,
       style,
       autoConfirm,
+      customInstructions,
+      memories,
     });
   }
 
@@ -618,7 +642,15 @@ export class AssistantService {
     pageParams?: Record<string, string>
   ): Promise<void> {
     const llm = this.createLlmClient({ baseUrl: config.baseUrl, apiKey: config.apiKey!, model: config.model });
-    const systemPrompt = await this.buildPrompt(auth, date, currentView, config.responseStyle, pageParams, config.autoConfirm);
+    const systemPrompt = await this.buildPrompt(
+      auth,
+      date,
+      currentView,
+      config.responseStyle,
+      pageParams,
+      config.autoConfirm,
+      config.customInstructions
+    );
     const context = this.toolContext(auth, date, currentView);
     // Reserve ~40% of the window for system/tools/output; history gets the rest (~4 chars/token).
     const historyCharBudget = config.contextWindow ? Math.floor(config.contextWindow * 0.6 * 4) : undefined;

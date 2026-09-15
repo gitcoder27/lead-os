@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { UserRole } from "shared/types";
 import { HttpError } from "../middleware/errorHandler";
 import type { AlertService } from "../services/alert.service";
+import type { AssistantMemoryService } from "../services/assistant-memory.service";
 import type { AutomationService } from "../services/automation.service";
 import type { DailyNotesService } from "../services/daily-notes.service";
 import type { IssueService } from "../services/issue.service";
@@ -36,6 +37,7 @@ export interface AssistantServices {
   workSavedViewsService: WorkSavedViewsService;
   automationService: AutomationService;
   settingsService: SettingsService;
+  memoryService: AssistantMemoryService;
 }
 
 export interface AssistantToolContext {
@@ -1846,6 +1848,28 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           result: { ok: true, date, noteId: response.note?.id },
           summary: `Replaced daily note for ${date}`,
         };
+      },
+    },
+    {
+      name: "save_memory",
+      description:
+        "Save a durable memory about the manager's preferences or recurring facts (e.g. \"Priya prefers async updates\", \"deploys are Fridays\"). Use when the manager says to remember something or states a stable preference — not for one-off tasks or dated facts.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "One short fact or preference (max 300 chars)" },
+        },
+        required: ["text"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["assistant", "memory"],
+      label: () => "Saving memory…",
+      summarize: (args) => `Remember: "${String(args.text ?? "")}"`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ text: z.string().trim().min(1).max(300) }), rawArgs);
+        const memory = await ctx.services.memoryService.add(ctx.managerAccountId, args.text, ctx.workspaceId);
+        return { result: { memory }, summary: "Saved to memory" };
       },
     },
   ];

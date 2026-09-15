@@ -28,6 +28,8 @@ const KEY_MAX_TOOL_ITERATIONS = "ai_max_tool_iterations";
 const KEY_RESPONSE_STYLE = "ai_response_style";
 const KEY_SUGGEST_FOLLOWUPS = "ai_suggest_followups";
 const KEY_SHOW_THINKING_TRACE = "ai_show_thinking_trace";
+const KEY_CUSTOM_INSTRUCTIONS = "ai_custom_instructions";
+const MAX_CUSTOM_INSTRUCTIONS_CHARS = 2_000;
 const KEY_AUTO_CONFIRM = "ai_auto_confirm";
 const KEY_PROVIDERS = "ai_providers";
 const KEY_ACTIVE_PROVIDER = "ai_active_provider";
@@ -249,7 +251,7 @@ export class AssistantConfigService {
 
   async getPublicConfig(workspaceId?: string): Promise<AiAssistantConfig> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const [enabled, baseUrl, model, maxToolIterations, responseStyle, suggestFollowups, autoConfirm, showThinkingTrace, apiKey, providerState] =
+    const [enabled, baseUrl, model, maxToolIterations, responseStyle, suggestFollowups, autoConfirm, showThinkingTrace, customInstructions, apiKey, providerState] =
       await Promise.all([
         this.getValue(normalizedWorkspaceId, KEY_ENABLED),
         this.getValue(normalizedWorkspaceId, KEY_BASE_URL),
@@ -259,6 +261,7 @@ export class AssistantConfigService {
         this.getValue(normalizedWorkspaceId, KEY_SUGGEST_FOLLOWUPS),
         this.getValue(normalizedWorkspaceId, KEY_AUTO_CONFIRM),
         this.getValue(normalizedWorkspaceId, KEY_SHOW_THINKING_TRACE),
+        this.getValue(normalizedWorkspaceId, KEY_CUSTOM_INSTRUCTIONS),
         getPersistedAiApiKey(normalizedWorkspaceId),
         this.getProviders(normalizedWorkspaceId),
       ]);
@@ -276,6 +279,7 @@ export class AssistantConfigService {
       suggestFollowups: suggestFollowups !== "false",
       autoConfirm: autoConfirm === "true",
       showThinkingTrace: showThinkingTrace !== "false",
+      customInstructions: customInstructions?.trim() ?? "",
       hasApiKey: activeProfile?.hasApiKey ?? Boolean(apiKey),
       providers: providerState.providers,
       activeProviderId: providerState.activeProviderId,
@@ -332,6 +336,13 @@ export class AssistantConfigService {
     }
     if (patch.showThinkingTrace !== undefined) {
       await this.upsertValue(normalizedWorkspaceId, KEY_SHOW_THINKING_TRACE, String(patch.showThinkingTrace));
+    }
+    if (patch.customInstructions !== undefined) {
+      const trimmed = patch.customInstructions.trim();
+      if (trimmed.length > MAX_CUSTOM_INSTRUCTIONS_CHARS) {
+        throw new HttpError(400, `Custom instructions must be ${MAX_CUSTOM_INSTRUCTIONS_CHARS} characters or fewer`);
+      }
+      await this.upsertValue(normalizedWorkspaceId, KEY_CUSTOM_INSTRUCTIONS, trimmed);
     }
     if (patch.apiKey?.trim()) {
       await storeAiApiKey(patch.apiKey, normalizedWorkspaceId);

@@ -11,6 +11,7 @@ import type { LlmClient } from "../src/assistant/llm-client";
 import { AssistantService } from "../src/assistant/service";
 import { AlertService } from "../src/services/alert.service";
 import { AssistantConfigService } from "../src/services/assistant-config.service";
+import { AssistantMemoryService } from "../src/services/assistant-memory.service";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -94,6 +95,7 @@ function buildService(client: LlmClient): AssistantService {
     workSavedViewsService: new WorkSavedViewsService(),
     automationService: new AutomationService(workloadService),
     settingsService,
+    memoryService: new AssistantMemoryService(),
     createLlmClient: () => client,
   });
 }

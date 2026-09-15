@@ -7,6 +7,7 @@ import { rawDb } from "./db/connection";
 import { configTable } from "./db/schema";
 import { migrate } from "./db/migrate";
 import { AlertService } from "./services/alert.service";
+import { AssistantMemoryService } from "./services/assistant-memory.service";
 import { AutomationService } from "./services/automation.service";
 import { BackupService } from "./services/backup.service";
 import { IssueService } from "./services/issue.service";
@@ -100,6 +101,7 @@ async function bootstrap(): Promise<void> {
     workSavedViewsService,
     automationService,
     settingsService,
+    memoryService: new AssistantMemoryService(),
   });
 
   const app = createApp({

@@ -389,6 +389,20 @@ CREATE TABLE IF NOT EXISTS assistant_messages (
 CREATE INDEX IF NOT EXISTS idx_assistant_conversations_owner ON assistant_conversations(workspace_id, manager_account_id);
 CREATE INDEX IF NOT EXISTS idx_assistant_messages_conversation ON assistant_messages(conversation_id, created_at);
 
+-- Manager-scoped durable memories for Copilot — short facts/preferences the
+-- manager confirms saving ("Priya prefers async updates"). Injected into the
+-- system prompt's volatile tail so they apply to every answer.
+CREATE TABLE IF NOT EXISTS assistant_memories (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL DEFAULT 'default',
+  manager_account_id TEXT NOT NULL,
+  text               TEXT NOT NULL,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_assistant_memories_owner ON assistant_memories(workspace_id, manager_account_id);
+
 -- FTS5 index over note bodies so Copilot search ranks relevance instead of
 -- substring-scanning every note. External-content table synced by triggers;
 -- the last INSERT backfills rows written before this index existed (and

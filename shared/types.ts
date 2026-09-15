@@ -1315,6 +1315,13 @@ export interface AssistantActionConfirmRequest {
   date: string;
 }
 
+/** A manager-scoped durable memory Copilot injects into every prompt. */
+export interface AssistantMemory {
+  id: number;
+  text: string;
+  createdAt: string;
+}
+
 export interface AssistantActionProposal {
   conversationId: number;
   toolCallId: string;
@@ -1401,6 +1408,8 @@ export interface AiAssistantConfig {
   autoConfirm: boolean;
   /** Keep each answer's reasoning trace collapsed on its message after streaming ends. */
   showThinkingTrace: boolean;
+  /** Manager-written standing instructions injected into every prompt. */
+  customInstructions: string;
   /** Whether the active provider profile has a stored key. */
   hasApiKey: boolean;
   /** All saved provider profiles (keyless). */
@@ -1430,6 +1439,8 @@ export interface UpdateAiAssistantConfigRequest {
   autoConfirm?: boolean;
   /** Keep completed answers' reasoning traces visible (collapsed) for the session. */
   showThinkingTrace?: boolean;
+  /** Manager-written standing instructions injected into every prompt; empty clears. */
+  customInstructions?: string;
   apiKey?: string;
   /** Switch the active provider profile. */
   activeProviderId?: string;

@@ -6,6 +6,7 @@ import type { LlmClient, LlmMessage } from "../src/assistant/llm-client";
 import { AssistantService, type AssistantAuth } from "../src/assistant/service";
 import { AlertService } from "../src/services/alert.service";
 import { AssistantConfigService } from "../src/services/assistant-config.service";
+import { AssistantMemoryService } from "../src/services/assistant-memory.service";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -102,6 +103,7 @@ function buildService(client: LlmClient): AssistantService {
     workSavedViewsService: new WorkSavedViewsService(),
     automationService: new AutomationService(workloadService),
     settingsService,
+    memoryService: new AssistantMemoryService(),
     createLlmClient: () => client,
   });
 }
@@ -229,6 +231,43 @@ describe("AssistantService", () => {
 
     const after = await deskService.getDay(AUTH.managerAccountId, DATE, WORKSPACE_ID);
     expect(after.items.map((item) => item.title)).toContain("Follow up with Alice");
+  });
+
+  it("saves a memory on confirm and injects it into the next prompt", async () => {
+    const { client } = createScriptedClient([
+      {
+        toolCalls: [
+          { id: "call-1", name: "save_memory", arguments: { text: "Priya prefers async updates" } },
+        ],
+      },
+      { content: "Remembered." },
+    ]);
+    const service = buildService(client);
+    const { events, emit } = collectEvents();
+
+    await service.chat(AUTH, { message: "Remember that Priya prefers async", date: DATE }, emit);
+    expect(eventTypes(events)).toEqual(["action_proposal", "message", "done"]);
+
+    const memoryService = new AssistantMemoryService();
+    expect(await memoryService.list(AUTH.managerAccountId, WORKSPACE_ID)).toEqual([]);
+
+    const confirmRun = collectEvents();
+    await service.confirmAction(
+      AUTH,
+      { conversationId: 1, toolCallId: "call-1", decision: "confirm", date: DATE },
+      confirmRun.emit
+    );
+    expect(confirmRun.events.at(-1)).toMatchObject({ type: "done", status: "complete" });
+
+    const memories = await memoryService.list(AUTH.managerAccountId, WORKSPACE_ID);
+    expect(memories.map((memory) => memory.text)).toEqual(["Priya prefers async updates"]);
+
+    // The next turn's system prompt carries the memory.
+    const secondScript = createScriptedClient([{ content: "Got it." }]);
+    const second = buildService(secondScript.client);
+    const secondRun = collectEvents();
+    await second.chat(AUTH, { message: "hi", date: DATE }, secondRun.emit);
+    expect(secondScript.calls[0]![0]!.content).toContain("Priya prefers async updates");
   });
 
   it("executes write tools inline when auto-confirm is enabled", async () => {

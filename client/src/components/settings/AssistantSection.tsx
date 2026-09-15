@@ -6,6 +6,11 @@ import {
   useTestAssistantConfig,
   useUpdateAssistantConfig,
 } from '@/hooks/useAssistantConfig';
+import {
+  useAssistantMemory,
+  useClearAssistantMemory,
+  useDeleteAssistantMemory,
+} from '@/hooks/useAssistantMemory';
 import type { AiProviderProfile, AiReasoningEffort, AssistantResponseStyle, UpdateAiAssistantConfigRequest } from '@/types';
 
 function GroupLabel({ children }: { children: ReactNode }) {
@@ -149,8 +154,15 @@ export function AssistantSection() {
   const [suggestFollowups, setSuggestFollowups] = useState(true);
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [showThinkingTrace, setShowThinkingTrace] = useState(true);
+  const [customInstructions, setCustomInstructions] = useState('');
   const [touched, setTouched] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const memoryQuery = useAssistantMemory();
+  const deleteMemory = useDeleteAssistantMemory();
+  const clearMemory = useClearAssistantMemory();
+  const [confirmingClearMemory, setConfirmingClearMemory] = useState(false);
+  const memories = memoryQuery.data?.memories ?? [];
 
   const [providerForm, setProviderForm] = useState<ProviderFormState>(CLOSED_PROVIDER_FORM);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -165,6 +177,7 @@ export function AssistantSection() {
       setSuggestFollowups(config.suggestFollowups);
       setAutoConfirm(config.autoConfirm);
       setShowThinkingTrace(config.showThinkingTrace);
+      setCustomInstructions(config.customInstructions);
     }
   }, [config, touched]);
 
@@ -318,6 +331,9 @@ export function AssistantSection() {
     }
     if (!config || showThinkingTrace !== config.showThinkingTrace) {
       patch.showThinkingTrace = showThinkingTrace;
+    }
+    if (!config || customInstructions !== config.customInstructions) {
+      patch.customInstructions = customInstructions;
     }
 
     setSaving(true);
@@ -725,6 +741,83 @@ export function AssistantSection() {
             </select>
           </LabeledInput>
         </div>
+        <div className="mt-3">
+          <LabeledInput label="Custom instructions" id="ai-custom-instructions">
+            <textarea
+              id="ai-custom-instructions"
+              rows={3}
+              maxLength={2000}
+              placeholder={'Standing instructions for every answer — e.g. "Always lead with risks", "I\'m an EM over two teams — skip onboarding basics".'}
+              value={customInstructions}
+              onChange={(e) => {
+                markTouched();
+                setCustomInstructions(e.target.value);
+              }}
+              className={`${inputClass} resize-y`}
+              style={inputStyle}
+            />
+          </LabeledInput>
+        </div>
+      </div>
+
+      {/* Memory */}
+      <div>
+        <GroupLabel>Memory</GroupLabel>
+        <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Durable facts Copilot remembers for you — saved only when you confirm a "remember" proposal in chat. They
+          shape every answer and are listed here for review.
+        </p>
+        {memoryQuery.isPending ? (
+          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            Loading…
+          </p>
+        ) : memories.length === 0 ? (
+          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            Nothing remembered yet — tell Copilot "remember that…" in chat.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <div className="overflow-hidden rounded-xl" style={{ border: 'var(--settings-pane-border)' }}>
+              {memories.map((memory, idx) => (
+                <div
+                  key={memory.id}
+                  className="flex items-start gap-3 px-3.5 py-2.5"
+                  style={{ borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
+                >
+                  <p className="flex-1 text-[12.5px] leading-5" style={{ color: 'var(--text-primary)' }}>
+                    {memory.text}
+                  </p>
+                  <button
+                    type="button"
+                    aria-label={`Delete memory "${memory.text}"`}
+                    onClick={() => void deleteMemory.mutateAsync(memory.id)}
+                    disabled={deleteMemory.isPending}
+                    className="shrink-0 rounded p-1 transition-colors disabled:opacity-50"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirmingClearMemory) {
+                  setConfirmingClearMemory(true);
+                  return;
+                }
+                setConfirmingClearMemory(false);
+                void clearMemory.mutateAsync();
+              }}
+              disabled={clearMemory.isPending}
+              className="text-[12px] font-medium transition-colors disabled:opacity-50"
+              style={{ color: 'var(--danger-muted)' }}
+            >
+              {confirmingClearMemory ? 'Click again to clear all memories' : 'Clear all memories'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Save */}

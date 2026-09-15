@@ -979,6 +979,7 @@ ORDER BY updated DESC`);
       suggestFollowups: true,
       autoConfirm: false,
       showThinkingTrace: true,
+      customInstructions: "",
       hasApiKey: false,
       providers: [],
       activeProviderId: null,

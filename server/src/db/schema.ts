@@ -357,6 +357,17 @@ export const assistantMessages = sqliteTable("assistant_messages", {
   index("idx_assistant_messages_conversation").on(table.conversationId, table.createdAt),
 ]);
 
+export const assistantMemories = sqliteTable("assistant_memories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  text: text("text").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  index("idx_assistant_memories_owner").on(table.workspaceId, table.managerAccountId),
+]);
+
 export const userNavPreferences = sqliteTable("user_nav_preferences", {
   workspaceId: text("workspace_id").notNull().default("default"),
   managerAccountId: text("manager_account_id").notNull(),

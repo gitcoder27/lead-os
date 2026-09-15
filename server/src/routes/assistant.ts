@@ -145,5 +145,32 @@ export function createAssistantRouter(assistantService: AssistantService): Route
     }
   });
 
+  router.get("/memory", async (req, res, next) => {
+    try {
+      const memories = await assistantService.listMemories(requestAuth(req));
+      res.json({ memories });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/memory", async (req, res, next) => {
+    try {
+      await assistantService.clearMemories(requestAuth(req));
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete("/memory/:id", validate(conversationParamsSchema), async (req, res, next) => {
+    try {
+      await assistantService.deleteMemory(requestAuth(req), Number(req.params.id));
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }

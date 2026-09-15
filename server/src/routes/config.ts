@@ -142,6 +142,7 @@ const aiConfigUpdateSchema = z.object({
     maxToolIterations: z.number().int().min(1).max(10).optional(),
     responseStyle: z.enum(["concise", "detailed"]).optional(),
     suggestFollowups: z.boolean().optional(),
+    showThinkingTrace: z.boolean().optional(),
     autoConfirm: z.boolean().optional(),
     apiKey: z.string().trim().optional(),
     activeProviderId: z.string().trim().min(1).optional(),
@@ -155,6 +156,7 @@ const aiConfigUpdateSchema = z.object({
         maxOutputTokens: z.number().int().min(1).max(1_000_000).nullable().optional(),
         contextWindow: z.number().int().min(1024).max(10_000_000).nullable().optional(),
         reasoningEffort: z.enum(["off", "low", "high", "max"]).nullable().optional(),
+        temperature: z.number().min(0).max(2).nullable().optional(),
       })
       .optional(),
     removeProviderId: z.string().trim().min(1).optional(),
@@ -531,7 +533,8 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         res.status(400).json({ error: "AI API key is required", status: 400 });
         return;
       }
-      const client = new OpenAiCompatibleClient({ baseUrl, apiKey, model });
+      // One retry at most — the Test button should fail fast, not wait out backoff.
+      const client = new OpenAiCompatibleClient({ baseUrl, apiKey, model, maxRetries: 1 });
       const startedAt = Date.now();
       // Exercise the profile's real params so Test catches incompatible
       // reasoning/max_tokens settings before the switch, not after.
@@ -539,6 +542,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         messages: [{ role: "user", content: "Reply with OK." }],
         maxTokens: 5,
         reasoningEffort: base.reasoningEffort,
+        temperature: base.temperature,
       });
       res.json({
         success: true,

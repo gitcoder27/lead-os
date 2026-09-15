@@ -32,7 +32,7 @@ export interface LlmChatParams {
   tools?: LlmToolDefinition[];
   signal?: AbortSignal;
   maxTokens?: number;
-  /** Sampling temperature; defaults to a crisp 0.3 for workspace Q&A. */
+  /** Sampling temperature; defaults to 0.7 — conversational but tool-safe. */
   temperature?: number;
   /**
    * Thinking-level override sent as `reasoning_effort` + `thinking.type`
@@ -53,6 +53,8 @@ export interface LlmChatResult {
     promptTokens: number;
     completionTokens: number;
     reasoningTokens?: number;
+    /** Provider prompt-cache hits within promptTokens (OpenAI/DeepSeek report this). */
+    cachedTokens?: number;
   };
 }
 
@@ -74,17 +76,21 @@ interface OpenAiCompatibleClientOptions {
   apiKey: string;
   model: string;
   timeoutMs?: number;
-  /** Base delay before the single retry on 429/5xx/network errors (jittered). */
+  /** Base delay between retries on 429/5xx/network errors (jittered, exponential). */
   retryDelayMs?: number;
+  /** Extra attempts after the first on retryable failures (default 2 → up to 3 tries). */
+  maxRetries?: number;
 }
 
-const DEFAULT_TEMPERATURE = 0.3;
+const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_RETRY_DELAY_MS = 500;
-const MAX_RETRY_AFTER_MS = 5_000;
+const DEFAULT_MAX_RETRIES = 2;
+const MAX_RETRY_AFTER_MS = 15_000;
 
 interface UsagePayload {
   prompt_tokens?: number;
   completion_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
   completion_tokens_details?: { reasoning_tokens?: number };
 }
 
@@ -204,6 +210,9 @@ function toResult(
           ...(usageRaw.completion_tokens_details?.reasoning_tokens !== undefined
             ? { reasoningTokens: usageRaw.completion_tokens_details.reasoning_tokens }
             : {}),
+          ...(usageRaw.prompt_tokens_details?.cached_tokens !== undefined
+            ? { cachedTokens: usageRaw.prompt_tokens_details.cached_tokens }
+            : {}),
         }
       : undefined,
   };
@@ -222,6 +231,7 @@ export class OpenAiCompatibleClient implements LlmClient {
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly retryDelayMs: number;
+  private readonly maxRetries: number;
 
   constructor(options: OpenAiCompatibleClientOptions) {
     this.baseUrl = options.baseUrl.trim().replace(/\/+$/, "");
@@ -229,6 +239,7 @@ export class OpenAiCompatibleClient implements LlmClient {
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   }
 
   async chat(params: LlmChatParams): Promise<LlmChatResult> {
@@ -341,9 +352,10 @@ export class OpenAiCompatibleClient implements LlmClient {
     return payload;
   }
 
-  /** Performs the POST with a single retry on 429/5xx/network errors. */
+  /** Performs the POST, retrying 429/5xx/network errors with exponential backoff + jitter. */
   private async request(payload: Record<string, unknown>, guard: RequestGuard): Promise<Response> {
     for (let attempt = 0; ; attempt += 1) {
+      const canRetry = attempt < this.maxRetries;
       try {
         const response = await fetch(`${this.baseUrl}/chat/completions`, {
           method: "POST",
@@ -355,8 +367,8 @@ export class OpenAiCompatibleClient implements LlmClient {
           body: JSON.stringify(payload),
           signal: guard.signal,
         });
-        if (attempt === 0 && !response.ok && isRetryableStatus(response.status)) {
-          const delay = this.retryDelay(response.headers.get("retry-after"));
+        if (canRetry && !response.ok && isRetryableStatus(response.status)) {
+          const delay = this.retryDelay(response.headers.get("retry-after"), attempt);
           void response.body?.cancel().catch(() => undefined);
           await this.sleep(delay, guard.signal);
           continue;
@@ -369,8 +381,8 @@ export class OpenAiCompatibleClient implements LlmClient {
         if (error instanceof HttpError) {
           throw error;
         }
-        if (attempt === 0) {
-          await this.sleep(this.jitteredDelay(), guard.signal);
+        if (canRetry) {
+          await this.sleep(this.jitteredDelay(attempt), guard.signal);
           continue;
         }
         throw new HttpError(502, "AI provider unreachable");
@@ -378,16 +390,17 @@ export class OpenAiCompatibleClient implements LlmClient {
     }
   }
 
-  private retryDelay(retryAfter: string | null): number {
+  private retryDelay(retryAfter: string | null, attempt: number): number {
     const seconds = retryAfter ? Number.parseFloat(retryAfter) : NaN;
     if (Number.isFinite(seconds) && seconds > 0) {
       return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
     }
-    return this.jitteredDelay();
+    return this.jitteredDelay(attempt);
   }
 
-  private jitteredDelay(): number {
-    return this.retryDelayMs + Math.random() * this.retryDelayMs;
+  private jitteredDelay(attempt: number): number {
+    const base = this.retryDelayMs * 2 ** attempt;
+    return base + Math.random() * this.retryDelayMs;
   }
 
   private async sleep(ms: number, signal: AbortSignal): Promise<void> {

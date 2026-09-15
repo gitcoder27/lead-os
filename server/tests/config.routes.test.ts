@@ -978,6 +978,7 @@ ORDER BY updated DESC`);
       responseStyle: "concise",
       suggestFollowups: true,
       autoConfirm: false,
+      showThinkingTrace: true,
       hasApiKey: false,
       providers: [],
       activeProviderId: null,
@@ -1205,6 +1206,7 @@ ORDER BY updated DESC`);
           contextWindow: 64_000,
           maxOutputTokens: 4_096,
           reasoningEffort: "low",
+          temperature: 1.2,
         },
       },
     });
@@ -1213,11 +1215,13 @@ ORDER BY updated DESC`);
       contextWindow: 64_000,
       maxOutputTokens: 4_096,
       reasoningEffort: "low",
+      temperature: 1.2,
       resolvedContextWindow: 64_000,
       resolvedMaxOutputTokens: 4_096,
     });
     expect(explicit.body?.contextWindow).toBe(64_000);
     expect(explicit.body?.reasoningEffort).toBe("low");
+    expect(explicit.body?.temperature).toBe(1.2);
 
     const catalog = await invoke(app, {
       method: "PUT",
@@ -1242,6 +1246,7 @@ ORDER BY updated DESC`);
     expect(switched.body?.contextWindow).toBe(131_072);
     expect(switched.body?.maxOutputTokens).toBe(32_768);
     expect(switched.body?.reasoningEffort).toBeUndefined();
+    expect(switched.body?.temperature).toBeUndefined();
   });
 
   it("removes a provider, clears its key, and reassigns active", async () => {

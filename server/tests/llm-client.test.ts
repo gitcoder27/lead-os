@@ -67,7 +67,7 @@ describe("OpenAiCompatibleClient.chatStream", () => {
 
     const body = lastRequestBody();
     expect(body.stream).toBe(true);
-    expect(body.temperature).toBe(0.3);
+    expect(body.temperature).toBe(0.7);
     const init = fetchMock.mock.calls[0]![1] as { headers: Record<string, string> };
     expect(init.headers.Authorization).toBe("Bearer test-key");
   });
@@ -166,8 +166,34 @@ describe("OpenAiCompatibleClient.chatStream", () => {
       status: 429,
       message: "AI provider rate limited — Insufficient balance or no resource package.",
     });
-    // 429 is retryable — retried once, then raised.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // 429 is retryable — two backoff retries, then raised.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("exhausts retries on persistent 5xx and raises", async () => {
+    const fetchMock = vi.fn(async () => new Response("boom", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(client().chat({ messages: [{ role: "user", content: "hi" }] })).rejects.toMatchObject({
+      status: 502,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a network failure and honors retry-after before the final attempt", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(new Response("limited", { status: 429, headers: { "retry-after": "0.01" } }))
+      .mockImplementationOnce(async () =>
+        sseResponse([sseChunk({ content: "ok" }), "data: [DONE]\n\n"])
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await client().chatStream({ messages: [{ role: "user", content: "hi" }] });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.content).toBe("ok");
   });
 
   it("retries once on a 5xx and then succeeds", async () => {

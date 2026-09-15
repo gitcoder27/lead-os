@@ -27,6 +27,7 @@ const KEY_MODEL = "ai_model";
 const KEY_MAX_TOOL_ITERATIONS = "ai_max_tool_iterations";
 const KEY_RESPONSE_STYLE = "ai_response_style";
 const KEY_SUGGEST_FOLLOWUPS = "ai_suggest_followups";
+const KEY_SHOW_THINKING_TRACE = "ai_show_thinking_trace";
 const KEY_AUTO_CONFIRM = "ai_auto_confirm";
 const KEY_PROVIDERS = "ai_providers";
 const KEY_ACTIVE_PROVIDER = "ai_active_provider";
@@ -48,6 +49,7 @@ interface StoredAiProviderProfile {
   maxOutputTokens?: number;
   contextWindow?: number;
   reasoningEffort?: AiReasoningEffort;
+  temperature?: number;
 }
 
 interface AiProviderState {
@@ -96,6 +98,10 @@ function parseReasoningEffort(value: unknown): AiReasoningEffort | undefined {
   return REASONING_EFFORTS.includes(value as AiReasoningEffort) ? (value as AiReasoningEffort) : undefined;
 }
 
+function parseTemperature(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 2 ? value : undefined;
+}
+
 /** Carry the optional capability fields through the stored profile shape. */
 function normalizeStoredProfile(entry: StoredAiProviderProfile): StoredAiProviderProfile {
   return {
@@ -106,6 +112,7 @@ function normalizeStoredProfile(entry: StoredAiProviderProfile): StoredAiProvide
     maxOutputTokens: parsePositiveInt(entry.maxOutputTokens),
     contextWindow: parsePositiveInt(entry.contextWindow),
     reasoningEffort: parseReasoningEffort(entry.reasoningEffort),
+    temperature: parseTemperature(entry.temperature),
   };
 }
 
@@ -242,7 +249,7 @@ export class AssistantConfigService {
 
   async getPublicConfig(workspaceId?: string): Promise<AiAssistantConfig> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const [enabled, baseUrl, model, maxToolIterations, responseStyle, suggestFollowups, autoConfirm, apiKey, providerState] =
+    const [enabled, baseUrl, model, maxToolIterations, responseStyle, suggestFollowups, autoConfirm, showThinkingTrace, apiKey, providerState] =
       await Promise.all([
         this.getValue(normalizedWorkspaceId, KEY_ENABLED),
         this.getValue(normalizedWorkspaceId, KEY_BASE_URL),
@@ -251,6 +258,7 @@ export class AssistantConfigService {
         this.getValue(normalizedWorkspaceId, KEY_RESPONSE_STYLE),
         this.getValue(normalizedWorkspaceId, KEY_SUGGEST_FOLLOWUPS),
         this.getValue(normalizedWorkspaceId, KEY_AUTO_CONFIRM),
+        this.getValue(normalizedWorkspaceId, KEY_SHOW_THINKING_TRACE),
         getPersistedAiApiKey(normalizedWorkspaceId),
         this.getProviders(normalizedWorkspaceId),
       ]);
@@ -267,12 +275,14 @@ export class AssistantConfigService {
       responseStyle: responseStyle === "detailed" ? "detailed" : DEFAULT_RESPONSE_STYLE,
       suggestFollowups: suggestFollowups !== "false",
       autoConfirm: autoConfirm === "true",
+      showThinkingTrace: showThinkingTrace !== "false",
       hasApiKey: activeProfile?.hasApiKey ?? Boolean(apiKey),
       providers: providerState.providers,
       activeProviderId: providerState.activeProviderId,
       maxOutputTokens: activeProfile?.resolvedMaxOutputTokens,
       contextWindow: activeProfile?.resolvedContextWindow,
       reasoningEffort: activeProfile?.reasoningEffort,
+      temperature: activeProfile?.temperature,
     };
   }
 
@@ -320,6 +330,9 @@ export class AssistantConfigService {
     if (patch.autoConfirm !== undefined) {
       await this.upsertValue(normalizedWorkspaceId, KEY_AUTO_CONFIRM, String(patch.autoConfirm));
     }
+    if (patch.showThinkingTrace !== undefined) {
+      await this.upsertValue(normalizedWorkspaceId, KEY_SHOW_THINKING_TRACE, String(patch.showThinkingTrace));
+    }
     if (patch.apiKey?.trim()) {
       await storeAiApiKey(patch.apiKey, normalizedWorkspaceId);
     }
@@ -348,6 +361,7 @@ export class AssistantConfigService {
         maxOutputTokens: parsePositiveInt(input.maxOutputTokens ?? undefined),
         contextWindow: parsePositiveInt(input.contextWindow ?? undefined),
         reasoningEffort: parseReasoningEffort(input.reasoningEffort ?? undefined),
+        temperature: parseTemperature(input.temperature ?? undefined),
       };
       const index = profiles.findIndex((p) => p.id === id);
       if (index >= 0) {

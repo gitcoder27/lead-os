@@ -1377,6 +1377,8 @@ export interface AiProviderProfile {
   contextWindow?: number;
   /** Thinking effort override; unset = provider default. */
   reasoningEffort?: AiReasoningEffort;
+  /** Sampling temperature override (0–2); unset = assistant default. */
+  temperature?: number;
   /** Effective context window after catalog fallback — display only. */
   resolvedContextWindow?: number;
   /** Effective output cap after catalog fallback — display only. */
@@ -1397,6 +1399,8 @@ export interface AiAssistantConfig {
   suggestFollowups: boolean;
   /** Full access — write tools execute immediately instead of awaiting confirmation. */
   autoConfirm: boolean;
+  /** Keep each answer's reasoning trace collapsed on its message after streaming ends. */
+  showThinkingTrace: boolean;
   /** Whether the active provider profile has a stored key. */
   hasApiKey: boolean;
   /** All saved provider profiles (keyless). */
@@ -1409,6 +1413,8 @@ export interface AiAssistantConfig {
   contextWindow?: number;
   /** Reasoning effort override for the active provider; unset = provider default. */
   reasoningEffort?: AiReasoningEffort;
+  /** Sampling temperature for the active provider; unset = assistant default (0.7). */
+  temperature?: number;
 }
 
 /** PUT /api/config/ai — every field optional; `apiKey` is write-only. */
@@ -1422,6 +1428,8 @@ export interface UpdateAiAssistantConfigRequest {
   suggestFollowups?: boolean;
   /** Full access — write tools execute immediately instead of awaiting confirmation. */
   autoConfirm?: boolean;
+  /** Keep completed answers' reasoning traces visible (collapsed) for the session. */
+  showThinkingTrace?: boolean;
   apiKey?: string;
   /** Switch the active provider profile. */
   activeProviderId?: string;
@@ -1438,6 +1446,8 @@ export interface UpdateAiAssistantConfigRequest {
     contextWindow?: number | null;
     /** Reasoning effort override; null/absent = provider default. */
     reasoningEffort?: AiReasoningEffort | null;
+    /** Sampling temperature (0–2); null/absent = assistant default. */
+    temperature?: number | null;
   };
   /** Delete a provider profile and its stored key. */
   removeProviderId?: string;

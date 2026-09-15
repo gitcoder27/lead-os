@@ -636,6 +636,7 @@ export class AssistantService {
             signal,
             maxTokens: config.maxOutputTokens,
             reasoningEffort: config.reasoningEffort,
+            temperature: config.temperature,
           },
           {
             onContent: (delta) => {

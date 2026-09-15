@@ -80,14 +80,21 @@ export async function invoke(
       }
       return res;
     };
+    res.write = (chunk: unknown) => {
+      if (chunk !== undefined) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+      }
+      return true;
+    };
     res.end = (chunk) => {
       if (chunk !== undefined) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
       }
       const rawBody = Buffer.concat(chunks).toString("utf8");
+      const isNdjson = (headers["content-type"] ?? "").includes("application/x-ndjson");
       resolve({
         status: res.statusCode,
-        body: rawBody ? JSON.parse(rawBody) : undefined,
+        body: rawBody ? (isNdjson ? rawBody : JSON.parse(rawBody)) : undefined,
         headers,
       });
       return res;

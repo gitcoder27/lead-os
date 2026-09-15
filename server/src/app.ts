@@ -22,6 +22,8 @@ import { createSearchRouter } from "./routes/search";
 import { createNotesRouter } from "./routes/notes";
 import { createPreferencesRouter } from "./routes/preferences";
 import { createWorkSavedViewsRouter } from "./routes/work";
+import { createAssistantRouter } from "./routes/assistant";
+import type { AssistantService } from "./assistant/service";
 import { requireAdmin, requireManager } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { AlertService } from "./services/alert.service";
@@ -102,6 +104,7 @@ export interface AppServices {
   workSavedViewsService: WorkSavedViewsService;
   dailyNotesService?: DailyNotesService;
   navPreferencesService?: NavPreferencesService;
+  assistantService?: AssistantService;
 }
 
 export function createApp(services: AppServices) {
@@ -166,6 +169,13 @@ export function createApp(services: AppServices) {
     requireManager(services.authService),
     createWorkSavedViewsRouter(services.workSavedViewsService)
   );
+  if (services.assistantService) {
+    app.use(
+      "/api/assistant",
+      requireManager(services.authService),
+      createAssistantRouter(services.assistantService)
+    );
+  }
 
   if (process.env.NODE_ENV === "production") {
     const clientDistPath = path.resolve(resolveWorkspaceRoot(), "client", "dist");

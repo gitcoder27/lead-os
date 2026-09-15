@@ -365,6 +365,29 @@ CREATE INDEX IF NOT EXISTS idx_daily_note_captures_note ON daily_note_captures(n
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_follow_ups_item ON daily_note_follow_ups(item_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_follow_ups_owner_request ON daily_note_follow_ups(workspace_id, manager_account_id, request_id);
 CREATE INDEX IF NOT EXISTS idx_daily_note_follow_ups_note ON daily_note_follow_ups(note_id);
+
+CREATE TABLE IF NOT EXISTS assistant_conversations (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL DEFAULT 'default',
+  manager_account_id TEXT NOT NULL,
+  title              TEXT NOT NULL,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS assistant_messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL,
+  role            TEXT NOT NULL,
+  content         TEXT NOT NULL DEFAULT '',
+  tool_calls      TEXT,
+  tool_call_id    TEXT,
+  created_at      TEXT NOT NULL,
+  FOREIGN KEY (conversation_id) REFERENCES assistant_conversations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_assistant_conversations_owner ON assistant_conversations(workspace_id, manager_account_id);
+CREATE INDEX IF NOT EXISTS idx_assistant_messages_conversation ON assistant_messages(conversation_id, created_at);
 `;
 
 const alterStatements = [

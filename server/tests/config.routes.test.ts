@@ -964,4 +964,140 @@ ORDER BY updated DESC`);
     expect(typeof res.body?.backup?.path).toBe("string");
     expect(fs.existsSync(res.body?.backup?.path)).toBe(true);
   });
+
+  it("GET /api/config/ai returns public defaults without a key", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, { method: "GET", url: "/api/config/ai" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      enabled: false,
+      provider: "openai-compatible",
+      baseUrl: "https://api.z.ai/api/paas/v4",
+      model: "glm-5.3-flash",
+      maxToolIterations: 6,
+      responseStyle: "concise",
+      suggestFollowups: true,
+      hasApiKey: false,
+    });
+  });
+
+  it("PUT /api/config/ai stores settings and masks the key as hasApiKey", async () => {
+    const app = createTestApp();
+    const putRes = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        enabled: true,
+        baseUrl: "https://llm.example.com/v1/",
+        model: "glm-5.3-flash",
+        maxToolIterations: 4,
+        responseStyle: "detailed",
+        apiKey: "secret-ai-key",
+      },
+    });
+    expect(putRes.status).toBe(200);
+    expect(putRes.body).toMatchObject({
+      enabled: true,
+      provider: "openai-compatible",
+      baseUrl: "https://llm.example.com/v1",
+      model: "glm-5.3-flash",
+      maxToolIterations: 4,
+      responseStyle: "detailed",
+      hasApiKey: true,
+    });
+    expect(JSON.stringify(putRes.body)).not.toContain("secret-ai-key");
+
+    const rows = await db.select().from(configTable);
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    expect(map["ai_assistant_enabled"]).toBe("true");
+    expect(map["ai_base_url"]).toBe("https://llm.example.com/v1");
+    expect(map["ai_response_style"]).toBe("detailed");
+    expect(map["ai_api_key"]).toBeDefined();
+    expect(isEncryptedSecret(map["ai_api_key"] as string)).toBe(true);
+    expect(map["ai_api_key"]).not.toBe("secret-ai-key");
+
+    const getRes = await invoke(app, { method: "GET", url: "/api/config/ai" });
+    expect(getRes.status).toBe(200);
+    expect(getRes.body?.hasApiKey).toBe(true);
+    expect(JSON.stringify(getRes.body)).not.toContain("secret-ai-key");
+  });
+
+  it("PUT /api/config/ai rejects an invalid response style", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { responseStyle: "wordy" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("PUT /api/config/ai rejects an invalid base URL", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { baseUrl: "not-a-url" },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body?.status).toBe(400);
+  });
+
+  it("POST /api/config/ai/test succeeds against a stubbed provider", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "OK" } }] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await db.insert(configTable).values({ key: "ai_api_key", value: "unused" });
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/config/ai/test",
+        body: { baseUrl: "https://llm.example.com/v1", model: "glm-5.3-flash", apiKey: "test-key" },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body?.success).toBe(true);
+      expect(res.body?.model).toBe("glm-5.3-flash");
+      expect(typeof res.body?.latencyMs).toBe("number");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://llm.example.com/v1/chat/completions",
+        expect.objectContaining({ method: "POST" })
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("POST /api/config/ai/test maps a 401 to a 400 error JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) }))
+    );
+    try {
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/config/ai/test",
+        body: { baseUrl: "https://llm.example.com/v1", apiKey: "bad-key" },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({ error: "AI credentials invalid", status: 400 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("POST /api/config/ai/test requires an API key", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "POST",
+      url: "/api/config/ai/test",
+      body: { baseUrl: "https://llm.example.com/v1" },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: "AI API key is required", status: 400 });
+  });
 });

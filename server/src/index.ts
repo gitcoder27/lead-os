@@ -22,6 +22,7 @@ import { TeamTrackerService } from "./services/team-tracker.service";
 import { TodayService } from "./services/today.service";
 import { SearchService } from "./services/search.service";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
+import { AssistantService } from "./assistant/service";
 import { SyncEngine } from "./sync/engine";
 import { logger } from "./utils/logger";
 import { db } from "./db/connection";
@@ -85,6 +86,17 @@ async function bootstrap(): Promise<void> {
   const navPreferencesService = new NavPreferencesService();
   const searchService = new SearchService(settingsService, dailyNotesService);
   const workSavedViewsService = new WorkSavedViewsService();
+  const assistantService = new AssistantService({
+    todayService,
+    teamTrackerService,
+    managerDeskService,
+    issueService,
+    dailyNotesService,
+    workloadService,
+    alertService,
+    searchService,
+    syncEngine,
+  });
 
   const app = createApp({
     issueService,
@@ -103,6 +115,7 @@ async function bootstrap(): Promise<void> {
     workSavedViewsService,
     dailyNotesService,
     navPreferencesService,
+    assistantService,
   });
 
   await backupService.initialize();

@@ -38,14 +38,14 @@ import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { runInTransaction } from "../db/transaction";
 import { normalizeWorkspaceId } from "./workspace.service";
 
-interface ManagerDeskLinkInput {
+export interface ManagerDeskLinkInput {
   linkType: ManagerDeskLinkType;
   issueKey?: string;
   developerAccountId?: string;
   externalLabel?: string;
 }
 
-interface CreateManagerDeskItemParams {
+export interface CreateManagerDeskItemParams {
   date: string;
   title: string;
   kind?: ManagerDeskItemKind;
@@ -63,7 +63,7 @@ interface CreateManagerDeskItemParams {
   links?: ManagerDeskLinkInput[];
 }
 
-interface UpdateManagerDeskItemParams {
+export interface UpdateManagerDeskItemParams {
   title?: string;
   kind?: ManagerDeskItemKind;
   category?: ManagerDeskCategory;

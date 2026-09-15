@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider, useToast } from '@/context/ToastContext';
 import { AuthProvider, useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { QuickActionsProvider, type QuickActionsValue } from '@/context/QuickActionsContext';
+import { AssistantProvider } from '@/context/AssistantContext';
 import { useBootstrapState } from '@/hooks/useBootstrapState';
 import { useSyncRefreshCoordinator } from '@/hooks/useSyncRefreshCoordinator';
 import { TodayPage } from '@/components/today/TodayPage';
@@ -38,6 +39,7 @@ const loadManagerDeskPage = () => import('@/components/manager-desk');
 const loadManagerMemoryPage = () => import('@/components/manager-memory');
 const loadNotesPage = () => import('@/components/notes/NotesPage');
 const loadSettingsPage = () => import('@/components/settings/SettingsPanel');
+const loadAssistantDock = () => import('@/components/assistant/AssistantDock');
 
 const TeamTrackerPage = lazy(async () => {
   const module = await loadTeamTrackerPage();
@@ -82,6 +84,11 @@ const NotesPage = lazy(async () => {
 const SettingsPage = lazy(async () => {
   const module = await loadSettingsPage();
   return { default: module.SettingsPage };
+});
+
+const AssistantDock = lazy(async () => {
+  const module = await loadAssistantDock();
+  return { default: module.AssistantDock };
 });
 
 function canonicalizeView(view: AppView): CanonicalAppView {
@@ -415,6 +422,7 @@ function AppContent() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureContext, setCaptureContext] = useState<GlobalCaptureContext>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useSyncRefreshCoordinator({ enabled: isAuthenticatedManager && activeView !== 'today' });
 
@@ -654,6 +662,10 @@ function AppContent() {
         event.preventDefault();
         setPaletteOpen((open) => !open);
       }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
+        event.preventDefault();
+        setAssistantOpen((open) => !open);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -815,23 +827,35 @@ function AppContent() {
 
   return (
     <QuickActionsProvider value={quickActions}>
-      {renderActiveView()}
-      {isAuthenticatedManager && captureOpen && (
-        <GlobalCaptureDialog
-          onClose={() => setCaptureOpen(false)}
-          onOpenManagerDesk={() => handleViewChange('desk')}
-          onOpenTeamTracker={() => handleViewChange('team')}
-          onOpenNotes={(targetDate) => handleOpenNotes(targetDate)}
-          context={{ ...captureContext, defaultTarget: captureContext.defaultTarget ?? defaultCaptureTarget }}
-        />
-      )}
-      {isAuthenticatedManager && paletteOpen && (
-        <CommandPalette
-          onClose={() => setPaletteOpen(false)}
-          onOpenTarget={handleOpenTodayTarget}
-          onViewChange={handleViewChange}
-        />
-      )}
+      <AssistantProvider
+        isOpen={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        currentView={activeView === 'not-found' ? window.location.pathname : viewToPath(activeView)}
+        onOpenTarget={handleOpenTodayTarget}
+      >
+        {renderActiveView()}
+        {isAuthenticatedManager && captureOpen && (
+          <GlobalCaptureDialog
+            onClose={() => setCaptureOpen(false)}
+            onOpenManagerDesk={() => handleViewChange('desk')}
+            onOpenTeamTracker={() => handleViewChange('team')}
+            onOpenNotes={(targetDate) => handleOpenNotes(targetDate)}
+            context={{ ...captureContext, defaultTarget: captureContext.defaultTarget ?? defaultCaptureTarget }}
+          />
+        )}
+        {isAuthenticatedManager && paletteOpen && (
+          <CommandPalette
+            onClose={() => setPaletteOpen(false)}
+            onOpenTarget={handleOpenTodayTarget}
+            onViewChange={handleViewChange}
+          />
+        )}
+        {isAuthenticatedManager && (
+          <Suspense fallback={null}>
+            <AssistantDock />
+          </Suspense>
+        )}
+      </AssistantProvider>
     </QuickActionsProvider>
   );
 }

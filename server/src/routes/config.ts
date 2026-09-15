@@ -9,6 +9,8 @@ import { normalizeConfiguredJqlForMode } from "../jira/jql";
 import { config } from "../config";
 import { clearJiraApiToken, getJiraApiToken } from "../runtime-credentials";
 import { BackupService } from "../services/backup.service";
+import { AssistantConfigService } from "../services/assistant-config.service";
+import { OpenAiCompatibleClient } from "../assistant/llm-client";
 import { getPersistedJiraApiToken, storeJiraApiToken } from "../services/jira-credentials.service";
 import { normalizeJiraSyncScopeMode, SettingsService } from "../services/settings.service";
 import { WorkspaceMaintenanceService } from "../services/workspace-maintenance.service";
@@ -131,9 +133,35 @@ async function testJiraConnection(baseUrl: string, email: string, token: string)
   return { displayName: user.displayName, accountId: user.accountId };
 }
 
+const aiConfigUpdateSchema = z.object({
+  body: z.object({
+    enabled: z.boolean().optional(),
+    provider: z.enum(["openai-compatible"]).optional(),
+    baseUrl: z.string().url().optional(),
+    model: z.string().trim().min(1).optional(),
+    maxToolIterations: z.number().int().min(1).max(10).optional(),
+    responseStyle: z.enum(["concise", "detailed"]).optional(),
+    suggestFollowups: z.boolean().optional(),
+    apiKey: z.string().trim().optional(),
+  }),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
+const aiConfigTestSchema = z.object({
+  body: z.object({
+    baseUrl: z.string().url().optional(),
+    model: z.string().trim().min(1).optional(),
+    apiKey: z.string().trim().optional(),
+  }),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
 export function createConfigRouter(syncEngine?: SyncEngine, backupService?: BackupService): Router {
   const settings = new SettingsService();
   const maintenance = new WorkspaceMaintenanceService(settings, backupService);
+  const assistantConfig = new AssistantConfigService();
   const router = Router();
 
   const maintenanceResetSchema = z.object({
@@ -449,6 +477,48 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       res.json({ success: true });
     } catch (error) {
       next(error);
+    }
+  });
+
+  router.get("/ai", async (req, res, next) => {
+    try {
+      res.json(await assistantConfig.getPublicConfig(req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/ai", validate(aiConfigUpdateSchema), async (req, res, next) => {
+    try {
+      res.json(await assistantConfig.update(req.auth!.user.workspaceId, req.body));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/ai/test", validate(aiConfigTestSchema), async (req, res) => {
+    try {
+      const workspaceId = req.auth!.user.workspaceId;
+      const stored = await assistantConfig.getResolvedConfig(workspaceId);
+      const baseUrl = req.body.baseUrl || stored.baseUrl;
+      const model = req.body.model || stored.model;
+      const apiKey = req.body.apiKey || stored.apiKey;
+      if (!apiKey) {
+        res.status(400).json({ error: "AI API key is required", status: 400 });
+        return;
+      }
+      const client = new OpenAiCompatibleClient({ baseUrl, apiKey, model });
+      const startedAt = Date.now();
+      await client.chat({ messages: [{ role: "user", content: "Reply with OK." }], maxTokens: 5 });
+      res.json({
+        success: true,
+        checkedAt: new Date().toISOString(),
+        model,
+        latencyMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to connect to AI provider";
+      res.status(400).json({ error: message, status: 400 });
     }
   });
 

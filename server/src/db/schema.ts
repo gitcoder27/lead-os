@@ -332,6 +332,31 @@ export const dailyNoteFollowUps = sqliteTable("daily_note_follow_ups", {
   index("idx_daily_note_follow_ups_note").on(table.noteId),
 ]);
 
+// ── LeadOS Copilot (assistant) tables ──────────────────
+
+export const assistantConversations = sqliteTable("assistant_conversations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  title: text("title").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  index("idx_assistant_conversations_owner").on(table.workspaceId, table.managerAccountId),
+]);
+
+export const assistantMessages = sqliteTable("assistant_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  conversationId: integer("conversation_id").notNull().references(() => assistantConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  content: text("content").notNull().default(""),
+  toolCalls: text("tool_calls"),
+  toolCallId: text("tool_call_id"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_assistant_messages_conversation").on(table.conversationId, table.createdAt),
+]);
+
 export const userNavPreferences = sqliteTable("user_nav_preferences", {
   workspaceId: text("workspace_id").notNull().default("default"),
   managerAccountId: text("manager_account_id").notNull(),

@@ -1,9 +1,10 @@
 import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff } from 'lucide-react';
+import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff, Sparkles } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
+import { useAssistant } from '@/context/AssistantContext';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { formatRelativeTime } from '@/lib/utils';
@@ -26,6 +27,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const { openCapture, openCommandPalette } = useQuickActions();
+  const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
   const { data: sync } = useSyncStatus({ enabled: activeView !== 'today' });
   const triggerSync = useTriggerSync();
   const headerRef = useRef<HTMLElement | null>(null);
@@ -189,6 +191,25 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
               {user?.role === 'manager' && onViewChange ? (
                 <ManagerActionInbox onOpenTarget={openActionTarget} onViewChange={onViewChange} />
               ) : null}
+
+              {canQuickCapture && (
+                <button
+                  type="button"
+                  onClick={toggleAssistant}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[12px] font-medium transition-all"
+                  style={{
+                    background: assistantOpen ? 'var(--bg-elevated)' : 'var(--bg-tertiary)',
+                    color: assistantOpen ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                  }}
+                  title="LeadOS Copilot (Ctrl/⌘+J)"
+                  aria-label="Open Copilot"
+                >
+                  <Sparkles size={13} />
+                  <span className="hidden sm:inline">Copilot</span>
+                  <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>⌘J</kbd>
+                </button>
+              )}
 
               {canQuickCapture && (
                 <button

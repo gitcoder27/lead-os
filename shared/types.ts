@@ -1226,3 +1226,174 @@ export function isCompleteNavPreferences(value: unknown): value is NavPreference
   }
   return new Set(combined).size === combined.length;
 }
+
+// ── LeadOS Copilot (assistant) ────────────────────────
+// Type-only contracts: no runtime exports here, so shared/types.js needs no regen.
+
+export type AssistantRole = "user" | "assistant" | "tool";
+
+export type AssistantConfirmMode = "always" | "never";
+
+export type AssistantToolCallStatus =
+  | "executed"
+  | "pending"
+  | "confirmed"
+  | "cancelled"
+  | "failed";
+
+/** One tool call recorded on an assistant message (`assistant_messages.tool_calls`). */
+export interface AssistantToolCallRecord {
+  id: string;
+  name: string;
+  /** Parsed JSON arguments the model supplied. */
+  arguments: Record<string, unknown>;
+  confirm: AssistantConfirmMode;
+  status: AssistantToolCallStatus;
+  /** Human-readable one-liner: "Assign 'Fix login' to Priya for today". */
+  summary: string;
+  /** Result summary after execution: "Checked 14 desk items". */
+  resultSummary?: string;
+  error?: string;
+}
+
+export interface AssistantMessage {
+  id: number;
+  conversationId: number;
+  role: AssistantRole;
+  content: string;
+  toolCalls?: AssistantToolCallRecord[];
+  /** Only set on `tool` role rows: which assistant tool call this result answers. */
+  toolCallId?: string;
+  createdAt: string;
+}
+
+export interface AssistantConversation {
+  id: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount?: number;
+}
+
+export interface AssistantConversationDetail {
+  conversation: AssistantConversation;
+  messages: AssistantMessage[];
+}
+
+export interface AssistantConversationsResponse {
+  conversations: AssistantConversation[];
+}
+
+/** Allowlisted URL state for the manager's current screen (filter keys, dates — never secrets). */
+export interface AssistantPageContext {
+  view: string;
+  params?: Record<string, string>;
+}
+
+export interface AssistantChatRequest {
+  conversationId?: number;
+  /** Required for normal sends; omitted when `retry` regenerates the last answer. */
+  message?: string;
+  /** Re-run the turn for the last user message, discarding the previous answer. */
+  retry?: boolean;
+  /** Current SPA path, e.g. "/team", so the model can resolve "this screen". */
+  currentView?: string;
+  /** Allowlisted URL params from the current screen (issue, dev, date, filters…). */
+  pageContext?: AssistantPageContext;
+  /** Manager-local ISO date (YYYY-MM-DD). */
+  date: string;
+}
+
+export type AssistantActionDecision = "confirm" | "cancel";
+
+export interface AssistantActionConfirmRequest {
+  conversationId: number;
+  toolCallId: string;
+  decision: AssistantActionDecision;
+  date: string;
+}
+
+export interface AssistantActionProposal {
+  conversationId: number;
+  toolCallId: string;
+  tool: string;
+  summary: string;
+  /** The tool arguments, for the "preview" section of the confirm card. */
+  preview: Record<string, unknown>;
+  jiraMutating: boolean;
+  status: AssistantToolCallStatus;
+}
+
+export type AssistantDoneStatus = "complete" | "awaiting_confirmation" | "error";
+
+/** NDJSON stream events for POST /api/assistant/chat and /actions/confirm. */
+export type AssistantStreamEvent =
+  | { type: "delta"; content: string }
+  | { type: "reasoning_delta"; content: string }
+  | { type: "tool_start"; toolCallId: string; name: string; label: string }
+  | {
+      type: "tool_end";
+      toolCallId: string;
+      name: string;
+      ok: boolean;
+      summary: string;
+      durationMs: number;
+    }
+  | { type: "action_proposal"; proposal: AssistantActionProposal }
+  | {
+      type: "action_executed";
+      conversationId: number;
+      toolCallId: string;
+      tool: string;
+      ok: boolean;
+      summary: string;
+      /** Top-level TanStack Query key roots the client should invalidate. */
+      invalidate: string[];
+    }
+  | { type: "message"; message: AssistantMessage }
+  | { type: "followups"; items: string[] }
+  | { type: "done"; conversationId: number; status: AssistantDoneStatus }
+  | { type: "error"; error: string; status: number };
+
+export type AiProvider = "openai-compatible";
+
+export type AssistantResponseStyle = "concise" | "detailed";
+
+/** Public, keyless view of the Copilot settings (GET /api/config/ai). */
+export interface AiAssistantConfig {
+  enabled: boolean;
+  provider: AiProvider;
+  baseUrl: string;
+  model: string;
+  maxToolIterations: number;
+  responseStyle: AssistantResponseStyle;
+  /** Whether the assistant emits follow-up suggestion chips after answers. */
+  suggestFollowups: boolean;
+  hasApiKey: boolean;
+}
+
+/** PUT /api/config/ai — every field optional; `apiKey` is write-only. */
+export interface UpdateAiAssistantConfigRequest {
+  enabled?: boolean;
+  provider?: AiProvider;
+  baseUrl?: string;
+  model?: string;
+  maxToolIterations?: number;
+  responseStyle?: AssistantResponseStyle;
+  suggestFollowups?: boolean;
+  apiKey?: string;
+}
+
+/** POST /api/config/ai/test — may override stored settings for a dry run. */
+export interface TestAiAssistantConfigRequest {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+}
+
+export interface TestAiAssistantConfigResponse {
+  success: boolean;
+  checkedAt: string;
+  model: string;
+  latencyMs: number;
+}

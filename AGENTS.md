@@ -59,6 +59,7 @@ Feature folders under `client/src/components/`:
 - `manager-desk/`: Desk workspace, item drawer, rhythm lists, carry-forward, linked issue/developer workflows.
 - `manager-memory/`: Follow-ups and Meetings views.
 - `notes/`: private daily Notes workspace (sidebar history, editor, follow-up creation).
+- `assistant/`: Copilot dock, chat thread, tool chips, action confirm cards.
 - `capture/`: global capture dialogs and capture forms.
 - `palette/`: Cmd+K command palette and global search results.
 - `settings/`, `setup/`: configuration, maintenance, users, bootstrap, onboarding.
@@ -74,7 +75,7 @@ Frontend conventions:
 
 ## Backend Map
 
-Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups`.
+Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups`, `assistant` (manager-only `/api/assistant` Copilot chat/confirm/conversations).
 
 Services live in `server/src/services/` and cover issues, workload, alerts, automation suggestions, settings/config, tags, backups, auth, Team Tracker, My Day, Manager Desk, developer availability, workspace maintenance, and board query logic.
 
@@ -82,6 +83,7 @@ Infrastructure:
 
 - `server/src/db/`: Drizzle schema, SQLite connection, migrations, transactions, path helpers.
 - `server/src/jira/`: Jira client, JQL helpers, Jira-facing types.
+- `server/src/assistant/`: LeadOS Copilot — OpenAI-compatible LLM client, tool registry, prompts, NDJSON chat/confirm service (write tools always require confirm).
 - `server/src/sync/`: scheduled Jira sync engine.
 - `server/src/middleware/`: auth, validation, error handling.
 - `server/src/scripts/`: restore, user creation, and Manager Desk cleanup CLI helpers.
@@ -105,6 +107,7 @@ Backend conventions:
 - Most API routes are manager-only.
 - Developer users route to `/my-day`; developer API access is primarily through `/api/my-day`.
 - Jira config is a mix of env vars and persisted SQLite settings. The live Jira API token is handled by runtime credentials/config flows; never hardcode or commit secrets.
+- Copilot config lives in the `config` table (`ai_assistant_enabled`, `ai_provider`, `ai_base_url`, `ai_model`, `ai_max_tool_iterations`, `ai_response_style`, `ai_suggest_followups`, encrypted `ai_api_key`) via `GET/PUT /api/config/ai` + `POST /api/config/ai/test`; Cmd/Ctrl+J toggles the dock. Replies stream via provider SSE (`delta`/`reasoning_delta` NDJSON events), follow-up chips via `followups`, and `retry: true` on `/chat` regenerates the last answer.
 
 ## Commands and Validation
 

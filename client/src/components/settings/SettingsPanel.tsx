@@ -2078,11 +2078,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         </div>
       </div>
 
-      {/* ── FOOTER ─────────────────────────────────────────── */}
-      <div
-        className="shrink-0 border-t px-5 py-2"
-        style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-secondary) 74%, var(--bg-primary) 26%)' }}
-      >
+      {/* ── FOOTER — Jira save/sync only on Jira sections; other sections have their own actions ── */}
+      {activeSection === 'maintenance' || activeSection === 'connection' || activeSection === 'sync' ? (
+        <div
+          className="shrink-0 border-t px-5 py-2"
+          style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-secondary) 74%, var(--bg-primary) 26%)' }}
+        >
         {activeSection === 'maintenance' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -2138,7 +2139,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
     </motion.div>
   );
 }

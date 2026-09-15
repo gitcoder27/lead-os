@@ -1123,6 +1123,8 @@ ORDER BY updated DESC`);
         baseUrl: "https://api.z.ai/api/paas/v4",
         model: "glm-5.3-flash",
         hasApiKey: true,
+        resolvedContextWindow: 1_048_576,
+        resolvedMaxOutputTokens: 131_072,
       },
     ]);
     expect(res.body?.activeProviderId).toBe("default");
@@ -1186,6 +1188,60 @@ ORDER BY updated DESC`);
     expect(isEncryptedSecret(map[`ai_api_key:${id}`] as string)).toBe(true);
     expect(JSON.parse(map["ai_providers"] as string)).toHaveLength(1);
     expect(map["ai_active_provider"]).toBe(id);
+  });
+
+  it("stores per-provider capability overrides and resolves catalog defaults", async () => {
+    const app = createTestApp();
+
+    const explicit = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        upsertProvider: {
+          name: "Custom",
+          baseUrl: "https://llm.example.com/v1",
+          model: "mystery-model",
+          apiKey: "x",
+          contextWindow: 64_000,
+          maxOutputTokens: 4_096,
+          reasoningEffort: "low",
+        },
+      },
+    });
+    expect(explicit.status).toBe(200);
+    expect(explicit.body?.providers?.[0]).toMatchObject({
+      contextWindow: 64_000,
+      maxOutputTokens: 4_096,
+      reasoningEffort: "low",
+      resolvedContextWindow: 64_000,
+      resolvedMaxOutputTokens: 4_096,
+    });
+    expect(explicit.body?.contextWindow).toBe(64_000);
+    expect(explicit.body?.reasoningEffort).toBe("low");
+
+    const catalog = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        upsertProvider: { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKey: "ds-key" },
+      },
+    });
+    expect(catalog.status).toBe(200);
+    // Known model with no explicit fields — catalog supplies resolved values.
+    expect(catalog.body?.providers?.[1]).toMatchObject({
+      resolvedContextWindow: 131_072,
+      resolvedMaxOutputTokens: 32_768,
+    });
+    expect(catalog.body?.providers?.[1]?.reasoningEffort).toBeUndefined();
+
+    const switched = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { activeProviderId: catalog.body?.providers?.[1]?.id },
+    });
+    expect(switched.body?.contextWindow).toBe(131_072);
+    expect(switched.body?.maxOutputTokens).toBe(32_768);
+    expect(switched.body?.reasoningEffort).toBeUndefined();
   });
 
   it("removes a provider, clears its key, and reassigns active", async () => {

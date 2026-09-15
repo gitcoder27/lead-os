@@ -4,6 +4,7 @@ import type {
   AiAssistantConfig,
   AiProvider,
   AiProviderProfile,
+  AiReasoningEffort,
   AssistantResponseStyle,
   UpdateAiAssistantConfigRequest,
 } from "shared/types";
@@ -16,6 +17,7 @@ import {
   getPersistedAiApiKey,
   storeAiApiKey,
 } from "./assistant-credentials.service";
+import { lookupModelCatalog } from "./assistant-model-catalog";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 const KEY_ENABLED = "ai_assistant_enabled";
@@ -43,6 +45,9 @@ interface StoredAiProviderProfile {
   name: string;
   baseUrl: string;
   model: string;
+  maxOutputTokens?: number;
+  contextWindow?: number;
+  reasoningEffort?: AiReasoningEffort;
 }
 
 interface AiProviderState {
@@ -81,6 +86,29 @@ function deriveProviderName(baseUrl: string): string {
   }
 }
 
+const REASONING_EFFORTS: readonly AiReasoningEffort[] = ["off", "low", "high", "max"];
+
+function parsePositiveInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.trunc(value) : undefined;
+}
+
+function parseReasoningEffort(value: unknown): AiReasoningEffort | undefined {
+  return REASONING_EFFORTS.includes(value as AiReasoningEffort) ? (value as AiReasoningEffort) : undefined;
+}
+
+/** Carry the optional capability fields through the stored profile shape. */
+function normalizeStoredProfile(entry: StoredAiProviderProfile): StoredAiProviderProfile {
+  return {
+    id: entry.id,
+    name: typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : deriveProviderName(entry.baseUrl),
+    baseUrl: entry.baseUrl,
+    model: entry.model,
+    maxOutputTokens: parsePositiveInt(entry.maxOutputTokens),
+    contextWindow: parsePositiveInt(entry.contextWindow),
+    reasoningEffort: parseReasoningEffort(entry.reasoningEffort),
+  };
+}
+
 function parseStoredProfiles(raw: string | undefined): StoredAiProviderProfile[] | undefined {
   if (!raw) {
     return undefined;
@@ -99,12 +127,7 @@ function parseStoredProfiles(raw: string | undefined): StoredAiProviderProfile[]
           typeof (entry as StoredAiProviderProfile).baseUrl === "string" &&
           typeof (entry as StoredAiProviderProfile).model === "string"
       )
-      .map((entry) => ({
-        id: entry.id,
-        name: typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : deriveProviderName(entry.baseUrl),
-        baseUrl: entry.baseUrl,
-        model: entry.model,
-      }));
+      .map(normalizeStoredProfile);
   } catch {
     return undefined;
   }
@@ -188,10 +211,15 @@ export class AssistantConfigService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const state = await this.getProfileState(normalizedWorkspaceId);
     const providers = await Promise.all(
-      state.profiles.map(async (profile) => ({
-        ...profile,
-        hasApiKey: Boolean(await getPersistedAiApiKey(normalizedWorkspaceId, profile.id)),
-      }))
+      state.profiles.map(async (profile) => {
+        const catalog = lookupModelCatalog(profile.model);
+        return {
+          ...profile,
+          hasApiKey: Boolean(await getPersistedAiApiKey(normalizedWorkspaceId, profile.id)),
+          resolvedContextWindow: profile.contextWindow ?? catalog?.contextWindow,
+          resolvedMaxOutputTokens: profile.maxOutputTokens ?? catalog?.maxOutputTokens,
+        };
+      })
     );
     const activeProviderId = providers.find((p) => p.id === state.activeId)?.id ?? providers[0]?.id ?? null;
     return { providers, activeProviderId };
@@ -201,7 +229,7 @@ export class AssistantConfigService {
   async getResolvedProvider(
     workspaceId: string | undefined,
     profileId: string
-  ): Promise<{ baseUrl: string; model: string; apiKey?: string } | undefined> {
+  ): Promise<(StoredAiProviderProfile & { apiKey?: string }) | undefined> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const state = await this.getProfileState(normalizedWorkspaceId);
     const profile = state.profiles.find((p) => p.id === profileId);
@@ -209,7 +237,7 @@ export class AssistantConfigService {
       return undefined;
     }
     const apiKey = await getPersistedAiApiKey(normalizedWorkspaceId, profile.id);
-    return { baseUrl: profile.baseUrl, model: profile.model, apiKey };
+    return { ...profile, apiKey };
   }
 
   async getPublicConfig(workspaceId?: string): Promise<AiAssistantConfig> {
@@ -242,6 +270,9 @@ export class AssistantConfigService {
       hasApiKey: activeProfile?.hasApiKey ?? Boolean(apiKey),
       providers: providerState.providers,
       activeProviderId: providerState.activeProviderId,
+      maxOutputTokens: activeProfile?.resolvedMaxOutputTokens,
+      contextWindow: activeProfile?.resolvedContextWindow,
+      reasoningEffort: activeProfile?.reasoningEffort,
     };
   }
 
@@ -309,7 +340,15 @@ export class AssistantConfigService {
       const name = input.name?.trim() || deriveProviderName(baseUrl);
       const profiles = state ? [...state.profiles] : [];
       const id = input.id?.trim() || randomUUID();
-      const record: StoredAiProviderProfile = { id, name, baseUrl, model };
+      const record: StoredAiProviderProfile = {
+        id,
+        name,
+        baseUrl,
+        model,
+        maxOutputTokens: parsePositiveInt(input.maxOutputTokens ?? undefined),
+        contextWindow: parsePositiveInt(input.contextWindow ?? undefined),
+        reasoningEffort: parseReasoningEffort(input.reasoningEffort ?? undefined),
+      };
       const index = profiles.findIndex((p) => p.id === id);
       if (index >= 0) {
         profiles[index] = record;

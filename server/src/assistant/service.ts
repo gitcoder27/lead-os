@@ -526,7 +526,7 @@ export class AssistantService {
     });
   }
 
-  private async loadHistory(conversationId: number): Promise<LlmMessage[]> {
+  private async loadHistory(conversationId: number, charBudget?: number): Promise<LlmMessage[]> {
     let rows = await db
       .select()
       .from(assistantMessages)
@@ -541,6 +541,26 @@ export class AssistantService {
       }
       rows = rows.slice(cutIndex);
       truncated = true;
+    }
+
+    // Token-budget guard: when the model's context window is known, drop the
+    // oldest whole turns until estimated chars fit — ~4 chars/token.
+    if (charBudget) {
+      const cost = (row: (typeof rows)[number]) => row.content.length + (row.toolCalls?.length ?? 0);
+      let total = rows.reduce((sum, row) => sum + cost(row), 0);
+      let cutIndex = 0;
+      while (total > charBudget && cutIndex < rows.length) {
+        total -= cost(rows[cutIndex]!);
+        cutIndex += 1;
+        while (cutIndex < rows.length && rows[cutIndex]!.role !== "user") {
+          total -= cost(rows[cutIndex]!);
+          cutIndex += 1;
+        }
+      }
+      if (cutIndex > 0) {
+        rows = rows.slice(cutIndex);
+        truncated = true;
+      }
     }
 
     const history = rows.map(toLlmMessage);
@@ -600,9 +620,11 @@ export class AssistantService {
     const llm = this.createLlmClient({ baseUrl: config.baseUrl, apiKey: config.apiKey!, model: config.model });
     const systemPrompt = await this.buildPrompt(auth, date, currentView, config.responseStyle, pageParams, config.autoConfirm);
     const context = this.toolContext(auth, date, currentView);
+    // Reserve ~40% of the window for system/tools/output; history gets the rest (~4 chars/token).
+    const historyCharBudget = config.contextWindow ? Math.floor(config.contextWindow * 0.6 * 4) : undefined;
 
     for (let iteration = 0; iteration < config.maxToolIterations; iteration += 1) {
-      const history = await this.loadHistory(conversationId);
+      const history = await this.loadHistory(conversationId, historyCharBudget);
       const llmStartedAt = Date.now();
       let streamedContent = "";
       let result;
@@ -612,6 +634,8 @@ export class AssistantService {
             messages: [{ role: "system", content: systemPrompt }, ...history],
             tools: this.llmTools,
             signal,
+            maxTokens: config.maxOutputTokens,
+            reasoningEffort: config.reasoningEffort,
           },
           {
             onContent: (delta) => {
@@ -644,6 +668,7 @@ export class AssistantService {
           iteration,
           toolCalls: result.toolCalls.length,
           durationMs: Date.now() - llmStartedAt,
+          ...(result.usage ? { usage: result.usage } : {}),
         },
         "Assistant LLM turn completed"
       );

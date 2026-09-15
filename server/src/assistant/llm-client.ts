@@ -34,6 +34,12 @@ export interface LlmChatParams {
   maxTokens?: number;
   /** Sampling temperature; defaults to a crisp 0.3 for workspace Q&A. */
   temperature?: number;
+  /**
+   * Thinking-level override sent as `reasoning_effort` + `thinking.type`
+   * (the shared ZAI/DeepSeek/OpenAI-compatible dialect). "off" disables
+   * thinking where supported and degrades to low effort elsewhere.
+   */
+  reasoningEffort?: "off" | "low" | "high" | "max";
 }
 
 export interface LlmChatResult {
@@ -324,6 +330,13 @@ export class OpenAiCompatibleClient implements LlmClient {
     }
     if (params.maxTokens !== undefined) {
       payload.max_tokens = params.maxTokens;
+    }
+    if (params.reasoningEffort === "off") {
+      payload.reasoning_effort = "low";
+      payload.thinking = { type: "disabled" };
+    } else if (params.reasoningEffort) {
+      payload.reasoning_effort = params.reasoningEffort;
+      payload.thinking = { type: "enabled" };
     }
     return payload;
   }

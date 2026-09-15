@@ -6,7 +6,7 @@ import {
   useTestAssistantConfig,
   useUpdateAssistantConfig,
 } from '@/hooks/useAssistantConfig';
-import type { AiProviderProfile, AssistantResponseStyle, UpdateAiAssistantConfigRequest } from '@/types';
+import type { AiProviderProfile, AiReasoningEffort, AssistantResponseStyle, UpdateAiAssistantConfigRequest } from '@/types';
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (
@@ -102,9 +102,37 @@ interface ProviderFormState {
   baseUrl: string;
   model: string;
   apiKey: string;
+  /** Token fields are strings in the form; empty = use model catalog default. */
+  maxOutputTokens: string;
+  contextWindow: string;
+  reasoningEffort: '' | AiReasoningEffort;
 }
 
-const CLOSED_PROVIDER_FORM: ProviderFormState = { open: false, id: null, name: '', baseUrl: '', model: '', apiKey: '' };
+const CLOSED_PROVIDER_FORM: ProviderFormState = {
+  open: false,
+  id: null,
+  name: '',
+  baseUrl: '',
+  model: '',
+  apiKey: '',
+  maxOutputTokens: '',
+  contextWindow: '',
+  reasoningEffort: '',
+};
+
+/** Compact token counts for provider rows: 128K, 1M, 384K. */
+function formatTokens(value?: number): string | null {
+  if (!value) {
+    return null;
+  }
+  if (value >= 1_000_000) {
+    return `${Number((value / 1_000_000).toFixed(1))}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}K`;
+  }
+  return String(value);
+}
 
 export function AssistantSection() {
   const { data: config } = useAssistantConfig();
@@ -140,20 +168,37 @@ export function AssistantSection() {
   const activeProviderId = config?.activeProviderId ?? null;
 
   const openAddProvider = () => {
-    setProviderForm({ open: true, id: null, name: '', baseUrl: '', model: '', apiKey: '' });
+    setProviderForm({ open: true, id: null, name: '', baseUrl: '', model: '', apiKey: '', maxOutputTokens: '', contextWindow: '', reasoningEffort: '' });
     setConfirmingDelete(false);
   };
 
   const openEditProvider = (provider: AiProviderProfile) => {
-    setProviderForm({ open: true, id: provider.id, name: provider.name, baseUrl: provider.baseUrl, model: provider.model, apiKey: '' });
+    setProviderForm({
+      open: true,
+      id: provider.id,
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      model: provider.model,
+      apiKey: '',
+      maxOutputTokens: provider.maxOutputTokens ? String(provider.maxOutputTokens) : '',
+      contextWindow: provider.contextWindow ? String(provider.contextWindow) : '',
+      reasoningEffort: provider.reasoningEffort ?? '',
+    });
     setConfirmingDelete(false);
   };
 
   const trimmedProviderBaseUrl = providerForm.baseUrl.trim();
   const trimmedProviderModel = providerForm.model.trim();
   const trimmedProviderApiKey = providerForm.apiKey.trim();
+  const parsedMaxOutputTokens = providerForm.maxOutputTokens.trim() ? Number(providerForm.maxOutputTokens.trim()) : null;
+  const parsedContextWindow = providerForm.contextWindow.trim() ? Number(providerForm.contextWindow.trim()) : null;
   const editingProvider = providers.find((p) => p.id === providerForm.id);
-  const canSaveProvider = Boolean(trimmedProviderBaseUrl && trimmedProviderModel);
+  const canSaveProvider = Boolean(
+    trimmedProviderBaseUrl &&
+      trimmedProviderModel &&
+      (parsedMaxOutputTokens === null || (Number.isFinite(parsedMaxOutputTokens) && parsedMaxOutputTokens > 0)) &&
+      (parsedContextWindow === null || (Number.isFinite(parsedContextWindow) && parsedContextWindow >= 1024))
+  );
 
   const handleSetActive = async (provider: AiProviderProfile) => {
     if (provider.id === activeProviderId || activatingId) {
@@ -183,6 +228,9 @@ export function AssistantSection() {
           baseUrl: trimmedProviderBaseUrl,
           model: trimmedProviderModel,
           ...(trimmedProviderApiKey ? { apiKey: trimmedProviderApiKey } : {}),
+          maxOutputTokens: parsedMaxOutputTokens,
+          contextWindow: parsedContextWindow,
+          reasoningEffort: providerForm.reasoningEffort || null,
         },
       });
       setProviderForm(CLOSED_PROVIDER_FORM);
@@ -384,6 +432,15 @@ export function AssistantSection() {
                   <p className="mt-0.5 truncate font-mono text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
                     {provider.model} · {hostOf(provider.baseUrl)}
                   </p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                    {[
+                      provider.resolvedContextWindow ? `ctx ${formatTokens(provider.resolvedContextWindow)}` : null,
+                      provider.resolvedMaxOutputTokens ? `out ≤${formatTokens(provider.resolvedMaxOutputTokens)}` : null,
+                      provider.reasoningEffort ? `thinking ${provider.reasoningEffort}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'provider defaults'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -482,6 +539,51 @@ export function AssistantSection() {
                     style={inputStyle}
                   />
                 </LabeledInput>
+              </div>
+              <LabeledInput label="Context window (tokens)" id="ai-provider-context-window">
+                <input
+                  id="ai-provider-context-window"
+                  type="number"
+                  min={1024}
+                  value={providerForm.contextWindow}
+                  onChange={(e) => setProviderForm((prev) => ({ ...prev, contextWindow: e.target.value }))}
+                  placeholder="auto — e.g. 128000"
+                  className={`${inputClass} font-mono`}
+                  style={inputStyle}
+                />
+              </LabeledInput>
+              <LabeledInput label="Max output tokens" id="ai-provider-max-output">
+                <input
+                  id="ai-provider-max-output"
+                  type="number"
+                  min={1}
+                  value={providerForm.maxOutputTokens}
+                  onChange={(e) => setProviderForm((prev) => ({ ...prev, maxOutputTokens: e.target.value }))}
+                  placeholder="auto — e.g. 8192"
+                  className={`${inputClass} font-mono`}
+                  style={inputStyle}
+                />
+              </LabeledInput>
+              <div className="sm:col-span-2">
+                <LabeledInput label="Reasoning effort" id="ai-provider-reasoning">
+                  <select
+                    id="ai-provider-reasoning"
+                    value={providerForm.reasoningEffort}
+                    onChange={(e) => setProviderForm((prev) => ({ ...prev, reasoningEffort: e.target.value as '' | AiReasoningEffort }))}
+                    className={inputClass}
+                    style={inputStyle}
+                  >
+                    <option value="">Provider default</option>
+                    <option value="off">Off (disable thinking where supported)</option>
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                    <option value="max">Max</option>
+                  </select>
+                </LabeledInput>
+                <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Applies to reasoning-capable endpoints (ZAI GLM, DeepSeek). Blank token fields use the
+                  model&apos;s catalog defaults when known.
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">

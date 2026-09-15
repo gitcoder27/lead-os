@@ -152,6 +152,9 @@ const aiConfigUpdateSchema = z.object({
         baseUrl: z.string().url(),
         model: z.string().trim().min(1),
         apiKey: z.string().trim().optional(),
+        maxOutputTokens: z.number().int().min(1).max(1_000_000).nullable().optional(),
+        contextWindow: z.number().int().min(1024).max(10_000_000).nullable().optional(),
+        reasoningEffort: z.enum(["off", "low", "high", "max"]).nullable().optional(),
       })
       .optional(),
     removeProviderId: z.string().trim().min(1).optional(),
@@ -530,7 +533,13 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       }
       const client = new OpenAiCompatibleClient({ baseUrl, apiKey, model });
       const startedAt = Date.now();
-      await client.chat({ messages: [{ role: "user", content: "Reply with OK." }], maxTokens: 5 });
+      // Exercise the profile's real params so Test catches incompatible
+      // reasoning/max_tokens settings before the switch, not after.
+      await client.chat({
+        messages: [{ role: "user", content: "Reply with OK." }],
+        maxTokens: 5,
+        reasoningEffort: base.reasoningEffort,
+      });
       res.json({
         success: true,
         checkedAt: new Date().toISOString(),

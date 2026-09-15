@@ -72,6 +72,31 @@ describe("OpenAiCompatibleClient.chatStream", () => {
     expect(init.headers.Authorization).toBe("Bearer test-key");
   });
 
+  it("sends reasoning_effort + thinking only when reasoningEffort is set", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => sseResponse([sseChunk({ content: "ok" }), "data: [DONE]\n\n"]))
+    );
+
+    await client().chatStream({ messages: [{ role: "user", content: "hi" }], reasoningEffort: "high" });
+    expect(lastRequestBody()).toMatchObject({ reasoning_effort: "high", thinking: { type: "enabled" } });
+
+    await client().chatStream({
+      messages: [{ role: "user", content: "hi" }],
+      reasoningEffort: "off",
+      maxTokens: 128,
+    });
+    expect(lastRequestBody()).toMatchObject({
+      reasoning_effort: "low",
+      thinking: { type: "disabled" },
+      max_tokens: 128,
+    });
+
+    await client().chatStream({ messages: [{ role: "user", content: "hi" }] });
+    expect(lastRequestBody()).not.toHaveProperty("reasoning_effort");
+    expect(lastRequestBody()).not.toHaveProperty("thinking");
+  });
+
   it("merges tool_call fragments across chunks by index", async () => {
     vi.stubGlobal(
       "fetch",

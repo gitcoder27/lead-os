@@ -1361,6 +1361,9 @@ export type AiProvider = "openai-compatible";
 
 export type AssistantResponseStyle = "concise" | "detailed";
 
+/** Reasoning/thinking effort sent to providers that support it (ZAI, DeepSeek). */
+export type AiReasoningEffort = "off" | "low" | "high" | "max";
+
 /** Public, keyless view of one saved Copilot provider profile. */
 export interface AiProviderProfile {
   id: string;
@@ -1368,6 +1371,16 @@ export interface AiProviderProfile {
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
+  /** Optional explicit cap sent as max_tokens; unset falls back to the model catalog. */
+  maxOutputTokens?: number;
+  /** Model context window (input + output); used to budget history sent to the model. */
+  contextWindow?: number;
+  /** Thinking effort override; unset = provider default. */
+  reasoningEffort?: AiReasoningEffort;
+  /** Effective context window after catalog fallback — display only. */
+  resolvedContextWindow?: number;
+  /** Effective output cap after catalog fallback — display only. */
+  resolvedMaxOutputTokens?: number;
 }
 
 /** Public, keyless view of the Copilot settings (GET /api/config/ai). */
@@ -1390,6 +1403,12 @@ export interface AiAssistantConfig {
   providers: AiProviderProfile[];
   /** The profile Copilot uses; null when none are saved. */
   activeProviderId: string | null;
+  /** Effective output cap for the active provider (profile override or catalog). */
+  maxOutputTokens?: number;
+  /** Effective context window for the active provider (profile override or catalog). */
+  contextWindow?: number;
+  /** Reasoning effort override for the active provider; unset = provider default. */
+  reasoningEffort?: AiReasoningEffort;
 }
 
 /** PUT /api/config/ai — every field optional; `apiKey` is write-only. */
@@ -1413,6 +1432,12 @@ export interface UpdateAiAssistantConfigRequest {
     baseUrl: string;
     model: string;
     apiKey?: string;
+    /** Cap on output tokens; null/absent uses the model catalog default. */
+    maxOutputTokens?: number | null;
+    /** Model context window; null/absent uses the model catalog default. */
+    contextWindow?: number | null;
+    /** Reasoning effort override; null/absent = provider default. */
+    reasoningEffort?: AiReasoningEffort | null;
   };
   /** Delete a provider profile and its stored key. */
   removeProviderId?: string;

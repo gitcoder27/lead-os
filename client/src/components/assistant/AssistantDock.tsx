@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Settings, Sparkles } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import { CopilotMark } from '@/components/brand/CopilotMark';
 import { useAssistant } from '@/context/AssistantContext';
 import { useAssistantThread } from '@/hooks/useAssistant';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
@@ -121,7 +122,7 @@ export function AssistantDock() {
             className="flex h-11 w-11 items-center justify-center rounded-2xl"
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
           >
-            <Sparkles size={20} />
+            <CopilotMark size={20} monochrome />
           </span>
           <div>
             <p className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -134,7 +135,7 @@ export function AssistantDock() {
           <button
             type="button"
             onClick={() => {
-              onOpenTarget?.({ type: 'view', view: 'settings' });
+              onOpenTarget?.({ type: 'view', view: 'settings', section: 'assistant' });
               close();
             }}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold"

@@ -251,6 +251,8 @@ export type TodayActionGroup = "now" | "next" | "later";
 export interface TodayActionTarget {
   type: TodayActionTargetType;
   view: "work" | "team" | "desk" | "follow-ups" | "meetings" | "notes" | "settings";
+  /** Settings sub-section to open when view === "settings" (e.g. "assistant"). */
+  section?: string;
   issueKey?: string;
   relatedIssueKeys?: string[];
   developerAccountId?: string;

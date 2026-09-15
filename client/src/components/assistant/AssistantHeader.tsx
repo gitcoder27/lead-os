@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { History, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react';
-import { LeadOSMark } from '@/components/brand/LeadOSMark';
+import { CopilotMark } from '@/components/brand/CopilotMark';
+import { viewingLabel } from '@/components/assistant/viewing-label';
 import { formatRelativeTime } from '@/lib/utils';
 import type { AssistantConversation } from '@/types';
 
@@ -61,14 +62,18 @@ export function AssistantHeader({
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
           style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
         >
-          <LeadOSMark size={18} />
+          <CopilotMark size={18} />
         </span>
         <div className="min-w-0">
           <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
             Copilot
           </p>
-          <p className="truncate text-[10.5px] leading-tight" style={{ color: 'var(--text-muted)' }}>
-            viewing: {currentView}
+          <p
+            className="truncate text-[10.5px] leading-tight"
+            style={{ color: 'var(--text-muted)' }}
+            title="What Copilot sees — this screen and its active filters go with each message"
+          >
+            viewing: {viewingLabel(currentView, window.location.search)}
           </p>
         </div>
       </div>

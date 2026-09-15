@@ -1,6 +1,7 @@
 import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff, Sparkles } from 'lucide-react';
+import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff } from 'lucide-react';
+import { CopilotMark } from '@/components/brand/CopilotMark';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
@@ -205,7 +206,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   title="LeadOS Copilot (Ctrl/⌘+J)"
                   aria-label="Open Copilot"
                 >
-                  <Sparkles size={13} />
+                  <CopilotMark size={13} monochrome />
                   <span className="hidden sm:inline">Copilot</span>
                   <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>⌘J</kbd>
                 </button>

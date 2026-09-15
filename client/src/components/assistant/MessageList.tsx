@@ -8,6 +8,7 @@ import type {
 } from '@/types';
 import type { AssistantStreamingTurn } from '@/hooks/useAssistant';
 import { ChatMessage } from '@/components/assistant/ChatMessage';
+import { renderMarkdownLite } from '@/components/assistant/markdown-lite';
 import { ToolCallChip } from '@/components/assistant/ToolCallChip';
 import { ActionConfirmCard } from '@/components/assistant/ActionConfirmCard';
 import { SuggestionChips } from '@/components/assistant/SuggestionChips';
@@ -19,6 +20,7 @@ interface MessageListProps {
   followups: string[];
   confirmingId: string | null;
   currentView: string;
+  expanded?: boolean;
   onDecision: (toolCallId: string, decision: AssistantActionDecision) => void;
   onPickSuggestion: (text: string) => void;
   onRegenerate?: () => void;
@@ -32,6 +34,7 @@ export function MessageList({
   followups,
   confirmingId,
   currentView,
+  expanded,
   onDecision,
   onPickSuggestion,
   onRegenerate,
@@ -50,7 +53,8 @@ export function MessageList({
   }, [messages.length, streaming?.content, streaming?.reasoning, streaming?.tools.length, proposals.length]);
 
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div className={expanded ? 'mx-auto w-full max-w-[880px] space-y-3' : 'space-y-3'}>
       {isEmpty ? (
         <div className="space-y-3 pt-6">
           <p className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
@@ -97,8 +101,8 @@ export function MessageList({
             </div>
           ) : null}
           {streaming.content ? (
-            <p className="whitespace-pre-wrap text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>
-              {streaming.content}
+            <div style={{ color: 'var(--text-primary)' }}>
+              {renderMarkdownLite(streaming.content)}
               <motion.span
                 aria-hidden="true"
                 animate={reduceMotion ? undefined : { opacity: [1, 0.15, 1] }}
@@ -107,7 +111,7 @@ export function MessageList({
               >
                 ▍
               </motion.span>
-            </p>
+            </div>
           ) : streaming.tools.length === 0 ? (
             <motion.span
               aria-hidden="true"
@@ -133,6 +137,7 @@ export function MessageList({
       {!streaming && followups.length > 0 ? (
         <SuggestionChips currentView={currentView} items={followups} onPick={onPickSuggestion} />
       ) : null}
+      </div>
     </div>
   );
 }

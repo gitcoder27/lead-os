@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUp, Square } from 'lucide-react';
 import { SuggestionChips } from '@/components/assistant/SuggestionChips';
 
@@ -6,15 +6,26 @@ interface AssistantComposerProps {
   disabled?: boolean;
   streaming: boolean;
   currentView: string;
+  expanded?: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
 }
 
 const MAX_TEXTAREA_ROWS = 6;
 
-export function AssistantComposer({ disabled, streaming, currentView, onSend, onStop }: AssistantComposerProps) {
+/** Skip autofocus on touch-first devices so the virtual keyboard doesn't pop uninvited. */
+const canAutofocus = () =>
+  typeof window === 'undefined' || window.matchMedia?.('(pointer: coarse)')?.matches !== true;
+
+export function AssistantComposer({ disabled, streaming, currentView, expanded, onSend, onStop }: AssistantComposerProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (!disabled && canAutofocus()) {
+      textareaRef.current?.focus();
+    }
+  }, [disabled, expanded]);
 
   const resize = useCallback(() => {
     const textarea = textareaRef.current;
@@ -42,6 +53,7 @@ export function AssistantComposer({ disabled, streaming, currentView, onSend, on
 
   return (
     <div className="shrink-0 border-t px-3 pb-2.5 pt-2" style={{ borderColor: 'var(--border)' }}>
+      <div className={expanded ? 'mx-auto w-full max-w-[880px]' : undefined}>
       {showSuggestions ? (
         <div className="mb-2">
           <SuggestionChips
@@ -106,6 +118,7 @@ export function AssistantComposer({ disabled, streaming, currentView, onSend, on
       <p className="mt-1.5 text-[10.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
         Copilot can make mistakes — review proposed actions before confirming.
       </p>
+      </div>
     </div>
   );
 }

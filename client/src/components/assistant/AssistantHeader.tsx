@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { History, Plus, Trash2, X } from 'lucide-react';
+import { History, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { formatRelativeTime } from '@/lib/utils';
 import type { AssistantConversation } from '@/types';
@@ -8,6 +8,8 @@ interface AssistantHeaderProps {
   conversations: AssistantConversation[];
   currentConversationId: number | null;
   currentView: string;
+  expanded: boolean;
+  onToggleExpand: () => void;
   onSelectConversation: (id: number) => void;
   onDeleteConversation: (id: number) => void;
   onNewChat: () => void;
@@ -18,6 +20,8 @@ export function AssistantHeader({
   conversations,
   currentConversationId,
   currentView,
+  expanded,
+  onToggleExpand,
   onSelectConversation,
   onDeleteConversation,
   onNewChat,
@@ -148,6 +152,17 @@ export function AssistantHeader({
           aria-label="New chat"
         >
           <Plus size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className={iconButtonClass}
+          style={iconButtonStyle}
+          title={expanded ? 'Restore dock size' : 'Expand Copilot'}
+          aria-label={expanded ? 'Restore dock size' : 'Expand Copilot'}
+          aria-pressed={expanded}
+        >
+          {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
         </button>
         <button
           type="button"

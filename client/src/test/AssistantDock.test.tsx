@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssistantProvider } from '@/context/AssistantContext';
@@ -347,6 +347,96 @@ describe('AssistantDock', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('expands to a fullscreen overlay and collapses on backdrop click', async () => {
+    renderDock();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Copilot' }));
+
+    expect(await screen.findByTestId('assistant-backdrop')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore dock size' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('assistant-backdrop'));
+
+    await waitFor(() => expect(screen.queryByTestId('assistant-backdrop')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Expand Copilot' })).toBeInTheDocument();
+  });
+
+  it('collapses expanded mode on Escape before closing', async () => {
+    const onOpenChange = vi.fn();
+    renderDock({ onOpenChange });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Copilot' }));
+    expect(await screen.findByTestId('assistant-backdrop')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByTestId('assistant-backdrop')).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('collapses to dock when an issue key is clicked in expanded mode', async () => {
+    streamEvents([
+      {
+        type: 'message',
+        message: {
+          id: 11,
+          conversationId: 7,
+          role: 'assistant',
+          content: 'Check AM-12 next.',
+          createdAt: '2026-09-15T10:00:00.000Z',
+        },
+      },
+      { type: 'done', conversationId: 7, status: 'complete' },
+    ]);
+    const { onOpenTarget } = renderDock();
+
+    fireEvent.click(await screen.findByText('Brief me on today'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand Copilot' }));
+    expect(await screen.findByTestId('assistant-backdrop')).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'AM-12' }));
+
+    expect(onOpenTarget).toHaveBeenCalledWith({ type: 'issue', view: 'work', issueKey: 'AM-12' });
+    await waitFor(() => expect(screen.queryByTestId('assistant-backdrop')).not.toBeInTheDocument());
+  });
+
+  it('focuses the composer when the dock opens', async () => {
+    renderDock();
+
+    const textarea = await screen.findByLabelText('Message Copilot');
+    await waitFor(() => expect(textarea).toHaveFocus());
+  });
+
+  it('refocuses the composer after a streamed response completes', async () => {
+    let finishStream: (() => void) | undefined;
+    mockStream.mockImplementation(
+      (_path: string, _body: unknown, onEvent: (event: AssistantStreamEvent) => void) =>
+        new Promise<void>((resolve) => {
+          finishStream = () => {
+            onEvent({ type: 'done', conversationId: 7, status: 'complete' });
+            resolve();
+          };
+        }),
+    );
+    renderDock();
+
+    const textarea = await screen.findByLabelText('Message Copilot');
+    await waitFor(() => expect(textarea).toHaveFocus());
+
+    fireEvent.change(textarea, { target: { value: 'hello' } });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+
+    await waitFor(() => expect(textarea).toBeDisabled());
+    screen.getByRole('button', { name: 'Stop generating' }).focus();
+    expect(textarea).not.toHaveFocus();
+
+    act(() => finishStream!());
+
+    await waitFor(() => expect(textarea).toHaveFocus());
   });
 
   it('shows the setup empty state when Copilot is not configured', async () => {

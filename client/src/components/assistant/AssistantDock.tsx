@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Settings, Sparkles } from 'lucide-react';
@@ -16,6 +16,7 @@ export function AssistantDock() {
   const configQuery = useAssistantConfig({ enabled: isOpen });
   const config = configQuery.data;
   const reduceMotion = useReducedMotion();
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -24,24 +25,34 @@ export function AssistantDock() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        close();
+        if (expanded) {
+          setExpanded(false);
+        } else {
+          close();
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, close]);
+  }, [isOpen, expanded, close]);
 
   const configured = Boolean(config?.enabled && config?.hasApiKey);
 
   const panel = (
     <motion.aside
+      key="assistant-panel"
       role="dialog"
       aria-label="LeadOS Copilot"
+      layout
       initial={reduceMotion ? { opacity: 0 } : { x: 24, opacity: 0 }}
       animate={reduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
       exit={reduceMotion ? { opacity: 0 } : { x: 24, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-      className="fixed inset-2 z-[350] flex flex-col overflow-hidden rounded-2xl sm:inset-auto sm:bottom-3 sm:right-3 sm:top-[calc(var(--app-header-height,64px)+10px)] sm:w-[400px] sm:max-w-[calc(100vw-24px)]"
+      className={
+        expanded
+          ? 'fixed inset-2 z-[350] flex flex-col overflow-hidden rounded-2xl sm:inset-4'
+          : 'fixed inset-2 z-[350] flex flex-col overflow-hidden rounded-2xl sm:inset-auto sm:bottom-3 sm:right-3 sm:top-[calc(var(--app-header-height,64px)+10px)] sm:w-[400px] sm:max-w-[calc(100vw-24px)]'
+      }
       style={{
         background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)',
         backdropFilter: 'blur(18px)',
@@ -54,6 +65,8 @@ export function AssistantDock() {
         conversations={thread.conversationsQuery.data?.conversations ?? []}
         currentConversationId={thread.conversationId}
         currentView={currentView}
+        expanded={expanded}
+        onToggleExpand={() => setExpanded((value) => !value)}
         onSelectConversation={(id) => void thread.loadConversation(id)}
         onDeleteConversation={thread.deleteConversation}
         onNewChat={thread.newChat}
@@ -84,15 +97,20 @@ export function AssistantDock() {
             followups={thread.followups}
             confirmingId={thread.confirmingId}
             currentView={currentView}
+            expanded={expanded}
             onDecision={(toolCallId, decision) => void thread.confirm(toolCallId, decision)}
             onPickSuggestion={(text) => void thread.send(text)}
             onRegenerate={thread.status === 'idle' ? () => void thread.regenerate() : undefined}
-            onOpenTarget={onOpenTarget}
+            onOpenTarget={(target) => {
+              setExpanded(false);
+              onOpenTarget?.(target);
+            }}
           />
           <AssistantComposer
             disabled={thread.status === 'streaming'}
             streaming={thread.status === 'streaming'}
             currentView={currentView}
+            expanded={expanded}
             onSend={(text) => void thread.send(text)}
             onStop={thread.stop}
           />
@@ -130,5 +148,24 @@ export function AssistantDock() {
     </motion.aside>
   );
 
-  return createPortal(<AnimatePresence>{isOpen ? panel : null}</AnimatePresence>, document.body);
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && expanded ? (
+        <motion.div
+          key="assistant-backdrop"
+          data-testid="assistant-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          className="fixed inset-0 z-[340]"
+          style={{ background: 'rgba(5, 8, 12, 0.55)' }}
+          onClick={() => setExpanded(false)}
+          aria-hidden="true"
+        />
+      ) : null}
+      {isOpen ? panel : null}
+    </AnimatePresence>,
+    document.body,
+  );
 }

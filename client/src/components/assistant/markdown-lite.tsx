@@ -72,6 +72,114 @@ const isBulletLine = (line: string) => /^\s*[-*]\s+/.test(line);
 const isNumberedLine = (line: string) => /^\s*\d+\.\s+/.test(line);
 const headingMatch = (line: string) => /^#{1,6}\s+(.+)$/.exec(line);
 
+const ESCAPED_PIPE = '\u0000';
+
+function splitTableRow(line: string): string[] {
+  let row = line.trim().replace(/\\\|/g, ESCAPED_PIPE);
+  if (row.startsWith('|')) {
+    row = row.slice(1);
+  }
+  if (row.endsWith('|')) {
+    row = row.slice(0, -1);
+  }
+  return row.split('|').map((cell) => cell.replaceAll(ESCAPED_PIPE, '|').trim());
+}
+
+function isTableSeparatorRow(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.includes('|') || !trimmed.includes('-')) {
+    return false;
+  }
+  const cells = splitTableRow(trimmed);
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell));
+}
+
+interface LineGroup {
+  kind: 'plain' | 'table';
+  lines: string[];
+}
+
+function groupTableLines(lines: string[]): LineGroup[] {
+  const groups: LineGroup[] = [];
+  let plain: string[] = [];
+  const flushPlain = () => {
+    if (plain.length > 0) {
+      groups.push({ kind: 'plain', lines: plain });
+      plain = [];
+    }
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    const next = lines[i + 1];
+    if (line.includes('|') && next !== undefined && isTableSeparatorRow(next)) {
+      flushPlain();
+      const tableLines = [line, next];
+      i += 2;
+      while (i < lines.length && lines[i]!.includes('|')) {
+        tableLines.push(lines[i]!);
+        i += 1;
+      }
+      groups.push({ kind: 'table', lines: tableLines });
+      continue;
+    }
+    plain.push(line);
+    i += 1;
+  }
+  flushPlain();
+  return groups;
+}
+
+function renderTable(lines: string[], opts: MarkdownLiteOptions, key: string): ReactNode {
+  const header = splitTableRow(lines[0]!);
+  const aligns = splitTableRow(lines[1]!).map((cell) => {
+    if (cell.startsWith(':') && cell.endsWith(':') && cell.length > 2) {
+      return 'center' as const;
+    }
+    if (cell.endsWith(':')) {
+      return 'right' as const;
+    }
+    return 'left' as const;
+  });
+  const rows = lines.slice(2).map(splitTableRow);
+  const colCount = Math.max(header.length, aligns.length, ...rows.map((row) => row.length));
+  const alignFor = (index: number) => aligns[index] ?? 'left';
+  const cellStyle = (index: number) => ({
+    textAlign: alignFor(index),
+    border: '1px solid var(--border)',
+  });
+  return (
+    <div key={key} className="overflow-x-auto">
+      <table className="w-full border-collapse text-[13px] leading-5">
+        <thead>
+          <tr>
+            {Array.from({ length: colCount }, (_, i) => (
+              <th
+                key={i}
+                className="px-2 py-1 font-medium"
+                style={{ ...cellStyle(i), background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+              >
+                {renderInline(header[i] ?? '', opts, `${key}-h${i}`)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {Array.from({ length: colCount }, (_, colIndex) => (
+                <td key={colIndex} className="px-2 py-1" style={cellStyle(colIndex)}>
+                  {renderInline(row[colIndex] ?? '', opts, `${key}-r${rowIndex}c${colIndex}`)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function renderParagraph(lines: string[], opts: MarkdownLiteOptions, key: string): ReactNode {
   if (lines.every(isBulletLine)) {
     return (
@@ -135,8 +243,12 @@ export function renderMarkdownLite(text: string, opts: MarkdownLiteOptions = {})
     }
     for (const paragraph of segment.split(/\n\s*\n/)) {
       const lines = paragraph.split('\n').filter((line) => line.trim() !== '');
-      if (lines.length > 0) {
-        blocks.push(renderParagraph(lines, opts, `p-${index++}`));
+      for (const group of groupTableLines(lines)) {
+        if (group.kind === 'table') {
+          blocks.push(renderTable(group.lines, opts, `t-${index++}`));
+        } else {
+          blocks.push(renderParagraph(group.lines, opts, `p-${index++}`));
+        }
       }
     }
   });

@@ -100,8 +100,13 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
   const [status, setStatus] = useState<AssistantThreadStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Live-session reasoning traces keyed by assistant message id — never persisted.
+  const [reasoningTraces, setReasoningTraces] = useState<Record<number, string>>({});
   const abortRef = useRef<AbortController | null>(null);
   const tempIdRef = useRef(0);
+  // Mirrors the turn's accumulated reasoning — `handle` can't read `streaming`
+  // state (stable callback), so the trace is captured here for `message` events.
+  const reasoningRef = useRef('');
   // Stream handlers are captured once per send() call; the ref keeps "proposals
   // remaining" checks current without re-subscribing mid-stream.
   const proposalsRef = useRef<AssistantActionProposal[]>([]);
@@ -128,6 +133,7 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
           }));
           break;
         case 'reasoning_delta':
+          reasoningRef.current += event.content;
           setStreaming((prev) => ({
             content: prev?.content ?? '',
             reasoning: (prev?.reasoning ?? '') + event.content,
@@ -170,6 +176,11 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
             setMessages((prev) =>
               prev.some((m) => m.id === event.message.id) ? prev : [...prev, event.message],
             );
+            // Pin this turn's reasoning to the message so it stays re-readable
+            // (collapsed) after streaming ends. In-memory only.
+            if (reasoningRef.current) {
+              setReasoningTraces((prev) => ({ ...prev, [event.message.id]: reasoningRef.current }));
+            }
             // The persisted row carries the tool-call chips for this turn.
             setStreaming({ content: '', reasoning: '', tools: [] });
           }
@@ -227,6 +238,7 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimistic]);
+      reasoningRef.current = '';
       setStreaming({ content: '', reasoning: '', tools: [] });
       setStatus('streaming');
       setError(null);
@@ -261,6 +273,7 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
       }
       setConfirmingId(toolCallId);
       setStatus('streaming');
+      reasoningRef.current = '';
       setStreaming({ content: '', reasoning: '', tools: [] });
       setError(null);
       const controller = new AbortController();
@@ -297,8 +310,21 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
       return;
     }
     // Drop the previous answer locally; the server discards it too.
-    setMessages((prev) => prev.slice(0, lastUserIndex + 1));
+    setMessages((prev) => {
+      const dropped = prev.slice(lastUserIndex + 1);
+      if (dropped.length > 0) {
+        setReasoningTraces((traces) => {
+          const next = { ...traces };
+          for (const message of dropped) {
+            delete next[message.id];
+          }
+          return next;
+        });
+      }
+      return prev.slice(0, lastUserIndex + 1);
+    });
     applyProposals(() => []);
+    reasoningRef.current = '';
     setStreaming({ content: '', reasoning: '', tools: [] });
     setStatus('streaming');
     setError(null);
@@ -336,6 +362,8 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
     abortRef.current = null;
     setConversationId(null);
     setMessages([]);
+    reasoningRef.current = '';
+    setReasoningTraces({});
     setStreaming(null);
     applyProposals(() => []);
     setFollowups([]);
@@ -352,6 +380,8 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
       const visible = detail.messages.filter((message) => message.role !== 'tool');
       setConversationId(detail.conversation.id);
       setMessages(visible);
+      reasoningRef.current = '';
+      setReasoningTraces({});
       setStreaming(null);
       setError(null);
       setFollowups([]);
@@ -398,6 +428,7 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
   return {
     conversationId,
     messages,
+    reasoningTraces,
     streaming,
     proposals,
     followups,

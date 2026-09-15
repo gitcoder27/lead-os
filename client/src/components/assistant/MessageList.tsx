@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Brain, ChevronDown } from 'lucide-react';
 import type {
   AssistantActionDecision,
   AssistantActionProposal,
@@ -13,8 +14,108 @@ import { ToolCallChip } from '@/components/assistant/ToolCallChip';
 import { ActionConfirmCard } from '@/components/assistant/ActionConfirmCard';
 import { SuggestionChips } from '@/components/assistant/SuggestionChips';
 
+/**
+ * Expandable live reasoning trace. Open while the model thinks; auto-collapses
+ * once the answer starts unless the user toggled it manually. Trace is
+ * stream-only — nothing is persisted.
+ */
+function ThinkingBlock({
+  reasoning,
+  active,
+  initialOpen = true,
+}: {
+  reasoning: string;
+  active: boolean;
+  initialOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(initialOpen);
+  const userToggled = useRef(false);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!active && !userToggled.current) {
+      setOpen(false);
+    }
+  }, [active]);
+
+  // Pin the inner scroll to the newest reasoning while it streams.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (el && open) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [reasoning, open]);
+
+  return (
+    <div
+      className="mb-1.5 overflow-hidden rounded-lg"
+      style={{
+        border: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)',
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? 'Hide thinking trace' : 'Show thinking trace'}
+        onClick={() => {
+          userToggled.current = true;
+          setOpen((prev) => !prev);
+        }}
+        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left"
+      >
+        <Brain size={12} style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }} />
+        <span className="text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          {active ? 'Thinking…' : 'Thought process'}
+        </span>
+        {active ? (
+          <motion.span
+            aria-hidden="true"
+            animate={reduceMotion ? undefined : { opacity: [0.3, 1, 0.3] }}
+            transition={reduceMotion ? undefined : { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="block h-1 w-1 rounded-full"
+            style={{ background: 'var(--accent)' }}
+          />
+        ) : null}
+        <motion.span
+          aria-hidden="true"
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.18 }}
+          className="ml-auto flex items-center"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronDown size={12} />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="thinking-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div
+              ref={bodyRef}
+              className="max-h-44 overflow-y-auto whitespace-pre-wrap px-2.5 pb-2.5 text-[12px] leading-5"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {reasoning}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 interface MessageListProps {
   messages: AssistantMessage[];
+  /** Live-session reasoning traces keyed by message id — rendered collapsed. */
+  reasoningTraces?: Record<number, string>;
   streaming: AssistantStreamingTurn | null;
   proposals: AssistantActionProposal[];
   followups: string[];
@@ -29,6 +130,7 @@ interface MessageListProps {
 
 export function MessageList({
   messages,
+  reasoningTraces,
   streaming,
   proposals,
   followups,
@@ -65,27 +167,23 @@ export function MessageList({
       ) : null}
 
       {messages.map((message) => (
-        <ChatMessage
-          key={message.id}
-          message={message}
-          canRegenerate={!streaming && message.id === lastAssistantId && Boolean(onRegenerate)}
-          onRegenerate={onRegenerate}
-          onOpenTarget={onOpenTarget}
-        />
+        <div key={message.id}>
+          {reasoningTraces?.[message.id] ? (
+            <ThinkingBlock reasoning={reasoningTraces[message.id]!} active={false} initialOpen={false} />
+          ) : null}
+          <ChatMessage
+            message={message}
+            canRegenerate={!streaming && message.id === lastAssistantId && Boolean(onRegenerate)}
+            onRegenerate={onRegenerate}
+            onOpenTarget={onOpenTarget}
+          />
+        </div>
       ))}
 
       {streaming ? (
         <div className="pr-4">
-          {streaming.reasoning && !streaming.content ? (
-            <motion.p
-              aria-live="polite"
-              animate={reduceMotion ? undefined : { opacity: [0.45, 1, 0.45] }}
-              transition={reduceMotion ? undefined : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-              className="mb-1.5 flex items-center gap-1.5 text-[12px] italic"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Thinking…
-            </motion.p>
+          {streaming.reasoning ? (
+            <ThinkingBlock reasoning={streaming.reasoning} active={!streaming.content} />
           ) : null}
           {streaming.tools.length > 0 ? (
             <div className="mb-1.5 flex flex-wrap gap-1.5">

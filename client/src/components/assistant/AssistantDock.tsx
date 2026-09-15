@@ -93,6 +93,7 @@ export function AssistantDock() {
           ) : null}
           <MessageList
             messages={thread.messages}
+            reasoningTraces={config?.showThinkingTrace === false ? undefined : thread.reasoningTraces}
             streaming={thread.streaming}
             proposals={thread.proposals}
             followups={thread.followups}

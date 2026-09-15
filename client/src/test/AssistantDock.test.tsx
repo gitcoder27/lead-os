@@ -287,6 +287,75 @@ describe('AssistantDock', () => {
     expect(await screen.findByText('Thinking…')).toBeInTheDocument();
   });
 
+  it('renders the live reasoning trace in an expandable thinking block', async () => {
+    mockStream.mockImplementation(
+      (_path: string, _body: unknown, onEvent: (event: AssistantStreamEvent) => void) => {
+        onEvent({ type: 'reasoning_delta', content: 'comparing vendor options' });
+        return new Promise(() => undefined);
+      },
+    );
+    renderDock();
+
+    fireEvent.click(await screen.findByText('Brief me on today'));
+    expect(await screen.findByText('comparing vendor options')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /hide thinking trace/i }));
+    await waitFor(() => {
+      expect(screen.queryByText('comparing vendor options')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /show thinking trace/i }));
+    expect(await screen.findByText('comparing vendor options')).toBeInTheDocument();
+  });
+
+  it('collapses the thinking trace once the answer starts streaming', async () => {
+    mockStream.mockImplementation(
+      (_path: string, _body: unknown, onEvent: (event: AssistantStreamEvent) => void) => {
+        onEvent({ type: 'reasoning_delta', content: 'comparing vendor options' });
+        onEvent({ type: 'delta', content: 'Here is the board.' });
+        return new Promise(() => undefined);
+      },
+    );
+    renderDock();
+
+    fireEvent.click(await screen.findByText('Brief me on today'));
+    expect(await screen.findByText('Here is the board.')).toBeInTheDocument();
+    expect(await screen.findByText('Thought process')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('comparing vendor options')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps the finished thinking trace collapsed on the message and expandable', async () => {
+    mockStream.mockImplementation(
+      (_path: string, _body: unknown, onEvent: (event: AssistantStreamEvent) => void) => {
+        onEvent({ type: 'reasoning_delta', content: 'weighing two options' });
+        onEvent({ type: 'delta', content: 'Here is the board.' });
+        onEvent({
+          type: 'message',
+          message: {
+            id: 9,
+            conversationId: 7,
+            role: 'assistant',
+            content: 'Here is the board.',
+            createdAt: '2026-09-15T10:00:00.000Z',
+          },
+        });
+        onEvent({ type: 'done', conversationId: 7, status: 'complete' });
+        return Promise.resolve();
+      },
+    );
+    renderDock();
+
+    fireEvent.click(await screen.findByText('Brief me on today'));
+    expect(await screen.findByText('Here is the board.')).toBeInTheDocument();
+    expect(await screen.findByText('Thought process')).toBeInTheDocument();
+    expect(screen.queryByText('weighing two options')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /show thinking trace/i }));
+    expect(await screen.findByText('weighing two options')).toBeInTheDocument();
+  });
+
   it('replaces the Thinking state once content streams', async () => {
     mockStream.mockImplementation(
       (_path: string, _body: unknown, onEvent: (event: AssistantStreamEvent) => void) => {

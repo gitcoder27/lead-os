@@ -106,6 +106,8 @@ interface ProviderFormState {
   maxOutputTokens: string;
   contextWindow: string;
   reasoningEffort: '' | AiReasoningEffort;
+  /** Empty = assistant default (0.7). */
+  temperature: string;
 }
 
 const CLOSED_PROVIDER_FORM: ProviderFormState = {
@@ -118,6 +120,7 @@ const CLOSED_PROVIDER_FORM: ProviderFormState = {
   maxOutputTokens: '',
   contextWindow: '',
   reasoningEffort: '',
+  temperature: '',
 };
 
 /** Compact token counts for provider rows: 128K, 1M, 384K. */
@@ -145,6 +148,7 @@ export function AssistantSection() {
   const [responseStyle, setResponseStyle] = useState<AssistantResponseStyle>('concise');
   const [suggestFollowups, setSuggestFollowups] = useState(true);
   const [autoConfirm, setAutoConfirm] = useState(false);
+  const [showThinkingTrace, setShowThinkingTrace] = useState(true);
   const [touched, setTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -160,6 +164,7 @@ export function AssistantSection() {
       setResponseStyle(config.responseStyle);
       setSuggestFollowups(config.suggestFollowups);
       setAutoConfirm(config.autoConfirm);
+      setShowThinkingTrace(config.showThinkingTrace);
     }
   }, [config, touched]);
 
@@ -168,7 +173,7 @@ export function AssistantSection() {
   const activeProviderId = config?.activeProviderId ?? null;
 
   const openAddProvider = () => {
-    setProviderForm({ open: true, id: null, name: '', baseUrl: '', model: '', apiKey: '', maxOutputTokens: '', contextWindow: '', reasoningEffort: '' });
+    setProviderForm({ open: true, id: null, name: '', baseUrl: '', model: '', apiKey: '', maxOutputTokens: '', contextWindow: '', reasoningEffort: '', temperature: '' });
     setConfirmingDelete(false);
   };
 
@@ -183,6 +188,7 @@ export function AssistantSection() {
       maxOutputTokens: provider.maxOutputTokens ? String(provider.maxOutputTokens) : '',
       contextWindow: provider.contextWindow ? String(provider.contextWindow) : '',
       reasoningEffort: provider.reasoningEffort ?? '',
+      temperature: provider.temperature !== undefined ? String(provider.temperature) : '',
     });
     setConfirmingDelete(false);
   };
@@ -192,12 +198,14 @@ export function AssistantSection() {
   const trimmedProviderApiKey = providerForm.apiKey.trim();
   const parsedMaxOutputTokens = providerForm.maxOutputTokens.trim() ? Number(providerForm.maxOutputTokens.trim()) : null;
   const parsedContextWindow = providerForm.contextWindow.trim() ? Number(providerForm.contextWindow.trim()) : null;
+  const parsedTemperature = providerForm.temperature.trim() ? Number(providerForm.temperature.trim()) : null;
   const editingProvider = providers.find((p) => p.id === providerForm.id);
   const canSaveProvider = Boolean(
     trimmedProviderBaseUrl &&
       trimmedProviderModel &&
       (parsedMaxOutputTokens === null || (Number.isFinite(parsedMaxOutputTokens) && parsedMaxOutputTokens > 0)) &&
-      (parsedContextWindow === null || (Number.isFinite(parsedContextWindow) && parsedContextWindow >= 1024))
+      (parsedContextWindow === null || (Number.isFinite(parsedContextWindow) && parsedContextWindow >= 1024)) &&
+      (parsedTemperature === null || (Number.isFinite(parsedTemperature) && parsedTemperature >= 0 && parsedTemperature <= 2))
   );
 
   const handleSetActive = async (provider: AiProviderProfile) => {
@@ -231,6 +239,7 @@ export function AssistantSection() {
           maxOutputTokens: parsedMaxOutputTokens,
           contextWindow: parsedContextWindow,
           reasoningEffort: providerForm.reasoningEffort || null,
+          temperature: parsedTemperature,
         },
       });
       setProviderForm(CLOSED_PROVIDER_FORM);
@@ -307,6 +316,9 @@ export function AssistantSection() {
     if (!config || autoConfirm !== config.autoConfirm) {
       patch.autoConfirm = autoConfirm;
     }
+    if (!config || showThinkingTrace !== config.showThinkingTrace) {
+      patch.showThinkingTrace = showThinkingTrace;
+    }
 
     setSaving(true);
     try {
@@ -353,6 +365,20 @@ export function AssistantSection() {
               setSuggestFollowups(next);
             }}
             ariaLabel="Toggle follow-up suggestions"
+          />
+          <ToggleRow
+            title="Keep thinking traces"
+            description={
+              showThinkingTrace
+                ? 'On — each answer keeps its reasoning as a collapsed “Thought process” block for the session.'
+                : 'Off — the live thinking panel unmounts as soon as the answer finishes.'
+            }
+            checked={showThinkingTrace}
+            onChange={(next) => {
+              markTouched();
+              setShowThinkingTrace(next);
+            }}
+            ariaLabel="Toggle keeping thinking traces"
           />
           <ToggleRow
             title="Full access — auto-confirm actions"
@@ -437,6 +463,7 @@ export function AssistantSection() {
                       provider.resolvedContextWindow ? `ctx ${formatTokens(provider.resolvedContextWindow)}` : null,
                       provider.resolvedMaxOutputTokens ? `out ≤${formatTokens(provider.resolvedMaxOutputTokens)}` : null,
                       provider.reasoningEffort ? `thinking ${provider.reasoningEffort}` : null,
+                      provider.temperature !== undefined ? `temp ${provider.temperature}` : null,
                     ]
                       .filter(Boolean)
                       .join(' · ') || 'provider defaults'}
@@ -564,27 +591,39 @@ export function AssistantSection() {
                   style={inputStyle}
                 />
               </LabeledInput>
-              <div className="sm:col-span-2">
-                <LabeledInput label="Reasoning effort" id="ai-provider-reasoning">
-                  <select
-                    id="ai-provider-reasoning"
-                    value={providerForm.reasoningEffort}
-                    onChange={(e) => setProviderForm((prev) => ({ ...prev, reasoningEffort: e.target.value as '' | AiReasoningEffort }))}
-                    className={inputClass}
-                    style={inputStyle}
-                  >
-                    <option value="">Provider default</option>
-                    <option value="off">Off (disable thinking where supported)</option>
-                    <option value="low">Low</option>
-                    <option value="high">High</option>
-                    <option value="max">Max</option>
-                  </select>
-                </LabeledInput>
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  Applies to reasoning-capable endpoints (ZAI GLM, DeepSeek). Blank token fields use the
-                  model&apos;s catalog defaults when known.
-                </p>
-              </div>
+              <LabeledInput label="Temperature (0–2)" id="ai-provider-temperature">
+                <input
+                  id="ai-provider-temperature"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={providerForm.temperature}
+                  onChange={(e) => setProviderForm((prev) => ({ ...prev, temperature: e.target.value }))}
+                  placeholder="default 0.7"
+                  className={`${inputClass} font-mono`}
+                  style={inputStyle}
+                />
+              </LabeledInput>
+              <LabeledInput label="Reasoning effort" id="ai-provider-reasoning">
+                <select
+                  id="ai-provider-reasoning"
+                  value={providerForm.reasoningEffort}
+                  onChange={(e) => setProviderForm((prev) => ({ ...prev, reasoningEffort: e.target.value as '' | AiReasoningEffort }))}
+                  className={inputClass}
+                  style={inputStyle}
+                >
+                  <option value="">Provider default</option>
+                  <option value="off">Off (disable thinking where supported)</option>
+                  <option value="low">Low</option>
+                  <option value="high">High</option>
+                  <option value="max">Max</option>
+                </select>
+              </LabeledInput>
+              <p className="text-[11px] sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
+                Reasoning applies to thinking-capable endpoints (ZAI GLM, DeepSeek). Blank token fields use
+                the model&apos;s catalog defaults when known; blank temperature uses the assistant default (0.7).
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

@@ -36,6 +36,7 @@ const CONFIGURED: AiAssistantConfig = {
   maxToolIterations: 6,
   responseStyle: 'concise',
   suggestFollowups: true,
+  autoConfirm: false,
   providers: [
     { id: 'default', name: 'Default', baseUrl: 'https://llm.test/v1', model: 'test-model', hasApiKey: true },
   ],

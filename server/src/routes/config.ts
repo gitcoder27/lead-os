@@ -142,6 +142,7 @@ const aiConfigUpdateSchema = z.object({
     maxToolIterations: z.number().int().min(1).max(10).optional(),
     responseStyle: z.enum(["concise", "detailed"]).optional(),
     suggestFollowups: z.boolean().optional(),
+    autoConfirm: z.boolean().optional(),
     apiKey: z.string().trim().optional(),
     activeProviderId: z.string().trim().min(1).optional(),
     upsertProvider: z

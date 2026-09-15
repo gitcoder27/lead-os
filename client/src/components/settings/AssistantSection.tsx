@@ -116,6 +116,7 @@ export function AssistantSection() {
   const [maxToolIterations, setMaxToolIterations] = useState(6);
   const [responseStyle, setResponseStyle] = useState<AssistantResponseStyle>('concise');
   const [suggestFollowups, setSuggestFollowups] = useState(true);
+  const [autoConfirm, setAutoConfirm] = useState(false);
   const [touched, setTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -130,6 +131,7 @@ export function AssistantSection() {
       setMaxToolIterations(config.maxToolIterations);
       setResponseStyle(config.responseStyle);
       setSuggestFollowups(config.suggestFollowups);
+      setAutoConfirm(config.autoConfirm);
     }
   }, [config, touched]);
 
@@ -254,6 +256,9 @@ export function AssistantSection() {
     if (!config || suggestFollowups !== config.suggestFollowups) {
       patch.suggestFollowups = suggestFollowups;
     }
+    if (!config || autoConfirm !== config.autoConfirm) {
+      patch.autoConfirm = autoConfirm;
+    }
 
     setSaving(true);
     try {
@@ -300,6 +305,20 @@ export function AssistantSection() {
               setSuggestFollowups(next);
             }}
             ariaLabel="Toggle follow-up suggestions"
+          />
+          <ToggleRow
+            title="Full access — auto-confirm actions"
+            description={
+              autoConfirm
+                ? 'On — Copilot runs write actions (desk items, check-ins, Jira changes) immediately, no confirmation asked.'
+                : 'Off — Copilot proposes write actions and waits for you to confirm each one.'
+            }
+            checked={autoConfirm}
+            onChange={(next) => {
+              markTouched();
+              setAutoConfirm(next);
+            }}
+            ariaLabel="Toggle full access auto-confirm"
           />
         </div>
       </div>

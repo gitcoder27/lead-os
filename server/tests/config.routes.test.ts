@@ -977,6 +977,7 @@ ORDER BY updated DESC`);
       maxToolIterations: 6,
       responseStyle: "concise",
       suggestFollowups: true,
+      autoConfirm: false,
       hasApiKey: false,
       providers: [],
       activeProviderId: null,
@@ -994,6 +995,7 @@ ORDER BY updated DESC`);
         model: "glm-5.3-flash",
         maxToolIterations: 4,
         responseStyle: "detailed",
+        autoConfirm: true,
         apiKey: "secret-ai-key",
       },
     });
@@ -1005,6 +1007,7 @@ ORDER BY updated DESC`);
       model: "glm-5.3-flash",
       maxToolIterations: 4,
       responseStyle: "detailed",
+      autoConfirm: true,
       hasApiKey: true,
     });
     expect(JSON.stringify(putRes.body)).not.toContain("secret-ai-key");

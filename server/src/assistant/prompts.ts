@@ -18,6 +18,8 @@ export interface SystemPromptParams {
   pageParams?: Record<string, string>;
   contextCard?: AssistantContextCard;
   style?: AssistantResponseStyle;
+  /** Full access — write tools run inline instead of awaiting manager confirmation. */
+  autoConfirm?: boolean;
 }
 
 const CONCISE_CONTRACT = [
@@ -81,7 +83,9 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     "- Format with markdown-lite: **bold**, bullets, inline code. Reference issues by key like AM-123.",
     "",
     "Write actions:",
-    "- Tools that change anything are proposals only. When you call one, tell the manager you have proposed the action and that it awaits their confirmation — never claim a write happened until you receive its tool result.",
+    params.autoConfirm
+      ? "- Tools that change anything run immediately — the manager granted full access. After calling one, report plainly what was done once its tool result arrives."
+      : "- Tools that change anything are proposals only. When you call one, tell the manager you have proposed the action and that it awaits their confirmation — never claim a write happened until you receive its tool result.",
     "- Read tools run immediately; their results come back as tool messages.",
     "",
     "Safety:",

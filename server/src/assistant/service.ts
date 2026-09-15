@@ -491,7 +491,8 @@ export class AssistantService {
     date: string,
     currentView?: string,
     style?: ResolvedAiAssistantConfig["responseStyle"],
-    pageParams?: Record<string, string>
+    pageParams?: Record<string, string>,
+    autoConfirm?: boolean
   ): Promise<string> {
     let contextCard: AssistantContextCard | undefined;
     try {
@@ -521,6 +522,7 @@ export class AssistantService {
       pageParams,
       contextCard,
       style,
+      autoConfirm,
     });
   }
 
@@ -596,7 +598,7 @@ export class AssistantService {
     pageParams?: Record<string, string>
   ): Promise<void> {
     const llm = this.createLlmClient({ baseUrl: config.baseUrl, apiKey: config.apiKey!, model: config.model });
-    const systemPrompt = await this.buildPrompt(auth, date, currentView, config.responseStyle, pageParams);
+    const systemPrompt = await this.buildPrompt(auth, date, currentView, config.responseStyle, pageParams, config.autoConfirm);
     const context = this.toolContext(auth, date, currentView);
 
     for (let iteration = 0; iteration < config.maxToolIterations; iteration += 1) {
@@ -675,7 +677,8 @@ export class AssistantService {
       for (const call of result.toolCalls) {
         const tool = this.toolByName.get(call.name);
         const record = recordById.get(call.id)!;
-        if (tool?.confirm === "always") {
+        // Full access mode runs confirm-gated writes inline instead of proposing them.
+        if (tool?.confirm === "always" && !config.autoConfirm) {
           emit({
             type: "action_proposal",
             proposal: {
@@ -700,6 +703,17 @@ export class AssistantService {
           record.error = outcome.summary;
         }
         await this.appendMessage(conversationId, "tool", JSON.stringify(outcome.result), { toolCallId: call.id });
+        if (tool && tool.invalidate.length > 0) {
+          emit({
+            type: "action_executed",
+            conversationId,
+            toolCallId: call.id,
+            tool: call.name,
+            ok: outcome.ok,
+            summary: outcome.summary,
+            invalidate: tool.invalidate,
+          });
+        }
       }
 
       await this.updateToolCallRecords(assistantRow.id, records);

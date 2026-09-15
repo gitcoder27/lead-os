@@ -1380,6 +1380,8 @@ export interface AiAssistantConfig {
   responseStyle: AssistantResponseStyle;
   /** Whether the assistant emits follow-up suggestion chips after answers. */
   suggestFollowups: boolean;
+  /** Full access — write tools execute immediately instead of awaiting confirmation. */
+  autoConfirm: boolean;
   /** Whether the active provider profile has a stored key. */
   hasApiKey: boolean;
   /** All saved provider profiles (keyless). */
@@ -1397,6 +1399,8 @@ export interface UpdateAiAssistantConfigRequest {
   maxToolIterations?: number;
   responseStyle?: AssistantResponseStyle;
   suggestFollowups?: boolean;
+  /** Full access — write tools execute immediately instead of awaiting confirmation. */
+  autoConfirm?: boolean;
   apiKey?: string;
   /** Switch the active provider profile. */
   activeProviderId?: string;

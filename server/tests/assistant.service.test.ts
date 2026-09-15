@@ -231,6 +231,45 @@ describe("AssistantService", () => {
     expect(after.items.map((item) => item.title)).toContain("Follow up with Alice");
   });
 
+  it("executes write tools inline when auto-confirm is enabled", async () => {
+    await enableCopilot({ autoConfirm: true });
+    const { client } = createScriptedClient([
+      {
+        toolCalls: [
+          { id: "call-1", name: "create_desk_item", arguments: { title: "Follow up with Alice", kind: "action" } },
+        ],
+      },
+      { content: "Done — created the desk item." },
+    ]);
+    const service = buildService(client);
+    const { events, emit } = collectEvents();
+
+    await service.chat(AUTH, { message: "Create a follow-up", date: DATE }, emit);
+
+    expect(eventTypes(events)).toEqual([
+      "tool_start",
+      "tool_end",
+      "action_executed",
+      "message",
+      "delta",
+      "message",
+      "done",
+    ]);
+    const executed = events.find((event) => event.type === "action_executed") as {
+      ok: boolean;
+      toolCallId: string;
+      invalidate: string[];
+    };
+    expect(executed.ok).toBe(true);
+    expect(executed.toolCallId).toBe("call-1");
+    expect(executed.invalidate).toContain("manager-desk");
+    expect(events.at(-1)).toMatchObject({ type: "done", status: "complete" });
+
+    const deskService = new ManagerDeskService(new TeamTrackerService());
+    const day = await deskService.getDay(AUTH.managerAccountId, DATE, WORKSPACE_ID);
+    expect(day.items.map((item) => item.title)).toContain("Follow up with Alice");
+  });
+
   it("cancels a proposal without writing and 404s on repeat", async () => {
     const { client } = createScriptedClient([
       {

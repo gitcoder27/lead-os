@@ -6,6 +6,8 @@ import { CopilotMark } from '@/components/brand/CopilotMark';
 import { useAssistant } from '@/context/AssistantContext';
 import { useAssistantThread } from '@/hooks/useAssistant';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
+import { useAlerts } from '@/hooks/useAlerts';
+import { contextualSuggestions } from '@/components/assistant/SuggestionChips';
 import { AssistantHeader } from '@/components/assistant/AssistantHeader';
 import { MessageList } from '@/components/assistant/MessageList';
 import { AssistantComposer } from '@/components/assistant/AssistantComposer';
@@ -16,6 +18,7 @@ export function AssistantDock() {
   const thread = useAssistantThread({ enabled: isOpen, currentView });
   const configQuery = useAssistantConfig({ enabled: isOpen });
   const config = configQuery.data;
+  const alertsQuery = useAlerts({ enabled: isOpen });
   const reduceMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
 
@@ -99,6 +102,7 @@ export function AssistantDock() {
             followups={thread.followups}
             confirmingId={thread.confirmingId}
             currentView={currentView}
+            emptySuggestions={contextualSuggestions(alertsQuery.data ?? [], currentView)}
             expanded={expanded}
             onDecision={(toolCallId, decision) => void thread.confirm(toolCallId, decision)}
             onPickSuggestion={(text) => void thread.send(text)}

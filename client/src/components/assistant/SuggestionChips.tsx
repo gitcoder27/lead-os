@@ -1,3 +1,5 @@
+import type { Alert } from '@/types';
+
 interface SuggestionChipsProps {
   currentView: string;
   /** Explicit items (e.g. server follow-up suggestions); defaults to per-view starters. */
@@ -19,6 +21,33 @@ export function suggestionsForView(path: string): string[] {
     return ["Summarize today's notes", 'Add a note'];
   }
   return ['Brief me on today', 'Who needs attention?', 'Create a follow-up'];
+}
+
+/** Live-data starters: alert-driven chips first, view defaults as fill — max 3. */
+export function contextualSuggestions(alerts: Alert[], path: string): string[] {
+  const counts = new Map<Alert['type'], number>();
+  for (const alert of alerts) {
+    counts.set(alert.type, (counts.get(alert.type) ?? 0) + 1);
+  }
+  const chips: string[] = [];
+  const overdue = counts.get('overdue') ?? 0;
+  if (overdue > 0) {
+    chips.push(`Show the ${overdue} overdue defect${overdue === 1 ? '' : 's'}`);
+  }
+  const idle = counts.get('idle_developer') ?? 0;
+  if (idle > 0) {
+    chips.push(`Draft nudges for the ${idle} missing check-in${idle === 1 ? '' : 's'}`);
+  }
+  if ((counts.get('blocked') ?? 0) > 0) {
+    chips.push('Which issues are blocked and who owns them?');
+  }
+  if ((counts.get('stale') ?? 0) > 0) {
+    chips.push('What has gone stale this week?');
+  }
+  if ((counts.get('high_priority_not_started') ?? 0) > 0) {
+    chips.push("Which high-priority defects haven't started?");
+  }
+  return [...new Set([...chips, ...suggestionsForView(path)])].slice(0, 3);
 }
 
 export function SuggestionChips({ currentView, items, onPick }: SuggestionChipsProps) {

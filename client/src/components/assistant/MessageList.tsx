@@ -121,6 +121,8 @@ interface MessageListProps {
   followups: string[];
   confirmingId: string | null;
   currentView: string;
+  /** Context-aware starter chips for the empty state; falls back to per-view defaults. */
+  emptySuggestions?: string[];
   expanded?: boolean;
   onDecision: (toolCallId: string, decision: AssistantActionDecision) => void;
   onPickSuggestion: (text: string) => void;
@@ -136,6 +138,7 @@ export function MessageList({
   followups,
   confirmingId,
   currentView,
+  emptySuggestions,
   expanded,
   onDecision,
   onPickSuggestion,
@@ -162,7 +165,7 @@ export function MessageList({
           <p className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
             Ask about your team, work, or desk — or let Copilot propose an action for you to confirm.
           </p>
-          <SuggestionChips currentView={currentView} onPick={onPickSuggestion} />
+          <SuggestionChips currentView={currentView} items={emptySuggestions} onPick={onPickSuggestion} />
         </div>
       ) : null}
 

@@ -411,6 +411,7 @@ function AppContent() {
   );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
   const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; nonce: number }>({ nonce: 0 });
+  const [settingsSectionTarget, setSettingsSectionTarget] = useState<{ section?: string; nonce: number }>({ nonce: 0 });
   const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; nonce: number }>(() => ({
     itemId: undefined,
     date:
@@ -531,6 +532,14 @@ function AppContent() {
       preloadView(target.view === 'desk' ? 'desk' : target.view);
       setActiveView(target.view);
       navigateToView(target.view);
+      return;
+    }
+
+    if (target.view === 'settings') {
+      setSettingsSectionTarget((prev) => ({ section: target.section, nonce: prev.nonce + 1 }));
+      preloadView('settings');
+      setActiveView('settings');
+      navigateToView('settings', { params: target.section ? { section: target.section } : undefined });
       return;
     }
 
@@ -789,7 +798,7 @@ function AppContent() {
     return (
       <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
         <Suspense fallback={<PanelLoading />}>
-          <SettingsPage />
+          <SettingsPage requestedSection={settingsSectionTarget} />
         </Suspense>
       </WorkspaceShell>
     );

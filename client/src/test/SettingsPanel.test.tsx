@@ -877,4 +877,29 @@ describe('SettingsPage', () => {
       }));
     });
   });
+
+  it('opens the Copilot section when requestedSection targets it', async () => {
+    render(
+      <TestWrapper>
+        <SettingsPage requestedSection={{ section: 'assistant', nonce: 1 }} />
+      </TestWrapper>
+    );
+
+    expect(await screen.findByText('Enable Copilot')).toBeInTheDocument();
+  });
+
+  it('deep-links into a section via the ?section= URL param', async () => {
+    window.history.replaceState(null, '', '/settings?section=assistant');
+    try {
+      render(
+        <TestWrapper>
+          <SettingsPage />
+        </TestWrapper>
+      );
+
+      expect(await screen.findByText('Enable Copilot')).toBeInTheDocument();
+    } finally {
+      window.history.replaceState(null, '', '/settings');
+    }
+  });
 });

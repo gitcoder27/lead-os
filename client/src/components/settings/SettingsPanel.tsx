@@ -62,7 +62,24 @@ type SectionId = 'navigation' | 'connection' | 'sync' | 'assistant' | 'team' | '
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
 const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_assignees';
 
-export function SettingsPage() {
+const SECTION_IDS: readonly SectionId[] = ['navigation', 'connection', 'sync', 'assistant', 'team', 'tags', 'maintenance', 'access'];
+
+function isSectionId(value: string | null | undefined): value is SectionId {
+  return value !== null && value !== undefined && (SECTION_IDS as readonly string[]).includes(value);
+}
+
+/** ?section= deep-link — reads the current URL, falling back to the default section. */
+function sectionFromLocation(): SectionId {
+  const param = new URLSearchParams(window.location.search).get('section');
+  return isSectionId(param) ? param : 'connection';
+}
+
+interface SettingsPageProps {
+  /** Live retarget from onOpenTarget — e.g. Copilot's "Open Settings" while already on /settings. */
+  requestedSection?: { section?: string; nonce: number };
+}
+
+export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const DISCOVER_PAGE_SIZE = 50;
   const DISCOVER_SEARCH_DEBOUNCE_MS = 350;
   const { user, logout } = useAuth();
@@ -143,7 +160,7 @@ export function SettingsPage() {
   const [deletingUsername, setDeletingUsername] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionId>('connection');
+  const [activeSection, setActiveSection] = useState<SectionId>(sectionFromLocation);
   const [showPasswordGen, setShowPasswordGen] = useState(false);
   const [showNewPw, setShowNewPw] = useState(true);
   const [copiedPw, setCopiedPw] = useState(false);
@@ -279,6 +296,14 @@ export function SettingsPage() {
     }, DISCOVER_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
   }, [discoveredSearch]);
+
+  // Deep-links like /settings?section=assistant — both on mount and when a
+  // requestedSection target arrives while the page is already mounted.
+  useEffect(() => {
+    if (isSectionId(requestedSection?.section)) {
+      setActiveSection(requestedSection.section);
+    }
+  }, [requestedSection]);
 
   const handleDiscoverFields = useCallback(async (target: FieldPickerTarget) => {
     setFieldPickerTarget(target);

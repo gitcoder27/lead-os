@@ -83,7 +83,7 @@ Infrastructure:
 
 - `server/src/db/`: Drizzle schema, SQLite connection, migrations, transactions, path helpers.
 - `server/src/jira/`: Jira client, JQL helpers, Jira-facing types.
-- `server/src/assistant/`: LeadOS Copilot — OpenAI-compatible LLM client, tool registry, prompts, NDJSON chat/confirm service (write tools always require confirm).
+- `server/src/assistant/`: LeadOS Copilot — OpenAI-compatible LLM client, tool registry, prompts, NDJSON chat/confirm service (write tools always require confirm); tool registry covers reads + confirm-gated writes across Today, desk, tracker, issues, notes, alerts, tags, carry-forward, and saved views.
 - `server/src/sync/`: scheduled Jira sync engine.
 - `server/src/middleware/`: auth, validation, error handling.
 - `server/src/scripts/`: restore, user creation, and Manager Desk cleanup CLI helpers.

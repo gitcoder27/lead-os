@@ -96,6 +96,10 @@ async function bootstrap(): Promise<void> {
     alertService,
     searchService,
     syncEngine,
+    tagService,
+    workSavedViewsService,
+    automationService,
+    settingsService,
   });
 
   const app = createApp({

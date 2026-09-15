@@ -3,13 +3,16 @@ import { db, resetDatabase } from "./helpers/db";
 import { developers, issues } from "../src/db/schema";
 import { HttpError } from "../src/middleware/errorHandler";
 import { AlertService } from "../src/services/alert.service";
+import { AutomationService } from "../src/services/automation.service";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { SearchService } from "../src/services/search.service";
 import { SettingsService } from "../src/services/settings.service";
+import { TagService } from "../src/services/tag.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
+import { WorkSavedViewsService } from "../src/services/work-saved-views.service";
 import { WorkloadService } from "../src/services/workload.service";
 import {
   createAssistantTools,
@@ -57,6 +60,10 @@ const services: AssistantServices = {
   alertService,
   searchService,
   syncEngine,
+  tagService: new TagService(),
+  workSavedViewsService: new WorkSavedViewsService(),
+  automationService: new AutomationService(workloadService),
+  settingsService,
 };
 
 const tools = createAssistantTools();
@@ -132,8 +139,8 @@ describe("assistant tools", () => {
     vi.useRealTimers();
   });
 
-  it("registers all 19 tools with LLM-ready metadata", () => {
-    expect(tools).toHaveLength(19);
+  it("registers all 42 tools with LLM-ready metadata", () => {
+    expect(tools).toHaveLength(42);
     for (const tool of tools) {
       expect(tool.name).toBeTruthy();
       expect(tool.description).toBeTruthy();
@@ -346,6 +353,21 @@ describe("assistant tools", () => {
       "update_issue_fields",
       "append_daily_note",
       "trigger_jira_sync",
+      "update_tracker_item",
+      "delete_tracker_item",
+      "update_developer_day",
+      "update_developer_availability",
+      "record_status_update",
+      "carry_forward",
+      "delete_desk_item",
+      "link_desk_item",
+      "unlink_desk_item",
+      "promote_tracker_item",
+      "cancel_delegated_task",
+      "set_issue_excluded",
+      "set_issue_tags",
+      "dismiss_alerts",
+      "replace_daily_note",
     ];
     for (const name of writeNames) {
       const tool = toolByName.get(name)!;
@@ -354,6 +376,199 @@ describe("assistant tools", () => {
     }
     expect(toolByName.get("add_issue_comment")!.jiraMutating).toBe(true);
     expect(toolByName.get("update_issue_fields")!.jiraMutating).toBe(true);
+  });
+
+  it("get_desk_item_detail returns item detail with links", async () => {
+    const item = await managerDeskService.createItem(MANAGER_ID, {
+      date: DATE,
+      title: "Follow up on AM-123",
+      links: [{ linkType: "issue", issueKey: "AM-123" }],
+    });
+
+    const { result } = await run("get_desk_item_detail", { itemId: item.id });
+    expect(result).toMatchObject({ item: expect.objectContaining({ id: item.id }) });
+  });
+
+  it("get_tracker_item_detail returns tracker task detail", async () => {
+    const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Task A" }, WORKSPACE_ID);
+
+    const { result } = await run("get_tracker_item_detail", { itemId: item.id });
+    expect(result).toBeTruthy();
+  });
+
+  it("preview_carry_forward works for both surfaces", async () => {
+    await managerDeskService.createItem(MANAGER_ID, { date: DATE, title: "Pending item", status: "planned" });
+
+    const desk = await run("preview_carry_forward", { surface: "desk", toDate: "2026-03-08" });
+    expect(desk.result).toMatchObject({ toDate: "2026-03-08" });
+
+    const tracker = await run("preview_carry_forward", { surface: "tracker", toDate: "2026-03-08" });
+    expect(tracker.result).toMatchObject({ toDate: "2026-03-08" });
+  });
+
+  it("list_notes lists and searches daily notes", async () => {
+    await dailyNotesService.append(MANAGER_ID, DATE, { text: "Discussed hiring plan", requestId: "n1" }, WORKSPACE_ID);
+
+    const all = await run("list_notes", {});
+    expect((all.result as { notes: unknown[] }).notes.length).toBeGreaterThan(0);
+
+    const hit = await run("list_notes", { q: "hiring" });
+    expect((hit.result as { notes: unknown[] }).notes).toHaveLength(1);
+
+    const miss = await run("list_notes", { q: "nonexistent-xyz" });
+    expect((miss.result as { notes: unknown[] }).notes).toHaveLength(0);
+  });
+
+  it("list_tags returns tags", async () => {
+    await services.tagService.create("regression", "#ff0000", WORKSPACE_ID);
+
+    const { result } = await run("list_tags", {});
+    expect(result).toMatchObject([{ name: "regression" }]);
+  });
+
+  it("list_saved_views returns arrays for both surfaces", async () => {
+    const work = await run("list_saved_views", { surface: "work" });
+    expect(Array.isArray(work.result)).toBe(true);
+    const team = await run("list_saved_views", { surface: "team" });
+    expect(Array.isArray(team.result)).toBe(true);
+  });
+
+  it("get_issue_suggestions returns ranked suggestions", async () => {
+    const { result } = await run("get_issue_suggestions", { jiraKey: "AM-123" });
+    expect(result).toMatchObject({ issueKey: "AM-123" });
+    await expect(run("get_issue_suggestions", { jiraKey: "AM-999" })).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("get_workspace_settings returns config facts without secrets", async () => {
+    const { result } = await run("get_workspace_settings", {});
+    const settings = result as Record<string, unknown>;
+    expect(settings.jiraConfigured).toBe(false);
+    expect(typeof settings.syncIntervalMinutes).toBe("number");
+    expect(JSON.stringify(result)).not.toContain("token");
+  });
+
+  it("update_tracker_item changes state and title", async () => {
+    const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Task A" }, WORKSPACE_ID);
+
+    const { result } = await run("update_tracker_item", { itemId: item.id, state: "done", title: "Task A+" });
+    expect(result).toMatchObject({ state: "done", title: "Task A+" });
+  });
+
+  it("delete_tracker_item removes the item", async () => {
+    const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Task B" }, WORKSPACE_ID);
+
+    await run("delete_tracker_item", { itemId: item.id });
+    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", undefined, WORKSPACE_ID);
+    expect(view.day.plannedItems.find((entry) => entry.id === item.id)).toBeUndefined();
+  });
+
+  it("update_developer_day sets status and notes", async () => {
+    const { result } = await run("update_developer_day", {
+      accountId: "dev-1",
+      status: "blocked",
+      managerNotes: "Waiting on API access",
+    });
+    expect(result).toMatchObject({ status: "blocked" });
+  });
+
+  it("update_developer_availability marks inactive", async () => {
+    const { result } = await run("update_developer_availability", {
+      accountId: "dev-1",
+      state: "inactive",
+      note: "OOO",
+    });
+    expect(result).toMatchObject({ state: "inactive" });
+  });
+
+  it("record_status_update records status and requires rationale for blocked", async () => {
+    const { result } = await run("record_status_update", { accountId: "dev-1", status: "on_track", summary: "Going well" });
+    expect(result).toMatchObject({ status: "on_track" });
+
+    await expect(run("record_status_update", { accountId: "dev-1", status: "blocked" })).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it("carry_forward moves desk and tracker items to the target date", async () => {
+    await managerDeskService.createItem(MANAGER_ID, { date: DATE, title: "Desk carry", status: "planned" });
+    await teamTrackerService.addItem("dev-1", DATE, { title: "Tracker carry" }, WORKSPACE_ID);
+
+    const desk = await run("carry_forward", { surface: "desk", fromDate: DATE, toDate: "2026-03-08" });
+    expect((desk.result as { carried: number }).carried).toBeGreaterThanOrEqual(1);
+
+    const tracker = await run("carry_forward", { surface: "tracker", fromDate: DATE, toDate: "2026-03-08" });
+    expect((tracker.result as { carried: number }).carried).toBeGreaterThanOrEqual(1);
+  });
+
+  it("delete_desk_item removes the item", async () => {
+    const item = await managerDeskService.createItem(MANAGER_ID, { date: DATE, title: "Delete me" });
+
+    await run("delete_desk_item", { itemId: item.id });
+    const day = await managerDeskService.getDay(MANAGER_ID, DATE, WORKSPACE_ID);
+    expect(day.items.find((entry) => entry.id === item.id)).toBeUndefined();
+  });
+
+  it("link_desk_item and unlink_desk_item manage links", async () => {
+    const item = await managerDeskService.createItem(MANAGER_ID, { date: DATE, title: "Linkable" });
+
+    const linked = await run("link_desk_item", { itemId: item.id, linkType: "issue", issueKey: "AM-123" });
+    const linkId = (linked.result as { id: number }).id;
+    expect(linkId).toBeGreaterThan(0);
+
+    const day = await managerDeskService.getDay(MANAGER_ID, DATE, WORKSPACE_ID);
+    expect(day.items.find((entry) => entry.id === item.id)?.links?.map((link) => link.issueKey)).toContain("AM-123");
+
+    await run("unlink_desk_item", { itemId: item.id, linkId });
+    const after = await managerDeskService.getDay(MANAGER_ID, DATE, WORKSPACE_ID);
+    expect(after.items.find((entry) => entry.id === item.id)?.links ?? []).toHaveLength(0);
+  });
+
+  it("promote_tracker_item creates a linked desk item", async () => {
+    const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Promote me" }, WORKSPACE_ID);
+
+    const { result } = await run("promote_tracker_item", { trackerItemId: item.id });
+    expect(result).toBeTruthy();
+  });
+
+  it("cancel_delegated_task cancels the delegated tracker task", async () => {
+    const item = await managerDeskService.createItem(MANAGER_ID, {
+      date: DATE,
+      title: "Delegated",
+      assigneeDeveloperAccountId: "dev-1",
+    });
+
+    const { result } = await run("cancel_delegated_task", { itemId: item.id });
+    expect(result).toMatchObject({ status: "cancelled" });
+  });
+
+  it("set_issue_excluded hides and restores an issue", async () => {
+    await run("set_issue_excluded", { jiraKey: "AM-123", excluded: true });
+    const hidden = await issueService.getById("AM-123", DATE, WORKSPACE_ID);
+    expect(hidden?.excluded).toBe(true);
+
+    await run("set_issue_excluded", { jiraKey: "AM-123", excluded: false });
+    const restored = await issueService.getById("AM-123", DATE, WORKSPACE_ID);
+    expect(restored?.excluded).toBe(false);
+  });
+
+  it("set_issue_tags replaces the issue's tags", async () => {
+    const tag = await services.tagService.create("frontend", "#00ff00", WORKSPACE_ID);
+
+    const { result } = await run("set_issue_tags", { jiraKey: "AM-123", tagIds: [tag.id] });
+    expect((result as { tags: Array<{ name: string }> }).tags.map((t) => t.name)).toContain("frontend");
+  });
+
+  it("dismiss_alerts dismisses by id", async () => {
+    const { result } = await run("dismiss_alerts", { alertIds: ["alert-1", "alert-2"] });
+    expect((result as { dismissed: string[] }).dismissed).toEqual(["alert-1", "alert-2"]);
+  });
+
+  it("replace_daily_note overwrites the note body", async () => {
+    await dailyNotesService.append(MANAGER_ID, DATE, { text: "Old text", requestId: "n1" }, WORKSPACE_ID);
+
+    await run("replace_daily_note", { body: "Fresh text" });
+    const day = await dailyNotesService.getDay(MANAGER_ID, DATE, WORKSPACE_ID);
+    expect(day.note?.body).toBe("Fresh text");
   });
 
   it("rejects invalid arguments with HttpError 400", async () => {

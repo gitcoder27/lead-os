@@ -21,6 +21,7 @@ import type {
   ManagerDeskViewMode,
   TrackerItemState,
   TrackerSharedTaskDetailResponse,
+  TrackerWorkItem,
 } from "shared/types";
 import { db } from "../db/connection";
 import {
@@ -1229,6 +1230,21 @@ export class ManagerDeskService {
       managerDeskItem,
       trackerItem: trackerContext.trackerItem,
     };
+  }
+
+  /** Full detail for any desk item — links, assignee, and delegated tracker task when present. */
+  async getItemDetail(
+    managerAccountId: string,
+    itemId: number,
+    workspaceId?: string
+  ): Promise<{ item: ManagerDeskItem; trackerItem?: TrackerWorkItem }> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const item = await this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
+    const trackerContext = await this.trackerService.getItemDetailContextForManagerDeskItem(
+      itemId,
+      normalizedWorkspaceId
+    );
+    return { item, trackerItem: trackerContext?.trackerItem };
   }
 
   async ensureDay(

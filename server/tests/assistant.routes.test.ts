@@ -14,8 +14,11 @@ import { AssistantConfigService } from "../src/services/assistant-config.service
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { AutomationService } from "../src/services/automation.service";
 import { SearchService } from "../src/services/search.service";
 import { SettingsService } from "../src/services/settings.service";
+import { TagService } from "../src/services/tag.service";
+import { WorkSavedViewsService } from "../src/services/work-saved-views.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
 import { WorkloadService } from "../src/services/workload.service";
@@ -87,6 +90,10 @@ function buildService(client: LlmClient): AssistantService {
     alertService,
     searchService,
     syncEngine: syncEngineStub,
+    tagService: new TagService(),
+    workSavedViewsService: new WorkSavedViewsService(),
+    automationService: new AutomationService(workloadService),
+    settingsService,
     createLlmClient: () => client,
   });
 }

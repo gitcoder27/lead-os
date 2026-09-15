@@ -3,12 +3,16 @@ import { z } from "zod";
 import type { UserRole } from "shared/types";
 import { HttpError } from "../middleware/errorHandler";
 import type { AlertService } from "../services/alert.service";
+import type { AutomationService } from "../services/automation.service";
 import type { DailyNotesService } from "../services/daily-notes.service";
 import type { IssueService } from "../services/issue.service";
 import type { ManagerDeskService } from "../services/manager-desk.service";
 import type { SearchService } from "../services/search.service";
+import type { SettingsService } from "../services/settings.service";
+import type { TagService } from "../services/tag.service";
 import type { TeamTrackerService } from "../services/team-tracker.service";
 import type { TodayService } from "../services/today.service";
+import type { WorkSavedViewsService } from "../services/work-saved-views.service";
 import type { WorkloadService } from "../services/workload.service";
 import type { SyncEngine } from "../sync/engine";
 import type { LlmToolDefinition } from "./llm-client";
@@ -28,6 +32,10 @@ export interface AssistantServices {
   alertService: AlertService;
   searchService: SearchService;
   syncEngine: AssistantSyncEngine;
+  tagService: TagService;
+  workSavedViewsService: WorkSavedViewsService;
+  automationService: AutomationService;
+  settingsService: SettingsService;
 }
 
 export interface AssistantToolContext {
@@ -667,6 +675,250 @@ export function createAssistantTools(): AssistantToolDefinition[] {
         };
       },
     },
+    {
+      name: "get_desk_item_detail",
+      description:
+        "Get full detail for one Manager Desk item: fields, linked Jira issues and developers, and delegated tracker task state.",
+      parameters: {
+        type: "object",
+        properties: { itemId: { type: "integer" } },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: (args) => `Opening desk item #${String(args.itemId ?? "?")}…`,
+      summarize: (args) => `Load desk item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
+        const detail = await ctx.services.managerDeskService.getItemDetail(
+          ctx.managerAccountId,
+          args.itemId,
+          ctx.workspaceId
+        );
+        return { result: compact(detail), summary: `Loaded desk item #${args.itemId}` };
+      },
+    },
+    {
+      name: "get_tracker_item_detail",
+      description:
+        "Get manager-facing detail for one Team Tracker item: state, developer, check-ins, and any linked desk item.",
+      parameters: {
+        type: "object",
+        properties: { itemId: { type: "integer" } },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: (args) => `Opening tracker item #${String(args.itemId ?? "?")}…`,
+      summarize: (args) => `Load tracker item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
+        const detail = await ctx.services.managerDeskService.getTrackerTaskDetail(
+          ctx.managerAccountId,
+          args.itemId,
+          ctx.workspaceId
+        );
+        return { result: compact(detail), summary: `Loaded tracker item #${args.itemId}` };
+      },
+    },
+    {
+      name: "preview_carry_forward",
+      description:
+        "Preview what a carry-forward would move without changing anything. For surface=tracker it auto-finds the source date unless fromDate is given; surface=desk requires fromDate.",
+      parameters: {
+        type: "object",
+        properties: {
+          surface: { type: "string", enum: ["desk", "tracker"] },
+          toDate: dateProperty("YYYY-MM-DD; destination date"),
+          fromDate: dateProperty("YYYY-MM-DD; required for desk, optional for tracker"),
+          lookbackDays: { type: "integer", description: "Tracker only: how far back to look for a source day (default 7)" },
+        },
+        required: ["surface", "toDate"],
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: () => "Previewing carry-forward…",
+      summarize: (args) => `Preview ${String(args.surface ?? "items")} carry-forward`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            surface: z.enum(["desk", "tracker"]),
+            toDate: dateSchema,
+            fromDate: dateSchema.optional(),
+            lookbackDays: z.number().int().min(1).max(30).optional(),
+          }),
+          rawArgs
+        );
+        const result =
+          args.surface === "desk"
+            ? args.fromDate
+              ? await ctx.services.managerDeskService.previewCarryForward(
+                  ctx.managerAccountId,
+                  args.fromDate,
+                  args.toDate,
+                  ctx.workspaceId
+                )
+              : await ctx.services.managerDeskService.getCarryForwardContext(
+                  ctx.managerAccountId,
+                  args.toDate,
+                  args.lookbackDays,
+                  ctx.workspaceId
+                )
+            : args.fromDate
+              ? await ctx.services.teamTrackerService.previewCarryForward(
+                  args.fromDate,
+                  args.toDate,
+                  ctx.workspaceId
+                )
+              : await ctx.services.teamTrackerService.getCarryForwardContext(
+                  args.toDate,
+                  args.lookbackDays,
+                  ctx.workspaceId
+                );
+        return { result: compact(result), summary: `Previewed ${args.surface} carry-forward` };
+      },
+    },
+    {
+      name: "list_notes",
+      description:
+        "List the manager's private daily notes (dates + excerpts), newest first. Supports text search and pagination via 'before' cursor. Use get_notes for a note's full body.",
+      parameters: {
+        type: "object",
+        properties: {
+          q: { type: "string", description: "Search note bodies" },
+          before: dateProperty("YYYY-MM-DD; only notes before this date"),
+          limit: { type: "integer", description: "Max notes (default 20)" },
+        },
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: () => "Listing notes…",
+      summarize: () => "List daily notes",
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            q: z.string().trim().max(200).optional(),
+            before: dateSchema.optional(),
+            limit: z.number().int().min(1).max(50).optional(),
+          }),
+          rawArgs
+        );
+        const response = await ctx.services.dailyNotesService.list(
+          ctx.managerAccountId,
+          { q: args.q, before: args.before, limit: args.limit },
+          ctx.workspaceId
+        );
+        return { result: compact(response), summary: `Listed ${response.notes.length} notes` };
+      },
+    },
+    {
+      name: "list_tags",
+      description: "List all local tags (id, name, color) available for tagging issues.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+      confirm: "never",
+      invalidate: [],
+      label: () => "Listing tags…",
+      summarize: () => "List tags",
+      execute: async (_args, ctx) => {
+        const tags = await ctx.services.tagService.getAll(ctx.workspaceId);
+        return { result: compact(tags), summary: `Listed ${tags.length} tags` };
+      },
+    },
+    {
+      name: "list_saved_views",
+      description: "List the manager's saved views for a surface (work board or team tracker).",
+      parameters: {
+        type: "object",
+        properties: { surface: { type: "string", enum: ["work", "team"] } },
+        required: ["surface"],
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: () => "Listing saved views…",
+      summarize: (args) => `List ${String(args.surface ?? "")} saved views`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ surface: z.enum(["work", "team"]) }), rawArgs);
+        const views =
+          args.surface === "work"
+            ? await ctx.services.workSavedViewsService.listSavedViews(ctx.managerAccountId, ctx.workspaceId)
+            : await ctx.services.teamTrackerService.listSavedViews(ctx.managerAccountId, ctx.workspaceId);
+        return { result: compact(views), summary: `Listed ${views.length} ${args.surface} saved views` };
+      },
+    },
+    {
+      name: "get_issue_suggestions",
+      description:
+        "Get automation suggestions for an issue: ranked assignee suggestions, suggested priority from labels, and a suggested due date.",
+      parameters: {
+        type: "object",
+        properties: { jiraKey: { type: "string" } },
+        required: ["jiraKey"],
+        additionalProperties: false,
+      },
+      confirm: "never",
+      invalidate: [],
+      label: (args) => `Suggesting for ${String(args.jiraKey ?? "issue")}…`,
+      summarize: (args) => `Suggestions for ${String(args.jiraKey ?? "issue")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ jiraKey: z.string().trim().min(1) }), rawArgs);
+        const issue = await ctx.services.issueService.getById(args.jiraKey, ctx.date, ctx.workspaceId);
+        if (!issue) {
+          throw new HttpError(404, "Issue not found");
+        }
+        const assignee = await ctx.services.automationService.suggestAssignee(ctx.workspaceId);
+        const priority = ctx.services.automationService.suggestPriority(issue.labels ?? []);
+        const dueDate = ctx.services.automationService.suggestDueDate(
+          issue.priorityName ?? "Medium",
+          issue.createdAt ?? new Date().toISOString()
+        );
+        return {
+          result: compact({ issueKey: issue.jiraKey, assignee, priority, dueDate }),
+          summary: `Suggested for ${issue.jiraKey}`,
+        };
+      },
+    },
+    {
+      name: "get_workspace_settings",
+      description:
+        "Read workspace configuration facts: Jira connection (host, project, whether a token is configured — never the token itself), sync settings, thresholds, backup enabled.",
+      parameters: { type: "object", properties: {}, additionalProperties: false },
+      confirm: "never",
+      invalidate: [],
+      label: () => "Reading workspace settings…",
+      summarize: () => "Read workspace settings",
+      execute: async (_args, ctx) => {
+        const s = ctx.services.settingsService;
+        const [jiraBaseUrl, jiraProjectKey, jiraEmail, jiraToken, autoSync, syncIntervalMs, staleH, backupEnabled] =
+          await Promise.all([
+            s.getJiraBaseUrl(ctx.workspaceId),
+            s.getJiraProjectKey(ctx.workspaceId),
+            s.getJiraEmail(ctx.workspaceId),
+            s.getJiraToken(ctx.workspaceId),
+            s.getJiraAutoSyncEnabled(ctx.workspaceId),
+            s.getSyncIntervalMs(ctx.workspaceId),
+            s.getStaleThresholdHours(ctx.workspaceId),
+            s.getBackupEnabled(ctx.workspaceId),
+          ]);
+        return {
+          result: compact({
+            jiraBaseUrl,
+            jiraEmail,
+            jiraProjectKey,
+            jiraConfigured: Boolean(jiraToken),
+            autoSyncEnabled: autoSync,
+            syncIntervalMinutes: Math.round(syncIntervalMs / 60000),
+            staleThresholdHours: staleH,
+            backupEnabled,
+          }),
+          summary: "Read workspace settings",
+        };
+      },
+    },
   ];
 
   const writeTools: AssistantToolDefinition[] = [
@@ -1074,6 +1326,525 @@ export function createAssistantTools(): AssistantToolDefinition[] {
         return {
           result: compact(result),
           summary: `Triggered Jira sync (${result.status})`,
+        };
+      },
+    },
+    {
+      name: "update_tracker_item",
+      description:
+        "Update a Team Tracker item: rename it, change its state (planned/in_progress/done/dropped), edit its note, or reorder it.",
+      parameters: {
+        type: "object",
+        properties: {
+          itemId: { type: "integer" },
+          title: { type: "string" },
+          state: { type: "string", enum: ["planned", "in_progress", "done", "dropped"] },
+          note: { type: ["string", "null"] },
+          position: { type: "integer" },
+        },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["today", "team-tracker", "workload", "manager-desk"],
+      label: () => "Updating tracker item…",
+      summarize: (args) => `Update tracker item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            itemId: z.number().int().positive(),
+            title: z.string().trim().min(1).max(500).optional(),
+            state: z.enum(["planned", "in_progress", "done", "dropped"]).optional(),
+            note: z.string().trim().max(2000).nullable().optional(),
+            position: z.number().int().min(0).optional(),
+          }),
+          rawArgs
+        );
+        const { itemId, ...updates } = args;
+        const item = await ctx.services.teamTrackerService.updateItem(itemId, updates, ctx.workspaceId);
+        return {
+          result: compact({ id: item.id, title: item.title, state: item.state }),
+          summary: `Updated tracker item #${item.id}`,
+        };
+      },
+    },
+    {
+      name: "delete_tracker_item",
+      description: "Permanently delete a Team Tracker item. Prefer update_tracker_item with state=dropped when history should be kept.",
+      parameters: {
+        type: "object",
+        properties: { itemId: { type: "integer" } },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["today", "team-tracker", "workload", "manager-desk"],
+      label: () => "Deleting tracker item…",
+      summarize: (args) => `Delete tracker item #${String(args.itemId ?? "?")} permanently`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
+        await ctx.services.teamTrackerService.deleteItem(args.itemId, undefined, ctx.workspaceId);
+        return { result: { ok: true, itemId: args.itemId }, summary: `Deleted tracker item #${args.itemId}` };
+      },
+    },
+    {
+      name: "update_developer_day",
+      description:
+        "Update a developer's day on the Team Tracker: status (on_track/at_risk/blocked/waiting/done_for_today), capacity units, or manager notes.",
+      parameters: {
+        type: "object",
+        properties: {
+          accountId: { type: "string", description: "Developer account id" },
+          date: dateProperty("YYYY-MM-DD; defaults to today"),
+          status: { type: "string", enum: ["on_track", "at_risk", "blocked", "waiting", "done_for_today"] },
+          capacityUnits: { type: ["integer", "null"] },
+          managerNotes: { type: "string" },
+        },
+        required: ["accountId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["team-tracker", "today", "workload"],
+      label: (args) => `Updating ${String(args.accountId ?? "developer")}'s day…`,
+      summarize: (args) => `Update ${String(args.accountId ?? "developer")}'s day`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            accountId: z.string().trim().min(1),
+            date: dateSchema.optional(),
+            status: z.enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"]).optional(),
+            capacityUnits: z.number().int().min(1).nullable().optional(),
+            managerNotes: z.string().trim().optional(),
+          }),
+          rawArgs
+        );
+        const day = await ctx.services.teamTrackerService.updateDay(
+          args.accountId,
+          args.date ?? ctx.date,
+          { status: args.status, capacityUnits: args.capacityUnits, managerNotes: args.managerNotes },
+          ctx.workspaceId
+        );
+        return {
+          result: compact({ date: day.date, status: day.status }),
+          summary: `Updated ${args.accountId}'s day`,
+        };
+      },
+    },
+    {
+      name: "update_developer_availability",
+      description:
+        "Mark a developer active or inactive (e.g. out of office / leave) starting from a date.",
+      parameters: {
+        type: "object",
+        properties: {
+          accountId: { type: "string", description: "Developer account id" },
+          effectiveDate: dateProperty("YYYY-MM-DD; defaults to today"),
+          state: { type: "string", enum: ["active", "inactive"] },
+          note: { type: "string" },
+        },
+        required: ["accountId", "state"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["team-tracker", "today", "workload", "manager-actions"],
+      label: (args) => `Setting ${String(args.accountId ?? "developer")} ${String(args.state ?? "")}…`,
+      summarize: (args) =>
+        `Mark ${String(args.accountId ?? "developer")} ${String(args.state ?? "?")} from ${String(args.effectiveDate ?? "today")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            accountId: z.string().trim().min(1),
+            effectiveDate: dateSchema.optional(),
+            state: z.enum(["active", "inactive"]),
+            note: z.string().trim().max(500).optional(),
+          }),
+          rawArgs
+        );
+        const availability = await ctx.services.teamTrackerService.updateAvailability(
+          args.accountId,
+          { effectiveDate: args.effectiveDate ?? ctx.date, state: args.state, note: args.note },
+          ctx.workspaceId
+        );
+        return { result: compact(availability), summary: `Set ${args.accountId} to ${args.state}` };
+      },
+    },
+    {
+      name: "record_status_update",
+      description:
+        "Record a manager-authored status update on a developer's day (status + rationale/summary/next follow-up). Different from add_check_in, which logs the developer's own check-in text.",
+      parameters: {
+        type: "object",
+        properties: {
+          accountId: { type: "string", description: "Developer account id" },
+          date: dateProperty("YYYY-MM-DD; defaults to today"),
+          status: { type: "string", enum: ["on_track", "at_risk", "blocked", "waiting", "done_for_today"] },
+          rationale: { type: "string", description: "Required when status is blocked or at_risk" },
+          summary: { type: "string" },
+          nextFollowUpAt: { type: ["string", "null"], description: "ISO datetime for the next follow-up" },
+        },
+        required: ["accountId", "status"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["team-tracker", "today", "manager-actions", "alerts"],
+      label: (args) => `Recording ${String(args.status ?? "status")} for ${String(args.accountId ?? "developer")}…`,
+      summarize: (args) => `Set ${String(args.accountId ?? "developer")} to ${String(args.status ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            accountId: z.string().trim().min(1),
+            date: dateSchema.optional(),
+            status: z.enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"]),
+            rationale: z.string().trim().max(2000).optional(),
+            summary: z.string().trim().max(2000).optional(),
+            nextFollowUpAt: z.string().nullable().optional(),
+          }),
+          rawArgs
+        );
+        const day = await ctx.services.teamTrackerService.recordStatusUpdate(
+          args.accountId,
+          args.date ?? ctx.date,
+          {
+            status: args.status,
+            rationale: args.rationale,
+            summary: args.summary,
+            nextFollowUpAt: args.nextFollowUpAt ?? undefined,
+          },
+          ctx.actor,
+          ctx.workspaceId
+        );
+        return {
+          result: compact({ date: day.date, status: day.status }),
+          summary: `Recorded ${args.status} for ${args.accountId}`,
+        };
+      },
+    },
+    {
+      name: "carry_forward",
+      description:
+        "Carry forward unfinished work from one date to another — surface=tracker moves developer day items (and their linked desk items); surface=desk moves manager desk items. Use preview_carry_forward first if unsure what would move.",
+      parameters: {
+        type: "object",
+        properties: {
+          surface: { type: "string", enum: ["desk", "tracker"] },
+          fromDate: dateProperty("YYYY-MM-DD"),
+          toDate: dateProperty("YYYY-MM-DD"),
+          itemIds: { type: "array", items: { type: "integer" }, description: "Limit to these items; omit to carry everything pending" },
+        },
+        required: ["surface", "fromDate", "toDate"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["today", "team-tracker", "manager-desk", "workload", "carry-forward-context", "carry-forward-preview"],
+      label: (args) => `Carrying ${String(args.surface ?? "items")} forward…`,
+      summarize: (args) =>
+        `Carry ${String(args.surface ?? "items")} forward ${String(args.fromDate ?? "?")} → ${String(args.toDate ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            surface: z.enum(["desk", "tracker"]),
+            fromDate: dateSchema,
+            toDate: dateSchema,
+            itemIds: z.array(z.number().int().positive()).optional(),
+          }),
+          rawArgs
+        );
+        const carried =
+          args.surface === "desk"
+            ? await ctx.services.managerDeskService.carryForward(
+                ctx.managerAccountId,
+                { fromDate: args.fromDate, toDate: args.toDate, itemIds: args.itemIds },
+                ctx.workspaceId
+              )
+            : await ctx.services.teamTrackerService.carryForward(
+                args.fromDate,
+                args.toDate,
+                {
+                  itemIds: args.itemIds,
+                  carryManagerDeskItems: (params) =>
+                    ctx.services.managerDeskService.moveLinkedItemsToDate(
+                      ctx.managerAccountId,
+                      params,
+                      ctx.workspaceId
+                    ),
+                },
+                ctx.workspaceId
+              );
+        return { result: { carried }, summary: `Carried ${carried} ${args.surface} items forward` };
+      },
+    },
+    {
+      name: "delete_desk_item",
+      description: "Permanently delete a Manager Desk item. Prefer status=cancelled via update_desk_item when history should be kept.",
+      parameters: {
+        type: "object",
+        properties: { itemId: { type: "integer" } },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["today", "manager-actions", "manager-desk", "daily-notes", "team-tracker"],
+      label: () => "Deleting desk item…",
+      summarize: (args) => `Delete desk item #${String(args.itemId ?? "?")} permanently`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
+        await ctx.services.managerDeskService.deleteItem(ctx.managerAccountId, args.itemId, ctx.workspaceId);
+        return { result: { ok: true, itemId: args.itemId }, summary: `Deleted desk item #${args.itemId}` };
+      },
+    },
+    {
+      name: "link_desk_item",
+      description:
+        "Link a Jira issue, a developer, or a free-text group to an existing Manager Desk item.",
+      parameters: {
+        type: "object",
+        properties: {
+          itemId: { type: "integer" },
+          linkType: { type: "string", enum: ["issue", "developer", "external_group"] },
+          issueKey: { type: "string", description: "Required when linkType=issue" },
+          developerAccountId: { type: "string", description: "Required when linkType=developer" },
+          externalLabel: { type: "string", description: "Required when linkType=external_group" },
+        },
+        required: ["itemId", "linkType"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["manager-desk", "team-tracker", "today"],
+      label: () => "Linking desk item…",
+      summarize: (args) =>
+        `Link ${String(args.issueKey ?? args.developerAccountId ?? args.externalLabel ?? "?")} to desk item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z
+            .object({
+              itemId: z.number().int().positive(),
+              linkType: z.enum(["issue", "developer", "external_group"]),
+              issueKey: z.string().trim().min(1).max(100).optional(),
+              developerAccountId: z.string().trim().min(1).max(200).optional(),
+              externalLabel: z.string().trim().min(1).max(300).optional(),
+            })
+            .refine(
+              (v) =>
+                (v.linkType === "issue" && Boolean(v.issueKey)) ||
+                (v.linkType === "developer" && Boolean(v.developerAccountId)) ||
+                (v.linkType === "external_group" && Boolean(v.externalLabel)),
+              { message: "link payload must match linkType" }
+            ),
+          rawArgs
+        );
+        const link = await ctx.services.managerDeskService.addLink(
+          ctx.managerAccountId,
+          args.itemId,
+          {
+            linkType: args.linkType,
+            issueKey: args.issueKey,
+            developerAccountId: args.developerAccountId,
+            externalLabel: args.externalLabel,
+          },
+          ctx.workspaceId
+        );
+        return { result: compact(link), summary: `Linked to desk item #${args.itemId}` };
+      },
+    },
+    {
+      name: "unlink_desk_item",
+      description: "Remove a link from a Manager Desk item. Get linkId from get_desk_item_detail.",
+      parameters: {
+        type: "object",
+        properties: {
+          itemId: { type: "integer" },
+          linkId: { type: "integer" },
+        },
+        required: ["itemId", "linkId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["manager-desk", "team-tracker", "today"],
+      label: () => "Removing link…",
+      summarize: (args) => `Remove link #${String(args.linkId ?? "?")} from desk item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({ itemId: z.number().int().positive(), linkId: z.number().int().positive() }),
+          rawArgs
+        );
+        await ctx.services.managerDeskService.deleteLink(
+          ctx.managerAccountId,
+          args.itemId,
+          args.linkId,
+          ctx.workspaceId
+        );
+        return { result: { ok: true }, summary: `Removed link #${args.linkId}` };
+      },
+    },
+    {
+      name: "promote_tracker_item",
+      description:
+        "Promote a Team Tracker item into a Manager Desk item (creates a linked desk item so it shows up in follow-ups/meetings).",
+      parameters: {
+        type: "object",
+        properties: { trackerItemId: { type: "integer" } },
+        required: ["trackerItemId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["manager-desk", "team-tracker", "today", "manager-actions"],
+      label: () => "Promoting tracker item…",
+      summarize: (args) => `Promote tracker item #${String(args.trackerItemId ?? "?")} to Desk`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ trackerItemId: z.number().int().positive() }), rawArgs);
+        const detail = await ctx.services.managerDeskService.promoteTrackerTask(
+          ctx.managerAccountId,
+          args.trackerItemId,
+          ctx.workspaceId
+        );
+        return { result: compact(detail), summary: `Promoted tracker item #${args.trackerItemId}` };
+      },
+    },
+    {
+      name: "cancel_delegated_task",
+      description:
+        "Cancel the tracker task delegated from a Manager Desk item — cancels both sides (desk item goes to cancelled).",
+      parameters: {
+        type: "object",
+        properties: { itemId: { type: "integer", description: "Desk item id" } },
+        required: ["itemId"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["manager-desk", "team-tracker", "today", "manager-actions"],
+      label: () => "Cancelling delegated task…",
+      summarize: (args) => `Cancel delegated task for desk item #${String(args.itemId ?? "?")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
+        const item = await ctx.services.managerDeskService.cancelDelegatedTask(
+          ctx.managerAccountId,
+          args.itemId,
+          ctx.workspaceId
+        );
+        return { result: compact({ id: item.id, status: item.status }), summary: `Cancelled delegated task #${args.itemId}` };
+      },
+    },
+    {
+      name: "set_issue_excluded",
+      description:
+        "Exclude an issue from the Work board (local hide — does not touch Jira) or restore a previously excluded one.",
+      parameters: {
+        type: "object",
+        properties: {
+          jiraKey: { type: "string" },
+          excluded: { type: "boolean" },
+        },
+        required: ["jiraKey", "excluded"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["issues", "issue", "today", "workload"],
+      label: (args) => `${args.excluded === false ? "Restoring" : "Excluding"} ${String(args.jiraKey ?? "issue")}…`,
+      summarize: (args) => `${args.excluded === false ? "Restore" : "Exclude"} ${String(args.jiraKey ?? "issue")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({ jiraKey: z.string().trim().min(1), excluded: z.boolean() }),
+          rawArgs
+        );
+        if (args.excluded) {
+          await ctx.services.issueService.excludeIssue(args.jiraKey, ctx.workspaceId);
+        } else {
+          await ctx.services.issueService.restoreIssue(args.jiraKey, ctx.workspaceId);
+        }
+        return {
+          result: { ok: true, jiraKey: args.jiraKey, excluded: args.excluded },
+          summary: `${args.excluded ? "Excluded" : "Restored"} ${args.jiraKey}`,
+        };
+      },
+    },
+    {
+      name: "set_issue_tags",
+      description:
+        "Replace the local tags on an issue (local only — not sent to Jira). Get tag ids from list_tags; pass an empty array to clear tags.",
+      parameters: {
+        type: "object",
+        properties: {
+          jiraKey: { type: "string" },
+          tagIds: { type: "array", items: { type: "integer" } },
+        },
+        required: ["jiraKey", "tagIds"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["issues", "issue", "tags", "tagCounts"],
+      label: (args) => `Tagging ${String(args.jiraKey ?? "issue")}…`,
+      summarize: (args) => `Set tags on ${String(args.jiraKey ?? "issue")}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({
+            jiraKey: z.string().trim().min(1),
+            tagIds: z.array(z.number().int().positive()).max(20),
+          }),
+          rawArgs
+        );
+        const tags = await ctx.services.tagService.setIssueTags(args.jiraKey, args.tagIds, ctx.workspaceId);
+        return { result: compact({ jiraKey: args.jiraKey, tags }), summary: `Tagged ${args.jiraKey}` };
+      },
+    },
+    {
+      name: "dismiss_alerts",
+      description: "Dismiss alerts from the manager attention inbox. Get alert ids from get_alerts.",
+      parameters: {
+        type: "object",
+        properties: { alertIds: { type: "array", items: { type: "string" } } },
+        required: ["alertIds"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["alerts", "today", "manager-actions"],
+      label: () => "Dismissing alerts…",
+      summarize: (args) => `Dismiss ${Array.isArray(args.alertIds) ? args.alertIds.length : "?"} alert(s)`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({ alertIds: z.array(z.string().trim().min(1)).min(1).max(50) }),
+          rawArgs
+        );
+        const dismissed = await ctx.services.alertService.dismissAlerts(
+          ctx.managerAccountId,
+          args.alertIds,
+          ctx.workspaceId
+        );
+        return { result: { dismissed }, summary: `Dismissed ${dismissed.length} alert(s)` };
+      },
+    },
+    {
+      name: "replace_daily_note",
+      description:
+        "Replace the entire body of the manager's private daily note for a date. Prefer append_daily_note for additions — this overwrites.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: dateProperty("YYYY-MM-DD; defaults to today"),
+          body: { type: "string", description: "Complete new note body" },
+        },
+        required: ["body"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["daily-notes", "global-search"],
+      label: () => "Rewriting daily note…",
+      summarize: (args) => `Replace ${String(args.date ?? "today")}'s daily note`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(
+          z.object({ date: dateSchema.optional(), body: z.string().max(20000) }),
+          rawArgs
+        );
+        const date = args.date ?? ctx.date;
+        const current = await ctx.services.dailyNotesService.getDay(ctx.managerAccountId, date, ctx.workspaceId);
+        const response = await ctx.services.dailyNotesService.save(
+          ctx.managerAccountId,
+          date,
+          { body: args.body, revision: current.note?.revision ?? 0 },
+          ctx.workspaceId
+        );
+        return {
+          result: { ok: true, date, noteId: response.note?.id },
+          summary: `Replaced daily note for ${date}`,
         };
       },
     },

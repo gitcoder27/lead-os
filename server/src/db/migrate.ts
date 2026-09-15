@@ -388,6 +388,28 @@ CREATE TABLE IF NOT EXISTS assistant_messages (
 
 CREATE INDEX IF NOT EXISTS idx_assistant_conversations_owner ON assistant_conversations(workspace_id, manager_account_id);
 CREATE INDEX IF NOT EXISTS idx_assistant_messages_conversation ON assistant_messages(conversation_id, created_at);
+
+-- FTS5 index over note bodies so Copilot search ranks relevance instead of
+-- substring-scanning every note. External-content table synced by triggers;
+-- the last INSERT backfills rows written before this index existed (and
+-- heals it if a table rebuild ever drops the triggers).
+CREATE VIRTUAL TABLE IF NOT EXISTS daily_notes_fts USING fts5(date, body, content='daily_notes', content_rowid='id');
+
+CREATE TRIGGER IF NOT EXISTS daily_notes_fts_ai AFTER INSERT ON daily_notes BEGIN
+  INSERT INTO daily_notes_fts(rowid, date, body) VALUES (new.id, new.date, new.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS daily_notes_fts_ad AFTER DELETE ON daily_notes BEGIN
+  INSERT INTO daily_notes_fts(daily_notes_fts, rowid, date, body) VALUES('delete', old.id, old.date, old.body);
+END;
+
+CREATE TRIGGER IF NOT EXISTS daily_notes_fts_au AFTER UPDATE ON daily_notes BEGIN
+  INSERT INTO daily_notes_fts(daily_notes_fts, rowid, date, body) VALUES('delete', old.id, old.date, old.body);
+  INSERT INTO daily_notes_fts(rowid, date, body) VALUES (new.id, new.date, new.body);
+END;
+
+INSERT INTO daily_notes_fts(rowid, date, body)
+SELECT id, date, body FROM daily_notes WHERE id NOT IN (SELECT rowid FROM daily_notes_fts);
 `;
 
 const alterStatements = [

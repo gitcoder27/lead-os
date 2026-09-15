@@ -231,6 +231,38 @@ describe("DailyNotesService.list", () => {
     const result = await service.list(MANAGER, { q: "shared keyword" }, WS);
     expect(result.notes.map((note) => note.date)).toEqual(["2026-03-01"]);
   });
+
+  it("matches note bodies by prefix terms via FTS", async () => {
+    await saveNote("Discussed supplier cost negotiation in the vendor sync", { date: "2026-03-01" });
+    await saveNote("unrelated note", { date: "2026-03-02" });
+
+    const result = await service.list(MANAGER, { q: "vend" }, WS);
+    expect(result.notes.map((note) => note.date)).toEqual(["2026-03-01"]);
+  });
+
+  it("ANDs multi-word queries so partial notes do not match", async () => {
+    await saveNote("vendor pricing agreed at 3k seats", { date: "2026-03-01" });
+    await saveNote("vendor logo review only", { date: "2026-03-02" });
+
+    const result = await service.list(MANAGER, { q: "vendor pricing" }, WS);
+    expect(result.notes.map((note) => note.date)).toEqual(["2026-03-01"]);
+  });
+
+  it("ranks FTS results by relevance ahead of recency", async () => {
+    await saveNote("vendor pricing vendor pricing vendor pricing deep dive", { date: "2026-03-01" });
+    await saveNote("vendor mentioned once", { date: "2026-03-05" });
+
+    const result = await service.list(MANAGER, { q: "vendor" }, WS);
+    expect(result.notes[0]?.date).toBe("2026-03-01");
+  });
+
+  it("keeps the FTS index in sync across edits", async () => {
+    await saveNote("alpha keyword", { date: "2026-03-01" });
+    await service.save(MANAGER, "2026-03-01", { body: "beta keyword", revision: 1 }, WS);
+
+    expect((await service.list(MANAGER, { q: "alpha" }, WS)).notes).toHaveLength(0);
+    expect((await service.list(MANAGER, { q: "beta" }, WS)).notes.map((note) => note.date)).toEqual(["2026-03-01"]);
+  });
 });
 
 describe("DailyNotesService.append", () => {

@@ -104,6 +104,58 @@ export class DailyNotesService {
 
   constructor(private readonly managerDesk = new ManagerDeskService()) {}
 
+  /**
+   * FTS5-ranked body search; undefined when the query has no searchable terms
+   * or the index is unavailable — callers fall back to substring matching.
+   */
+  private searchNoteBodies(
+    managerAccountId: string,
+    workspaceId: string,
+    query: string,
+    before: string | undefined,
+    limit: number
+  ): DailyNoteRow[] | undefined {
+    const terms = (query.match(/[\p{L}\p{N}]+/gu) ?? []).slice(0, 12);
+    if (terms.length === 0) {
+      return undefined;
+    }
+    const match = terms
+      .map((term) => (term.length >= 3 ? `${term}*` : `"${term.replace(/"/g, '""')}"`))
+      .join(" ");
+    try {
+      const params: unknown[] = [match, workspaceId, managerAccountId];
+      if (before) {
+        params.push(before);
+      }
+      params.push(limit);
+      const rows = rawDb
+        .prepare(
+          `SELECT n.id, n.workspace_id, n.manager_account_id, n.date, n.body, n.revision, n.created_at, n.updated_at
+           FROM daily_notes_fts
+           JOIN daily_notes n ON n.id = daily_notes_fts.rowid
+           WHERE daily_notes_fts MATCH ?
+             AND n.workspace_id = ?
+             AND n.manager_account_id = ?
+             ${before ? "AND n.date < ?" : ""}
+           ORDER BY bm25(daily_notes_fts) ASC, n.date DESC
+           LIMIT ?`
+        )
+        .all(...params) as Array<Record<string, unknown>>;
+      return rows.map((row) => ({
+        id: row.id as number,
+        workspaceId: row.workspace_id as string,
+        managerAccountId: row.manager_account_id as string,
+        date: row.date as string,
+        body: row.body as string,
+        revision: row.revision as number,
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
+      }));
+    } catch {
+      return undefined;
+    }
+  }
+
   async list(
     managerAccountId: string,
     query: { q?: string; before?: string; limit?: number },
@@ -114,25 +166,31 @@ export class DailyNotesService {
     const limit = Math.min(Math.max(Math.trunc(query.limit ?? DEFAULT_LIST_LIMIT), 1), MAX_LIST_LIMIT);
     const trimmedQuery = query.q?.trim();
 
-    const conditions = [
-      eq(dailyNotes.workspaceId, normalizedWorkspaceId),
-      eq(dailyNotes.managerAccountId, managerAccountId),
-    ];
-    if (query.before) {
-      conditions.push(lt(dailyNotes.date, query.before));
-    }
-    if (trimmedQuery) {
-      conditions.push(
-        sql`(instr(lower(${dailyNotes.body}), lower(${trimmedQuery})) > 0 OR instr(${dailyNotes.date}, ${trimmedQuery}) > 0)`
-      );
-    }
+    let rows: DailyNoteRow[] | undefined = trimmedQuery
+      ? this.searchNoteBodies(managerAccountId, normalizedWorkspaceId, trimmedQuery, query.before, limit + 1)
+      : undefined;
 
-    const rows = await db
-      .select()
-      .from(dailyNotes)
-      .where(and(...conditions))
-      .orderBy(desc(dailyNotes.date))
-      .limit(limit + 1);
+    if (!rows) {
+      const conditions = [
+        eq(dailyNotes.workspaceId, normalizedWorkspaceId),
+        eq(dailyNotes.managerAccountId, managerAccountId),
+      ];
+      if (query.before) {
+        conditions.push(lt(dailyNotes.date, query.before));
+      }
+      if (trimmedQuery) {
+        conditions.push(
+          sql`(instr(lower(${dailyNotes.body}), lower(${trimmedQuery})) > 0 OR instr(${dailyNotes.date}, ${trimmedQuery}) > 0)`
+        );
+      }
+
+      rows = await db
+        .select()
+        .from(dailyNotes)
+        .where(and(...conditions))
+        .orderBy(desc(dailyNotes.date))
+        .limit(limit + 1);
+    }
 
     const page = rows.slice(0, limit);
     const hasMore = rows.length > limit;

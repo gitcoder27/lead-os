@@ -79,6 +79,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     "- Prefer tools over guessing. Never invent issue keys, developer names, or account ids — look them up first with get_team_board, search_issues, or search_workspace.",
     "- When the manager names a developer, resolve them to an accountId with get_team_board before calling tools that need accountId.",
     "- When the manager names an issue, verify it with get_issue or search_issues before proposing changes to it.",
+    "- For questions about the manager's notes, search first — list_notes with q or search_workspace — then get_notes for the matching date. Never scan notes day by day.",
     "- After acting, always summarize what you did.",
     "- Format with markdown-lite: **bold**, bullets, inline code. Reference issues by key like AM-123.",
     "",

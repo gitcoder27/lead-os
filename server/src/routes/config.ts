@@ -143,6 +143,17 @@ const aiConfigUpdateSchema = z.object({
     responseStyle: z.enum(["concise", "detailed"]).optional(),
     suggestFollowups: z.boolean().optional(),
     apiKey: z.string().trim().optional(),
+    activeProviderId: z.string().trim().min(1).optional(),
+    upsertProvider: z
+      .object({
+        id: z.string().trim().min(1).optional(),
+        name: z.string().trim().max(80).optional(),
+        baseUrl: z.string().url(),
+        model: z.string().trim().min(1),
+        apiKey: z.string().trim().optional(),
+      })
+      .optional(),
+    removeProviderId: z.string().trim().min(1).optional(),
   }),
   params: z.any().optional(),
   query: z.any().optional(),
@@ -150,6 +161,7 @@ const aiConfigUpdateSchema = z.object({
 
 const aiConfigTestSchema = z.object({
   body: z.object({
+    providerId: z.string().trim().min(1).optional(),
     baseUrl: z.string().url().optional(),
     model: z.string().trim().min(1).optional(),
     apiKey: z.string().trim().optional(),
@@ -499,10 +511,18 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
   router.post("/ai/test", validate(aiConfigTestSchema), async (req, res) => {
     try {
       const workspaceId = req.auth!.user.workspaceId;
-      const stored = await assistantConfig.getResolvedConfig(workspaceId);
-      const baseUrl = req.body.baseUrl || stored.baseUrl;
-      const model = req.body.model || stored.model;
-      const apiKey = req.body.apiKey || stored.apiKey;
+      let base = await assistantConfig.getResolvedConfig(workspaceId);
+      if (req.body.providerId) {
+        const profile = await assistantConfig.getResolvedProvider(workspaceId, req.body.providerId);
+        if (!profile) {
+          res.status(404).json({ error: "Unknown provider", status: 404 });
+          return;
+        }
+        base = { ...base, ...profile };
+      }
+      const baseUrl = req.body.baseUrl || base.baseUrl;
+      const model = req.body.model || base.model;
+      const apiKey = req.body.apiKey || base.apiKey;
       if (!apiKey) {
         res.status(400).json({ error: "AI API key is required", status: 400 });
         return;

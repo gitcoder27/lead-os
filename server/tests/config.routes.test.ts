@@ -978,6 +978,8 @@ ORDER BY updated DESC`);
       responseStyle: "concise",
       suggestFollowups: true,
       hasApiKey: false,
+      providers: [],
+      activeProviderId: null,
     });
   });
 
@@ -1099,5 +1101,175 @@ ORDER BY updated DESC`);
     });
     expect(res.status).toBe(400);
     expect(res.body).toMatchObject({ error: "AI API key is required", status: 400 });
+  });
+
+  it("synthesizes a Default provider profile from legacy flat keys", async () => {
+    const app = createTestApp();
+    await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { baseUrl: "https://api.z.ai/api/paas/v4", model: "glm-5.3-flash", apiKey: "zai-key" },
+    });
+
+    const res = await invoke(app, { method: "GET", url: "/api/config/ai" });
+    expect(res.status).toBe(200);
+    expect(res.body?.providers).toEqual([
+      {
+        id: "default",
+        name: "Default",
+        baseUrl: "https://api.z.ai/api/paas/v4",
+        model: "glm-5.3-flash",
+        hasApiKey: true,
+      },
+    ]);
+    expect(res.body?.activeProviderId).toBe("default");
+    expect(JSON.stringify(res.body)).not.toContain("zai-key");
+  });
+
+  it("upserts provider profiles, keeps the first active, and switches on demand", async () => {
+    const app = createTestApp();
+
+    const first = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        upsertProvider: { name: "ZAI", baseUrl: "https://api.z.ai/api/paas/v4", model: "glm-5.3-flash", apiKey: "zai-key" },
+      },
+    });
+    expect(first.status).toBe(200);
+    const zaiId = first.body?.providers?.[0]?.id as string;
+    expect(zaiId).toBeTruthy();
+    expect(first.body?.activeProviderId).toBe(zaiId);
+    expect(first.body?.providers?.[0]?.hasApiKey).toBe(true);
+    expect(JSON.stringify(first.body)).not.toContain("zai-key");
+
+    const second = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        upsertProvider: { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKey: "ds-key" },
+      },
+    });
+    expect(second.status).toBe(200);
+    expect(second.body?.providers).toHaveLength(2);
+    expect(second.body?.activeProviderId).toBe(zaiId);
+    expect(second.body?.baseUrl).toBe("https://api.z.ai/api/paas/v4");
+
+    const switched = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { activeProviderId: second.body?.providers?.[1]?.id },
+    });
+    expect(switched.status).toBe(200);
+    expect(switched.body?.activeProviderId).toBe(second.body?.providers?.[1]?.id);
+    expect(switched.body?.baseUrl).toBe("https://api.deepseek.com/v1");
+    expect(switched.body?.model).toBe("deepseek-chat");
+  });
+
+  it("stores each provider key under its own encrypted row", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: {
+        upsertProvider: { name: "DeepSeek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKey: "ds-key" },
+      },
+    });
+    const id = res.body?.providers?.[0]?.id as string;
+
+    const rows = await db.select().from(configTable);
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    expect(map[`ai_api_key:${id}`]).toBeDefined();
+    expect(isEncryptedSecret(map[`ai_api_key:${id}`] as string)).toBe(true);
+    expect(JSON.parse(map["ai_providers"] as string)).toHaveLength(1);
+    expect(map["ai_active_provider"]).toBe(id);
+  });
+
+  it("removes a provider, clears its key, and reassigns active", async () => {
+    const app = createTestApp();
+    const first = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { upsertProvider: { baseUrl: "https://api.z.ai/api/paas/v4", model: "glm-5.3-flash", apiKey: "zai-key" } },
+    });
+    const zaiId = first.body?.providers?.[0]?.id as string;
+    const second = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { upsertProvider: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKey: "ds-key" } },
+    });
+    const dsId = second.body?.providers?.[1]?.id as string;
+
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { removeProviderId: zaiId },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body?.providers).toHaveLength(1);
+    expect(res.body?.activeProviderId).toBe(dsId);
+
+    const rows = await db.select().from(configTable);
+    const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    expect(map[`ai_api_key:${zaiId}`]).toBeUndefined();
+    expect(map[`ai_api_key:${dsId}`]).toBeDefined();
+  });
+
+  it("rejects switching to an unknown provider", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/ai",
+      body: { activeProviderId: "nope" },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: "Unknown provider", status: 400 });
+  });
+
+  it("POST /api/config/ai/test uses the requested provider's stored key", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "OK" } }] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const app = createTestApp();
+      const put = await invoke(app, {
+        method: "PUT",
+        url: "/api/config/ai",
+        body: {
+          upsertProvider: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKey: "ds-key" },
+        },
+      });
+      const providerId = put.body?.providers?.[0]?.id as string;
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/config/ai/test",
+        body: { providerId },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body?.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.deepseek.com/v1/chat/completions",
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: "Bearer ds-key" }),
+        })
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("POST /api/config/ai/test 404s on an unknown providerId", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "POST",
+      url: "/api/config/ai/test",
+      body: { providerId: "missing" },
+    });
+    expect(res.status).toBe(404);
+    expect(res.body).toMatchObject({ error: "Unknown provider", status: 404 });
   });
 });

@@ -1359,17 +1359,33 @@ export type AiProvider = "openai-compatible";
 
 export type AssistantResponseStyle = "concise" | "detailed";
 
+/** Public, keyless view of one saved Copilot provider profile. */
+export interface AiProviderProfile {
+  id: string;
+  name: string;
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
+}
+
 /** Public, keyless view of the Copilot settings (GET /api/config/ai). */
 export interface AiAssistantConfig {
   enabled: boolean;
   provider: AiProvider;
+  /** Resolved from the active provider profile. */
   baseUrl: string;
+  /** Resolved from the active provider profile. */
   model: string;
   maxToolIterations: number;
   responseStyle: AssistantResponseStyle;
   /** Whether the assistant emits follow-up suggestion chips after answers. */
   suggestFollowups: boolean;
+  /** Whether the active provider profile has a stored key. */
   hasApiKey: boolean;
+  /** All saved provider profiles (keyless). */
+  providers: AiProviderProfile[];
+  /** The profile Copilot uses; null when none are saved. */
+  activeProviderId: string | null;
 }
 
 /** PUT /api/config/ai — every field optional; `apiKey` is write-only. */
@@ -1382,10 +1398,24 @@ export interface UpdateAiAssistantConfigRequest {
   responseStyle?: AssistantResponseStyle;
   suggestFollowups?: boolean;
   apiKey?: string;
+  /** Switch the active provider profile. */
+  activeProviderId?: string;
+  /** Create or update a provider profile; `apiKey` stored encrypted when present. */
+  upsertProvider?: {
+    id?: string;
+    name?: string;
+    baseUrl: string;
+    model: string;
+    apiKey?: string;
+  };
+  /** Delete a provider profile and its stored key. */
+  removeProviderId?: string;
 }
 
 /** POST /api/config/ai/test — may override stored settings for a dry run. */
 export interface TestAiAssistantConfigRequest {
+  /** Test a specific saved profile; inline fields below override it. */
+  providerId?: string;
   baseUrl?: string;
   model?: string;
   apiKey?: string;

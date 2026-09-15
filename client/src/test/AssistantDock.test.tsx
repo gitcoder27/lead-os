@@ -36,6 +36,10 @@ const CONFIGURED: AiAssistantConfig = {
   maxToolIterations: 6,
   responseStyle: 'concise',
   suggestFollowups: true,
+  providers: [
+    { id: 'default', name: 'Default', baseUrl: 'https://llm.test/v1', model: 'test-model', hasApiKey: true },
+  ],
+  activeProviderId: 'default',
 };
 
 function streamEvents(events: AssistantStreamEvent[]) {

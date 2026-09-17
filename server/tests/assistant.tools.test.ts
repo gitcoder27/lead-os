@@ -139,8 +139,8 @@ describe("assistant tools", () => {
     vi.useRealTimers();
   });
 
-  it("registers all 42 tools with LLM-ready metadata", () => {
-    expect(tools).toHaveLength(42);
+  it("registers all 43 tools with LLM-ready metadata", () => {
+    expect(tools).toHaveLength(43);
     for (const tool of tools) {
       expect(tool.name).toBeTruthy();
       expect(tool.description).toBeTruthy();
@@ -368,6 +368,7 @@ describe("assistant tools", () => {
       "set_issue_tags",
       "dismiss_alerts",
       "replace_daily_note",
+      "save_memory",
     ];
     for (const name of writeNames) {
       const tool = toolByName.get(name)!;

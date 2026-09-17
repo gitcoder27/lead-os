@@ -29,7 +29,8 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
   const { user } = useAuth();
   const { openCapture, openCommandPalette } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
-  const { data: sync } = useSyncStatus({ enabled: activeView !== 'today' });
+  const showJiraSync = activeView === 'work';
+  const { data: sync } = useSyncStatus({ enabled: showJiraSync });
   const triggerSync = useTriggerSync();
   const headerRef = useRef<HTMLElement | null>(null);
   const [, setTimeTick] = useState(0);
@@ -51,8 +52,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
     ? 'Sync off'
     : sync?.lastSyncedAt
     ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
-    : activeView === 'today'
-    ? 'Status in Today'
     : 'Not synced';
   const syncTitle = hasError
     ? `Sync issue${sync?.errorMessage ? `: ${sync.errorMessage}` : ''}${autoSyncOff ? ' Jira auto-sync is off; manual sync is still available.' : ''}`
@@ -60,8 +59,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
     ? 'Jira auto-sync is off. Manual sync is still available; turn it back on in Settings → Sync Scope.'
     : sync?.lastSyncedAt
     ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
-    : activeView === 'today'
-    ? 'Sync status is included in Today'
     : 'Not synced';
   const canQuickCapture = user?.role === 'manager';
   const currentView = activeView ?? 'today';
@@ -157,6 +154,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
           </div>
 
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
+            {showJiraSync && (
             <div
               className="h-9 rounded-xl px-2.5 flex items-center gap-2"
               style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
@@ -187,6 +185,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 </div>
               </div>
             </div>
+            )}
 
             <div className="flex items-center gap-1.5">
               {user?.role === 'manager' && onViewChange ? (
@@ -247,9 +246,11 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                     border: '1px solid rgba(217,169,78,0.22)',
                     boxShadow: '0 10px 24px rgba(217,169,78,0.08)',
                   }}
+                  title="Quick capture (Ctrl/⌘+I)"
                 >
                   <Plus size={12} />
-                  Capture
+                  <span>Capture</span>
+                  <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--md-accent)', opacity: 0.7 }}>⌘I</kbd>
                 </button>
               )}
 
@@ -257,19 +258,21 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 className="rounded-xl p-0.5 flex items-center gap-0.5"
                 style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
               >
-                <button
-                  onClick={() => triggerSync.mutate()}
-                  disabled={isSyncing}
-                  className="h-8 w-8 rounded-lg transition-colors duration-150 disabled:opacity-50 flex items-center justify-center"
-                  style={{ background: 'transparent' }}
-                  title="Manual sync (r)"
-                >
-                  <RefreshCw
-                    size={16}
-                    className={isSyncing ? 'animate-spin' : ''}
-                    style={{ color: 'var(--text-secondary)' }}
-                  />
-                </button>
+                {showJiraSync && (
+                  <button
+                    onClick={() => triggerSync.mutate()}
+                    disabled={isSyncing}
+                    className="h-8 w-8 rounded-lg transition-colors duration-150 disabled:opacity-50 flex items-center justify-center"
+                    style={{ background: 'transparent' }}
+                    title="Manual sync (r)"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={isSyncing ? 'animate-spin' : ''}
+                      style={{ color: 'var(--text-secondary)' }}
+                    />
+                  </button>
+                )}
 
                 <button
                   onClick={toggleTheme}

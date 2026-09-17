@@ -273,6 +273,24 @@ describe('Header', () => {
     expect(screen.getByTitle(/Jira authentication failed \(401\)/)).toBeInTheDocument();
   });
 
+  it('only shows Jira sync status and manual sync on the work view', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { status: 'idle', lastSyncedAt: '2026-09-08T09:00:00.000Z', autoSyncEnabled: false },
+    });
+
+    const { rerender } = render(<Header activeView="today" onViewChange={vi.fn()} />);
+    expect(screen.queryByText('Sync off')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /manual sync/i })).not.toBeInTheDocument();
+
+    rerender(<Header activeView="team" onViewChange={vi.fn()} />);
+    expect(screen.queryByText('Sync off')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /manual sync/i })).not.toBeInTheDocument();
+
+    rerender(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByText('Sync off')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /manual sync/i })).toBeInTheDocument();
+  });
+
   it('advances the relative sync label over time without new sync data', () => {
     vi.useFakeTimers();
     try {

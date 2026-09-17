@@ -675,10 +675,16 @@ function AppContent() {
         event.preventDefault();
         setAssistantOpen((open) => !open);
       }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        if (!captureOpen) {
+          openCapture();
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isAuthenticatedManager]);
+  }, [isAuthenticatedManager, captureOpen, openCapture]);
 
   const renderActiveView = () => {
     if (authLoading || isBootstrapPending) {

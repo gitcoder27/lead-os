@@ -36,3 +36,9 @@ export function parseTaskNotes(value: string): { legacyBody: string; datedSectio
   if (current) datedSections.push({ ...current, body: trimBlankLines(current.body) });
   return { legacyBody: trimBlankLines(legacyLines.join("\n")), datedSections };
 }
+
+/** Server port of formatTriageNotesHeading: "MMM d, yyyy:" for a YYYY-MM-DD date. */
+export function formatDatedNoteHeading(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${months[(month ?? 1) - 1]} ${day}, ${year}:`;
+}

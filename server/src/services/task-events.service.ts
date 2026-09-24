@@ -9,20 +9,21 @@ import { normalizeWorkspaceId } from "./workspace.service";
 import { TaskKeysService } from "./task-keys.service";
 
 const imported = z.object({ field: z.enum(["tracker_note", "desk_context_note"]), sourceTable: z.enum(["team_tracker_items", "manager_desk_items"]), sourceId: z.number().int().positive(), sectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(), approximateTime: z.literal(true) });
+const approx = { approximateTime: z.literal(true).optional() };
 const via = z.enum(["standup", "task_drawer", "notes_page", "copilot"]);
-const messageMeta = z.object({ via: via.optional() }).nullable();
+const messageMeta = z.object({ via: via.optional(), ...approx }).nullable();
 const eventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional() }), body: z.null() }),
+  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("update"), meta: z.object({ via: z.enum(["standup", "task_drawer", "my_day", "notes_page", "copilot", "note_field", "context_note_field"]).optional(), imported: imported.optional(), checkInId: z.number().int().positive().optional() }).nullable(), body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("instruction"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("decision"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),
-  z.object({ type: z.literal("blocker"), meta: z.object({ action: z.enum(["raised", "cleared"]), developerDayStatus: z.enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"]).optional(), checkInId: z.number().int().positive().optional() }), body: z.string().trim().min(1).max(4000).nullable() }),
-  z.object({ type: z.literal("status"), meta: z.object({ domain: z.enum(["tracker_state", "desk_status"]), from: z.string().nullable(), to: z.string(), reason: z.enum(["user", "desk_sync", "reassigned", "single_current", "migration"]).optional(), outcome: z.string().optional() }), body: z.null() }),
-  z.object({ type: z.literal("assign"), meta: z.object({ fromType: z.enum(["manager", "developer"]).nullable(), fromId: z.string().nullable(), toType: z.enum(["manager", "developer"]).nullable(), toId: z.string().nullable(), stateReset: z.object({ from: z.string(), to: z.string() }).optional() }), body: z.null() }),
-  z.object({ type: z.literal("focus"), meta: z.object({ action: z.enum(["set_current", "unset_current"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }), body: z.null() }),
-  z.object({ type: z.literal("title"), meta: z.object({ from: z.string(), to: z.string() }), body: z.null() }),
-  z.object({ type: z.literal("schedule"), meta: z.object({ field: z.enum(["day", "follow_up_at", "planned_start_at", "planned_end_at"]), from: z.string().nullable(), to: z.string().nullable(), via: z.enum(["carry_forward", "reschedule", "snooze", "edit", "reassign"]) }), body: z.null() }),
-  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external"]), ref: z.string(), role: z.enum(["primary", "related"]).optional() }), body: z.null() }),
+  z.object({ type: z.literal("blocker"), meta: z.object({ action: z.enum(["raised", "cleared"]), developerDayStatus: z.enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"]).optional(), checkInId: z.number().int().positive().optional(), ...approx }), body: z.string().trim().min(1).max(4000).nullable() }),
+  z.object({ type: z.literal("status"), meta: z.object({ domain: z.enum(["tracker_state", "desk_status", "task_status"]), from: z.string().nullable(), to: z.string(), reason: z.enum(["user", "desk_sync", "reassigned", "single_current", "migration"]).optional(), outcome: z.string().optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("assign"), meta: z.object({ fromType: z.enum(["manager", "developer"]).nullable(), fromId: z.string().nullable(), toType: z.enum(["manager", "developer"]).nullable(), toId: z.string().nullable(), stateReset: z.object({ from: z.string(), to: z.string() }).optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("focus"), meta: z.object({ action: z.enum(["set_current", "unset_current"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("title"), meta: z.object({ from: z.string(), to: z.string(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("schedule"), meta: z.object({ field: z.enum(["day", "follow_up_at", "planned_start_at", "planned_end_at"]), from: z.string().nullable(), to: z.string().nullable(), via: z.enum(["carry_forward", "reschedule", "snooze", "edit", "reassign"]), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external"]), ref: z.string(), role: z.enum(["primary", "related"]).optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("checkin_ref"), meta: z.object({ checkInId: z.number().int().positive(), date: z.string(), developerAccountId: z.string(), excerpt: z.string().max(200) }), body: z.null() }),
   z.object({ type: z.literal("note_ref"), meta: z.object({ noteId: z.number().int().positive(), noteDate: z.string(), relation: z.enum(["mentioned", "created_from", "update_from"]), excerpt: z.string().optional() }), body: z.null() }),
   z.object({ type: z.literal("merged"), meta: z.object({ survivorKey: z.string(), mergedKey: z.string(), decisionRef: z.string() }), body: z.null() }),
@@ -72,18 +73,30 @@ export class TaskEventsService {
     return (await this.appendInternal(input, actor, true)).event;
   }
 
+  /**
+   * Phase 2 backfill writes (§2.2.10): system/migration-authored events with
+   * `p2:` dedupe keys. Skips the phase-1 flag gate like appendImport, and lets
+   * non-system actors emit types the API gate would reject (e.g. a private
+   * `note_ref` authored by the owning manager). Validation still applies.
+   */
+  async appendBackfill(input: TaskEventInput, actor: TaskEventActor): Promise<TaskEvent> {
+    if (!input.dedupeKey?.startsWith("p2:")) throw new HttpError(403, "Backfill events require a p2: dedupe key");
+    return (await this.appendInternal(input, actor, true)).event;
+  }
+
   private async appendInternal(input: TaskEventInput, actor: TaskEventActor, migration: boolean): Promise<{ event: TaskEvent; replayed: boolean }> {
     const workspaceId = normalizeWorkspaceId(input.workspaceId);
     if (!migration) await this.keys.assertEnabled(workspaceId);
     const parsed = eventSchema.safeParse({ type: input.type, meta: input.meta, body: input.body });
     if (!parsed.success || (input.type === "blocker" && input.meta?.action === "raised" && !input.body)) throw new HttpError(400, parsed.success ? "Raised blocker needs a body" : parsed.error.issues.map((issue) => issue.message).join(", "));
     const checkInSideEffect = input.type === "checkin_ref" && input.sourceTable === "team_tracker_checkins";
-    if (actor.type === "developer") {
+    const backfill = migration && input.dedupeKey?.startsWith("p2:");
+    if (actor.type === "developer" && !backfill) {
       if (input.visibility === "private") throw new HttpError(400, "Developer updates must be shared");
       if (!checkInSideEffect && !(["update", "blocker"] as string[]).includes(input.type)) throw new HttpError(403, "Event type is not allowed for developers");
       await this.assertDeveloperOwns(input.taskKey, { kind: "developer", accountId: actor.accountId ?? "", workspaceId });
     }
-    if (actor.type !== "system" && !checkInSideEffect && !(["update", "instruction", "decision", "blocker"] as string[]).includes(input.type)) throw new HttpError(403, "System event only");
+    if (actor.type !== "system" && !backfill && !checkInSideEffect && !(["update", "instruction", "decision", "blocker"] as string[]).includes(input.type)) throw new HttpError(403, "System event only");
     const visibility: TaskEventVisibility = input.type === "note_ref" || (input.type === "schedule" && input.meta?.field === "follow_up_at") || (input.type === "update" && input.meta?.imported?.field === "desk_context_note") || (input.type === "update" && input.meta?.via === "context_note_field")
       ? "private" : actor.type === "developer" || !(["update", "instruction", "decision", "blocker"] as string[]).includes(input.type) ? "shared" : input.visibility ?? "shared";
     const dedupeKey = input.requestId ? `req:${input.requestId}` : input.dedupeKey ?? null;
@@ -208,5 +221,37 @@ export class TaskEventsService {
     const event = await this.get(id, { kind: "manager", accountId, workspaceId });
     if (event.taskKey !== key || event.author.type !== "manager" || event.author.id !== accountId || event.redacted || Date.now() - new Date(event.occurredAt).getTime() > 30 * 86400000) throw new HttpError(403, "Event cannot be redacted");
     await db.update(taskEvents).set({ body: null, metaJson: null, redactedAt: new Date().toISOString(), redactedBy: accountId }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.id, id)));
+  }
+
+  // ── Phase 2 backfill surface ─────────────────────────
+  // Internal to the backfill service/CLI; never routed. Keeps the single-owner
+  // boundary for the event table while letting the migration read raw rows,
+  // repoint task_id, and perform the audited task_key rewrite for approved
+  // split decisions (§2.2.1 — the only place task_key is rewritten).
+
+  async listRawForWorkspace(workspaceId?: string): Promise<EventRow[]> {
+    return db.select().from(taskEvents).where(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)));
+  }
+
+  async repointKeyToTaskId(workspaceId: string, taskKey: string, taskId: number): Promise<void> {
+    await db.update(taskEvents).set({ taskId }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.taskKey, taskKey)));
+  }
+
+  async moveEventsToKey(workspaceId: string, eventIds: number[], taskKey: string): Promise<void> {
+    if (!eventIds.length) return;
+    await db.update(taskEvents).set({ taskKey }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.id, eventIds)));
+  }
+
+  /** Internal: clear repointed task ids (used when re-running the Phase 2 backfill, which wipes and rebuilds the tasks table). */
+  async clearTaskIds(workspaceId: string): Promise<void> {
+    await db.update(taskEvents).set({ taskId: null }).where(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)));
+  }
+
+  /** Internal: table fingerprint for the Phase 2 backfill input hash. */
+  async fingerprint(workspaceId: string): Promise<{ count: number; maxId: number | null; maxTs: string | null }> {
+    const rows = await db.all<{ count: number; maxId: number | null; maxTs: string | null }>(
+      sql`SELECT COUNT(*) AS count, MAX(id) AS maxId, MAX(created_at) AS maxTs FROM task_events WHERE workspace_id = ${normalizeWorkspaceId(workspaceId)}`
+    );
+    return rows[0] ?? { count: 0, maxId: null, maxTs: null };
   }
 }

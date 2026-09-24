@@ -2,6 +2,10 @@ import { db, rawDb } from "../../src/db/connection";
 import { migrate } from "../../src/db/migrate";
 
 export async function resetDatabase(): Promise<void> {
+  // Clear migration markers before migrate() so a p2_backfill marker left by a
+  // previous test does not contract task_events.task_id to NOT NULL.
+  const hasMigrations = rawDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='data_migrations'").get();
+  if (hasMigrations) rawDb.exec("DELETE FROM data_migrations;");
   rawDb.exec(`
     DROP TABLE IF EXISTS manager_desk_item_history;
   `);
@@ -19,6 +23,11 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM daily_note_follow_ups;
     DELETE FROM daily_note_captures;
     DELETE FROM daily_notes;
+    DELETE FROM task_links;
+    DELETE FROM day_focus;
+    DELETE FROM task_legacy_map;
+    DELETE FROM developer_notes;
+    DELETE FROM tasks;
     DELETE FROM user_nav_preferences;
     DELETE FROM manager_desk_item_history;
     DELETE FROM manager_desk_links;
@@ -44,7 +53,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM assistant_memories;
     DELETE FROM sqlite_sequence WHERE name IN ('app_users', 'local_tags', 'sync_log', 'issue_scope_history', 'team_tracker_days', 'developer_availability_periods', 'team_tracker_items', 'team_tracker_checkins', 'team_tracker_saved_views',
     'work_saved_views', 'manager_desk_days', 'manager_desk_items', 'manager_desk_links', 'manager_desk_item_history',
-    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories');
+    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories', 'tasks', 'task_links', 'day_focus');
   `);
 }
 

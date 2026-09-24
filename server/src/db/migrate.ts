@@ -397,6 +397,97 @@ CREATE TABLE IF NOT EXISTS daily_note_task_refs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_task_refs_request ON daily_note_task_refs(workspace_id, manager_account_id, request_id) WHERE request_id IS NOT NULL;
 
+-- Phase 2 canonical task tables. Inert until tasks:phase2-backfill populates
+-- them; legacy tracker/desk tables stay authoritative until the cutover CLI.
+CREATE TABLE IF NOT EXISTS tasks (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id          TEXT NOT NULL DEFAULT 'default',
+  task_key              TEXT NOT NULL,
+  title                 TEXT NOT NULL,
+  kind                  TEXT NOT NULL DEFAULT 'task',
+  status                TEXT NOT NULL DEFAULT 'open',
+  later                 INTEGER NOT NULL DEFAULT 0,
+  owner_type            TEXT,
+  owner_id              TEXT,
+  tracked_by_manager_id TEXT,
+  parent_id             INTEGER,
+  priority              TEXT NOT NULL DEFAULT 'normal',
+  labels_json           TEXT,
+  scheduled_on          TEXT,
+  due_at                TEXT,
+  follow_up_at          TEXT,
+  starts_at             TEXT,
+  ends_at               TEXT,
+  participants          TEXT,
+  next_action           TEXT,
+  outcome               TEXT,
+  created_by_type       TEXT NOT NULL DEFAULT 'unknown',
+  created_by_id         TEXT,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
+  closed_at             TEXT,
+  deleted_at            TEXT,
+  FOREIGN KEY (parent_id) REFERENCES tasks(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_workspace_key ON tasks(workspace_id, task_key);
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace_owner_status ON tasks(workspace_id, owner_type, owner_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace_tracked ON tasks(workspace_id, tracked_by_manager_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace_follow_up ON tasks(workspace_id, follow_up_at) WHERE follow_up_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace_closed ON tasks(workspace_id, closed_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id) WHERE parent_id IS NOT NULL;
+-- One active task per developer; managers may have several (Desk "Now").
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_one_active_per_developer ON tasks(workspace_id, owner_id)
+  WHERE status = 'active' AND owner_type = 'developer' AND deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS task_links (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL DEFAULT 'default',
+  task_id      INTEGER NOT NULL,
+  kind         TEXT NOT NULL,
+  ref          TEXT NOT NULL,
+  role         TEXT,
+  created_at   TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_links_unique ON task_links(workspace_id, task_id, kind, ref);
+CREATE INDEX IF NOT EXISTS idx_task_links_ref ON task_links(workspace_id, kind, ref);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_links_one_primary_jira ON task_links(task_id) WHERE kind = 'jira' AND role = 'primary';
+
+CREATE TABLE IF NOT EXISTS day_focus (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL DEFAULT 'default',
+  date         TEXT NOT NULL,
+  owner_type   TEXT NOT NULL,
+  owner_id     TEXT NOT NULL,
+  task_id      INTEGER NOT NULL,
+  position     INTEGER NOT NULL DEFAULT 0,
+  source       TEXT NOT NULL DEFAULT 'plan',
+  created_at   TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_day_focus_unique ON day_focus(workspace_id, date, owner_type, owner_id, task_id);
+CREATE INDEX IF NOT EXISTS idx_day_focus_owner_date ON day_focus(workspace_id, owner_type, owner_id, date);
+
+CREATE TABLE IF NOT EXISTS task_legacy_map (
+  workspace_id TEXT NOT NULL,
+  task_id      INTEGER NOT NULL,
+  source_table TEXT NOT NULL,
+  source_id    INTEGER NOT NULL,
+  role         TEXT NOT NULL,
+  PRIMARY KEY (source_table, source_id),
+  FOREIGN KEY (task_id) REFERENCES tasks(id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_legacy_map_task ON task_legacy_map(task_id);
+
+CREATE TABLE IF NOT EXISTS developer_notes (
+  workspace_id         TEXT NOT NULL,
+  developer_account_id TEXT NOT NULL,
+  body                 TEXT NOT NULL DEFAULT '',
+  updated_at           TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, developer_account_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_app_users_username ON app_users(username);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace ON app_users(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace_dev_account ON app_users(workspace_id, developer_account_id);
@@ -551,6 +642,14 @@ const alterStatements = [
   "ALTER TABLE manager_desk_items ADD COLUMN created_by_id TEXT",
   "CREATE INDEX IF NOT EXISTS idx_tracker_items_workspace_task_key ON team_tracker_items(workspace_id, task_key)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_task_key ON manager_desk_items(workspace_id, task_key) WHERE task_key IS NOT NULL",
+  // Phase 2 expand step (§2.1.2): task_id columns are filled by the backfill;
+  // task_events.task_id is contracted to NOT NULL at stage 2d by the guarded
+  // rebuild in maybeContractTaskEventsTable below.
+  "ALTER TABLE task_events ADD COLUMN task_id INTEGER REFERENCES tasks(id)",
+  "CREATE INDEX IF NOT EXISTS idx_task_events_task_time ON task_events(task_id, occurred_at, id)",
+  "ALTER TABLE checkin_task_refs ADD COLUMN task_id INTEGER REFERENCES tasks(id)",
+  "ALTER TABLE daily_note_task_refs ADD COLUMN task_id INTEGER REFERENCES tasks(id)",
+  "ALTER TABLE daily_note_follow_ups ADD COLUMN task_id INTEGER REFERENCES tasks(id)",
 ];
 
 const constraintRepairStatements = [
@@ -1099,12 +1198,63 @@ function rebuildTable(sqlite: BetterSqlite3.Database, spec: RebuildSpec): void {
   sqlite.exec(`ALTER TABLE ${quoteIdentifier(tempTableName)} RENAME TO ${quoteIdentifier(spec.tableName)}`);
 }
 
+const taskEventsContractRebuild: RebuildSpec = {
+  tableName: "task_events",
+  expectedSqlFragment: "task_id INTEGER NOT NULL",
+  columns: ["id", "workspace_id", "task_key", "task_id", "type", "body", "visibility", "author_type", "author_id",
+    "meta_json", "source_table", "source_id", "dedupe_key", "occurred_at", "created_at", "redacted_at", "redacted_by"],
+  defaults: { workspace_id: `'${DEFAULT_WORKSPACE_ID}'` },
+  createSql: (t) => `
+    CREATE TABLE ${quoteIdentifier(t)} (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace_id TEXT NOT NULL DEFAULT '${DEFAULT_WORKSPACE_ID}',
+      task_key     TEXT NOT NULL,
+      task_id      INTEGER NOT NULL,
+      type         TEXT NOT NULL,
+      body         TEXT,
+      visibility   TEXT NOT NULL CHECK (visibility IN ('shared', 'private')),
+      author_type  TEXT NOT NULL CHECK (author_type IN ('manager', 'developer', 'copilot', 'system')),
+      author_id    TEXT,
+      meta_json    TEXT,
+      source_table TEXT,
+      source_id    INTEGER,
+      dedupe_key   TEXT,
+      occurred_at  TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      redacted_at  TEXT,
+      redacted_by  TEXT,
+      FOREIGN KEY (task_id) REFERENCES tasks(id)
+    )`,
+};
+
+// Stage 2d contract (§2.1.2): rebuild task_events with task_id NOT NULL, but
+// only after the backfill marker exists and every event row was repointed.
+function maybeContractTaskEventsTable(sqlite: BetterSqlite3.Database): void {
+  if (!tableExists(sqlite, "task_events") || !tableExists(sqlite, "data_migrations") || !columnExists(sqlite, "task_events", "task_id")) {
+    return;
+  }
+  const applied = sqlite
+    .prepare("SELECT COUNT(*) AS count FROM data_migrations WHERE name = 'p2_backfill' OR name LIKE 'p2_backfill:%'")
+    .get() as { count: number };
+  if (applied.count === 0) {
+    return;
+  }
+  const unrepointed = sqlite
+    .prepare("SELECT COUNT(*) AS count FROM task_events WHERE task_id IS NULL")
+    .get() as { count: number };
+  if (unrepointed.count > 0) {
+    return;
+  }
+  rebuildTable(sqlite, taskEventsContractRebuild);
+}
+
 function rebuildWorkspaceKeyTables(sqlite: BetterSqlite3.Database): void {
   sqlite.exec("PRAGMA foreign_keys = OFF");
   try {
     for (const spec of workspaceKeyRebuilds) {
       rebuildTable(sqlite, spec);
     }
+    maybeContractTaskEventsTable(sqlite);
   } finally {
     sqlite.exec("PRAGMA foreign_keys = ON");
   }

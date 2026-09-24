@@ -329,6 +329,7 @@ export const dailyNoteFollowUps = sqliteTable("daily_note_follow_ups", {
   managerAccountId: text("manager_account_id").notNull(),
   noteId: integer("note_id").notNull().references(() => dailyNotes.id, { onDelete: "cascade" }),
   itemId: integer("item_id").notNull().references(() => managerDeskItems.id, { onDelete: "cascade" }),
+  taskId: integer("task_id"),
   requestId: text("request_id").notNull(),
   payloadHash: text("payload_hash").notNull(),
   createdAt: text("created_at").notNull(),
@@ -361,6 +362,7 @@ export const taskEvents = sqliteTable("task_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id").notNull().default("default"),
   taskKey: text("task_key").notNull(),
+  taskId: integer("task_id"),
   type: text("type").notNull(),
   body: text("body"),
   visibility: text("visibility").notNull(),
@@ -384,6 +386,7 @@ export const checkinTaskRefs = sqliteTable("checkin_task_refs", {
   workspaceId: text("workspace_id").notNull().default("default"),
   checkinId: integer("checkin_id").notNull().references(() => teamTrackerCheckIns.id, { onDelete: "cascade" }),
   taskKey: text("task_key").notNull(),
+  taskId: integer("task_id"),
   createdAt: text("created_at").notNull(),
 }, (table) => [primaryKey({ columns: [table.workspaceId, table.checkinId, table.taskKey] })]);
 
@@ -392,10 +395,94 @@ export const dailyNoteTaskRefs = sqliteTable("daily_note_task_refs", {
   managerAccountId: text("manager_account_id").notNull(),
   noteId: integer("note_id").notNull().references(() => dailyNotes.id, { onDelete: "cascade" }),
   taskKey: text("task_key").notNull(),
+  taskId: integer("task_id"),
   relation: text("relation").notNull(),
   requestId: text("request_id"),
   createdAt: text("created_at").notNull(),
 }, (table) => [primaryKey({ columns: [table.noteId, table.taskKey, table.relation] })]);
+
+// ── Phase 2 canonical task tables (inert until the backfill runs) ──
+
+export const tasks = sqliteTable("tasks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  taskKey: text("task_key").notNull(),
+  title: text("title").notNull(),
+  kind: text("kind").notNull().default("task"),
+  status: text("status").notNull().default("open"),
+  later: integer("later").notNull().default(0),
+  ownerType: text("owner_type"),
+  ownerId: text("owner_id"),
+  trackedByManagerId: text("tracked_by_manager_id"),
+  parentId: integer("parent_id"),
+  priority: text("priority").notNull().default("normal"),
+  labelsJson: text("labels_json"),
+  scheduledOn: text("scheduled_on"),
+  dueAt: text("due_at"),
+  followUpAt: text("follow_up_at"),
+  startsAt: text("starts_at"),
+  endsAt: text("ends_at"),
+  participants: text("participants"),
+  nextAction: text("next_action"),
+  outcome: text("outcome"),
+  createdByType: text("created_by_type").notNull().default("unknown"),
+  createdById: text("created_by_id"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  closedAt: text("closed_at"),
+  deletedAt: text("deleted_at"),
+}, (table) => [
+  uniqueIndex("idx_tasks_workspace_key").on(table.workspaceId, table.taskKey),
+  index("idx_tasks_workspace_owner_status").on(table.workspaceId, table.ownerType, table.ownerId, table.status),
+  index("idx_tasks_workspace_tracked").on(table.workspaceId, table.trackedByManagerId, table.status),
+  index("idx_tasks_workspace_closed").on(table.workspaceId, table.closedAt),
+]);
+
+export const taskLinks = sqliteTable("task_links", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  ref: text("ref").notNull(),
+  role: text("role"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_task_links_unique").on(table.workspaceId, table.taskId, table.kind, table.ref),
+  index("idx_task_links_ref").on(table.workspaceId, table.kind, table.ref),
+]);
+
+export const dayFocus = sqliteTable("day_focus", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  date: text("date").notNull(),
+  ownerType: text("owner_type").notNull(),
+  ownerId: text("owner_id").notNull(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  position: integer("position").notNull().default(0),
+  source: text("source").notNull().default("plan"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_day_focus_unique").on(table.workspaceId, table.date, table.ownerType, table.ownerId, table.taskId),
+  index("idx_day_focus_owner_date").on(table.workspaceId, table.ownerType, table.ownerId, table.date),
+]);
+
+export const taskLegacyMap = sqliteTable("task_legacy_map", {
+  workspaceId: text("workspace_id").notNull(),
+  taskId: integer("task_id").notNull().references(() => tasks.id),
+  sourceTable: text("source_table").notNull(),
+  sourceId: integer("source_id").notNull(),
+  role: text("role").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.sourceTable, table.sourceId] }),
+  index("idx_task_legacy_map_task").on(table.taskId),
+]);
+
+export const developerNotes = sqliteTable("developer_notes", {
+  workspaceId: text("workspace_id").notNull(),
+  developerAccountId: text("developer_account_id").notNull(),
+  body: text("body").notNull().default(""),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.developerAccountId] })]);
 
 // ── LeadOS Copilot (assistant) tables ──────────────────
 

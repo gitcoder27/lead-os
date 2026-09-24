@@ -52,6 +52,9 @@ export function TrackerTaskExecutionPanel({
   const trimmedNote = note.trim();
   const noteChanged = trimmedNote !== (item.note ?? '');
   const isClosed = item.state === 'done' || item.state === 'dropped';
+  // Delegated tasks are closed/reopened from the Manager Desk workflow below so
+  // this panel stays the single source for execution state, not a second Done.
+  const isDelegated = Boolean(item.managerDeskItemId);
 
   const handleSaveNote = async () => {
     setNoteSaveState('saving');
@@ -116,35 +119,35 @@ export function TrackerTaskExecutionPanel({
               Set Current
             </button>
           )}
-          {!isClosed && (
-            <>
-              <button
-                type="button"
-                onClick={() => onUpdateState(item.id, 'done')}
-                disabled={isPending}
-                className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
-                style={{
-                  background: 'rgba(16,185,129,0.12)',
-                  color: 'var(--success)',
-                  border: '1px solid rgba(16,185,129,0.24)',
-                }}
-              >
-                <CheckCircle2 size={12} />
-                Mark Done
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdateState(item.id, 'dropped')}
-                disabled={isPending}
-                className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
-                style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-              >
-                <XCircle size={12} />
-                Drop
-              </button>
-            </>
+          {!isClosed && !isDelegated && (
+            <button
+              type="button"
+              onClick={() => onUpdateState(item.id, 'done')}
+              disabled={isPending}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              style={{
+                background: 'rgba(16,185,129,0.12)',
+                color: 'var(--success)',
+                border: '1px solid rgba(16,185,129,0.24)',
+              }}
+            >
+              <CheckCircle2 size={12} />
+              Mark Done
+            </button>
           )}
-          {isClosed && (
+          {!isClosed && (
+            <button
+              type="button"
+              onClick={() => onUpdateState(item.id, 'dropped')}
+              disabled={isPending}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              <XCircle size={12} />
+              Drop
+            </button>
+          )}
+          {isClosed && !isDelegated && (
             <button
               type="button"
               onClick={() => onUpdateState(item.id, 'planned')}
@@ -155,6 +158,11 @@ export function TrackerTaskExecutionPanel({
               <RotateCcw size={12} />
               Reopen
             </button>
+          )}
+          {isDelegated && !isClosed && (
+            <span className="self-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Close via My follow-through
+            </span>
           )}
         </div>
       </div>

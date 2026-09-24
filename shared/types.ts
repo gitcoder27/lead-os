@@ -553,6 +553,7 @@ export interface TrackerCheckIn {
   status?: TrackerDeveloperStatus;
   rationale?: string;
   nextFollowUpAt?: string;
+  date?: string;
 }
 
 export interface TrackerWorkItem {
@@ -591,6 +592,7 @@ export interface TrackerDeveloperDay {
   completedItems: TrackerWorkItem[];
   droppedItems: TrackerWorkItem[];
   checkIns: TrackerCheckIn[];
+  recentCheckIns: TrackerCheckIn[];
   isStale: boolean;
   signals: TrackerDeveloperSignals;
   statusUpdatedAt?: string;
@@ -997,6 +999,21 @@ export interface GlobalSearchCheckInItem {
   createdAt: string;
 }
 
+export interface GlobalSearchTrackerItem {
+  itemId: number;
+  date: string;
+  developerAccountId: string;
+  developerName: string;
+  title: string;
+  state: TrackerItemState;
+  lifecycle: TrackerTaskLifecycle;
+  jiraKey?: string;
+  relatedIssueKeys?: string[];
+  note?: string;
+  managerDeskItemId?: number;
+  updatedAt: string;
+}
+
 export interface GlobalSearchDeveloperItem {
   accountId: string;
   displayName: string;
@@ -1009,6 +1026,7 @@ export interface GlobalSearchResponse {
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
   checkIns: GlobalSearchCheckInItem[];
+  trackerItems: GlobalSearchTrackerItem[];
   developers: GlobalSearchDeveloperItem[];
   notes?: DailyNoteSummary[];
 }

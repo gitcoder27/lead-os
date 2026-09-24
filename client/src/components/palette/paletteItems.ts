@@ -6,12 +6,13 @@ import type {
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
   GlobalSearchIssueItem,
+  GlobalSearchTrackerItem,
   TodayActionTarget,
 } from '@/types';
 import { KIND_LABELS } from '@/types/manager-desk';
 import { isValidIsoDate } from '@/lib/view-params';
 
-export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'checkins' | 'developers' | 'notes';
+export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'tracker' | 'checkins' | 'developers' | 'notes';
 
 export interface PaletteItem {
   id: string;
@@ -164,6 +165,35 @@ export function deskItemToPaletteItem(item: GlobalSearchDeskItem, index: number)
   };
 }
 
+const TRACKER_STATE_LABELS: Record<GlobalSearchTrackerItem['state'], string> = {
+  planned: 'Planned',
+  in_progress: 'In progress',
+  done: 'Done',
+  dropped: 'Dropped',
+};
+
+export function trackerItemToPaletteItem(item: GlobalSearchTrackerItem, index: number): PaletteItem {
+  const context = [item.developerName, item.date, TRACKER_STATE_LABELS[item.state] ?? item.state];
+  if (item.jiraKey) {
+    context.unshift(item.jiraKey);
+  }
+  return {
+    id: `tracker-${item.itemId}-${index}`,
+    group: 'tracker',
+    title: item.title,
+    description: context.join(' · '),
+    keywords: [item.jiraKey, ...(item.relatedIssueKeys ?? []), item.developerName].filter(Boolean).join(' '),
+    target: {
+      type: 'tracker_item',
+      view: 'team',
+      trackerItemId: item.itemId,
+      developerAccountId: item.developerAccountId,
+      managerDeskItemId: item.managerDeskItemId,
+      date: item.date,
+    },
+  };
+}
+
 export function checkInToPaletteItem(checkIn: GlobalSearchCheckInItem, index: number): PaletteItem {
   return {
     id: `checkin-${checkIn.checkInId}-${index}`,
@@ -198,6 +228,7 @@ export function noteToPaletteItem(note: DailyNoteSummary, index: number): Palett
 export function buildResultGroups(results: {
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
+  trackerItems?: GlobalSearchTrackerItem[];
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
   notes?: DailyNoteSummary[];
@@ -212,6 +243,11 @@ export function buildResultGroups(results: {
       id: 'desk',
       label: 'Desk items & follow-ups',
       items: results.deskItems.map(deskItemToPaletteItem),
+    },
+    {
+      id: 'tracker',
+      label: 'Tracker tasks',
+      items: (results.trackerItems ?? []).map(trackerItemToPaletteItem),
     },
     {
       id: 'checkins',

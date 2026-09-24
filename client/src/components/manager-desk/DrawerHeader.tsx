@@ -153,7 +153,7 @@ export function DrawerHeader({
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <span className="text-[10px] font-bold uppercase tracking-[0.12em] mr-0.5" style={{ color: 'var(--text-muted)' }}>
-          {exec ? 'Manager Status' : 'Status'}
+          {exec ? 'My follow-through' : 'Status'}
         </span>
         <span className={chipClass} style={tones.accent}>{KIND_LABELS[item.kind]}</span>
         <span className={chipClass} style={tones[chipTone('status', item.status)]}>{STATUS_LABELS[item.status]}</span>

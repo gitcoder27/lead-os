@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
 import type {
   TrackerDeveloperStatus,
   TrackerItemState,
@@ -51,6 +51,7 @@ import {
   resolveUnsavedBoardQuery,
 } from "./team-tracker-board-query";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { isoDatePart } from "../utils/date";
 
 interface TrackerSignalConfig {
   staleThresholdHours: number;
@@ -216,6 +217,8 @@ const BLOCKED_FIRST_STATUS_ORDER: Record<TrackerDeveloperStatus, number> = {
   done_for_today: 4,
 };
 const SMART_CARRY_FORWARD_LOOKBACK_DAYS = 30;
+const RECENT_CHECKIN_LOOKBACK_DAYS = 7;
+const RECENT_CHECKIN_LIMIT = 5;
 
 function parseIsoDate(value: string): { year: number; month: number; day: number } {
   const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/.exec(value);
@@ -251,11 +254,7 @@ function assertForwardDateRange(fromDate: string, toDate: string): void {
 }
 
 function endOfIsoDate(date: string): Date {
-  return new Date(`${date}T23:59:59.999Z`);
-}
-
-function isoDatePart(value: string | null | undefined): string | undefined {
-  return value?.slice(0, 10);
+  return new Date(`${date}T23:59:59.999`);
 }
 
 function getTrackerViewMode(date: string): TeamTrackerViewMode {
@@ -489,21 +488,20 @@ function mapDeveloper(row: typeof developers.$inferSelect): Developer {
 function buildCarryForwardKey(
   item: Pick<
     typeof teamTrackerItems.$inferSelect,
-    "jiraKey" | "relatedJiraKeys" | "title" | "note"
+    "jiraKey" | "relatedJiraKeys" | "title"
   >
 ): string {
   return JSON.stringify([
     item.jiraKey ?? null,
     parseRelatedIssueKeys(item.relatedJiraKeys),
     item.title,
-    item.note ?? null,
   ]);
 }
 
 function buildLiveWorkspaceItemKey(
   item: Pick<
     typeof teamTrackerItems.$inferSelect,
-    "managerDeskItemId" | "jiraKey" | "relatedJiraKeys" | "title" | "note"
+    "managerDeskItemId" | "jiraKey" | "relatedJiraKeys" | "title"
   >
 ): string {
   if (item.managerDeskItemId !== null) {
@@ -1269,6 +1267,7 @@ export class TeamTrackerService {
         developerAccountId,
         status: seededStatus,
         capacityUnits: priorDay?.capacityUnits ?? null,
+        managerNotes: priorDay?.managerNotes ?? null,
         nextFollowUpAt: priorDay?.nextFollowUpAt ?? null,
         statusUpdatedAt:
           seededStatus === priorDay?.status && priorDay?.statusUpdatedAt
@@ -1404,14 +1403,41 @@ export class TeamTrackerService {
     title: string;
     issueKeys: string[];
     note?: string | null;
+    outcome?: "done" | "dropped";
+    reopened?: boolean;
   }): Promise<void> {
     return runInTransaction(async () => {
     const workspaceId = normalizeWorkspaceId(params.workspaceId);
     const existing = await this.getManagerDeskTrackerItem(params.managerDeskItemId, workspaceId);
 
+    if (params.outcome) {
+      if (!existing) {
+        return;
+      }
+      const nextState = params.outcome;
+      if (existing.state !== nextState) {
+        const now = nowIso();
+        const setFields: Record<string, unknown> = {
+          state: nextState,
+          updatedAt: now,
+        };
+        if (nextState === "done" && existing.state !== "done") {
+          setFields.completedAt = now;
+        }
+        await db
+          .update(teamTrackerItems)
+          .set(setFields)
+          .where(eq(teamTrackerItems.id, existing.id));
+      }
+      return;
+    }
+
     if (!params.assigneeDeveloperAccountId) {
       if (existing) {
-        await this.deleteItem(existing.id, { allowLinkedManagerDeskDelete: true }, workspaceId);
+        await db
+          .update(teamTrackerItems)
+          .set({ state: "dropped", updatedAt: nowIso() })
+          .where(eq(teamTrackerItems.id, existing.id));
       }
       return;
     }
@@ -1424,25 +1450,45 @@ export class TeamTrackerService {
     await this.assertIssueKeysAvailable(normalizedIssueKeys, workspaceId);
 
     if (existing) {
-      const currentDay = await this.getDayById(existing.dayId, workspaceId);
-      if (
-        currentDay?.developerAccountId === params.assigneeDeveloperAccountId &&
-        currentDay.date === params.date
-      ) {
-        await db
-          .update(teamTrackerItems)
-          .set({
-            itemType: jiraKey ? "jira" : "custom",
-            jiraKey: jiraKey ?? null,
-            relatedJiraKeys: serializeRelatedIssueKeys(relatedIssueKeys),
-            title: params.title,
-            updatedAt: nowIso(),
-          })
-          .where(eq(teamTrackerItems.id, existing.id));
-        return;
+      await this.availability.assertAvailableForDate(
+        params.assigneeDeveloperAccountId,
+        params.date,
+        workspaceId
+      );
+      const targetDay = await this.ensureDay(
+        params.date,
+        params.assigneeDeveloperAccountId,
+        workspaceId
+      );
+      const now = nowIso();
+      const setFields: Record<string, unknown> = {
+        itemType: jiraKey ? "jira" : "custom",
+        jiraKey: jiraKey ?? null,
+        relatedJiraKeys: serializeRelatedIssueKeys(relatedIssueKeys),
+        title: params.title,
+        updatedAt: now,
+      };
+
+      if (existing.dayId !== targetDay.id) {
+        setFields.dayId = targetDay.id;
+        const targetRows = await db
+          .select({ position: teamTrackerItems.position })
+          .from(teamTrackerItems)
+          .where(eq(teamTrackerItems.dayId, targetDay.id));
+        setFields.position =
+          targetRows.reduce((max, row) => Math.max(max, row.position), -1) + 1;
       }
 
-      await this.deleteItem(existing.id, { allowLinkedManagerDeskDelete: true }, workspaceId);
+      if (params.reopened && (existing.state === "done" || existing.state === "dropped")) {
+        setFields.state = "planned";
+        setFields.completedAt = null;
+      }
+
+      await db
+        .update(teamTrackerItems)
+        .set(setFields)
+        .where(eq(teamTrackerItems.id, existing.id));
+      return;
     }
 
     await this.addItem(params.assigneeDeveloperAccountId, params.date, {
@@ -1478,7 +1524,10 @@ export class TeamTrackerService {
       return false;
     }
 
-    await this.deleteItem(existing.id, { allowLinkedManagerDeskDelete: true }, normalizedWorkspaceId);
+    await db
+      .update(teamTrackerItems)
+      .set({ state: "dropped", updatedAt: nowIso() })
+      .where(eq(teamTrackerItems.id, existing.id));
     return true;
   }
 
@@ -1521,7 +1570,9 @@ export class TeamTrackerService {
           currentDay.developerAccountId,
           currentDay.id,
           itemId,
-          now
+          now,
+          undefined,
+          normalizedWorkspaceId
         )) {
           linkedManagerDeskItemIds.add(managerDeskItemId);
         }
@@ -1591,7 +1642,8 @@ export class TeamTrackerService {
       day.id,
       itemId,
       now,
-      options
+      options,
+      normalizedWorkspaceId
     );
     if (linkedManagerDeskItemIds.length > 0) {
       await this.touchManagerDeskItems(linkedManagerDeskItemIds, now);
@@ -1820,8 +1872,7 @@ export class TeamTrackerService {
       developer: mapDeveloper(row.developer),
       trackerItem: mapItem(
         row.item,
-        row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined,
-        row.date
+        row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined
       ),
     };
   }
@@ -1865,8 +1916,7 @@ export class TeamTrackerService {
       developer: mapDeveloper(row.developer),
       trackerItem: mapItem(
         row.item,
-        row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined,
-        row.date
+        row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined
       ),
     };
   }
@@ -2060,11 +2110,15 @@ export class TeamTrackerService {
       .select()
       .from(teamTrackerCheckIns)
       .where(eq(teamTrackerCheckIns.dayId, day.id));
+    const recentCheckInsByDeveloper = await this.getRecentCheckInsByDeveloper(
+      [developer.accountId],
+      date,
+      normalizedWorkspaceId
+    );
 
     const mapped = (await this.mapItemsWithIssueContext(
       items,
-      normalizedWorkspaceId,
-      new Map([[day.id, day]])
+      normalizedWorkspaceId
     )).sort(
       (a, b) => a.position - b.position
     );
@@ -2099,6 +2153,7 @@ export class TeamTrackerService {
       completedItems,
       droppedItems,
       checkIns: checkIns.map(mapCheckIn),
+      recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
       signals,
       statusUpdatedAt: day.statusUpdatedAt ?? undefined,
@@ -2127,11 +2182,15 @@ export class TeamTrackerService {
           .from(teamTrackerCheckIns)
           .where(eq(teamTrackerCheckIns.dayId, day.id))
       : [];
+    const recentCheckInsByDeveloper = await this.getRecentCheckInsByDeveloper(
+      [developer.accountId],
+      date,
+      normalizedWorkspaceId
+    );
 
     const mapped = (await this.mapItemsWithIssueContext(
       items,
-      normalizedWorkspaceId,
-      day ? new Map([[day.id, day]]) : undefined
+      normalizedWorkspaceId
     )).sort(
       (a, b) => a.position - b.position
     );
@@ -2167,6 +2226,7 @@ export class TeamTrackerService {
       completedItems,
       droppedItems,
       checkIns: checkIns.map(mapCheckIn),
+      recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
       signals,
       statusUpdatedAt: day?.statusUpdatedAt ?? undefined,
@@ -2202,8 +2262,7 @@ export class TeamTrackerService {
     const canonicalItemRows = this.getLiveCanonicalItemRows(itemRows, dayById);
     const mappedCanonicalItems = (await this.mapItemsWithIssueContext(
       canonicalItemRows,
-      normalizedWorkspaceId,
-      dayById
+      normalizedWorkspaceId
     )).sort(
       compareLiveOpenItems
     );
@@ -2225,6 +2284,11 @@ export class TeamTrackerService {
           .from(teamTrackerCheckIns)
           .where(eq(teamTrackerCheckIns.dayId, exactDay.id))
       : [];
+    const recentCheckInsByDeveloper = await this.getRecentCheckInsByDeveloper(
+      [developer.accountId],
+      date,
+      normalizedWorkspaceId
+    );
     const effectiveDay = exactDay ?? latestDay;
     const signals = buildSignals({
       date,
@@ -2253,6 +2317,7 @@ export class TeamTrackerService {
       completedItems,
       droppedItems,
       checkIns: checkIns.map(mapCheckIn),
+      recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
       signals,
       statusUpdatedAt: effectiveDay?.statusUpdatedAt ?? undefined,
@@ -2356,6 +2421,11 @@ export class TeamTrackerService {
       dayCheckIns.push(checkIn);
       checkInsByDayId.set(checkIn.dayId, dayCheckIns);
     }
+    const recentCheckInsByDeveloper = await this.getRecentCheckInsByDeveloper(
+      developerAccountIds,
+      date,
+      normalizedWorkspaceId
+    );
 
     return developerList.map((developer) => {
       const eligibleDays = daysByDeveloper.get(developer.accountId) ?? [];
@@ -2366,8 +2436,7 @@ export class TeamTrackerService {
         .map((row) =>
           mapItem(
             row,
-            row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined,
-            dayById.get(row.dayId)?.date
+            row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined
           )
         )
         .sort(compareLiveOpenItems);
@@ -2384,6 +2453,7 @@ export class TeamTrackerService {
         (item) => item.state === "dropped" && isoDatePart(item.updatedAt) === date
       );
       const checkIns = exactDay ? checkInsByDayId.get(exactDay.id) ?? [] : [];
+      const recentCheckIns = recentCheckInsByDeveloper.get(developer.accountId) ?? [];
       const signals = buildSignals({
         date,
         status: (effectiveDay?.status as TrackerDeveloperStatus | undefined) ?? "on_track",
@@ -2411,6 +2481,7 @@ export class TeamTrackerService {
         completedItems,
         droppedItems,
         checkIns: checkIns.map(mapCheckIn),
+        recentCheckIns,
         isStale: signals.freshness.staleByTime,
         signals,
         statusUpdatedAt: effectiveDay?.statusUpdatedAt ?? undefined,
@@ -2538,22 +2609,19 @@ export class TeamTrackerService {
   private async getItemById(itemId: number, workspaceId?: string): Promise<TrackerWorkItem> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const row = await this.getItemRow(itemId, normalizedWorkspaceId);
-    const day = await this.getDayById(row.dayId, normalizedWorkspaceId);
     const issueContextMap = await this.getIssueContextMap(
       row.jiraKey ? [row.jiraKey] : [],
       normalizedWorkspaceId
     );
     return mapItem(
       row,
-      row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined,
-      day?.date
+      row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined
     );
   }
 
   private async mapItemsWithIssueContext(
     rows: Array<typeof teamTrackerItems.$inferSelect>,
-    workspaceId?: string,
-    dayById?: Map<number, typeof teamTrackerDays.$inferSelect>
+    workspaceId?: string
   ): Promise<TrackerWorkItem[]> {
     const jiraKeys = rows
       .map((row) => row.jiraKey)
@@ -2563,10 +2631,52 @@ export class TeamTrackerService {
     return rows.map((row) =>
       mapItem(
         row,
-        row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined,
-        dayById?.get(row.dayId)?.date
+        row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined
       )
     );
+  }
+
+  private async getRecentCheckInsByDeveloper(
+    developerAccountIds: string[],
+    date: string,
+    workspaceId: string
+  ): Promise<Map<string, TrackerCheckIn[]>> {
+    const recentCheckIns = new Map<string, TrackerCheckIn[]>();
+    if (developerAccountIds.length === 0) {
+      return recentCheckIns;
+    }
+
+    const rows = await db
+      .select({
+        checkIn: teamTrackerCheckIns,
+        date: teamTrackerDays.date,
+        developerAccountId: teamTrackerDays.developerAccountId,
+      })
+      .from(teamTrackerCheckIns)
+      .innerJoin(
+        teamTrackerDays,
+        eq(teamTrackerCheckIns.dayId, teamTrackerDays.id)
+      )
+      .where(
+        and(
+          eq(teamTrackerDays.workspaceId, workspaceId),
+          inArray(teamTrackerDays.developerAccountId, developerAccountIds),
+          lt(teamTrackerDays.date, date),
+          gte(teamTrackerDays.date, addDaysToIsoDate(date, -RECENT_CHECKIN_LOOKBACK_DAYS))
+        )
+      )
+      .orderBy(desc(teamTrackerDays.date), desc(teamTrackerCheckIns.createdAt));
+
+    for (const row of rows) {
+      const entries = recentCheckIns.get(row.developerAccountId) ?? [];
+      if (entries.length >= RECENT_CHECKIN_LIMIT) {
+        continue;
+      }
+      entries.push({ ...mapCheckIn(row.checkIn), date: row.date });
+      recentCheckIns.set(row.developerAccountId, entries);
+    }
+
+    return recentCheckIns;
   }
 
   private async getManagerDeskTrackerItem(
@@ -2808,13 +2918,13 @@ export class TeamTrackerService {
     sourceItems: Array<
       Pick<
         typeof teamTrackerItems.$inferSelect,
-        "jiraKey" | "relatedJiraKeys" | "title" | "note"
+        "jiraKey" | "relatedJiraKeys" | "title"
       >
     >,
     targetItems: Array<
       Pick<
         typeof teamTrackerItems.$inferSelect,
-        "jiraKey" | "relatedJiraKeys" | "title" | "note"
+        "jiraKey" | "relatedJiraKeys" | "title"
       >
     >
   ): Map<string, number> {
@@ -3077,19 +3187,14 @@ export class TeamTrackerService {
       const now = nowIso();
 
       for (const item of sourceItems.sort((a, b) => a.position - b.position)) {
-        await db.insert(teamTrackerItems).values({
-          workspaceId: normalizedWorkspaceId,
-          dayId: newDay.id,
-          itemType: item.itemType,
-          jiraKey: item.jiraKey,
-          relatedJiraKeys: item.relatedJiraKeys,
-          title: item.title,
-          state: "planned",
-          position: nextPosition,
-          note: item.note,
-          createdAt: now,
-          updatedAt: now,
-        });
+        await db
+          .update(teamTrackerItems)
+          .set({
+            dayId: newDay.id,
+            position: nextPosition,
+            updatedAt: now,
+          })
+          .where(eq(teamTrackerItems.id, item.id));
         nextPosition += 1;
         carried += 1;
       }
@@ -3177,8 +3282,10 @@ export class TeamTrackerService {
     dayId: number,
     itemId: number,
     now: string,
-    options: { ifNoCurrent?: boolean } = {}
+    options: { ifNoCurrent?: boolean } = {},
+    workspaceId?: string
   ): Promise<number[]> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const dayRows = await db
       .select({ id: teamTrackerDays.id })
       .from(teamTrackerDays)
@@ -3211,9 +3318,11 @@ export class TeamTrackerService {
         managerDeskItemId: teamTrackerItems.managerDeskItemId,
       })
       .from(teamTrackerItems)
+      .innerJoin(teamTrackerDays, eq(teamTrackerItems.dayId, teamTrackerDays.id))
       .where(
         and(
-          eq(teamTrackerItems.dayId, dayId),
+          eq(teamTrackerDays.developerAccountId, developerAccountId),
+          eq(teamTrackerDays.workspaceId, normalizedWorkspaceId),
           eq(teamTrackerItems.state, "in_progress")
         )
       );
@@ -3221,15 +3330,15 @@ export class TeamTrackerService {
       throw new HttpError(409, "Current work changed. Refresh Today before setting current work.");
     }
 
-    await db
-      .update(teamTrackerItems)
-      .set({ state: "planned", updatedAt: now })
-      .where(
-        and(
-          eq(teamTrackerItems.dayId, dayId),
-          eq(teamTrackerItems.state, "in_progress")
-        )
-      );
+    const staleCurrentIds = currentRows
+      .map((row) => row.id)
+      .filter((id) => id !== itemId);
+    if (staleCurrentIds.length > 0) {
+      await db
+        .update(teamTrackerItems)
+        .set({ state: "planned", updatedAt: now })
+        .where(inArray(teamTrackerItems.id, staleCurrentIds));
+    }
 
     await db
       .update(teamTrackerItems)

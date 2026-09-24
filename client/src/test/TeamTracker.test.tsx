@@ -59,6 +59,7 @@ const mockDay: (overrides?: Partial<TrackerDeveloperDay>) => TrackerDeveloperDay
   completedItems: [],
   droppedItems: [],
   checkIns: [],
+  recentCheckIns: [],
   isStale: false,
   signals: buildSignals(),
   statusUpdatedAt: '2026-03-07T08:00:00Z',
@@ -1408,7 +1409,7 @@ describe('TrackerItemRow', () => {
           jiraDueDate: '2026-03-09',
           title: 'Validate the staging rollout guardrails',
           state: 'planned',
-          note: 'This note should stay hidden in the drawer row.',
+          note: 'This note stays visible on the drawer row.',
           position: 0,
           createdAt: '2026-03-07T08:00:00Z',
           updatedAt: '2026-03-07T08:00:00Z',
@@ -1423,7 +1424,7 @@ describe('TrackerItemRow', () => {
     expect(screen.getByText('Validate the staging rollout guardrails')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'AM-456' })).toBeInTheDocument();
     expect(screen.queryByText('Highest • Due Mar 9')).not.toBeInTheDocument();
-    expect(screen.queryByText('This note should stay hidden in the drawer row.')).not.toBeInTheDocument();
+    expect(screen.getByText('This note stays visible on the drawer row.')).toBeInTheDocument();
     expect(screen.queryByText(/^Start$/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /start validate the staging rollout guardrails/i }));

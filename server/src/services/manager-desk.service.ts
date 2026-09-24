@@ -38,6 +38,7 @@ import { TeamTrackerService } from "./team-tracker.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { runInTransaction } from "../db/transaction";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { isoDatePart } from "../utils/date";
 
 export interface ManagerDeskLinkInput {
   linkType: ManagerDeskLinkType;
@@ -281,27 +282,7 @@ function isOpenStatus(status: ManagerDeskStatus): boolean {
 }
 
 function endOfIsoDate(date: string): string {
-  return `${date}T23:59:59.999Z`;
-}
-
-function isoDatePart(value: string | undefined): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value.slice(0, 10);
-  }
-
-  const year = String(date.getFullYear()).padStart(4, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return new Date(`${date}T23:59:59.999`).toISOString();
 }
 
 function getViewMode(date: string): ManagerDeskViewMode {
@@ -629,10 +610,12 @@ export class ManagerDeskService {
       throw new Error(`Manager desk day ${updatedItem.dayId} was not found`);
     }
 
-    // Reassignment recreates the linked tracker row — carry the dev's note over.
-    const trackerNote = linkedTrackerContext
-      ? (await this.getTrackerNotesByManagerDeskItemIds([itemId], normalizedWorkspaceId)).get(itemId) ?? null
-      : undefined;
+    // Fallback note used only if the linked tracker row is missing and must be
+    // recreated; existing rows keep their own note through moves.
+    const trackerNote = linkedTrackerContext?.trackerItem.note ?? null;
+    const reopened =
+      !isOpenStatus(existing.status as ManagerDeskStatus) &&
+      isOpenStatus(updatedItem.status as ManagerDeskStatus);
 
     await this.syncTrackerAssignment(
       itemId,
@@ -642,7 +625,8 @@ export class ManagerDeskService {
       updatedLinks,
       updatedItem.status as ManagerDeskStatus,
       trackerNote,
-      normalizedWorkspaceId
+      normalizedWorkspaceId,
+      reopened
     );
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
     return this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
@@ -2075,7 +2059,8 @@ export class ManagerDeskService {
     links: NormalizedManagerDeskLink[],
     status: ManagerDeskStatus,
     note?: string | null,
-    workspaceId?: string
+    workspaceId?: string,
+    reopened?: boolean
   ): Promise<void> {
     await this.trackerService.syncManagerDeskItem({
       workspaceId: normalizeWorkspaceId(workspaceId),
@@ -2087,6 +2072,8 @@ export class ManagerDeskService {
         .filter((link) => link.linkType === "issue" && link.issueKey)
         .map((link) => link.issueKey!),
       note,
+      outcome: status === "done" ? "done" : isOpenStatus(status) ? undefined : "dropped",
+      reopened,
     });
   }
 

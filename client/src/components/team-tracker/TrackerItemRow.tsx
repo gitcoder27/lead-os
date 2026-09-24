@@ -38,6 +38,23 @@ const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }>
   dropped: { icon: XCircle, color: 'var(--text-muted)' },
 };
 
+function localDayMs(isoDate: string): number | null {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+  return new Date(year, month - 1, day).getTime();
+}
+
+function continuedDays(originDate: string, viewDate: string): number {
+  const origin = localDayMs(originDate);
+  const view = localDayMs(viewDate);
+  if (origin === null || view === null) {
+    return 0;
+  }
+  return Math.max(0, Math.round((view - origin) / 86_400_000));
+}
+
 export function TrackerItemRow({
   item,
   onOpen,
@@ -89,6 +106,7 @@ export function TrackerItemRow({
   const jiraMeta = [item.jiraPriorityName, item.jiraDueDate ? `Due ${formatDate(item.jiraDueDate)}` : undefined].filter(Boolean).join(' • ');
   const resolvedActionPreset = hideActions || readOnly ? 'none' : actionPreset;
   const isContinued = Boolean(viewDate && item.originDate && item.originDate !== viewDate);
+  const ageDays = isContinued && viewDate && item.originDate ? continuedDays(item.originDate, viewDate) : 0;
 
   const commitTitle = () => {
     const trimmed = draftTitle.trim();
@@ -283,7 +301,7 @@ export function TrackerItemRow({
             </span>
           </div>
         )}
-        {isContinued && !compact && !isDrawerPlanned && (
+        {isContinued && !compact && (
           <div className="mt-0.5">
             <span
               className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
@@ -294,18 +312,22 @@ export function TrackerItemRow({
               }}
             >
               Continued from {formatDate(item.originDate)}
+              {ageDays > 0 ? ` · ${ageDays}d` : ''}
             </span>
           </div>
         )}
-        {item.note && !compact && !noteEditing && !isDrawerPlanned && (
+        {item.note && !compact && !noteEditing && (
           <div className="mt-1 flex items-start gap-1.5">
             <StickyNote size={12} className="shrink-0 mt-[2px]" style={{ color: 'var(--text-muted)' }} />
-            <span className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+            <span
+              className={`text-[13px] leading-5 ${isDrawerPlanned ? 'line-clamp-2' : ''}`}
+              style={{ color: 'var(--text-secondary)' }}
+            >
               {item.note}
             </span>
           </div>
         )}
-        {!compact && noteEditing && !isDrawerPlanned && (
+        {!compact && noteEditing && (
           <div className="mt-1.5 space-y-1.5">
             <textarea
               value={draftNote}

@@ -5,7 +5,7 @@ import type { TrackerDeveloperDay, TrackerDeveloperStatus, Issue } from '@/types
 import type { TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
-import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
+import { formatAbsoluteDateTime, formatDate, formatRelativeTime } from '@/lib/utils';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
 import { useManagerDesk, useUpdateManagerDeskItem } from '@/hooks/useManagerDesk';
 import { DrawerHeader, DrawerSection, HistorySection, StatusSummary } from './DeveloperDrawerSections';
@@ -64,6 +64,52 @@ function getCheckInAuthorBadge(authorType?: TrackerDeveloperDay['checkIns'][numb
     background: 'var(--bg-secondary)',
     border: 'var(--border)',
   };
+}
+
+function CheckInRow({
+  checkIn,
+  showDate = false,
+}: {
+  checkIn: TrackerDeveloperDay['checkIns'][number];
+  showDate?: boolean;
+}) {
+  const badge = getCheckInAuthorBadge(checkIn.authorType);
+  const absoluteCreatedAt = formatAbsoluteDateTime(checkIn.createdAt);
+
+  return (
+    <div className="flex gap-3 px-1 py-3">
+      <div className="flex w-4 shrink-0 justify-center pt-1">
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ background: badge.color, boxShadow: `0 0 0 4px ${badge.background}` }}
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>{checkIn.summary}</div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span
+            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+            style={{
+              color: badge.color,
+              background: badge.background,
+            }}
+          >
+            {badge.label}
+          </span>
+          {showDate && checkIn.date && (
+            <span
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+              style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
+            >
+              {formatDate(checkIn.date)}
+            </span>
+          )}
+          <span title={absoluteCreatedAt}>{formatRelativeTime(checkIn.createdAt)}</span>
+          <span>{absoluteCreatedAt}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DeveloperTrackerDrawer({
@@ -252,6 +298,7 @@ export function DeveloperTrackerDrawer({
                     <TrackerItemRow
                       item={day.currentItem}
                       actionPreset="hover-done"
+                      viewDate={date}
                       onOpen={readOnly ? undefined : onOpenTaskDetail}
                       onUpdateNote={readOnly ? undefined : (itemId, note) => onUpdateItemNote({ itemId, note })}
                       onUpdateTitle={readOnly ? undefined : (itemId, title) => onUpdateItemTitle({ itemId, title })}
@@ -301,6 +348,7 @@ export function DeveloperTrackerDrawer({
                           item={item}
                           variant="drawer-planned"
                           hideActions
+                          viewDate={date}
                           onOpen={undefined}
                         />
                       ))}
@@ -337,6 +385,7 @@ export function DeveloperTrackerDrawer({
                           draggable
                           variant="drawer-planned"
                           actionPreset="hover-start"
+                          viewDate={date}
                           onOpen={onOpenTaskDetail}
                           onUpdateNote={(itemId, note) => onUpdateItemNote({ itemId, note })}
                           onUpdateTitle={(itemId, title) => onUpdateItemTitle({ itemId, title })}
@@ -443,7 +492,7 @@ export function DeveloperTrackerDrawer({
                 onToggle={() => setDroppedOpen((current) => !current)}
               />
 
-              <DrawerSection title="Check-ins" count={day.checkIns.length}>
+              <DrawerSection title="Check-ins" count={day.checkIns.length + day.recentCheckIns.length}>
                 <div className="space-y-0">
                   {day.checkIns.length === 0 && (
                     <div className="rounded-2xl px-4 py-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
@@ -451,40 +500,21 @@ export function DeveloperTrackerDrawer({
                     </div>
                   )}
                   {[...day.checkIns].reverse().map((ci) => (
-                    <div key={ci.id} className="flex gap-3 px-1 py-3">
-                      {(() => {
-                        const badge = getCheckInAuthorBadge(ci.authorType);
-                        const absoluteCreatedAt = formatAbsoluteDateTime(ci.createdAt);
-
-                        return (
-                          <>
-                            <div className="flex w-4 shrink-0 justify-center pt-1">
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{ background: badge.color, boxShadow: `0 0 0 4px ${badge.background}` }}
-                              />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>{ci.summary}</div>
-                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                                <span
-                                  className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
-                                  style={{
-                                    color: badge.color,
-                                    background: badge.background,
-                                  }}
-                                >
-                                  {badge.label}
-                                </span>
-                                <span title={absoluteCreatedAt}>{formatRelativeTime(ci.createdAt)}</span>
-                                <span>{absoluteCreatedAt}</span>
-                              </div>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
+                    <CheckInRow key={ci.id} checkIn={ci} />
                   ))}
+                  {day.recentCheckIns.length > 0 && (
+                    <>
+                      <div
+                        className="mt-1 px-1 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.14em]"
+                        style={{ color: 'var(--text-muted)', borderTop: '1px solid color-mix(in srgb, var(--border) 45%, transparent)' }}
+                      >
+                        Earlier this week
+                      </div>
+                      {day.recentCheckIns.map((ci) => (
+                        <CheckInRow key={`recent-${ci.id}`} checkIn={ci} showDate />
+                      ))}
+                    </>
+                  )}
                 </div>
               </DrawerSection>
             </div>

@@ -410,7 +410,7 @@ function AppContent() {
       : getLocalIsoDate(),
   );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
-  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; nonce: number }>({ nonce: 0 });
+  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; nonce: number }>({ nonce: 0 });
   const [settingsSectionTarget, setSettingsSectionTarget] = useState<{ section?: string; nonce: number }>({ nonce: 0 });
   const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; nonce: number }>(() => ({
     itemId: undefined,
@@ -508,7 +508,12 @@ function AppContent() {
     }
 
     if (target.view === 'team') {
-      setTodayTeamTarget((prev) => ({ developerAccountId: target.developerAccountId, nonce: prev.nonce + 1 }));
+      setTodayTeamTarget((prev) => ({
+        developerAccountId: target.developerAccountId,
+        trackerItemId: target.trackerItemId,
+        managerDeskItemId: target.managerDeskItemId,
+        nonce: prev.nonce + 1,
+      }));
       preloadView('team');
       setActiveView('team');
       navigateToView('team');
@@ -764,6 +769,8 @@ function AppContent() {
           <TeamTrackerPage
             onViewChange={handleViewChange}
             initialDeveloperAccountId={todayTeamTarget.developerAccountId}
+            initialTrackerItemId={todayTeamTarget.trackerItemId}
+            initialManagerDeskItemId={todayTeamTarget.managerDeskItemId}
             initialDeveloperNonce={todayTeamTarget.nonce}
             onInitialDeveloperHandled={() => setTodayTeamTarget((prev) => ({ nonce: prev.nonce + 1 }))}
             initialBoardQuery={teamBoardQuery}

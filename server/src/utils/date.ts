@@ -21,6 +21,20 @@ export function todayIsoDate(now = new Date(), timeZone?: string): string {
   return formatIsoDate(now, timeZone);
 }
 
+export function isoDatePart(value: string | null | undefined, timeZone?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 10);
+  }
+  return formatIsoDate(date, timeZone);
+}
+
 function shiftIsoDate(dateStr: string, days: number): string {
   const shifted = addDays(new Date(`${dateStr}T00:00:00.000Z`), days);
   return formatIsoDate(shifted, "UTC");

@@ -315,7 +315,7 @@ describe('MyDayPage', () => {
       </TestWrapper>
     );
 
-    expect(screen.getAllByText('Continued from Mar 9')).toHaveLength(2);
+    expect(screen.getAllByText(/Continued from Mar 9/)).toHaveLength(2);
   });
 
   it('disables task controls when My Day is viewing history', () => {

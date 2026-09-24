@@ -31,7 +31,7 @@ export function DrawerProperties({ item, readOnly = false, onFieldChange }: Draw
       </summary>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
         <InlineSelect label="Kind" value={item.kind} options={visibleKindOpts} onChange={(v) => onFieldChange('kind', v)} disabled={readOnly} />
-        <InlineSelect label="Status" value={item.status} options={visibleStatusOpts} onChange={(v) => onFieldChange('status', v)} disabled={readOnly} />
+        <InlineSelect label={hasLinkedWork ? 'My follow-through' : 'Status'} value={item.status} options={visibleStatusOpts} onChange={(v) => onFieldChange('status', v)} disabled={readOnly} />
         <InlineSelect label="Category" value={item.category} options={categoryOpts} onChange={(v) => onFieldChange('category', v)} disabled={readOnly} />
         <InlineSelect label="Priority" value={item.priority} options={priorityOpts} onChange={(v) => onFieldChange('priority', v)} disabled={readOnly} />
         <InlineText label="Participants" value={item.participants ?? ''} placeholder="e.g. Design Team, Rahul" onChange={(v) => onFieldChange('participants', v.trim() ? v : null)} className="col-span-2" disabled={readOnly} />

@@ -146,7 +146,7 @@ describe("my day routes", () => {
       expect.objectContaining({
         id: item.id,
         title: "Yesterday follow-up",
-        originDate: "2026-03-06",
+        originDate: "2026-03-07",
       }),
     ]);
 
@@ -432,7 +432,7 @@ describe("my day routes", () => {
     expect(today.status).toBe(200);
     expect(today.body).toMatchObject({
       id: inherited.id,
-      originDate: "2026-03-06",
+      originDate: "2026-03-07",
       note: "Live note",
     });
 
@@ -508,7 +508,7 @@ describe("my day routes", () => {
     expect(res.body).toMatchObject({
       id: inherited.id,
       state: "in_progress",
-      originDate: "2026-03-06",
+      originDate: "2026-03-07",
     });
 
     const rows = await db

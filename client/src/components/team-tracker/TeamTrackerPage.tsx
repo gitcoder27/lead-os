@@ -42,6 +42,8 @@ import type {
 interface TeamTrackerPageProps {
   onViewChange?: (view: AppView) => void;
   initialDeveloperAccountId?: string;
+  initialTrackerItemId?: number;
+  initialManagerDeskItemId?: number;
   initialDeveloperNonce?: number;
   onInitialDeveloperHandled?: () => void;
   initialBoardQuery?: TeamTrackerBoardQuery;
@@ -270,6 +272,8 @@ function useTeamTrackerWorkflow({
 export function TeamTrackerPage({
   onViewChange,
   initialDeveloperAccountId,
+  initialTrackerItemId,
+  initialManagerDeskItemId,
   initialDeveloperNonce,
   onInitialDeveloperHandled,
   initialBoardQuery,
@@ -340,11 +344,28 @@ export function TeamTrackerPage({
   });
 
   useEffect(() => {
+    if (!initialDeveloperAccountId && !initialTrackerItemId) {
+      return;
+    }
     if (initialDeveloperAccountId) {
       workflow.setDrawerAccountId(initialDeveloperAccountId);
-      onInitialDeveloperHandled?.();
     }
-  }, [initialDeveloperAccountId, initialDeveloperNonce, onInitialDeveloperHandled, workflow.setDrawerAccountId]);
+    if (initialTrackerItemId) {
+      workflow.setSelectedTask({
+        trackerItemId: initialTrackerItemId,
+        managerDeskItemId: initialManagerDeskItemId,
+      });
+    }
+    onInitialDeveloperHandled?.();
+  }, [
+    initialDeveloperAccountId,
+    initialTrackerItemId,
+    initialManagerDeskItemId,
+    initialDeveloperNonce,
+    onInitialDeveloperHandled,
+    workflow.setDrawerAccountId,
+    workflow.setSelectedTask,
+  ]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

@@ -101,6 +101,26 @@ describe("TeamTrackerService", () => {
       expect(day.nextFollowUpAt).toBe("2026-03-07T10:00:00.000Z");
     });
 
+    it("seeds manager notes from the latest prior day", async () => {
+      await service.updateDay("dev-1", "2026-03-06", {
+        managerNotes: "Focus the migration review on the edge-case repro.",
+      });
+
+      const day = await service.ensureDay("2026-03-07", "dev-1");
+
+      expect(day.managerNotes).toBe("Focus the migration review on the edge-case repro.");
+    });
+
+    it("does not seed manager notes for non-live dates", async () => {
+      await service.updateDay("dev-1", "2026-03-06", {
+        managerNotes: "Focus the migration review on the edge-case repro.",
+      });
+
+      const day = await service.ensureDay("2026-03-05", "dev-1");
+
+      expect(day.managerNotes).toBeNull();
+    });
+
     it("returns the same row under concurrent calls", async () => {
       const [first, second] = await Promise.all([
         service.ensureDay("2026-03-07", "dev-1"),
@@ -592,7 +612,7 @@ describe("TeamTrackerService", () => {
       expect(devDay.plannedItems.some((i) => i.id === item1.id)).toBe(true);
     });
 
-    it("does not demote historical in-progress work when setting today's current item", async () => {
+    it("demotes in-progress work on other days when setting today's current item", async () => {
       const yesterday = await service.addItem("dev-1", "2026-03-06", {
         title: "Yesterday current task",
       });
@@ -608,10 +628,11 @@ describe("TeamTrackerService", () => {
         .from(teamTrackerItems)
         .where(eq(teamTrackerItems.id, yesterday.id));
 
-      expect(rows[0]?.state).toBe("in_progress");
+      expect(rows[0]?.state).toBe("planned");
     });
 
     it("chooses the most recently activated live in-progress item as current", async () => {
+      vi.setSystemTime(new Date("2026-03-06T09:00:00.000Z"));
       const yesterday = await service.addItem("dev-1", "2026-03-06", {
         title: "Yesterday current task",
       });
@@ -631,14 +652,15 @@ describe("TeamTrackerService", () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: yesterday.id,
-            state: "in_progress",
+            state: "planned",
             originDate: "2026-03-06",
           }),
         ])
       );
     });
 
-    it("can make reactivated inherited work the live current item without rewriting today's row", async () => {
+    it("can make reactivated inherited work the live current item and demotes the previous one", async () => {
+      vi.setSystemTime(new Date("2026-03-06T09:00:00.000Z"));
       const yesterday = await service.addItem("dev-1", "2026-03-06", {
         title: "Yesterday current task",
       });
@@ -661,7 +683,7 @@ describe("TeamTrackerService", () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: today.id,
-            state: "in_progress",
+            state: "planned",
             originDate: "2026-03-07",
           }),
         ])
@@ -671,7 +693,7 @@ describe("TeamTrackerService", () => {
         .select()
         .from(teamTrackerItems)
         .where(eq(teamTrackerItems.id, today.id));
-      expect(rows[0]?.state).toBe("in_progress");
+      expect(rows[0]?.state).toBe("planned");
     });
 
     it("rejects guarded stale set-current when another item is already current", async () => {
@@ -974,7 +996,7 @@ describe("TeamTrackerService", () => {
       ]);
     });
 
-    it("cancels linked Manager Desk work by deleting the tracker item", async () => {
+    it("cancels linked Manager Desk work by marking the tracker item dropped", async () => {
       const managerItem = await managerDeskService.createItem("manager-1", {
         date: "2026-03-07",
         title: "Shared delegated task",
@@ -991,7 +1013,12 @@ describe("TeamTrackerService", () => {
         .select()
         .from(teamTrackerItems)
         .where(eq(teamTrackerItems.id, linkedItem!.id));
-      expect(rows).toHaveLength(0);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          id: linkedItem!.id,
+          state: "dropped",
+        }),
+      ]);
     });
   });
 
@@ -1021,6 +1048,29 @@ describe("TeamTrackerService", () => {
       )!;
       expect(devDay.status).toBe("blocked");
       expect(devDay.statusUpdatedAt).toBeDefined();
+    });
+
+    it("exposes recent check-ins from prior days on the live board", async () => {
+      await service.addCheckIn("dev-1", "2026-02-20", {
+        summary: "Old check-in outside window",
+      });
+      await service.addCheckIn("dev-1", "2026-03-05", {
+        summary: "Thursday sync",
+      });
+      await service.addCheckIn("dev-1", "2026-03-06", {
+        summary: "Friday sync",
+      });
+
+      const board = await service.getBoard("2026-03-07");
+      const devDay = board.developers.find(
+        (d) => d.developer.accountId === "dev-1"
+      )!;
+
+      expect(devDay.checkIns).toHaveLength(0);
+      expect(devDay.recentCheckIns).toEqual([
+        expect.objectContaining({ summary: "Friday sync", date: "2026-03-06" }),
+        expect.objectContaining({ summary: "Thursday sync", date: "2026-03-05" }),
+      ]);
     });
 
     it("clears the next follow-up marker when a new check-in is recorded", async () => {
@@ -1562,7 +1612,7 @@ describe("TeamTrackerService", () => {
       const plannedTitles = devDay.plannedItems.map((item) => item.title);
       expect(plannedTitles.filter((title) => title === "Already carried")).toHaveLength(1);
       expect(plannedTitles.filter((title) => title === "Shared follow-up")).toHaveLength(2);
-      expect(plannedTitles.filter((title) => title === "Needs follow-up")).toHaveLength(1);
+      expect(devDay.currentItem?.title).toBe("Needs follow-up");
 
       expect(
         devDay.plannedItems
@@ -1570,6 +1620,53 @@ describe("TeamTrackerService", () => {
           .map((item) => item.lifecycle)
           .sort()
       ).toEqual(["manager_desk_linked", "tracker_only"]);
+    });
+
+    it("moves the tracker row forward preserving id, state, and note", async () => {
+      vi.setSystemTime(new Date("2026-03-06T09:00:00.000Z"));
+      const inFlight = await service.addItem("dev-1", "2026-03-06", {
+        title: "In-flight task",
+        note: "Waiting on the upstream fix.",
+      });
+      await service.setCurrentItem(inFlight.id);
+
+      vi.setSystemTime(new Date("2026-03-07T08:00:00.000Z"));
+      const carried = await service.carryForward("2026-03-06", "2026-03-07");
+      expect(carried).toBe(1);
+
+      const rows = await db
+        .select()
+        .from(teamTrackerItems)
+        .where(eq(teamTrackerItems.id, inFlight.id));
+      const targetDay = await db
+        .select()
+        .from(teamTrackerDays)
+        .where(eq(teamTrackerDays.id, rows[0]!.dayId));
+      expect(targetDay[0]?.date).toBe("2026-03-07");
+      expect(rows[0]?.state).toBe("in_progress");
+      expect(rows[0]?.note).toBe("Waiting on the upstream fix.");
+
+      const board = await service.getBoard("2026-03-07");
+      const devDay = board.developers.find(
+        (d) => d.developer.accountId === "dev-1"
+      )!;
+      expect(devDay.currentItem?.id).toBe(inFlight.id);
+      expect(devDay.currentItem?.originDate).toBe("2026-03-06");
+    });
+
+    it("does not duplicate work when the carried item's note was edited", async () => {
+      await service.addItem("dev-1", "2026-03-06", {
+        title: "Ongoing task",
+        note: "first pass",
+      });
+      await service.addItem("dev-1", "2026-03-07", {
+        title: "Ongoing task",
+        note: "edited context",
+      });
+
+      const carried = await service.carryForward("2026-03-06", "2026-03-07");
+
+      expect(carried).toBe(0);
     });
   });
 

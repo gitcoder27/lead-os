@@ -6,6 +6,7 @@ import type {
   GlobalSearchDeskItem,
   GlobalSearchIssueItem,
   GlobalSearchResponse,
+  GlobalSearchTrackerItem,
 } from "shared/types";
 import { db } from "../db/connection";
 import {
@@ -15,6 +16,7 @@ import {
   managerDeskItems,
   teamTrackerCheckIns,
   teamTrackerDays,
+  teamTrackerItems,
 } from "../db/schema";
 import { isVisibleWorkIssue } from "./issue-rules";
 import { DailyNotesService } from "./daily-notes.service";
@@ -25,6 +27,7 @@ const MIN_QUERY_LENGTH = 2;
 const ISSUE_LIMIT = 6;
 const DESK_ITEM_LIMIT = 6;
 const CHECK_IN_LIMIT = 6;
+const TRACKER_ITEM_LIMIT = 6;
 const DEVELOPER_LIMIT = 4;
 const NOTE_LIMIT = 6;
 
@@ -36,6 +39,20 @@ function sanitizeQuery(rawQuery: string): string {
 
 function containsPattern(query: string): string {
   return `%${query}%`;
+}
+
+function parseRelatedKeys(raw: string | null): string[] | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0
+      ? parsed.filter((key): key is string => typeof key === "string")
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class SearchService {
@@ -51,6 +68,7 @@ export class SearchService {
       issues: [],
       deskItems: [],
       checkIns: [],
+      trackerItems: [],
       developers: [],
       notes: [],
     };
@@ -62,10 +80,11 @@ export class SearchService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const pattern = containsPattern(query);
 
-    const [issueItems, deskItems, checkIns, developerItems, noteItems] = await Promise.all([
+    const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems] = await Promise.all([
       this.searchIssues(normalizedWorkspaceId, pattern),
       this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
       this.searchCheckIns(normalizedWorkspaceId, pattern),
+      this.searchTrackerItems(normalizedWorkspaceId, pattern),
       this.searchDevelopers(normalizedWorkspaceId, pattern),
       this.searchNotes(normalizedWorkspaceId, managerAccountId, query),
     ]);
@@ -75,6 +94,7 @@ export class SearchService {
       issues: issueItems,
       deskItems,
       checkIns,
+      trackerItems,
       developers: developerItems,
       notes: noteItems,
     };
@@ -233,6 +253,80 @@ export class SearchService {
       status: row.status ?? undefined,
       createdAt: row.createdAt,
     }));
+  }
+
+  private async searchTrackerItems(workspaceId: string, pattern: string): Promise<GlobalSearchTrackerItem[]> {
+    const rows = await db
+      .select({
+        itemId: teamTrackerItems.id,
+        date: teamTrackerDays.date,
+        developerAccountId: teamTrackerDays.developerAccountId,
+        developerName: developers.displayName,
+        title: teamTrackerItems.title,
+        state: teamTrackerItems.state,
+        jiraKey: teamTrackerItems.jiraKey,
+        relatedJiraKeys: teamTrackerItems.relatedJiraKeys,
+        note: teamTrackerItems.note,
+        managerDeskItemId: teamTrackerItems.managerDeskItemId,
+        updatedAt: teamTrackerItems.updatedAt,
+      })
+      .from(teamTrackerItems)
+      .innerJoin(teamTrackerDays, eq(teamTrackerItems.dayId, teamTrackerDays.id))
+      .leftJoin(
+        developers,
+        and(
+          eq(developers.workspaceId, teamTrackerDays.workspaceId),
+          eq(developers.accountId, teamTrackerDays.developerAccountId)
+        )
+      )
+      .where(
+        and(
+          eq(teamTrackerItems.workspaceId, workspaceId),
+          or(
+            like(teamTrackerItems.title, pattern),
+            like(teamTrackerItems.note, pattern),
+            like(teamTrackerItems.jiraKey, pattern),
+            like(teamTrackerItems.relatedJiraKeys, pattern)
+          )
+        )
+      )
+      .orderBy(desc(teamTrackerItems.updatedAt));
+
+    // Tracker rows predating move-semantics can repeat across days for the same
+    // task; collapse them so search shows each task once (most recent update).
+    const seen = new Set<string>();
+    const items: GlobalSearchTrackerItem[] = [];
+    for (const row of rows) {
+      const key = JSON.stringify([
+        row.developerAccountId,
+        row.jiraKey ?? null,
+        row.relatedJiraKeys ?? null,
+        row.title,
+      ]);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      items.push({
+        itemId: row.itemId,
+        date: row.date,
+        developerAccountId: row.developerAccountId,
+        developerName: row.developerName ?? row.developerAccountId,
+        title: row.title,
+        state: row.state as GlobalSearchTrackerItem["state"],
+        lifecycle: row.managerDeskItemId === null ? "tracker_only" : "manager_desk_linked",
+        jiraKey: row.jiraKey ?? undefined,
+        relatedIssueKeys: parseRelatedKeys(row.relatedJiraKeys),
+        note: row.note ?? undefined,
+        managerDeskItemId: row.managerDeskItemId ?? undefined,
+        updatedAt: row.updatedAt,
+      });
+      if (items.length >= TRACKER_ITEM_LIMIT) {
+        break;
+      }
+    }
+
+    return items;
   }
 
   private async searchDevelopers(workspaceId: string, pattern: string): Promise<GlobalSearchDeveloperItem[]> {

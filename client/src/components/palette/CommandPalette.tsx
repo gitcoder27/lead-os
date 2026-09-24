@@ -6,6 +6,7 @@ import {
   Bug,
   CalendarClock,
   ClipboardList,
+  ListChecks,
   MessageSquare,
   NotebookPen,
   Plus,
@@ -60,6 +61,7 @@ const ACTION_ICONS: Record<string, typeof Sunrise> = {
 const RESULT_ICONS: Record<string, typeof Bug> = {
   issues: Bug,
   desk: ClipboardList,
+  tracker: ListChecks,
   checkins: MessageSquare,
   developers: User,
   notes: NotebookPen,
@@ -69,6 +71,7 @@ const GROUP_LABELS: Record<string, string> = {
   actions: 'Actions',
   issues: 'Work items',
   desk: 'Desk items & follow-ups',
+  tracker: 'Tracker tasks',
   checkins: 'Check-ins',
   developers: 'Developers',
   notes: 'Notes',
@@ -101,6 +104,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
       ? buildResultGroups({
           issues: searchQuery.data?.issues ?? [],
           deskItems: searchQuery.data?.deskItems ?? [],
+          trackerItems: searchQuery.data?.trackerItems ?? [],
           checkIns: searchQuery.data?.checkIns ?? [],
           developers: searchQuery.data?.developers ?? [],
           notes: searchQuery.data?.notes ?? [],

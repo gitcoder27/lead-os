@@ -72,7 +72,7 @@ export function DrawerWorkflowActions({
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto min-w-[136px]">
           <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
-            Workflow
+            {hasLinkedWork ? 'My follow-through' : 'Workflow'}
           </div>
           <div className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
             {STATUS_LABELS[item.status]}

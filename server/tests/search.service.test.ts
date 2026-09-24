@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import {
   configTable,
@@ -9,6 +10,7 @@ import {
   managerDeskItems,
   teamTrackerCheckIns,
   teamTrackerDays,
+  teamTrackerItems,
 } from "../src/db/schema";
 import { SearchService } from "../src/services/search.service";
 
@@ -122,6 +124,65 @@ async function seedCheckIn(options: { summary: string; developerAccountId?: stri
   return checkIn!;
 }
 
+async function seedTrackerItem(
+  options: {
+    title: string;
+    developerAccountId?: string;
+    date?: string;
+    note?: string;
+    jiraKey?: string;
+    state?: string;
+    managerDeskItemId?: number;
+    workspaceId?: string;
+    updatedAt?: string;
+  }
+) {
+  const [existingDay] = await db
+    .select()
+    .from(teamTrackerDays)
+    .where(
+      and(
+        eq(teamTrackerDays.workspaceId, options.workspaceId ?? "default"),
+        eq(teamTrackerDays.developerAccountId, options.developerAccountId ?? "dev-1"),
+        eq(teamTrackerDays.date, options.date ?? "2026-03-07")
+      )
+    );
+
+  const day =
+    existingDay ??
+    (
+      await db
+        .insert(teamTrackerDays)
+        .values({
+          workspaceId: options.workspaceId ?? "default",
+          date: options.date ?? "2026-03-07",
+          developerAccountId: options.developerAccountId ?? "dev-1",
+          createdAt: "2026-03-07T00:00:00.000Z",
+          updatedAt: "2026-03-07T00:00:00.000Z",
+        })
+        .returning()
+    )[0]!;
+
+  const [item] = await db
+    .insert(teamTrackerItems)
+    .values({
+      workspaceId: options.workspaceId ?? "default",
+      dayId: day.id,
+      itemType: options.jiraKey ? "jira" : "custom",
+      jiraKey: options.jiraKey ?? null,
+      title: options.title,
+      state: options.state ?? "planned",
+      note: options.note ?? null,
+      managerDeskItemId: options.managerDeskItemId ?? null,
+      position: 0,
+      createdAt: "2026-03-07T00:00:00.000Z",
+      updatedAt: options.updatedAt ?? "2026-03-07T09:00:00.000Z",
+    })
+    .returning();
+
+  return item!;
+}
+
 beforeEach(async () => {
   await resetDatabase();
   await db.insert(developers).values([
@@ -152,7 +213,7 @@ describe("SearchService.search", () => {
 
     const result = await searchService.search("p");
 
-    expect(result).toEqual({ query: "p", issues: [], deskItems: [], checkIns: [], developers: [], notes: [] });
+    expect(result).toEqual({ query: "p", issues: [], deskItems: [], checkIns: [], trackerItems: [], developers: [], notes: [] });
   });
 
   it("matches issues by key, summary, and assignee name", async () => {
@@ -272,6 +333,82 @@ describe("SearchService.search", () => {
     const byDeveloper = await searchService.search("sharma");
     expect(byDeveloper.checkIns).toHaveLength(1);
     expect(byDeveloper.checkIns[0]?.summary).toBe("Finished code review");
+  });
+
+  it("matches tracker items by title, note, and Jira key with developer context", async () => {
+    const linked = await seedTrackerItem({
+      title: "Reproduce payment gateway timeouts",
+      developerAccountId: "dev-1",
+      jiraKey: "PROJ-900",
+      state: "in_progress",
+      managerDeskItemId: 42,
+    });
+    await seedTrackerItem({
+      title: "Note about the payment retry loop",
+      developerAccountId: "dev-2",
+      note: "payment edge cases",
+    });
+    await seedTrackerItem({
+      title: "Unrelated cleanup",
+      developerAccountId: "dev-1",
+    });
+
+    const byTitle = await searchService.search("payment");
+    expect(byTitle.trackerItems.map((item) => item.itemId)).toContain(linked.id);
+    const linkedResult = byTitle.trackerItems.find((item) => item.itemId === linked.id);
+    expect(linkedResult).toMatchObject({
+      date: "2026-03-07",
+      developerAccountId: "dev-1",
+      developerName: "Alice Smith",
+      state: "in_progress",
+      lifecycle: "manager_desk_linked",
+      jiraKey: "PROJ-900",
+      managerDeskItemId: 42,
+    });
+
+    const byNote = await searchService.search("edge cases");
+    expect(byNote.trackerItems).toEqual([
+      expect.objectContaining({ title: "Note about the payment retry loop", developerAccountId: "dev-2" }),
+    ]);
+
+    const byJiraKey = await searchService.search("PROJ-900");
+    expect(byJiraKey.trackerItems).toEqual([
+      expect.objectContaining({ itemId: linked.id }),
+    ]);
+  });
+
+  it("collapses repeated tracker rows for the same task across days", async () => {
+    const stale = await seedTrackerItem({
+      title: "Carried task",
+      developerAccountId: "dev-1",
+      date: "2026-03-06",
+      updatedAt: "2026-03-06T09:00:00.000Z",
+    });
+    const fresh = await seedTrackerItem({
+      title: "Carried task",
+      developerAccountId: "dev-1",
+      date: "2026-03-07",
+      updatedAt: "2026-03-07T09:00:00.000Z",
+    });
+
+    const result = await searchService.search("carried");
+
+    expect(result.trackerItems).toEqual([
+      expect.objectContaining({ itemId: fresh.id, date: "2026-03-07" }),
+    ]);
+    expect(result.trackerItems.some((item) => item.itemId === stale.id)).toBe(false);
+  });
+
+  it("does not return tracker items from other workspaces", async () => {
+    await seedTrackerItem({
+      title: "Payment task in another workspace",
+      developerAccountId: "dev-1",
+      workspaceId: "other",
+    });
+
+    const result = await searchService.search("payment");
+
+    expect(result.trackerItems).toHaveLength(0);
   });
 
   it("matches active developers by display name and excludes inactive ones", async () => {

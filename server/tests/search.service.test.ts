@@ -213,7 +213,7 @@ describe("SearchService.search", () => {
 
     const result = await searchService.search("p");
 
-    expect(result).toEqual({ query: "p", issues: [], deskItems: [], checkIns: [], trackerItems: [], developers: [], notes: [] });
+    expect(result).toEqual({ query: "p", tasks: [], issues: [], deskItems: [], checkIns: [], trackerItems: [], developers: [], notes: [] });
   });
 
   it("matches issues by key, summary, and assignee name", async () => {

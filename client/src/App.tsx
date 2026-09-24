@@ -22,13 +22,16 @@ import {
 } from '@/lib/view-params';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
-import type { TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
+import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
+import type { TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
 export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'notes' | 'my-day' | 'settings';
 export type LegacyAppView = 'dashboard' | 'team-tracker' | 'manager-desk';
 export type AppView = CanonicalAppView | LegacyAppView;
-export type ActiveAppView = AppView | 'not-found';
-type ResolvedAppView = CanonicalAppView | 'not-found';
+export type ActiveAppView = AppView | 'not-found' | 'task';
+type ResolvedAppView = CanonicalAppView | 'not-found' | 'task';
+
+const TASK_LINK_PATH_PATTERN = /^\/t\/([Tt]-\d{1,9})\/?$/;
 
 const loadTeamTrackerPage = () => import('@/components/team-tracker/TeamTrackerPage');
 const loadDashboardLayout = () => import('@/components/layout/DashboardLayout');
@@ -99,6 +102,7 @@ function canonicalizeView(view: AppView): CanonicalAppView {
 }
 
 function pathToView(pathname: string): ResolvedAppView {
+  if (TASK_LINK_PATH_PATTERN.test(pathname)) return 'task';
   if (pathname === '/my-day' || pathname === '/my-day/') return 'my-day';
   if (pathname === '/team' || pathname === '/team/' || pathname === '/team-tracker' || pathname === '/team-tracker/') return 'team';
   if (pathname === '/desk' || pathname === '/desk/' || pathname === '/manager-desk' || pathname === '/manager-desk/') return 'desk';
@@ -226,7 +230,7 @@ function navigateToView(view: AppView, options: NavigateOptions = {}) {
 
 function replaceLegacyPathIfNeeded() {
   const currentView = pathToView(window.location.pathname);
-  if (currentView === 'not-found') {
+  if (currentView === 'not-found' || currentView === 'task') {
     return;
   }
   const canonicalPath = viewToPath(currentView);
@@ -553,6 +557,33 @@ function AppContent() {
     navigateToView(nextView);
   }, [dashboardFilterState, handleOpenNotes]);
 
+  const handleTaskResolved = useCallback((task: TaskResolution) => {
+    if (user?.role === 'developer') {
+      preloadView('my-day');
+      setActiveView('my-day');
+      navigateToView('my-day', { replace: true, params: { task: task.taskKey } });
+      return;
+    }
+    if (task.kind === 'desk_only') {
+      setTodayDeskTarget((prev) => ({ itemId: task.managerDeskItemId, date: task.date, nonce: prev.nonce + 1 }));
+      setDeskDateParam(task.date);
+      preloadView('desk');
+      setActiveView('desk');
+      navigateToView('desk', { replace: true, params: { date: task.date, task: task.taskKey } });
+      return;
+    }
+    setTodayTeamTarget((prev) => ({
+      developerAccountId: task.developer?.accountId,
+      trackerItemId: task.trackerItemId,
+      managerDeskItemId: task.managerDeskItemId,
+      nonce: prev.nonce + 1,
+    }));
+    setTeamBoardQuery(undefined);
+    preloadView('team');
+    setActiveView('team');
+    navigateToView('team', { replace: true, params: { task: task.taskKey } });
+  }, [user?.role]);
+
   const replaceView = useCallback((view: AppView) => {
     const nextView = canonicalizeView(view);
     preloadView(nextView);
@@ -640,7 +671,7 @@ function AppContent() {
       return;
     }
 
-    if (isAuthenticated && user?.role === 'developer') {
+    if (isAuthenticated && user?.role === 'developer' && activeView !== 'task') {
       replaceView('my-day');
     }
   }, [
@@ -731,6 +762,27 @@ function AppContent() {
       <Suspense fallback={<FullPageLoading />}>
         <LoginPage role="manager" />
       </Suspense>
+    );
+  }
+
+  if (activeView === 'task') {
+    const taskKey = TASK_LINK_PATH_PATTERN.exec(window.location.pathname)?.[1];
+    const resolver = taskKey && user?.role ? (
+      <TaskLinkResolver
+        taskKey={taskKey}
+        role={user.role}
+        onResolved={handleTaskResolved}
+        onGoToday={() => handleViewChange(user.role === 'developer' ? 'my-day' : 'today')}
+        notFound={<NotFoundState onGoToday={() => handleViewChange(user.role === 'developer' ? 'my-day' : 'today')} />}
+      />
+    ) : <FullPageLoading />;
+    if (user?.role !== 'manager') {
+      return resolver;
+    }
+    return (
+      <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
+        {resolver}
+      </WorkspaceShell>
     );
   }
 
@@ -852,7 +904,7 @@ function AppContent() {
       <AssistantProvider
         isOpen={assistantOpen}
         onOpenChange={setAssistantOpen}
-        currentView={activeView === 'not-found' ? window.location.pathname : viewToPath(activeView)}
+        currentView={activeView === 'not-found' || activeView === 'task' ? window.location.pathname : viewToPath(activeView)}
         onOpenTarget={handleOpenTodayTarget}
       >
         {renderActiveView()}

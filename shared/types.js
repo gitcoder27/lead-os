@@ -1,9 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_KEY_PATTERN = void 0;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
 exports.isCompleteNavPreferences = isCompleteNavPreferences;
+exports.TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
+exports.TASK_EVENT_TYPES = [
+    "created", "update", "instruction", "decision", "blocker", "status", "assign",
+    "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
+];
 exports.NAV_PAGE_IDS = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
 exports.DEFAULT_NAV_PREFERENCES = {
     topNav: ["work", "team", "desk"],

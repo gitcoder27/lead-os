@@ -332,6 +332,71 @@ CREATE TABLE IF NOT EXISTS user_nav_preferences (
   PRIMARY KEY (workspace_id, manager_account_id)
 );
 
+CREATE TABLE IF NOT EXISTS task_key_sequences (
+  workspace_id TEXT PRIMARY KEY,
+  next_value INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS task_key_aliases (
+  workspace_id TEXT NOT NULL,
+  alias_key TEXT NOT NULL,
+  task_key TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, alias_key)
+);
+
+CREATE TABLE IF NOT EXISTS data_migrations (
+  name TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL,
+  report_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS task_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL DEFAULT 'default',
+  task_key TEXT NOT NULL,
+  type TEXT NOT NULL,
+  body TEXT,
+  visibility TEXT NOT NULL CHECK (visibility IN ('shared', 'private')),
+  author_type TEXT NOT NULL CHECK (author_type IN ('manager', 'developer', 'copilot', 'system')),
+  author_id TEXT,
+  meta_json TEXT,
+  source_table TEXT,
+  source_id INTEGER,
+  dedupe_key TEXT,
+  occurred_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  redacted_at TEXT,
+  redacted_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_task_events_workspace_key_time ON task_events(workspace_id, task_key, occurred_at, id);
+CREATE INDEX IF NOT EXISTS idx_task_events_workspace_author ON task_events(workspace_id, author_type, author_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_events_workspace_dedupe ON task_events(workspace_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS checkin_task_refs (
+  workspace_id TEXT NOT NULL DEFAULT 'default',
+  checkin_id INTEGER NOT NULL,
+  task_key TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, checkin_id, task_key),
+  FOREIGN KEY (checkin_id) REFERENCES team_tracker_checkins(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_checkin_task_refs_key ON checkin_task_refs(workspace_id, task_key);
+
+CREATE TABLE IF NOT EXISTS daily_note_task_refs (
+  workspace_id TEXT NOT NULL,
+  manager_account_id TEXT NOT NULL,
+  note_id INTEGER NOT NULL,
+  task_key TEXT NOT NULL,
+  relation TEXT NOT NULL,
+  request_id TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (note_id, task_key, relation),
+  FOREIGN KEY (note_id) REFERENCES daily_notes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_task_refs_request ON daily_note_task_refs(workspace_id, manager_account_id, request_id) WHERE request_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_app_users_username ON app_users(username);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace ON app_users(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_app_users_workspace_dev_account ON app_users(workspace_id, developer_account_id);
@@ -478,6 +543,14 @@ const alterStatements = [
   "CREATE TABLE IF NOT EXISTS manager_desk_item_history (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL, manager_account_id TEXT NOT NULL, event_type TEXT NOT NULL, snapshot_json TEXT NOT NULL, recorded_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_item_recorded ON manager_desk_item_history(item_id, recorded_at)",
   "CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_manager_recorded ON manager_desk_item_history(manager_account_id, recorded_at)",
+  "ALTER TABLE team_tracker_items ADD COLUMN task_key TEXT",
+  "ALTER TABLE team_tracker_items ADD COLUMN created_by_type TEXT",
+  "ALTER TABLE team_tracker_items ADD COLUMN created_by_id TEXT",
+  "ALTER TABLE manager_desk_items ADD COLUMN task_key TEXT",
+  "ALTER TABLE manager_desk_items ADD COLUMN created_by_type TEXT",
+  "ALTER TABLE manager_desk_items ADD COLUMN created_by_id TEXT",
+  "CREATE INDEX IF NOT EXISTS idx_tracker_items_workspace_task_key ON team_tracker_items(workspace_id, task_key)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_task_key ON manager_desk_items(workspace_id, task_key) WHERE task_key IS NOT NULL",
 ];
 
 const constraintRepairStatements = [
@@ -603,6 +676,11 @@ const workspaceOwnedTables = [
   "developer_availability_periods",
   "team_tracker_items",
   "team_tracker_checkins",
+  "task_key_sequences",
+  "task_key_aliases",
+  "task_events",
+  "checkin_task_refs",
+  "daily_note_task_refs",
   "team_tracker_saved_views",
   "work_saved_views",
   "manager_desk_days",

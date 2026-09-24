@@ -173,4 +173,45 @@ describe("database migrations", () => {
       oldDb.close();
     }
   });
+
+  it("creates Phase 1 task tables and columns idempotently", () => {
+    migrate(rawDb);
+    migrate(rawDb);
+
+    const tables = (rawDb.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(
+      (row) => row.name
+    );
+    for (const name of [
+      "task_key_sequences",
+      "task_key_aliases",
+      "task_events",
+      "checkin_task_refs",
+      "daily_note_task_refs",
+      "data_migrations",
+    ]) {
+      expect(tables).toContain(name);
+    }
+
+    const trackerCols = (rawDb.prepare("PRAGMA table_info(team_tracker_items)").all() as { name: string }[]).map(
+      (row) => row.name
+    );
+    expect(trackerCols).toEqual(expect.arrayContaining(["task_key", "created_by_type", "created_by_id"]));
+    const deskCols = (rawDb.prepare("PRAGMA table_info(manager_desk_items)").all() as { name: string }[]).map(
+      (row) => row.name
+    );
+    expect(deskCols).toEqual(expect.arrayContaining(["task_key", "created_by_type", "created_by_id"]));
+
+    const indexes = (rawDb.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]).map(
+      (row) => row.name
+    );
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        "idx_task_events_workspace_dedupe",
+        "idx_task_events_workspace_key_time",
+        "idx_task_events_workspace_author",
+      ])
+    );
+    const sequences = rawDb.prepare("PRAGMA table_info(task_key_sequences)").all() as { name: string; pk: number }[];
+    expect(sequences.find((col) => col.name === "workspace_id")?.pk).toBe(1);
+  });
 });

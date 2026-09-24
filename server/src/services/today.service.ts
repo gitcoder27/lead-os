@@ -381,7 +381,7 @@ export class TodayService {
         const result = await this.teamTrackerService.addCheckIn(
           developerAccountId,
           date,
-          { summary },
+          { summary, taskKeys: request.taskKeys },
           actor,
           workspaceId,
         );
@@ -402,7 +402,7 @@ export class TodayService {
         const title = requireTrimmedText(request.title, "title");
         const result = await this.managerDeskService.createItem(
           managerAccountId,
-          buildFollowUpCreateParams(date, actionTarget, title),
+          { ...buildFollowUpCreateParams(date, actionTarget, title), source: "today", actor: { type: "manager", accountId: managerAccountId } },
           workspaceId,
         );
         return commandResponse(command.kind, actionTarget, result);
@@ -586,6 +586,7 @@ function getDeveloperAttentionPrimary(
   const currentTarget = target("developer", "team", {
     developerAccountId: item.developer.accountId,
     trackerItemId: item.currentItem?.id,
+    taskKey: item.currentItem?.taskKey ?? undefined,
     issueKey: item.currentItem?.jiraKey,
     relatedIssueKeys: item.currentItem?.relatedIssueKeys,
     date,
@@ -599,6 +600,7 @@ function getDeveloperAttentionPrimary(
       target: target("tracker_item", "team", {
         developerAccountId: item.developer.accountId,
         trackerItemId: setCurrentCandidate.id,
+        taskKey: setCurrentCandidate.taskKey ?? undefined,
         issueKey: setCurrentCandidate.jiraKey,
         relatedIssueKeys: setCurrentCandidate.relatedIssueKeys,
         date,
@@ -645,6 +647,7 @@ function getDeveloperPulsePrimary(
   const openTarget = target("developer", "team", {
     developerAccountId: day.developer.accountId,
     trackerItemId: day.currentItem?.id,
+    taskKey: day.currentItem?.taskKey ?? undefined,
     issueKey: day.currentItem?.jiraKey,
     relatedIssueKeys: day.currentItem?.relatedIssueKeys,
     date,
@@ -658,6 +661,7 @@ function getDeveloperPulsePrimary(
       target: target("tracker_item", "team", {
         developerAccountId: day.developer.accountId,
         trackerItemId: setCurrentCandidate.id,
+        taskKey: setCurrentCandidate.taskKey ?? undefined,
         issueKey: setCurrentCandidate.jiraKey,
         relatedIssueKeys: setCurrentCandidate.relatedIssueKeys,
         date,
@@ -731,6 +735,7 @@ function buildFollowUpActions(items: ManagerDeskItem[], date: string): TodayActi
   return items.map((item) => {
     const actionTarget = target("follow_up", "follow-ups", {
       managerDeskItemId: item.id,
+      taskKey: item.taskKey ?? undefined,
       date: item.originDate || date,
     });
 
@@ -756,6 +761,7 @@ function buildMeetingActions(items: ManagerDeskItem[]): TodayActionItem[] {
   return items.map((item) => {
     const actionTarget = target("meeting", "meetings", {
       managerDeskItemId: item.id,
+      taskKey: item.taskKey ?? undefined,
       date: item.originDate,
     });
 
@@ -784,6 +790,7 @@ function buildDeskCarryForwardActions(items: ManagerDeskItem[], date: string): T
     .map((item) => {
       const actionTarget = target("manager_desk_item", "desk", {
         managerDeskItemId: item.id,
+        taskKey: item.taskKey ?? undefined,
         date: item.originDate,
       });
 
@@ -842,6 +849,7 @@ function buildTeamPulse(board: TeamTrackerBoardResponse, date: string): TodayTea
       const pulseTarget = target("developer", "team", {
         developerAccountId: day.developer.accountId,
         trackerItemId: day.currentItem?.id,
+    taskKey: day.currentItem?.taskKey ?? undefined,
         issueKey: day.currentItem?.jiraKey,
         relatedIssueKeys: day.currentItem?.relatedIssueKeys,
         date,
@@ -870,6 +878,7 @@ function buildTeamPulse(board: TeamTrackerBoardResponse, date: string): TodayTea
 function buildPromiseItem(item: ManagerDeskItem, date: string): TodayPromiseItem {
   const promiseTarget = target("follow_up", "follow-ups", {
     managerDeskItemId: item.id,
+    taskKey: item.taskKey ?? undefined,
     date: item.originDate || date,
   });
 
@@ -887,6 +896,7 @@ function buildPromiseItem(item: ManagerDeskItem, date: string): TodayPromiseItem
 function buildMeetingPrompt(item: ManagerDeskItem): TodayMeetingPrompt {
   const meetingTarget = target("meeting", "meetings", {
     managerDeskItemId: item.id,
+    taskKey: item.taskKey ?? undefined,
     date: item.originDate,
   });
 
@@ -936,7 +946,7 @@ function buildStandupPrompts(
       };
     });
   const promisePrompts = followUps.slice(0, 2).map((item) => {
-    const promiseTarget = target("follow_up", "follow-ups", { managerDeskItemId: item.id, date: item.originDate || date });
+    const promiseTarget = target("follow_up", "follow-ups", { managerDeskItemId: item.id, taskKey: item.taskKey ?? undefined, date: item.originDate || date });
     return {
       id: `standup-follow-up-${item.id}`,
       title: item.title,
@@ -1302,11 +1312,7 @@ function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarg
     category: "follow_up" as const,
     status: "planned" as const,
     priority: "medium" as const,
-    contextNote: actionTarget.trackerItemId
-      ? `Tracker item ${actionTarget.trackerItemId}`
-      : actionTarget.managerDeskItemId
-      ? `Source Manager Desk item ${actionTarget.managerDeskItemId}`
-      : undefined,
+    contextNote: actionTarget.taskKey ? `Follow-up for ${actionTarget.taskKey}` : undefined,
     links,
   };
 }

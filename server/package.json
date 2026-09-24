@@ -9,6 +9,7 @@
     "start": "node dist/server/src/index.js",
     "backup:restore": "tsx src/scripts/restore-backup.ts",
     "manager-desk:cleanup-carry-forward": "tsx src/scripts/cleanup-manager-desk-carry-forward.ts",
+    "tasks:phase1-migrate": "tsx src/scripts/task-phase1-migrate.ts",
     "auth:create-user": "tsx src/scripts/create-auth-user.ts",
     "auth:delete-user": "tsx src/scripts/delete-auth-user.ts",
     "test": "vitest run",

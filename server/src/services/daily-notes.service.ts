@@ -17,12 +17,17 @@ import {
   dailyNoteCaptures,
   dailyNoteFollowUps,
   dailyNotes,
+  dailyNoteTaskRefs,
   managerDeskDays,
   managerDeskItems,
 } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { ManagerDeskService } from "./manager-desk.service";
+import { TeamTrackerService } from "./team-tracker.service";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskEventsService } from "./task-events.service";
+import { todayIsoDate } from "../utils/date";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 const MAX_BODY_LENGTH = 50000;
@@ -102,7 +107,22 @@ function hashPayload(shape: Record<string, unknown>): string {
 export class DailyNotesService {
   private readonly followUpOperations = new Map<string, Promise<void>>();
 
-  constructor(private readonly managerDesk = new ManagerDeskService()) {}
+  constructor(private readonly managerDesk = new ManagerDeskService(), private readonly tracker = new TeamTrackerService()) {}
+  private readonly taskKeys = new TaskKeysService();
+  private readonly eventsService = new TaskEventsService(this.taskKeys);
+
+  private async scanMentions(note: DailyNoteRow): Promise<void> {
+    if (!(await this.taskKeys.enabled(note.workspaceId))) return;
+    for (const match of note.body.matchAll(/\bT-\d{1,9}\b/gi)) {
+      const key = await this.taskKeys.resolve(note.workspaceId, match[0]);
+      if (!key) continue;
+      try { if ((await this.taskKeys.resolveTask(note.workspaceId, key)).deleted) continue; } catch { continue; }
+      const inserted = await db.insert(dailyNoteTaskRefs).values({ workspaceId: note.workspaceId, managerAccountId: note.managerAccountId, noteId: note.id, taskKey: key, relation: "mentioned", createdAt: nowIso() }).onConflictDoNothing().returning();
+      if (!inserted.length) continue;
+      const index = match.index ?? 0;
+      await this.eventsService.append({ workspaceId: note.workspaceId, taskKey: key, type: "note_ref", body: null, meta: { noteId: note.id, noteDate: note.date, relation: "mentioned", excerpt: note.body.slice(Math.max(0, index - 80), index + match[0].length + 80) } }, { type: "system", accountId: note.managerAccountId });
+    }
+  }
 
   /**
    * FTS5-ranked body search; undefined when the query has no searchable terms
@@ -258,6 +278,7 @@ export class DailyNotesService {
       throw new HttpError(400, `Note body must be ${MAX_BODY_LENGTH} characters or fewer`);
     }
 
+    return runInTransaction(async () => {
     rawDb.transaction(() => {
       const current = db
         .select()
@@ -316,8 +337,10 @@ export class DailyNotesService {
         throw new HttpError(409, NOTE_CONFLICT_MESSAGE);
       }
     })();
-
+    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId);
+    if (note) await this.scanMentions(note);
     return this.getDay(managerAccountId, date, normalizedWorkspaceId);
+    });
   }
 
   async append(
@@ -337,6 +360,7 @@ export class DailyNotesService {
     }
     const payloadHash = hashPayload({ route: "append", date, text });
 
+    return runInTransaction(async () => {
     rawDb.transaction(() => {
       const receipt = db
         .select()
@@ -412,8 +436,49 @@ export class DailyNotesService {
         })
         .run();
     })();
-
+    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId);
+    if (note) await this.scanMentions(note);
     return this.getDay(managerAccountId, date, normalizedWorkspaceId);
+    });
+  }
+
+  async addTaskUpdate(managerAccountId: string, noteDate: string, input: { taskKey: string; text: string; type?: "update" | "instruction" | "decision"; visibility?: "shared" | "private"; requestId: string }, workspaceId: string) {
+    await this.taskKeys.assertEnabled(workspaceId);
+    return runInTransaction(async () => {
+      const note = await this.findNote(managerAccountId, noteDate, workspaceId);
+      if (!note) throw new HttpError(404, "Note not found");
+      const task = await this.taskKeys.resolveTask(workspaceId, input.taskKey);
+      if (task.deleted) throw new HttpError(410, "Task was deleted");
+      const type = input.type ?? "update";
+      const event = await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type, body: input.text, meta: { via: "notes_page" }, visibility: input.visibility ?? "private", requestId: input.requestId }, { type: "manager", accountId: managerAccountId });
+      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: task.taskKey, relation: "update_from", requestId: input.requestId, createdAt: nowIso() }).onConflictDoNothing();
+      await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "update_from" }, dedupeKey: `note:ref:${input.requestId}` }, { type: "system", accountId: managerAccountId });
+      return event;
+    });
+  }
+
+  async createTask(managerAccountId: string, noteDate: string, input: { title: string; developerAccountId?: string; jiraKey?: string; context?: string; requestId: string }, workspaceId: string) {
+    await this.taskKeys.assertEnabled(workspaceId);
+    return runInTransaction(async () => {
+      const note = await this.findNote(managerAccountId, noteDate, workspaceId);
+      if (!note) throw new HttpError(404, "Note not found");
+      const receipt = (await db.select().from(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, workspaceId), eq(dailyNoteTaskRefs.managerAccountId, managerAccountId), eq(dailyNoteTaskRefs.requestId, input.requestId))).limit(1))[0];
+      if (receipt) {
+        const existing = await this.taskKeys.resolveTask(workspaceId, receipt.taskKey);
+        if (receipt.relation !== "created_from" || existing.title !== input.title.trim() || existing.developer?.accountId !== input.developerAccountId) throw new HttpError(409, "requestId was already used with a different payload");
+        return existing;
+      }
+      const actor = { type: "manager" as const, accountId: managerAccountId };
+      const created = input.developerAccountId
+        ? await this.tracker.addItem(input.developerAccountId, todayIsoDate(), { title: input.title, jiraKey: input.jiraKey, source: "note", actor }, workspaceId)
+        : await this.managerDesk.createItem(managerAccountId, { date: todayIsoDate(), title: input.title, status: "inbox", source: "note", actor }, workspaceId);
+      const key = created.taskKey;
+      if (!key) throw new Error("Task key was not allocated");
+      if (input.context?.trim()) await this.eventsService.append({ workspaceId, taskKey: key, type: "update", body: input.context, meta: { via: "notes_page" }, visibility: "private" }, actor);
+      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: key, relation: "created_from", requestId: input.requestId, createdAt: nowIso() });
+      await this.eventsService.append({ workspaceId, taskKey: key, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
+      return this.taskKeys.resolveTask(workspaceId, key);
+    });
   }
 
   async createFollowUp(
@@ -532,6 +597,8 @@ export class DailyNotesService {
         status: "planned",
         priority: "medium",
         followUpAt: input.followUpAt,
+        source: "note",
+        actor: { type: "manager", accountId: managerAccountId },
       }, normalizedWorkspaceId);
 
       await db.insert(dailyNoteFollowUps).values({
@@ -543,6 +610,10 @@ export class DailyNotesService {
         payloadHash,
         createdAt: nowIso(),
       });
+      if (item.taskKey) {
+        await db.insert(dailyNoteTaskRefs).values({ workspaceId: normalizedWorkspaceId, managerAccountId, noteId: note.id, taskKey: item.taskKey, relation: "created_from", createdAt: nowIso() }).onConflictDoNothing();
+        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: item.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
+      }
 
       return {
         itemId: item.id,

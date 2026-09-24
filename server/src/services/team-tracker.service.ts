@@ -39,6 +39,7 @@ import {
   teamTrackerItems,
   teamTrackerCheckIns,
   teamTrackerSavedViews,
+  checkinTaskRefs,
 } from "../db/schema";
 import { getEffectiveDueDate } from "./issue-rules";
 import { HttpError } from "../middleware/errorHandler";
@@ -51,7 +52,10 @@ import {
   resolveUnsavedBoardQuery,
 } from "./team-tracker-board-query";
 import { normalizeWorkspaceId } from "./workspace.service";
-import { isoDatePart } from "../utils/date";
+import { isoDatePart, todayIsoDate } from "../utils/date";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskEventsService, type TaskEventActor, type TaskEventInput } from "./task-events.service";
+import { TASK_KEY_PATTERN } from "shared/types";
 
 interface TrackerSignalConfig {
   staleThresholdHours: number;
@@ -415,6 +419,8 @@ function mapItem(
     id: row.id,
     dayId: row.dayId,
     originDate: originDate ?? isoDatePart(row.createdAt) ?? "",
+    taskKey: row.taskKey,
+    ...(row.createdByType && { createdBy: { type: row.createdByType as NonNullable<TrackerWorkItem["createdBy"]>["type"], ...(row.createdById && { id: row.createdById }) } }),
     managerDeskItemId: row.managerDeskItemId ?? undefined,
     lifecycle: row.managerDeskItemId === null ? "tracker_only" : "manager_desk_linked",
     itemType: row.jiraKey ? "jira" : "custom",
@@ -448,15 +454,17 @@ function mapCheckIn(
     status: (row.status as TrackerDeveloperStatus | null) ?? undefined,
     rationale: row.rationale ?? undefined,
     nextFollowUpAt: row.nextFollowUpAt ?? undefined,
+    taskKeys: [],
   };
 }
 
 function mapAttentionActionItem(item: TrackerWorkItem): TrackerAttentionActionItem {
   return {
     id: item.id,
+    ...(item.taskKey && { taskKey: item.taskKey }),
     title: item.title,
     jiraKey: item.jiraKey,
-    relatedIssueKeys: item.relatedIssueKeys,
+    ...(item.relatedIssueKeys && { relatedIssueKeys: item.relatedIssueKeys }),
     lifecycle: item.lifecycle,
   };
 }
@@ -501,9 +509,10 @@ function buildCarryForwardKey(
 function buildLiveWorkspaceItemKey(
   item: Pick<
     typeof teamTrackerItems.$inferSelect,
-    "managerDeskItemId" | "jiraKey" | "relatedJiraKeys" | "title"
+    "managerDeskItemId" | "taskKey" | "jiraKey" | "relatedJiraKeys" | "title"
   >
 ): string {
+  if (item.taskKey) return `task:${item.taskKey}`;
   if (item.managerDeskItemId !== null) {
     return `manager_desk:${item.managerDeskItemId}`;
   }
@@ -934,6 +943,35 @@ export class TeamTrackerService {
     private readonly availability = new DeveloperAvailabilityService()
   ) {}
 
+  private readonly taskKeys = new TaskKeysService();
+  private readonly eventsService = new TaskEventsService(this.taskKeys);
+
+  private async emit(row: { taskKey: string | null; workspaceId: string; id: number }, event: Omit<TaskEventInput, "taskKey" | "workspaceId">, actor: TaskEventActor = { type: "system" }): Promise<void> {
+    if (row.taskKey && await this.taskKeys.enabled(row.workspaceId)) await this.eventsService.append({ ...event, taskKey: row.taskKey, workspaceId: row.workspaceId, sourceTable: "team_tracker_items", sourceId: row.id } as TaskEventInput, actor);
+  }
+
+  private async decorateDayEvents(days: TrackerDeveloperDay[], viewer: { kind: "manager" | "developer"; accountId: string; workspaceId: string }): Promise<void> {
+    if (!(await this.taskKeys.enabled(viewer.workspaceId))) return;
+    const items = days.flatMap((day) => [day.currentItem, ...day.plannedItems, ...day.completedItems, ...day.droppedItems]).filter((item): item is TrackerWorkItem => Boolean(item));
+    const keys = [...new Set(items.map((item) => item.taskKey).filter((key): key is string => Boolean(key)))];
+    const summaries = await this.eventsService.latestForKeys(keys, viewer);
+    const origins = keys.length ? await db.select({ taskKey: teamTrackerItems.taskKey, createdAt: teamTrackerItems.createdAt }).from(teamTrackerItems).where(and(eq(teamTrackerItems.workspaceId, viewer.workspaceId), inArray(teamTrackerItems.taskKey, keys))) : [];
+    const firstByKey = new Map<string, string>();
+    for (const row of origins) if (row.taskKey && (!firstByKey.has(row.taskKey) || row.createdAt < firstByKey.get(row.taskKey)!)) firstByKey.set(row.taskKey, row.createdAt);
+    const now = todayIsoDate();
+    for (const item of items) if (item.taskKey) {
+      item.latestEvent = summaries.get(item.taskKey);
+      const first = firstByKey.get(item.taskKey);
+      if (first) item.ageDays = Math.max(0, Math.round((Date.parse(`${now}T12:00:00Z`) - Date.parse(`${todayIsoDate(new Date(first))}T12:00:00Z`)) / 86400000));
+    }
+    const checkIns = days.flatMap((day) => [...day.checkIns, ...day.recentCheckIns]);
+    const ids = [...new Set(checkIns.map((checkIn) => checkIn.id))];
+    if (ids.length) {
+      const refs = await db.select().from(checkinTaskRefs).where(and(eq(checkinTaskRefs.workspaceId, viewer.workspaceId), inArray(checkinTaskRefs.checkinId, ids)));
+      for (const checkIn of checkIns) checkIn.taskKeys = refs.filter((ref) => ref.checkinId === checkIn.id).map((ref) => ref.taskKey);
+    }
+  }
+
   async getBoard(
     date: string,
     options?: {
@@ -982,6 +1020,7 @@ export class TeamTrackerService {
           )
         )
       : await this.buildLiveDeveloperDays(date, activeDevelopers, signalConfig, workspaceId);
+    await this.decorateDayEvents(devDays, { kind: "manager", accountId: options?.managerAccountId ?? "", workspaceId });
 
     const summary = this.computeSummary(devDays);
     const normalizedQuery = query.q.toLowerCase();
@@ -1192,7 +1231,7 @@ export class TeamTrackerService {
   async getDeveloperDayView(
     date: string,
     developerAccountId: string,
-    options?: { includeManagerNotes?: boolean },
+    options: { viewer: { kind: "manager" | "developer"; accountId: string } },
     workspaceId?: string
   ): Promise<DeveloperDayView> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
@@ -1218,11 +1257,12 @@ export class TeamTrackerService {
             signalConfig,
             normalizedWorkspaceId
           );
+    await this.decorateDayEvents([day], { ...options.viewer, workspaceId: normalizedWorkspaceId });
 
     return {
       viewMode,
       day:
-        options?.includeManagerNotes === false
+        options.viewer.kind === "developer"
           ? {
               ...day,
               managerNotes: undefined,
@@ -1351,9 +1391,12 @@ export class TeamTrackerService {
       title: string;
       note?: string;
       managerDeskItemId?: number;
+      actor?: TaskEventActor;
+      source?: "tracker" | "my_day" | "note" | "copilot" | "today";
     },
     workspaceId?: string
   ): Promise<TrackerWorkItem> {
+    return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await this.availability.assertAvailableForDate(accountId, date, normalizedWorkspaceId);
     const day = await this.ensureDay(date, accountId, normalizedWorkspaceId);
@@ -1374,12 +1417,19 @@ export class TeamTrackerService {
     );
 
     const now = nowIso();
+    const desk = params.managerDeskItemId ? (await db.select({ taskKey: managerDeskItems.taskKey }).from(managerDeskItems).where(and(eq(managerDeskItems.workspaceId, normalizedWorkspaceId), eq(managerDeskItems.id, params.managerDeskItemId))).limit(1))[0] : undefined;
+    if (params.managerDeskItemId && !desk) throw new HttpError(404, "Manager Desk item not found");
+    const taskKey = await this.taskKeys.enabled(normalizedWorkspaceId) ? desk?.taskKey ?? this.taskKeys.allocate(normalizedWorkspaceId) : null;
+    const actor = params.actor ?? { type: "system" as const };
     const inserted = await db
       .insert(teamTrackerItems)
       .values({
         workspaceId: normalizedWorkspaceId,
         dayId: day.id,
         managerDeskItemId: params.managerDeskItemId ?? null,
+        taskKey,
+        createdByType: params.source === "note" || params.source === "today" ? params.source : params.actor?.type ?? "unknown",
+        createdById: params.actor?.accountId ?? null,
         itemType: jiraKey ? "jira" : "custom",
         jiraKey: jiraKey ?? null,
         relatedJiraKeys: serializeRelatedIssueKeys(relatedIssueKeys),
@@ -1392,7 +1442,10 @@ export class TeamTrackerService {
       })
       .returning();
 
+    await this.emit(inserted[0]!, { type: "created", body: null, meta: { source: params.source ?? "tracker", ownerType: "developer", ownerId: accountId, title: params.title, ...(allIssueKeys.length && { jiraKeys: allIssueKeys }) } }, { type: "system", accountId: actor.accountId });
+    if (params.note?.trim()) await this.emit(inserted[0]!, { type: "update", body: params.note, meta: { via: "note_field" } }, actor);
     return this.getItemById(inserted[0]!.id, normalizedWorkspaceId);
+    });
   }
 
   async syncManagerDeskItem(params: {
@@ -1409,6 +1462,7 @@ export class TeamTrackerService {
     return runInTransaction(async () => {
     const workspaceId = normalizeWorkspaceId(params.workspaceId);
     const existing = await this.getManagerDeskTrackerItem(params.managerDeskItemId, workspaceId);
+    const desk = (await db.select({ taskKey: managerDeskItems.taskKey }).from(managerDeskItems).where(and(eq(managerDeskItems.workspaceId, workspaceId), eq(managerDeskItems.id, params.managerDeskItemId))).limit(1))[0];
 
     if (params.outcome) {
       if (!existing) {
@@ -1428,6 +1482,7 @@ export class TeamTrackerService {
           .update(teamTrackerItems)
           .set(setFields)
           .where(eq(teamTrackerItems.id, existing.id));
+        await this.emit(existing, { type: "status", body: null, meta: { domain: "tracker_state", from: existing.state, to: nextState, reason: "desk_sync" } });
       }
       return;
     }
@@ -1438,6 +1493,7 @@ export class TeamTrackerService {
           .update(teamTrackerItems)
           .set({ state: "dropped", updatedAt: nowIso() })
           .where(eq(teamTrackerItems.id, existing.id));
+        if (existing.state !== "dropped") await this.emit(existing, { type: "status", body: null, meta: { domain: "tracker_state", from: existing.state, to: "dropped", reason: "desk_sync" } });
       }
       return;
     }
@@ -1461,7 +1517,9 @@ export class TeamTrackerService {
         workspaceId
       );
       const now = nowIso();
+      const oldDay = await this.getDayById(existing.dayId, workspaceId);
       const setFields: Record<string, unknown> = {
+        taskKey: desk?.taskKey ?? existing.taskKey,
         itemType: jiraKey ? "jira" : "custom",
         jiraKey: jiraKey ?? null,
         relatedJiraKeys: serializeRelatedIssueKeys(relatedIssueKeys),
@@ -1488,6 +1546,12 @@ export class TeamTrackerService {
         .update(teamTrackerItems)
         .set(setFields)
         .where(eq(teamTrackerItems.id, existing.id));
+      const keyed = { ...existing, taskKey: desk?.taskKey ?? existing.taskKey };
+      const resetTo = setFields.state !== undefined && setFields.state !== existing.state ? String(setFields.state) : null;
+      if (oldDay?.developerAccountId !== params.assigneeDeveloperAccountId) await this.emit(keyed, { type: "assign", body: null, meta: { fromType: "developer", fromId: oldDay?.developerAccountId ?? null, toType: "developer", toId: params.assigneeDeveloperAccountId, ...(resetTo && { stateReset: { from: existing.state, to: resetTo } }) } });
+      if (oldDay?.date !== params.date) await this.emit(keyed, { type: "schedule", body: null, meta: { field: "day", from: oldDay?.date ?? null, to: params.date, via: "reschedule" } });
+      if (existing.title !== params.title) await this.emit(keyed, { type: "title", body: null, meta: { from: existing.title, to: params.title } });
+      if (setFields.state && setFields.state !== existing.state) await this.emit(keyed, { type: "status", body: null, meta: { domain: "tracker_state", from: existing.state, to: String(setFields.state), reason: "desk_sync" } });
       return;
     }
 
@@ -1539,7 +1603,8 @@ export class TeamTrackerService {
       note?: string | null;
       position?: number;
     },
-    workspaceId?: string
+    workspaceId?: string,
+    actor: TaskEventActor = { type: "system" }
   ): Promise<TrackerWorkItem> {
     return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
@@ -1602,8 +1667,46 @@ export class TeamTrackerService {
     if (linkedManagerDeskItemIds.size > 0) {
       await this.touchManagerDeskItems([...linkedManagerDeskItemIds], now);
     }
+    if (updates.title !== undefined && updates.title !== existing.title) await this.emit(existing, { type: "title", body: null, meta: { from: existing.title, to: updates.title } }, { type: "system", accountId: actor.accountId });
+    if (updates.note?.trim() && updates.note !== existing.note) await this.emit(existing, { type: "update", body: updates.note, meta: { via: "note_field" } }, actor);
+    if (updates.state !== undefined && updates.state !== existing.state) {
+      await this.emit(existing, { type: "status", body: null, meta: { domain: "tracker_state", from: existing.state, to: updates.state, reason: "user" } }, { type: "system", accountId: actor.accountId });
+      if (updates.state === "in_progress") {
+        const day = await this.getDayById(existing.dayId, normalizedWorkspaceId);
+        if (day) await this.emit(existing, { type: "focus", body: null, meta: { action: "set_current", date: day.date } }, { type: "system", accountId: actor.accountId });
+      }
+    }
 
     return this.getItemById(itemId, normalizedWorkspaceId);
+    });
+  }
+
+  async reassignItem(itemId: number, toAccountId: string, date: string, requestId: string, workspaceId?: string, actorId?: string): Promise<TrackerWorkItem> {
+    return runInTransaction(async () => {
+      const scope = normalizeWorkspaceId(workspaceId);
+      await this.taskKeys.assertEnabled(scope);
+      const item = await this.getItemRow(itemId, scope);
+      const replay = await this.eventsService.getByRequestId(requestId, { kind: "manager", accountId: actorId ?? "", workspaceId: scope });
+      if (replay) {
+        const day = await this.getDayById(item.dayId, scope);
+        if (replay.sourceId !== itemId || replay.event.taskKey !== item.taskKey || !(["assign", "schedule"] as string[]).includes(replay.event.type) || day?.developerAccountId !== toAccountId || day.date !== date) throw new HttpError(409, "requestId was already used with a different payload");
+        return this.getItemById(itemId, scope);
+      }
+      if (item.managerDeskItemId !== null) throw new HttpError(409, "Reassign delegated tasks from Manager Desk");
+      if (item.state === "done" || item.state === "dropped") throw new HttpError(409, "Reopen closed work before reassigning");
+      await this.availability.assertAvailableForDate(toAccountId, date, scope);
+      const oldDay = await this.getDayById(item.dayId, scope);
+      if (!oldDay) throw new HttpError(404, "Tracker day not found");
+      if (oldDay.developerAccountId === toAccountId && oldDay.date === date) return this.getItemById(itemId, scope);
+      const day = await this.ensureDay(date, toAccountId, scope);
+      const siblings = await db.select({ position: teamTrackerItems.position }).from(teamTrackerItems).where(eq(teamTrackerItems.dayId, day.id));
+      const position = siblings.reduce((max, sibling) => Math.max(max, sibling.position), -1) + 1;
+      const state = item.state === "in_progress" ? "planned" : item.state;
+      await db.update(teamTrackerItems).set({ dayId: day.id, position, state, updatedAt: nowIso() }).where(eq(teamTrackerItems.id, itemId));
+      if (oldDay.developerAccountId !== toAccountId) await this.emit(item, { type: "assign", body: null, meta: { fromType: "developer", fromId: oldDay.developerAccountId, toType: "developer", toId: toAccountId, ...(state !== item.state && { stateReset: { from: item.state, to: state } }) }, requestId }, { type: "system", accountId: actorId });
+      if (oldDay.date !== date) await this.emit(item, { type: "schedule", body: null, meta: { field: "day", from: oldDay.date, to: date, via: "reassign" }, ...((oldDay.developerAccountId === toAccountId) && { requestId }) }, { type: "system", accountId: actorId });
+      if (state !== item.state) await this.emit(item, { type: "status", body: null, meta: { domain: "tracker_state", from: item.state, to: state, reason: "reassigned" } }, { type: "system", accountId: actorId });
+      return this.getItemById(itemId, scope);
     });
   }
 
@@ -1621,6 +1724,7 @@ export class TeamTrackerService {
       );
     }
 
+    await this.emit(existing, { type: "status", body: null, meta: { domain: "tracker_state", from: existing.state, to: "deleted", reason: "user" } });
     await db
       .delete(teamTrackerItems)
       .where(eq(teamTrackerItems.id, itemId));
@@ -1656,6 +1760,8 @@ export class TeamTrackerService {
       .limit(1);
 
     if (!updated[0]) throw new Error("Item not found after update");
+    if (item.state !== "in_progress") await this.emit(item, { type: "status", body: null, meta: { domain: "tracker_state", from: item.state, to: "in_progress", reason: "user" } });
+    await this.emit(item, { type: "focus", body: null, meta: { action: "set_current", date: day.date } });
     return this.getItemById(updated[0].id, normalizedWorkspaceId);
     });
   }
@@ -1668,6 +1774,7 @@ export class TeamTrackerService {
       status?: TrackerDeveloperStatus;
       rationale?: string;
       nextFollowUpAt?: string | null;
+      taskKeys?: string[];
     },
     actor?: {
       type: UserRole;
@@ -1675,6 +1782,7 @@ export class TeamTrackerService {
     },
     workspaceId?: string
   ): Promise<TrackerCheckIn> {
+    return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await this.availability.assertAvailableForDate(accountId, date, normalizedWorkspaceId);
     const day = await this.ensureDay(date, accountId, normalizedWorkspaceId);
@@ -1721,7 +1829,38 @@ export class TeamTrackerService {
       .set(dayUpdates)
       .where(eq(teamTrackerDays.id, day.id));
 
-    return mapCheckIn(checkInRow);
+    const taskKeys = new Set<string>();
+    if (await this.taskKeys.enabled(normalizedWorkspaceId)) {
+      for (const raw of params.taskKeys ?? []) {
+        if (!TASK_KEY_PATTERN.test(raw)) throw new HttpError(400, "Invalid task key");
+        const key = await this.taskKeys.resolve(normalizedWorkspaceId, raw);
+        if (!key) throw new HttpError(400, "Unknown task key");
+        try {
+          const task = await this.taskKeys.resolveTask(normalizedWorkspaceId, key);
+          if (task.deleted) throw new HttpError(400, "Deleted task key");
+          if (actor?.type === "developer") await this.eventsService.list(key, { kind: "developer", accountId, workspaceId: normalizedWorkspaceId }, { limit: 1 });
+        } catch {
+          throw new HttpError(400, "Unknown or unowned task key");
+        }
+        taskKeys.add(key);
+      }
+      for (const match of summary.matchAll(/\bT-\d{1,9}\b/gi)) {
+        const key = await this.taskKeys.resolve(normalizedWorkspaceId, match[0]);
+        if (!key || taskKeys.has(key)) continue;
+        try {
+          const task = await this.taskKeys.resolveTask(normalizedWorkspaceId, key);
+          if (task.deleted) continue;
+          if (actor?.type === "developer") await this.eventsService.list(key, { kind: "developer", accountId, workspaceId: normalizedWorkspaceId }, { limit: 1 });
+          taskKeys.add(key);
+        } catch { continue; }
+      }
+      for (const key of taskKeys) {
+        await db.insert(checkinTaskRefs).values({ workspaceId: normalizedWorkspaceId, checkinId: checkInRow.id, taskKey: key, createdAt: now });
+        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: key, type: "checkin_ref", body: null, meta: { checkInId: checkInRow.id, date, developerAccountId: accountId, excerpt: summary.slice(0, 200) }, sourceTable: "team_tracker_checkins", sourceId: checkInRow.id }, { type: actor?.type === "developer" ? "developer" : "manager", accountId: actor?.accountId });
+      }
+    }
+    return { ...mapCheckIn(checkInRow), taskKeys: [...taskKeys] };
+    });
   }
 
   async recordStatusUpdate(
@@ -1732,6 +1871,7 @@ export class TeamTrackerService {
       rationale?: string;
       summary?: string;
       nextFollowUpAt?: string | null;
+      taskKey?: string;
     },
     actor?: {
       type: UserRole;
@@ -1739,18 +1879,21 @@ export class TeamTrackerService {
     },
     workspaceId?: string
   ): Promise<TrackerDeveloperDay> {
+    return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const rationale = normalizeOptionalText(params.rationale);
     const summary = normalizeOptionalText(params.summary);
 
-    if (requiresStatusRationale(params.status) && !rationale) {
+    if ((requiresStatusRationale(params.status) || (params.taskKey && params.status === "waiting")) && !rationale) {
       throw new HttpError(
         400,
-        "rationale is required when status is blocked or at_risk"
+        params.status === "waiting" ? "rationale is required for a waiting task blocker" : "rationale is required when status is blocked or at_risk"
       );
     }
 
-    await this.addCheckIn(
+    const resolution = params.taskKey ? await this.taskKeys.resolveTask(normalizedWorkspaceId, params.taskKey) : null;
+    if (resolution && resolution.developer?.accountId !== accountId) throw new HttpError(400, "Task is not owned by this developer");
+    const checkIn = await this.addCheckIn(
       accountId,
       date,
       {
@@ -1762,12 +1905,20 @@ export class TeamTrackerService {
         status: params.status,
         rationale,
         nextFollowUpAt: params.nextFollowUpAt ?? null,
+        taskKeys: resolution ? [resolution.taskKey] : undefined,
       },
       actor,
       normalizedWorkspaceId
     );
-
+    if (resolution) {
+      const raising = (["blocked", "at_risk", "waiting"] as string[]).includes(params.status);
+      const latest = raising ? null : await this.eventsService.latestOfType(resolution.taskKey, "blocker", { kind: "manager", accountId: actor?.accountId ?? "", workspaceId: normalizedWorkspaceId });
+      if (raising || (latest?.meta && typeof latest.meta === "object" && "action" in latest.meta && latest.meta.action === "raised")) {
+        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: resolution.taskKey, type: "blocker", body: raising ? rationale! : null, meta: { action: raising ? "raised" : "cleared", ...(raising && { developerDayStatus: params.status }), checkInId: checkIn.id } }, { type: "system", accountId: actor?.accountId });
+      }
+    }
     return this.getDeveloperDay(date, accountId, undefined, normalizedWorkspaceId);
+    });
   }
 
   async assertItemBelongsToDeveloper(
@@ -3313,10 +3464,7 @@ export class TeamTrackerService {
         )
       );
     const currentRows = await db
-      .select({
-        id: teamTrackerItems.id,
-        managerDeskItemId: teamTrackerItems.managerDeskItemId,
-      })
+      .select({ item: teamTrackerItems, date: teamTrackerDays.date })
       .from(teamTrackerItems)
       .innerJoin(teamTrackerDays, eq(teamTrackerItems.dayId, teamTrackerDays.id))
       .where(
@@ -3326,18 +3474,22 @@ export class TeamTrackerService {
           eq(teamTrackerItems.state, "in_progress")
         )
       );
-    if (options.ifNoCurrent && currentRows.some((row) => row.id !== itemId)) {
+    if (options.ifNoCurrent && currentRows.some((row) => row.item.id !== itemId)) {
       throw new HttpError(409, "Current work changed. Refresh Today before setting current work.");
     }
 
     const staleCurrentIds = currentRows
-      .map((row) => row.id)
+      .map((row) => row.item.id)
       .filter((id) => id !== itemId);
     if (staleCurrentIds.length > 0) {
       await db
         .update(teamTrackerItems)
         .set({ state: "planned", updatedAt: now })
         .where(inArray(teamTrackerItems.id, staleCurrentIds));
+      for (const row of currentRows.filter((current) => current.item.id !== itemId)) {
+        await this.emit(row.item, { type: "status", body: null, meta: { domain: "tracker_state", from: "in_progress", to: "planned", reason: "single_current" } });
+        await this.emit(row.item, { type: "focus", body: null, meta: { action: "unset_current", date: row.date } });
+      }
     }
 
     await db
@@ -3345,7 +3497,7 @@ export class TeamTrackerService {
       .set({ state: "in_progress", updatedAt: now, completedAt: null })
       .where(eq(teamTrackerItems.id, itemId));
 
-    return [...currentRows, ...affectedRows]
+    return [...currentRows.map((row) => row.item), ...affectedRows]
       .map((row) => row.managerDeskItemId)
       .filter((managerDeskItemId): managerDeskItemId is number => managerDeskItemId !== null);
   }

@@ -173,6 +173,12 @@ const updateItemSchema = z.object({
   query: z.any().optional(),
 });
 
+const reassignItemSchema = z.object({
+  params: z.object({ itemId: z.string().regex(/^\d+$/) }),
+  body: z.object({ toAccountId: z.string().min(1), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), requestId: z.string().uuid() }),
+  query: z.any().optional(),
+});
+
 const deleteItemSchema = z.object({
   params: z.object({
     itemId: z.string().regex(/^\d+$/, "Invalid item id"),
@@ -199,6 +205,7 @@ const addCheckInSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     summary: z.string().trim().min(1).max(2000),
     status: trackerStatusSchema.optional(),
+    taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
   }),
   query: z.any().optional(),
 });
@@ -214,6 +221,7 @@ const statusUpdateSchema = z
       rationale: z.string().trim().max(2000).optional(),
       summary: z.string().trim().max(2000).optional(),
       nextFollowUpAt: isoDateTimeSchema.nullable().optional(),
+      taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
     }),
     query: z.any().optional(),
   })
@@ -401,6 +409,7 @@ export function createTeamTrackerRouter(
           relatedIssueKeys,
           title,
           note,
+          actor: { type: "manager", accountId: req.auth!.user.accountId },
         }, req.auth!.user.workspaceId);
         res.status(201).json(item);
       } catch (error) {
@@ -416,13 +425,19 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const itemId = parseInt(req.params.itemId as string, 10);
-        const item = await trackerService.updateItem(itemId, req.body, req.auth!.user.workspaceId);
+        const item = await trackerService.updateItem(itemId, req.body, req.auth!.user.workspaceId, { type: "manager", accountId: req.auth!.user.accountId });
         res.json(item);
       } catch (error) {
         next(error);
       }
     }
   );
+
+  router.post("/items/:itemId/reassign", validate(reassignItemSchema), async (req, res, next) => {
+    try {
+      res.json(await trackerService.reassignItem(Number(req.params.itemId), req.body.toAccountId, req.body.date, req.body.requestId, req.auth!.user.workspaceId, req.auth!.user.accountId));
+    } catch (error) { next(error); }
+  });
 
   // DELETE /api/team-tracker/items/:itemId
   router.delete(
@@ -463,10 +478,11 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, summary, status } = req.body;
+        const { date, summary, status, taskKeys } = req.body;
         const checkIn = await trackerService.addCheckIn(accountId, date, {
           summary,
           status,
+          taskKeys,
         }, {
           type: req.auth?.user.role ?? "manager",
           accountId: req.auth?.user.accountId,
@@ -484,7 +500,7 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, status, rationale, summary, nextFollowUpAt } = req.body;
+        const { date, status, rationale, summary, nextFollowUpAt, taskKey } = req.body;
         const day = await trackerService.recordStatusUpdate(
           accountId,
           date,
@@ -493,6 +509,7 @@ export function createTeamTrackerRouter(
             rationale,
             summary,
             nextFollowUpAt,
+            taskKey,
           },
           {
             type: req.auth?.user.role ?? "manager",

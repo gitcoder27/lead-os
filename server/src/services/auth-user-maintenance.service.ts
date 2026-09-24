@@ -16,6 +16,7 @@ import {
 } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { TaskEventsService } from "./task-events.service";
 
 export type DeletableAuthUserRole = Extract<UserRole, "manager" | "developer">;
 
@@ -35,6 +36,7 @@ export interface AuthUserDeletionPrivateDataPreview {
   managerDeskLinkCount: number;
   managerDeskHistoryCount: number;
   linkedTrackerItemCount: number;
+  privateTaskEventCount: number;
 }
 
 export interface AuthUserDeletionPreview {
@@ -70,10 +72,13 @@ function emptyPrivateDataPreview(): AuthUserDeletionPrivateDataPreview {
     managerDeskLinkCount: 0,
     managerDeskHistoryCount: 0,
     linkedTrackerItemCount: 0,
+    privateTaskEventCount: 0,
   };
 }
 
 export class AuthUserMaintenanceService {
+  private readonly eventsService = new TaskEventsService();
+
   async getDeletionPreview(params: DeleteUserParams): Promise<AuthUserDeletionPreview> {
     const user = await this.getActiveUser(params.username, params.workspaceId);
     if (user.role !== params.role) {
@@ -210,12 +215,13 @@ export class AuthUserMaintenanceService {
       alertDismissalCount: alertRows.length,
       teamTrackerSavedViewCount: savedViewRows.length,
       ...managerDesk,
+      privateTaskEventCount: await this.eventsService.countPrivateForAuthor(user.workspaceId, user.username),
     };
   }
 
   private async getManagerDeskPrivateDataPreview(
     user: PersistedAuthUser
-  ): Promise<Omit<AuthUserDeletionPrivateDataPreview, "sessionCount" | "alertDismissalCount" | "teamTrackerSavedViewCount">> {
+  ): Promise<Omit<AuthUserDeletionPrivateDataPreview, "sessionCount" | "alertDismissalCount" | "teamTrackerSavedViewCount" | "privateTaskEventCount">> {
     const dayRows = await db
       .select({ id: managerDeskDays.id })
       .from(managerDeskDays)
@@ -274,6 +280,7 @@ export class AuthUserMaintenanceService {
     if (user.role !== "manager") {
       return;
     }
+    await this.eventsService.deletePrivateForAuthor(user.workspaceId, user.username);
 
     const dayRows = await db
       .select({ id: managerDeskDays.id })
@@ -303,5 +310,6 @@ export class AuthUserMaintenanceService {
       .delete(managerDeskItemHistory)
       .where(and(eq(managerDeskItemHistory.workspaceId, user.workspaceId), eq(managerDeskItemHistory.managerAccountId, user.username)));
     await db.delete(managerDeskDays).where(inArray(managerDeskDays.id, dayIds));
+    await this.eventsService.pruneOrphans(user.workspaceId);
   }
 }

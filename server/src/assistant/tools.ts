@@ -13,6 +13,8 @@ import type { SettingsService } from "../services/settings.service";
 import type { TagService } from "../services/tag.service";
 import type { TeamTrackerService } from "../services/team-tracker.service";
 import type { TodayService } from "../services/today.service";
+import { TaskKeysService } from "../services/task-keys.service";
+import { TaskEventsService } from "../services/task-events.service";
 import type { WorkSavedViewsService } from "../services/work-saved-views.service";
 import type { WorkloadService } from "../services/workload.service";
 import type { SyncEngine } from "../sync/engine";
@@ -172,7 +174,21 @@ function dateProperty(description: string): Record<string, unknown> {
 }
 
 export function createAssistantTools(): AssistantToolDefinition[] {
+  const taskKeys = new TaskKeysService();
+  const eventsService = new TaskEventsService(taskKeys);
   const readTools: AssistantToolDefinition[] = [
+    {
+      name: "get_task",
+      description: "Resolve a task key and read its latest manager-visible timeline events. Private updates from other managers are not available.",
+      parameters: { type: "object", properties: { taskKey: { type: "string" } }, required: ["taskKey"], additionalProperties: false },
+      confirm: "never", invalidate: [], label: () => "Reading task…", summarize: (args) => `Read ${String(args.taskKey)}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ taskKey: z.string().regex(/^[Tt]-\d{1,9}$/) }), rawArgs);
+        const task = await taskKeys.resolveTask(ctx.workspaceId, args.taskKey);
+        const timeline = await eventsService.list(task.taskKey, { kind: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }, { limit: 10 });
+        return { result: compact({ task, events: timeline.events }), summary: `Loaded ${task.taskKey}` };
+      },
+    },
     {
       name: "get_today_snapshot",
       description:
@@ -305,7 +321,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
         const view = await ctx.services.teamTrackerService.getDeveloperDayView(
           date,
           args.accountId,
-          undefined,
+          { viewer: { kind: "manager", accountId: ctx.managerAccountId } },
           ctx.workspaceId
         );
         const projectItem = (item: {
@@ -698,7 +714,8 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           args.itemId,
           ctx.workspaceId
         );
-        return { result: compact(detail), summary: `Loaded desk item #${args.itemId}` };
+        const events = detail.item.taskKey ? (await eventsService.list(detail.item.taskKey, { kind: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }, { limit: 10 })).events : [];
+        return { result: compact({ ...detail, events }), summary: `Loaded desk item #${args.itemId}` };
       },
     },
     {
@@ -722,7 +739,8 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           args.itemId,
           ctx.workspaceId
         );
-        return { result: compact(detail), summary: `Loaded tracker item #${args.itemId}` };
+        const events = detail.trackerItem.taskKey ? (await eventsService.list(detail.trackerItem.taskKey, { kind: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }, { limit: 10 })).events : [];
+        return { result: compact({ ...detail, events }), summary: `Loaded tracker item #${args.itemId}` };
       },
     },
     {
@@ -925,6 +943,24 @@ export function createAssistantTools(): AssistantToolDefinition[] {
 
   const writeTools: AssistantToolDefinition[] = [
     {
+      name: "add_task_update",
+      description: "Append a manager-authored update, instruction, decision, or blocker to a task key, optionally private to the author.",
+      parameters: { type: "object", properties: { taskKey: { type: "string" }, type: { type: "string", enum: ["update", "instruction", "decision", "blocker"] }, body: { type: "string" }, visibility: { type: "string", enum: ["shared", "private"] }, blockerAction: { type: "string", enum: ["raised", "cleared"] } }, required: ["taskKey", "type", "body"], additionalProperties: false },
+      confirm: "always", invalidate: ["today", "team-tracker", "manager-desk", "tasks"], label: () => "Adding task update…", summarize: (args) => `Add ${String(args.type)} to ${String(args.taskKey)}`,
+      execute: async (rawArgs, ctx) => {
+        const args = parseArgs(z.object({ taskKey: z.string().regex(/^[Tt]-\d{1,9}$/), type: z.enum(["update", "instruction", "decision", "blocker"]), body: z.string().trim().min(1).max(4000), visibility: z.enum(["shared", "private"]).optional(), blockerAction: z.enum(["raised", "cleared"]).optional() }), rawArgs);
+        const task = await taskKeys.resolveTask(ctx.workspaceId, args.taskKey);
+        if (task.deleted) throw new HttpError(410, "Task was deleted");
+        if (args.type === "blocker" && !args.blockerAction) throw new HttpError(400, "blockerAction is required");
+        const common = { workspaceId: ctx.workspaceId, taskKey: task.taskKey, body: args.body, visibility: args.visibility, requestId: ctx.toolCallId ?? randomUUID() };
+        const actor = { type: "copilot" as const, accountId: ctx.managerAccountId };
+        const event = args.type === "blocker"
+          ? await eventsService.append({ ...common, type: "blocker", meta: { action: args.blockerAction! } }, actor)
+          : await eventsService.append({ ...common, type: args.type, meta: { via: "copilot" } }, actor);
+        return { result: compact(event), summary: `Updated ${task.taskKey}` };
+      },
+    },
+    {
       name: "manager_action",
       description:
         "Run a Today command: add_check_in, set_current_work, mark_done, carry_forward, capture_follow_up, capture_meeting_outcome, or snooze against a Today action target. To give a developer a task, use assign_tracker_task instead.",
@@ -960,6 +996,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
               developerAccountId: { type: "string" },
               managerDeskItemId: { type: "integer" },
               trackerItemId: { type: "integer" },
+              taskKey: { type: "string" },
               date: dateProperty("YYYY-MM-DD"),
               filter: { type: "string", enum: filterTypeSchema.options },
             },
@@ -970,6 +1007,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           outcome: { type: "string" },
           preset: { type: "string", enum: ["later_today", "tomorrow", "next_week"] },
           summary: { type: "string", description: "Check-in text for add_check_in" },
+          taskKeys: { type: "array", items: { type: "string" }, description: "Referenced task keys for add_check_in" },
           date: dateProperty("YYYY-MM-DD; defaults to today"),
         },
         required: ["kind", "target"],
@@ -1000,6 +1038,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
               developerAccountId: z.string().optional(),
               managerDeskItemId: z.number().int().optional(),
               trackerItemId: z.number().int().optional(),
+              taskKey: z.string().regex(/^[Tt]-\d{1,9}$/).optional(),
               date: dateSchema.optional(),
               filter: filterTypeSchema.optional(),
             }),
@@ -1007,6 +1046,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
             outcome: z.string().optional(),
             preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),
             summary: z.string().optional(),
+            taskKeys: z.array(z.string().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
             date: dateSchema.optional(),
           }),
           rawArgs
@@ -1021,6 +1061,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
             outcome: args.outcome,
             preset: args.preset,
             summary: args.summary,
+            taskKeys: args.taskKeys,
           },
           ctx.actor,
           ctx.workspaceId
@@ -1089,6 +1130,8 @@ export function createAssistantTools(): AssistantToolDefinition[] {
             followUpAt: args.followUpAt,
             participants: args.participants,
             links: args.issueKeys?.map((issueKey) => ({ linkType: "issue" as const, issueKey })),
+            actor: { type: "copilot", accountId: ctx.managerAccountId },
+            source: "copilot",
           },
           ctx.workspaceId
         );
@@ -1151,7 +1194,8 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           ctx.managerAccountId,
           itemId,
           updates,
-          ctx.workspaceId
+          ctx.workspaceId,
+          { type: "copilot", accountId: ctx.managerAccountId }
         );
         return {
           result: compact({ id: item.id, title: item.title, status: item.status }),
@@ -1194,7 +1238,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
         const item = await ctx.services.teamTrackerService.addItem(
           args.accountId,
           args.date ?? ctx.date,
-          { title: args.title, jiraKey: args.jiraKey, note: args.note },
+          { title: args.title, jiraKey: args.jiraKey, note: args.note, source: "copilot", actor: { type: "copilot", accountId: ctx.managerAccountId } },
           ctx.workspaceId
         );
         return {
@@ -1363,7 +1407,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           rawArgs
         );
         const { itemId, ...updates } = args;
-        const item = await ctx.services.teamTrackerService.updateItem(itemId, updates, ctx.workspaceId);
+        const item = await ctx.services.teamTrackerService.updateItem(itemId, updates, ctx.workspaceId, { type: "copilot", accountId: ctx.managerAccountId });
         return {
           result: compact({ id: item.id, title: item.title, state: item.state }),
           summary: `Updated tracker item #${item.id}`,
@@ -1483,6 +1527,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
           rationale: { type: "string", description: "Required when status is blocked or at_risk" },
           summary: { type: "string" },
           nextFollowUpAt: { type: ["string", "null"], description: "ISO datetime for the next follow-up" },
+          taskKey: { type: "string", description: "Optional task key for a blocker update" },
         },
         required: ["accountId", "status"],
         additionalProperties: false,
@@ -1500,6 +1545,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
             rationale: z.string().trim().max(2000).optional(),
             summary: z.string().trim().max(2000).optional(),
             nextFollowUpAt: z.string().nullable().optional(),
+            taskKey: z.string().regex(/^[Tt]-\d{1,9}$/).optional(),
           }),
           rawArgs
         );
@@ -1511,6 +1557,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
             rationale: args.rationale,
             summary: args.summary,
             nextFollowUpAt: args.nextFollowUpAt ?? undefined,
+            taskKey: args.taskKey,
           },
           ctx.actor,
           ctx.workspaceId

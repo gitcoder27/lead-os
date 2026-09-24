@@ -21,6 +21,7 @@ import {
 } from "../db/schema";
 import { BackupService } from "./backup.service";
 import { SettingsService } from "./settings.service";
+import { TaskEventsService } from "./task-events.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 interface ManagerDeskResetScope {
@@ -39,6 +40,7 @@ export class WorkspaceMaintenanceService {
     private readonly settings = new SettingsService(),
     private readonly backupService?: BackupService
   ) {}
+  private readonly eventsService = new TaskEventsService();
 
   async getResetPreview(
     managerAccountId: string,
@@ -80,6 +82,7 @@ export class WorkspaceMaintenanceService {
           deleteLinkedTrackerItems: target === "manager_desk",
         });
       }
+      await this.eventsService.pruneOrphans(normalizedWorkspaceId, target === "workspace");
     });
 
     return {

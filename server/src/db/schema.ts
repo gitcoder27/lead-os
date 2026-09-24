@@ -179,6 +179,9 @@ export const teamTrackerItems = sqliteTable("team_tracker_items", {
   workspaceId: text("workspace_id").notNull().default("default"),
   dayId: integer("day_id").notNull(),
   managerDeskItemId: integer("manager_desk_item_id"),
+  taskKey: text("task_key"),
+  createdByType: text("created_by_type"),
+  createdById: text("created_by_id"),
   itemType: text("item_type").notNull(),
   jiraKey: text("jira_key"),
   relatedJiraKeys: text("related_jira_keys"),
@@ -252,6 +255,9 @@ export const managerDeskItems = sqliteTable("manager_desk_items", {
   workspaceId: text("workspace_id").notNull().default("default"),
   dayId: integer("day_id").notNull(),
   sourceItemId: integer("source_item_id"),
+  taskKey: text("task_key"),
+  createdByType: text("created_by_type"),
+  createdById: text("created_by_id"),
   assigneeDeveloperAccountId: text("assignee_developer_account_id"),
   title: text("title").notNull(),
   kind: text("kind").notNull(),
@@ -331,6 +337,65 @@ export const dailyNoteFollowUps = sqliteTable("daily_note_follow_ups", {
   uniqueIndex("idx_daily_note_follow_ups_owner_request").on(table.workspaceId, table.managerAccountId, table.requestId),
   index("idx_daily_note_follow_ups_note").on(table.noteId),
 ]);
+
+export const taskKeySequences = sqliteTable("task_key_sequences", {
+  workspaceId: text("workspace_id").primaryKey(),
+  nextValue: integer("next_value").notNull(),
+});
+
+export const taskKeyAliases = sqliteTable("task_key_aliases", {
+  workspaceId: text("workspace_id").notNull(),
+  aliasKey: text("alias_key").notNull(),
+  taskKey: text("task_key").notNull(),
+  reason: text("reason").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.aliasKey] })]);
+
+export const dataMigrations = sqliteTable("data_migrations", {
+  name: text("name").primaryKey(),
+  appliedAt: text("applied_at").notNull(),
+  reportJson: text("report_json"),
+});
+
+export const taskEvents = sqliteTable("task_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  taskKey: text("task_key").notNull(),
+  type: text("type").notNull(),
+  body: text("body"),
+  visibility: text("visibility").notNull(),
+  authorType: text("author_type").notNull(),
+  authorId: text("author_id"),
+  metaJson: text("meta_json"),
+  sourceTable: text("source_table"),
+  sourceId: integer("source_id"),
+  dedupeKey: text("dedupe_key"),
+  occurredAt: text("occurred_at").notNull(),
+  createdAt: text("created_at").notNull(),
+  redactedAt: text("redacted_at"),
+  redactedBy: text("redacted_by"),
+}, (table) => [
+  index("idx_task_events_workspace_key_time").on(table.workspaceId, table.taskKey, table.occurredAt, table.id),
+  index("idx_task_events_workspace_author").on(table.workspaceId, table.authorType, table.authorId),
+  uniqueIndex("idx_task_events_workspace_dedupe").on(table.workspaceId, table.dedupeKey),
+]);
+
+export const checkinTaskRefs = sqliteTable("checkin_task_refs", {
+  workspaceId: text("workspace_id").notNull().default("default"),
+  checkinId: integer("checkin_id").notNull().references(() => teamTrackerCheckIns.id, { onDelete: "cascade" }),
+  taskKey: text("task_key").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.checkinId, table.taskKey] })]);
+
+export const dailyNoteTaskRefs = sqliteTable("daily_note_task_refs", {
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  noteId: integer("note_id").notNull().references(() => dailyNotes.id, { onDelete: "cascade" }),
+  taskKey: text("task_key").notNull(),
+  relation: text("relation").notNull(),
+  requestId: text("request_id"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.noteId, table.taskKey, table.relation] })]);
 
 // ── LeadOS Copilot (assistant) tables ──────────────────
 

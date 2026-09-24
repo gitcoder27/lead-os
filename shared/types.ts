@@ -258,6 +258,7 @@ export interface TodayActionTarget {
   developerAccountId?: string;
   managerDeskItemId?: number;
   trackerItemId?: number;
+  taskKey?: string;
   date?: string;
   filter?: FilterType;
 }
@@ -388,6 +389,7 @@ export interface ManagerActionCommandRequest {
   outcome?: string;
   preset?: ManagerActionSnoozePreset;
   summary?: string;
+  taskKeys?: string[];
 }
 
 export interface ManagerActionCommandResponse {
@@ -536,6 +538,46 @@ export type TrackerDeveloperStatus =
   | "waiting"
   | "done_for_today";
 
+export const TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
+export const TASK_EVENT_TYPES = [
+  "created", "update", "instruction", "decision", "blocker", "status", "assign",
+  "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
+] as const;
+export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
+export type TaskEventVisibility = "shared" | "private";
+export interface TaskActorRef {
+  type: "manager" | "developer" | "copilot" | "note" | "today" | "system" | "unknown";
+  id?: string;
+}
+export interface TaskEvent {
+  id: number;
+  taskKey: string;
+  type: TaskEventType;
+  body?: string | null;
+  visibility: TaskEventVisibility;
+  author: { type: "manager" | "developer" | "copilot" | "system"; id?: string; displayName?: string };
+  meta?: unknown | null;
+  occurredAt: string;
+  approximateTime: boolean;
+  redacted?: true;
+}
+export interface TaskEventSummary {
+  id: number;
+  type: TaskEventType;
+  excerpt: string;
+  authorType: TaskEvent["author"]["type"];
+  occurredAt: string;
+  approximateTime: boolean;
+  visibility: TaskEventVisibility;
+}
+export interface AddTaskEventRequest {
+  type: "update" | "instruction" | "decision" | "blocker";
+  body: string;
+  visibility?: TaskEventVisibility;
+  blockerAction?: "raised" | "cleared";
+  via?: "standup" | "task_drawer";
+  requestId: string;
+}
 export type TrackerItemState = "planned" | "in_progress" | "done" | "dropped";
 export type TrackerItemType = "jira" | "custom";
 export type TrackerTaskLifecycle = "tracker_only" | "manager_desk_linked";
@@ -554,12 +596,17 @@ export interface TrackerCheckIn {
   rationale?: string;
   nextFollowUpAt?: string;
   date?: string;
+  taskKeys: string[];
 }
 
 export interface TrackerWorkItem {
   id: number;
   dayId: number;
   originDate: string;
+  taskKey: string | null;
+  createdBy?: TaskActorRef;
+  latestEvent?: TaskEventSummary;
+  ageDays?: number;
   managerDeskItemId?: number;
   lifecycle: TrackerTaskLifecycle;
   itemType: TrackerItemType;
@@ -626,6 +673,7 @@ export type TrackerAttentionQuickAction =
 
 export interface TrackerAttentionActionItem {
   id: number;
+  taskKey?: string | null;
   title: string;
   jiraKey?: string;
   relatedIssueKeys?: string[];
@@ -870,6 +918,8 @@ export interface ManagerDeskItem {
   id: number;
   dayId: number;
   originDate: string;
+  taskKey: string | null;
+  createdBy?: TaskActorRef;
   title: string;
   kind: ManagerDeskItemKind;
   category: ManagerDeskCategory;
@@ -889,6 +939,21 @@ export interface ManagerDeskItem {
   createdAt: string;
   updatedAt: string;
   links: ManagerDeskLink[];
+}
+
+export interface TaskResolution {
+  taskKey: string;
+  requestedKey: string;
+  title: string;
+  kind: "tracker_only" | "delegated" | "desk_only";
+  trackerItemId?: number;
+  managerDeskItemId?: number;
+  developer?: Developer;
+  date: string;
+  state?: TrackerItemState;
+  status?: ManagerDeskStatus;
+  updatedAt?: string;
+  deleted: boolean;
 }
 
 export interface ManagerDeskSummary {
@@ -979,6 +1044,7 @@ export interface GlobalSearchIssueItem {
 
 export interface GlobalSearchDeskItem {
   itemId: number;
+  taskKey?: string | null;
   date: string;
   title: string;
   kind: ManagerDeskItemKind;
@@ -1021,8 +1087,21 @@ export interface GlobalSearchDeveloperItem {
   avatarUrl?: string;
 }
 
+export interface GlobalSearchTaskItem {
+  taskKey: string;
+  title: string;
+  kind: TaskResolution["kind"];
+  developerName?: string;
+  state?: TrackerItemState;
+  status?: ManagerDeskStatus;
+  matchedIn: "key" | "title" | "event";
+  excerpt?: string;
+  updatedAt: string;
+}
+
 export interface GlobalSearchResponse {
   query: string;
+  tasks: GlobalSearchTaskItem[];
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
   checkIns: GlobalSearchCheckInItem[];

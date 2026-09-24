@@ -7,6 +7,9 @@ import type {
 } from "shared/types";
 import { TeamTrackerService } from "./team-tracker.service";
 import { HttpError } from "../middleware/errorHandler";
+import { TaskEventsService } from "./task-events.service";
+import { TaskKeysService } from "./task-keys.service";
+import type { TaskEvent } from "shared/types";
 
 interface AddMyDayItemParams {
   date: string;
@@ -25,10 +28,36 @@ interface UpdateMyDayItemParams {
 
 export class MyDayService {
   constructor(private readonly trackerService: TeamTrackerService) {}
+  private readonly taskKeys = new TaskKeysService();
+  private readonly eventsService = new TaskEventsService(this.taskKeys);
+
+  async resolveTask(accountId: string, key: string, workspaceId?: string) {
+    await this.eventsService.list(key, { kind: "developer", accountId, workspaceId }, { limit: 1 });
+    const task = await this.taskKeys.resolveTask(workspaceId ?? "default", key);
+    return { ...task, status: undefined, managerDeskItemId: undefined };
+  }
+
+  async getTaskEvents(accountId: string, key: string, options: { cursor?: string; limit?: number }, workspaceId?: string) {
+    return this.eventsService.list(key, { kind: "developer", accountId, workspaceId }, options);
+  }
+
+  async addTaskEvent(accountId: string, key: string, input: { date: string; type: "update" | "blocker" | "instruction" | "decision"; body: string; blockerAction?: "raised" | "cleared"; visibility?: "shared" | "private"; requestId: string }, workspaceId?: string): Promise<{ event: TaskEvent; replayed: boolean }> {
+    await this.taskKeys.assertEnabled(workspaceId);
+    if (input.visibility === "private") throw new HttpError(400, "Developer updates must be shared");
+    if (input.type === "instruction" || input.type === "decision") throw new HttpError(403, "Event type is not allowed for developers");
+    await this.assertWritable(accountId, input.date, workspaceId);
+    const taskKey = await this.taskKeys.resolve(workspaceId ?? "default", key);
+    if (!taskKey) throw new HttpError(404, "Task not found");
+    if (input.type === "blocker") {
+      if (!input.blockerAction) throw new HttpError(400, "blockerAction is required");
+      return this.eventsService.appendWithReplay({ workspaceId, taskKey, type: "blocker", body: input.body, meta: { action: input.blockerAction }, requestId: input.requestId }, { type: "developer", accountId });
+    }
+    return this.eventsService.appendWithReplay({ workspaceId, taskKey, type: "update", body: input.body, meta: { via: "my_day" }, requestId: input.requestId }, { type: "developer", accountId });
+  }
 
   async getMyDay(accountId: string, date: string, workspaceId?: string): Promise<MyDayResponse> {
     const { day, viewMode } = await this.trackerService.getDeveloperDayView(date, accountId, {
-      includeManagerNotes: false,
+      viewer: { kind: "developer", accountId },
     }, workspaceId);
     const readOnlyReason = this.getReadOnlyReason(day.availability.state, viewMode);
 
@@ -69,6 +98,8 @@ export class MyDayService {
       relatedIssueKeys: params.relatedIssueKeys,
       title: params.title,
       note: params.note,
+      source: "my_day",
+      actor: { type: "developer", accountId },
     }, workspaceId);
   }
 
@@ -82,7 +113,7 @@ export class MyDayService {
     const ownership = await this.trackerService.assertItemBelongsToDeveloper(itemId, accountId, workspaceId);
     await this.assertWritable(accountId, date, workspaceId);
     this.assertItemAvailableInSelectedView(ownership.date, date);
-    return this.trackerService.updateItem(itemId, updates, workspaceId);
+    return this.trackerService.updateItem(itemId, updates, workspaceId, { type: "developer", accountId });
   }
 
   async deleteItem(accountId: string, itemId: number, date: string, workspaceId?: string): Promise<void> {
@@ -105,6 +136,7 @@ export class MyDayService {
     params: {
       summary: string;
       status?: TrackerDeveloperStatus;
+      taskKeys?: string[];
     },
     workspaceId?: string
   ): Promise<TrackerCheckIn> {
@@ -115,6 +147,7 @@ export class MyDayService {
       {
         summary: params.summary,
         status: params.status,
+        taskKeys: params.taskKeys,
       },
       {
         type: "developer",
@@ -142,7 +175,7 @@ export class MyDayService {
 
   private async assertWritable(accountId: string, date: string, workspaceId?: string): Promise<void> {
     const { day, viewMode } = await this.trackerService.getDeveloperDayView(date, accountId, {
-      includeManagerNotes: false,
+      viewer: { kind: "developer", accountId },
     }, workspaceId);
     const reason = this.getReadOnlyReason(day.availability.state, viewMode);
     if (!reason) {

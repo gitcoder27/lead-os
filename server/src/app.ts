@@ -19,6 +19,7 @@ import { createManagerDeskRouter } from "./routes/manager-desk";
 import { createManagerActionsRouter } from "./routes/manager-actions";
 import { createTodayRouter } from "./routes/today";
 import { createSearchRouter } from "./routes/search";
+import { createTasksRouter } from "./routes/tasks";
 import { createNotesRouter } from "./routes/notes";
 import { createPreferencesRouter } from "./routes/preferences";
 import { createWorkSavedViewsRouter } from "./routes/work";
@@ -37,6 +38,8 @@ import { MyDayService } from "./services/my-day.service";
 import { NavPreferencesService } from "./services/nav-preferences.service";
 import { WorkloadService } from "./services/workload.service";
 import { SearchService } from "./services/search.service";
+import { TaskKeysService } from "./services/task-keys.service";
+import { TaskEventsService } from "./services/task-events.service";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
 import { TagService } from "./services/tag.service";
 import { TeamTrackerService } from "./services/team-tracker.service";
@@ -101,6 +104,8 @@ export interface AppServices {
   managerDeskService: ManagerDeskService;
   todayService: TodayService;
   searchService: SearchService;
+  taskKeysService?: TaskKeysService;
+  taskEventsService?: TaskEventsService;
   workSavedViewsService: WorkSavedViewsService;
   dailyNotesService?: DailyNotesService;
   navPreferencesService?: NavPreferencesService;
@@ -114,6 +119,8 @@ export function createApp(services: AppServices) {
 
   const dailyNotesService = services.dailyNotesService ?? new DailyNotesService(services.managerDeskService);
   const navPreferencesService = services.navPreferencesService ?? new NavPreferencesService();
+  const taskKeysService = services.taskKeysService ?? new TaskKeysService();
+  const taskEventsService = services.taskEventsService ?? new TaskEventsService(taskKeysService);
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -158,6 +165,7 @@ export function createApp(services: AppServices) {
     createManagerDeskRouter(services.managerDeskService, services.authService)
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
+  app.use("/api/tasks", requireManager(services.authService), createTasksRouter(taskKeysService, taskEventsService));
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(
     "/api/preferences",

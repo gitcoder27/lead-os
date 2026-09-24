@@ -39,6 +39,8 @@ import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { runInTransaction } from "../db/transaction";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { isoDatePart } from "../utils/date";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskEventsService, type TaskEventActor, type TaskEventInput } from "./task-events.service";
 
 export interface ManagerDeskLinkInput {
   linkType: ManagerDeskLinkType;
@@ -63,6 +65,9 @@ export interface CreateManagerDeskItemParams {
   plannedEndAt?: string | null;
   followUpAt?: string | null;
   links?: ManagerDeskLinkInput[];
+  actor?: TaskEventActor;
+  source?: "desk" | "note" | "today" | "copilot" | "promote";
+  taskKey?: string;
 }
 
 export interface UpdateManagerDeskItemParams {
@@ -354,6 +359,13 @@ export class ManagerDeskService {
     private readonly availability = new DeveloperAvailabilityService()
   ) {}
 
+  private readonly taskKeys = new TaskKeysService();
+  private readonly eventsService = new TaskEventsService(this.taskKeys);
+
+  private async emit(item: ManagerDeskItemRow, event: Omit<TaskEventInput, "taskKey" | "workspaceId">, actor: TaskEventActor = { type: "system" }): Promise<void> {
+    if (item.taskKey && await this.taskKeys.enabled(item.workspaceId)) await this.eventsService.append({ ...event, taskKey: item.taskKey, workspaceId: item.workspaceId, sourceTable: "manager_desk_items", sourceId: item.id } as TaskEventInput, actor);
+  }
+
   async getDay(managerAccountId: string, date: string, workspaceId?: string): Promise<ManagerDeskDayResponse> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await this.ensureDay(managerAccountId, date, normalizedWorkspaceId);
@@ -453,12 +465,16 @@ export class ManagerDeskService {
     );
 
     const now = nowIso();
+    const taskKey = await this.taskKeys.enabled(normalizedWorkspaceId) ? params.taskKey ?? this.taskKeys.allocate(normalizedWorkspaceId) : null;
     const inserted = await db
       .insert(managerDeskItems)
       .values({
         workspaceId: normalizedWorkspaceId,
         dayId: day.id,
         sourceItemId: null,
+        taskKey,
+        createdByType: params.source === "note" || params.source === "today" ? params.source : params.actor?.type ?? "unknown",
+        createdById: params.actor?.accountId ?? null,
         title,
         kind: params.kind ?? "action",
         category: params.category ?? "other",
@@ -486,6 +502,8 @@ export class ManagerDeskService {
       throw new Error("Failed to create manager desk item");
     }
 
+    await this.emit(item, { type: "created", body: null, meta: { source: params.source ?? "desk", ownerType: assigneeDeveloperAccountId ? "developer" : "manager", ownerId: assigneeDeveloperAccountId ?? managerAccountId, title } }, { type: "system", accountId: params.actor?.accountId ?? managerAccountId });
+    if (item.contextNote) await this.emit(item, { type: "update", body: item.contextNote, meta: { via: "context_note_field" } }, params.actor ?? { type: "manager", accountId: managerAccountId });
     for (const link of normalizedLinks) {
       await db.insert(managerDeskLinks).values({
         workspaceId: normalizedWorkspaceId,
@@ -518,7 +536,8 @@ export class ManagerDeskService {
     managerAccountId: string,
     itemId: number,
     updates: UpdateManagerDeskItemParams,
-    workspaceId?: string
+    workspaceId?: string,
+    actor: TaskEventActor = { type: "manager", accountId: managerAccountId }
   ): Promise<ManagerDeskItem> {
     return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
@@ -629,6 +648,15 @@ export class ManagerDeskService {
       reopened
     );
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
+    const system = { type: "system" as const, accountId: managerAccountId };
+    if (existing.title !== updatedItem.title) await this.emit(existing, { type: "title", body: null, meta: { from: existing.title, to: updatedItem.title } }, system);
+    if (existing.status !== updatedItem.status) await this.emit(existing, { type: "status", body: null, meta: { domain: "desk_status", from: existing.status, to: updatedItem.status, reason: "user" } }, system);
+    if (existing.assigneeDeveloperAccountId !== updatedItem.assigneeDeveloperAccountId) await this.emit(existing, { type: "assign", body: null, meta: { fromType: existing.assigneeDeveloperAccountId ? "developer" : "manager", fromId: existing.assigneeDeveloperAccountId ?? managerAccountId, toType: updatedItem.assigneeDeveloperAccountId ? "developer" : "manager", toId: updatedItem.assigneeDeveloperAccountId ?? managerAccountId } }, system);
+    for (const field of ["plannedStartAt", "plannedEndAt", "followUpAt"] as const) {
+      if (existing[field] !== updatedItem[field]) await this.emit(existing, { type: "schedule", body: null, meta: { field: field === "plannedStartAt" ? "planned_start_at" : field === "plannedEndAt" ? "planned_end_at" : "follow_up_at", from: existing[field], to: updatedItem[field], via: "edit" } }, system);
+    }
+    if (updatedItem.contextNote && existing.contextNote !== updatedItem.contextNote) await this.emit(existing, { type: "update", body: updatedItem.contextNote, meta: { via: "context_note_field" } }, actor);
+    if (updatedItem.outcome && existing.outcome !== updatedItem.outcome) await this.emit(existing, { type: "decision", body: updatedItem.outcome, meta: null }, actor);
     return this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
     });
   }
@@ -640,6 +668,7 @@ export class ManagerDeskService {
     const snapshot = await this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
     await this.insertHistoryRow(managerAccountId, existing.id, snapshot, "deleted", normalizedWorkspaceId);
     await this.trackerService.unlinkManagerDeskItem(itemId, normalizedWorkspaceId);
+    await this.emit(existing, { type: "status", body: null, meta: { domain: "desk_status", from: existing.status, to: "deleted", reason: "user" } }, { type: "system", accountId: managerAccountId });
     await db.delete(managerDeskLinks).where(eq(managerDeskLinks.itemId, itemId));
     await db.delete(managerDeskItems).where(eq(managerDeskItems.id, itemId));
     });
@@ -670,6 +699,7 @@ export class ManagerDeskService {
       .where(eq(managerDeskItems.id, itemId));
 
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
+    await this.emit(existing, { type: "status", body: null, meta: { domain: "desk_status", from: existing.status, to: "cancelled", reason: "user" } }, { type: "system", accountId: managerAccountId });
     return this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
     });
   }
@@ -729,6 +759,7 @@ export class ManagerDeskService {
     }
 
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
+    await this.emit(item, { type: "link", body: null, meta: { action: "added", kind: normalizedLink.linkType === "issue" ? "jira" : normalizedLink.linkType === "developer" ? "person" : "external", ref: normalizedLink.issueKey ?? normalizedLink.developerAccountId ?? normalizedLink.externalLabel ?? "" } }, { type: "system", accountId: managerAccountId });
     return createdLink;
     });
   }
@@ -770,6 +801,8 @@ export class ManagerDeskService {
     }
 
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
+    const removed = rows[0];
+    await this.emit(item, { type: "link", body: null, meta: { action: "removed", kind: removed.linkType === "issue" ? "jira" : removed.linkType === "developer" ? "person" : "external", ref: removed.issueKey ?? removed.developerAccountId ?? removed.externalLabel ?? "" } }, { type: "system", accountId: managerAccountId });
     });
   }
 
@@ -887,6 +920,10 @@ export class ManagerDeskService {
       );
 
       await this.recordHistorySnapshotForItem(managerAccountId, entry.item.id, "upsert", normalizedWorkspaceId);
+      await this.emit(entry.item, { type: "schedule", body: null, meta: { field: "day", from: params.fromDate, to: params.toDate, via: "carry_forward" } }, { type: "system", accountId: managerAccountId });
+      for (const [field, from, to] of [["planned_start_at", entry.item.plannedStartAt, entry.rebasedPlannedStartAt], ["planned_end_at", entry.item.plannedEndAt, entry.rebasedPlannedEndAt], ["follow_up_at", entry.item.followUpAt, entry.rebasedFollowUpAt]] as const) {
+        if (from !== to) await this.emit(entry.item, { type: "schedule", body: null, meta: { field, from, to, via: "carry_forward" } }, { type: "system", accountId: managerAccountId });
+      }
 
       updated += 1;
     }
@@ -952,6 +989,10 @@ export class ManagerDeskService {
         normalizedWorkspaceId
       );
       await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
+      await this.emit(item, { type: "schedule", body: null, meta: { field: "day", from: sourceDate, to: params.toDate, via: "reschedule" } }, { type: "system", accountId: managerAccountId });
+      for (const [field, from, to] of [["planned_start_at", item.plannedStartAt, rebasedPlannedStartAt], ["planned_end_at", item.plannedEndAt, rebasedPlannedEndAt], ["follow_up_at", item.followUpAt, rebasedFollowUpAt]] as const) {
+        if (from !== to) await this.emit(item, { type: "schedule", body: null, meta: { field, from, to, via: "reschedule" } }, { type: "system", accountId: managerAccountId });
+      }
       moved += 1;
     }
 
@@ -1931,6 +1972,8 @@ export class ManagerDeskService {
       id: item.id,
       dayId: item.dayId,
       originDate: originDate ?? localTodayIso(),
+      taskKey: item.taskKey,
+      ...(item.createdByType && { createdBy: { type: item.createdByType as NonNullable<ManagerDeskItem["createdBy"]>["type"], ...(item.createdById && { id: item.createdById }) } }),
       title: item.title,
       kind: item.kind as ManagerDeskItemKind,
       category: item.category as ManagerDeskCategory,
@@ -2149,6 +2192,9 @@ export class ManagerDeskService {
         workspaceId: normalizedWorkspaceId,
         dayId: day.id,
         sourceItemId: null,
+        taskKey: trackerContext.trackerItem.taskKey,
+        createdByType: "manager",
+        createdById: managerAccountId,
         assigneeDeveloperAccountId: trackerContext.developer.accountId,
         title: trackerContext.trackerItem.title,
         kind: "action",
@@ -2195,6 +2241,7 @@ export class ManagerDeskService {
     }
 
     await this.trackerService.linkManagerDeskItem(trackerContext.trackerItem.id, item.id, normalizedWorkspaceId);
+    await this.emit(item, { type: "created", body: null, meta: { source: "promote", ownerType: "developer", ownerId: trackerContext.developer.accountId, title: item.title } }, { type: "system", accountId: managerAccountId });
     await this.recordHistorySnapshotForItem(managerAccountId, item.id, "upsert", normalizedWorkspaceId);
 
     return item.id;

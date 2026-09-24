@@ -22,6 +22,8 @@ import { TagService } from "./services/tag.service";
 import { TeamTrackerService } from "./services/team-tracker.service";
 import { TodayService } from "./services/today.service";
 import { SearchService } from "./services/search.service";
+import { TaskKeysService } from "./services/task-keys.service";
+import { TaskEventsService } from "./services/task-events.service";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
 import { AssistantService } from "./assistant/service";
 import { SyncEngine } from "./sync/engine";
@@ -86,6 +88,8 @@ async function bootstrap(): Promise<void> {
   const dailyNotesService = new DailyNotesService(managerDeskService);
   const navPreferencesService = new NavPreferencesService();
   const searchService = new SearchService(settingsService, dailyNotesService);
+  const taskKeysService = new TaskKeysService();
+  const taskEventsService = new TaskEventsService(taskKeysService);
   const workSavedViewsService = new WorkSavedViewsService();
   const assistantService = new AssistantService({
     todayService,
@@ -118,6 +122,8 @@ async function bootstrap(): Promise<void> {
     managerDeskService,
     todayService,
     searchService,
+    taskKeysService,
+    taskEventsService,
     workSavedViewsService,
     dailyNotesService,
     navPreferencesService,

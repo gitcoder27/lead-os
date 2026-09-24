@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import { invoke } from "./helpers/http";
 import { db, resetDatabase } from "./helpers/db";
-import { issues } from "../src/db/schema";
+import { configTable, developers, issues } from "../src/db/schema";
+import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { AuthService } from "../src/services/auth.service";
@@ -61,6 +62,7 @@ describe("GET /api/search", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       query: "payment",
+      tasks: [],
       issues: [
         expect.objectContaining({ jiraKey: "PROJ-1", summary: "Payment provider timeouts" }),
       ],
@@ -70,6 +72,19 @@ describe("GET /api/search", () => {
       developers: [],
       notes: [],
     });
+  });
+
+  it("returns an exact task-key hit first in the tasks group", async () => {
+    await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    await db.insert(developers).values({ accountId: "dev-1", displayName: "Alice", isActive: 1 });
+    const item = await new TeamTrackerService().addItem("dev-1", "2026-09-24", { title: "Payment follow-up" });
+
+    const response = await invoke(createTestApp(), { method: "GET", url: `/api/search?q=${item.taskKey}` });
+
+    expect(response.status).toBe(200);
+    expect(response.body.tasks).toEqual([
+      expect.objectContaining({ taskKey: item.taskKey, title: "Payment follow-up", matchedIn: "key" }),
+    ]);
   });
 
   it("returns 400 when the query is missing", async () => {

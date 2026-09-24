@@ -80,6 +80,16 @@ const createFollowUpSchema = z.object({
   query: z.any().optional(),
 });
 
+const taskUpdateSchema = z.object({
+  params: z.object({ date: dateSchema }), query: z.any().optional(),
+  body: z.object({ taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/), text: z.string().trim().min(1).max(4000), type: z.enum(["update", "instruction", "decision"]).optional(), visibility: z.enum(["shared", "private"]).optional(), requestId: z.string().uuid() }),
+});
+
+const createTaskSchema = z.object({
+  params: z.object({ date: dateSchema }), query: z.any().optional(),
+  body: z.object({ title: z.string().trim().min(1).max(500), developerAccountId: z.string().min(1).optional(), jiraKey: z.string().min(1).optional(), context: z.string().trim().max(4000).optional(), requestId: z.string().uuid() }),
+});
+
 export function createNotesRouter(service: DailyNotesService): Router {
   const router = Router();
 
@@ -171,6 +181,13 @@ export function createNotesRouter(service: DailyNotesService): Router {
     } catch (error) {
       next(error);
     }
+  });
+
+  router.post("/:date/task-updates", validate(taskUpdateSchema), async (req, res, next) => {
+    try { res.status(201).json(await service.addTaskUpdate(req.auth!.user.accountId, req.params.date as string, req.body, req.auth!.user.workspaceId)); } catch (error) { next(error); }
+  });
+  router.post("/:date/tasks", validate(createTaskSchema), async (req, res, next) => {
+    try { res.status(201).json(await service.createTask(req.auth!.user.accountId, req.params.date as string, req.body, req.auth!.user.workspaceId)); } catch (error) { next(error); }
   });
 
   return router;

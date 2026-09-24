@@ -139,8 +139,8 @@ describe("assistant tools", () => {
     vi.useRealTimers();
   });
 
-  it("registers all 43 tools with LLM-ready metadata", () => {
-    expect(tools).toHaveLength(43);
+  it("registers all 45 tools with LLM-ready metadata", () => {
+    expect(tools).toHaveLength(45);
     for (const tool of tools) {
       expect(tool.name).toBeTruthy();
       expect(tool.description).toBeTruthy();
@@ -270,7 +270,7 @@ describe("assistant tools", () => {
     });
     expect(summary).toContain("add_check_in");
 
-    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", undefined, WORKSPACE_ID);
+    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", { viewer: { kind: "manager", accountId: MANAGER_ID } }, WORKSPACE_ID);
     expect(view.day.checkIns.at(-1)?.summary).toBe("Making progress");
   });
 
@@ -307,7 +307,7 @@ describe("assistant tools", () => {
     });
     expect(result).toMatchObject({ title: "Fix login redirect loop", state: "planned" });
 
-    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", undefined, WORKSPACE_ID);
+    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", { viewer: { kind: "manager", accountId: MANAGER_ID } }, WORKSPACE_ID);
     expect(view.day.plannedItems.map((entry) => entry.jiraKey)).toContain("AM-123");
   });
 
@@ -459,7 +459,7 @@ describe("assistant tools", () => {
     const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Task B" }, WORKSPACE_ID);
 
     await run("delete_tracker_item", { itemId: item.id });
-    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", undefined, WORKSPACE_ID);
+    const view = await teamTrackerService.getDeveloperDayView(DATE, "dev-1", { viewer: { kind: "manager", accountId: MANAGER_ID } }, WORKSPACE_ID);
     expect(view.day.plannedItems.find((entry) => entry.id === item.id)).toBeUndefined();
   });
 

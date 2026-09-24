@@ -32,6 +32,7 @@ const actionTargetSchema = z.object({
   developerAccountId: z.string().optional(),
   managerDeskItemId: z.number().int().positive().optional(),
   trackerItemId: z.number().int().positive().optional(),
+  taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
   date: z.string().regex(dateRegex, "target date must be YYYY-MM-DD").optional(),
   filter: z.string().optional(),
 });
@@ -64,6 +65,7 @@ const commandSchema = z.object({
     outcome: z.string().optional(),
     preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),
     summary: z.string().optional(),
+    taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
   }),
 });
 

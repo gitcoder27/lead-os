@@ -140,3 +140,17 @@ export function deskDateToSearch(date: string | undefined): string {
 export function notesDateFromParams(params: URLSearchParams): string | undefined {
   return dateParam(params, 'date');
 }
+
+const TASK_KEY_PARAM_PATTERN = /^[Tt]-\d{1,9}$/;
+
+export function taskKeyFromParams(params: URLSearchParams): string | undefined {
+  const value = firstParam(params, 'task');
+  if (!value || !TASK_KEY_PARAM_PATTERN.test(value)) {
+    return undefined;
+  }
+  return `T-${Number(value.slice(2))}`;
+}
+
+export function taskKeyToParams(taskKey: string | undefined): Record<string, string | undefined> {
+  return { task: taskKey };
+}

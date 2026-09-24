@@ -7,7 +7,9 @@ import type {
   GlobalSearchIssueItem,
   GlobalSearchResponse,
   GlobalSearchTrackerItem,
+  GlobalSearchTaskItem,
 } from "shared/types";
+import { TASK_KEY_PATTERN } from "shared/types";
 import { db } from "../db/connection";
 import {
   developers,
@@ -22,6 +24,8 @@ import { isVisibleWorkIssue } from "./issue-rules";
 import { DailyNotesService } from "./daily-notes.service";
 import { SettingsService } from "./settings.service";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskEventsService } from "./task-events.service";
 
 const MIN_QUERY_LENGTH = 2;
 const ISSUE_LIMIT = 6;
@@ -60,11 +64,14 @@ export class SearchService {
     private readonly settings = new SettingsService(),
     private readonly dailyNotes = new DailyNotesService()
   ) {}
+  private readonly taskKeys = new TaskKeysService();
+  private readonly eventsService = new TaskEventsService(this.taskKeys);
 
   async search(rawQuery: string, workspaceId?: string, managerAccountId?: string): Promise<GlobalSearchResponse> {
     const query = sanitizeQuery(rawQuery);
     const emptyResponse: GlobalSearchResponse = {
       query,
+      tasks: [],
       issues: [],
       deskItems: [],
       checkIns: [],
@@ -80,24 +87,54 @@ export class SearchService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const pattern = containsPattern(query);
 
-    const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems] = await Promise.all([
+    const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems, tasks] = await Promise.all([
       this.searchIssues(normalizedWorkspaceId, pattern),
       this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
       this.searchCheckIns(normalizedWorkspaceId, pattern),
       this.searchTrackerItems(normalizedWorkspaceId, pattern),
       this.searchDevelopers(normalizedWorkspaceId, pattern),
       this.searchNotes(normalizedWorkspaceId, managerAccountId, query),
+      this.searchTasks(normalizedWorkspaceId, managerAccountId, query, pattern),
     ]);
 
     return {
       query,
+      tasks,
       issues: issueItems,
-      deskItems,
+      deskItems: deskItems.filter((item) => !tasks.some((task) => task.taskKey && task.taskKey === item.taskKey)),
       checkIns,
       trackerItems,
       developers: developerItems,
       notes: noteItems,
     };
+  }
+
+  private async searchTasks(workspaceId: string, managerAccountId: string | undefined, query: string, pattern: string): Promise<GlobalSearchTaskItem[]> {
+    if (!(await this.taskKeys.enabled(workspaceId))) return [];
+    const matches = new Map<string, { matchedIn: GlobalSearchTaskItem["matchedIn"]; excerpt?: string }>();
+    if (TASK_KEY_PATTERN.test(query)) {
+      const key = await this.taskKeys.resolve(workspaceId, query);
+      if (key) matches.set(key, { matchedIn: "key" });
+    }
+    const [deskRows, trackerRows, eventRows] = await Promise.all([
+      db.select({ key: managerDeskItems.taskKey }).from(managerDeskItems)
+        .innerJoin(managerDeskDays, eq(managerDeskItems.dayId, managerDeskDays.id))
+        .where(and(eq(managerDeskItems.workspaceId, workspaceId), ...(managerAccountId ? [eq(managerDeskDays.managerAccountId, managerAccountId)] : []), like(managerDeskItems.title, pattern))).limit(DESK_ITEM_LIMIT),
+      db.select({ key: teamTrackerItems.taskKey }).from(teamTrackerItems).where(and(eq(teamTrackerItems.workspaceId, workspaceId), like(teamTrackerItems.title, pattern))).limit(DESK_ITEM_LIMIT),
+      this.eventsService.searchBodies({ kind: "manager", accountId: managerAccountId ?? "", workspaceId }, pattern, DESK_ITEM_LIMIT),
+    ]);
+    for (const row of [...deskRows, ...trackerRows]) if (row.key && !matches.has(row.key)) matches.set(row.key, { matchedIn: "title" });
+    for (const row of eventRows) if (!matches.has(row.taskKey)) matches.set(row.taskKey, { matchedIn: "event", excerpt: row.excerpt });
+    const tasks: GlobalSearchTaskItem[] = [];
+    for (const [key, match] of matches) {
+      if (tasks.length >= DESK_ITEM_LIMIT) break;
+      try {
+        const resolved = await this.taskKeys.resolveTask(workspaceId, key);
+        if (resolved.deleted) continue;
+        tasks.push({ taskKey: key, title: resolved.title, kind: resolved.kind, developerName: resolved.developer?.displayName, state: resolved.state, status: resolved.status, matchedIn: match.matchedIn, excerpt: match.excerpt, updatedAt: resolved.updatedAt ?? "" });
+      } catch { continue; }
+    }
+    return tasks;
   }
 
   private async searchNotes(
@@ -171,6 +208,7 @@ export class SearchService {
     const rows = await db
       .select({
         itemId: managerDeskItems.id,
+        taskKey: managerDeskItems.taskKey,
         date: managerDeskDays.date,
         title: managerDeskItems.title,
         kind: managerDeskItems.kind,
@@ -200,6 +238,7 @@ export class SearchService {
 
     return rows.map((row) => ({
       itemId: row.itemId,
+      taskKey: row.taskKey,
       date: row.date,
       title: row.title,
       kind: row.kind as GlobalSearchDeskItem["kind"],

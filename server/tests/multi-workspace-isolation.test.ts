@@ -277,4 +277,48 @@ describe("multi-workspace API isolation", () => {
     expect(bIssuesRes.status).toBe(200);
     expect(bIssuesRes.body.issues.map((issue: { summary: string }) => issue.summary)).toEqual(["Workspace B issue"]);
   });
+
+  it("scopes task keys and events by workspace", async () => {
+    const authService = new AuthService();
+    const trackerService = new TeamTrackerService();
+    const managerA = await authService.createUser({
+      username: "manager-a",
+      displayName: "Manager A",
+      password: "secret123",
+      role: "manager",
+    });
+    const managerB = await authService.createUser({
+      username: "manager-b",
+      displayName: "Manager B",
+      password: "secret123",
+      role: "manager",
+    });
+    await seedDeveloper(managerA.workspaceId, "dev-1", "Alice A");
+    await seedDeveloper(managerB.workspaceId, "dev-1", "Alice B");
+    await db.insert(configTable).values([
+      { workspaceId: managerA.workspaceId, key: "tasks_phase1_enabled", value: "true" },
+      { workspaceId: managerB.workspaceId, key: "tasks_phase1_enabled", value: "true" },
+    ]);
+
+    const itemA = await trackerService.addItem("dev-1", "2026-09-24", { title: "Workspace A task" }, managerA.workspaceId);
+    const itemB = await trackerService.addItem("dev-1", "2026-09-24", { title: "Workspace B task" }, managerB.workspaceId);
+    expect(itemA.taskKey).toBe("T-1");
+    expect(itemB.taskKey).toBe("T-1");
+
+    const app = buildApp(authService, trackerService, new ManagerDeskService(trackerService));
+    const managerACookie = await cookieFor(authService, "manager-a");
+    const managerBCookie = await cookieFor(authService, "manager-b");
+
+    const resA = await invoke(app, { method: "GET", url: "/api/tasks/T-1", headers: { cookie: managerACookie } });
+    expect(resA.status).toBe(200);
+    expect(resA.body.title).toBe("Workspace A task");
+    const resB = await invoke(app, { method: "GET", url: "/api/tasks/T-1", headers: { cookie: managerBCookie } });
+    expect(resB.status).toBe(200);
+    expect(resB.body.title).toBe("Workspace B task");
+
+    const eventsB = await invoke(app, { method: "GET", url: "/api/tasks/T-1/events", headers: { cookie: managerBCookie } });
+    expect(eventsB.status).toBe(200);
+    expect(eventsB.body.events.map((event: { type: string }) => event.type)).toEqual(["created"]);
+    expect(eventsB.body.events[0].meta.title).toBe("Workspace B task");
+  });
 });

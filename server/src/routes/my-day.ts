@@ -87,6 +87,7 @@ const addCheckInSchema = z.object({
     status: z
       .enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"])
       .optional(),
+    taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
   }),
   query: z.any().optional(),
   params: z.any().optional(),
@@ -100,6 +101,20 @@ export function createMyDayRouter(
   const router = Router();
 
   router.use(requireDeveloper(authService));
+
+  const taskParams = z.object({ key: z.string().trim().regex(/^[Tt]-\d{1,9}$/) });
+  router.get("/tasks/:key", validate(z.object({ params: taskParams, body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
+    try { res.json(await myDayService.resolveTask(req.auth!.user.developerAccountId!, req.params.key as string, req.auth!.user.workspaceId)); } catch (error) { next(error); }
+  });
+  router.get("/tasks/:key/events", validate(z.object({ params: taskParams, body: z.any().optional(), query: z.object({ cursor: z.string().regex(/^\d+$/).optional(), limit: z.coerce.number().int().min(1).max(100).optional() }) })), async (req, res, next) => {
+    try { res.json(await myDayService.getTaskEvents(req.auth!.user.developerAccountId!, req.params.key as string, { cursor: req.query.cursor as string | undefined, limit: req.query.limit ? Number(req.query.limit) : undefined }, req.auth!.user.workspaceId)); } catch (error) { next(error); }
+  });
+  router.post("/tasks/:key/events", validate(z.object({ params: taskParams, query: z.any().optional(), body: z.object({ date: isoDateSchema, type: z.enum(["update", "blocker", "instruction", "decision"]), body: z.string().trim().min(1).max(4000), blockerAction: z.enum(["raised", "cleared"]).optional(), visibility: z.enum(["shared", "private"]).optional(), requestId: z.string().uuid() }).superRefine((body, ctx) => { if (body.type === "blocker" && !body.blockerAction) ctx.addIssue({ code: "custom", message: "blockerAction required" }); }) })), async (req, res, next) => {
+    try {
+      const { event, replayed } = await myDayService.addTaskEvent(req.auth!.user.developerAccountId!, req.params.key as string, req.body, req.auth!.user.workspaceId);
+      res.status(replayed ? 200 : 201).json(event);
+    } catch (error) { next(error); }
+  });
 
   router.get("/issues", async (req, res, next) => {
     try {
@@ -184,10 +199,11 @@ export function createMyDayRouter(
   router.post("/checkins", validate(addCheckInSchema), async (req, res, next) => {
     try {
       const accountId = req.auth!.user.developerAccountId!;
-      const { date, summary, status } = req.body;
+      const { date, summary, status, taskKeys } = req.body;
       const checkIn = await myDayService.addCheckIn(accountId, date, {
         summary,
         status,
+        taskKeys,
       }, req.auth!.user.workspaceId);
       res.status(201).json(checkIn);
     } catch (error) {

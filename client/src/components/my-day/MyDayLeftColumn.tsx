@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Target, Zap, CheckCircle2, MessageSquare } from 'lucide-react';
 import type { AuthUser, MyDayResponse, TrackerDeveloperStatus } from '@/types';
+import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { MyDayHeader } from './MyDayHeader';
 import { StatusSelector } from './StatusSelector';
 import { CurrentTask } from './CurrentTask';
@@ -22,9 +23,8 @@ interface MyDayLeftColumnProps {
   updateStatusPending: boolean;
   handleMarkDone: (id: number) => void;
   handleDrop: (id: number) => void;
-  handleUpdateItemNote: (id: number, note: string | null) => void;
   handleUpdateItemTitle: (id: number, title: string) => void;
-  handleAddCheckIn: (summary: string) => void;
+  handleAddCheckIn: (summary: string, status?: TrackerDeveloperStatus, taskKeys?: string[]) => void;
   addCheckInPending: boolean;
   readOnly?: boolean;
 }
@@ -47,7 +47,6 @@ export function MyDayLeftColumn({
   updateStatusPending,
   handleMarkDone,
   handleDrop,
-  handleUpdateItemNote,
   handleUpdateItemTitle,
   handleAddCheckIn,
   addCheckInPending,
@@ -98,7 +97,6 @@ export function MyDayLeftColumn({
           item={day?.currentItem}
           onMarkDone={handleMarkDone}
           onDrop={handleDrop}
-          onUpdateNote={handleUpdateItemNote}
           onUpdateTitle={handleUpdateItemTitle}
           hasPlannedItems={(day?.plannedItems.length ?? 0) > 0}
           readOnly={readOnly}
@@ -154,7 +152,12 @@ export function MyDayLeftColumn({
             Quick Updates
           </h2>
         </div>
-        <QuickUpdates onAddCheckIn={handleAddCheckIn} isPending={addCheckInPending} disabled={readOnly} />
+        <QuickUpdates
+          onAddCheckIn={handleAddCheckIn}
+          tasks={tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, day?.plannedItems)}
+          isPending={addCheckInPending}
+          disabled={readOnly}
+        />
       </motion.section>
     </div>
   );

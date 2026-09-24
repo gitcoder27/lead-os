@@ -89,6 +89,7 @@ export function useAddMyDayCheckIn(date: string) {
     mutationFn: (params: {
       summary: string;
       status?: TrackerDeveloperStatus;
+      taskKeys?: string[];
     }) =>
       api.post<TrackerCheckIn>('/my-day/checkins', { date, ...params }),
     onSuccess: () => {

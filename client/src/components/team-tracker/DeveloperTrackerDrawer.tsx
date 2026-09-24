@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { MessageSquare, Save } from 'lucide-react';
 import type { TrackerDeveloperDay, TrackerDeveloperStatus, Issue } from '@/types';
@@ -8,6 +8,9 @@ import { AddTrackerItemForm } from './AddTrackerItemForm';
 import { formatAbsoluteDateTime, formatDate, formatRelativeTime } from '@/lib/utils';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
 import { useManagerDesk, useUpdateManagerDeskItem } from '@/hooks/useManagerDesk';
+import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
+import { TaskPicker, taskKeysForSubmit, tasksFromItems } from '@/components/tasks/TaskPicker';
+import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { DrawerHeader, DrawerSection, HistorySection, StatusSummary } from './DeveloperDrawerSections';
 import { ManagerFollowUpRow } from './ManagerFollowUpsSection';
 import type { ManagerDeskItem } from '@/types/manager-desk';
@@ -26,12 +29,11 @@ interface DeveloperTrackerDrawerProps {
   onAddItem: (params: { accountId: string; jiraKey?: string; relatedIssueKeys?: string[]; title: string; note?: string }) => void;
   onOpenTaskDetail: (itemId: number, managerDeskItemId?: number) => void;
   onReorderPlannedItem: (params: { itemId: number; position: number }) => void;
-  onUpdateItemNote: (params: { itemId: number; note: string | null }) => void;
   onUpdateItemTitle: (params: { itemId: number; title: string }) => void;
   onSetCurrent: (itemId: number) => void;
   onMarkDone: (itemId: number) => void;
   onDropItem: (itemId: number) => void;
-  onAddCheckIn: (params: { accountId: string; summary: string; status?: TrackerDeveloperStatus }) => void;
+  onAddCheckIn: (params: { accountId: string; summary: string; status?: TrackerDeveloperStatus; taskKeys?: string[] }) => void;
   onMarkInactive?: (day: TrackerDeveloperDay) => void;
   onOpenManagerDesk?: () => void;
   issues?: Issue[];
@@ -86,6 +88,13 @@ function CheckInRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>{checkIn.summary}</div>
+        {(checkIn.taskKeys ?? []).length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {(checkIn.taskKeys ?? []).map((key) => (
+              <TaskKeyChip key={key} taskKey={key} />
+            ))}
+          </div>
+        )}
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
           <span
             className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
@@ -121,7 +130,6 @@ export function DeveloperTrackerDrawer({
   onAddItem,
   onOpenTaskDetail,
   onReorderPlannedItem,
-  onUpdateItemNote,
   onUpdateItemTitle,
   onSetCurrent,
   onMarkDone,
@@ -134,6 +142,7 @@ export function DeveloperTrackerDrawer({
   readOnly = false,
 }: DeveloperTrackerDrawerProps) {
   const [checkInText, setCheckInText] = useState('');
+  const [checkInTaskKeys, setCheckInTaskKeys] = useState<string[]>([]);
   const [notesText, setNotesText] = useState('');
   const [capacityText, setCapacityText] = useState('');
   const [notesEditing, setNotesEditing] = useState(false);
@@ -144,6 +153,7 @@ export function DeveloperTrackerDrawer({
   const localPlannedItemsRef = useRef<TrackerWorkItem[]>([]);
   const isDraggingRef = useRef(false);
   const draggedItemIdRef = useRef<number | null>(null);
+  const composerApisRef = useRef(new Map<number, { expand: () => void; focus: () => void }>());
   const assignedTodayCount = (day?.currentItem ? 1 : 0) + (day?.plannedItems.length ?? 0);
   const loadLabel = day?.capacityUnits ? `${assignedTodayCount}/${day.capacityUnits}` : `${assignedTodayCount}`;
   const isOverCapacity = day?.capacityUnits !== undefined && assignedTodayCount > day.capacityUnits;
@@ -201,6 +211,52 @@ export function DeveloperTrackerDrawer({
     onReorderPlannedItem({ itemId: movedItemId, position: targetPosition });
   }, [day, onReorderPlannedItem]);
 
+  const checkInTasks = useMemo(
+    () => tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, localPlannedItems),
+    [day?.currentItem, localPlannedItems],
+  );
+
+  const composerOrder = useMemo(
+    () =>
+      [day?.currentItem?.id, ...localPlannedItems.map((item) => item.id)].filter(
+        (id): id is number => id !== undefined,
+      ),
+    [day?.currentItem?.id, localPlannedItems],
+  );
+
+  const focusAdjacentComposer = useCallback(
+    (itemId: number, direction: 'up' | 'down') => {
+      const index = composerOrder.indexOf(itemId);
+      const nextId = composerOrder[index + (direction === 'down' ? 1 : -1)];
+      if (nextId === undefined) return;
+      composerApisRef.current.get(nextId)?.expand();
+    },
+    [composerOrder],
+  );
+
+  const registerComposer = useCallback(
+    (itemId: number) => (api: { expand: () => void; focus: () => void } | null) => {
+      if (api) {
+        composerApisRef.current.set(itemId, api);
+      } else {
+        composerApisRef.current.delete(itemId);
+      }
+    },
+    [],
+  );
+
+  const composerFor = (item: TrackerWorkItem) =>
+    !readOnly && item.taskKey ? (
+      <TaskUpdateComposer
+        taskKey={item.taskKey}
+        mode="manager"
+        via="standup"
+        collapsed
+        registerComposer={registerComposer(item.id)}
+        onArrowNav={(direction) => focusAdjacentComposer(item.id, direction)}
+      />
+    ) : undefined;
+
   const handleSaveNotes = () => {
     if (!day) return;
     onUpdateDay({ accountId: day.developer.accountId, managerNotes: notesText });
@@ -209,8 +265,10 @@ export function DeveloperTrackerDrawer({
 
   const handleCheckIn = () => {
     if (!day || !checkInText.trim()) return;
-    onAddCheckIn({ accountId: day.developer.accountId, summary: checkInText.trim() });
+    const taskKeys = taskKeysForSubmit(checkInTaskKeys, checkInText, checkInTasks);
+    onAddCheckIn({ accountId: day.developer.accountId, summary: checkInText.trim(), taskKeys });
     setCheckInText('');
+    setCheckInTaskKeys([]);
   };
 
   const handleSaveCapacity = () => {
@@ -300,11 +358,11 @@ export function DeveloperTrackerDrawer({
                       actionPreset="hover-done"
                       viewDate={date}
                       onOpen={readOnly ? undefined : onOpenTaskDetail}
-                      onUpdateNote={readOnly ? undefined : (itemId, note) => onUpdateItemNote({ itemId, note })}
                       onUpdateTitle={readOnly ? undefined : (itemId, title) => onUpdateItemTitle({ itemId, title })}
                       onSetCurrent={readOnly ? undefined : onSetCurrent}
                       onMarkDone={readOnly ? undefined : onMarkDone}
                       onDrop={readOnly ? undefined : onDropItem}
+                      composer={composerFor(day.currentItem)}
                     />
                   </div>
                 ) : (
@@ -387,11 +445,11 @@ export function DeveloperTrackerDrawer({
                           actionPreset="hover-start"
                           viewDate={date}
                           onOpen={onOpenTaskDetail}
-                          onUpdateNote={(itemId, note) => onUpdateItemNote({ itemId, note })}
                           onUpdateTitle={(itemId, title) => onUpdateItemTitle({ itemId, title })}
                           onSetCurrent={onSetCurrent}
                           onMarkDone={onMarkDone}
                           onDrop={onDropItem}
+                          composer={composerFor(item)}
                         />
                       </Reorder.Item>
                     ))}
@@ -527,12 +585,21 @@ export function DeveloperTrackerDrawer({
                 }}
               >
                 <div
-                  className="flex items-center gap-2 rounded-2xl px-3 py-2"
+                  className="rounded-2xl px-3 py-2"
                   style={{
                     background: 'color-mix(in srgb, var(--bg-tertiary) 48%, transparent)',
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
                   }}
                 >
+                  <div className="mb-1.5">
+                    <TaskPicker
+                      tasks={checkInTasks}
+                      text={checkInText}
+                      selected={checkInTaskKeys}
+                      onChange={setCheckInTaskKeys}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
                   <MessageSquare size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
                   <input
                     type="text"
@@ -557,6 +624,7 @@ export function DeveloperTrackerDrawer({
                   >
                     Save
                   </button>
+                  </div>
                 </div>
               </div>
             )}

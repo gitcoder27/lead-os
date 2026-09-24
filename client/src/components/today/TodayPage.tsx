@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
 import { useTodayActions } from '@/hooks/useTodayActions';
+import { useTeamTracker } from '@/hooks/useTeamTracker';
+import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { getLocalIsoDate } from '@/lib/utils';
 import type { FilterType, TodayActionCommand, TodayActionTarget, TodayResponse } from '@/types';
 import { TodayActionQueue } from './TodayActionQueue';
@@ -42,6 +44,15 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   } | null>(null);
   const today = useToday(date);
   const snapshot = today.data;
+  // Only fetch the board while the check-in dialog is open — it provides the
+  // developer's current/planned tasks for the task picker.
+  const checkInBoard = useTeamTracker(date, undefined, Boolean(checkInDraft));
+  const checkInTasks = useMemo(() => {
+    const devDay = checkInBoard.data?.developers?.find(
+      (developerDay) => developerDay.developer.accountId === checkInDraft?.command.target.developerAccountId,
+    );
+    return tasksFromItems(devDay?.currentItem ? [devDay.currentItem] : undefined, devDay?.plannedItems);
+  }, [checkInBoard.data, checkInDraft]);
 
   const openTarget = (target: TodayActionTarget) => {
     if (onOpenTodayTarget) {
@@ -168,10 +179,11 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         <TodayCheckInDialog
           developerName={checkInDraft.developerName}
           defaultSummary={checkInDraft.defaultSummary}
+          tasks={checkInTasks}
           isSaving={actions.isPending && actions.pendingKind === 'add_check_in'}
           onClose={() => setCheckInDraft(null)}
-          onSave={(summary) => {
-            actions.runAction(checkInDraft.command, { summary });
+          onSave={(summary, taskKeys) => {
+            actions.runAction(checkInDraft.command, { summary, taskKeys });
             setCheckInDraft(null);
           }}
         />

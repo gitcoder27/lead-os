@@ -11,14 +11,12 @@ interface TrackerItemRowActionsProps {
   draggable?: boolean;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
-  hasNote?: boolean;
   onSetCurrent?: (id: number) => void;
   onMarkDone?: (id: number) => void;
   onDrop?: (id: number) => void;
   onMoveUp?: (id: number) => void;
   onMoveDown?: (id: number) => void;
   onToggleTitleEditor?: () => void;
-  onToggleNoteEditor?: () => void;
 }
 
 export function TrackerItemRowActions({
@@ -29,14 +27,12 @@ export function TrackerItemRowActions({
   draggable,
   canMoveUp = false,
   canMoveDown = false,
-  hasNote,
   onSetCurrent,
   onMarkDone,
   onDrop,
   onMoveUp,
   onMoveDown,
   onToggleTitleEditor,
-  onToggleNoteEditor,
 }: TrackerItemRowActionsProps) {
   if (actionPreset === 'none') {
     return null;
@@ -159,19 +155,6 @@ export function TrackerItemRowActions({
           aria-label={`Mark ${itemTitle} done`}
         >
           <CheckCircle2 size={13} style={{ color: 'var(--success)' }} />
-        </button>
-      )}
-      {!hoverPrimaryOnly && onToggleNoteEditor && (
-        <button
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleNoteEditor();
-          }}
-          className="h-6 w-6 rounded-md flex items-center justify-center transition-colors"
-          style={{ background: 'var(--bg-tertiary)' }}
-          title="Edit note"
-        >
-          <PencilLine size={10} style={{ color: hasNote ? 'var(--accent)' : 'var(--text-secondary)' }} />
         </button>
       )}
       {!hoverPrimaryOnly && onMarkDone && (

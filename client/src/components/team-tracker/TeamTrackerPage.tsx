@@ -1,7 +1,9 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, History, RefreshCw } from 'lucide-react';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
+import { useTaskResolution } from '@/hooks/useTasks';
+import { writeTaskParam } from '@/lib/view-params';
 import {
   useUpdateDay,
   useUpdateAvailability,
@@ -44,6 +46,8 @@ interface TeamTrackerPageProps {
   initialDeveloperAccountId?: string;
   initialTrackerItemId?: number;
   initialManagerDeskItemId?: number;
+  /** Deep-linked task key (`/team?task=T-5`) — resolved to developer + task drawers. */
+  initialTaskKey?: string;
   initialDeveloperNonce?: number;
   onInitialDeveloperHandled?: () => void;
   initialBoardQuery?: TeamTrackerBoardQuery;
@@ -74,7 +78,7 @@ function useTeamTrackerWorkflow({
   refetchBoard: () => unknown;
 }) {
   const [drawerAccountId, setDrawerAccountId] = useState<string | undefined>();
-  const [selectedTask, setSelectedTask] = useState<{ trackerItemId: number; managerDeskItemId?: number } | null>(null);
+  const [selectedTask, setSelectedTask] = useState<{ trackerItemId: number | null; managerDeskItemId?: number; taskKey?: string } | null>(null);
   const [availabilityTarget, setAvailabilityTarget] = useState<TrackerDeveloperDay | undefined>();
   const [followUpTarget, setFollowUpTarget] = useState<{ day: TrackerDeveloperDay; reasons: TrackerAttentionReason[] } | null>(null);
 
@@ -189,8 +193,8 @@ function useTeamTrackerWorkflow({
   );
 
   const handleOpenTaskDetail = useCallback((itemId: number, managerDeskItemId?: number) => {
-    setSelectedTask({ trackerItemId: itemId, managerDeskItemId });
-  }, []);
+    setSelectedTask({ trackerItemId: itemId, managerDeskItemId, taskKey: findTrackerItem(itemId)?.taskKey ?? undefined });
+  }, [findTrackerItem]);
 
   const handleCreateTask = useCallback(
     (params: { accountId: string; title: string; jiraKey?: string; relatedIssueKeys?: string[]; note?: string }) => {
@@ -274,6 +278,7 @@ export function TeamTrackerPage({
   initialDeveloperAccountId,
   initialTrackerItemId,
   initialManagerDeskItemId,
+  initialTaskKey,
   initialDeveloperNonce,
   onInitialDeveloperHandled,
   initialBoardQuery,
@@ -354,6 +359,7 @@ export function TeamTrackerPage({
       workflow.setSelectedTask({
         trackerItemId: initialTrackerItemId,
         managerDeskItemId: initialManagerDeskItemId,
+        taskKey: initialTaskKey,
       });
     }
     onInitialDeveloperHandled?.();
@@ -361,11 +367,49 @@ export function TeamTrackerPage({
     initialDeveloperAccountId,
     initialTrackerItemId,
     initialManagerDeskItemId,
+    initialTaskKey,
     initialDeveloperNonce,
     onInitialDeveloperHandled,
     workflow.setDrawerAccountId,
     workflow.setSelectedTask,
   ]);
+
+  const taskResolution = useTaskResolution(initialTaskKey);
+  const handledTaskRef = useRef<string | undefined>();
+  useEffect(() => {
+    const resolution = taskResolution.data;
+    if (!resolution || handledTaskRef.current === `${initialTaskKey}:${initialDeveloperNonce ?? 0}`) {
+      return;
+    }
+    handledTaskRef.current = `${initialTaskKey}:${initialDeveloperNonce ?? 0}`;
+    if (resolution.developer) {
+      workflow.setDrawerAccountId(resolution.developer.accountId);
+    }
+    if (resolution.trackerItemId || resolution.managerDeskItemId) {
+      workflow.setSelectedTask({
+        trackerItemId: resolution.trackerItemId ?? null,
+        managerDeskItemId: resolution.managerDeskItemId,
+        taskKey: resolution.taskKey,
+      });
+    }
+    onInitialDeveloperHandled?.();
+  }, [taskResolution.data, initialTaskKey, initialDeveloperNonce, onInitialDeveloperHandled, workflow.setDrawerAccountId, workflow.setSelectedTask]);
+
+  // A stale ?task= (unknown, deleted, or cross-workspace key) is dropped once
+  // resolution settles so the board doesn't keep a dead deep link.
+  useEffect(() => {
+    if (!initialTaskKey || !taskResolution.isError) {
+      return;
+    }
+    writeTaskParam(undefined);
+    addToast(`Task ${initialTaskKey} is not available`, 'error');
+    onInitialDeveloperHandled?.();
+  }, [initialTaskKey, taskResolution.isError, addToast, onInitialDeveloperHandled]);
+
+  // Mirror the open task drawer into ?task= so deep links stay shareable.
+  useEffect(() => {
+    writeTaskParam(workflow.selectedTask?.taskKey);
+  }, [workflow.selectedTask]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -578,7 +622,6 @@ export function TeamTrackerPage({
         onAddItem={workflow.handleCreateTask}
         onOpenTaskDetail={workflow.handleOpenTaskDetail}
         onReorderPlannedItem={(params) => updateItem.mutate(params)}
-        onUpdateItemNote={(params) => updateItem.mutate(params)}
         onUpdateItemTitle={(params) => updateItem.mutate(params)}
         onSetCurrent={workflow.handleSetCurrent}
         onMarkDone={workflow.handleMarkDone}

@@ -17,6 +17,7 @@ import {
   deskDateFromParams,
   isValidIsoDate,
   notesDateFromParams,
+  taskKeyFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
 } from '@/lib/view-params';
@@ -414,13 +415,23 @@ function AppContent() {
       : getLocalIsoDate(),
   );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
-  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; nonce: number }>({ nonce: 0 });
+  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; taskKey?: string; nonce: number }>(() => ({
+    taskKey:
+      pathToView(window.location.pathname) === 'team'
+        ? taskKeyFromParams(new URLSearchParams(window.location.search))
+        : undefined,
+    nonce: 0,
+  }));
   const [settingsSectionTarget, setSettingsSectionTarget] = useState<{ section?: string; nonce: number }>({ nonce: 0 });
-  const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; nonce: number }>(() => ({
+  const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; taskKey?: string; nonce: number }>(() => ({
     itemId: undefined,
     date:
       pathToView(window.location.pathname) === 'desk'
         ? deskDateFromParams(new URLSearchParams(window.location.search))
+        : undefined,
+    taskKey:
+      pathToView(window.location.pathname) === 'desk'
+        ? taskKeyFromParams(new URLSearchParams(window.location.search))
         : undefined,
     nonce: 0,
   }));
@@ -516,11 +527,12 @@ function AppContent() {
         developerAccountId: target.developerAccountId,
         trackerItemId: target.trackerItemId,
         managerDeskItemId: target.managerDeskItemId,
+        taskKey: target.taskKey,
         nonce: prev.nonce + 1,
       }));
       preloadView('team');
       setActiveView('team');
-      navigateToView('team');
+      navigateToView('team', { params: target.taskKey ? { task: target.taskKey } : undefined });
       return;
     }
 
@@ -528,12 +540,39 @@ function AppContent() {
       setTodayDeskTarget((prev) => ({
         itemId: target.managerDeskItemId,
         date: target.date,
+        taskKey: target.taskKey,
         nonce: prev.nonce + 1,
       }));
       setDeskDateParam(target.date);
       preloadView('desk');
       setActiveView('desk');
-      navigateToView('desk', { params: target.date ? { date: target.date } : undefined });
+      navigateToView('desk', {
+        params: {
+          ...(target.date ? { date: target.date } : {}),
+          ...(target.taskKey ? { task: target.taskKey } : {}),
+        },
+      });
+      return;
+    }
+
+    if (target.view === 'desk' && target.taskKey) {
+      setTodayDeskTarget((prev) => ({
+        itemId: target.managerDeskItemId,
+        date: target.date,
+        taskKey: target.taskKey,
+        nonce: prev.nonce + 1,
+      }));
+      if (target.date) {
+        setDeskDateParam(target.date);
+      }
+      preloadView('desk');
+      setActiveView('desk');
+      navigateToView('desk', {
+        params: {
+          ...(target.date ? { date: target.date } : {}),
+          task: target.taskKey,
+        },
+      });
       return;
     }
 
@@ -565,7 +604,7 @@ function AppContent() {
       return;
     }
     if (task.kind === 'desk_only') {
-      setTodayDeskTarget((prev) => ({ itemId: task.managerDeskItemId, date: task.date, nonce: prev.nonce + 1 }));
+      setTodayDeskTarget((prev) => ({ itemId: task.managerDeskItemId, date: task.date, taskKey: task.taskKey, nonce: prev.nonce + 1 }));
       setDeskDateParam(task.date);
       preloadView('desk');
       setActiveView('desk');
@@ -576,6 +615,7 @@ function AppContent() {
       developerAccountId: task.developer?.accountId,
       trackerItemId: task.trackerItemId,
       managerDeskItemId: task.managerDeskItemId,
+      taskKey: task.taskKey,
       nonce: prev.nonce + 1,
     }));
     setTeamBoardQuery(undefined);
@@ -604,6 +644,17 @@ function AppContent() {
       if (nextView === 'team') {
         setTeamBoardQuery(teamBoardQueryFromParams(params));
         setTeamBoardQueryNonce((nonce) => nonce + 1);
+        const taskKey = taskKeyFromParams(params);
+        if (taskKey) {
+          setTodayTeamTarget((prev) => ({ taskKey, nonce: prev.nonce + 1 }));
+        }
+      }
+      if (nextView === 'desk') {
+        const taskKey = taskKeyFromParams(params);
+        const date = deskDateFromParams(params);
+        if (taskKey) {
+          setTodayDeskTarget((prev) => ({ taskKey, date, nonce: prev.nonce + 1 }));
+        }
       }
       if (nextView === 'notes') {
         setNotesDate(notesDateFromParams(params) ?? getLocalIsoDate());
@@ -642,7 +693,12 @@ function AppContent() {
     if (activeView !== 'team' || !teamBoardQuery) {
       return;
     }
-    const target = `${window.location.pathname}${buildSearchFromParams(teamBoardQueryToParams(teamBoardQuery))}`;
+    // Keep the deep-linked task param in sync so task drawers stay shareable.
+    const taskKey = taskKeyFromParams(new URLSearchParams(window.location.search));
+    const target = `${window.location.pathname}${buildSearchFromParams({
+      ...teamBoardQueryToParams(teamBoardQuery),
+      task: taskKey,
+    })}`;
     if (sameLocation(target)) {
       return;
     }
@@ -805,6 +861,7 @@ function AppContent() {
           <ManagerDeskPage
             initialItemId={todayDeskTarget.itemId}
             initialDate={todayDeskTarget.date}
+            initialTaskKey={todayDeskTarget.taskKey}
             initialItemNonce={todayDeskTarget.nonce}
             onInitialItemHandled={() => setTodayDeskTarget((prev) => ({ nonce: prev.nonce + 1 }))}
             onDateChange={handleDeskDateChange}
@@ -823,6 +880,7 @@ function AppContent() {
             initialDeveloperAccountId={todayTeamTarget.developerAccountId}
             initialTrackerItemId={todayTeamTarget.trackerItemId}
             initialManagerDeskItemId={todayTeamTarget.managerDeskItemId}
+            initialTaskKey={todayTeamTarget.taskKey}
             initialDeveloperNonce={todayTeamTarget.nonce}
             onInitialDeveloperHandled={() => setTodayTeamTarget((prev) => ({ nonce: prev.nonce + 1 }))}
             initialBoardQuery={teamBoardQuery}

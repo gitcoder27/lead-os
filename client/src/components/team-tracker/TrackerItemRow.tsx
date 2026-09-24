@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Link2, Play, Save, StickyNote, X, XCircle } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Link2, Play, StickyNote, X, XCircle } from 'lucide-react';
 import type { TrackerItemState, TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { formatDate, priorityColor } from '@/lib/utils';
+import { formatDate, formatRelativeTime, priorityColor } from '@/lib/utils';
+import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { TrackerItemRowActions, type TrackerItemActionPreset } from './TrackerItemRowActions';
 import { TrackerItemRowDetails } from './TrackerItemRowDetails';
 import { RelatedIssueChips } from './RelatedIssueChips';
@@ -17,7 +18,6 @@ interface TrackerItemRowProps {
   onDrop?: (id: number) => void;
   onMoveUp?: (id: number) => void;
   onMoveDown?: (id: number) => void;
-  onUpdateNote?: (id: number, note: string | null) => void;
   onUpdateTitle?: (id: number, title: string) => void;
   viewDate?: string;
   canMoveUp?: boolean;
@@ -29,6 +29,8 @@ interface TrackerItemRowProps {
   actionPreset?: TrackerItemActionPreset;
   hideActions?: boolean;
   readOnly?: boolean;
+  /** Inline task-event composer (e.g. standup updates), rendered under the row. */
+  composer?: ReactNode;
 }
 
 const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }> = {
@@ -63,7 +65,6 @@ export function TrackerItemRow({
   onDrop,
   onMoveUp,
   onMoveDown,
-  onUpdateNote,
   onUpdateTitle,
   viewDate,
   canMoveUp = false,
@@ -75,18 +76,15 @@ export function TrackerItemRow({
   actionPreset = 'default',
   hideActions = false,
   readOnly = false,
+  composer,
 }: TrackerItemRowProps) {
-  const [noteEditing, setNoteEditing] = useState(false);
-  const [draftNote, setDraftNote] = useState(item.note ?? '');
   const [titleEditing, setTitleEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(item.title);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  useEffect(() => setDraftNote(item.note ?? ''), [item.id, item.note]);
   useEffect(() => setDraftTitle(item.title), [item.id, item.title]);
   useEffect(() => {
     setDetailsOpen(false);
-    setNoteEditing(false);
     setTitleEditing(false);
   }, [item.id]);
 
@@ -96,7 +94,7 @@ export function TrackerItemRow({
   const isDone = item.state === 'done' || item.state === 'dropped';
   const isLinked = Boolean(item.managerDeskItemId);
   const isDrawerPlanned = variant === 'drawer-planned';
-  const canOpen = Boolean(onOpen) && !noteEditing && !titleEditing;
+  const canOpen = Boolean(onOpen) && !titleEditing;
   const isTitleEditable = !readOnly && !compact && Boolean(onUpdateTitle) && !isDone && !isLinked;
   const hasExplicitTitleEditAction = isTitleEditable && Boolean(onOpen);
   const isInlineTitleEditable = isTitleEditable && !hasExplicitTitleEditAction;
@@ -114,16 +112,12 @@ export function TrackerItemRow({
     setTitleEditing(false);
   };
 
-  const commitNote = () => {
-    onUpdateNote?.(item.id, draftNote.trim() || null);
-    setNoteEditing(false);
-  };
-
   const toggleDetails = () => setDetailsOpen((open) => !open);
   const handleOpen = () => onOpen?.(item.id, item.managerDeskItemId);
 
   return (
     <div
+      data-task-key={item.taskKey ?? undefined}
       className={`group relative flex items-center gap-2.5 rounded-xl transition-colors ${canOpen ? 'cursor-pointer' : ''} ${
         isDrawerPlanned ? 'px-3 py-2.5' : 'px-2 py-1.5'
       }`}
@@ -164,6 +158,7 @@ export function TrackerItemRow({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-1.5">
+          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-[1px]" />}
           <div className="flex-1 min-w-0">
             {titleEditing && isTitleEditable ? (
               <div className="flex items-center gap-1 min-w-0">
@@ -316,7 +311,18 @@ export function TrackerItemRow({
             </span>
           </div>
         )}
-        {item.note && !compact && !noteEditing && (
+        {item.latestEvent && !compact && (
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="truncate" title={item.latestEvent.excerpt}>
+              {item.latestEvent.excerpt}
+            </span>
+            <span className="shrink-0">· {formatRelativeTime(item.latestEvent.occurredAt)}</span>
+            {typeof item.ageDays === 'number' && item.ageDays > 0 && (
+              <span className="shrink-0">· {item.ageDays}d</span>
+            )}
+          </div>
+        )}
+        {item.note && !compact && (
           <div className="mt-1 flex items-start gap-1.5">
             <StickyNote size={12} className="shrink-0 mt-[2px]" style={{ color: 'var(--text-muted)' }} />
             <span
@@ -327,36 +333,10 @@ export function TrackerItemRow({
             </span>
           </div>
         )}
-        {!compact && noteEditing && (
-          <div className="mt-1.5 space-y-1.5">
-            <textarea
-              value={draftNote}
-              onChange={(event) => setDraftNote(event.target.value)}
-              rows={2}
-              className="w-full rounded-lg px-2 py-1.5 text-[13px] outline-none resize-none"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
-            />
-            <div className="flex items-center gap-1.5">
-              <button onClick={commitNote} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[13px]" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
-                <Save size={11} />
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setDraftNote(item.note ?? '');
-                  setNoteEditing(false);
-                }}
-                className="text-[13px]"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-        {canShowDetails && detailsOpen && !titleEditing && !noteEditing && (
+        {canShowDetails && detailsOpen && !titleEditing && (
           <TrackerItemRowDetails regionId={detailsRegionId} title={item.title} note={item.note} />
         )}
+        {composer}
       </div>
 
       {!isDone && resolvedActionPreset !== 'none' && (
@@ -368,7 +348,6 @@ export function TrackerItemRow({
           draggable={draggable}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
-          hasNote={Boolean(item.note)}
           onSetCurrent={onSetCurrent}
           onMarkDone={onMarkDone}
           onDrop={onDrop}
@@ -378,7 +357,6 @@ export function TrackerItemRow({
             setDetailsOpen(false);
             setTitleEditing(true);
           } : undefined}
-          onToggleNoteEditor={!compact && onUpdateNote ? () => setNoteEditing((editing) => !editing) : undefined}
         />
       )}
     </div>

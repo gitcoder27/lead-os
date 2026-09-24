@@ -111,7 +111,6 @@ function renderQueue(items: TrackerWorkItem[], onReorder = vi.fn()) {
       onMarkDone={vi.fn()}
       onDrop={vi.fn()}
       onReorder={onReorder}
-      onUpdateNote={vi.fn()}
       onUpdateTitle={vi.fn()}
     />
   );
@@ -146,7 +145,6 @@ describe('PlannedQueue', () => {
         onMarkDone={vi.fn()}
         onDrop={vi.fn()}
         onReorder={vi.fn()}
-        onUpdateNote={vi.fn()}
         onUpdateTitle={vi.fn()}
       />
     );

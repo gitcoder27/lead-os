@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Reorder } from 'framer-motion';
 import type { TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from '@/components/team-tracker/TrackerItemRow';
+import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 
 interface PlannedQueueProps {
   viewDate?: string;
@@ -10,7 +11,6 @@ interface PlannedQueueProps {
   onMarkDone: (id: number) => void;
   onDrop: (id: number) => void;
   onReorder: (itemId: number, newPosition: number) => void;
-  onUpdateNote: (id: number, note: string | null) => void;
   onUpdateTitle: (id: number, title: string) => void;
   readOnly?: boolean;
 }
@@ -22,7 +22,6 @@ export function PlannedQueue({
   onMarkDone,
   onDrop,
   onReorder,
-  onUpdateNote,
   onUpdateTitle,
   readOnly,
 }: PlannedQueueProps) {
@@ -137,9 +136,13 @@ export function PlannedQueue({
             onSetCurrent={onSetCurrent}
             onMarkDone={onMarkDone}
             onDrop={onDrop}
-            onUpdateNote={onUpdateNote}
             onUpdateTitle={onUpdateTitle}
             readOnly={readOnly}
+            composer={
+              !readOnly && item.taskKey && viewDate ? (
+                <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed />
+              ) : undefined
+            }
           />
         </Reorder.Item>
       ))}

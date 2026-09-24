@@ -6,13 +6,15 @@ import type {
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
   GlobalSearchIssueItem,
+  GlobalSearchTaskItem,
   GlobalSearchTrackerItem,
   TodayActionTarget,
 } from '@/types';
 import { KIND_LABELS } from '@/types/manager-desk';
 import { isValidIsoDate } from '@/lib/view-params';
+import { TASK_KEY_PATTERN } from '@/types';
 
-export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'tracker' | 'checkins' | 'developers' | 'notes';
+export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'tracker' | 'tasks' | 'checkins' | 'developers' | 'notes';
 
 export interface PaletteItem {
   id: string;
@@ -142,6 +144,23 @@ export function placeQuickAddItem(rows: PaletteItem[], quickAdd: PaletteItem | n
   return rows.length === 0 ? [quickAdd] : [...rows, quickAdd];
 }
 
+/**
+ * A typed task key (e.g. "T-5") pins the matching task rows ahead of commands
+ * and quick-add so Enter always opens the task, never creates a desk item.
+ */
+export function pinExactTaskKey(rows: PaletteItem[], query: string): PaletteItem[] {
+  const match = TASK_KEY_PATTERN.exec(query.trim());
+  if (!match) {
+    return rows;
+  }
+  const key = `T-${Number(match[1])}`;
+  const pinned = rows.filter((row) => row.group === 'tasks' && row.id.startsWith(`task-${key}-`));
+  if (pinned.length === 0) {
+    return rows;
+  }
+  return [...pinned, ...rows.filter((row) => !pinned.includes(row))];
+}
+
 export function issueToPaletteItem(issue: GlobalSearchIssueItem, index: number): PaletteItem {
   return {
     id: `issue-${issue.jiraKey}-${index}`,
@@ -171,6 +190,33 @@ const TRACKER_STATE_LABELS: Record<GlobalSearchTrackerItem['state'], string> = {
   done: 'Done',
   dropped: 'Dropped',
 };
+
+export function taskToPaletteItem(task: GlobalSearchTaskItem, index: number): PaletteItem {
+  const context = [task.taskKey];
+  if (task.developerName) {
+    context.push(task.developerName);
+  }
+  if (task.state) {
+    context.push(TRACKER_STATE_LABELS[task.state] ?? task.state);
+  } else if (task.status) {
+    context.push(task.status === 'done' ? 'Done' : task.status.replace(/_/g, ' '));
+  }
+  if (task.excerpt) {
+    context.push(task.excerpt);
+  }
+  const target: TodayActionTarget =
+    task.kind === 'desk_only'
+      ? { type: 'manager_desk_item', view: 'desk', taskKey: task.taskKey }
+      : { type: 'tracker_item', view: 'team', taskKey: task.taskKey };
+  return {
+    id: `task-${task.taskKey}-${index}`,
+    group: 'tasks',
+    title: task.title,
+    description: context.join(' · '),
+    keywords: `${task.taskKey} ${task.taskKey.toLowerCase()} task`,
+    target,
+  };
+}
 
 export function trackerItemToPaletteItem(item: GlobalSearchTrackerItem, index: number): PaletteItem {
   const context = [item.developerName, item.date, TRACKER_STATE_LABELS[item.state] ?? item.state];
@@ -229,11 +275,17 @@ export function buildResultGroups(results: {
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
   trackerItems?: GlobalSearchTrackerItem[];
+  tasks?: GlobalSearchTaskItem[];
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
   notes?: DailyNoteSummary[];
 }): PaletteGroup[] {
   const groups: PaletteGroup[] = [
+    {
+      id: 'tasks',
+      label: 'Tasks',
+      items: (results.tasks ?? []).map(taskToPaletteItem),
+    },
     {
       id: 'issues',
       label: 'Work items',

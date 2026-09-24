@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DailyNoteSummary, GlobalSearchCheckInItem, GlobalSearchDeskItem, GlobalSearchDeveloperItem, GlobalSearchIssueItem } from '@/types';
+import type { DailyNoteSummary, GlobalSearchCheckInItem, GlobalSearchDeskItem, GlobalSearchDeveloperItem, GlobalSearchIssueItem, GlobalSearchTaskItem } from '@/types';
 import {
   buildNavigationCommands,
   buildQuickActions,
@@ -11,8 +11,10 @@ import {
   filterCommands,
   issueToPaletteItem,
   noteToPaletteItem,
+  pinExactTaskKey,
   placeQuickAddItem,
   QUICK_ADD_MIN_QUERY_LENGTH,
+  taskToPaletteItem,
 } from '@/components/palette/paletteItems';
 
 const issue: GlobalSearchIssueItem = {
@@ -50,6 +52,25 @@ const developer: GlobalSearchDeveloperItem = {
   accountId: 'dev-1',
   displayName: 'Alice Smith',
   email: 'alice@example.com',
+};
+
+const task: GlobalSearchTaskItem = {
+  taskKey: 'T-5',
+  title: 'Fix login bug',
+  kind: 'delegated',
+  developerName: 'Bob Jones',
+  state: 'in_progress',
+  matchedIn: 'key',
+  updatedAt: '2026-03-07T08:00:00.000Z',
+};
+
+const deskOnlyTask: GlobalSearchTaskItem = {
+  taskKey: 'T-9',
+  title: 'Renew vendor contract',
+  kind: 'desk_only',
+  status: 'in_progress',
+  matchedIn: 'title',
+  updatedAt: '2026-03-07T08:00:00.000Z',
 };
 
 const dailyNote: DailyNoteSummary = {
@@ -112,6 +133,24 @@ describe('palette item builders', () => {
     expect(item.description).toContain('Draft agenda');
   });
 
+  it('maps a tracker task to a team target keyed by task key', () => {
+    const item = taskToPaletteItem(task, 0);
+
+    expect(item.group).toBe('tasks');
+    expect(item.target).toEqual({ type: 'tracker_item', view: 'team', taskKey: 'T-5' });
+    expect(item.title).toBe('Fix login bug');
+    expect(item.description).toContain('T-5');
+    expect(item.description).toContain('Bob Jones');
+    expect(item.keywords).toContain('T-5');
+  });
+
+  it('maps a desk-only task to a desk target keyed by task key', () => {
+    const item = taskToPaletteItem(deskOnlyTask, 1);
+
+    expect(item.target).toEqual({ type: 'manager_desk_item', view: 'desk', taskKey: 'T-9' });
+    expect(item.id).toBe('task-T-9-1');
+  });
+
   it('builds result groups with only non-empty groups', () => {
     const groups = buildResultGroups({
       issues: [issue],
@@ -121,6 +160,20 @@ describe('palette item builders', () => {
     });
 
     expect(groups.map((group) => group.id)).toEqual(['issues', 'checkins']);
+  });
+
+  it('places the tasks group first when present', () => {
+    const groups = buildResultGroups({
+      issues: [issue],
+      deskItems: [],
+      tasks: [task],
+      trackerItems: [],
+      checkIns: [checkIn],
+      developers: [],
+    });
+
+    expect(groups.map((group) => group.id)).toEqual(['tasks', 'issues', 'checkins']);
+    expect(groups[0].items[0].id).toBe('task-T-5-0');
   });
 
   it('includes a notes group when note results are present', () => {
@@ -240,6 +293,37 @@ describe('quick-add to Desk', () => {
 
     expect(rows[rows.length - 1]?.id).toBe('quick-add-desk');
     expect(rows.filter((row) => row.id === 'quick-add-desk')).toHaveLength(1);
+  });
+});
+
+describe('exact task-key pinning', () => {
+  it('pins the matching task row ahead of commands and quick-add', () => {
+    const rows = [
+      ...buildNavigationCommands().slice(0, 2),
+      taskToPaletteItem(task, 0),
+      taskToPaletteItem(deskOnlyTask, 1),
+    ];
+    const placed = placeQuickAddItem(rows, buildQuickAddItem('T-5'));
+
+    const pinned = pinExactTaskKey(placed, 'T-5');
+
+    expect(pinned[0].id).toBe('task-T-5-0');
+    expect(pinned[pinned.length - 1]?.id).toBe('quick-add-desk');
+    expect(pinned).toHaveLength(placed.length);
+  });
+
+  it('matches lowercase keys against canonical row ids', () => {
+    const rows = [taskToPaletteItem(task, 0)];
+
+    expect(pinExactTaskKey(rows, 't-5')[0].id).toBe('task-T-5-0');
+  });
+
+  it('leaves rows untouched when the query is not a task key or no task matches', () => {
+    const rows = [taskToPaletteItem(task, 0), ...buildNavigationCommands().slice(0, 1)];
+
+    expect(pinExactTaskKey(rows, 'login')).toBe(rows);
+    expect(pinExactTaskKey(rows, 'T-99')).toBe(rows);
+    expect(pinExactTaskKey(rows, '')).toBe(rows);
   });
 });
 

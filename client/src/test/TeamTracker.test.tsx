@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { TestWrapper } from '@/test/wrapper';
-import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse } from '@/types';
+import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse, TaskResolution } from '@/types';
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 
@@ -14,6 +14,7 @@ const mockAddToast = vi.fn();
 const mockCreateManagerDeskItemMutate = vi.fn();
 const mockUpdateManagerDeskItemMutate = vi.fn();
 const mockAddTrackerItemMutate = vi.fn();
+const mockAddCheckInMutate = vi.fn();
 const mockRefetchBoard = vi.fn();
 const mockRefetchCarryForwardPreview = vi.fn();
 const mockRefetchCarryForwardContext = vi.fn();
@@ -354,7 +355,7 @@ vi.mock('@/hooks/useTeamTrackerMutations', () => ({
   useSetCurrentItem: () => ({ mutate: mockSetCurrentMutate, isPending: false }),
   useUpdateTrackerItem: () => ({ mutate: mockUpdateTrackerItemMutate }),
   useDeleteTrackerItem: () => ({ mutate: vi.fn() }),
-  useAddCheckIn: () => ({ mutate: vi.fn() }),
+  useAddCheckIn: () => ({ mutate: mockAddCheckInMutate }),
   useCarryForward: () => ({ mutate: mockCarryForwardMutate, isPending: false }),
   useStatusUpdate: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -380,6 +381,22 @@ vi.mock('@/context/ToastContext', () => ({
   useToast: () => ({
     addToast: mockAddToast,
   }),
+}));
+
+let mockTaskResolution: { data: TaskResolution | undefined; isError: boolean; isLoading: boolean } = {
+  data: undefined,
+  isError: false,
+  isLoading: false,
+};
+
+vi.mock('@/hooks/useTasks', () => ({
+  useTaskResolution: () => mockTaskResolution,
+  useTaskEvents: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }),
+  useMyDayTaskEvents: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }),
+  useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
+  useAddMyDayTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateTaskEventVisibility: () => ({ mutate: vi.fn(), isPending: false }),
+  useRedactTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/components/team-tracker/TrackerTaskDetailDrawer', () => ({
@@ -456,6 +473,7 @@ describe('TeamTrackerPage', () => {
     mockCreateManagerDeskItemMutate.mockReset();
     mockUpdateManagerDeskItemMutate.mockReset();
     mockAddTrackerItemMutate.mockReset();
+    mockAddCheckInMutate.mockReset();
     mockRefetchBoard.mockReset();
     mockRefetchCarryForwardPreview.mockReset();
     mockRefetchCarryForwardContext.mockReset();
@@ -479,7 +497,9 @@ describe('TeamTrackerPage', () => {
       },
     };
     mockBoard.inactiveDevelopers = [];
+    mockTaskResolution = { data: undefined, isError: false, isLoading: false };
     window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/team');
   });
 
   afterEach(() => {
@@ -513,6 +533,123 @@ describe('TeamTrackerPage', () => {
     );
     expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Bob Jones').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('opens the task drawer for an initial task key and mirrors it into ?task=', () => {
+    mockTaskResolution = {
+      data: {
+        taskKey: 'T-10',
+        requestedKey: 'T-10',
+        title: 'Fix login bug',
+        kind: 'delegated',
+        trackerItemId: 10,
+        managerDeskItemId: 110,
+        developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
+        date: '2026-03-07',
+        deleted: false,
+      },
+      isError: false,
+      isLoading: false,
+    };
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage initialTaskKey="T-10" initialDeveloperNonce={1} />
+      </TestWrapper>
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Team Tracker task detail' })).toBeInTheDocument();
+    expect(screen.getByText('Shared task detail for item 10')).toBeInTheDocument();
+    expect(screen.getByText('Shared manager task 110')).toBeInTheDocument();
+    expect(window.location.search).toContain('task=T-10');
+  });
+
+  it('removes ?task= from the URL when the task drawer closes', () => {
+    mockTaskResolution = {
+      data: {
+        taskKey: 'T-10',
+        requestedKey: 'T-10',
+        title: 'Fix login bug',
+        kind: 'tracker_only',
+        trackerItemId: 13,
+        developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
+        date: '2026-03-07',
+        deleted: false,
+      },
+      isError: false,
+      isLoading: false,
+    };
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage initialTaskKey="T-10" initialDeveloperNonce={1} />
+      </TestWrapper>
+    );
+
+    expect(window.location.search).toContain('task=T-10');
+    fireEvent.click(screen.getByRole('button', { name: 'Close shared task detail' }));
+    expect(window.location.search).not.toContain('task=');
+  });
+
+  it('drops a stale ?task= param and toasts when resolution fails', () => {
+    window.history.replaceState(null, '', '/team?task=T-99');
+    mockTaskResolution = { data: undefined, isError: true, isLoading: false };
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage initialTaskKey="T-99" initialDeveloperNonce={1} />
+      </TestWrapper>
+    );
+
+    expect(window.location.search).not.toContain('task=');
+    expect(mockAddToast).toHaveBeenCalledWith(expect.stringContaining('T-99'), 'error');
+  });
+
+  it('submits check-in task references picked in the drawer footer', () => {
+    mockBoard.developers[1]!.currentItem = {
+      ...mockBoard.developers[1]!.currentItem!,
+      taskKey: 'T-10',
+    };
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+
+    fireEvent.click(screen.getByRole('button', { name: 'T-10' }));
+    const input = screen.getByPlaceholderText(/add a check-in note/i);
+    fireEvent.change(input, { target: { value: 'Progress on the fix' } });
+    fireEvent.click(within(input.parentElement as HTMLElement).getByRole('button', { name: 'Save' }));
+
+    expect(mockAddCheckInMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'dev-2', summary: 'Progress on the fix', taskKeys: ['T-10'] }),
+    );
+  });
+
+  it('submits check-in task references typed as T-n tokens', () => {
+    mockBoard.developers[1]!.currentItem = {
+      ...mockBoard.developers[1]!.currentItem!,
+      taskKey: 'T-10',
+    };
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+
+    const input = screen.getByPlaceholderText(/add a check-in note/i);
+    fireEvent.change(input, { target: { value: 'Moving T-10 forward' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(mockAddCheckInMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'dev-2', taskKeys: ['T-10'] }),
+    );
   });
 
   it('shows a retryable error state when the board query fails', () => {
@@ -1478,66 +1615,89 @@ describe('TrackerItemRow', () => {
     expect(textEl.style.textDecoration).toBe('line-through');
   });
 
-  it('saves edited notes through the provided callback', async () => {
+  it('renders the task key chip and data-task-key attribute', async () => {
     const { TrackerItemRow } = await import('@/components/team-tracker/TrackerItemRow');
-    const onUpdateNote = vi.fn();
 
-    render(
+    const { container } = render(
       <TrackerItemRow
         item={{
           id: 4,
           dayId: 1,
+          originDate: '2026-03-07',
+          taskKey: 'T-12',
           lifecycle: 'tracker_only',
           itemType: 'custom',
           title: 'Investigate logs',
-          note: 'Initial context',
           state: 'planned',
           position: 0,
           createdAt: '2026-03-07T08:00:00Z',
           updatedAt: '2026-03-07T08:00:00Z',
         }}
-        onUpdateNote={onUpdateNote}
       />
     );
 
-    fireEvent.click(screen.getByTitle('Edit note'));
-    fireEvent.change(screen.getByRole('textbox'), {
-      target: { value: 'Updated context' },
-    });
-    fireEvent.click(screen.getByText('Save'));
-
-    expect(onUpdateNote).toHaveBeenCalledWith(4, 'Updated context');
+    expect(screen.getByText('T-12')).toBeInTheDocument();
+    expect(container.querySelector('[data-task-key="T-12"]')).not.toBeNull();
   });
 
-  it('sends null when an edited note is cleared', async () => {
+  it('renders the latest event excerpt with relative time and age', async () => {
     const { TrackerItemRow } = await import('@/components/team-tracker/TrackerItemRow');
-    const onUpdateNote = vi.fn();
 
     render(
       <TrackerItemRow
         item={{
           id: 19,
           dayId: 1,
+          originDate: '2026-03-05',
+          taskKey: 'T-7',
           lifecycle: 'tracker_only',
           itemType: 'custom',
-          title: 'Clear stale note',
-          note: 'Remove this context',
-          state: 'planned',
+          title: 'Investigate logs',
+          state: 'in_progress',
+          position: 0,
+          ageDays: 2,
+          latestEvent: {
+            id: 91,
+            type: 'update',
+            excerpt: 'Waiting on API credentials',
+            authorType: 'developer',
+            occurredAt: new Date().toISOString(),
+            approximateTime: false,
+            visibility: 'shared',
+          },
+          createdAt: '2026-03-07T08:00:00Z',
+          updatedAt: '2026-03-07T08:00:00Z',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Waiting on API credentials')).toBeInTheDocument();
+    expect(screen.getByText(/· 2d/)).toBeInTheDocument();
+  });
+
+  it('renders the composer slot under the row content', async () => {
+    const { TrackerItemRow } = await import('@/components/team-tracker/TrackerItemRow');
+
+    render(
+      <TrackerItemRow
+        item={{
+          id: 21,
+          dayId: 1,
+          originDate: '2026-03-07',
+          taskKey: 'T-9',
+          lifecycle: 'tracker_only',
+          itemType: 'custom',
+          title: 'Standup task',
+          state: 'in_progress',
           position: 0,
           createdAt: '2026-03-07T08:00:00Z',
           updatedAt: '2026-03-07T08:00:00Z',
         }}
-        onUpdateNote={onUpdateNote}
+        composer={<div data-testid="inline-composer">composer here</div>}
       />
     );
 
-    fireEvent.click(screen.getByTitle('Edit note'));
-    fireEvent.change(screen.getByRole('textbox'), {
-      target: { value: '   ' },
-    });
-    fireEvent.click(screen.getByText('Save'));
-
-    expect(onUpdateNote).toHaveBeenCalledWith(19, null);
+    expect(screen.getByTestId('inline-composer')).toBeInTheDocument();
   });
 
   it('edits a title via click-to-edit and saves on Enter', async () => {

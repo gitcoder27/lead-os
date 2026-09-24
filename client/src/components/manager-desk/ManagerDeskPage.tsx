@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { addDays, format, isToday, parseISO, subDays } from 'date-fns';
 import { Briefcase, CalendarClock, History } from 'lucide-react';
@@ -11,6 +11,8 @@ import {
   useManagerDesk,
   useUpdateManagerDeskItem,
 } from '@/hooks/useManagerDesk';
+import { useTaskResolution } from '@/hooks/useTasks';
+import { writeTaskParam } from '@/lib/view-params';
 import type { ManagerDeskItem, ManagerDeskViewMode } from '@/types/manager-desk';
 import { EmptyDay } from './EmptyDay';
 import { ItemDetailDrawer } from './ItemDetailDrawer';
@@ -36,6 +38,8 @@ const getDefaultQuickFilter = (): ManagerDeskQuickFilter => 'all';
 interface ManagerDeskPageProps {
   initialItemId?: number;
   initialDate?: string;
+  /** Deep-linked task key (`/desk?task=T-5`) — resolved to the desk item. */
+  initialTaskKey?: string;
   initialItemNonce?: number;
   onInitialItemHandled?: () => void;
   onDateChange?: (date: string) => void;
@@ -44,6 +48,7 @@ interface ManagerDeskPageProps {
 export function ManagerDeskPage({
   initialItemId,
   initialDate,
+  initialTaskKey,
   initialItemNonce,
   onInitialItemHandled,
   onDateChange,
@@ -115,6 +120,40 @@ export function ManagerDeskPage({
       onInitialItemHandled?.();
     }
   }, [initialItemId, initialItemNonce, onInitialItemHandled, sourceItems]);
+
+  const taskResolution = useTaskResolution(initialTaskKey);
+  const handledTaskRef = useRef<string | undefined>();
+  useEffect(() => {
+    const resolution = taskResolution.data;
+    const handleKey = `${initialTaskKey}:${initialItemNonce ?? 0}`;
+    if (!resolution || handledTaskRef.current === handleKey) {
+      return;
+    }
+    handledTaskRef.current = handleKey;
+    if (resolution.managerDeskItemId) {
+      if (resolution.date) {
+        setDate(resolution.date);
+      }
+      setSelectedItemId(resolution.managerDeskItemId);
+    }
+    onInitialItemHandled?.();
+  }, [taskResolution.data, initialTaskKey, initialItemNonce, onInitialItemHandled]);
+
+  // A stale ?task= (unknown, deleted, or cross-workspace key) is dropped once
+  // resolution settles so the desk doesn't keep a dead deep link.
+  useEffect(() => {
+    if (!initialTaskKey || !taskResolution.isError) {
+      return;
+    }
+    writeTaskParam(undefined);
+    addToast(`Task ${initialTaskKey} is not available`, 'error');
+    onInitialItemHandled?.();
+  }, [initialTaskKey, taskResolution.isError, addToast, onInitialItemHandled]);
+
+  // Mirror the open drawer into ?task= so task deep links stay shareable.
+  useEffect(() => {
+    writeTaskParam(selectedItem?.taskKey ?? undefined);
+  }, [selectedItem]);
 
   useEffect(() => {
     onDateChange?.(date);

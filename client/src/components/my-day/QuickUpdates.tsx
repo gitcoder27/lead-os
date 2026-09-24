@@ -2,21 +2,26 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, MessageSquare } from 'lucide-react';
 import type { TrackerDeveloperStatus } from '@/types';
+import { TaskPicker, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 
 interface QuickUpdatesProps {
-  onAddCheckIn: (summary: string, status?: TrackerDeveloperStatus) => void;
+  onAddCheckIn: (summary: string, status?: TrackerDeveloperStatus, taskKeys?: string[]) => void;
+  /** Tasks that can be tagged on the check-in (current + planned work). */
+  tasks?: TaskPickerTask[];
   isPending?: boolean;
   disabled?: boolean;
 }
 
-export function QuickUpdates({ onAddCheckIn, isPending, disabled }: QuickUpdatesProps) {
+export function QuickUpdates({ onAddCheckIn, tasks = [], isPending, disabled }: QuickUpdatesProps) {
   const [draft, setDraft] = useState('');
+  const [taskKeys, setTaskKeys] = useState<string[]>([]);
 
   const handleSubmit = () => {
     const text = draft.trim();
     if (!text || disabled) return;
-    onAddCheckIn(text);
+    onAddCheckIn(text, undefined, taskKeysForSubmit(taskKeys, text, tasks));
     setDraft('');
+    setTaskKeys([]);
   };
 
   return (
@@ -51,6 +56,11 @@ export function QuickUpdates({ onAddCheckIn, isPending, disabled }: QuickUpdates
             color: 'var(--text-primary)',
           }}
         />
+        {!disabled && tasks.length > 0 && (
+          <div className="mb-2">
+            <TaskPicker tasks={tasks} text={draft} selected={taskKeys} onChange={setTaskKeys} />
+          </div>
+        )}
         <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border)]">
           <span className="text-[12px] font-medium tracking-wide text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(to right, var(--text-muted), transparent)' }}>
             Press Enter to send

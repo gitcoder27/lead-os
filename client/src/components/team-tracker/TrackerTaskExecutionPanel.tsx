@@ -1,16 +1,14 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle2, Play, RotateCcw, StickyNote, UserCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, History, Play, RotateCcw, UserCircle, XCircle } from 'lucide-react';
 import type { Developer, TrackerWorkItem } from '@/types';
+import { TaskTimeline } from '@/components/tasks/TaskTimeline';
+import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { RelatedIssueChips } from './RelatedIssueChips';
-
-type NoteSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface TrackerTaskExecutionPanelProps {
   developer: Developer;
   item: TrackerWorkItem;
   onSetCurrent: (itemId: number) => void;
   onUpdateState: (itemId: number, state: TrackerWorkItem['state']) => void;
-  onUpdateNote: (itemId: number, note: string | null) => Promise<void>;
   isPending?: boolean;
 }
 
@@ -26,56 +24,12 @@ export function TrackerTaskExecutionPanel({
   item,
   onSetCurrent,
   onUpdateState,
-  onUpdateNote,
   isPending = false,
 }: TrackerTaskExecutionPanelProps) {
-  const [note, setNote] = useState(item.note ?? '');
-  const [noteSaveState, setNoteSaveState] = useState<NoteSaveState>('idle');
-
-  useEffect(() => {
-    setNote(item.note ?? '');
-    setNoteSaveState('idle');
-  }, [item.id, item.note]);
-
-  useEffect(() => {
-    if (noteSaveState !== 'saved') {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setNoteSaveState('idle');
-    }, 2000);
-
-    return () => window.clearTimeout(timer);
-  }, [noteSaveState]);
-
-  const trimmedNote = note.trim();
-  const noteChanged = trimmedNote !== (item.note ?? '');
   const isClosed = item.state === 'done' || item.state === 'dropped';
   // Delegated tasks are closed/reopened from the Manager Desk workflow below so
   // this panel stays the single source for execution state, not a second Done.
   const isDelegated = Boolean(item.managerDeskItemId);
-
-  const handleSaveNote = async () => {
-    setNoteSaveState('saving');
-    try {
-      await onUpdateNote(item.id, trimmedNote || null);
-      setNoteSaveState('saved');
-    } catch {
-      setNoteSaveState('error');
-    }
-  };
-
-  const noteStatusLabel =
-    noteSaveState === 'saving'
-      ? 'Saving…'
-      : noteSaveState === 'saved'
-      ? 'Saved'
-      : noteSaveState === 'error'
-      ? 'Save failed'
-      : noteChanged
-      ? 'Unsaved changes'
-      : 'Up to date';
 
   return (
     <section
@@ -168,73 +122,25 @@ export function TrackerTaskExecutionPanel({
       </div>
 
       <div className="mt-4">
-        <label
-          htmlFor={`tracker-task-note-${item.id}`}
+        <div
           className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em]"
           style={{ color: 'var(--text-muted)' }}
         >
-          <StickyNote size={11} />
-          Execution Note
-        </label>
-        <textarea
-          id={`tracker-task-note-${item.id}`}
-          value={note}
-          onChange={(event) => {
-            setNote(event.target.value);
-            setNoteSaveState('idle');
-          }}
-          rows={4}
-          placeholder="What matters for today’s execution, handoff, or follow-up?"
-          className="mt-2 w-full rounded-2xl px-3 py-2.5 text-[13px] outline-none resize-none"
-          style={{
-            background: 'var(--bg-elevated)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border)',
-          }}
-        />
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleSaveNote()}
-            disabled={(!noteChanged && noteSaveState !== 'error') || isPending || noteSaveState === 'saving'}
-            className="rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
-            style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
-          >
-            {noteSaveState === 'saving'
-              ? 'Saving…'
-              : noteSaveState === 'saved'
-              ? 'Saved'
-              : noteSaveState === 'error'
-              ? 'Retry Save'
-              : 'Save Note'}
-          </button>
-          <span
-            className="text-[12px]"
-            style={{
-              color:
-                noteSaveState === 'error'
-                  ? 'var(--danger)'
-                  : noteChanged
-                  ? 'var(--warning)'
-                  : 'var(--text-muted)',
-            }}
-          >
-            {noteStatusLabel}
-          </span>
-          {noteChanged && (
-            <button
-              type="button"
-              onClick={() => {
-                setNote(item.note ?? '');
-                setNoteSaveState('idle');
-              }}
-              className="text-[12px]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Reset
-            </button>
-          )}
+          <History size={11} />
+          Timeline
         </div>
+        {item.taskKey ? (
+          <>
+            <TaskTimeline taskKey={item.taskKey} mode="manager" />
+            {!isClosed && (
+              <TaskUpdateComposer taskKey={item.taskKey} mode="manager" via="task_drawer" collapsed />
+            )}
+          </>
+        ) : (
+          <div className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            No task timeline yet.
+          </div>
+        )}
       </div>
     </section>
   );

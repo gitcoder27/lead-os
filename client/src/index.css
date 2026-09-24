@@ -333,3 +333,16 @@ body::after {
 .triage-reveal-3     { animation-delay: 0.11s; }
 .triage-reveal-4     { animation-delay: 0.15s; }
 .triage-reveal-5     { animation-delay: 0.19s; }
+
+/* ── Task deep-link row highlight (?task=T-n) ────────── */
+
+@keyframes taskDeepLinkPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.task-row-deep-link {
+  animation: taskDeepLinkPulse 0.9s ease-out 2;
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}

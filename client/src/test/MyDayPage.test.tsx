@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { format } from 'date-fns';
 import { act, render, renderHook, screen, fireEvent, within } from '@testing-library/react';
 import { MyDayPage } from '@/components/my-day/MyDayPage';
 import { useMyDayHandlers } from '@/components/my-day/useMyDayHandlers';
@@ -13,6 +14,7 @@ const mockAddItemMutate = vi.fn();
 const mockUpdateItemMutate = vi.fn();
 const mockSetCurrentMutate = vi.fn();
 const mockAddCheckInMutate = vi.fn();
+const mockAddMyDayTaskEventMutate = vi.fn();
 
 let mockDay: MyDayResponse;
 
@@ -37,6 +39,7 @@ vi.mock('@/context/AuthContext', () => ({
     user: { displayName: 'Alice Smith', role: 'developer', developerAccountId: 'dev-1' },
     logout: mockLogout,
   }),
+  useAuthScopeKey: () => 'dev-1',
 }));
 
 vi.mock('@/context/ThemeContext', () => ({
@@ -69,6 +72,14 @@ vi.mock('@/hooks/useMyDay', () => ({
   useUpdateMyDayItem: () => ({ mutate: mockUpdateItemMutate, isPending: false }),
   useSetMyDayCurrent: () => ({ mutate: mockSetCurrentMutate, isPending: false }),
   useAddMyDayCheckIn: () => ({ mutate: mockAddCheckInMutate, isPending: false }),
+}));
+
+vi.mock('@/hooks/useTasks', () => ({
+  useTaskResolution: () => ({ data: undefined, isError: false, isLoading: false }),
+  useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, isPending: false }),
+  useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
+  useMyDayTaskEvents: () => ({ data: undefined }),
+  useTaskEvents: () => ({ data: undefined }),
 }));
 
 vi.mock('@/components/my-day/AddTaskForm', () => ({
@@ -269,7 +280,11 @@ describe('MyDayPage', () => {
     expect(screen.getByText('OPS-9')).toBeInTheDocument();
   });
 
-  it('edits a planned task note through the shared My Day mutation', () => {
+  it('posts a planned task update through the inline task-event composer', () => {
+    mockDay.plannedItems = [
+      createItem({ id: 102, title: 'Prepare release checklist', position: 1, taskKey: 'T-3' }),
+    ];
+
     render(
       <TestWrapper>
         <MyDayPage />
@@ -279,14 +294,19 @@ describe('MyDayPage', () => {
     const upNextSection = screen.getByText('Up Next').closest('section');
     expect(upNextSection).toBeTruthy();
 
-    fireEvent.click(within(upNextSection as HTMLElement).getByTitle('Edit note'));
+    fireEvent.click(within(upNextSection as HTMLElement).getByText('Add an update…'));
     fireEvent.change(within(upNextSection as HTMLElement).getByRole('textbox'), {
       target: { value: 'Updated handoff note' },
     });
-    fireEvent.click(within(upNextSection as HTMLElement).getByText('Save'));
+    fireEvent.click(within(upNextSection as HTMLElement).getByText('Post'));
 
-    expect(mockUpdateItemMutate).toHaveBeenCalledWith(
-      { itemId: 102, note: 'Updated handoff note' },
+    expect(mockAddMyDayTaskEventMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        type: 'update',
+        body: 'Updated handoff note',
+        requestId: expect.any(String),
+      }),
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),

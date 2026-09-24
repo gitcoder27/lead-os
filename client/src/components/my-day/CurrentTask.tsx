@@ -2,13 +2,13 @@ import { motion } from 'framer-motion';
 import { Play, Zap } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from '@/components/team-tracker/TrackerItemRow';
+import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 
 interface CurrentTaskProps {
   viewDate?: string;
   item?: TrackerWorkItem;
   onMarkDone?: (id: number) => void;
   onDrop?: (id: number) => void;
-  onUpdateNote?: (id: number, note: string | null) => void;
   onUpdateTitle?: (id: number, title: string) => void;
   hasPlannedItems?: boolean;
   readOnly?: boolean;
@@ -19,7 +19,6 @@ export function CurrentTask({
   item,
   onMarkDone,
   onDrop,
-  onUpdateNote,
   onUpdateTitle,
   hasPlannedItems,
   readOnly,
@@ -96,11 +95,15 @@ export function CurrentTask({
             <TrackerItemRow
               item={item}
               viewDate={viewDate}
-              onUpdateNote={onUpdateNote}
               onUpdateTitle={onUpdateTitle}
               onMarkDone={onMarkDone}
               onDrop={onDrop}
               readOnly={readOnly}
+              composer={
+                !readOnly && item.taskKey && viewDate ? (
+                  <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed />
+                ) : undefined
+              }
             />
           </div>
         </div>

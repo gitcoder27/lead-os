@@ -1,5 +1,8 @@
 import { useCallback, useEffect, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { History } from 'lucide-react';
+import { TaskTimeline } from '@/components/tasks/TaskTimeline';
+import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import {
   useAddManagerDeskLink,
   useRemoveManagerDeskLink,
@@ -172,7 +175,20 @@ function DrawerContent({
           onFieldChange={handleFieldChange}
           onAssigneeChange={(accountId) => onUpdate(item.id, { assigneeDeveloperAccountId: accountId })}
         />
-        <DrawerNotes key={`notes-${item.id}`} item={item} readOnly={readOnly} onFieldChange={handleFieldChange} />
+        {item.delegatedExecution && item.taskKey ? (
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+              <History size={11} />
+              Task timeline
+            </div>
+            <TaskTimeline taskKey={item.taskKey} mode="manager" />
+            {!readOnly && (
+              <TaskUpdateComposer taskKey={item.taskKey} mode="manager" via="task_drawer" collapsed />
+            )}
+          </div>
+        ) : (
+          <DrawerNotes key={`notes-${item.id}`} item={item} readOnly={readOnly} onFieldChange={handleFieldChange} />
+        )}
         <DrawerProperties
           item={item}
           readOnly={readOnly}

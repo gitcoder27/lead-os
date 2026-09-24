@@ -6,8 +6,11 @@ import {
   deskDateFromParams,
   deskDateToSearch,
   notesDateFromParams,
+  taskKeyFromParams,
+  taskKeyToParams,
   teamBoardQueryFromParams,
   teamBoardQueryToSearch,
+  writeTaskParam,
 } from '@/lib/view-params';
 
 function paramsFromSearch(search: string): URLSearchParams {
@@ -79,5 +82,33 @@ describe('notes date serialization', () => {
     expect(notesDateFromParams(paramsFromSearch('?date=2026-02-30'))).toBeUndefined();
     expect(notesDateFromParams(paramsFromSearch('?date=tomorrow'))).toBeUndefined();
     expect(notesDateFromParams(paramsFromSearch('?other=1'))).toBeUndefined();
+  });
+});
+
+describe('task key params', () => {
+  it('parses and canonicalizes task keys', () => {
+    expect(taskKeyFromParams(paramsFromSearch('?task=T-5'))).toBe('T-5');
+    expect(taskKeyFromParams(paramsFromSearch('?task=t-42'))).toBe('T-42');
+    expect(taskKeyFromParams(paramsFromSearch('?task=T-007'))).toBe('T-7');
+    expect(taskKeyFromParams(paramsFromSearch('?task=banana'))).toBeUndefined();
+    expect(taskKeyFromParams(paramsFromSearch('?task=T5'))).toBeUndefined();
+    expect(taskKeyFromParams(paramsFromSearch('?task=T-1234567890'))).toBeUndefined();
+    expect(taskKeyFromParams(paramsFromSearch('?other=1'))).toBeUndefined();
+  });
+
+  it('serializes task keys', () => {
+    expect(taskKeyToParams('T-9')).toEqual({ task: 'T-9' });
+    expect(taskKeyToParams(undefined)).toEqual({ task: undefined });
+  });
+
+  it('writes and removes the task param without touching other params', () => {
+    window.history.replaceState(null, '', '/team?q=alice');
+    writeTaskParam('T-3');
+    expect(window.location.search).toBe('?q=alice&task=T-3');
+    writeTaskParam('T-3');
+    expect(window.location.search).toBe('?q=alice&task=T-3');
+    writeTaskParam(undefined);
+    expect(window.location.search).toBe('?q=alice');
+    window.history.replaceState(null, '', '/');
   });
 });

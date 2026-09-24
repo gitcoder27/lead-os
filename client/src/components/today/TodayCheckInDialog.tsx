@@ -1,22 +1,27 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { MessageSquare, X } from 'lucide-react';
+import { TaskPicker, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 
 interface TodayCheckInDialogProps {
   developerName: string;
   defaultSummary?: string;
+  /** Tasks that can be tagged on this check-in (developer's current + planned work). */
+  tasks?: TaskPickerTask[];
   isSaving: boolean;
   onClose: () => void;
-  onSave: (summary: string) => void;
+  onSave: (summary: string, taskKeys: string[]) => void;
 }
 
 export function TodayCheckInDialog({
   developerName,
   defaultSummary = '',
+  tasks = [],
   isSaving,
   onClose,
   onSave,
 }: TodayCheckInDialogProps) {
   const [summary, setSummary] = useState(defaultSummary);
+  const [taskKeys, setTaskKeys] = useState<string[]>([]);
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -133,6 +138,11 @@ export function TodayCheckInDialog({
               placeholder="Asked for today update, blocker detail, or current status..."
             />
           </label>
+          {tasks.length > 0 && (
+            <div className="mt-3">
+              <TaskPicker tasks={tasks} text={summary} selected={taskKeys} onChange={setTaskKeys} />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
@@ -146,7 +156,7 @@ export function TodayCheckInDialog({
           </button>
           <button
             type="button"
-            onClick={() => onSave(summary)}
+            onClick={() => onSave(summary, taskKeysForSubmit(taskKeys, summary, tasks))}
             disabled={!canSave}
             className="rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-opacity disabled:opacity-45"
             style={{ background: 'var(--accent)', color: '#fff' }}

@@ -30,6 +30,10 @@ vi.mock('@/hooks/useTodayActions', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useTeamTracker', () => ({
+  useTeamTracker: () => ({ data: undefined, isLoading: false }),
+}));
+
 vi.mock('@/hooks/useAlerts', () => ({
   useAlerts: () => ({ data: mockAlerts }),
   useDismissAlerts: () => ({ mutate: mockDismiss, isPending: false }),

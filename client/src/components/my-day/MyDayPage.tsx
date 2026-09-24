@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { XCircle, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
 import { useMyDay } from '@/hooks/useMyDay';
+import { useTaskResolution } from '@/hooks/useTasks';
+import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
 import { useMyDayHandlers } from './useMyDayHandlers';
 
 import { MyDayLeftColumn } from './MyDayLeftColumn';
@@ -16,6 +18,7 @@ export function MyDayPage() {
   const { theme, toggleTheme } = useTheme();
   const { addToast } = useToast();
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [deepLinkTaskKey] = useState(() => taskKeyFromParams(new URLSearchParams(window.location.search)));
 
   const { data: day, isLoading, isFetching, error, refetch } = useMyDay(date);
   const isReadOnly = Boolean(
@@ -28,7 +31,6 @@ export function MyDayPage() {
     handleDrop,
     handleSetCurrent,
     handleReorder,
-    handleUpdateItemNote,
     handleUpdateItemTitle,
     handleAddItem,
     handleAddCheckIn,
@@ -36,6 +38,41 @@ export function MyDayPage() {
     addItemPending,
     addCheckInPending,
   } = useMyDayHandlers(date, isReadOnly);
+
+  // /my-day?task=T-n deep link: resolve ownership, move to the task's date,
+  // then scroll to and highlight its row. Unknown/non-owned keys 404.
+  const taskResolution = useTaskResolution(deepLinkTaskKey, { role: 'developer' });
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandledRef.current) {
+      return;
+    }
+    if (taskResolution.isError) {
+      deepLinkHandledRef.current = true;
+      writeTaskParam(undefined);
+      addToast('That task is not available here', 'error');
+      return;
+    }
+    const resolution = taskResolution.data;
+    if (!resolution) {
+      return;
+    }
+    if (resolution.date && resolution.date !== date) {
+      setDate(resolution.date);
+      return;
+    }
+    if (!day) {
+      return;
+    }
+    const row = document.querySelector(`[data-task-key="${resolution.taskKey}"]`);
+    if (!row) {
+      return;
+    }
+    deepLinkHandledRef.current = true;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('task-row-deep-link');
+    window.setTimeout(() => row.classList.remove('task-row-deep-link'), 2400);
+  }, [taskResolution.data, taskResolution.isError, day, date, addToast]);
 
   const handleRefresh = async () => {
     try {
@@ -108,7 +145,6 @@ export function MyDayPage() {
               updateStatusPending={updateStatusPending}
               handleMarkDone={handleMarkDone}
               handleDrop={handleDrop}
-              handleUpdateItemNote={handleUpdateItemNote}
               handleUpdateItemTitle={handleUpdateItemTitle}
               handleAddCheckIn={handleAddCheckIn}
               addCheckInPending={addCheckInPending}
@@ -126,7 +162,6 @@ export function MyDayPage() {
               handleMarkDone={handleMarkDone}
               handleDrop={handleDrop}
               handleReorder={handleReorder}
-              handleUpdateItemNote={handleUpdateItemNote}
               handleUpdateItemTitle={handleUpdateItemTitle}
               handleAddItem={handleAddItem}
               addItemPending={addItemPending}

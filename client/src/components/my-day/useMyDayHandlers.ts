@@ -63,17 +63,6 @@ export function useMyDayHandlers(date: string, readOnly = false) {
     updateItem.mutate({ itemId, position: newPosition }, { onError: (err) => addToast(err.message, 'error') });
   };
 
-  const handleUpdateItemNote = (itemId: number, note: string | null) => {
-    if (readOnly) {
-      addToast('This day is read-only', 'warning');
-      return;
-    }
-    updateItem.mutate(
-      { itemId, note },
-      { onSuccess: () => addToast('Task note updated', 'success'), onError: (err) => addToast(err.message, 'error') }
-    );
-  };
-
   const handleUpdateItemTitle = (itemId: number, title: string) => {
     if (readOnly) {
       addToast('This day is read-only', 'warning');
@@ -93,13 +82,13 @@ export function useMyDayHandlers(date: string, readOnly = false) {
     addItem.mutate(params, { onSuccess: () => addToast('Task added', 'success'), onError: (err) => addToast(err.message, 'error') });
   };
 
-  const handleAddCheckIn = (summary: string, status?: TrackerDeveloperStatus) => {
+  const handleAddCheckIn = (summary: string, status?: TrackerDeveloperStatus, taskKeys?: string[]) => {
     if (readOnly) {
       addToast('This day is read-only', 'warning');
       return;
     }
     addCheckIn.mutate(
-      { summary, status },
+      { summary, status, taskKeys },
       { onSuccess: () => addToast('Update posted', 'success'), onError: (err) => addToast(err.message, 'error') }
     );
   };
@@ -110,7 +99,6 @@ export function useMyDayHandlers(date: string, readOnly = false) {
     handleDrop,
     handleSetCurrent,
     handleReorder,
-    handleUpdateItemNote,
     handleUpdateItemTitle,
     handleAddItem,
     handleAddCheckIn,

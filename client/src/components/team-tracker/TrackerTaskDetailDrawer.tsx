@@ -12,6 +12,7 @@ import { useSetCurrentItem, useUpdateTrackerItem } from '@/hooks/useTeamTrackerM
 import { TrackerTaskExecutionPanel } from './TrackerTaskExecutionPanel';
 import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
+import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { RelatedIssueChips } from './RelatedIssueChips';
 
 interface TrackerTaskDetailDrawerProps {
@@ -100,9 +101,6 @@ export function TrackerTaskDetailDrawer({
               isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
               onSetCurrent={(id) => setCurrentItem.mutate(id)}
               onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
-              onUpdateNote={(id, note) =>
-                updateTrackerItem.mutateAsync({ itemId: id, note }).then(() => undefined)
-              }
             />
           ) : null}
         </>
@@ -196,8 +194,11 @@ function TrackerOnlyDrawer({
                   Tracker Only
                 </span>
               </div>
-              <div className="mt-2 text-[18px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                {item.title}
+              <div className="mt-2 flex items-center gap-2">
+                {item.taskKey && <TaskKeyChip taskKey={item.taskKey} />}
+                <span className="text-[18px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                  {item.title}
+                </span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
                 <span>{dev.displayName}</span>
@@ -237,9 +238,6 @@ function TrackerOnlyDrawer({
             isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
             onSetCurrent={(id) => setCurrentItem.mutate(id)}
             onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
-            onUpdateNote={(id, note) =>
-              updateTrackerItem.mutateAsync({ itemId: id, note }).then(() => undefined)
-            }
           />
 
           {/* Promote CTA */}

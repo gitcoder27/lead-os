@@ -8,6 +8,7 @@ import type { ManagerDeskItem } from '@/types/manager-desk';
 import { KIND_LABELS, STATUS_LABELS, CATEGORY_LABELS, PRIORITY_LABELS } from '@/types/manager-desk';
 import { AssigneePill } from './AssigneePill';
 import { DrawerWorkflowActions } from './DrawerWorkflowActions';
+import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 
 interface DrawerHeaderProps {
   item: ManagerDeskItem;
@@ -91,9 +92,13 @@ export function DrawerHeader({
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[11px] font-bold tracking-wide" style={{ color: 'var(--text-muted)' }}>
-          #{item.id}
-        </span>
+        {item.taskKey ? (
+          <TaskKeyChip taskKey={item.taskKey} />
+        ) : (
+          <span className="font-mono text-[11px] font-bold tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            #{item.id}
+          </span>
+        )}
         <div className="relative flex items-center gap-0.5" ref={menuRef}>
           {readOnly ? null : hasLinkedWork ? (
             <button

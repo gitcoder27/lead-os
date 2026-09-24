@@ -154,3 +154,18 @@ export function taskKeyFromParams(params: URLSearchParams): string | undefined {
 export function taskKeyToParams(taskKey: string | undefined): Record<string, string | undefined> {
   return { task: taskKey };
 }
+
+/** Writes/removes the `?task=` param on the current URL without adding history. */
+export function writeTaskParam(taskKey: string | undefined) {
+  const params = new URLSearchParams(window.location.search);
+  const current = params.get('task');
+  if (taskKey && current !== taskKey) {
+    params.set('task', taskKey);
+  } else if (!taskKey && current !== null) {
+    params.delete('task');
+  } else {
+    return;
+  }
+  const search = params.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
+}

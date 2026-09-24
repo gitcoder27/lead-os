@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { useManagerActions } from '@/hooks/useManagerActions';
 import { useTodayActions } from '@/hooks/useTodayActions';
+import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useAlerts, useDismissAlerts } from '@/hooks/useAlerts';
 import { useToast } from '@/context/ToastContext';
+import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { getLocalIsoDate } from '@/lib/utils';
 import type {
   Alert,
@@ -90,6 +92,15 @@ export function ManagerActionInbox({
   const urgentCount = managerActions.data?.urgentCount ?? 0;
   const actionRunner = useTodayActions({ date, onOpenTarget, onViewChange });
   const { addToast } = useToast();
+  // Board fetch is only needed while the check-in dialog is open — it supplies
+  // the developer's current/planned tasks for the task picker.
+  const checkInBoard = useTeamTracker(date, undefined, Boolean(checkInDraft));
+  const checkInTasks = useMemo(() => {
+    const devDay = checkInBoard.data?.developers?.find(
+      (developerDay) => developerDay.developer.accountId === checkInDraft?.command.target.developerAccountId,
+    );
+    return tasksFromItems(devDay?.currentItem ? [devDay.currentItem] : undefined, devDay?.plannedItems);
+  }, [checkInBoard.data, checkInDraft]);
   const alertsQuery = useAlerts({ enabled });
   const dismissAlerts = useDismissAlerts();
 
@@ -189,10 +200,11 @@ export function ManagerActionInbox({
           <TodayCheckInDialog
             developerName={checkInDraft.developerName}
             defaultSummary={checkInDraft.defaultSummary}
+            tasks={checkInTasks}
             isSaving={actionRunner.isPending && actionRunner.pendingKind === 'add_check_in'}
             onClose={() => setCheckInDraft(null)}
-            onSave={(summary) => {
-              actionRunner.runAction(checkInDraft.command, { summary });
+            onSave={(summary, taskKeys) => {
+              actionRunner.runAction(checkInDraft.command, { summary, taskKeys });
               setCheckInDraft(null);
             }}
           />

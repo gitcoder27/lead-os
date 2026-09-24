@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '@/App';
+import { ApiRequestError } from '@/lib/api';
+import type { TaskResolution } from '@/types';
 
 const useBootstrapStateMock = vi.fn();
 const useAuthMock = vi.fn();
 const dashboardLayoutSpy = vi.fn();
+const useTaskResolutionMock = vi.fn();
 
 vi.mock('@/hooks/useBootstrapState', () => ({
   useBootstrapState: () => useBootstrapStateMock(),
+}));
+
+vi.mock('@/hooks/useTasks', () => ({
+  useTaskResolution: (key: string | undefined) => useTaskResolutionMock(key),
 }));
 
 vi.mock('@/context/AuthContext', () => ({
@@ -118,6 +125,8 @@ describe('App', () => {
       logout: vi.fn(),
       refreshSession: vi.fn(),
     });
+
+    useTaskResolutionMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
   });
 
   it('shows loading while bootstrap state is loading', () => {
@@ -402,5 +411,164 @@ describe('App', () => {
 
     fireEvent.click(screen.getByText('Open Work'));
     expect(await screen.findByText('Work filter: blocked')).toBeInTheDocument();
+  });
+
+  it('redirects /t/:key to the team view with ?task= for delegated tasks', async () => {
+    window.history.pushState(null, '', '/t/T-5');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    useTaskResolutionMock.mockReturnValue({
+      data: {
+        taskKey: 'T-5',
+        requestedKey: 'T-5',
+        title: 'Fix login bug',
+        kind: 'delegated',
+        trackerItemId: 10,
+        managerDeskItemId: 110,
+        developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
+        date: '2026-03-07',
+        deleted: false,
+      } satisfies TaskResolution,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/team');
+      expect(window.location.search).toContain('task=T-5');
+    });
+    expect(await screen.findByText('Team loaded')).toBeInTheDocument();
+  });
+
+  it('redirects /t/:key to the desk with date and task params for desk-only tasks', async () => {
+    window.history.pushState(null, '', '/t/T-9');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    useTaskResolutionMock.mockReturnValue({
+      data: {
+        taskKey: 'T-9',
+        requestedKey: 'T-9',
+        title: 'Renew vendor contract',
+        kind: 'desk_only',
+        managerDeskItemId: 42,
+        date: '2026-03-08',
+        deleted: false,
+      } satisfies TaskResolution,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/desk');
+      expect(window.location.search).toContain('date=2026-03-08');
+      expect(window.location.search).toContain('task=T-9');
+    });
+    expect(await screen.findByText('Desk loaded')).toBeInTheDocument();
+  });
+
+  it('redirects /t/:key to /my-day?task= for developers', async () => {
+    window.history.pushState(null, '', '/t/T-5');
+    useAuthMock.mockReturnValue({
+      user: { role: 'developer', developerAccountId: 'dev-1' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    useTaskResolutionMock.mockReturnValue({
+      data: {
+        taskKey: 'T-5',
+        requestedKey: 'T-5',
+        title: 'Fix login bug',
+        kind: 'tracker_only',
+        trackerItemId: 10,
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        date: '2026-03-07',
+        deleted: false,
+      } satisfies TaskResolution,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/my-day');
+      expect(window.location.search).toContain('task=T-5');
+    });
+  });
+
+  it('renders the deleted-task state when /t/:key resolves to a tombstone', async () => {
+    window.history.pushState(null, '', '/t/T-7');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    useTaskResolutionMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiRequestError('Task deleted', 410, {
+        taskKey: 'T-7',
+        requestedKey: 'T-7',
+        title: 'Old migration task',
+        kind: 'tracker_only',
+        date: '2026-03-01',
+        deleted: true,
+      }),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /t-7 was deleted/i })).toBeInTheDocument();
+    expect(screen.getByText('Old migration task')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/t/T-7');
+  });
+
+  it('renders the not-found state for unknown task keys', async () => {
+    window.history.pushState(null, '', '/t/T-77');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    useTaskResolutionMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new ApiRequestError('Not found', 404, { error: 'Unknown task' }),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /workspace not found/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/t/T-77');
   });
 });

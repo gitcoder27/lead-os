@@ -158,11 +158,13 @@ export function useAddCheckIn(date: string) {
       accountId: string;
       summary: string;
       status?: TrackerDeveloperStatus;
+      taskKeys?: string[];
     }) =>
       api.post<TrackerCheckIn>(`/team-tracker/${params.accountId}/checkins`, {
         date,
         summary: params.summary,
         status: params.status,
+        taskKeys: params.taskKeys,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });

@@ -21,6 +21,7 @@ type TodayActionVariables = {
   outcome?: string;
   preset?: 'later_today' | 'tomorrow' | 'next_week';
   summary?: string;
+  taskKeys?: string[];
 };
 
 export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayActionsOptions) {
@@ -123,7 +124,7 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
   };
 
   const mutation = useMutation({
-    mutationFn: async ({ command, outcome, preset, summary, title }: TodayActionVariables) => {
+    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys }: TodayActionVariables) => {
       const { target } = command;
 
       if (command.kind === 'open' || command.kind === 'assign_owner' || command.kind === 'ask_check_in') {
@@ -143,7 +144,7 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
         if (!summary?.trim()) {
           return { cancelled: true };
         }
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, summary: summary.trim() });
+        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, summary: summary.trim(), taskKeys });
       }
 
       if (command.kind === 'set_current_work' && target.trackerItemId) {

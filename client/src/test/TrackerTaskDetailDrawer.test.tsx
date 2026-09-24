@@ -231,6 +231,42 @@ describe('TrackerTaskDetailDrawer', () => {
     }));
   });
 
+  it('shows the task key chip in the tracker-only drawer header', () => {
+    mockUseTrackerSharedTaskDetail.mockReturnValue({
+      data: {
+        date: '2026-03-14',
+        developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+        lifecycle: 'tracker_only',
+        trackerItem: {
+          id: 10,
+          dayId: 1,
+          taskKey: 'T-8',
+          lifecycle: 'tracker_only',
+          itemType: 'custom',
+          title: 'Review pull request',
+          state: 'planned',
+          position: 0,
+          createdAt: '2026-03-14T09:00:00Z',
+          updatedAt: '2026-03-14T09:00:00Z',
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <TrackerTaskDetailDrawer
+        trackerItemId={10}
+        initialManagerDeskItemId={null}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /task t-8/i })).toBeInTheDocument();
+  });
+
   it('shows the developer name on the tracker-only drawer', () => {
     mockUseTrackerSharedTaskDetail.mockReturnValue({
       data: {

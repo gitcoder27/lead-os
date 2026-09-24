@@ -14,7 +14,6 @@ interface MyDayRightColumnProps {
   handleMarkDone: (id: number) => void;
   handleDrop: (id: number) => void;
   handleReorder: (id: number, pos: number) => void;
-  handleUpdateItemNote: (id: number, note: string | null) => void;
   handleUpdateItemTitle: (id: number, title: string) => void;
   handleAddItem: (params: { title: string; jiraKey?: string; note?: string }) => void;
   addItemPending: boolean;
@@ -36,7 +35,6 @@ export function MyDayRightColumn({
   handleMarkDone,
   handleDrop,
   handleReorder,
-  handleUpdateItemNote,
   handleUpdateItemTitle,
   handleAddItem,
   addItemPending,
@@ -72,7 +70,6 @@ export function MyDayRightColumn({
           onMarkDone={handleMarkDone}
           onDrop={handleDrop}
           onReorder={handleReorder}
-          onUpdateNote={handleUpdateItemNote}
           onUpdateTitle={handleUpdateItemTitle}
           readOnly={readOnly}
         />

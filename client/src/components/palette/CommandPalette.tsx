@@ -33,6 +33,7 @@ import {
   buildQuickAddItem,
   buildResultGroups,
   filterCommands,
+  pinExactTaskKey,
   placeQuickAddItem,
   type PaletteItem,
 } from './paletteItems';
@@ -62,6 +63,7 @@ const RESULT_ICONS: Record<string, typeof Bug> = {
   issues: Bug,
   desk: ClipboardList,
   tracker: ListChecks,
+  tasks: ListChecks,
   checkins: MessageSquare,
   developers: User,
   notes: NotebookPen,
@@ -72,6 +74,7 @@ const GROUP_LABELS: Record<string, string> = {
   issues: 'Work items',
   desk: 'Desk items & follow-ups',
   tracker: 'Tracker tasks',
+  tasks: 'Tasks',
   checkins: 'Check-ins',
   developers: 'Developers',
   notes: 'Notes',
@@ -105,12 +108,13 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           issues: searchQuery.data?.issues ?? [],
           deskItems: searchQuery.data?.deskItems ?? [],
           trackerItems: searchQuery.data?.trackerItems ?? [],
+          tasks: searchQuery.data?.tasks ?? [],
           checkIns: searchQuery.data?.checkIns ?? [],
           developers: searchQuery.data?.developers ?? [],
           notes: searchQuery.data?.notes ?? [],
         }).flatMap((group) => group.items)
       : [];
-    return placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query));
+    return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query)), query);
   }, [hasResults, navigationCommands, query, quickActions, searchQuery.data]);
 
   useEffect(() => {

@@ -520,8 +520,14 @@ export interface AuthUser {
   developerAccountId?: string;
 }
 
+export interface SessionFeatures {
+  /** Phase 3 workspace flag (P3 §0): one flag drives every Phase 3 surface. */
+  tasksPhase3: boolean;
+}
+
 export interface AuthSessionResponse {
   user: AuthUser;
+  features?: SessionFeatures;
 }
 
 export interface AuthBootstrapResponse {
@@ -607,6 +613,67 @@ export interface SurfaceTaskFields {
 export type ManagerSurfaceTask = ManagerTask & SurfaceTaskFields;
 export type DeveloperSurfaceTask = DeveloperTask & SurfaceTaskFields;
 export type SurfaceTask = ManagerSurfaceTask | DeveloperSurfaceTask;
+
+/**
+ * Phase 3 (P3-D13): labels are the only task taxonomy. `task_labels` registers
+ * every label name in the workspace; system labels (`category:follow_up`,
+ * `kind:decision`, `kind:waiting`, `priority:*`) are protected because
+ * `category:follow_up` feeds the Follow-ups predicate.
+ */
+export interface TaskLabel {
+  name: string;
+  color: string;
+  system: boolean;
+  createdAt: string;
+}
+
+export interface TaskLabelListResponse {
+  labels: TaskLabel[];
+}
+
+export const TASK_LABEL_COLORS = [
+  "slate",
+  "red",
+  "amber",
+  "green",
+  "teal",
+  "blue",
+  "violet",
+  "pink",
+] as const;
+export type TaskLabelColor = (typeof TASK_LABEL_COLORS)[number];
+
+export function isSystemTaskLabel(name: string): boolean {
+  return name === "category:follow_up" || name === "kind:decision" || name === "kind:waiting" || name.startsWith("priority:");
+}
+
+/** Label chip text: system labels render without their `x:` prefix. */
+export function taskLabelDisplayName(name: string): string {
+  const stripped = name.replace(/^(category|kind|priority):/, "");
+  return stripped.replace(/_/g, " ");
+}
+
+/** A child/parent reference inside the shared task detail payload. */
+export interface TaskChildRef {
+  id: number;
+  taskKey: string;
+  title: string;
+  kind: "task" | "meeting";
+  status: TaskStatus;
+  ownerType: TaskOwnerType | null;
+  ownerId: string | null;
+}
+
+/**
+ * `GET /api/tasks/:key/detail` (and the developer equivalent under
+ * `/api/my-day`) — the task DTO plus its action-item children and parent.
+ * Developer principals get the DeveloperTask projection with children scoped
+ * to tasks they own.
+ */
+export type TaskDetailResponse = (ManagerTask | DeveloperTask) & {
+  children: TaskChildRef[];
+  parent: TaskChildRef | null;
+};
 export interface CreateTaskRequest {
   title: string;
   kind?: "task" | "meeting";

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { ManagerDeskItem, ManagerDeskItemKind, ManagerDeskStatus, ManagerDeskUpdateItemPayload } from '@/types/manager-desk';
 import { KIND_LABELS, STATUS_LABELS, CATEGORY_LABELS, PRIORITY_LABELS } from '@/types/manager-desk';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 interface DrawerPropertiesProps {
   item: ManagerDeskItem;
@@ -16,6 +17,8 @@ const categoryOpts = (['analysis', 'design', 'team_management', 'cross_team', 'f
 const priorityOpts = (['low', 'medium', 'high', 'critical'] as const).map((v) => ({ value: v, label: PRIORITY_LABELS[v] }));
 
 export function DrawerProperties({ item, readOnly = false, onFieldChange }: DrawerPropertiesProps) {
+  // Phase 3 (P3-D13): kind/category fields retire; labels are the taxonomy.
+  const phase3 = useTasksPhase3();
   const hasLinkedWork = !!item.delegatedExecution;
 
   const filteredStatusOpts = hasLinkedWork
@@ -30,9 +33,9 @@ export function DrawerProperties({ item, readOnly = false, onFieldChange }: Draw
         Details
       </summary>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-        <InlineSelect label="Kind" value={item.kind} options={visibleKindOpts} onChange={(v) => onFieldChange('kind', v)} disabled={readOnly} />
+        {!phase3 && <InlineSelect label="Kind" value={item.kind} options={visibleKindOpts} onChange={(v) => onFieldChange('kind', v)} disabled={readOnly} />}
         <InlineSelect label={hasLinkedWork ? 'My follow-through' : 'Status'} value={item.status} options={visibleStatusOpts} onChange={(v) => onFieldChange('status', v)} disabled={readOnly} />
-        <InlineSelect label="Category" value={item.category} options={categoryOpts} onChange={(v) => onFieldChange('category', v)} disabled={readOnly} />
+        {!phase3 && <InlineSelect label="Category" value={item.category} options={categoryOpts} onChange={(v) => onFieldChange('category', v)} disabled={readOnly} />}
         <InlineSelect label="Priority" value={item.priority} options={priorityOpts} onChange={(v) => onFieldChange('priority', v)} disabled={readOnly} />
         <InlineText label="Participants" value={item.participants ?? ''} placeholder="e.g. Design Team, Rahul" onChange={(v) => onFieldChange('participants', v.trim() ? v : null)} className="col-span-2" disabled={readOnly} />
         <InlineDatetime label="Start" value={item.plannedStartAt ?? ''} onChange={(v) => onFieldChange('plannedStartAt', v)} disabled={readOnly} />

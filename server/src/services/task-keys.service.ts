@@ -25,6 +25,39 @@ export class TaskKeysService {
     if (!(await this.enabled(workspaceId))) throw new HttpError(404, "Not Found");
   }
 
+  private async configValue(workspaceId: string | undefined, key: string): Promise<string | undefined> {
+    const rows = await db.select({ value: configTable.value }).from(configTable).where(and(
+      eq(configTable.workspaceId, normalizeWorkspaceId(workspaceId)), eq(configTable.key, key)
+    )).limit(1);
+    return rows[0]?.value;
+  }
+
+  /**
+   * Phase 3 (P3 §0): `tasks_phase3_enabled` only takes effect once the
+   * workspace is in canonical read mode (stage `2c`/`2d`). With the flag off —
+   * or the stage too early — every Phase 3 surface must be unreachable.
+   */
+  async phase3Enabled(workspaceId?: string): Promise<boolean> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const stage = await this.stage(scope);
+    if (!["2c", "2d"].includes(stage ?? "")) return false;
+    return (await this.configValue(scope, "tasks_phase3_enabled")) === "true";
+  }
+
+  async assertPhase3Enabled(workspaceId?: string): Promise<void> {
+    if (!(await this.phase3Enabled(workspaceId))) throw new HttpError(404, "Not Found");
+  }
+
+  /** CLI-only toggle for `tasks_phase3_enabled`; refuses stages below 2c. */
+  async setPhase3Enabled(workspaceId: string | undefined, enable: boolean): Promise<void> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    if (enable && !["2c", "2d"].includes((await this.stage(scope)) ?? "")) {
+      throw new HttpError(409, "tasks_phase3_enabled requires tasks_phase2_stage 2c or 2d");
+    }
+    await db.insert(configTable).values({ workspaceId: scope, key: "tasks_phase3_enabled", value: enable ? "true" : "false" })
+      .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: enable ? "true" : "false" } });
+  }
+
   async stage(workspaceId?: string): Promise<string | undefined> {
     const rows = await db.select({ value: configTable.value }).from(configTable).where(and(
       eq(configTable.workspaceId, normalizeWorkspaceId(workspaceId)), eq(configTable.key, "tasks_phase2_stage")

@@ -19,6 +19,7 @@ import type {
   ManagerDeskItemKind,
 } from '@/types/manager-desk';
 import { CATEGORY_LABELS, KIND_LABELS } from '@/types/manager-desk';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 type CaptureLink = NonNullable<ManagerDeskCreateItemPayload['links']>[number];
 
@@ -99,6 +100,9 @@ export function ManagerDeskCaptureDialog({
   const createItem = useCreateManagerDeskItem(captureDate);
   const { addToast } = useToast();
   const titleRef = useRef<HTMLInputElement>(null);
+  // Phase 3 (P3-D13): kind/category pickers retire; initial values still apply
+  // semantically (e.g. follow_up → category:follow_up label).
+  const phase3 = useTasksPhase3();
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const [title, setTitle] = useState(initialTitle);
@@ -297,7 +301,8 @@ export function ManagerDeskCaptureDialog({
             maxLength={200}
           />
 
-          {/* Kind + Category — single compact row */}
+          {/* Kind + Category — single compact row (hidden under Phase 3) */}
+          {!phase3 && (
           <div className="flex items-center gap-2 flex-wrap">
             {kindOptions.map((option) => {
               const isActive = kind === option;
@@ -337,6 +342,7 @@ export function ManagerDeskCaptureDialog({
               </select>
             </div>
           </div>
+          )}
 
           {/* Context note — collapsible */}
           <div

@@ -429,6 +429,17 @@ CREATE TABLE IF NOT EXISTS task_legacy_map (
 );
 CREATE INDEX IF NOT EXISTS idx_task_legacy_map_task ON task_legacy_map(task_id);
 
+CREATE TABLE IF NOT EXISTS task_labels (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  color        TEXT NOT NULL DEFAULT 'slate',
+  system       INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_labels_unique ON task_labels(workspace_id, name);
+CREATE INDEX IF NOT EXISTS idx_task_labels_workspace ON task_labels(workspace_id);
+
 CREATE TABLE IF NOT EXISTS developer_notes (
   workspace_id         TEXT NOT NULL,
   developer_account_id TEXT NOT NULL,

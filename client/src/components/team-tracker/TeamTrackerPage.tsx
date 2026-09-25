@@ -24,6 +24,8 @@ import { TeamTrackerViewSwitcher, type TeamTrackerLens } from './TeamTrackerView
 import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
 import { AvailabilityDialog } from './AvailabilityDialog';
 import { TrackerTaskDetailDrawer } from './TrackerTaskDetailDrawer';
+import { TaskDrawer } from '@/components/tasks/TaskDrawer';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { describeTeamTrackerView } from './SavedViewItem';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
 import {
@@ -287,6 +289,7 @@ export function TeamTrackerPage({
   onBoardQueryChange,
 }: TeamTrackerPageProps) {
   const { addToast } = useToast();
+  const tasksPhase3 = useTasksPhase3();
   const [date, setDate] = useState(getLocalIsoDate);
   const [activeLens, setActiveLens] = useState<TeamTrackerLens>('team');
 
@@ -633,12 +636,22 @@ export function TeamTrackerPage({
         isAddItemPending={addTrackerItem.isPending}
         readOnly={readOnly}
       />
-      <TrackerTaskDetailDrawer
-        trackerItemId={workflow.selectedTask?.trackerItemId ?? null}
-        initialManagerDeskItemId={workflow.selectedTask?.managerDeskItemId ?? null}
-        backTo={workflow.drawerDay?.developer.displayName}
-        onClose={() => workflow.setSelectedTask(null)}
-      />
+      {/* Phase 3 (P3-D2): the shared TaskDrawer replaces the tracker detail drawer. */}
+      {tasksPhase3 && workflow.selectedTask?.taskKey ? (
+        <TaskDrawer
+          taskKey={workflow.selectedTask.taskKey}
+          stacked={Boolean(workflow.drawerAccountId)}
+          onClose={() => workflow.setSelectedTask(null)}
+          onNavigateTask={(key) => workflow.setSelectedTask({ trackerItemId: null, taskKey: key })}
+        />
+      ) : (
+        <TrackerTaskDetailDrawer
+          trackerItemId={workflow.selectedTask?.trackerItemId ?? null}
+          initialManagerDeskItemId={workflow.selectedTask?.managerDeskItemId ?? null}
+          backTo={workflow.drawerDay?.developer.displayName}
+          onClose={() => workflow.setSelectedTask(null)}
+        />
+      )}
       <AvailabilityDialog
         open={!!workflow.availabilityTarget}
         developerName={workflow.availabilityTarget?.developer.displayName}

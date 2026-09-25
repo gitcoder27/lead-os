@@ -16,6 +16,8 @@ import { writeTaskParam } from '@/lib/view-params';
 import type { ManagerDeskItem, ManagerDeskViewMode } from '@/types/manager-desk';
 import { EmptyDay } from './EmptyDay';
 import { ItemDetailDrawer } from './ItemDetailDrawer';
+import { TaskDrawer, navigateToTaskPage } from '@/components/tasks/TaskDrawer';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { RescheduleItemDialog } from './RescheduleItemDialog';
 import { ManagerDeskCommandBar } from './ManagerDeskCommandBar';
 import { ManagerDeskHeader } from './ManagerDeskHeader';
@@ -54,6 +56,7 @@ export function ManagerDeskPage({
   onDateChange,
 }: ManagerDeskPageProps = {}) {
   const { addToast } = useToast();
+  const tasksPhase3 = useTasksPhase3();
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [filters, setFilters] = useState<ManagerDeskFilterState>(defaultFilters);
@@ -400,20 +403,33 @@ export function ManagerDeskPage({
         )}
       </ManagerDeskWorkspace>
 
-      <ItemDetailDrawer
-        item={selectedItem}
-        open={selectedItem !== null}
-        date={date}
-        readOnly={readOnly}
-        onClose={handleCloseDetail}
-        onUpdate={handleUpdateItem}
-        onDelete={handleDeleteItem}
-        onCancelDelegatedTask={handleCancelDelegatedTask}
-        isCancelDelegatedPending={cancelDelegated.isPending}
-        onCarryForward={readOnly ? undefined : handleOpenReschedule}
-        isCarryForwardPending={carryForward.isPending}
-        topSlot={<DrawerModeNote viewMode={viewMode} date={date} />}
-      />
+      {/* Phase 3 (P3-D2): the shared TaskDrawer replaces the desk item drawer. */}
+      {tasksPhase3 && selectedItem?.taskKey ? (
+        <TaskDrawer
+          taskKey={selectedItem.taskKey}
+          onClose={handleCloseDetail}
+          onNavigateTask={(key) => {
+            const target = sourceItems.find((item) => item.taskKey === key);
+            if (target) setSelectedItemId(target.id);
+            else navigateToTaskPage(key);
+          }}
+        />
+      ) : (
+        <ItemDetailDrawer
+          item={selectedItem}
+          open={selectedItem !== null}
+          date={date}
+          readOnly={readOnly}
+          onClose={handleCloseDetail}
+          onUpdate={handleUpdateItem}
+          onDelete={handleDeleteItem}
+          onCancelDelegatedTask={handleCancelDelegatedTask}
+          isCancelDelegatedPending={cancelDelegated.isPending}
+          onCarryForward={readOnly ? undefined : handleOpenReschedule}
+          isCarryForwardPending={carryForward.isPending}
+          topSlot={<DrawerModeNote viewMode={viewMode} date={date} />}
+        />
+      )}
 
       {rescheduleItem && (
         <RescheduleItemDialog

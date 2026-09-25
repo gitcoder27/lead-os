@@ -15,6 +15,7 @@
     "tasks:cutover": "tsx src/scripts/task-cutover.ts",
     "tasks:stage": "tsx src/scripts/task-stage.ts",
     "tasks:contract": "tsx src/scripts/task-contract.ts",
+    "tasks:phase3": "tsx src/scripts/task-phase3.ts",
     "auth:create-user": "tsx src/scripts/create-auth-user.ts",
     "auth:delete-user": "tsx src/scripts/delete-auth-user.ts",
     "test": "vitest run",

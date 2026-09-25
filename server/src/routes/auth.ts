@@ -4,6 +4,7 @@ import type { AuthBootstrapResponse, AuthSessionResponse, AuthUser } from "share
 import { validate } from "../middleware/validate";
 import { requireAuth, requireManager } from "../middleware/auth";
 import { AuthService, clearSessionCookie, serializeSessionCookie, SESSION_COOKIE_NAME } from "../services/auth.service";
+import { TaskKeysService } from "../services/task-keys.service";
 import { HttpError } from "../middleware/errorHandler";
 
 const loginSchema = z.object({
@@ -84,6 +85,11 @@ function throttleKey(req: { ip?: string; socket?: { remoteAddress?: string } }, 
 export function createAuthRouter(authService: AuthService): Router {
   const router = Router();
   const throttle = new AuthAttemptThrottle();
+  const taskKeys = new TaskKeysService();
+  const sessionResponse = async (user: AuthUser): Promise<AuthSessionResponse> => ({
+    user,
+    features: { tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId) },
+  });
 
   router.get("/bootstrap", async (_req, res, next) => {
     try {
@@ -109,8 +115,7 @@ export function createAuthRouter(authService: AuthService): Router {
         "Set-Cookie",
         serializeSessionCookie(result.sessionId, authService.sessionMaxAgeSeconds)
       );
-      const response: AuthSessionResponse = { user: result.user };
-      res.json(response);
+      res.json(await sessionResponse(result.user));
     } catch (error) {
       if (req.body?.username && error instanceof HttpError && error.status === 401) {
         throttle.recordFailure(throttleKey(req, req.body.username));
@@ -208,9 +213,12 @@ export function createAuthRouter(authService: AuthService): Router {
     }
   });
 
-  router.get("/me", requireAuth(authService), async (req, res) => {
-    const response: AuthSessionResponse = { user: req.auth!.user };
-    res.json(response);
+  router.get("/me", requireAuth(authService), async (req, res, next) => {
+    try {
+      res.json(await sessionResponse(req.auth!.user));
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.post("/logout", requireAuth(authService), async (req, res, next) => {

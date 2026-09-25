@@ -5,6 +5,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import { ArrowRightFromLine, CalendarDays, Clock, User, X } from 'lucide-react';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import { KIND_LABELS, STATUS_LABELS } from '@/types/manager-desk';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 interface Props {
   item: ManagerDeskItem;
@@ -22,6 +23,7 @@ function formatShortDate(iso: string): string {
 }
 
 export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Props) {
+  const phase3 = useTasksPhase3();
   const minDate = useMemo(
     () => format(addDays(parseISO(item.originDate), 1), 'yyyy-MM-dd'),
     [item.originDate],
@@ -135,16 +137,18 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               {item.title}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <span
-                className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
-                style={{
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                {KIND_LABELS[item.kind]}
-              </span>
+              {!phase3 && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {KIND_LABELS[item.kind]}
+                </span>
+              )}
               <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                 {STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}
               </span>

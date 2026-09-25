@@ -6,6 +6,7 @@ import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
 import type { ManagerDeskCategory, ManagerDeskCreateItemPayload, ManagerDeskItemKind } from '@/types/manager-desk';
 import { CATEGORY_LABELS, KIND_LABELS } from '@/types/manager-desk';
 import type { GlobalCaptureContext } from './GlobalCaptureDialog';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 const kindOptions: ManagerDeskItemKind[] = ['action', 'meeting', 'decision', 'waiting'];
 const categoryOptions: ManagerDeskCategory[] = [
@@ -38,6 +39,8 @@ export function DeskCaptureForm({
   const createItem = useCreateManagerDeskItem(date);
   const { addToast } = useToast();
   const titleRef = useRef<HTMLInputElement>(null);
+  // Phase 3 (P3-D13): kind/category pickers retire; labels are the taxonomy.
+  const phase3 = useTasksPhase3();
 
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<ManagerDeskItemKind>('action');
@@ -124,7 +127,8 @@ export function DeskCaptureForm({
           maxLength={200}
         />
 
-        {/* Kind + Category row */}
+        {/* Kind + Category row — retired under Phase 3 (labels replace them) */}
+        {!phase3 && (
         <div className="flex items-center gap-2 flex-wrap">
           {kindOptions.map((opt) => {
             const active = kind === opt;
@@ -167,6 +171,7 @@ export function DeskCaptureForm({
             ))}
           </select>
         </div>
+        )}
 
         {/* Context note — collapsible */}
         <div

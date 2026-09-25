@@ -478,6 +478,24 @@ export const taskLegacyMap = sqliteTable("task_legacy_map", {
   index("idx_task_legacy_map_task").on(table.taskId),
 ]);
 
+/**
+ * Phase 3 (P3-D13): registry of known labels per workspace. Task rows keep the
+ * string list in `tasks.labels_json`; this table records names, colors, and
+ * system-label protection (`category:follow_up` feeds the Follow-ups
+ * predicate; `kind:*`/`priority:*` back existing task semantics).
+ */
+export const taskLabels = sqliteTable("task_labels", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("slate"),
+  system: integer("system", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_task_labels_unique").on(table.workspaceId, table.name),
+  index("idx_task_labels_workspace").on(table.workspaceId),
+]);
+
 export const developerNotes = sqliteTable("developer_notes", {
   workspaceId: text("workspace_id").notNull(),
   developerAccountId: text("developer_account_id").notNull(),

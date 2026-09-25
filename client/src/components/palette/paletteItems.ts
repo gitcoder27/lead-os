@@ -172,14 +172,16 @@ export function issueToPaletteItem(issue: GlobalSearchIssueItem, index: number):
   };
 }
 
-export function deskItemToPaletteItem(item: GlobalSearchDeskItem, index: number): PaletteItem {
+export function deskItemToPaletteItem(item: GlobalSearchDeskItem, index: number, options?: { showTaxonomy?: boolean }): PaletteItem {
+  const showTaxonomy = options?.showTaxonomy ?? true;
   const kindLabel = KIND_LABELS[item.kind] ?? 'Desk item';
   const statusLabel = item.status === 'done' ? 'Done' : item.status.replace(/_/g, ' ');
   return {
     id: `desk-${item.itemId}-${index}`,
     group: 'desk',
     title: item.title,
-    description: [kindLabel, item.date, statusLabel].join(' · '),
+    // Phase 3 (P3-D13): kind/category retire — desk results lead with the date.
+    description: [...(showTaxonomy ? [kindLabel] : []), item.date, statusLabel].join(' · '),
     target: { type: 'manager_desk_item', view: 'desk', managerDeskItemId: item.itemId, date: item.date },
   };
 }
@@ -279,7 +281,7 @@ export function buildResultGroups(results: {
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
   notes?: DailyNoteSummary[];
-}): PaletteGroup[] {
+}, options?: { showTaxonomy?: boolean }): PaletteGroup[] {
   const groups: PaletteGroup[] = [
     {
       id: 'tasks',
@@ -294,7 +296,7 @@ export function buildResultGroups(results: {
     {
       id: 'desk',
       label: 'Desk items & follow-ups',
-      items: results.deskItems.map(deskItemToPaletteItem),
+      items: results.deskItems.map((item, index) => deskItemToPaletteItem(item, index, options)),
     },
     {
       id: 'tracker',

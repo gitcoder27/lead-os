@@ -4,10 +4,13 @@ import { api } from '@/lib/api';
 import { clearDailyNoteDraftsForScope } from '@/lib/daily-note-drafts';
 import { clearNavPreferencesCacheForScope } from '@/lib/nav-preferences-cache';
 import { clearTodaySnapshotsForScope } from '@/lib/today-snapshot-cache';
-import type { AuthUser, AuthSessionResponse } from '@/types';
+import type { AuthUser, AuthSessionResponse, SessionFeatures } from '@/types';
+
+const DEFAULT_FEATURES: SessionFeatures = { tasksPhase3: false };
 
 interface AuthContextValue {
   user: AuthUser | null;
+  features: SessionFeatures;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -17,6 +20,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
+  features: DEFAULT_FEATURES,
   isLoading: true,
   isAuthenticated: false,
   login: async () => {},
@@ -35,6 +39,7 @@ export function getAuthScopeKey(user: AuthUser | null | undefined): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [features, setFeatures] = useState<SessionFeatures>(DEFAULT_FEATURES);
   const [isLoading, setIsLoading] = useState(true);
   const authScopeKey = getAuthScopeKey(user);
   const previousAuthScopeKeyRef = useRef<string | null>(null);
@@ -43,9 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.get<AuthSessionResponse>('/auth/me');
       setUser(res.user);
+      setFeatures(res.features ?? DEFAULT_FEATURES);
       return res.user;
     } catch {
       setUser(null);
+      setFeatures(DEFAULT_FEATURES);
       return null;
     }
   }, []);
@@ -72,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const res = await api.post<AuthSessionResponse>('/auth/login', { username, password });
     setUser(res.user);
+    setFeatures(res.features ?? DEFAULT_FEATURES);
   }, []);
 
   const logout = useCallback(async () => {
@@ -79,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post('/auth/logout');
     } finally {
       setUser(null);
+      setFeatures(DEFAULT_FEATURES);
     }
   }, []);
 
@@ -86,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        features,
         isLoading,
         isAuthenticated: user !== null,
         login,

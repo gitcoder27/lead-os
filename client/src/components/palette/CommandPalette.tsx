@@ -27,6 +27,7 @@ import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
 import { getLocalIsoDate } from '@/lib/utils';
 import { GLOBAL_SEARCH_MIN_LENGTH, useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useQuickActions } from '@/context/QuickActionsContext';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import {
   buildNavigationCommands,
   buildQuickActions,
@@ -88,6 +89,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
   const { addToast } = useToast();
   const { openCapture } = useQuickActions();
+  const tasksPhase3 = useTasksPhase3();
   const triggerSync = useTriggerSync();
   // The palette remounts on open, so resolving today here keeps quick-add
   // anchored to the day the manager is working in.
@@ -112,10 +114,10 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           checkIns: searchQuery.data?.checkIns ?? [],
           developers: searchQuery.data?.developers ?? [],
           notes: searchQuery.data?.notes ?? [],
-        }).flatMap((group) => group.items)
+        }, { showTaxonomy: !tasksPhase3 }).flatMap((group) => group.items)
       : [];
     return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query)), query);
-  }, [hasResults, navigationCommands, query, quickActions, searchQuery.data]);
+  }, [hasResults, navigationCommands, query, quickActions, searchQuery.data, tasksPhase3]);
 
   useEffect(() => {
     setActiveIndex(0);

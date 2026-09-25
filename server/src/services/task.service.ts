@@ -1,12 +1,13 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
+import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService, type TaskEventInput } from "./task-events.service";
+import { TaskLabelsService } from "./task-labels.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { isoDatePart, todayIsoDate } from "../utils/date";
@@ -202,6 +203,10 @@ export class TaskService {
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);
       if (principal.type === "developer" && Object.keys(data).some((field) => !["title", "status", "scheduledOn"].includes(field))) throw new HttpError(403, "Developer creation fields are restricted");
+      // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
+      if (data.labels?.length && await this.keys.phase3Enabled(scope)) {
+        await new TaskLabelsService().ensureRegistered(scope, data.labels);
+      }
       const now = new Date().toISOString();
       const ownerType = principal.type === "developer" ? "developer" : data.ownerType === undefined ? "manager" : data.ownerType;
       const ownerId = principal.type === "developer" ? principal.accountId : data.ownerId === undefined && ownerType === "manager" ? principal.accountId : data.ownerId ?? null;
@@ -214,7 +219,8 @@ export class TaskService {
       await this.demoteOthers({ ...values, id: -1 }, principal);
       const row = (await db.insert(tasks).values(values).returning())[0]!;
       await this.focus(row, row.scheduledOn ?? todayIsoDate());
-      await this.emit(row, { type: "created", body: null, meta: { source: principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk", ownerType, ownerId, title: row.title } }, principal);
+      const parent = row.parentId ? await this.getById(row.parentId, scope) : undefined;
+      await this.emit(row, { type: "created", body: null, meta: { source: principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk", ownerType, ownerId, title: row.title, ...(parent && { parentKey: parent.taskKey }) } }, principal);
       if (row.status !== "open") await this.emit(row, { type: "status", body: null, meta: { domain: "task_status", from: "open", to: row.status, reason: "user" } }, principal);
       if (row.status === "active") await this.emit(row, { type: "focus", body: null, meta: { action: "set_current", date: todayIsoDate() } }, principal);
       return row;
@@ -231,6 +237,10 @@ export class TaskService {
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
       }
       const { labels, later, ...fields } = data;
+      // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
+      if (labels && labels.length && await this.keys.phase3Enabled(before.workspaceId)) {
+        await new TaskLabelsService().ensureRegistered(before.workspaceId, labels);
+      }
       const next = { ...before, ...fields, labelsJson: labels === undefined ? before.labelsJson : JSON.stringify(labels), later: later === undefined ? before.later : Number(later) };
       const reassigned = next.ownerType !== before.ownerType || next.ownerId !== before.ownerId;
       if (reassigned) {
@@ -316,6 +326,36 @@ export class TaskService {
       eq(tasks.taskKey, key)
     )).limit(1);
     return rows[0];
+  }
+
+  private childRef(row: TaskRow): TaskChildRef {
+    return {
+      id: row.id, taskKey: row.taskKey, title: row.title,
+      kind: row.kind as TaskChildRef["kind"], status: row.status as TaskStatus,
+      ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId,
+    };
+  }
+
+  /**
+   * Phase 3 (P3-D2/D3): task DTO plus action-item children and parent ref.
+   * Developer viewers only see children they own; deleted tasks return a
+   * tombstone DTO (manager only — `requireTask` already excludes deleted rows
+   * for developers).
+   */
+  async detail(key: string, principal: TaskPrincipal): Promise<TaskDetailResponse> {
+    const row = await this.requireTask(key, principal, true);
+    const dto = await this.toDto(row, principal);
+    const scope = row.workspaceId;
+    const childRows = await db.select().from(tasks).where(and(
+      eq(tasks.workspaceId, scope), eq(tasks.parentId, row.id), isNull(tasks.deletedAt),
+      principal.type === "developer" ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId)) : undefined,
+    )).orderBy(tasks.createdAt, tasks.id);
+    const parentRow = row.parentId ? await this.getById(row.parentId, scope) : undefined;
+    return {
+      ...dto,
+      children: childRows.map((child) => this.childRef(child)),
+      parent: parentRow ? this.childRef(parentRow) : null,
+    };
   }
 
   async track(key: string, principal: TaskPrincipal): Promise<TaskRow> {

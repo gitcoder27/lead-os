@@ -66,6 +66,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM daily_notes;
     DELETE FROM task_links;
     DELETE FROM day_focus;
+    DELETE FROM task_labels;
     DELETE FROM task_legacy_map;
     DELETE FROM developer_notes;
     DELETE FROM tasks;
@@ -94,7 +95,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM assistant_memories;
     DELETE FROM sqlite_sequence WHERE name IN ('app_users', 'local_tags', 'sync_log', 'issue_scope_history', 'team_tracker_days', 'developer_availability_periods', 'team_tracker_items', 'team_tracker_checkins', 'team_tracker_saved_views',
     'work_saved_views', 'manager_desk_days', 'manager_desk_items', 'manager_desk_links', 'manager_desk_item_history',
-    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories', 'tasks', 'task_links', 'day_focus');
+    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories', 'tasks', 'task_links', 'day_focus', 'task_labels');
   `);
 }
 

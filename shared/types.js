@@ -1,10 +1,30 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_KEY_PATTERN = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
+exports.isSystemTaskLabel = isSystemTaskLabel;
+exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
 exports.isCompleteNavPreferences = isCompleteNavPreferences;
 exports.TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
+exports.TASK_LABEL_COLORS = [
+    "slate",
+    "red",
+    "amber",
+    "green",
+    "teal",
+    "blue",
+    "violet",
+    "pink",
+];
+function isSystemTaskLabel(name) {
+    return name === "category:follow_up" || name === "kind:decision" || name === "kind:waiting" || name.startsWith("priority:");
+}
+/** Label chip text: system labels render without their `x:` prefix. */
+function taskLabelDisplayName(name) {
+    const stripped = name.replace(/^(category|kind|priority):/, "");
+    return stripped.replace(/_/g, " ");
+}
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",

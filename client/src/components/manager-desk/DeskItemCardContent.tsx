@@ -19,6 +19,7 @@ import {
   type RowQuickAction,
   type DeskItemVariant,
 } from './DeskItemCardPrimitives';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 interface Props {
   item: ManagerDeskItem;
@@ -31,7 +32,10 @@ interface Props {
 }
 
 export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly, viewDate, onStatusChange }: Props) {
-  const KindIcon = kindIcons[item.kind];
+  // Phase 3 (P3-D13): kind taxonomy is retired from the UI — only meetings
+  // (a real task kind) keep their distinct icon; everything else is a task.
+  const phase3 = useTasksPhase3();
+  const KindIcon = phase3 ? (item.kind === 'meeting' ? kindIcons.meeting : kindIcons.action) : kindIcons[item.kind];
   const dateSignal = useMemo(() => getDateSignal(item, isOverdue), [item, isOverdue]);
   const sourceSignal = useMemo(() => getSourceSignal(item), [item]);
   const continuedSignal = useMemo(() => getContinuedSignal(item, viewDate), [item, viewDate]);
@@ -58,7 +62,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
         <span
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
           style={{ background: getKindBackground(variant), color: getKindColor(variant, item.status) }}
-          title={KIND_LABELS[item.kind]}
+          title={phase3 ? (item.kind === 'meeting' ? KIND_LABELS.meeting : 'Task') : KIND_LABELS[item.kind]}
         >
           <KindIcon size={15} />
         </span>

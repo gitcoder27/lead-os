@@ -3,6 +3,7 @@ import type { ManagerDeskItem } from '@/types/manager-desk';
 import { QuickCapture } from './QuickCapture';
 import type { ManagerDeskFilterState, ManagerDeskQuickFilter } from './workbench-utils';
 import { getQuickFilterCount } from './workbench-utils';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 const quickFilters: Array<{ key: ManagerDeskQuickFilter; label: string }> = [
   { key: 'all', label: 'Today' },
@@ -194,20 +195,26 @@ function StructuredFilters({
   onChange: (value: ManagerDeskFilterState) => void;
   onClear: () => void;
 }) {
+  // Phase 3 (P3-D13): kind/category filters retire; labels are the taxonomy.
+  const phase3 = useTasksPhase3();
   return (
     <div className="mt-2 grid gap-1.5 rounded-lg border p-2 md:grid-cols-4" style={{ borderColor: 'var(--border)', background: 'var(--bg-primary)' }}>
-      <SelectControl
-        label="Kind"
-        value={filters.kind ?? ''}
-        onChange={(value) => onChange({ ...filters, kind: (value || null) as ManagerDeskFilterState['kind'] })}
-        options={['action', 'meeting', 'decision']}
-      />
-      <SelectControl
-        label="Category"
-        value={filters.category ?? ''}
-        onChange={(value) => onChange({ ...filters, category: (value || null) as ManagerDeskFilterState['category'] })}
-        options={['analysis', 'design', 'team_management', 'cross_team', 'follow_up', 'escalation', 'admin', 'planning', 'other']}
-      />
+      {!phase3 && (
+        <SelectControl
+          label="Kind"
+          value={filters.kind ?? ''}
+          onChange={(value) => onChange({ ...filters, kind: (value || null) as ManagerDeskFilterState['kind'] })}
+          options={['action', 'meeting', 'decision']}
+        />
+      )}
+      {!phase3 && (
+        <SelectControl
+          label="Category"
+          value={filters.category ?? ''}
+          onChange={(value) => onChange({ ...filters, category: (value || null) as ManagerDeskFilterState['category'] })}
+          options={['analysis', 'design', 'team_management', 'cross_team', 'follow_up', 'escalation', 'admin', 'planning', 'other']}
+        />
+      )}
       <SelectControl
         label="Status"
         value={filters.status ?? ''}

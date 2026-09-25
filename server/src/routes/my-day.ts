@@ -2,10 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireDeveloper } from "../middleware/auth";
 import { validate } from "../middleware/validate";
+import { HttpError } from "../middleware/errorHandler";
 import { AuthService } from "../services/auth.service";
 import { IssueService } from "../services/issue.service";
 import { MyDayService } from "../services/my-day.service";
-import { taskCreateSchema, taskUpdateSchema, TaskService } from "../services/task.service";
+import { TaskKeysService } from "../services/task-keys.service";
+import { taskCreateSchema, taskUpdateSchema, TaskService, type TaskPrincipal } from "../services/task.service";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
 
@@ -116,6 +118,16 @@ export function createMyDayRouter(
   });
 
   const taskParams = z.object({ key: z.string().trim().regex(/^[Tt]-\d{1,9}$/) });
+  // Phase 3 (P3-D2): developer-side shared task detail (children + parent ref).
+  router.get("/tasks/:key/detail", validate(z.object({ params: taskParams, body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
+    try {
+      const workspaceId = req.auth!.user.workspaceId;
+      const keys = new TaskKeysService();
+      if (!(await keys.phase3Enabled(workspaceId))) throw new HttpError(404, "Not Found");
+      const principal: TaskPrincipal = { type: "developer", accountId: req.auth!.user.developerAccountId!, workspaceId };
+      res.json(await tasks.detail(req.params.key as string, principal));
+    } catch (error) { next(error); }
+  });
   router.get("/tasks/:key", validate(z.object({ params: taskParams, body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
     try { res.json(await myDayService.resolveTask(req.auth!.user.developerAccountId!, req.params.key as string, req.auth!.user.workspaceId)); } catch (error) { next(error); }
   });

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, Zap, Tag } from 'lucide-react';
 import type { ManagerDeskItemKind, ManagerDeskCategory } from '@/types/manager-desk';
 import { KIND_LABELS, CATEGORY_LABELS } from '@/types/manager-desk';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 interface Props {
   onCapture: (title: string, kind?: ManagerDeskItemKind, category?: ManagerDeskCategory) => void;
@@ -18,6 +19,8 @@ const categoryOptions: ManagerDeskCategory[] = [
 ];
 
 export function QuickCapture({ onCapture, isPending, disabled = false, disabledLabel = 'Capture is unavailable for this view.' }: Props) {
+  // Phase 3 (P3-D13): kind/category pickers retire; labels are the taxonomy.
+  const phase3 = useTasksPhase3();
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<ManagerDeskItemKind | ''>('');
   const [category, setCategory] = useState<ManagerDeskCategory | ''>('');
@@ -37,12 +40,12 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
     const trimmed = title.trim();
     if (!trimmed) return;
     shouldRestoreFocusRef.current = true;
-    onCapture(trimmed, kind || undefined, category || undefined);
+    onCapture(trimmed, phase3 ? undefined : kind || undefined, phase3 ? undefined : category || undefined);
     setTitle('');
     setKind('');
     setCategory('');
     setExpanded(false);
-  }, [title, kind, category, onCapture, isPending, disabled]);
+  }, [title, kind, category, onCapture, isPending, disabled, phase3]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -118,8 +121,8 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
         </button>
       </div>
 
-      {/* Expanded options row */}
-      {expanded && !disabled && (
+      {/* Expanded options row — kind/category pickers retire under Phase 3 */}
+      {expanded && !disabled && !phase3 && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}

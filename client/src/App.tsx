@@ -40,6 +40,7 @@ const loadSetupWizard = () => import('@/components/setup/SetupWizard');
 const loadMyDayPage = () => import('@/components/my-day/MyDayPage');
 const loadLoginPage = () => import('@/components/my-day/LoginPage');
 const loadManagerDeskPage = () => import('@/components/manager-desk');
+const loadTaskPage = () => import('@/components/tasks/TaskPage');
 const loadManagerMemoryPage = () => import('@/components/manager-memory');
 const loadNotesPage = () => import('@/components/notes/NotesPage');
 const loadSettingsPage = () => import('@/components/settings/SettingsPanel');
@@ -73,6 +74,11 @@ const LoginPage = lazy(async () => {
 const ManagerDeskPage = lazy(async () => {
   const module = await loadManagerDeskPage();
   return { default: module.ManagerDeskPage };
+});
+
+const TaskPage = lazy(async () => {
+  const module = await loadTaskPage();
+  return { default: module.TaskPage };
 });
 
 const ManagerMemoryPage = lazy(async () => {
@@ -386,7 +392,7 @@ function WorkspaceShell({ activeView, onViewChange, onOpenActionTarget, children
 }
 
 function AppContent() {
-  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { user, features, isLoading: authLoading, isAuthenticated } = useAuth();
   const bootstrapQuery = useBootstrapState();
   const bootstrapState = bootstrapQuery.data;
   const isAuthenticatedManager = isAuthenticated && user?.role === 'manager';
@@ -823,6 +829,31 @@ function AppContent() {
 
   if (activeView === 'task') {
     const taskKey = TASK_LINK_PATH_PATTERN.exec(window.location.pathname)?.[1];
+    // Phase 3 (P3-D2): `/t/:key` renders the shared task detail as a full page.
+    // Flag off keeps the Phase 2 deep-link resolver behaviour.
+    if (features?.tasksPhase3) {
+      if (!taskKey || !user?.role) return <FullPageLoading />;
+      const goBack = () => {
+        if (document.referrer.startsWith(window.location.origin)) {
+          window.history.back();
+        } else {
+          handleViewChange(user.role === 'developer' ? 'my-day' : 'today');
+        }
+      };
+      const page = (
+        <Suspense fallback={<FullPageLoading />}>
+          <TaskPage taskKey={taskKey} onBack={goBack} />
+        </Suspense>
+      );
+      if (user.role !== 'manager') {
+        return page;
+      }
+      return (
+        <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
+          {page}
+        </WorkspaceShell>
+      );
+    }
     const resolver = taskKey && user?.role ? (
       <TaskLinkResolver
         taskKey={taskKey}

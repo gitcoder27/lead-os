@@ -44,7 +44,17 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
     try { await assertCanonical(req); const actor = principal(req); res.status(201).json(await tasks.toDto(await tasks.create(req.body, actor), actor)); } catch (error) { next(error); }
   });
   router.get("/:key/detail", validate(z.object({ params, body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
-    try { await assertCanonical(req); const actor = principal(req); res.json(await tasks.toDto(await tasks.requireTask(req.params.key as string, actor), actor)); } catch (error) { next(error); }
+    try {
+      await assertCanonical(req);
+      const actor = principal(req);
+      // Phase 3 (P3-D2): detail payload carries children/parent and tolerates
+      // deleted rows so the task page can render a tombstone.
+      if (await keys.phase3Enabled(req.auth!.user.workspaceId)) {
+        res.json(await tasks.detail(req.params.key as string, actor));
+        return;
+      }
+      res.json(await tasks.toDto(await tasks.requireTask(req.params.key as string, actor), actor));
+    } catch (error) { next(error); }
   });
   router.patch("/:key", validate(z.object({ params, body: taskUpdateSchema, query: z.any().optional() })), async (req, res, next) => {
     try { await assertCanonical(req); const actor = principal(req); res.json(await tasks.toDto(await tasks.update(req.params.key as string, req.body, actor), actor)); } catch (error) { next(error); }

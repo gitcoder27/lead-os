@@ -21,6 +21,7 @@ import {
   EyeOff,
   RefreshCcw,
   Tag,
+  Tags,
   Globe,
   Pencil,
   PanelTop,
@@ -51,18 +52,20 @@ import {
   type JiraField,
 } from '@/hooks/useSettingsActions';
 import { TagManagementSection } from '@/components/settings/TagManagementSection';
+import { LabelsSection } from '@/components/settings/LabelsSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
-type SectionId = 'navigation' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'maintenance' | 'access';
+type SectionId = 'navigation' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'maintenance' | 'access';
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
 const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_assignees';
 
-const SECTION_IDS: readonly SectionId[] = ['navigation', 'connection', 'sync', 'assistant', 'team', 'tags', 'maintenance', 'access'];
+const SECTION_IDS: readonly SectionId[] = ['navigation', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'maintenance', 'access'];
 
 function isSectionId(value: string | null | undefined): value is SectionId {
   return value !== null && value !== undefined && (SECTION_IDS as readonly string[]).includes(value);
@@ -83,6 +86,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const DISCOVER_PAGE_SIZE = 50;
   const DISCOVER_SEARCH_DEBOUNCE_MS = 350;
   const { user, logout } = useAuth();
+  const tasksPhase3 = useTasksPhase3();
   const { data: config, refetch: refetchConfig } = useConfig();
   const { data: assistantConfig } = useAssistantConfig();
   const { data: syncStatus } = useSyncStatus();
@@ -793,6 +797,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     assistant: { title: 'Copilot', description: 'AI assistant provider, model, and API key.' },
     team: { title: 'Team Members', description: 'Manage tracked developers for workload, routing, and sync scope.' },
     tags: { title: 'Defect Tags', description: 'Review the shared tag library and safely remove labels.' },
+    labels: { title: 'Task Labels', description: 'Manage the shared task label library — add, rename, recolor, or remove labels.' },
     maintenance: { title: 'Data Maintenance', description: 'Preview and run rare cleanup resets for Manager Desk and Team Tracker.' },
     access: { title: 'Developer Access', description: 'Create developer accounts and manage app user access.' },
   };
@@ -804,6 +809,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     { id: 'assistant', icon: <Sparkles size={13} />, label: 'Copilot', status: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'On' : 'Off', sv: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'success' : 'muted' },
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
+    ...(tasksPhase3 ? [{ id: 'labels' as const, icon: <Tags size={13} />, label: 'Task Labels', status: null, sv: 'muted' as const }] : []),
     { id: 'maintenance', icon: <AlertTriangle size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
     { id: 'access', icon: <Shield size={13} />, label: 'Developer Access', status: !loadingUsers ? `${appUsers.length} user${appUsers.length !== 1 ? 's' : ''}` : null, sv: 'muted' },
   ];
@@ -1773,6 +1779,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               {/* ── TAGS ────── */}
               {activeSection === 'tags' ? (
                 <TagManagementSection />
+              ) : null}
+
+              {/* ── TASK LABELS (Phase 3) ────── */}
+              {activeSection === 'labels' && tasksPhase3 ? (
+                <LabelsSection />
               ) : null}
 
               {/* ── DATA MAINTENANCE ────── */}

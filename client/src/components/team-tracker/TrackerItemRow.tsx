@@ -92,10 +92,10 @@ export function TrackerItemRow({
   const Icon = stateInfo.icon;
   const isActive = item.state === 'in_progress';
   const isDone = item.state === 'done' || item.state === 'dropped';
-  const isLinked = Boolean(item.managerDeskItemId);
+  const isLinked = !item.canonicalTask && Boolean(item.managerDeskItemId);
   const isDrawerPlanned = variant === 'drawer-planned';
   const canOpen = Boolean(onOpen) && !titleEditing;
-  const isTitleEditable = !readOnly && !compact && Boolean(onUpdateTitle) && !isDone && !isLinked;
+  const isTitleEditable = !readOnly && !compact && Boolean(onUpdateTitle) && !isDone && !isLinked && item.canRename !== false;
   const hasExplicitTitleEditAction = isTitleEditable && Boolean(onOpen);
   const isInlineTitleEditable = isTitleEditable && !hasExplicitTitleEditAction;
   const canShowDetails = showDetailsToggle && !compact && !canOpen;

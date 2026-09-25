@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { registerSurfaceTaskIds, surfaceTaskToWorkItem } from '@/lib/surface-tasks';
 import type {
   TeamTrackerBoardResponse,
   TeamTrackerBoardQuery,
@@ -31,6 +32,25 @@ export function useTeamTracker(date: string, query?: TeamTrackerBoardQuery, enab
     queryFn: () => api.get<TeamTrackerBoardResponse>(buildBoardUrl(date, query)),
     refetchInterval: enabled ? 30_000 : false,
     enabled,
+    // Phase 2c: canonical transport carries `developers[].tasks`; rebuild the
+    // item-shaped presentation arrays so board components stay agnostic.
+    select: (data) => {
+      if (data.taskModel !== 'canonical') return data;
+      return {
+        ...data,
+        developers: data.developers.map((day) => {
+          const items = (day.tasks ?? []).map((task) => surfaceTaskToWorkItem(task, day.developer.accountId));
+          registerSurfaceTaskIds('tracker', items);
+          return {
+            ...day,
+            currentItem: items.find((item) => item.state === 'in_progress'),
+            plannedItems: items.filter((item) => item.state === 'planned'),
+            completedItems: items.filter((item) => item.state === 'done'),
+            droppedItems: items.filter((item) => item.state === 'dropped'),
+          };
+        }),
+      };
+    },
   });
 }
 

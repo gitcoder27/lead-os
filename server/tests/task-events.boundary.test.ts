@@ -3,7 +3,16 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "../src");
-const allowed = new Set(["db/migrate.ts", "db/schema.ts", "services/task-events.service.ts", "scripts/task-phase2-backfill.ts"]);
+const allowed = new Set([
+  "db/migrate.ts",
+  "db/schema.ts",
+  "services/task-events.service.ts",
+  "scripts/task-phase2-backfill.ts",
+  // Phase 2d contract tooling references the table by name for the
+  // task_id NOT NULL rebuild and its preflight check.
+  "services/task-contract.service.ts",
+  "scripts/task-contract.ts",
+]);
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

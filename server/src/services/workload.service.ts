@@ -6,6 +6,8 @@ import { todayIsoDate } from "../utils/date";
 import { getEffectiveDueDate, isActiveTeamIssue } from "./issue-rules";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { TaskKeysService } from "./task-keys.service";
+import { TeamTrackerService } from "./team-tracker.service";
 
 const PRIORITY_WEIGHTS: Record<string, number> = {
   Highest: 5,
@@ -100,12 +102,14 @@ export class WorkloadService {
     const devs = (await this.getDevelopers(date, normalizedWorkspaceId)).filter(
       (developer) => developer.availability?.state !== "inactive"
     );
+    const canonicalDays = await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)
+      ? (await new TeamTrackerService().getBoard(date, { workspaceId: normalizedWorkspaceId })).developers : undefined;
     const issueRows = await db.select().from(issues).where(eq(issues.workspaceId, normalizedWorkspaceId));
     const dayRows = await db
       .select()
       .from(teamTrackerDays)
       .where(and(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId), eq(teamTrackerDays.date, date)));
-    const trackerItems = dayRows.length > 0
+    const trackerItems = !canonicalDays && dayRows.length > 0
       ? await db
         .select()
         .from(teamTrackerItems)
@@ -134,12 +138,13 @@ export class WorkloadService {
       const score = this.calculateScore(mine.map((item) => item.priorityName));
       const trackerDay = trackerDayByDeveloper.get(dev.accountId);
       const trackerDayItems = trackerDay ? trackerItemsByDayId.get(trackerDay.id) ?? [] : [];
-      const currentCount = trackerDayItems.some((item) => item.state === "in_progress") ? 1 : 0;
-      const plannedCount = trackerDayItems.filter((item) => item.state === "planned").length;
-      const completedTodayCount = trackerDayItems.filter((item) => item.state === "done").length;
-      const droppedTodayCount = trackerDayItems.filter((item) => item.state === "dropped").length;
+      const canonicalDay = canonicalDays?.find((day) => day.developer.accountId === dev.accountId);
+      const currentCount = (canonicalDay ? Boolean(canonicalDay.currentItem) : trackerDayItems.some((item) => item.state === "in_progress")) ? 1 : 0;
+      const plannedCount = canonicalDay?.plannedItems.length ?? trackerDayItems.filter((item) => item.state === "planned").length;
+      const completedTodayCount = canonicalDay?.completedItems.length ?? trackerDayItems.filter((item) => item.state === "done").length;
+      const droppedTodayCount = canonicalDay?.droppedItems.length ?? trackerDayItems.filter((item) => item.state === "dropped").length;
       const assignedTodayCount = currentCount + plannedCount;
-      const capacityUnits = trackerDay?.capacityUnits ?? undefined;
+      const capacityUnits = canonicalDay?.capacityUnits ?? trackerDay?.capacityUnits ?? undefined;
       const capacityUsed = assignedTodayCount;
       const capacityRemaining = capacityUnits !== undefined
         ? capacityUnits - capacityUsed

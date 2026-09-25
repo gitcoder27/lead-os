@@ -1,3 +1,4 @@
+import { TaskKeysService } from "../services/task-keys.service";
 import { and, count, desc, eq, gt, inArray } from "drizzle-orm";
 import type {
   AssistantActionConfirmRequest,
@@ -144,7 +145,7 @@ export class AssistantService {
     this.createLlmClient =
       deps.createLlmClient ?? ((cfg) => new OpenAiCompatibleClient({ ...cfg }));
     this.tools = deps.tools ?? createAssistantTools();
-    this.toolByName = new Map(this.tools.map((tool) => [tool.name, tool]));
+    this.toolByName = new Map([...this.tools, ...(deps.tools ? [] : createAssistantTools(true))].map((tool) => [tool.name, tool]));
     this.llmTools = toLlmToolDefinitions(this.tools);
     this.now = deps.now ?? (() => new Date());
   }
@@ -652,6 +653,7 @@ export class AssistantService {
       config.customInstructions
     );
     const context = this.toolContext(auth, date, currentView);
+    const llmTools = !this.deps.tools && await new TaskKeysService().canonicalEnabled(auth.workspaceId) ? toLlmToolDefinitions(createAssistantTools(true)) : this.llmTools;
     // Reserve ~40% of the window for system/tools/output; history gets the rest (~4 chars/token).
     const historyCharBudget = config.contextWindow ? Math.floor(config.contextWindow * 0.6 * 4) : undefined;
 
@@ -664,7 +666,7 @@ export class AssistantService {
         result = await llm.chatStream(
           {
             messages: [{ role: "system", content: systemPrompt }, ...history],
-            tools: this.llmTools,
+            tools: llmTools,
             signal,
             maxTokens: config.maxOutputTokens,
             reasoningEffort: config.reasoningEffort,

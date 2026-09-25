@@ -13,8 +13,14 @@ import {
   teamTrackerItems,
 } from "../src/db/schema";
 import { SearchService } from "../src/services/search.service";
+import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { TaskEventsService } from "../src/services/task-events.service";
+import { TeamTrackerService } from "../src/services/team-tracker.service";
 
 const searchService = new SearchService();
+const trackerService = new TeamTrackerService();
+const managerDeskService = new ManagerDeskService(trackerService);
+const eventsService = new TaskEventsService();
 
 async function seedIssue(overrides: Partial<typeof issues.$inferInsert> = {}) {
   await db.insert(issues).values({
@@ -468,5 +474,108 @@ describe("SearchService.search", () => {
     const result = await searchService.search("payment % timeouts _");
 
     expect(result.issues).toHaveLength(0);
+  });
+
+  describe("tasks group", () => {
+    async function enableTaskKeys() {
+      await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    }
+
+    it("matches tasks by title across tracker items", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Quartz payment migration",
+      });
+
+      const result = await searchService.search("quartz", "default", "manager-a");
+
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0]).toMatchObject({
+        taskKey: item.taskKey,
+        title: "Quartz payment migration",
+        matchedIn: "title",
+        developerName: "Alice Smith",
+      });
+    });
+
+    it("matches tasks by event body with excerpt", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Unrelated title",
+      });
+      await eventsService.append(
+        {
+          taskKey: item.taskKey!,
+          type: "instruction",
+          body: "Verify the quartz rollout window",
+          meta: { via: "task_drawer" },
+          visibility: "shared",
+        },
+        { type: "manager", accountId: "manager-a" }
+      );
+
+      const result = await searchService.search("quartz", "default", "manager-a");
+
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0]).toMatchObject({
+        taskKey: item.taskKey,
+        matchedIn: "event",
+      });
+      expect(result.tasks[0]?.excerpt).toContain("quartz rollout");
+    });
+
+    it("never matches another manager's private events", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Shared title",
+      });
+      await eventsService.append(
+        {
+          taskKey: item.taskKey!,
+          type: "instruction",
+          body: "Private quartz note",
+          meta: { via: "task_drawer" },
+          visibility: "private",
+        },
+        { type: "manager", accountId: "manager-a" }
+      );
+
+      const otherManager = await searchService.search("quartz", "default", "manager-b");
+      expect(otherManager.tasks).toHaveLength(0);
+
+      const author = await searchService.search("quartz", "default", "manager-a");
+      expect(author.tasks).toHaveLength(1);
+      expect(author.tasks[0]?.matchedIn).toBe("event");
+    });
+
+    it("de-duplicates desk items when their task key already appears in tasks", async () => {
+      await enableTaskKeys();
+      const deskItem = await managerDeskService.createItem("manager-a", {
+        date: "2026-03-07",
+        title: "Quartz migration follow-up",
+      });
+      expect(deskItem.taskKey).toBeDefined();
+
+      const result = await searchService.search("quartz", "default", "manager-a");
+
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0]?.taskKey).toBe(deskItem.taskKey);
+      expect(result.deskItems).toHaveLength(0);
+    });
+
+    it("matches tasks directly by task key", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Unrelated title",
+      });
+
+      const result = await searchService.search(item.taskKey!, "default", "manager-a");
+
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0]).toMatchObject({
+        taskKey: item.taskKey,
+        matchedIn: "key",
+      });
+    });
   });
 });

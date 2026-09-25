@@ -539,6 +539,94 @@ export type TrackerDeveloperStatus =
   | "done_for_today";
 
 export const TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
+
+export type TaskStatus = "open" | "active" | "blocked" | "done" | "dropped";
+export type TaskOwnerType = "manager" | "developer";
+export interface TaskLink {
+  id: number;
+  kind: "jira" | "person" | "external" | "task";
+  ref: string;
+  role: "primary" | "related" | null;
+}
+export interface DeveloperTask {
+  id: number;
+  taskKey: string;
+  title: string;
+  kind: "task" | "meeting";
+  status: TaskStatus;
+  ownerType: TaskOwnerType | null;
+  ownerId: string | null;
+  priority: "normal" | "high";
+  scheduledOn: string | null;
+  dueAt: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  participants: string | null;
+  outcome: string | null;
+  createdByType: string;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  deletedAt: string | null;
+  links: TaskLink[];
+}
+export interface ManagerTask extends DeveloperTask {
+  legacyDeskItemId?: number;
+  later: boolean;
+  trackedByManagerId: string | null;
+  parentId: number | null;
+  labels: string[];
+  nextAction: string | null;
+  followUpAt: string | null;
+}
+
+/**
+ * Phase 2c native surface contract: the canonical task plus the per-surface
+ * presentation fields the legacy DTOs carried (position, origin date, Jira
+ * context, latest event, assignee). Populated by TaskService.surfaceDtos so
+ * Team Tracker, My Day, and Manager Desk transport canonical tasks instead of
+ * synthesized legacy rows.
+ */
+export interface SurfaceTaskFields {
+  position: number;
+  originDate: string;
+  itemType: TrackerItemType;
+  lifecycle: TrackerTaskLifecycle;
+  trackerItemId?: number;
+  deskItemId?: number;
+  jiraKey?: string;
+  relatedIssueKeys: string[];
+  jiraSummary?: string;
+  jiraPriorityName?: string;
+  jiraDueDate?: string;
+  latestEvent?: TaskEventSummary;
+  ageDays?: number;
+  assignee?: ManagerDeskAssignee;
+}
+export type ManagerSurfaceTask = ManagerTask & SurfaceTaskFields;
+export type DeveloperSurfaceTask = DeveloperTask & SurfaceTaskFields;
+export type SurfaceTask = ManagerSurfaceTask | DeveloperSurfaceTask;
+export interface CreateTaskRequest {
+  title: string;
+  kind?: "task" | "meeting";
+  status?: TaskStatus;
+  ownerType?: TaskOwnerType | null;
+  ownerId?: string | null;
+  later?: boolean;
+  priority?: "normal" | "high";
+  labels?: string[];
+  scheduledOn?: string | null;
+  dueAt?: string | null;
+  followUpAt?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  participants?: string | null;
+  nextAction?: string | null;
+  outcome?: string | null;
+  parentId?: number | null;
+}
+export type UpdateTaskRequest = Partial<CreateTaskRequest>;
 export const TASK_EVENT_TYPES = [
   "created", "update", "instruction", "decision", "blocker", "status", "assign",
   "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
@@ -600,6 +688,8 @@ export interface TrackerCheckIn {
 }
 
 export interface TrackerWorkItem {
+  canonicalTask?: boolean;
+  canRename?: boolean;
   id: number;
   dayId: number;
   originDate: string;
@@ -638,6 +728,10 @@ export interface TrackerDeveloperDay {
   plannedItems: TrackerWorkItem[];
   completedItems: TrackerWorkItem[];
   droppedItems: TrackerWorkItem[];
+  /** Phase 2c: canonical tasks for this day when the canonical model serves
+   *  the surface. The legacy item arrays are emptied at the transport
+   *  boundary; consumers should read `tasks`. */
+  tasks?: SurfaceTask[];
   checkIns: TrackerCheckIn[];
   recentCheckIns: TrackerCheckIn[];
   isStale: boolean;
@@ -772,6 +866,9 @@ export interface TeamTrackerSavedView {
 export interface TeamTrackerBoardResponse {
   date: string;
   viewMode: TeamTrackerViewMode;
+  /** "canonical" when the response transports ManagerSurfaceTask/…SurfaceTask
+   *  contracts in `developers[].tasks` and the legacy item arrays are empty. */
+  taskModel?: "canonical";
   developers: TrackerDeveloperDay[];
   inactiveDevelopers: InactiveDeveloperListItem[];
   summary: TrackerBoardSummary;
@@ -789,6 +886,10 @@ export interface InactiveDeveloperListItem {
 export interface MyDayResponse {
   date: string;
   viewMode: MyDayViewMode;
+  /** "canonical" when `tasks` carries the canonical task contracts and the
+   *  legacy item arrays are empty. */
+  taskModel?: "canonical";
+  tasks?: DeveloperSurfaceTask[];
   readOnlyReason?: MyDayReadOnlyReason;
   developer: Developer;
   status: TrackerDeveloperStatus;
@@ -808,6 +909,7 @@ export interface TrackerIssueAssignment {
   date: string;
   jiraKey: string;
   itemId: number;
+  taskKey?: string;
   title: string;
   state: TrackerItemState;
   developer: Developer;
@@ -915,6 +1017,7 @@ export interface ManagerDeskAssignee {
 }
 
 export interface ManagerDeskItem {
+  canonicalTask?: boolean;
   id: number;
   dayId: number;
   originDate: string;
@@ -968,6 +1071,10 @@ export interface ManagerDeskSummary {
 }
 
 export interface ManagerDeskDayResponse {
+  taskModel?: "canonical";
+  /** Phase 2c: canonical tasks when taskModel === "canonical" (the legacy
+   *  `items` array is then empty). */
+  tasks?: ManagerSurfaceTask[];
   date: string;
   viewMode: ManagerDeskViewMode;
   items: ManagerDeskItem[];
@@ -1011,6 +1118,8 @@ export interface TrackerSharedTaskDetailResponse {
   date: string;
   developer: Developer;
   lifecycle: TrackerTaskLifecycle;
+  /** Phase 2c canonical detail payload. */
+  task?: ManagerSurfaceTask;
   managerDeskItem?: ManagerDeskItem;
   trackerItem: TrackerWorkItem;
 }

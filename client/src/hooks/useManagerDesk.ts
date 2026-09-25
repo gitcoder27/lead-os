@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { registerSurfaceTaskIds, surfaceTaskToDeskItem, taskRefFor } from '@/lib/surface-tasks';
 import type {
   ManagerDeskDayResponse,
   ManagerDeskItem,
@@ -17,6 +18,9 @@ import type {
 } from '@/types/manager-desk';
 
 function invalidateDeskDependentViews(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['tasks'] });
+  qc.invalidateQueries({ queryKey: ['task-events'] });
+  qc.invalidateQueries({ queryKey: ['task-resolution'] });
   qc.invalidateQueries({ queryKey: ['today'] });
   qc.invalidateQueries({ queryKey: ['manager-desk'] });
   qc.invalidateQueries({ queryKey: ['manager-desk', 'task-detail'] });
@@ -35,6 +39,18 @@ export function useManagerDesk(date: string, enabled = true) {
     queryFn: () => api.get<ManagerDeskDayResponse>(`/manager-desk?date=${date}`),
     enabled,
     refetchInterval: 30_000,
+    // Phase 2c: canonical transport carries `tasks`; rebuild the item-shaped
+    // presentation arrays so desk components are agnostic to taskModel.
+    select: (data) => {
+      if (data.taskModel !== 'canonical' || !data.tasks) return data;
+      const items = data.tasks.map(surfaceTaskToDeskItem);
+      registerSurfaceTaskIds('desk', items);
+      return {
+        ...data,
+        items,
+        createdThatDayItems: items.filter((item) => item.createdAt.slice(0, 10) === data.date),
+      };
+    },
   });
 }
 
@@ -103,8 +119,8 @@ export function useCreateManagerDeskItem(date: string) {
 export function useUpdateManagerDeskItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, ...body }: ManagerDeskUpdateItemPayload & { itemId: number }) =>
-      api.patch<ManagerDeskItem>(`/manager-desk/items/${itemId}`, body),
+    mutationFn: ({ itemId, taskKey, ...body }: ManagerDeskUpdateItemPayload & { itemId: number; taskKey?: string }) =>
+      api.patch<ManagerDeskItem>(`/manager-desk/items/${taskRefFor('desk', itemId, taskKey)}`, body),
     onSuccess: (item) => {
       qc.setQueriesData<TrackerSharedTaskDetailResponse>(
         { queryKey: ['manager-desk', 'task-detail'] },
@@ -139,7 +155,7 @@ export function useDeleteManagerDeskItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: number) =>
-      api.delete<{ deleted: boolean }>(`/manager-desk/items/${itemId}`),
+      api.delete<{ deleted: boolean }>(`/manager-desk/items/${taskRefFor('desk', itemId)}`),
     onSuccess: () => {
       invalidateDeskDependentViews(qc);
     },
@@ -152,7 +168,7 @@ export function useCancelDelegatedManagerDeskTask(date: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: number) =>
-      api.post<ManagerDeskItem>(`/manager-desk/items/${itemId}/cancel-delegated-task`),
+      api.post<ManagerDeskItem>(`/manager-desk/items/${taskRefFor('desk', itemId)}/cancel-delegated-task`),
     onSuccess: (item) => {
       qc.setQueriesData<TrackerSharedTaskDetailResponse>(
         { queryKey: ['manager-desk', 'task-detail'] },
@@ -173,8 +189,8 @@ export function useCancelDelegatedManagerDeskTask(date: string) {
 export function useAddManagerDeskLink(date: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ itemId, ...body }: ManagerDeskAddLinkPayload & { itemId: number }) =>
-      api.post<ManagerDeskLink>(`/manager-desk/items/${itemId}/links`, body),
+    mutationFn: ({ itemId, taskKey, ...body }: ManagerDeskAddLinkPayload & { itemId: number; taskKey?: string }) =>
+      api.post<ManagerDeskLink>(`/manager-desk/items/${taskRefFor('desk', itemId, taskKey)}/links`, body),
     onSuccess: () => {
       invalidateDeskDependentViews(qc);
     },
@@ -187,7 +203,7 @@ export function useRemoveManagerDeskLink(date: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, linkId }: { itemId: number; linkId: number }) =>
-      api.delete<{ deleted: boolean }>(`/manager-desk/items/${itemId}/links/${linkId}`),
+      api.delete<{ deleted: boolean }>(`/manager-desk/items/${taskRefFor('desk', itemId)}/links/${linkId}`),
     onSuccess: () => {
       invalidateDeskDependentViews(qc);
     },

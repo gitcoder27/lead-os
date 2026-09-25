@@ -4,17 +4,29 @@ import { db, resetDatabase } from "./helpers/db";
 import { rawDb } from "../src/db/connection";
 import { migrate } from "../src/db/migrate";
 import {
+  configTable,
   dailyNoteCaptures,
   dailyNoteFollowUps,
+  dailyNoteTaskRefs,
   dailyNotes,
+  developers,
   managerDeskDays,
   managerDeskItems,
 } from "../src/db/schema";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { TaskEventsService } from "../src/services/task-events.service";
+import { TeamTrackerService } from "../src/services/team-tracker.service";
 
 const managerDesk = new ManagerDeskService();
-const service = new DailyNotesService(managerDesk);
+const tracker = new TeamTrackerService();
+const eventsService = new TaskEventsService();
+const service = new DailyNotesService(managerDesk, tracker);
+const managerViewer = { kind: "manager" as const, accountId: "manager-a" };
+
+async function enableTaskKeys() {
+  await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+}
 
 const MANAGER = "manager-a";
 const OTHER_MANAGER = "manager-b";
@@ -468,6 +480,127 @@ describe("DailyNotesService.createFollowUp/getSources", () => {
     expect(day.note?.body).toBe("keep me");
     expect(day.followUps).toEqual([]);
     expect((await service.getSources(MANAGER, [followUp.itemId], WS)).sources).toEqual([]);
+  });
+});
+
+describe("DailyNotesService task actions", () => {
+  beforeEach(async () => {
+    await db.insert(developers).values({
+      accountId: "dev-1",
+      displayName: "Dev One",
+      isActive: 1,
+    });
+  });
+
+  it("addTaskUpdate appends the update event plus a private note_ref and ref row", async () => {
+    await enableTaskKeys();
+    const item = await tracker.addItem("dev-1", DATE, { title: "Queue review" });
+    await saveNote("Selected excerpt lives here");
+
+    const event = await service.addTaskUpdate(MANAGER, DATE, {
+      taskKey: item.taskKey!,
+      text: "Add this to the timeline",
+      type: "instruction",
+      visibility: "shared",
+      requestId: randomUUID(),
+    }, WS);
+
+    expect(event).toMatchObject({
+      taskKey: item.taskKey,
+      type: "instruction",
+      body: "Add this to the timeline",
+      meta: { via: "notes_page" },
+    });
+
+    const events = await eventsService.list(item.taskKey!, managerViewer);
+    expect(events.events.map((entry) => entry.type)).toEqual(
+      expect.arrayContaining(["instruction", "note_ref", "created"])
+    );
+    const noteRef = events.events.find((entry) => entry.type === "note_ref");
+    expect(noteRef?.meta).toMatchObject({ noteDate: DATE, relation: "update_from" });
+
+    const refs = await db.select().from(dailyNoteTaskRefs);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]).toMatchObject({ taskKey: item.taskKey, relation: "update_from" });
+  });
+
+  it("addTaskUpdate rejects missing notes and unknown task keys", async () => {
+    await enableTaskKeys();
+    await expect(
+      service.addTaskUpdate(MANAGER, DATE, {
+        taskKey: "T-1",
+        text: "x",
+        requestId: randomUUID(),
+      }, WS)
+    ).rejects.toMatchObject({ status: 404 });
+
+    await saveNote("body");
+    await expect(
+      service.addTaskUpdate(MANAGER, DATE, {
+        taskKey: "T-999",
+        text: "x",
+        requestId: randomUUID(),
+      }, WS)
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("createTask adds a developer task with a private context update and note_ref", async () => {
+    await enableTaskKeys();
+    await saveNote("Captured context");
+
+    const task = await service.createTask(MANAGER, DATE, {
+      title: "Fix the flapping test",
+      developerAccountId: "dev-1",
+      context: "Selection from notes",
+      requestId: randomUUID(),
+    }, WS);
+
+    expect(task.taskKey).toMatch(/^T-\d+$/);
+    expect(task.developer?.accountId).toBe("dev-1");
+
+    const events = await eventsService.list(task.taskKey, managerViewer);
+    const types = events.events.map((entry) => entry.type);
+    expect(types).toEqual(expect.arrayContaining(["created", "update", "note_ref"]));
+    const context = events.events.find(
+      (entry) => entry.type === "update" && entry.body === "Selection from notes"
+    );
+    expect(context?.visibility).toBe("private");
+    const noteRef = events.events.find((entry) => entry.type === "note_ref");
+    expect(noteRef?.meta).toMatchObject({ noteDate: DATE, relation: "created_from" });
+  });
+
+  it("createTask replays the same requestId and rejects divergent payloads", async () => {
+    await enableTaskKeys();
+    await saveNote("body");
+    const requestId = randomUUID();
+
+    const first = await service.createTask(MANAGER, DATE, {
+      title: "Reusable task",
+      requestId,
+    }, WS);
+    const replay = await service.createTask(MANAGER, DATE, {
+      title: "Reusable task",
+      requestId,
+    }, WS);
+    expect(replay.taskKey).toBe(first.taskKey);
+
+    await expect(
+      service.createTask(MANAGER, DATE, { title: "Changed", requestId }, WS)
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("task actions require the phase 1 flag", async () => {
+    await saveNote("body");
+    await expect(
+      service.addTaskUpdate(MANAGER, DATE, {
+        taskKey: "T-1",
+        text: "x",
+        requestId: randomUUID(),
+      }, WS)
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      service.createTask(MANAGER, DATE, { title: "x", requestId: randomUUID() }, WS)
+    ).rejects.toMatchObject({ status: 404 });
   });
 });
 

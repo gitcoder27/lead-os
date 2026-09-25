@@ -78,6 +78,11 @@ function renderVerify(result: TaskPhase2VerifyResult): string {
     for (const d of result.parityDiffs.slice(0, 20)) lines.push(`    ${d.surface} ${d.owner} ${d.date} ${d.field}: legacy=${JSON.stringify(d.legacy)} tasks=${JSON.stringify(d.tasks)}`);
     if (result.parityDiffs.length > 20) lines.push(`    … and ${result.parityDiffs.length - 20} more`);
   }
+  if (result.explainedDrift?.length) {
+    lines.push(`  explained drift (event-replay divergences, informational): ${result.explainedDrift.length}`);
+    for (const d of result.explainedDrift.slice(0, 10)) lines.push(`    ${d.surface} ${d.owner} ${d.date} ${d.field}: legacy=${JSON.stringify(d.legacy)} tasks=${JSON.stringify(d.tasks)}`);
+    if (result.explainedDrift.length > 10) lines.push(`    … and ${result.explainedDrift.length - 10} more`);
+  }
   return lines.join("\n");
 }
 
@@ -93,6 +98,7 @@ async function main(): Promise<void> {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--apply") apply = true;
+    else if (arg === "--dry-run") continue;
     else if (arg === "--verify") verify = true;
     else if (arg === "--strict") strict = true;
     else if (arg === "--resume") resume = true;

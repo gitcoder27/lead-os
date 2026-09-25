@@ -15,6 +15,7 @@ const mockCreateManagerDeskItemMutate = vi.fn();
 const mockUpdateManagerDeskItemMutate = vi.fn();
 const mockAddTrackerItemMutate = vi.fn();
 const mockAddCheckInMutate = vi.fn();
+const mockStatusUpdateMutate = vi.fn();
 const mockRefetchBoard = vi.fn();
 const mockRefetchCarryForwardPreview = vi.fn();
 const mockRefetchCarryForwardContext = vi.fn();
@@ -357,7 +358,7 @@ vi.mock('@/hooks/useTeamTrackerMutations', () => ({
   useDeleteTrackerItem: () => ({ mutate: vi.fn() }),
   useAddCheckIn: () => ({ mutate: mockAddCheckInMutate }),
   useCarryForward: () => ({ mutate: mockCarryForwardMutate, isPending: false }),
-  useStatusUpdate: () => ({ mutate: vi.fn(), isPending: false }),
+  useStatusUpdate: () => ({ mutate: mockStatusUpdateMutate, isPending: false, reset: vi.fn(), error: null }),
 }));
 
 vi.mock('@/hooks/useManagerDesk', () => ({
@@ -649,6 +650,90 @@ describe('TeamTrackerPage', () => {
 
     expect(mockAddCheckInMutate).toHaveBeenCalledWith(
       expect.objectContaining({ accountId: 'dev-2', taskKeys: ['T-10'] }),
+    );
+  });
+
+  it('sends non-rationale statuses straight to the status-update endpoint', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Alice Smith');
+
+    const select = screen.getByLabelText('Change developer status');
+    fireEvent.change(select, { target: { value: 'done_for_today' } });
+
+    expect(mockStatusUpdateMutate).toHaveBeenCalledWith(
+      { accountId: 'dev-1', status: 'done_for_today' },
+      expect.anything(),
+    );
+    expect(screen.queryByRole('button', { name: 'Set status' })).not.toBeInTheDocument();
+  });
+
+  it('requires a rationale before a blocked status reaches the endpoint', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Alice Smith');
+
+    const select = screen.getByLabelText('Change developer status');
+    fireEvent.change(select, { target: { value: 'blocked' } });
+
+    const dialog = screen.getByRole('dialog', { name: /Alice Smith → Blocked/ });
+    const submit = within(dialog).getByRole('button', { name: 'Set status' });
+    expect(submit).toBeDisabled();
+
+    fireEvent.change(within(dialog).getByLabelText(/^Rationale/), {
+      target: { value: 'Waiting on the API contract' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Set status' }));
+
+    expect(mockStatusUpdateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: 'dev-1',
+        status: 'blocked',
+        rationale: 'Waiting on the API contract',
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('links a picked task to a waiting status update', () => {
+    mockBoard.developers[1]!.plannedItems = mockBoard.developers[1]!.plannedItems.map(
+      (item) => (item.id === 13 ? { ...item, taskKey: 'T-13' } : item),
+    );
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+
+    const select = screen.getByLabelText('Change developer status');
+    fireEvent.change(select, { target: { value: 'waiting' } });
+
+    const dialog = screen.getByRole('dialog', { name: /Bob Jones → Waiting/ });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'T-13' }));
+    fireEvent.change(within(dialog).getByLabelText(/^Rationale/), {
+      target: { value: 'Blocked on the vendor review' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Set status' }));
+
+    expect(mockStatusUpdateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: 'dev-2',
+        status: 'waiting',
+        rationale: 'Blocked on the vendor review',
+        taskKey: 'T-13',
+      }),
+      expect.anything(),
     );
   });
 

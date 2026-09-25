@@ -3,6 +3,7 @@ import { Play, Zap } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from '@/components/team-tracker/TrackerItemRow';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
+import { TaskTimelineDisclosure } from '@/components/tasks/TaskTimeline';
 
 interface CurrentTaskProps {
   viewDate?: string;
@@ -105,6 +106,7 @@ export function CurrentTask({
                 ) : undefined
               }
             />
+            {item.taskKey && <TaskTimelineDisclosure taskKey={item.taskKey} mode="developer" />}
           </div>
         </div>
       </div>

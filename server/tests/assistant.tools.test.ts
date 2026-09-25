@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { developers, issues } from "../src/db/schema";
+import { configTable, developers, issues } from "../src/db/schema";
 import { HttpError } from "../src/middleware/errorHandler";
 import { AlertService } from "../src/services/alert.service";
 import { AutomationService } from "../src/services/automation.service";
@@ -10,6 +10,7 @@ import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { SearchService } from "../src/services/search.service";
 import { SettingsService } from "../src/services/settings.service";
 import { TagService } from "../src/services/tag.service";
+import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
 import { WorkSavedViewsService } from "../src/services/work-saved-views.service";
@@ -148,6 +149,13 @@ describe("assistant tools", () => {
       expect(typeof tool.label({})).toBe("string");
       expect(typeof tool.summarize({})).toBe("string");
     }
+  });
+
+  it("registers 38 canonical tools with confirmation for every task write", () => {
+    const canonical = createAssistantTools(true);
+    expect(canonical).toHaveLength(38);
+    expect(canonical.some((tool) => tool.name === "carry_forward" || tool.name === "promote_tracker_item")).toBe(false);
+    for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
   });
 
   it("get_today_snapshot returns a compact projection", async () => {
@@ -579,5 +587,60 @@ describe("assistant tools", () => {
 
     const error = await run("get_developer_day", {}).catch((err: unknown) => err);
     expect(error).toBeInstanceOf(HttpError);
+  });
+
+  describe("phase 1 task tools", () => {
+    async function enableTaskKeys() {
+      await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    }
+
+    it("get_task resolves the key and filters another manager's private events", async () => {
+      await enableTaskKeys();
+      const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Copilot target" });
+      const events = new TaskEventsService();
+      await events.append(
+        { taskKey: item.taskKey!, type: "update", body: "Shared progress", meta: { via: "task_drawer" }, visibility: "shared" },
+        { type: "manager", accountId: MANAGER_ID }
+      );
+      await events.append(
+        { taskKey: item.taskKey!, type: "update", body: "Private note", meta: { via: "task_drawer" }, visibility: "private" },
+        { type: "manager", accountId: "manager-2" }
+      );
+
+      const { result } = await run("get_task", { taskKey: item.taskKey });
+      const payload = result as { task: { taskKey: string }; events: Array<{ type: string; body: string | null }> };
+      expect(payload.task.taskKey).toBe(item.taskKey);
+      expect(payload.events.map((event) => event.type)).toEqual(expect.arrayContaining(["update", "created"]));
+      expect(payload.events.map((event) => event.body)).not.toContain("Private note");
+
+      await expect(run("get_task", { taskKey: "T-999" })).rejects.toMatchObject({ status: 404 });
+      await expect(run("get_task", { taskKey: "bogus" })).rejects.toMatchObject({ status: 400 });
+    });
+
+    it("add_task_update is confirm-gated and appends a copilot-authored event", async () => {
+      await enableTaskKeys();
+      const item = await teamTrackerService.addItem("dev-1", DATE, { title: "Copilot update target" });
+      expect(toolByName.get("add_task_update")?.confirm).toBe("always");
+
+      const { result } = await run("add_task_update", {
+        taskKey: item.taskKey,
+        type: "decision",
+        body: "Ship after QA signoff",
+        visibility: "private",
+      });
+      const event = result as { type: string; author: { type: string; id: string }; visibility: string };
+      expect(event).toMatchObject({
+        type: "decision",
+        visibility: "private",
+        author: { type: "copilot", id: MANAGER_ID },
+      });
+
+      await expect(
+        run("add_task_update", { taskKey: item.taskKey, type: "blocker", body: "x" })
+      ).rejects.toMatchObject({ status: 400 });
+      await expect(
+        run("add_task_update", { taskKey: "T-999", type: "update", body: "x" })
+      ).rejects.toMatchObject({ status: 404 });
+    });
   });
 });

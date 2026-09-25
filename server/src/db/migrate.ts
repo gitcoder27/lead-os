@@ -172,23 +172,7 @@ CREATE TABLE IF NOT EXISTS developer_availability_periods (
   updated_at            TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS team_tracker_items (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  workspace_id  TEXT NOT NULL DEFAULT 'default',
-  day_id        INTEGER NOT NULL,
-  manager_desk_item_id INTEGER,
-  item_type     TEXT NOT NULL,
-  jira_key      TEXT,
-  related_jira_keys TEXT,
-  title         TEXT NOT NULL,
-  state         TEXT NOT NULL DEFAULT 'planned',
-  position      INTEGER NOT NULL DEFAULT 0,
-  note          TEXT,
-  completed_at  TEXT,
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  FOREIGN KEY (day_id) REFERENCES team_tracker_days(id)
-);
+
 
 CREATE TABLE IF NOT EXISTS team_tracker_checkins (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,42 +224,7 @@ CREATE TABLE IF NOT EXISTS manager_desk_days (
   UNIQUE(workspace_id, date, manager_account_id)
 );
 
-CREATE TABLE IF NOT EXISTS manager_desk_items (
-  id               INTEGER PRIMARY KEY AUTOINCREMENT,
-  workspace_id     TEXT NOT NULL DEFAULT 'default',
-  day_id           INTEGER NOT NULL,
-  source_item_id   INTEGER,
-  assignee_developer_account_id TEXT,
-  title            TEXT NOT NULL,
-  kind             TEXT NOT NULL,
-  category         TEXT NOT NULL,
-  status           TEXT NOT NULL DEFAULT 'inbox',
-  priority         TEXT NOT NULL DEFAULT 'medium',
-  participants     TEXT,
-  context_note     TEXT,
-  next_action      TEXT,
-  outcome          TEXT,
-  planned_start_at TEXT,
-  planned_end_at   TEXT,
-  follow_up_at     TEXT,
-  completed_at     TEXT,
-  created_at       TEXT NOT NULL,
-  updated_at       TEXT NOT NULL,
-  FOREIGN KEY (day_id) REFERENCES manager_desk_days(id),
-  FOREIGN KEY (source_item_id) REFERENCES manager_desk_items(id)
-);
 
-CREATE TABLE IF NOT EXISTS manager_desk_links (
-  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-  workspace_id         TEXT NOT NULL DEFAULT 'default',
-  item_id              INTEGER NOT NULL,
-  link_type            TEXT NOT NULL,
-  issue_key            TEXT,
-  developer_account_id TEXT,
-  external_label       TEXT,
-  created_at           TEXT NOT NULL,
-  FOREIGN KEY (item_id) REFERENCES manager_desk_items(id)
-);
 
 CREATE TABLE IF NOT EXISTS manager_desk_item_history (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -499,20 +448,12 @@ CREATE INDEX IF NOT EXISTS idx_tracker_days_workspace_date ON team_tracker_days(
 CREATE INDEX IF NOT EXISTS idx_tracker_days_workspace_dev ON team_tracker_days(workspace_id, developer_account_id);
 CREATE INDEX IF NOT EXISTS idx_tracker_days_workspace_developer_date ON team_tracker_days(workspace_id, developer_account_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_dev_availability_workspace_dev_dates ON developer_availability_periods(workspace_id, developer_account_id, start_date, end_date);
-CREATE INDEX IF NOT EXISTS idx_tracker_items_workspace_day ON team_tracker_items(workspace_id, day_id);
 CREATE INDEX IF NOT EXISTS idx_tracker_checkins_workspace_day ON team_tracker_checkins(workspace_id, day_id);
 CREATE INDEX IF NOT EXISTS idx_tracker_saved_views_workspace_manager ON team_tracker_saved_views(workspace_id, manager_account_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tracker_saved_views_workspace_manager_name ON team_tracker_saved_views(workspace_id, manager_account_id, name);
 CREATE INDEX IF NOT EXISTS idx_work_saved_views_workspace_manager ON work_saved_views(workspace_id, manager_account_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_saved_views_workspace_manager_name ON work_saved_views(workspace_id, manager_account_id, name);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_days_workspace_manager_date ON manager_desk_days(workspace_id, manager_account_id, date);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_day ON manager_desk_items(workspace_id, day_id);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_status ON manager_desk_items(workspace_id, status);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_follow_up_at ON manager_desk_items(workspace_id, follow_up_at);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_source_item_id ON manager_desk_items(workspace_id, source_item_id);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_item ON manager_desk_links(workspace_id, item_id);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_issue_key ON manager_desk_links(workspace_id, issue_key);
-CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_developer_account_id ON manager_desk_links(workspace_id, developer_account_id);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_item_recorded ON manager_desk_item_history(workspace_id, item_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_manager_recorded ON manager_desk_item_history(workspace_id, manager_account_id, recorded_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date);
@@ -582,6 +523,75 @@ INSERT INTO daily_notes_fts(rowid, date, body)
 SELECT id, date, body FROM daily_notes WHERE id NOT IN (SELECT rowid FROM daily_notes_fts);
 `;
 
+// Phase 2d: these tables are renamed to legacy_* archives by the contract
+// command. Their DDL runs only while the workspace is un-contracted so a
+// contracted startup does not silently recreate empty legacy tables.
+const legacyTaskTablesDdl = `
+CREATE TABLE IF NOT EXISTS team_tracker_items (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id  TEXT NOT NULL DEFAULT 'default',
+  day_id        INTEGER NOT NULL,
+  manager_desk_item_id INTEGER,
+  item_type     TEXT NOT NULL,
+  jira_key      TEXT,
+  related_jira_keys TEXT,
+  title         TEXT NOT NULL,
+  state         TEXT NOT NULL DEFAULT 'planned',
+  position      INTEGER NOT NULL DEFAULT 0,
+  note          TEXT,
+  completed_at  TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  FOREIGN KEY (day_id) REFERENCES team_tracker_days(id)
+);
+
+CREATE TABLE IF NOT EXISTS manager_desk_items (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id     TEXT NOT NULL DEFAULT 'default',
+  day_id           INTEGER NOT NULL,
+  source_item_id   INTEGER,
+  assignee_developer_account_id TEXT,
+  title            TEXT NOT NULL,
+  kind             TEXT NOT NULL,
+  category         TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'inbox',
+  priority         TEXT NOT NULL DEFAULT 'medium',
+  participants     TEXT,
+  context_note     TEXT,
+  next_action      TEXT,
+  outcome          TEXT,
+  planned_start_at TEXT,
+  planned_end_at   TEXT,
+  follow_up_at     TEXT,
+  completed_at     TEXT,
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL,
+  FOREIGN KEY (day_id) REFERENCES manager_desk_days(id),
+  FOREIGN KEY (source_item_id) REFERENCES manager_desk_items(id)
+);
+
+CREATE TABLE IF NOT EXISTS manager_desk_links (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id         TEXT NOT NULL DEFAULT 'default',
+  item_id              INTEGER NOT NULL,
+  link_type            TEXT NOT NULL,
+  issue_key            TEXT,
+  developer_account_id TEXT,
+  external_label       TEXT,
+  created_at           TEXT NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES manager_desk_items(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tracker_items_workspace_day ON team_tracker_items(workspace_id, day_id);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_day ON manager_desk_items(workspace_id, day_id);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_status ON manager_desk_items(workspace_id, status);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_follow_up_at ON manager_desk_items(workspace_id, follow_up_at);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_source_item_id ON manager_desk_items(workspace_id, source_item_id);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_item ON manager_desk_links(workspace_id, item_id);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_issue_key ON manager_desk_links(workspace_id, issue_key);
+CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_developer_account_id ON manager_desk_links(workspace_id, developer_account_id);
+`;
+
 const alterStatements = [
   "ALTER TABLE issues ADD COLUMN aspen_severity TEXT",
   "ALTER TABLE issues ADD COLUMN development_due_date TEXT",
@@ -640,6 +650,7 @@ const alterStatements = [
   "ALTER TABLE manager_desk_items ADD COLUMN task_key TEXT",
   "ALTER TABLE manager_desk_items ADD COLUMN created_by_type TEXT",
   "ALTER TABLE manager_desk_items ADD COLUMN created_by_id TEXT",
+  "ALTER TABLE daily_note_task_refs ADD COLUMN payload_hash TEXT",
   "CREATE INDEX IF NOT EXISTS idx_tracker_items_workspace_task_key ON team_tracker_items(workspace_id, task_key)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_manager_desk_items_workspace_task_key ON manager_desk_items(workspace_id, task_key) WHERE task_key IS NOT NULL",
   // Phase 2 expand step (§2.1.2): task_id columns are filled by the backfill;
@@ -757,7 +768,9 @@ function runConstraintRepairStatements(sqlite: BetterSqlite3.Database, tolerateM
 
 function isExpectedMigrationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /duplicate column name/i.test(message);
+  // "no such table" tolerates statements targeting tables archived to
+  // legacy_* by the Phase 2d contract.
+  return /duplicate column name/i.test(message) || /no such table/i.test(message);
 }
 
 const workspaceOwnedTables = [
@@ -1227,9 +1240,11 @@ const taskEventsContractRebuild: RebuildSpec = {
     )`,
 };
 
-// Stage 2d contract (§2.1.2): rebuild task_events with task_id NOT NULL, but
-// only after the backfill marker exists and every event row was repointed.
-function maybeContractTaskEventsTable(sqlite: BetterSqlite3.Database): void {
+/**
+ * Exported for the Phase 2d contract command: after `p2_contract` is recorded
+ * the rebuild contracts task_events.task_id to NOT NULL.
+ */
+export function maybeContractTaskEventsTable(sqlite: BetterSqlite3.Database): void {
   if (!tableExists(sqlite, "task_events") || !tableExists(sqlite, "data_migrations") || !columnExists(sqlite, "task_events", "task_id")) {
     return;
   }
@@ -1237,6 +1252,10 @@ function maybeContractTaskEventsTable(sqlite: BetterSqlite3.Database): void {
     .prepare("SELECT COUNT(*) AS count FROM data_migrations WHERE name = 'p2_backfill' OR name LIKE 'p2_backfill:%'")
     .get() as { count: number };
   if (applied.count === 0) {
+    return;
+  }
+  const contracted = sqlite.prepare("SELECT 1 FROM data_migrations WHERE name = 'p2_contract'").get();
+  if (!contracted) {
     return;
   }
   const unrepointed = sqlite
@@ -1290,6 +1309,11 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   runConstraintRepairStatements(sqlite, true);
   rebuildWorkspaceKeyTables(sqlite);
   sqlite.exec(ddl);
+  const contracted = tableExists(sqlite, "data_migrations")
+    && Boolean(sqlite.prepare("SELECT 1 FROM data_migrations WHERE name = 'p2_contract'").get());
+  if (!contracted) {
+    sqlite.exec(legacyTaskTablesDdl);
+  }
   ensureDefaultWorkspace(sqlite);
   for (const stmt of alterStatements) {
     try {
@@ -1300,7 +1324,9 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
       }
     }
   }
-  runConstraintRepairStatements(sqlite);
+  // tolerateMissingTables: the Phase 2d contract renames legacy task tables
+  // to legacy_* archives, after which these repair statements are inert.
+  runConstraintRepairStatements(sqlite, true);
   migrateSecretConfigValues(sqlite);
 }
 

@@ -8,7 +8,7 @@ import {
   useTrackerSharedTaskDetail,
   useUpdateManagerDeskItem,
 } from '@/hooks/useManagerDesk';
-import { useSetCurrentItem, useUpdateTrackerItem } from '@/hooks/useTeamTrackerMutations';
+import { useReassignTrackerItem, useSetCurrentItem, useUpdateTrackerItem } from '@/hooks/useTeamTrackerMutations';
 import { TrackerTaskExecutionPanel } from './TrackerTaskExecutionPanel';
 import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
@@ -40,10 +40,18 @@ export function TrackerTaskDetailDrawer({
   const cancelDelegated = useCancelDelegatedManagerDeskTask(detailDate);
   const updateTrackerItem = useUpdateTrackerItem(detailDate);
   const setCurrentItem = useSetCurrentItem(detailDate);
+  const reassignItem = useReassignTrackerItem(detailDate);
   const promoteItem = usePromoteTrackerItem();
   const isOpen = trackerItemId !== null || initialManagerDeskItemId !== null;
 
   const isLinked = detail?.lifecycle === 'manager_desk_linked';
+
+  const handleReassign = (itemId: number, toAccountId: string) => {
+    reassignItem.mutate(
+      { itemId, toAccountId },
+      { onError: (err) => addToast(err.message, 'error') },
+    );
+  };
 
   if (!isOpen) {
     return null;
@@ -65,6 +73,8 @@ export function TrackerTaskDetailDrawer({
         }}
         updateTrackerItem={updateTrackerItem}
         setCurrentItem={setCurrentItem}
+        reassignItem={reassignItem}
+        onReassign={handleReassign}
       />
     );
   }
@@ -94,13 +104,15 @@ export function TrackerTaskDetailDrawer({
       topSlot={
         <>
           <BackToDeveloperRow label={backTo} onBack={onClose} className="px-4 pt-3 md:px-5" />
-          {detail ? (
+          {detail && !detail.trackerItem.canonicalTask ? (
             <TrackerTaskExecutionPanel
               developer={detail.developer}
               item={detail.trackerItem}
-              isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
+              date={detail.date}
+              isPending={updateTrackerItem.isPending || setCurrentItem.isPending || reassignItem.isPending}
               onSetCurrent={(id) => setCurrentItem.mutate(id)}
               onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
+              onReassign={handleReassign}
             />
           ) : null}
         </>
@@ -128,6 +140,8 @@ function TrackerOnlyDrawer({
   onPromote,
   updateTrackerItem,
   setCurrentItem,
+  reassignItem,
+  onReassign,
 }: {
   detail: NonNullable<ReturnType<typeof useTrackerSharedTaskDetail>['data']>;
   isOpen: boolean;
@@ -137,6 +151,8 @@ function TrackerOnlyDrawer({
   onPromote: () => void;
   updateTrackerItem: ReturnType<typeof useUpdateTrackerItem>;
   setCurrentItem: ReturnType<typeof useSetCurrentItem>;
+  reassignItem: ReturnType<typeof useReassignTrackerItem>;
+  onReassign: (itemId: number, toAccountId: string) => void;
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -235,13 +251,15 @@ function TrackerOnlyDrawer({
           <TrackerTaskExecutionPanel
             developer={dev}
             item={item}
-            isPending={updateTrackerItem.isPending || setCurrentItem.isPending}
+            date={detail.date}
+            isPending={updateTrackerItem.isPending || setCurrentItem.isPending || reassignItem.isPending}
             onSetCurrent={(id) => setCurrentItem.mutate(id)}
             onUpdateState={(id, state) => updateTrackerItem.mutate({ itemId: id, state })}
+            onReassign={onReassign}
           />
 
           {/* Promote CTA */}
-          <div
+          {!item.canonicalTask && <div
             className="rounded-[20px] border p-4"
             style={{
               borderColor: 'color-mix(in srgb, var(--accent) 18%, var(--border) 82%)',
@@ -269,7 +287,7 @@ function TrackerOnlyDrawer({
               <ArrowUpRight size={13} strokeWidth={2.5} />
               {isPromoting ? 'Promoting…' : 'Promote to Manager Follow-Up'}
             </button>
-          </div>
+          </div>}
         </div>
       </aside>
     </>

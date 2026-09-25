@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, like, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
-import { taskEvents, teamTrackerDays, teamTrackerItems } from "../db/schema";
+import { taskEvents, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -23,13 +23,14 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("focus"), meta: z.object({ action: z.enum(["set_current", "unset_current"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...approx }), body: z.null() }),
   z.object({ type: z.literal("title"), meta: z.object({ from: z.string(), to: z.string(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("schedule"), meta: z.object({ field: z.enum(["day", "follow_up_at", "planned_start_at", "planned_end_at"]), from: z.string().nullable(), to: z.string().nullable(), via: z.enum(["carry_forward", "reschedule", "snooze", "edit", "reassign"]), ...approx }), body: z.null() }),
-  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external"]), ref: z.string(), role: z.enum(["primary", "related"]).optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external", "task"]), ref: z.string(), role: z.enum(["primary", "related"]).optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("checkin_ref"), meta: z.object({ checkInId: z.number().int().positive(), date: z.string(), developerAccountId: z.string(), excerpt: z.string().max(200) }), body: z.null() }),
   z.object({ type: z.literal("note_ref"), meta: z.object({ noteId: z.number().int().positive(), noteDate: z.string(), relation: z.enum(["mentioned", "created_from", "update_from"]), excerpt: z.string().optional() }), body: z.null() }),
   z.object({ type: z.literal("merged"), meta: z.object({ survivorKey: z.string(), mergedKey: z.string(), decisionRef: z.string() }), body: z.null() }),
 ]);
 
 export type TaskEventInput = z.input<typeof eventSchema> & {
+  taskId?: number;
   taskKey: string;
   workspaceId?: string;
   visibility?: TaskEventVisibility;
@@ -109,7 +110,15 @@ export class TaskEventsService {
         }
       }
       const now = new Date().toISOString();
+      let taskId = input.taskId;
+      if (await this.keys.canonicalEnabled(workspaceId)) {
+        const key = await this.keys.resolve(workspaceId, input.taskKey);
+        const canonical = (await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.taskKey, key ?? ""))).limit(1))[0];
+        if (!canonical || (taskId !== undefined && taskId !== canonical.id)) throw new HttpError(404, "Task not found");
+        taskId = canonical.id;
+      }
       const rows = await db.insert(taskEvents).values({
+        taskId,
         workspaceId, taskKey: input.taskKey, type: input.type, body: parsed.data.body,
         visibility, authorType: actor.type, authorId: actor.accountId ?? null,
         metaJson: parsed.data.meta === null ? null : JSON.stringify(parsed.data.meta),
@@ -120,7 +129,15 @@ export class TaskEventsService {
     });
   }
 
-  private visibility(viewer: TaskViewer) {
+  private async visibility(viewer: TaskViewer) {
+    if (viewer.kind === "developer" && await this.keys.canonicalEnabled(viewer.workspaceId)) {
+      return and(eq(taskEvents.visibility, "shared"), sql`EXISTS (
+        SELECT 1 FROM tasks owned WHERE owned.id = ${taskEvents.taskId}
+        AND owned.workspace_id = ${normalizeWorkspaceId(viewer.workspaceId)}
+        AND owned.owner_type = 'developer' AND owned.owner_id = ${viewer.accountId}
+        AND owned.deleted_at IS NULL
+      )`)!;
+    }
     return viewer.kind === "manager"
       ? or(eq(taskEvents.visibility, "shared"), eq(taskEvents.authorId, viewer.accountId))!
       : and(eq(taskEvents.visibility, "shared"), sql`EXISTS (
@@ -133,6 +150,12 @@ export class TaskEventsService {
   }
 
   private async assertDeveloperOwns(key: string, viewer: TaskViewer): Promise<void> {
+    if (await this.keys.canonicalEnabled(viewer.workspaceId)) {
+      const resolved = await this.keys.resolve(normalizeWorkspaceId(viewer.workspaceId), key);
+      const task = (await db.select().from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(tasks.taskKey, resolved ?? ""))).limit(1))[0];
+      if (!task || task.deletedAt || task.ownerType !== "developer" || task.ownerId !== viewer.accountId) throw new HttpError(404, "Task not found");
+      return;
+    }
     const rows = await db.select({ accountId: teamTrackerDays.developerAccountId }).from(teamTrackerItems)
       .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerItems.dayId))
       .where(and(eq(teamTrackerItems.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(teamTrackerItems.taskKey, key)))
@@ -148,14 +171,15 @@ export class TaskEventsService {
     const limit = Math.min(100, Math.max(1, options.limit ?? 50));
     const cursor = options.cursor ? Number(options.cursor) : undefined;
     if (cursor !== undefined && (!Number.isSafeInteger(cursor) || cursor < 1)) throw new HttpError(400, "Invalid cursor");
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.taskKey, key), this.visibility(viewer), cursor ? lt(taskEvents.id, cursor) : undefined)).orderBy(desc(taskEvents.id)).limit(limit + 1);
+    const identity = await this.identity(key, viewer.workspaceId);
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), identity, await this.visibility(viewer), cursor ? lt(taskEvents.id, cursor) : undefined)).orderBy(desc(taskEvents.id)).limit(limit + 1);
     return { events: rows.slice(0, limit).map(mapEvent), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
   }
 
   async latestOfType(taskKey: string, type: TaskEventType, viewer: TaskViewer): Promise<TaskEvent | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
     if (viewer.kind === "developer") await this.assertDeveloperOwns(taskKey, viewer);
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.taskKey, taskKey), eq(taskEvents.type, type), this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(1);
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), await this.identity(taskKey, viewer.workspaceId), eq(taskEvents.type, type), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(1);
     return rows[0] ? mapEvent(rows[0]) : null;
   }
 
@@ -166,34 +190,41 @@ export class TaskEventsService {
 
   async getByRequestId(requestId: string, viewer: TaskViewer): Promise<{ event: TaskEvent; sourceId: number | null } | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.dedupeKey, `req:${requestId}`), this.visibility(viewer))).limit(1);
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.dedupeKey, `req:${requestId}`), await this.visibility(viewer))).limit(1);
     return rows[0] ? { event: mapEvent(rows[0]), sourceId: rows[0].sourceId } : null;
   }
 
   async get(eventId: number, viewer: TaskViewer): Promise<TaskEvent> {
     await this.keys.assertEnabled(viewer.workspaceId);
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.id, eventId), this.visibility(viewer))).limit(1);
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.id, eventId), await this.visibility(viewer))).limit(1);
     if (!rows[0]) throw new HttpError(404, "Event not found");
     return mapEvent(rows[0]);
   }
 
   async searchBodies(viewer: TaskViewer, pattern: string, limit: number): Promise<{ taskKey: string; excerpt: string }[]> {
     if (!(await this.keys.enabled(viewer.workspaceId))) return [];
-    const rows = await db.select({ taskKey: taskEvents.taskKey, body: taskEvents.body }).from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), like(taskEvents.body, pattern), this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(limit * 5);
+    const rows = await db.select({ taskKey: taskEvents.taskKey, body: taskEvents.body }).from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), like(taskEvents.body, pattern), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(limit * 5);
     return [...new Map(rows.map((row) => [row.taskKey, { taskKey: row.taskKey, excerpt: (row.body ?? "").slice(0, 160) }])).values()].slice(0, limit);
   }
 
   async latestForKeys(keys: string[], viewer: TaskViewer): Promise<Map<string, TaskEventSummary>> {
     const result = new Map<string, TaskEventSummary>();
     if (!keys.length || !(await this.keys.enabled(viewer.workspaceId))) return result;
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), inArray(taskEvents.taskKey, keys), this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
-    for (const row of rows) if (!result.has(row.taskKey)) result.set(row.taskKey, { id: row.id, type: row.type as TaskEventType, excerpt: row.redactedAt ? "[redacted]" : (row.body ?? row.type).slice(0, 160), authorType: row.authorType as TaskEvent["author"]["type"], occurredAt: row.occurredAt, approximateTime: row.metaJson?.includes('"approximateTime":true') ?? false, visibility: row.visibility as TaskEventVisibility });
+    const canonical = await this.keys.canonicalEnabled(viewer.workspaceId);
+    const canonicalRows = canonical ? await db.select({ id: tasks.id, taskKey: tasks.taskKey }).from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), inArray(tasks.taskKey, keys))) : [];
+    const keyById = new Map(canonicalRows.map((row) => [row.id, row.taskKey]));
+    if (canonical && !canonicalRows.length) return result;
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), canonical ? inArray(taskEvents.taskId, canonicalRows.map((row) => row.id)) : inArray(taskEvents.taskKey, keys), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
+    for (const row of rows) {
+      const key = canonical ? keyById.get(row.taskId!)! : row.taskKey;
+      if (!result.has(key)) result.set(key, { id: row.id, type: row.type as TaskEventType, excerpt: row.redactedAt ? "[redacted]" : (row.body ?? row.type).slice(0, 160), authorType: row.authorType as TaskEvent["author"]["type"], occurredAt: row.occurredAt, approximateTime: row.metaJson?.includes('"approximateTime":true') ?? false, visibility: row.visibility as TaskEventVisibility });
+    }
     return result;
   }
 
   async changeVisibility(key: string, id: number, accountId: string, visibility: TaskEventVisibility, workspaceId?: string): Promise<TaskEvent> {
     const event = await this.get(id, { kind: "manager", accountId, workspaceId });
-    if (event.taskKey !== key || event.author.id !== accountId || event.redacted || !(["update", "instruction", "decision", "blocker"] as string[]).includes(event.type) || !(["manager", "copilot"] as string[]).includes(event.author.type) || (event.meta && typeof event.meta === "object" && ("imported" in event.meta || ("via" in event.meta && event.meta.via === "context_note_field")))) throw new HttpError(403, "Visibility cannot be changed");
+    if (await this.keys.resolve(normalizeWorkspaceId(workspaceId), event.taskKey) !== await this.keys.resolve(normalizeWorkspaceId(workspaceId), key) || event.author.id !== accountId || event.redacted || !(["update", "instruction", "decision", "blocker"] as string[]).includes(event.type) || !(["manager", "copilot"] as string[]).includes(event.author.type) || (event.meta && typeof event.meta === "object" && ("imported" in event.meta || ("via" in event.meta && event.meta.via === "context_note_field")))) throw new HttpError(403, "Visibility cannot be changed");
     const rows = await db.update(taskEvents).set({ visibility }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.id, id))).returning();
     return mapEvent(rows[0]!);
   }
@@ -212,6 +243,10 @@ export class TaskEventsService {
     return deleted.length;
   }
 
+  async deleteForTasks(workspaceId: string, taskIds: number[]): Promise<void> {
+    if (taskIds.length) await db.delete(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds)));
+  }
+
   async countPrivateForAuthor(workspaceId: string, accountId: string): Promise<number> {
     const rows = await db.select({ id: taskEvents.id }).from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.visibility, "private"), eq(taskEvents.authorId, accountId)));
     return rows.length;
@@ -219,7 +254,7 @@ export class TaskEventsService {
 
   async redact(key: string, id: number, accountId: string, workspaceId?: string): Promise<void> {
     const event = await this.get(id, { kind: "manager", accountId, workspaceId });
-    if (event.taskKey !== key || event.author.type !== "manager" || event.author.id !== accountId || event.redacted || Date.now() - new Date(event.occurredAt).getTime() > 30 * 86400000) throw new HttpError(403, "Event cannot be redacted");
+    if (await this.keys.resolve(normalizeWorkspaceId(workspaceId), event.taskKey) !== await this.keys.resolve(normalizeWorkspaceId(workspaceId), key) || event.author.type === "developer" || !accountId || event.author.id !== accountId || event.redacted || Date.now() - new Date(event.occurredAt).getTime() > 30 * 86400000) throw new HttpError(403, "Event cannot be redacted");
     await db.update(taskEvents).set({ body: null, metaJson: null, redactedAt: new Date().toISOString(), redactedBy: accountId }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.id, id)));
   }
 
@@ -231,6 +266,17 @@ export class TaskEventsService {
 
   async listRawForWorkspace(workspaceId?: string): Promise<EventRow[]> {
     return db.select().from(taskEvents).where(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)));
+  }
+
+  async historyForTasks(taskIds: number[], workspaceId?: string): Promise<EventRow[]> {
+    if (!taskIds.length) return [];
+    return db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
+  }
+
+  private async identity(key: string, workspaceId?: string) {
+    if (!(await this.keys.canonicalEnabled(workspaceId))) return eq(taskEvents.taskKey, key);
+    const resolved = await this.keys.resolve(normalizeWorkspaceId(workspaceId), key);
+    return sql`${taskEvents.taskId} IN (SELECT id FROM tasks WHERE workspace_id = ${normalizeWorkspaceId(workspaceId)} AND task_key = ${resolved ?? ""})`;
   }
 
   async repointKeyToTaskId(workspaceId: string, taskKey: string, taskId: number): Promise<void> {

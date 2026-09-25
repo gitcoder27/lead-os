@@ -16,6 +16,24 @@ beforeEach(async () => {
 });
 
 describe("Phase 1 migration", () => {
+  it("imports repeated dated sections without collisions and safely replays the import", async () => {
+    const contextNote = "Jan 2, 2026:\nFirst update\n\nJan 2, 2026:\nSecond update";
+    await new ManagerDeskService().createItem("manager-a", { date: "2026-09-24", title: "Repeated sections", contextNote });
+    expect((await migration.migrate("default")).deskNoteEvents).toBe(2);
+    await migration.migrate("default", true);
+    const row = (await db.select().from(managerDeskItems))[0]!;
+    const events = new TaskEventsService();
+    const viewer = { kind: "manager" as const, accountId: "manager-a" };
+    const imported = (await events.list(row.taskKey!, viewer)).events;
+    expect(imported.map((event) => event.body).sort()).toEqual(["First update", "Second update"]);
+    expect(imported.every((event) => event.visibility === "private" && event.approximateTime)).toBe(true);
+    expect(row.contextNote).toBe(contextNote);
+    expect(await new TaskKeysService().enabled("default")).toBe(true);
+    await migration.migrate("default", true, ["p1_import_task_notes"]);
+    expect((await events.list(row.taskKey!, viewer)).events).toEqual(imported);
+    expect((await events.list(row.taskKey!, { kind: "manager", accountId: "manager-b" })).events).toEqual([]);
+  });
+
   it("parses dated sections, preserves invalid headers as body", () => {
     expect(parseTaskNotes("Older\n\nJan 2, 2026:\nNew\n\nFeb 31, 2026:\nStill new")).toEqual({ legacyBody: "Older", datedSections: [{ date: "2026-01-02", body: "New\n\nFeb 31, 2026:\nStill new" }] });
   });

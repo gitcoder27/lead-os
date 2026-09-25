@@ -2,11 +2,15 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import {
+  configTable,
   dataMigrations,
   developers,
   managerDeskDays,
   managerDeskItems,
+  managerDeskLinks,
   taskKeySequences,
+  taskLinks,
+  tasks,
   teamTrackerDays,
   teamTrackerItems,
 } from "../src/db/schema";
@@ -164,5 +168,84 @@ describe("Phase 2 parity (§2.5.3)", () => {
     const result = await service.verify("default", { strict: true });
     expect(result.ok).toBe(true);
     expect(result.parityDiffs).toEqual([]);
+  });
+
+  it("verify covers follow_ups, meetings, desk live/planning/history and links cleanly", async () => {
+    const day = await deskDay(today);
+    const item = await db.insert(managerDeskItems).values({
+      workspaceId: "default", dayId: day.id, taskKey: "T-1", title: "Ping dev-1",
+      kind: "action", category: "follow_up", status: "planned", priority: "medium",
+      followUpAt: T(today), createdAt: T(today), updatedAt: T(today),
+    }).returning();
+    await db.insert(managerDeskItems).values({
+      workspaceId: "default", dayId: day.id, taskKey: "T-2", title: "Standup",
+      kind: "meeting", category: "meeting", status: "planned", priority: "medium",
+      createdAt: T(today), updatedAt: T(today),
+    });
+    await db.insert(managerDeskLinks).values({
+      workspaceId: "default", itemId: item[0]!.id, linkType: "developer",
+      developerAccountId: "dev-1", createdAt: T(today),
+    });
+    const day2 = await devDay(yday);
+    await trackerRow(day2.id, { taskKey: "T-3", title: "Done work", state: "done", createdAt: T(yday), completedAt: T(yday, "T17:00:00.000Z"), updatedAt: T(yday, "T17:00:00.000Z") });
+    await backfill();
+
+    const result = await service.verify("default", { strict: true });
+    expect(result.parityDiffs).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("strict verify catches a planted canonical-only task (presence diff)", async () => {
+    const day = await deskDay(today);
+    await deskRow(day.id, { taskKey: "T-1", title: "B", status: "inbox", createdAt: T(today) });
+    await backfill();
+    await db.insert(configTable).values({ workspaceId: "default", key: "tasks_phase1_enabled", value: "true" }).onConflictDoNothing();
+    await taskService.create({ title: "Post-backfill task", scheduledOn: today }, { type: "manager", accountId: "mgr-1", workspaceId: "default" });
+
+    const result = await service.verify("default", { strict: true });
+    expect(result.ok).toBe(false);
+    expect(result.parityDiffs.some((d) => d.field === "presence" && d.legacy === "(absent)")).toBe(true);
+  });
+
+  it("strict verify catches a title drift between legacy and canonical", async () => {
+    const day = await deskDay(today);
+    await deskRow(day.id, { taskKey: "T-1", title: "Original", status: "planned", createdAt: T(today) });
+    await backfill();
+    await db.update(tasks).set({ title: "Edited" }).where(eq(tasks.taskKey, "T-1"));
+
+    const result = await service.verify("default", { strict: true });
+    expect(result.ok).toBe(false);
+    expect(result.parityDiffs.some((d) => d.field === "title" && d.legacy === "Original" && d.tasks === "Edited")).toBe(true);
+  });
+
+  it("strict verify catches a missing task link (desk_links → task_links)", async () => {
+    const day = await deskDay(today);
+    const item = await deskRow(day.id, { taskKey: "T-1", title: "Linked", status: "planned", createdAt: T(today) });
+    await db.insert(managerDeskLinks).values({
+      workspaceId: "default", itemId: item.id, linkType: "issue", issueKey: "ABC-1", createdAt: T(today),
+    });
+    await backfill();
+    // Drop the canonical link — the legacy link still exists → parity diff.
+    await db.delete(taskLinks);
+
+    const result = await service.verify("default", { strict: true });
+    expect(result.ok).toBe(false);
+    expect(result.parityDiffs.some((d) => d.surface === "links")).toBe(true);
+  });
+
+  it("developer surface DTOs hide manager-private fields", async () => {
+    const day = await deskDay(today);
+    const item = await deskRow(day.id, { taskKey: "T-1", title: "Delegated", status: "planned", assignee: "dev-1", followUpAt: T(today), createdAt: T(today) });
+    const dev = await devDay(today);
+    await trackerRow(dev.id, { taskKey: "T-1", title: "Delegated", managerDeskItemId: item.id, state: "in_progress", createdAt: T(today) });
+    await backfill();
+
+    const dto = (await taskService.surfaceDtos(
+      [(await db.select().from(tasks).where(eq(tasks.taskKey, "T-1")))[0]!],
+      { date: today, principal: { type: "developer", accountId: "dev-1", workspaceId: "default" } }
+    ))[0] as Record<string, unknown>;
+    for (const field of ["trackedByManagerId", "labels", "later", "parentId", "nextAction", "followUpAt", "legacyDeskItemId"]) {
+      expect(Object.prototype.hasOwnProperty.call(dto, field)).toBe(false);
+    }
   });
 });

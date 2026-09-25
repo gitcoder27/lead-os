@@ -1,16 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { eq } from "drizzle-orm";
 import { Readable, Writable } from "node:stream";
 import { createTeamTrackerRouter } from "../src/routes/team-tracker";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { resetDatabase, db } from "./helpers/db";
-import { developers, issues, managerDeskItems, teamTrackerSavedViews } from "../src/db/schema";
+import { checkinTaskRefs, configTable, developerAvailabilityPeriods, developers, issues, managerDeskItems, teamTrackerSavedViews } from "../src/db/schema";
 
 const trackerService = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(trackerService);
+const eventsService = new TaskEventsService();
 
 async function seedDevelopers() {
   await db.insert(developers).values([
@@ -1062,5 +1065,345 @@ describe("team tracker routes", () => {
 
     expect(res.status).toBe(400);
     expect(res.body?.error).toBe("toDate must be after fromDate");
+  });
+
+  describe("phase 1 task surface", () => {
+    const managerViewer = { kind: "manager" as const, accountId: "manager-1" };
+
+    async function enableTaskKeys() {
+      await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    }
+
+    it("POST /:accountId/checkins records explicit taskKeys, ref rows, and checkin_ref events", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Review queue",
+      });
+      expect(item.taskKey).toMatch(/^T-\d+$/);
+
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/checkins",
+        body: {
+          date: "2026-03-07",
+          summary: "Discussed in standup",
+          taskKeys: [item.taskKey],
+        },
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.taskKeys).toEqual([item.taskKey]);
+
+      const refs = await db
+        .select()
+        .from(checkinTaskRefs)
+        .where(eq(checkinTaskRefs.checkinId, res.body.id));
+      expect(refs.map((ref) => ref.taskKey)).toEqual([item.taskKey]);
+
+      const events = await eventsService.list(item.taskKey!, managerViewer);
+      expect(events.events.map((event) => event.type)).toEqual(["checkin_ref", "created"]);
+      expect(events.events[0]?.meta).toMatchObject({
+        checkInId: res.body.id,
+        developerAccountId: "dev-1",
+      });
+    });
+
+    it("POST /:accountId/checkins parses T-n tokens from the summary", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Parsed reference",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/checkins",
+        body: {
+          date: "2026-03-07",
+          summary: `Progress on ${item.taskKey} today`,
+        },
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.taskKeys).toEqual([item.taskKey]);
+    });
+
+    it("POST /:accountId/checkins rejects unknown explicit task keys with 400", async () => {
+      await enableTaskKeys();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/checkins",
+        body: {
+          date: "2026-03-07",
+          summary: "Standup",
+          taskKeys: ["T-999"],
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body?.error).toBe("Unknown or unowned task key");
+    });
+
+    it("POST /:accountId/checkins silently drops unknown T-n tokens in the summary", async () => {
+      await enableTaskKeys();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/checkins",
+        body: {
+          date: "2026-03-07",
+          summary: "Worked on T-999 today",
+        },
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.taskKeys).toEqual([]);
+    });
+
+    it("GET /api/team-tracker decorates board items with latestEvent and ageDays", async () => {
+      await enableTaskKeys();
+      vi.setSystemTime(new Date("2026-03-07T08:00:00.000Z"));
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Decorated item",
+      });
+
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "GET",
+        url: "/api/team-tracker?date=2026-03-07",
+      });
+
+      expect(res.status).toBe(200);
+      const day = res.body.developers.find(
+        (developerDay: { developer: { accountId: string } }) =>
+          developerDay.developer.accountId === "dev-1"
+      );
+      const boardItem = day.plannedItems.find(
+        (candidate: { id: number }) => candidate.id === item.id
+      );
+      expect(boardItem.taskKey).toBe(item.taskKey);
+      expect(boardItem.latestEvent).toMatchObject({ type: "created" });
+      expect(boardItem.ageDays).toBe(0);
+    });
+
+    it("POST /items/:itemId/reassign keeps the same row id and task key", async () => {
+      await enableTaskKeys();
+      await db.insert(developers).values({
+        accountId: "dev-3",
+        displayName: "Carol Active",
+        email: null,
+        avatarUrl: null,
+        isActive: 1,
+      });
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Handoff candidate",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: `/api/team-tracker/items/${item.id}/reassign`,
+        body: {
+          toAccountId: "dev-3",
+          date: "2026-03-07",
+          requestId: randomUUID(),
+        },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: item.id,
+        taskKey: item.taskKey,
+      });
+
+      const board = await trackerService.getBoard("2026-03-07");
+      const devDay = board.developers.find(
+        (developerDay) => developerDay.developer.accountId === "dev-3"
+      )!;
+      expect(devDay.plannedItems.map((planned) => planned.id)).toContain(item.id);
+    });
+
+    it("POST /items/:itemId/reassign rejects delegated tasks with 409", async () => {
+      await enableTaskKeys();
+      const managerItem = await managerDeskService.createItem("manager-1", {
+        date: "2026-03-07",
+        title: "Delegated task",
+        assigneeDeveloperAccountId: "dev-1",
+      });
+      const linkedItem = (
+        await trackerService.getItemDetailContextForManagerDeskItem(managerItem.id)
+      )?.trackerItem;
+      expect(linkedItem?.taskKey).toBeDefined();
+
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "POST",
+        url: `/api/team-tracker/items/${linkedItem!.id}/reassign`,
+        body: {
+          toAccountId: "dev-1",
+          date: "2026-03-08",
+          requestId: randomUUID(),
+        },
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body?.error).toBe("Reassign delegated tasks from Manager Desk");
+    });
+
+    it("POST /items/:itemId/reassign rejects closed tasks with 409", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Finished work",
+      });
+      await trackerService.updateItem(item.id, { state: "done" });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: `/api/team-tracker/items/${item.id}/reassign`,
+        body: {
+          toAccountId: "dev-1",
+          date: "2026-03-08",
+          requestId: randomUUID(),
+        },
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body?.error).toBe("Reopen closed work before reassigning");
+    });
+
+    it("POST /items/:itemId/reassign rejects inactive targets", async () => {
+      await enableTaskKeys();
+      await db.insert(developerAvailabilityPeriods).values({
+        developerAccountId: "dev-2",
+        startDate: "2026-03-07",
+        note: "Out today",
+        createdAt: "2026-03-07T08:00:00.000Z",
+        updatedAt: "2026-03-07T08:00:00.000Z",
+      });
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Handoff to inactive dev",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: `/api/team-tracker/items/${item.id}/reassign`,
+        body: {
+          toAccountId: "dev-2",
+          date: "2026-03-07",
+          requestId: randomUUID(),
+        },
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body?.error).toContain("inactive");
+    });
+
+    it("records created_by provenance for manager, developer, and copilot creation paths", async () => {
+      await enableTaskKeys();
+      const app = createTestApp();
+
+      const viaRoute = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/items",
+        body: { date: "2026-03-07", title: "Manager-added item" },
+      });
+      expect(viaRoute.status).toBe(201);
+      expect(viaRoute.body.createdBy).toEqual({ type: "manager", id: "manager-1" });
+
+      const viaDeveloper = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Developer-added item",
+        source: "my_day",
+        actor: { type: "developer", accountId: "dev-1" },
+      });
+      expect(viaDeveloper.createdBy).toEqual({ type: "developer", id: "dev-1" });
+
+      const viaCopilot = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Copilot-added item",
+        source: "copilot",
+        actor: { type: "copilot", accountId: "manager-1" },
+      });
+      expect(viaCopilot.createdBy).toEqual({ type: "copilot", id: "manager-1" });
+    });
+
+    it("POST /:accountId/status-update with taskKey emits blocker raised and cleared events", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Blocked candidate",
+      });
+      const app = createTestApp();
+
+      const blocked = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/status-update",
+        body: {
+          date: "2026-03-07",
+          status: "blocked",
+          rationale: "Waiting on platform review",
+          taskKey: item.taskKey,
+        },
+      });
+      expect(blocked.status).toBe(201);
+
+      let events = await eventsService.list(item.taskKey!, managerViewer);
+      expect(events.events.map((event) => event.type)).toEqual(
+        expect.arrayContaining(["blocker", "checkin_ref", "created"])
+      );
+      const raised = events.events.find((event) => event.type === "blocker");
+      expect(raised?.meta).toMatchObject({ action: "raised", developerDayStatus: "blocked" });
+      expect(raised?.body).toBe("Waiting on platform review");
+
+      const cleared = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/status-update",
+        body: {
+          date: "2026-03-07",
+          status: "on_track",
+          taskKey: item.taskKey,
+        },
+      });
+      expect(cleared.status).toBe(201);
+
+      events = await eventsService.list(item.taskKey!, managerViewer);
+      const clearEvent = events.events.find(
+        (event) => event.type === "blocker" && event.meta && typeof event.meta === "object" && "action" in event.meta && event.meta.action === "cleared"
+      );
+      expect(clearEvent).toBeDefined();
+      expect(clearEvent?.body).toBeNull();
+    });
+
+    it("POST /:accountId/status-update rejects task keys owned by another developer", async () => {
+      await enableTaskKeys();
+      await db.insert(developers).values({
+        accountId: "dev-3",
+        displayName: "Carol Active",
+        email: null,
+        avatarUrl: null,
+        isActive: 1,
+      });
+      const item = await trackerService.addItem("dev-3", "2026-03-07", {
+        title: "Not Alice's task",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/team-tracker/dev-1/status-update",
+        body: {
+          date: "2026-03-07",
+          status: "waiting",
+          rationale: "Waiting on them",
+          taskKey: item.taskKey,
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body?.error).toBe("Task is not owned by this developer");
+    });
   });
 });

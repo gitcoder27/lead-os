@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { resetDatabase, db } from "./helpers/db";
 import {
+  configTable,
   developers,
   issues,
   managerDeskItems,
@@ -14,6 +17,12 @@ import {
 
 const service = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(service);
+const eventsService = new TaskEventsService();
+const managerViewer = { kind: "manager" as const, accountId: "manager-1" };
+
+async function enableTaskKeys() {
+  await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+}
 
 async function seedDevelopers() {
   await db.insert(developers).values([
@@ -1667,6 +1676,131 @@ describe("TeamTrackerService", () => {
       const carried = await service.carryForward("2026-03-06", "2026-03-07");
 
       expect(carried).toBe(0);
+    });
+
+    it("emits a schedule event with via 'carry_forward' for each moved keyed row", async () => {
+      await enableTaskKeys();
+      const item = await service.addItem("dev-1", "2026-03-06", {
+        title: "Keyed carry candidate",
+      });
+      expect(item.taskKey).toMatch(/^T-\d+$/);
+
+      const carried = await service.carryForward("2026-03-06", "2026-03-07");
+      expect(carried).toBe(1);
+
+      const events = await eventsService.list(item.taskKey!, managerViewer);
+      const schedule = events.events.find((event) => event.type === "schedule");
+      expect(schedule).toBeDefined();
+      expect(schedule?.meta).toMatchObject({
+        field: "day",
+        from: "2026-03-06",
+        to: "2026-03-07",
+        via: "carry_forward",
+      });
+    });
+
+    it("groups carried work by task key even when the target row was renamed", async () => {
+      await enableTaskKeys();
+      const item = await service.addItem("dev-1", "2026-03-06", {
+        title: "Original title",
+        note: "ctx",
+      });
+      const targetDay = await service.ensureDay("2026-03-07", "dev-1");
+      await db.insert(teamTrackerItems).values({
+        workspaceId: "default",
+        dayId: targetDay.id,
+        taskKey: item.taskKey,
+        itemType: "custom",
+        title: "Renamed title",
+        note: null,
+        state: "planned",
+        position: 0,
+        createdAt: "2026-03-07T08:00:00.000Z",
+        updatedAt: "2026-03-07T08:00:00.000Z",
+      });
+
+      const carried = await service.carryForward("2026-03-06", "2026-03-07");
+
+      expect(carried).toBe(0);
+    });
+
+    it("carries distinct keyed tasks even when titles match the target day", async () => {
+      await enableTaskKeys();
+      await service.addItem("dev-1", "2026-03-06", { title: "Same title" });
+      await service.addItem("dev-1", "2026-03-06", { title: "Same title" });
+      await service.addItem("dev-1", "2026-03-07", { title: "Same title" });
+
+      const carried = await service.carryForward("2026-03-06", "2026-03-07");
+
+      expect(carried).toBe(2);
+      const board = await service.getBoard("2026-03-07");
+      const devDay = board.developers.find(
+        (d) => d.developer.accountId === "dev-1"
+      )!;
+      expect(
+        devDay.plannedItems.filter((item) => item.title === "Same title")
+      ).toHaveLength(3);
+    });
+  });
+
+  describe("reassignItem", () => {
+    it("emits assign, schedule, and status events when moving an in-progress task", async () => {
+      await enableTaskKeys();
+      const item = await service.addItem("dev-1", "2026-03-07", {
+        title: "In-flight reassignment",
+      });
+      await service.setCurrentItem(item.id);
+
+      const updated = await service.reassignItem(
+        item.id,
+        "dev-2",
+        "2026-03-08",
+        randomUUID()
+      );
+      expect(updated.id).toBe(item.id);
+      expect(updated.taskKey).toBe(item.taskKey);
+      expect(updated.state).toBe("planned");
+
+      const events = await eventsService.list(item.taskKey!, managerViewer);
+      const assign = events.events.find((event) => event.type === "assign");
+      expect(assign?.meta).toMatchObject({
+        fromType: "developer",
+        fromId: "dev-1",
+        toType: "developer",
+        toId: "dev-2",
+        stateReset: { from: "in_progress", to: "planned" },
+      });
+      const schedule = events.events.find((event) => event.type === "schedule");
+      expect(schedule?.meta).toMatchObject({
+        field: "day",
+        from: "2026-03-07",
+        to: "2026-03-08",
+        via: "reassign",
+      });
+      const status = events.events.find((event) => event.type === "status");
+      expect(status?.meta).toMatchObject({
+        domain: "tracker_state",
+        from: "in_progress",
+        to: "planned",
+        reason: "reassigned",
+      });
+    });
+
+    it("replays by requestId without duplicating events", async () => {
+      await enableTaskKeys();
+      const item = await service.addItem("dev-1", "2026-03-07", {
+        title: "Idempotent reassign",
+      });
+      const requestId = randomUUID();
+
+      await service.reassignItem(item.id, "dev-2", "2026-03-08", requestId);
+      const replayed = await service.reassignItem(item.id, "dev-2", "2026-03-08", requestId);
+      expect(replayed.id).toBe(item.id);
+
+      const events = await eventsService.list(item.taskKey!, managerViewer);
+      expect(
+        events.events.filter((event) => event.type === "assign")
+      ).toHaveLength(1);
     });
   });
 

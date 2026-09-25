@@ -1,3 +1,7 @@
+import { TaskCutoverService } from "../src/services/task-cutover.service";
+import { DailyNotesService } from "../src/services/daily-notes.service";
+import { MyDayService } from "../src/services/my-day.service";
+import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
@@ -439,6 +443,27 @@ describe("Phase 2 backfill", () => {
     expect((await db.select().from(taskEvents)).filter((r) => r.type === "note_ref")).toHaveLength(1);
   });
 
+  it("fails structural verification for unresolved references", async () => {
+    const note = (await db.insert(dailyNotes).values({ workspaceId: "default", managerAccountId: "mgr-1", date: D(5), body: "Reference", createdAt: T(5), updatedAt: T(5) }).returning())[0]!;
+    await db.insert(dailyNoteTaskRefs).values({ workspaceId: "default", managerAccountId: "mgr-1", noteId: note.id, taskKey: "T-999", relation: "mentioned", createdAt: T(5) });
+    expect(await service.verifyStructure("default")).toMatchObject({ ok: false, unfilledRefs: { noteTask: 1 } });
+  });
+
+  it("rollback excludes deleted tasks and preserves live IDs and note follow-ups", async () => {
+    const day = await deskDay(D(5));
+    const item = await deskRow(day.id, { taskKey: "T-1", title: "Live", createdAt: T(5) });
+    const deleted = await deskRow(day.id, { taskKey: "T-2", title: "Deleted", createdAt: T(5) });
+    const note = (await db.insert(dailyNotes).values({ workspaceId: "default", managerAccountId: "mgr-1", date: D(5), body: "Note", createdAt: T(5), updatedAt: T(5) }).returning())[0]!;
+    await db.insert(dailyNoteFollowUps).values({ workspaceId: "default", managerAccountId: "mgr-1", noteId: note.id, itemId: item.id, requestId: "rollback", payloadHash: "hash", createdAt: T(5) });
+    const report = await service.plan("default");
+    await service.apply("default", decisionsFrom(report));
+    await db.update(tasks).set({ deletedAt: T(6) }).where(eq(tasks.taskKey, "T-2"));
+    await exporter.apply("default");
+    expect(await db.select().from(managerDeskItems)).toEqual([expect.objectContaining({ id: item.id, taskKey: "T-1" })]);
+    expect((await db.select().from(dailyNoteFollowUps))[0]?.itemId).toBe(item.id);
+    expect(await db.select().from(managerDeskItems).where(eq(managerDeskItems.id, deleted.id))).toEqual([]);
+  });
+
   it("F14: manager_notes dedupe into developer_notes dated sections", async () => {
     for (const [i, date] of [D(5), D(6), D(7), D(8), D(9)].entries()) {
       const day = await devDay(date);
@@ -512,6 +537,42 @@ describe("Phase 2 backfill", () => {
     expect(oth[0]!.title).toBe("Other task");
     const defEvents = await db.select().from(taskEvents).where(eq(taskEvents.workspaceId, "default"));
     expect(defEvents.every((e) => e.taskId === def[0]!.id)).toBe(true);
+  });
+
+  it("requires clean parity, freezes legacy writes, and rolls back canonical writes", async () => {
+    const cutover = new TaskCutoverService();
+    await expect(cutover.cutover("default", true)).rejects.toThrow(/verifications/);
+    const report = await service.plan("default");
+    await service.apply("default", decisionsFrom(report));
+    await cutover.verify("default");
+    await cutover.verify("default");
+    expect((await cutover.cutover("default")).applied).toBe(false);
+    await cutover.cutover("default", true);
+    await expect(service.apply("default", decisionsFrom(report), { resume: true })).rejects.toThrow(/after write cutover/);
+    const tracker = new TeamTrackerService();
+    const item = await tracker.addItem("dev-1", taskService.today(), { title: "Post-cutover", actor: { type: "manager", accountId: "mgr-1" } });
+    await tracker.setCurrentItem(item.id, undefined, "default", { type: "manager", accountId: "mgr-1" });
+    const myDay = new MyDayService(tracker);
+    expect((await myDay.getMyDay("dev-1", taskService.today())).currentItem).toMatchObject({ taskKey: item.taskKey, canonicalTask: true });
+    await myDay.addCheckIn("dev-1", taskService.today(), { summary: "Progress", taskKeys: [item.taskKey!] });
+    const notes = new DailyNotesService();
+    await notes.save("mgr-1", taskService.today(), { body: "Follow up", revision: 0 }, "default");
+    const followUpInput = { date: taskService.today(), title: "After cutover", requestId: crypto.randomUUID() };
+    const followUp = await notes.createFollowUp("mgr-1", taskService.today(), followUpInput, "default");
+    const day = await devDay(D(5));
+    await expect(trackerRow(day.id, { taskKey: "T-900", title: "Forbidden", createdAt: T(5) })).rejects.toThrow(/read-only/);
+    await exporter.apply("default");
+    expect((await db.select().from(teamTrackerItems))[0]).toMatchObject({ taskKey: item.taskKey, state: "in_progress" });
+    expect(await notes.createFollowUp("mgr-1", taskService.today(), followUpInput, "default")).toMatchObject({ itemId: followUp.itemId });
+    expect((await notes.getSources("mgr-1", [followUp.itemId], "default")).sources).toHaveLength(1);
+  });
+
+  it("detects snapshot changes even when counts and timestamps are unchanged", async () => {
+    const day = await devDay(D(5));
+    const row = await trackerRow(day.id, { taskKey: "T-901", title: "Original", createdAt: T(5) });
+    const before = await service.computeInputHash("default");
+    await db.update(teamTrackerItems).set({ title: "Edited without timestamp" }).where(eq(teamTrackerItems.id, row.id));
+    expect(await service.computeInputHash("default")).not.toBe(before);
   });
 
   it("F18: export-legacy round-trip preserves title/state/owner/key", async () => {
@@ -595,5 +656,6 @@ describe("Phase 2 backfill", () => {
     expect(task).toMatchObject({ taskKey: "T-1", status: "active", ownerType: "developer", ownerId: "dev-1" });
     const resolvedId = await taskService.resolveLegacyId("team_tracker_items", (await db.select().from(teamTrackerItems))[0]!.id, 1_000_000);
     expect(resolvedId).toBe(task!.id);
+    expect(task!.id).toBeGreaterThan(item.id);
   });
 });

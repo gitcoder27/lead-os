@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { Bell, CalendarDays, Search } from 'lucide-react';
 import type { AppView } from '@/App';
 import { useToast } from '@/context/ToastContext';
@@ -9,6 +9,7 @@ import {
   useUpdateManagerDeskItem,
 } from '@/hooks/useManagerDesk';
 import { useDailyNoteSources } from '@/hooks/useDailyNotes';
+import { useCanonicalMemoryTasks, useCanonicalTaskMutation } from '@/hooks/useCanonicalTasks';
 import {
   buildMemoryStats,
   filterMemoryItems,
@@ -52,12 +53,15 @@ export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerM
   const { addToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const day = useManagerDesk(today);
+  const canonical = day.data?.taskModel === 'canonical';
+  const nativeTasks = useCanonicalMemoryTasks(mode, today, format(subDays(new Date(), 30), 'yyyy-MM-dd'), canonical);
+  const nativeMutation = useCanonicalTaskMutation();
   const createItem = useCreateManagerDeskItem(today);
   const updateItem = useUpdateManagerDeskItem(today);
   const copy = pageCopy[mode];
   const Icon = copy.Icon;
 
-  const allItems = useMemo(() => filterMemoryItems(mode, day.data?.items ?? []), [day.data?.items, mode]);
+  const allItems = useMemo(() => filterMemoryItems(mode, canonical ? nativeTasks.data ?? [] : day.data?.items ?? []), [canonical, nativeTasks.data, day.data?.items, mode]);
   const visibleItems = useMemo(() => searchMemoryItems(allItems, searchQuery), [allItems, searchQuery]);
   const stats = useMemo(() => buildMemoryStats(mode, allItems), [allItems, mode]);
   const itemIds = useMemo(() => allItems.map((item) => item.id), [allItems]);
@@ -76,6 +80,7 @@ export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerM
         type: 'manager_desk_item',
         view: 'desk',
         managerDeskItemId: item.id,
+        taskKey: item.taskKey ?? undefined,
         date: item.originDate,
       });
       return;
@@ -93,6 +98,11 @@ export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerM
   };
 
   const handleStatusChange = (itemId: number, status: ManagerDeskStatus) => {
+    const item = allItems.find((entry) => entry.id === itemId);
+    if (canonical && item?.taskKey) {
+      nativeMutation.mutate({ taskKey: item.taskKey, updates: { status: status === 'done' ? 'done' : status === 'cancelled' ? 'dropped' : status === 'waiting' ? 'blocked' : status === 'in_progress' ? 'active' : 'open' } }, { onError: (error) => addToast(error.message, 'error') });
+      return;
+    }
     updateItem.mutate(
       { itemId, status },
       {
@@ -165,10 +175,10 @@ export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerM
             </label>
           </div>
 
-          {day.isLoading ? (
+          {day.isLoading || (canonical && nativeTasks.isLoading) ? (
             <MemorySkeleton />
-          ) : day.error ? (
-            <MemoryError message={(day.error as Error).message} onRetry={() => void day.refetch()} />
+          ) : day.error || (canonical && nativeTasks.error) ? (
+            <MemoryError message={((canonical ? nativeTasks.error : day.error) as Error).message} onRetry={() => void (canonical ? nativeTasks.refetch() : day.refetch())} />
           ) : (
             <MemoryList
               mode={mode}

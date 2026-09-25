@@ -1,14 +1,18 @@
-import { CheckCircle2, History, Play, RotateCcw, UserCircle, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRightLeft, CheckCircle2, History, Play, RotateCcw, UserCircle, X, XCircle } from 'lucide-react';
 import type { Developer, TrackerWorkItem } from '@/types';
 import { TaskTimeline } from '@/components/tasks/TaskTimeline';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
+import { DeveloperPicker } from '@/components/capture/DeveloperPicker';
 import { RelatedIssueChips } from './RelatedIssueChips';
 
 interface TrackerTaskExecutionPanelProps {
   developer: Developer;
   item: TrackerWorkItem;
+  date: string;
   onSetCurrent: (itemId: number) => void;
   onUpdateState: (itemId: number, state: TrackerWorkItem['state']) => void;
+  onReassign?: (itemId: number, toAccountId: string) => void;
   isPending?: boolean;
 }
 
@@ -22,14 +26,20 @@ const STATE_LABELS: Record<TrackerWorkItem['state'], string> = {
 export function TrackerTaskExecutionPanel({
   developer,
   item,
+  date,
   onSetCurrent,
   onUpdateState,
+  onReassign,
   isPending = false,
 }: TrackerTaskExecutionPanelProps) {
+  const [reassignOpen, setReassignOpen] = useState(false);
   const isClosed = item.state === 'done' || item.state === 'dropped';
   // Delegated tasks are closed/reopened from the Manager Desk workflow below so
   // this panel stays the single source for execution state, not a second Done.
-  const isDelegated = Boolean(item.managerDeskItemId);
+  const isDelegated = !item.canonicalTask && Boolean(item.managerDeskItemId);
+  // Only tracker-only open items can be handed off here; delegated tasks move
+  // through the Desk assignee field instead.
+  const canReassign = !isDelegated && !isClosed && Boolean(onReassign);
 
   return (
     <section
@@ -89,6 +99,19 @@ export function TrackerTaskExecutionPanel({
               Mark Done
             </button>
           )}
+          {canReassign && (
+            <button
+              type="button"
+              onClick={() => setReassignOpen((current) => !current)}
+              disabled={isPending}
+              aria-expanded={reassignOpen}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
+              <ArrowRightLeft size={12} />
+              Reassign
+            </button>
+          )}
           {!isClosed && (
             <button
               type="button"
@@ -120,6 +143,42 @@ export function TrackerTaskExecutionPanel({
           )}
         </div>
       </div>
+
+      {canReassign && reassignOpen && (
+        <div
+          className="mt-3 rounded-xl border p-3"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span
+              className="text-[11px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Reassign to
+            </span>
+            <button
+              type="button"
+              aria-label="Cancel reassign"
+              onClick={() => setReassignOpen(false)}
+              className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+          <DeveloperPicker
+            date={date}
+            selected={null}
+            onSelect={(dev) => {
+              setReassignOpen(false);
+              if (dev.accountId !== developer.accountId) {
+                onReassign?.(item.id, dev.accountId);
+              }
+            }}
+            onClear={() => setReassignOpen(false)}
+          />
+        </div>
+      )}
 
       <div className="mt-4">
         <div

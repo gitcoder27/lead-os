@@ -1,3 +1,5 @@
+import { TaskKeysService } from "./task-keys.service";
+import { TaskService } from "./task.service";
 import { performance } from "node:perf_hooks";
 import type {
   FilterType,
@@ -346,6 +348,19 @@ export class TodayService {
   ): Promise<ManagerActionCommandResponse> {
     const { command, date } = request;
     const { target: actionTarget } = command;
+    if (actionTarget.taskKey && await new TaskKeysService().canonicalEnabled(workspaceId)) {
+      const tasks = new TaskService();
+      const principal = { type: "manager" as const, accountId: managerAccountId, workspaceId };
+      if (command.kind === "mark_done" || command.kind === "set_current_work" || command.kind === "snooze" || command.kind === "carry_forward" || command.kind === "capture_meeting_outcome") {
+        const updates = command.kind === "mark_done" ? { status: "done" as const }
+          : command.kind === "set_current_work" ? { status: "active" as const }
+          : command.kind === "snooze" ? { followUpAt: buildSnoozeIso(date, request.preset ?? "tomorrow") }
+          : command.kind === "capture_meeting_outcome" ? { outcome: requireTrimmedText(request.outcome, "outcome") }
+          : { scheduledOn: date };
+        const result = command.kind === "set_current_work" ? await tasks.setCurrent(actionTarget.taskKey, principal, true) : await tasks.update(actionTarget.taskKey, updates, principal);
+        return commandResponse(command.kind, actionTarget, await tasks.toDto(result, principal));
+      }
+    }
 
     switch (command.kind) {
       case "open":
@@ -371,6 +386,8 @@ export class TodayService {
           itemId,
           { followUpAt: buildSnoozeIso(date, request.preset ?? "tomorrow") },
           workspaceId,
+          undefined,
+          { scheduleVia: "snooze" },
         );
         return commandResponse(command.kind, actionTarget, result);
       }
@@ -394,6 +411,7 @@ export class TodayService {
           itemId,
           { ifNoCurrent: true },
           workspaceId,
+          { type: "system", accountId: actor.accountId ?? managerAccountId },
         );
         return commandResponse(command.kind, actionTarget, result);
       }

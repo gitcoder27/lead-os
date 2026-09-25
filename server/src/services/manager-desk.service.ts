@@ -41,6 +41,9 @@ import { normalizeWorkspaceId } from "./workspace.service";
 import { isoDatePart } from "../utils/date";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService, type TaskEventActor, type TaskEventInput } from "./task-events.service";
+import { TaskService, type TaskRow } from "./task.service";
+import { surfaceTaskToDeskItem } from "./task-view-models";
+import type { ManagerSurfaceTask, SurfaceTask, UpdateTaskRequest } from "shared/types";
 
 export interface ManagerDeskLinkInput {
   linkType: ManagerDeskLinkType;
@@ -360,6 +363,45 @@ export class ManagerDeskService {
   ) {}
 
   private readonly taskKeys = new TaskKeysService();
+  private readonly tasks = new TaskService();
+
+  private canonicalFields(input: UpdateManagerDeskItemParams, managerId: string, currentLabels: string[] = []): UpdateTaskRequest {
+    const status = input.status === undefined ? undefined : input.status === "in_progress" ? "active" : input.status === "waiting" ? "blocked" : input.status === "cancelled" ? "dropped" : input.status === "done" ? "done" : "open";
+    const labels = currentLabels.filter((label) => !(input.category !== undefined && label.startsWith("category:")) && !(input.kind !== undefined && label.startsWith("kind:")));
+    if (input.category && input.category !== "other") labels.push(`category:${input.category}`);
+    if (input.kind === "decision" || input.kind === "waiting") labels.push(`kind:${input.kind}`);
+    return {
+      ...(input.title !== undefined && { title: input.title }), ...(status && { status, later: input.status === "backlog" }),
+      ...(input.kind !== undefined && { kind: input.kind === "meeting" ? "meeting" : "task" }),
+      ...((input.kind !== undefined || input.category !== undefined) && { labels }),
+      ...(input.priority !== undefined && { priority: input.priority === "high" || input.priority === "critical" ? "high" : "normal" }),
+      ...(input.assigneeDeveloperAccountId !== undefined && { ownerType: input.assigneeDeveloperAccountId ? "developer" : "manager", ownerId: input.assigneeDeveloperAccountId ?? managerId }),
+      ...(input.participants !== undefined && { participants: input.participants }), ...(input.nextAction !== undefined && { nextAction: input.nextAction }),
+      ...(input.outcome !== undefined && { outcome: input.outcome }), ...(input.plannedStartAt !== undefined && { startsAt: input.plannedStartAt }),
+      ...(input.plannedEndAt !== undefined && { endsAt: input.plannedEndAt }), ...(input.followUpAt !== undefined && { followUpAt: input.followUpAt }),
+    };
+  }
+
+  /**
+   * Canonical task -> desk view-model item (§2.3.2). The wire contract is the
+   * surface task (`tasks` arrays / `task` fields); this stays as the internal
+   * view-model mapper for summaries, Today projections, and mutation
+   * responses.
+   */
+  private async canonicalItem(task: TaskRow, managerId: string): Promise<ManagerDeskItem> {
+    if (task.trackedByManagerId !== managerId && !(task.ownerType === "manager" && task.ownerId === managerId)) throw new HttpError(404, "Item not found");
+    const surface = await this.tasks.surfaceDto(task, { date: task.scheduledOn ?? localTodayIso(), principal: { type: "manager", accountId: managerId, workspaceId: task.workspaceId } });
+    const names = await this.getDeveloperDisplayNameMap(surface.links.flatMap((link) => link.kind === "person" ? [link.ref] : []), task.workspaceId);
+    return surfaceTaskToDeskItem(surface as ManagerSurfaceTask, names);
+  }
+
+  private async deskItemsFromSurfaces(surfaces: SurfaceTask[], workspaceId?: string): Promise<ManagerDeskItem[]> {
+    const names = await this.getDeveloperDisplayNameMap(
+      surfaces.flatMap((task) => task.links.filter((link) => link.kind === "person").map((link) => link.ref)),
+      workspaceId
+    );
+    return surfaces.map((task) => surfaceTaskToDeskItem(task as ManagerSurfaceTask, names));
+  }
   private readonly eventsService = new TaskEventsService(this.taskKeys);
 
   private async emit(item: ManagerDeskItemRow, event: Omit<TaskEventInput, "taskKey" | "workspaceId">, actor: TaskEventActor = { type: "system" }): Promise<void> {
@@ -371,6 +413,14 @@ export class ManagerDeskService {
     await this.ensureDay(managerAccountId, date, normalizedWorkspaceId);
 
     const viewMode = getViewMode(date);
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const response = viewMode === "history" ? await this.buildHistoricalDayView(managerAccountId, date, normalizedWorkspaceId)
+        : viewMode === "planning" ? await this.buildPlanningDayView(managerAccountId, date, normalizedWorkspaceId) : await this.buildLiveDayView(managerAccountId, date, normalizedWorkspaceId);
+      // Canonical mode: `tasks` carries the native transport; the legacy item
+      // arrays stay populated for internal callers and are emptied at the
+      // route boundary (§2.3.2).
+      return { ...response, taskModel: "canonical" };
+    }
     if (viewMode === "history") {
       return this.buildHistoricalDayView(managerAccountId, date, normalizedWorkspaceId);
     }
@@ -381,6 +431,10 @@ export class ManagerDeskService {
   }
 
   async getTodayItems(managerAccountId: string, date: string, workspaceId?: string): Promise<ManagerDeskItem[]> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const projected = await this.tasks.projectTodayItems(managerAccountId, date, workspaceId);
+      return Promise.all(projected.map(async (item) => this.canonicalItem((await this.tasks.getByKey(item.taskKey, workspaceId))!, managerAccountId)));
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const days = await db
       .select()
@@ -448,6 +502,15 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<ManagerDeskItem> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      if (params.contextNote !== undefined) await this.taskKeys.assertLegacyFieldsAllowed(workspaceId);
+      const actor = this.tasks.principal(workspaceId, params.actor, managerAccountId);
+      const task = await this.tasks.create({ ...this.canonicalFields(params, managerAccountId), title: params.title, scheduledOn: params.date,
+        ...(!params.assigneeDeveloperAccountId && (!params.status || params.status === "inbox") && { ownerType: null, ownerId: null }) }, actor);
+      for (const link of params.links ?? []) await this.tasks.addLink(task.taskKey, { kind: link.linkType === "issue" ? "jira" : link.linkType === "developer" ? "person" : "external", ref: link.issueKey ?? link.developerAccountId ?? link.externalLabel ?? "" }, actor);
+      if (params.contextNote?.trim()) await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type: "update", body: params.contextNote, meta: { via: "context_note_field" } }, params.actor ?? { type: "manager", accountId: managerAccountId });
+      return this.canonicalItem(task, managerAccountId);
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const day = await this.ensureDay(managerAccountId, params.date, normalizedWorkspaceId);
     const title = normalizeRequiredTitle(params.title);
@@ -517,6 +580,7 @@ export class ManagerDeskService {
     }
 
     await this.syncTrackerAssignment(
+      params.actor ?? { type: "manager", accountId: managerAccountId },
       item.id,
       assigneeDeveloperAccountId,
       params.date,
@@ -537,9 +601,18 @@ export class ManagerDeskService {
     itemId: number,
     updates: UpdateManagerDeskItemParams,
     workspaceId?: string,
-    actor: TaskEventActor = { type: "manager", accountId: managerAccountId }
+    actor: TaskEventActor = { type: "manager", accountId: managerAccountId },
+    options?: { scheduleVia?: "carry_forward" | "reschedule" | "snooze" | "edit" | "reassign" }
   ): Promise<ManagerDeskItem> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      if (updates.contextNote !== undefined) await this.taskKeys.assertLegacyFieldsAllowed(workspaceId);
+      const task = await this.tasks.resolve("manager_desk_items", itemId, workspaceId);
+      await this.canonicalItem(task, managerAccountId);
+      const updated = await this.tasks.update(task.taskKey, this.canonicalFields(updates, managerAccountId, JSON.parse(task.labelsJson ?? "[]") as string[]), this.tasks.principal(workspaceId, actor, managerAccountId));
+      if (updates.contextNote?.trim()) await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type: "update", body: updates.contextNote, meta: { via: "context_note_field" } }, actor);
+      return this.canonicalItem(updated, managerAccountId);
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const existing = await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
     const linkedTrackerContext =
@@ -637,6 +710,7 @@ export class ManagerDeskService {
       isOpenStatus(updatedItem.status as ManagerDeskStatus);
 
     await this.syncTrackerAssignment(
+      actor,
       itemId,
       updatedItem.assigneeDeveloperAccountId,
       day.date,
@@ -648,12 +722,12 @@ export class ManagerDeskService {
       reopened
     );
     await this.recordHistorySnapshotForItem(managerAccountId, itemId, "upsert", normalizedWorkspaceId);
-    const system = { type: "system" as const, accountId: managerAccountId };
+    const system = { type: "system" as const, accountId: actor.accountId ?? managerAccountId };
     if (existing.title !== updatedItem.title) await this.emit(existing, { type: "title", body: null, meta: { from: existing.title, to: updatedItem.title } }, system);
     if (existing.status !== updatedItem.status) await this.emit(existing, { type: "status", body: null, meta: { domain: "desk_status", from: existing.status, to: updatedItem.status, reason: "user" } }, system);
     if (existing.assigneeDeveloperAccountId !== updatedItem.assigneeDeveloperAccountId) await this.emit(existing, { type: "assign", body: null, meta: { fromType: existing.assigneeDeveloperAccountId ? "developer" : "manager", fromId: existing.assigneeDeveloperAccountId ?? managerAccountId, toType: updatedItem.assigneeDeveloperAccountId ? "developer" : "manager", toId: updatedItem.assigneeDeveloperAccountId ?? managerAccountId } }, system);
     for (const field of ["plannedStartAt", "plannedEndAt", "followUpAt"] as const) {
-      if (existing[field] !== updatedItem[field]) await this.emit(existing, { type: "schedule", body: null, meta: { field: field === "plannedStartAt" ? "planned_start_at" : field === "plannedEndAt" ? "planned_end_at" : "follow_up_at", from: existing[field], to: updatedItem[field], via: "edit" } }, system);
+      if (existing[field] !== updatedItem[field]) await this.emit(existing, { type: "schedule", body: null, meta: { field: field === "plannedStartAt" ? "planned_start_at" : field === "plannedEndAt" ? "planned_end_at" : "follow_up_at", from: existing[field], to: updatedItem[field], via: options?.scheduleVia ?? "edit" } }, system);
     }
     if (updatedItem.contextNote && existing.contextNote !== updatedItem.contextNote) await this.emit(existing, { type: "update", body: updatedItem.contextNote, meta: { via: "context_note_field" } }, actor);
     if (updatedItem.outcome && existing.outcome !== updatedItem.outcome) await this.emit(existing, { type: "decision", body: updatedItem.outcome, meta: null }, actor);
@@ -663,6 +737,12 @@ export class ManagerDeskService {
 
   async deleteItem(managerAccountId: string, itemId: number, workspaceId?: string): Promise<void> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const task = await this.tasks.resolve("manager_desk_items", itemId, workspaceId);
+      await this.canonicalItem(task, managerAccountId);
+      await this.tasks.remove(task.taskKey, this.tasks.principal(workspaceId, undefined, managerAccountId));
+      return;
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const existing = await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
     const snapshot = await this.getItemById(managerAccountId, itemId, normalizedWorkspaceId);
@@ -680,9 +760,10 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<ManagerDeskItem> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.updateItem(managerAccountId, itemId, { status: "cancelled" }, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const existing = await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
-    const cancelled = await this.trackerService.cancelManagerDeskItem(itemId, normalizedWorkspaceId);
+    const cancelled = await this.trackerService.cancelManagerDeskItem(itemId, normalizedWorkspaceId, { type: "manager", accountId: managerAccountId });
 
     if (!cancelled) {
       throw new HttpError(409, "Task has no linked delegated work to cancel");
@@ -711,6 +792,12 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<ManagerDeskLink> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const task = await this.tasks.resolve("manager_desk_items", itemId, workspaceId);
+      await this.canonicalItem(task, managerAccountId);
+      const created = await this.tasks.addLink(task.taskKey, { kind: payload.linkType === "issue" ? "jira" : payload.linkType === "developer" ? "person" : "external", ref: payload.issueKey ?? payload.developerAccountId ?? payload.externalLabel ?? "" }, this.tasks.principal(workspaceId, undefined, managerAccountId));
+      return (await this.canonicalItem(task, managerAccountId)).links.find((link) => link.id === created.id)!;
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
     const normalizedLink = await this.normalizeLinkInput(payload, normalizedWorkspaceId);
@@ -747,6 +834,7 @@ export class ManagerDeskService {
     const day = await this.getDayById(item.dayId, normalizedWorkspaceId);
     if (day) {
       await this.syncTrackerAssignment(
+        { type: "manager", accountId: managerAccountId },
         itemId,
         item.assigneeDeveloperAccountId,
         day.date,
@@ -771,6 +859,12 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<void> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const task = await this.tasks.resolve("manager_desk_items", itemId, workspaceId);
+      await this.canonicalItem(task, managerAccountId);
+      await this.tasks.removeLink(task.taskKey, linkId, this.tasks.principal(workspaceId, undefined, managerAccountId));
+      return;
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
     const rows = await db
@@ -789,6 +883,7 @@ export class ManagerDeskService {
     const day = await this.getDayById(item.dayId, normalizedWorkspaceId);
     if (day) {
       await this.syncTrackerAssignment(
+        { type: "manager", accountId: managerAccountId },
         itemId,
         item.assigneeDeveloperAccountId,
         day.date,
@@ -812,6 +907,7 @@ export class ManagerDeskService {
     toDate: string,
     workspaceId?: string
   ): Promise<ManagerDeskCarryForwardPreviewResponse> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return { fromDate, toDate, carryable: 0, overdueOnArrivalCount: 0, timeMode: MANAGER_DESK_CARRY_FORWARD_TIME_MODE, items: [] };
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     this.assertCarryForwardDateOrder(fromDate, toDate);
 
@@ -848,6 +944,7 @@ export class ManagerDeskService {
     lookbackDays = SMART_CARRY_FORWARD_LOOKBACK_DAYS,
     workspaceId?: string
   ): Promise<ManagerDeskCarryForwardContextResponse> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return { toDate, carryable: 0, overdueOnArrivalCount: 0, timeMode: MANAGER_DESK_CARRY_FORWARD_TIME_MODE, items: [] };
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const fromDate = await this.resolveLatestCarryForwardSourceDate(
       managerAccountId,
@@ -884,6 +981,7 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<number> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.rescheduleCanonical(managerAccountId, params, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     this.assertCarryForwardDateOrder(params.fromDate, params.toDate);
 
@@ -909,6 +1007,7 @@ export class ManagerDeskService {
         .where(eq(managerDeskItems.id, entry.item.id));
 
       await this.syncTrackerAssignment(
+        { type: "manager", accountId: managerAccountId },
         entry.item.id,
         entry.item.assigneeDeveloperAccountId,
         params.toDate,
@@ -938,6 +1037,7 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<number> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.rescheduleCanonical(managerAccountId, params, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     this.assertCarryForwardDateOrder(params.fromDate, params.toDate);
 
@@ -979,6 +1079,7 @@ export class ManagerDeskService {
 
       const links = await this.getNormalizedLinksByItemId(itemId, normalizedWorkspaceId);
       await this.syncTrackerAssignment(
+        { type: "manager", accountId: managerAccountId },
         itemId,
         item.assigneeDeveloperAccountId,
         params.toDate,
@@ -1224,6 +1325,11 @@ export class ManagerDeskService {
     workspaceId?: string
   ): Promise<TrackerSharedTaskDetailResponse> {
     return runInTransaction(async () => {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const task = await this.tasks.resolve("team_tracker_items", trackerItemId, workspaceId);
+      await this.tasks.track(task.taskKey, this.tasks.principal(workspaceId, undefined, managerAccountId));
+      return this.getTrackerTaskDetail(managerAccountId, trackerItemId, workspaceId);
+    }
     const trackerContext = await this.trackerService.getItemDetailContext(trackerItemId, workspaceId);
 
     if (!trackerContext.trackerItem.managerDeskItemId) {
@@ -1254,6 +1360,7 @@ export class ManagerDeskService {
       lifecycle: "manager_desk_linked",
       managerDeskItem,
       trackerItem: trackerContext.trackerItem,
+      task: trackerContext.task as ManagerSurfaceTask | undefined,
     };
   }
 
@@ -1305,7 +1412,7 @@ export class ManagerDeskService {
     date: string,
     workspaceId?: string
   ): Promise<ManagerDeskDayResponse> {
-    const items = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
+    const { items, tasks } = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
     const visible = items.filter((item) => {
       if (item.status === "backlog") {
         return true;
@@ -1317,11 +1424,13 @@ export class ManagerDeskService {
       }
       return isoDatePart(item.completedAt) === date;
     });
+    const visibleKeys = new Set(visible.map((item) => item.taskKey));
 
     return {
       date,
       viewMode: "live",
       items: visible,
+      tasks: tasks.length ? tasks.filter((task) => visibleKeys.has(task.taskKey)) : undefined,
       summary: this.buildSummary(visible),
     };
   }
@@ -1331,13 +1440,15 @@ export class ManagerDeskService {
     date: string,
     workspaceId?: string
   ): Promise<ManagerDeskDayResponse> {
-    const items = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
+    const { items, tasks } = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
     const visible = items.filter((item) => this.isRelevantToPlanningDate(item, date));
+    const visibleKeys = new Set(visible.map((item) => item.taskKey));
 
     return {
       date,
       viewMode: "planning",
       items: visible,
+      tasks: tasks.length ? tasks.filter((task) => visibleKeys.has(task.taskKey)) : undefined,
       summary: this.buildSummary(visible),
     };
   }
@@ -1347,6 +1458,15 @@ export class ManagerDeskService {
     date: string,
     workspaceId?: string
   ): Promise<ManagerDeskDayResponse> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const rows = await this.tasks.history(managerAccountId, date, workspaceId);
+      const tasks = (await this.tasks.surfaceDtos(rows, {
+        date,
+        principal: { type: "manager", accountId: managerAccountId, workspaceId },
+      })) as ManagerSurfaceTask[];
+      const items = await this.deskItemsFromSurfaces(tasks, workspaceId);
+      return { date, viewMode: "history", items, tasks, summary: this.buildSummary(items), createdThatDayItems: items.filter((item) => isoDatePart(item.createdAt) === date) };
+    }
     const history = await this.getHistoricalItemsForDate(managerAccountId, date, workspaceId);
     const createdThatDayItems = history.filter((item) => isoDatePart(item.createdAt) === date);
 
@@ -1363,7 +1483,13 @@ export class ManagerDeskService {
     managerAccountId: string,
     date: string,
     workspaceId?: string
-  ): Promise<ManagerDeskItem[]> {
+  ): Promise<{ items: ManagerDeskItem[]; tasks: ManagerSurfaceTask[] }> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const principal = this.tasks.principal(workspaceId, undefined, managerAccountId);
+      const rows = await this.tasks.list(principal, { view: "desk", date });
+      const tasks = (await this.tasks.surfaceDtos(rows, { date, principal })) as ManagerSurfaceTask[];
+      return { items: await this.deskItemsFromSurfaces(tasks, workspaceId), tasks };
+    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const days = await db
       .select()
@@ -1371,7 +1497,7 @@ export class ManagerDeskService {
       .where(and(eq(managerDeskDays.workspaceId, normalizedWorkspaceId), eq(managerDeskDays.managerAccountId, managerAccountId)));
 
     if (days.length === 0) {
-      return [];
+      return { items: [], tasks: [] };
     }
 
     const dayById = new Map(days.map((day) => [day.id, day]));
@@ -1388,19 +1514,22 @@ export class ManagerDeskService {
     );
     const assigneesByAccountId = await this.getAssigneeMap(dedupedRows, date, normalizedWorkspaceId);
 
-    return dedupedRows
-      .sort(compareItemRows)
-      .map((item) =>
-        this.mapItem(
-          item,
-          linksByItemId.get(item.id) ?? [],
-          delegatedExecutionByItemId.get(item.id),
-          item.assigneeDeveloperAccountId
-            ? assigneesByAccountId.get(item.assigneeDeveloperAccountId) ?? undefined
-            : undefined,
-          dayById.get(item.dayId)?.date ?? date
-        )
-      );
+    return {
+      items: dedupedRows
+        .sort(compareItemRows)
+        .map((item) =>
+          this.mapItem(
+            item,
+            linksByItemId.get(item.id) ?? [],
+            delegatedExecutionByItemId.get(item.id),
+            item.assigneeDeveloperAccountId
+              ? assigneesByAccountId.get(item.assigneeDeveloperAccountId) ?? undefined
+              : undefined,
+            dayById.get(item.dayId)?.date ?? date
+          )
+        ),
+      tasks: [],
+    };
   }
 
   private dedupeCurrentLineageRows(itemRows: ManagerDeskItemRow[]): ManagerDeskItemRow[] {
@@ -1495,7 +1624,7 @@ export class ManagerDeskService {
     date: string,
     workspaceId?: string
   ): Promise<ManagerDeskItem[]> {
-    const items = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
+    const { items } = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
     const cutoff = endOfIsoDate(date);
 
     return items.filter((item) => {
@@ -1506,6 +1635,30 @@ export class ManagerDeskService {
         return true;
       }
       return item.completedAt <= cutoff || isOpenStatus(item.status);
+    });
+  }
+
+  /**
+   * Read-only day projections for the Phase 2a strict-parity harness
+   * (§2.2.13). Mirrors the legacy view filters without ensureDay's write.
+   */
+  async parityDayView(
+    managerAccountId: string,
+    date: string,
+    viewMode: "live" | "planning" | "history",
+    workspaceId?: string
+  ): Promise<ManagerDeskItem[]> {
+    if (viewMode === "history") {
+      return this.getHistoricalItemsForDate(managerAccountId, date, workspaceId);
+    }
+    const { items } = await this.getCurrentItemsForManager(managerAccountId, date, workspaceId);
+    if (viewMode === "planning") {
+      return items.filter((item) => this.isRelevantToPlanningDate(item, date));
+    }
+    return items.filter((item) => {
+      if (item.status === "backlog") return true;
+      if (isOpenStatus(item.status)) return item.originDate <= date;
+      return isoDatePart(item.completedAt) === date;
     });
   }
 
@@ -1568,6 +1721,7 @@ export class ManagerDeskService {
     itemId: number,
     workspaceId?: string
   ): Promise<ManagerDeskItem> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.canonicalItem(await this.tasks.resolve("manager_desk_items", itemId, workspaceId), managerAccountId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const item = await this.getOwnedItemRow(managerAccountId, itemId, normalizedWorkspaceId);
     const day = await this.getDayById(item.dayId, normalizedWorkspaceId);
@@ -1634,6 +1788,22 @@ export class ManagerDeskService {
     if (toDate <= fromDate) {
       throw new HttpError(400, "toDate must be after fromDate");
     }
+  }
+
+  private async rescheduleCanonical(managerId: string, params: CarryForwardParams, workspaceId?: string): Promise<number> {
+    this.assertCarryForwardDateOrder(params.fromDate, params.toDate);
+    const principal = this.tasks.principal(workspaceId, undefined, managerId);
+    const selected = params.itemIds
+      ? await Promise.all(params.itemIds.map((id) => this.tasks.resolve("manager_desk_items", id, workspaceId)))
+      : await this.tasks.list(principal, { view: "desk", date: params.fromDate });
+    let moved = 0;
+    for (const row of selected) {
+      await this.canonicalItem(row, managerId);
+      if (["done", "dropped"].includes(row.status)) continue;
+      await this.tasks.update(row.taskKey, { scheduledOn: params.toDate }, principal);
+      moved++;
+    }
+    return moved;
   }
 
   private async buildCarryForwardPlan(
@@ -1835,6 +2005,27 @@ export class ManagerDeskService {
   }
 
   private async getRawLinksByItemIds(itemIds: number[], workspaceId?: string): Promise<Map<number, ManagerDeskLinkRow[]>> {
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
+      const mapped = new Map<number, ManagerDeskLinkRow[]>();
+      for (const itemId of itemIds) {
+        const task = await this.tasks.resolve("manager_desk_items", itemId, workspaceId);
+        const links = await this.tasks.listLinks([task.id], task.workspaceId);
+        mapped.set(
+          itemId,
+          links.map((link) => ({
+            id: link.id,
+            workspaceId: task.workspaceId,
+            itemId,
+            linkType: (link.kind === "jira" ? "issue" : link.kind === "person" ? "developer" : "external_group") as ManagerDeskLinkType,
+            issueKey: link.kind === "jira" ? link.ref : null,
+            developerAccountId: link.kind === "person" ? link.ref : null,
+            externalLabel: link.kind === "external" || link.kind === "task" ? link.ref : null,
+            createdAt: link.createdAt,
+          }))
+        );
+      }
+      return mapped;
+    }
     if (itemIds.length === 0) {
       return new Map();
     }
@@ -2095,6 +2286,7 @@ export class ManagerDeskService {
   }
 
   private async syncTrackerAssignment(
+    actor: TaskEventActor,
     managerDeskItemId: number,
     assigneeDeveloperAccountId: string | null | undefined,
     date: string,
@@ -2106,6 +2298,7 @@ export class ManagerDeskService {
     reopened?: boolean
   ): Promise<void> {
     await this.trackerService.syncManagerDeskItem({
+      actor,
       workspaceId: normalizeWorkspaceId(workspaceId),
       managerDeskItemId,
       assigneeDeveloperAccountId: isOpenStatus(status) ? assigneeDeveloperAccountId : null,
@@ -2260,6 +2453,7 @@ export class ManagerDeskService {
         developer: trackerContext.developer,
         lifecycle: "tracker_only",
         trackerItem: trackerContext.trackerItem,
+        task: trackerContext.task as ManagerSurfaceTask | undefined,
       };
     }
 
@@ -2269,6 +2463,7 @@ export class ManagerDeskService {
       lifecycle: "manager_desk_linked",
       managerDeskItem: await this.getItemById(managerAccountId, managerDeskItemId, workspaceId),
       trackerItem: trackerContext.trackerItem,
+      task: trackerContext.task as ManagerSurfaceTask | undefined,
     };
   }
 

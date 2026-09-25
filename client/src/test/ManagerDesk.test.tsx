@@ -187,6 +187,16 @@ vi.mock('@/context/AuthContext', () => ({
   useAuthScopeKey: () => 'ws:mgr:manager:',
 }));
 
+vi.mock('@/hooks/useTasks', () => ({
+  useTaskResolution: () => ({ data: undefined }),
+  useTaskEvents: () => ({ data: { pages: [{ events: [{ id: 1, taskKey: 'T-1', type: 'update', body: 'Private task context', visibility: 'private', author: { type: 'manager', id: 'mgr-1' }, occurredAt: new Date().toISOString(), approximateTime: false }], nextCursor: null }] } }),
+  useMyDayTaskEvents: () => ({ data: undefined }),
+  useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
+  useAddMyDayTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
+  useRedactTaskEvent: () => ({ mutate: vi.fn() }),
+  useUpdateTaskEventVisibility: () => ({ mutate: vi.fn() }),
+}));
+
 let mockNoteSources: { itemId: number; noteId: number; date: string }[] = [];
 
 vi.mock('@/hooks/useDailyNotes', () => ({
@@ -613,6 +623,17 @@ describe('ManagerDeskPage', () => {
     );
     expect(screen.queryByRole('button', { name: /^carry forward$/i })).not.toBeInTheDocument();
     expect(screen.getByText('Live')).toBeInTheDocument();
+  });
+
+  it('shows the timeline and composer for a keyed desk-only task', () => {
+    currentMockDay = { ...mockDayResponse, items: [mockItem({ title: 'Desk-only keyed task', taskKey: 'T-1', contextNote: 'Legacy text' })] };
+    render(<ManagerDeskPage />, { wrapper: TestWrapper });
+    fireEvent.click(screen.getByText('Desk-only keyed task'));
+    expect(screen.getByText('Task timeline')).toBeInTheDocument();
+    expect(screen.getByText('Private task context')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Add an update…'));
+    expect(screen.getByRole('textbox', { name: 'Add an update to T-1' })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Legacy text')).not.toBeInTheDocument();
   });
 
   it('opens the item detail drawer with primary manager fields visible', () => {

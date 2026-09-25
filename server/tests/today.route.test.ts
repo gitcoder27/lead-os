@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { developers } from "../src/db/schema";
+import { checkinTaskRefs, configTable, developers } from "../src/db/schema";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
 
 const authService = new AuthService();
 const trackerService = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(trackerService);
+const eventsService = new TaskEventsService();
 const issueService = new IssueService(undefined, undefined, trackerService);
 const todayService = new TodayService(issueService, trackerService, managerDeskService, {
   getLastSyncLog: async () => undefined,
@@ -170,6 +173,62 @@ describe("today routes", () => {
       command: "mark_done",
       target: { managerDeskItemId: item.id },
       result: { status: "done" },
+    });
+  });
+
+  it("POST /api/manager-actions/commands add_check_in writes checkin_task_refs and checkin_ref events", async () => {
+    await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    const { cookie, user } = await managerSession();
+    const item = await trackerService.addItem("dev-1", "2026-03-08", {
+      title: "Standup task",
+    });
+    expect(item.taskKey).toMatch(/^T-\d+$/);
+
+    const response = await invoke(createTestApp(), {
+      method: "POST",
+      url: "/api/manager-actions/commands",
+      headers: { cookie },
+      body: {
+        date: "2026-03-08",
+        summary: "Walked through the queue",
+        taskKeys: [item.taskKey],
+        command: {
+          kind: "add_check_in",
+          label: "Add check-in",
+          target: {
+            type: "developer",
+            view: "team",
+            developerAccountId: "dev-1",
+            date: "2026-03-08",
+          },
+          confirm: true,
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      command: "add_check_in",
+      result: { taskKeys: [item.taskKey] },
+    });
+
+    const refs = await db
+      .select()
+      .from(checkinTaskRefs)
+      .where(eq(checkinTaskRefs.taskKey, item.taskKey!));
+    expect(refs).toHaveLength(1);
+
+    const events = await eventsService.list(item.taskKey!, {
+      kind: "manager",
+      accountId: user.accountId,
+    });
+    const checkinRef = events.events.find((event) => event.type === "checkin_ref");
+    expect(checkinRef).toBeDefined();
+    expect(checkinRef?.meta).toMatchObject({
+      checkInId: response.body.result.id,
+      date: "2026-03-08",
+      developerAccountId: "dev-1",
     });
   });
 });

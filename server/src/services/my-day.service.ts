@@ -1,4 +1,5 @@
 import type {
+  DeveloperSurfaceTask,
   MyDayReadOnlyReason,
   MyDayResponse,
   TrackerCheckIn,
@@ -10,6 +11,8 @@ import { HttpError } from "../middleware/errorHandler";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import type { TaskEvent } from "shared/types";
+import { TaskService } from "./task.service";
+import type { CreateTaskRequest, UpdateTaskRequest } from "shared/types";
 
 interface AddMyDayItemParams {
   date: string;
@@ -60,8 +63,9 @@ export class MyDayService {
       viewer: { kind: "developer", accountId },
     }, workspaceId);
     const readOnlyReason = this.getReadOnlyReason(day.availability.state, viewMode);
+    const safeItem = (item: TrackerWorkItem): TrackerWorkItem => item.canonicalTask ? { ...item, managerDeskItemId: undefined, lifecycle: "tracker_only", canRename: item.createdBy?.type === "developer" && item.createdBy.id === accountId } : item;
 
-    return {
+    const base = {
       date: day.date,
       viewMode,
       readOnlyReason,
@@ -71,12 +75,31 @@ export class MyDayService {
       availability: day.availability,
       isReadOnly: readOnlyReason !== undefined,
       lastCheckInAt: day.lastCheckInAt,
-      currentItem: day.currentItem,
-      plannedItems: day.plannedItems,
-      completedItems: day.completedItems,
-      droppedItems: day.droppedItems,
       checkIns: day.checkIns,
       isStale: day.isStale,
+    };
+
+    // Canonical mode: `tasks` carries the native transport; the legacy item
+    // arrays stay populated for internal callers and are emptied at the route
+    // boundary (§2.3.2).
+    if (day.tasks) {
+      return {
+        ...base,
+        taskModel: "canonical",
+        tasks: day.tasks as DeveloperSurfaceTask[],
+        currentItem: day.currentItem ? safeItem(day.currentItem) : undefined,
+        plannedItems: day.plannedItems.map(safeItem),
+        completedItems: day.completedItems.map(safeItem),
+        droppedItems: day.droppedItems.map(safeItem),
+      };
+    }
+
+    return {
+      ...base,
+      currentItem: day.currentItem ? safeItem(day.currentItem) : undefined,
+      plannedItems: day.plannedItems.map(safeItem),
+      completedItems: day.completedItems.map(safeItem),
+      droppedItems: day.droppedItems.map(safeItem),
     };
   }
 
@@ -89,6 +112,22 @@ export class MyDayService {
     await this.assertWritable(accountId, date, workspaceId);
     await this.trackerService.updateDay(accountId, date, { status }, workspaceId);
     return this.getMyDay(accountId, date, workspaceId);
+  }
+
+  async nativeTasks(accountId: string, date: string, workspaceId?: string) {
+    if (!(await this.taskKeys.canonicalEnabled(workspaceId))) throw new HttpError(404, "Canonical tasks are not enabled");
+    const service = new TaskService();
+    const principal = { type: "developer" as const, accountId, workspaceId };
+    return { tasks: await Promise.all((await service.list(principal, { date })).map((task) => service.toDto(task, principal))) };
+  }
+
+  async mutateTask(accountId: string, date: string, input: CreateTaskRequest | UpdateTaskRequest, workspaceId?: string, key?: string) {
+    if (!(await this.taskKeys.canonicalEnabled(workspaceId))) throw new HttpError(404, "Canonical tasks are not enabled");
+    await this.assertWritable(accountId, date, workspaceId);
+    const service = new TaskService();
+    const principal = { type: "developer" as const, accountId, workspaceId };
+    const row = key ? await service.update(key, input, principal) : await service.create(input as CreateTaskRequest, principal);
+    return service.toDto(row, principal);
   }
 
   async addItem(accountId: string, params: AddMyDayItemParams, workspaceId?: string): Promise<TrackerWorkItem> {
@@ -120,14 +159,14 @@ export class MyDayService {
     const ownership = await this.trackerService.assertItemBelongsToDeveloper(itemId, accountId, workspaceId);
     await this.assertWritable(accountId, date, workspaceId);
     this.assertItemAvailableInSelectedView(ownership.date, date);
-    await this.trackerService.deleteItem(itemId, undefined, workspaceId);
+    await this.trackerService.deleteItem(itemId, undefined, workspaceId, { type: "developer", accountId });
   }
 
   async setCurrentItem(accountId: string, itemId: number, date: string, workspaceId?: string): Promise<TrackerWorkItem> {
     const ownership = await this.trackerService.assertItemBelongsToDeveloper(itemId, accountId, workspaceId);
     await this.assertWritable(accountId, date, workspaceId);
     this.assertItemAvailableInSelectedView(ownership.date, date);
-    return this.trackerService.setCurrentItem(itemId, undefined, workspaceId);
+    return this.trackerService.setCurrentItem(itemId, undefined, workspaceId, { type: "developer", accountId });
   }
 
   async addCheckIn(

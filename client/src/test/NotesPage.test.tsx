@@ -7,6 +7,8 @@ import type { DailyNoteFollowUp, DailyNoteSummary } from '@/types';
 
 const mockAddToast = vi.fn();
 const mockFollowUpMutate = vi.fn();
+const mockTaskUpdateMutate = vi.fn();
+const mockTaskCreateMutate = vi.fn();
 const editorDatesSeen = vi.hoisted(() => [] as string[]);
 
 const savedNote = {
@@ -66,6 +68,8 @@ vi.mock('@/hooks/useDailyNotes', () => ({
     isFetchingNextPage: false,
   }),
   useCreateDailyNoteFollowUp: () => ({ mutate: mockFollowUpMutate, isPending: false }),
+  useAddDailyNoteTaskUpdate: () => ({ mutate: mockTaskUpdateMutate, isPending: false }),
+  useCreateDailyNoteTask: () => ({ mutate: mockTaskCreateMutate, isPending: false }),
   useDailyNoteSources: () => ({ data: [] }),
   useAppendDailyNote: () => ({ mutate: vi.fn(), isPending: false }),
 }));
@@ -362,6 +366,83 @@ describe('NotesPage', () => {
     editorState.latest = null;
     renderPage();
     expect(screen.getByRole('button', { name: /create follow-up/i })).toBeDisabled();
+  });
+
+  it('opens the task-update dialog prefilled from the selected text', async () => {
+    renderPage();
+
+    const textarea = screen.getByLabelText(/Notes for/) as HTMLTextAreaElement;
+    textarea.setSelectionRange(0, 8);
+    fireEvent.select(textarea);
+
+    fireEvent.click(screen.getByRole('button', { name: /add as update/i }));
+    await screen.findByRole('dialog');
+
+    expect(screen.getByText('Add as task update')).toBeInTheDocument();
+    expect(screen.getByLabelText('Update text')).toHaveValue('existing');
+  });
+
+  it('submits the selected text as a shared update on a picked task', async () => {
+    renderPage();
+
+    const textarea = screen.getByLabelText(/Notes for/) as HTMLTextAreaElement;
+    textarea.setSelectionRange(0, 8);
+    fireEvent.select(textarea);
+
+    fireEvent.click(screen.getByRole('button', { name: /add as update/i }));
+    const dialog = await screen.findByRole('dialog');
+
+    fireEvent.change(within(dialog).getByLabelText('Task'), {
+      target: { value: 'T-12' },
+    });
+    fireEvent.click(within(dialog).getByText('T-12'));
+    fireEvent.click(within(dialog).getByLabelText('Shared with developer'));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Add update$/ }));
+
+    expect(mockTaskUpdateMutate).toHaveBeenCalledTimes(1);
+    expect(mockTaskUpdateMutate.mock.calls[0][0]).toMatchObject({
+      taskKey: 'T-12',
+      text: 'existing',
+      type: 'update',
+      visibility: 'shared',
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+  });
+
+  it('creates a task from the selected text', async () => {
+    renderPage();
+
+    const textarea = screen.getByLabelText(/Notes for/) as HTMLTextAreaElement;
+    textarea.setSelectionRange(0, 8);
+    fireEvent.select(textarea);
+
+    fireEvent.click(screen.getByRole('button', { name: /create task/i }));
+    const dialog = await screen.findByRole('dialog');
+
+    expect(screen.getByLabelText('Title')).toHaveValue('existing');
+    expect(screen.getByLabelText(/Context/)).toHaveValue('existing');
+
+    fireEvent.change(screen.getByLabelText('Title'), {
+      target: { value: 'Chase the deployment' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Create task$/ }));
+
+    expect(mockTaskCreateMutate).toHaveBeenCalledTimes(1);
+    expect(mockTaskCreateMutate.mock.calls[0][0]).toMatchObject({
+      title: 'Chase the deployment',
+      context: 'existing',
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+  });
+
+  it('does not open the task dialog when the flush fails', async () => {
+    editorState.flush.mockResolvedValue(false);
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /create task/i }));
+
+    await waitFor(() => expect(editorState.flush).toHaveBeenCalled());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('disables follow-up creation while a conflict is unresolved', () => {

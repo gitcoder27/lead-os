@@ -1,4 +1,4 @@
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, like, or, isNull } from "drizzle-orm";
 import type {
   DailyNoteSummary,
   GlobalSearchCheckInItem,
@@ -19,6 +19,7 @@ import {
   teamTrackerCheckIns,
   teamTrackerDays,
   teamTrackerItems,
+  tasks as canonicalTasks,
 } from "../db/schema";
 import { isVisibleWorkIssue } from "./issue-rules";
 import { DailyNotesService } from "./daily-notes.service";
@@ -86,12 +87,13 @@ export class SearchService {
 
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const pattern = containsPattern(query);
+    const canonical = await this.taskKeys.canonicalEnabled(normalizedWorkspaceId);
 
     const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems, tasks] = await Promise.all([
       this.searchIssues(normalizedWorkspaceId, pattern),
-      this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
+      canonical ? Promise.resolve([]) : this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
       this.searchCheckIns(normalizedWorkspaceId, pattern),
-      this.searchTrackerItems(normalizedWorkspaceId, pattern),
+      canonical ? Promise.resolve([]) : this.searchTrackerItems(normalizedWorkspaceId, pattern),
       this.searchDevelopers(normalizedWorkspaceId, pattern),
       this.searchNotes(normalizedWorkspaceId, managerAccountId, query),
       this.searchTasks(normalizedWorkspaceId, managerAccountId, query, pattern),
@@ -117,10 +119,12 @@ export class SearchService {
       if (key) matches.set(key, { matchedIn: "key" });
     }
     const [deskRows, trackerRows, eventRows] = await Promise.all([
-      db.select({ key: managerDeskItems.taskKey }).from(managerDeskItems)
+      await this.taskKeys.canonicalEnabled(workspaceId)
+        ? db.select({ key: canonicalTasks.taskKey }).from(canonicalTasks).where(and(eq(canonicalTasks.workspaceId, workspaceId), isNull(canonicalTasks.deletedAt), like(canonicalTasks.title, pattern))).limit(DESK_ITEM_LIMIT)
+        : db.select({ key: managerDeskItems.taskKey }).from(managerDeskItems)
         .innerJoin(managerDeskDays, eq(managerDeskItems.dayId, managerDeskDays.id))
         .where(and(eq(managerDeskItems.workspaceId, workspaceId), ...(managerAccountId ? [eq(managerDeskDays.managerAccountId, managerAccountId)] : []), like(managerDeskItems.title, pattern))).limit(DESK_ITEM_LIMIT),
-      db.select({ key: teamTrackerItems.taskKey }).from(teamTrackerItems).where(and(eq(teamTrackerItems.workspaceId, workspaceId), like(teamTrackerItems.title, pattern))).limit(DESK_ITEM_LIMIT),
+      await this.taskKeys.canonicalEnabled(workspaceId) ? Promise.resolve([]) : db.select({ key: teamTrackerItems.taskKey }).from(teamTrackerItems).where(and(eq(teamTrackerItems.workspaceId, workspaceId), like(teamTrackerItems.title, pattern))).limit(DESK_ITEM_LIMIT),
       this.eventsService.searchBodies({ kind: "manager", accountId: managerAccountId ?? "", workspaceId }, pattern, DESK_ITEM_LIMIT),
     ]);
     for (const row of [...deskRows, ...trackerRows]) if (row.key && !matches.has(row.key)) matches.set(row.key, { matchedIn: "title" });

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type {
   ManagerDeskMaintenancePreview,
   TeamTrackerMaintenancePreview,
@@ -18,11 +18,15 @@ import {
   teamTrackerDays,
   teamTrackerItems,
   teamTrackerSavedViews,
+  tasks,
+  developerNotes,
 } from "../db/schema";
 import { BackupService } from "./backup.service";
 import { SettingsService } from "./settings.service";
 import { TaskEventsService } from "./task-events.service";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskService } from "./task.service";
 
 interface ManagerDeskResetScope {
   preview: ManagerDeskMaintenancePreview;
@@ -71,6 +75,19 @@ export class WorkspaceMaintenanceService {
       : null;
 
     await runInTransaction(async () => {
+      if (await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)) {
+        const rows = await db.select().from(tasks).where(eq(tasks.workspaceId, normalizedWorkspaceId));
+        const selected = rows.filter((row) => target === "workspace" || (target === "team_tracker" ? row.ownerType === "developer" : row.trackedByManagerId === managerAccountId || (row.ownerType === "manager" && row.ownerId === managerAccountId)));
+        await new TaskService().purge(selected.map((row) => row.id), normalizedWorkspaceId);
+        if (target === "team_tracker" || target === "workspace") {
+          await db.delete(teamTrackerCheckIns).where(eq(teamTrackerCheckIns.workspaceId, normalizedWorkspaceId));
+          await db.delete(developerNotes).where(eq(developerNotes.workspaceId, normalizedWorkspaceId));
+          await db.delete(developerAvailabilityPeriods).where(eq(developerAvailabilityPeriods.workspaceId, normalizedWorkspaceId));
+          await db.delete(teamTrackerSavedViews).where(and(eq(teamTrackerSavedViews.workspaceId, normalizedWorkspaceId), eq(teamTrackerSavedViews.managerAccountId, managerAccountId)));
+          await db.update(teamTrackerDays).set({ status: "on_track", capacityUnits: null, managerNotes: null, lastCheckInAt: null, nextFollowUpAt: null }).where(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId));
+        }
+        return;
+      }
       if (target === "team_tracker" || target === "workspace") {
         const teamTrackerScope = await this.buildTeamTrackerScope(managerAccountId, normalizedWorkspaceId);
         await this.clearTeamTracker(managerAccountId, teamTrackerScope, normalizedWorkspaceId);
@@ -105,6 +122,11 @@ export class WorkspaceMaintenanceService {
     workspaceId?: string
   ): Promise<ManagerDeskResetScope> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    if (await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)) {
+      const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, normalizedWorkspaceId), or(eq(tasks.trackedByManagerId, managerAccountId), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, managerAccountId)))));
+      const links = await new TaskService().listLinks(rows.map((row) => row.id), normalizedWorkspaceId);
+      return { preview: { dayCount: 0, itemCount: rows.length, linkCount: links.length, historyCount: 0, linkedTrackerItemCount: rows.filter((row) => row.ownerType === "developer").length }, dayIds: [], itemIds: rows.map((row) => row.id), linkedTrackerItemIds: [] };
+    }
     const dayRows = await db
       .select({ id: managerDeskDays.id })
       .from(managerDeskDays)
@@ -172,6 +194,14 @@ export class WorkspaceMaintenanceService {
     workspaceId?: string
   ): Promise<TeamTrackerResetScope> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    if (await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)) {
+      const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, normalizedWorkspaceId), eq(tasks.ownerType, "developer")));
+      const checkIns = await db.select().from(teamTrackerCheckIns).where(eq(teamTrackerCheckIns.workspaceId, normalizedWorkspaceId));
+      const availability = await db.select().from(developerAvailabilityPeriods).where(eq(developerAvailabilityPeriods.workspaceId, normalizedWorkspaceId));
+      const views = await db.select().from(teamTrackerSavedViews).where(and(eq(teamTrackerSavedViews.workspaceId, normalizedWorkspaceId), eq(teamTrackerSavedViews.managerAccountId, managerAccountId)));
+      const days = await db.select().from(teamTrackerDays).where(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId));
+      return { preview: { dayCount: days.length, itemCount: rows.length, checkInCount: checkIns.length, availabilityPeriodCount: availability.length, savedViewCount: views.length, linkedManagerDeskItemCount: rows.filter((row) => row.trackedByManagerId).length } };
+    }
     const [
       dayRows,
       itemRows,

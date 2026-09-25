@@ -1,4 +1,5 @@
-import { Eye, EyeOff, Lock, Loader2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, History, Lock, Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -43,6 +44,30 @@ function blockerAction(event: TaskEvent): 'raised' | 'cleared' | undefined {
   return action === 'raised' || action === 'cleared' ? action : undefined;
 }
 
+function eventDescription(event: TaskEvent): string {
+  if (event.body) return event.body;
+  const meta = eventMeta(event);
+  const text = (field: string, fallback = 'Not set') => typeof meta[field] === 'string' && meta[field] ? String(meta[field]) : fallback;
+  const readable = (field: string) => text(field).replace(/_/g, ' ');
+  switch (event.type) {
+    case 'created': return `Created ${text('title', event.taskKey)}${meta.ownerId ? ` for ${text('ownerId')}` : ''}`;
+    case 'status': return `${readable('from')} → ${readable('to')}${meta.reason ? ` (${readable('reason')})` : ''}`;
+    case 'assign': {
+      const reset = meta.stateReset as { from?: string; to?: string } | undefined;
+      return `${text('fromId', 'Unassigned')} → ${text('toId', 'Unassigned')}${reset?.from && reset.to ? ` (${reset.from.replace(/_/g, ' ')} → ${reset.to.replace(/_/g, ' ')})` : ''}`;
+    }
+    case 'focus': return `${meta.action === 'set_current' ? 'Set as current work' : 'Removed from current work'} on ${text('date')}`;
+    case 'title': return `${text('from')} → ${text('to')}`;
+    case 'schedule': return `${readable('field')}: ${text('from')} → ${text('to')}`;
+    case 'link': return `${meta.action === 'removed' ? 'Removed' : 'Added'} ${text('kind', 'link')}: ${text('ref')}${meta.role ? ` (${text('role')})` : ''}`;
+    case 'checkin_ref': return `Check-in on ${text('date')}${meta.developerAccountId ? ` for ${text('developerAccountId')}` : ''}${meta.excerpt ? `: ${text('excerpt')}` : ''}`;
+    case 'note_ref': return `${meta.relation === 'created_from' ? 'Created from note' : meta.relation === 'update_from' ? 'Updated from note' : 'Mentioned in note'} on ${text('noteDate')}${meta.excerpt ? `: ${text('excerpt')}` : ''}`;
+    case 'merged': return `${text('mergedKey')} → ${text('survivorKey')} (${text('decisionRef')})`;
+    case 'blocker': return meta.action === 'cleared' ? 'Blocker cleared' : 'Blocker raised';
+    default: return EVENT_TYPE_LABELS[event.type];
+  }
+}
+
 function canToggleVisibility(event: TaskEvent, accountId: string | undefined): boolean {
   const meta = eventMeta(event);
   return Boolean(
@@ -60,14 +85,14 @@ function canRedact(event: TaskEvent, accountId: string | undefined): boolean {
   return Boolean(
     accountId &&
       !event.redacted &&
-      event.author.type === 'manager' &&
+      event.author.type !== 'developer' &&
       event.author.id === accountId &&
       Date.now() - new Date(event.occurredAt).getTime() <= 30 * 86_400_000,
   );
 }
 
 function authorLabel(event: TaskEvent): string {
-  return event.author.displayName ?? AUTHOR_LABELS[event.author.type] ?? event.author.type;
+  return event.author.displayName ?? `${AUTHOR_LABELS[event.author.type] ?? event.author.type}${event.author.id ? ` (${event.author.id})` : ''}`;
 }
 
 function EventBadges({ event }: { event: TaskEvent }) {
@@ -133,6 +158,27 @@ interface TaskTimelineProps {
   taskKey: string;
   mode: 'manager' | 'developer';
   emptyLabel?: string;
+}
+
+export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="min-w-0 px-2 pb-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={`Activity for ${taskKey}`}
+        className="flex items-center gap-1.5 py-1 text-[12px]"
+        style={{ color: 'var(--text-secondary)' }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); }}
+      >
+        <History size={12} />
+        {expanded ? 'Hide activity' : 'Activity'}
+      </button>
+      {expanded && <TaskTimeline taskKey={taskKey} mode={mode} />}
+    </div>
+  );
 }
 
 export function TaskTimeline({ taskKey, mode, emptyLabel = 'No activity yet.' }: TaskTimelineProps) {
@@ -223,13 +269,13 @@ export function TaskTimeline({ taskKey, mode, emptyLabel = 'No activity yet.' }:
                     )}
                   </span>
                 </div>
-                <div className="mt-0.5 whitespace-pre-wrap text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>
+                <div className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5" style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}>
                   {event.redacted ? (
                     <span className="italic" style={{ color: 'var(--text-muted)' }}>
                       This entry was removed.
                     </span>
                   ) : (
-                    event.body || <span style={{ color: 'var(--text-secondary)' }}>{typeLabel}</span>
+                    eventDescription(event)
                   )}
                 </div>
                 <div className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>

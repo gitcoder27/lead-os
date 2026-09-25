@@ -12,6 +12,22 @@ describe("database migrations", () => {
     await resetDatabase();
   });
 
+  it("keeps shadow backfill event writes nullable until an explicit contract", () => {
+    const shadowDb = new Database(":memory:");
+    try {
+      migrate(shadowDb);
+      shadowDb.prepare("INSERT INTO data_migrations (name, applied_at) VALUES (?, ?)").run("p2_backfill", new Date().toISOString());
+      migrate(shadowDb);
+      const taskIdColumn = () => (shadowDb.prepare("PRAGMA table_info(task_events)").all() as { name: string; notnull: number }[]).find((column) => column.name === "task_id");
+      expect(taskIdColumn()?.notnull).toBe(0);
+      shadowDb.prepare("INSERT INTO data_migrations (name, applied_at) VALUES (?, ?)").run("p2_contract", new Date().toISOString());
+      migrate(shadowDb);
+      expect(taskIdColumn()?.notnull).toBe(1);
+    } finally {
+      shadowDb.close();
+    }
+  });
+
   it("repairs duplicate manager and tracker day rows before adding unique indexes", () => {
     const oldDb = new Database(":memory:");
     try {

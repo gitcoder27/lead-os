@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { UserRole } from "shared/types";
 import { db } from "../db/connection";
 import { runInTransaction } from "../db/transaction";
@@ -13,10 +13,13 @@ import {
   teamTrackerItems,
   teamTrackerSavedViews,
   workspaces,
+  tasks,
 } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { TaskEventsService } from "./task-events.service";
+import { TaskKeysService } from "./task-keys.service";
+import { TaskService } from "./task.service";
 
 export type DeletableAuthUserRole = Extract<UserRole, "manager" | "developer">;
 
@@ -222,6 +225,11 @@ export class AuthUserMaintenanceService {
   private async getManagerDeskPrivateDataPreview(
     user: PersistedAuthUser
   ): Promise<Omit<AuthUserDeletionPrivateDataPreview, "sessionCount" | "alertDismissalCount" | "teamTrackerSavedViewCount" | "privateTaskEventCount">> {
+    if (await new TaskKeysService().canonicalEnabled(user.workspaceId)) {
+      const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, user.workspaceId), or(eq(tasks.trackedByManagerId, user.username), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, user.username)))));
+      const links = await new TaskService().listLinks(rows.filter((row) => row.ownerType !== "developer").map((row) => row.id), user.workspaceId);
+      return { managerDeskDayCount: 0, managerDeskItemCount: rows.length, managerDeskLinkCount: links.length, managerDeskHistoryCount: 0, linkedTrackerItemCount: rows.filter((row) => row.ownerType === "developer").length };
+    }
     const dayRows = await db
       .select({ id: managerDeskDays.id })
       .from(managerDeskDays)
@@ -281,6 +289,12 @@ export class AuthUserMaintenanceService {
       return;
     }
     await this.eventsService.deletePrivateForAuthor(user.workspaceId, user.username);
+    if (await new TaskKeysService().canonicalEnabled(user.workspaceId)) {
+      const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, user.workspaceId), or(eq(tasks.trackedByManagerId, user.username), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, user.username)))));
+      await new TaskService().purge(rows.filter((row) => row.ownerType !== "developer").map((row) => row.id), user.workspaceId);
+      await db.update(tasks).set({ trackedByManagerId: null, nextAction: null, followUpAt: null, labelsJson: null }).where(and(eq(tasks.workspaceId, user.workspaceId), eq(tasks.trackedByManagerId, user.username)));
+      return;
+    }
 
     const dayRows = await db
       .select({ id: managerDeskDays.id })

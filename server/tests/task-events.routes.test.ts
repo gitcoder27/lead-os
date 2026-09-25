@@ -43,6 +43,31 @@ beforeEach(async () => {
 afterEach(() => vi.useRealTimers());
 
 describe("task event routes", () => {
+  it("serves gated canonical task mutations and protects manager fields", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    expect((await invoke(app, { method: "GET", url: "/api/tasks", headers })).status).toBe(404);
+    await db.insert(configTable).values({ key: "tasks_phase2_stage", value: "2b" });
+    const created = await invoke(app, { method: "POST", url: "/api/tasks", headers, body: { title: "Canonical", ownerType: "developer", ownerId: "dev-1", nextAction: "Private next action" } });
+    expect(created.status).toBe(201);
+    const taskKey = created.body.taskKey;
+    expect((await invoke(app, { method: "PATCH", url: `/api/tasks/${taskKey}`, headers, body: { status: "active" } })).body.status).toBe("active");
+    const other = await invoke(app, { method: "GET", url: `/api/tasks/${taskKey}/detail`, headers: { cookie: await cookie("manager-b") } });
+    expect(other.body.nextAction).toBeNull();
+    expect((await invoke(app, { method: "GET", url: `/api/tasks/${taskKey}`, headers })).body.developer.accountId).toBe("dev-1");
+    expect((await invoke(app, { method: "GET", url: "/api/tasks?view=developer", headers })).body.tasks).toHaveLength(1);
+    const developerHeaders = { cookie: await cookie("dev-user") };
+    const nativeDay = await invoke(app, { method: "GET", url: "/api/my-day/tasks?date=2026-09-24", headers: developerHeaders });
+    expect(nativeDay.status).toBe(200);
+    expect(nativeDay.body.tasks[0]).not.toHaveProperty("nextAction");
+    expect(nativeDay.body.tasks[0]).not.toHaveProperty("followUpAt");
+    expect((await invoke(app, { method: "PATCH", url: `/api/my-day/tasks/${taskKey}`, headers: developerHeaders, body: { date: "2026-09-24", nextAction: "Forbidden" } })).status).toBe(403);
+    expect((await invoke(app, { method: "PATCH", url: `/api/my-day/tasks/${taskKey}`, headers: developerHeaders, body: { date: "2026-09-24", title: "Forbidden" } })).status).toBe(403);
+    expect((await invoke(app, { method: "PATCH", url: `/api/my-day/tasks/${taskKey}`, headers: developerHeaders, body: { date: "2026-09-23", status: "done" } })).status).toBe(409);
+    expect((await invoke(app, { method: "POST", url: "/api/tasks", headers: { cookie: await cookie("dev-user") }, body: { title: "Forbidden" } })).status).toBe(403);
+    expect((await invoke(app, { method: "DELETE", url: `/api/tasks/${taskKey}`, headers })).status).toBe(200);
+    expect((await invoke(app, { method: "GET", url: `/api/tasks/${taskKey}`, headers })).status).toBe(410);
+  });
+
   it("resolves keys, keeps private events author-only, and responds 200 on replay", async () => {
     const item = await tracker.addItem("dev-1", "2026-09-24", { title: "Review" });
     const requestId = randomUUID();

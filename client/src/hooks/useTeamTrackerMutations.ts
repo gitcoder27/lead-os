@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { taskRefFor } from '@/lib/surface-tasks';
 import type {
   TrackerWorkItem,
   TrackerCheckIn,
@@ -102,13 +103,14 @@ export function useUpdateTrackerItem(date: string) {
   return useMutation({
     mutationFn: (params: {
       itemId: number;
+      taskKey?: string;
       title?: string;
       state?: TrackerItemState;
       note?: string | null;
       position?: number;
     }) => {
-      const { itemId, ...body } = params;
-      return api.patch<TrackerWorkItem>(`/team-tracker/items/${itemId}`, body);
+      const { itemId, taskKey, ...body } = params;
+      return api.patch<TrackerWorkItem>(`/team-tracker/items/${taskRefFor('tracker', itemId, taskKey)}`, body);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
@@ -125,7 +127,7 @@ export function useDeleteTrackerItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: number) =>
-      api.delete(`/team-tracker/items/${itemId}`),
+      api.delete(`/team-tracker/items/${taskRefFor('tracker', itemId)}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['manager-desk', 'task-detail'] });
@@ -140,9 +142,31 @@ export function useSetCurrentItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: number) =>
-      api.post<TrackerWorkItem>(`/team-tracker/items/${itemId}/set-current`),
+      api.post<TrackerWorkItem>(`/team-tracker/items/${taskRefFor('tracker', itemId)}/set-current`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
+      qc.invalidateQueries({ queryKey: ['manager-desk'] });
+      qc.invalidateQueries({ queryKey: ['workload'] });
+      invalidateIssueAssignments(qc, date);
+      invalidateIssueViews(qc);
+    },
+  });
+}
+
+export function useReassignTrackerItem(date: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { itemId: number; toAccountId: string }) =>
+      api.post<TrackerWorkItem>(`/team-tracker/items/${taskRefFor('tracker', params.itemId)}/reassign`, {
+        toAccountId: params.toAccountId,
+        date,
+        requestId: crypto.randomUUID(),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['team-tracker'] });
+      qc.invalidateQueries({ queryKey: ['task-events'] });
+      qc.invalidateQueries({ queryKey: ['my-day'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
       invalidateIssueAssignments(qc, date);
@@ -182,6 +206,7 @@ export function useStatusUpdate(date: string) {
       rationale?: string;
       summary?: string;
       nextFollowUpAt?: string | null;
+      taskKey?: string;
     }) => {
       const { accountId, ...body } = params;
       return api.post(`/team-tracker/${accountId}/status-update`, {

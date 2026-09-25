@@ -10,6 +10,8 @@ import type {
   DailyNoteSource,
   DailyNoteSourcesResponse,
   DailyNotesResponse,
+  TaskEvent,
+  TaskResolution,
 } from '@/types';
 
 const LIST_PAGE_SIZE = 30;
@@ -127,6 +129,67 @@ export function useCreateDailyNoteFollowUp(noteDate: string) {
       invalidateDailyNotesViews(qc);
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
       qc.invalidateQueries({ queryKey: ['today'] });
+    },
+  });
+}
+
+export function useAddDailyNoteTaskUpdate(noteDate: string) {
+  const qc = useQueryClient();
+  const authScopeKey = useAuthScopeKey();
+  const scopeAtSendRef = useRef(authScopeKey);
+  const stillCurrent = useMutationScopeGuard();
+
+  return useMutation({
+    mutationFn: (payload: {
+      taskKey: string;
+      text: string;
+      type?: 'update' | 'instruction' | 'decision';
+      visibility?: 'shared' | 'private';
+      requestId: string;
+    }) => {
+      scopeAtSendRef.current = authScopeKey;
+      return api.post<TaskEvent>(`/notes/${encodeURIComponent(noteDate)}/task-updates`, payload);
+    },
+    onSuccess: () => {
+      if (!stillCurrent(scopeAtSendRef.current)) {
+        return;
+      }
+      invalidateDailyNotesViews(qc);
+      qc.invalidateQueries({ queryKey: ['task-events'] });
+      qc.invalidateQueries({ queryKey: ['team-tracker'] });
+      qc.invalidateQueries({ queryKey: ['manager-desk'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
+    },
+  });
+}
+
+export function useCreateDailyNoteTask(noteDate: string) {
+  const qc = useQueryClient();
+  const authScopeKey = useAuthScopeKey();
+  const scopeAtSendRef = useRef(authScopeKey);
+  const stillCurrent = useMutationScopeGuard();
+
+  return useMutation({
+    mutationFn: (payload: {
+      title: string;
+      developerAccountId?: string;
+      jiraKey?: string;
+      context?: string;
+      requestId: string;
+    }) => {
+      scopeAtSendRef.current = authScopeKey;
+      return api.post<TaskResolution>(`/notes/${encodeURIComponent(noteDate)}/tasks`, payload);
+    },
+    onSuccess: () => {
+      if (!stillCurrent(scopeAtSendRef.current)) {
+        return;
+      }
+      invalidateDailyNotesViews(qc);
+      qc.invalidateQueries({ queryKey: ['team-tracker'] });
+      qc.invalidateQueries({ queryKey: ['manager-desk'] });
+      qc.invalidateQueries({ queryKey: ['my-day'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
+      qc.invalidateQueries({ queryKey: ['task-events'] });
     },
   });
 }

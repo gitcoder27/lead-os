@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
-import { CalendarClock, ChevronLeft, ChevronRight, History, Lock } from 'lucide-react';
+import { CalendarClock, ChevronLeft, ChevronRight, History, ListPlus, Lock, SquarePlus } from 'lucide-react';
 import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor } from '@/hooks/useDailyNoteEditor';
 import { isValidIsoDate } from '@/lib/view-params';
 import type { TodayActionTarget } from '@/types';
 import { NotesConflictPanel } from './NotesConflictPanel';
 import { NotesFollowUpDialog } from './NotesFollowUpDialog';
+import { NotesTaskActionDialog, type NotesTaskActionMode } from './NotesTaskActionDialog';
 
 interface NoteDocumentProps {
   date: string;
@@ -34,6 +35,8 @@ export function NoteDocument({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [taskActionOpen, setTaskActionOpen] = useState(false);
+  const [taskActionMode, setTaskActionMode] = useState<NotesTaskActionMode>('update');
   const [selectedText, setSelectedText] = useState('');
 
   const { flush } = editor;
@@ -77,13 +80,24 @@ export function NoteDocument({
     }
   };
 
+  const handleOpenTaskAction = async (mode: NotesTaskActionMode) => {
+    captureSelection();
+    const { start, end } = selectionRef.current;
+    setSelectedText(end > start ? editor.body.slice(start, end) : '');
+    const ok = await flush();
+    if (ok) {
+      setTaskActionMode(mode);
+      setTaskActionOpen(true);
+    }
+  };
+
   const heading = safeFormat(date, 'EEEE, MMMM d');
   const subline = safeFormat(date, 'yyyy');
   const isToday = date === today;
   const showCharCount = editor.body.length > CHAR_COUNT_THRESHOLD;
   const overLimit = editor.body.length > DAILY_NOTE_MAX_LENGTH;
   const conflicted = editor.saveState === 'conflict';
-  const followUpDisabled =
+  const selectionActionsDisabled =
     editor.loading || conflicted || (!editor.latest && editor.body.trim().length === 0);
 
   const saveStatus = statusLabel(editor.saveState);
@@ -245,8 +259,28 @@ export function NoteDocument({
                 type="button"
                 className="notes-followup-button"
                 onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleOpenTaskAction('update')}
+                disabled={selectionActionsDisabled}
+              >
+                <ListPlus size={12} />
+                Add as update to…
+              </button>
+              <button
+                type="button"
+                className="notes-followup-button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleOpenTaskAction('create')}
+                disabled={selectionActionsDisabled}
+              >
+                <SquarePlus size={12} />
+                Create task…
+              </button>
+              <button
+                type="button"
+                className="notes-followup-button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => void handleOpenFollowUp()}
-                disabled={followUpDisabled}
+                disabled={selectionActionsDisabled}
               >
                 <CalendarClock size={12} />
                 Create follow-up
@@ -291,6 +325,13 @@ export function NoteDocument({
         noteDate={date}
         selectedText={selectedText}
         onClose={() => setFollowUpOpen(false)}
+      />
+      <NotesTaskActionDialog
+        open={taskActionOpen}
+        mode={taskActionMode}
+        noteDate={date}
+        selectedText={selectedText}
+        onClose={() => setTaskActionOpen(false)}
       />
     </section>
   );

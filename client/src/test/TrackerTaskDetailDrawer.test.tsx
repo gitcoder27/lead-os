@@ -26,6 +26,7 @@ vi.mock('@/hooks/useTeamTrackerMutations', () => ({
     isPending: false,
   }),
   useSetCurrentItem: () => ({ mutate: mockSetCurrentItemMutate, isPending: false }),
+  useReassignTrackerItem: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/context/ToastContext', () => ({

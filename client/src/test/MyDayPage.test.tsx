@@ -78,8 +78,10 @@ vi.mock('@/hooks/useTasks', () => ({
   useTaskResolution: () => ({ data: undefined, isError: false, isLoading: false }),
   useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, isPending: false }),
   useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
-  useMyDayTaskEvents: () => ({ data: undefined }),
+  useMyDayTaskEvents: () => ({ data: { pages: [{ events: [{ id: 1, taskKey: 'T-1', type: 'update', body: 'Earlier shared progress', visibility: 'shared', author: { type: 'developer', id: 'dev-1' }, occurredAt: new Date().toISOString(), approximateTime: false }], nextCursor: null }] } }),
   useTaskEvents: () => ({ data: undefined }),
+  useRedactTaskEvent: () => ({ mutate: vi.fn() }),
+  useUpdateTaskEventVisibility: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('@/components/my-day/AddTaskForm', () => ({
@@ -219,6 +221,18 @@ describe('MyDayPage', () => {
       checkIns: [],
       isStale: false,
     };
+  });
+
+  it('opens shared activity from current and planned tasks without manager controls', () => {
+    mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Current keyed task', state: 'in_progress' });
+    mockDay.plannedItems = [createItem({ id: 102, taskKey: 'T-2', title: 'Planned keyed task' })];
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.queryByText('Earlier shared progress')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-1' }));
+    expect(screen.getByText('Earlier shared progress')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redact event' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-2' }));
+    expect(screen.getAllByText('Earlier shared progress')).toHaveLength(2);
   });
 
   it('shows synced task notes across current, planned, completed, and dropped work', () => {

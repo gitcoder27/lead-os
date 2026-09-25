@@ -130,9 +130,13 @@ export class TaskPhase1MigrationService {
         const managerId = dayByDesk.get(row.dayId)?.managerAccountId;
         if (!managerId) throw new Error(`Desk item ${row.id} has no manager day`);
         const notes = parseTaskNotes(row.contextNote!);
+        const sectionCounts = new Map<string, number>();
         for (const section of [{ date: null, body: notes.legacyBody }, ...notes.datedSections]) {
           if (!section.body) continue;
-          imports.push({ key, body: section.body, authorId: managerId, field: "desk_context_note", sourceId: row.id, sectionDate: section.date, occurredAt: section.date ? `${section.date}T12:00:00.000Z` : row.createdAt, dedupeKey: `imp:dcn:${row.id}:${section.date ?? "legacy"}` });
+          const sectionKey = section.date ?? "legacy";
+          const occurrence = (sectionCounts.get(sectionKey) ?? 0) + 1;
+          sectionCounts.set(sectionKey, occurrence);
+          imports.push({ key, body: section.body, authorId: managerId, field: "desk_context_note", sourceId: row.id, sectionDate: section.date, occurredAt: section.date ? `${section.date}T12:00:00.000Z` : row.createdAt, dedupeKey: `imp:dcn:${row.id}:${sectionKey}${occurrence > 1 ? `:${occurrence}` : ""}` });
           report.deskNoteEvents++;
         }
       }

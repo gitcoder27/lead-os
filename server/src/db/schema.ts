@@ -398,6 +398,7 @@ export const dailyNoteTaskRefs = sqliteTable("daily_note_task_refs", {
   taskId: integer("task_id"),
   relation: text("relation").notNull(),
   requestId: text("request_id"),
+  payloadHash: text("payload_hash"),
   createdAt: text("created_at").notNull(),
 }, (table) => [primaryKey({ columns: [table.noteId, table.taskKey, table.relation] })]);
 

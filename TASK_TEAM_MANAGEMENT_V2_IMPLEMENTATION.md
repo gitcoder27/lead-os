@@ -694,6 +694,8 @@ For each workspace:
 
 ### 1.6.3 Note import algorithm
 
+Implementation note (2026-09-24): repeated non-empty Desk sections for the same date use stable occurrence suffixes (`:2`, `:3`, etc.) on the import dedupe key. The first occurrence retains its original key. Source text remains unchanged.
+
 **Parser.** A server port of the client parser `client/src/components/triage/triage-notes.ts:13-104`, placed in `server/src/services/task-notes-import.ts` (the server has no `date-fns`):
 - Header regex: identical to `DATED_HEADER_PATTERN` (`triage-notes.ts:13`), i.e. `^(Jan|Feb|…|Dec) \d{1,2}, \d{4}:$`.
 - Date parse: month-name table plus `Number(day)` and `Number(year)`, validated with a round-trip through `Date.UTC`. Invalid headers fall through into the body, matching `triage-notes.ts:71-79`.
@@ -853,6 +855,8 @@ For each workspace:
   - `server/tests/team-tracker.routes.test.ts`: `created_by` recorded for manager, developer and Copilot.
 
 **Item 14: Notes → tasks**
+Implementation note (2026-09-24): task-creation receipts store a hash of the normalized title, owner, Jira key, context, and source note. Retries compare the original payload, not mutable task fields. Pre-existing receipts without a hash return `409`; use a fresh request ID for a new operation, after checking whether the original task already exists. Manager-owned task creation preserves Jira links as Desk issue links.
+
 - **Server, changed:**
   - `server/src/db/migrate.ts`
   - `server/src/services/daily-notes.service.ts` (`save` 246-321, `append` 323-417, `createFollowUpInternal` 482-555, new `addTaskUpdate` and `createTask`)
@@ -894,6 +898,66 @@ Each step ships behind the same flag and is independently revertible by turning 
 ---
 
 # PART II: PHASE 2 MIGRATION PLAN
+
+## Implementation Checkpoint (2026-10-08)
+
+**Phase 2 code work is complete.** Operational rollout (production-copy parity review, approved decisions, soaks, manual UI acceptance) remains — see "Operational gates still required" below. Everything runs behind `tasks_phase2_stage` (`2b`, `2c`, `2d`; absent and `rolled_back` use legacy paths).
+
+Implemented:
+
+- Canonical task CRUD, links, soft deletion, owner validation, creator-only developer rename, atomic single-current switching, reassignment without identity changes, and manager-private DTO fields.
+- **2c native transport**: Team Tracker, My Day, and Manager Desk responses carry canonical `tasks` payloads keyed by `T-<n>` (`SurfaceTask`/`ManagerSurfaceTask`/`DeveloperSurfaceTask` in `shared/types.ts`); legacy item arrays are emptied at the route boundary once canonical transport is active, and client hooks (`useTeamTracker`, `useMyDay`, `useManagerDesk`) map `tasks` back to the existing view models. Item-targeted mutations accept `T-<n>` refs during the dual-identity window and client hooks prefer them (`client/src/lib/surface-tasks.ts`). `TaskCompatibilityService` is retired; `task-view-models.ts` holds the pure mappers.
+- Canonical projections in `TaskService` cover board day, developer history (`day_focus`), desk live day, desk planning day, Today items, follow-ups, meetings, and per-developer active counts — batched, no all-history scans.
+- Follow-ups/Meetings read `GET /api/tasks?view=…` natively with `closedFrom`/`closedTo` ranges. Today commands operate on `taskKey`. Search/palette, workload, developer notes, check-in references, Notes sources/receipts, resets, and manager private-data purges are canonical-backed.
+- A workspace-selected 38-tool canonical Copilot registry; task writes retain confirmation metadata. Legacy tool handlers remain for earlier conversation confirmations.
+- Explicit cutover CLI with backup, two strict verification receipts, snapshot-drift refusal, unconditional legacy write-guard triggers (§2.1.3), and non-overlapping canonical IDs.
+- **Expanded strict parity (§2.2.13/B11)**: `tasks:phase2-backfill --verify --strict` now compares canonical vs legacy projections across the board, developer history days, Desk live/planning/history day views over the 15-day window, follow-ups and meetings sets, desk→task link counts, tracker jira-key links, unfilled check-in/note/follow-up references, multi-active violations, and a developer-DTO privacy check. Any diff fails strict verification and blocks cutover. One deliberate exception: history-day title/status diffs that are fully explained by a recorded task event (legacy rows show mutated current values; canonical replays point-in-time state — the §2.3.3 B9 fix) are reported as *explained drift*, informational only.
+- **Stage-transition CLI** (`tasks:stage`): `--to 2c` enforces the one-week post-2b soak from `tasks_phase2_cutover_at`; `--complete 2c` records `tasks_phase2c_completed_at` explicitly.
+- **2d contract CLI** (`tasks:contract`, dry-run by default): requires stage `2c`, `tasks_phase2c_completed_at` ≥ 14 days old, clean structural verification, no compatibility-adapter imports, and no routes reading legacy task tables. `--apply` creates a `pre-task-contract` backup, then in one transaction drops the read-only triggers, renames `team_tracker_items`/`manager_desk_items`/`manager_desk_links` to `legacy_*`, records `p2_contract`, sets `tasks_phase2_stage = "2d"` + `tasks_phase2_contracted_at`, and contracts `task_events.task_id` to NOT NULL. Idempotent; a second run reports already applied.
+- Legacy `note`/`contextNote` writes are rejected once the workspace is at stage 2d (`assertLegacyFieldsAllowed`); canonical DTOs no longer populate them.
+- `tasks:export-legacy` rollback physically drops the guard triggers before regenerating legacy rows and is refused at stage 2d (forward-fix only). Startup migrations skip the archived-table DDL once `p2_contract` is recorded and tolerate statements targeting archived tables.
+- Rollback preserves exposed IDs, note receipts, developer notes, and excludes deleted tasks; lossy fields are listed in §2.3.5.
+
+**Operational gates still required (not code work):**
+
+- Production-copy parity review and approved decisions file. Strict verification is intentionally conservative and may reject legitimate reviewed differences; do not bypass it by setting the stage flag manually.
+- Manual UI acceptance of the 2c native surfaces.
+- One-week 2b soak before `--to 2c`; two-week post-2c soak before `tasks:contract --apply`.
+- Do not insert `p2_contract` manually; the contract CLI owns it.
+
+### Cutover Procedure
+
+Keep application writers stopped from the approved backfill through cutover. Back up and rehearse on a copy first. Existing shadow backfills created before canonical ID reservation must be reviewed and rebuilt with `--resume` before cutover.
+
+```sh
+# Stage 2a: shadow backfill on a copy + strict parity verification.
+npm run tasks:phase2-backfill --workspace=server -- --dry-run --workspace default
+# Review the generated report/decisions; apply using that decisions file.
+npm run tasks:phase2-backfill --workspace=server -- --apply --workspace default --decisions /path/to/approved-decisions.json
+npm run tasks:phase2-backfill --workspace=server -- --verify --strict --workspace default
+
+# Stage 2b: write cutover (two clean verify receipts are required).
+npm run tasks:cutover --workspace=server -- --workspace default --verify
+npm run tasks:cutover --workspace=server -- --workspace default --verify
+npm run tasks:cutover --workspace=server -- --workspace default --dry-run
+npm run tasks:cutover --workspace=server -- --workspace default --apply
+
+# Rollback window (lossy per §2.3.5; refused after 2d).
+npm run tasks:export-legacy --workspace=server -- --workspace default --dry-run
+npm run tasks:export-legacy --workspace=server -- --workspace default --apply
+
+# Stage 2c: after the one-week post-cutover soak.
+npm run tasks:stage --workspace=server -- --workspace default --to 2c --dry-run
+npm run tasks:stage --workspace=server -- --workspace default --to 2c --apply
+# When every surface is verified green on native transport:
+npm run tasks:stage --workspace=server -- --workspace default --complete 2c --apply
+
+# Stage 2d: after the two-week post-2c soak.
+npm run tasks:contract --workspace=server -- --workspace default            # plan/dry-run
+npm run tasks:contract --workspace=server -- --workspace default --apply    # backup + apply
+```
+
+Every apply command creates a backup first. A changed snapshot requires a new reviewed report, explicit backfill resume, and new verification receipts. Backfill refuses to run after cutover. Rollback is lossy as described in section 2.3.5 and is refused for a contracted workspace (`stage = "2d"`).
 
 ## 2.1 Target schema
 

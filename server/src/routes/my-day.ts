@@ -5,6 +5,7 @@ import { validate } from "../middleware/validate";
 import { AuthService } from "../services/auth.service";
 import { IssueService } from "../services/issue.service";
 import { MyDayService } from "../services/my-day.service";
+import { taskCreateSchema, taskUpdateSchema, TaskService } from "../services/task.service";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
 
@@ -41,7 +42,7 @@ const addItemSchema = z.object({
 
 const updateItemSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   body: z.object({
     date: isoDateSchema,
@@ -62,7 +63,7 @@ const updateItemSchema = z.object({
 
 const deleteItemSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   query: z.object({
     date: isoDateSchema,
@@ -72,7 +73,7 @@ const deleteItemSchema = z.object({
 
 const setCurrentSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   body: z.object({
     date: isoDateSchema,
@@ -99,8 +100,20 @@ export function createMyDayRouter(
   issueService: IssueService
 ): Router {
   const router = Router();
+  const tasks = new TaskService();
+  const itemRefToId = (ref: string, workspaceId?: string) =>
+    tasks.surfaceIdForRef("team_tracker_items", ref, workspaceId);
 
   router.use(requireDeveloper(authService));
+  router.get("/tasks", validate(dateQuerySchema), async (req, res, next) => {
+    try { res.json(await myDayService.nativeTasks(req.auth!.user.developerAccountId!, req.query.date as string, req.auth!.user.workspaceId)); } catch (error) { next(error); }
+  });
+  router.post("/tasks", validate(z.object({ body: taskCreateSchema.extend({ date: isoDateSchema }), query: z.any().optional(), params: z.any().optional() })), async (req, res, next) => {
+    try { const { date, ...input } = req.body; res.status(201).json(await myDayService.mutateTask(req.auth!.user.developerAccountId!, date, input, req.auth!.user.workspaceId)); } catch (error) { next(error); }
+  });
+  router.patch("/tasks/:key", validate(z.object({ body: taskUpdateSchema.extend({ date: isoDateSchema }), query: z.any().optional(), params: z.object({ key: z.string().regex(/^[Tt]-\d{1,9}$/) }) })), async (req, res, next) => {
+    try { const { date, ...input } = req.body; res.json(await myDayService.mutateTask(req.auth!.user.developerAccountId!, date, input, req.auth!.user.workspaceId, req.params.key as string)); } catch (error) { next(error); }
+  });
 
   const taskParams = z.object({ key: z.string().trim().regex(/^[Tt]-\d{1,9}$/) });
   router.get("/tasks/:key", validate(z.object({ params: taskParams, body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
@@ -131,6 +144,12 @@ export function createMyDayRouter(
       const date = req.query.date as string;
       const accountId = req.auth!.user.developerAccountId!;
       const day = await myDayService.getMyDay(accountId, date, req.auth!.user.workspaceId);
+      if (day.taskModel === "canonical") {
+        day.currentItem = undefined;
+        day.plannedItems = [];
+        day.completedItems = [];
+        day.droppedItems = [];
+      }
       res.json(day);
     } catch (error) {
       next(error);
@@ -161,7 +180,7 @@ export function createMyDayRouter(
   router.patch("/items/:itemId", validate(updateItemSchema), async (req, res, next) => {
     try {
       const accountId = req.auth!.user.developerAccountId!;
-      const itemId = parseInt(req.params.itemId as string, 10);
+      const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
       const { date, ...updates } = req.body;
       const item = await myDayService.updateItem(accountId, itemId, date, updates, req.auth!.user.workspaceId);
       res.json(item);
@@ -173,7 +192,7 @@ export function createMyDayRouter(
   router.delete("/items/:itemId", validate(deleteItemSchema), async (req, res, next) => {
     try {
       const accountId = req.auth!.user.developerAccountId!;
-      const itemId = parseInt(req.params.itemId as string, 10);
+      const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
       await myDayService.deleteItem(accountId, itemId, req.query.date as string, req.auth!.user.workspaceId);
       res.json({ deleted: true });
     } catch (error) {
@@ -187,7 +206,7 @@ export function createMyDayRouter(
     async (req, res, next) => {
       try {
         const accountId = req.auth!.user.developerAccountId!;
-        const itemId = parseInt(req.params.itemId as string, 10);
+        const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
         const item = await myDayService.setCurrentItem(accountId, itemId, req.body.date, req.auth!.user.workspaceId);
         res.json(item);
       } catch (error) {

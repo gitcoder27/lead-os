@@ -6,6 +6,47 @@ export async function resetDatabase(): Promise<void> {
   // previous test does not contract task_events.task_id to NOT NULL.
   const hasMigrations = rawDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='data_migrations'").get();
   if (hasMigrations) rawDb.exec("DELETE FROM data_migrations;");
+  // Recover from contract tests: drop leftover write-guard triggers and
+  // restore legacy_* archive renames before migrate() recreates the tables.
+  for (const table of ["team_tracker_items", "manager_desk_items", "manager_desk_links"]) {
+    for (const op of ["insert", "update", "delete"]) {
+      rawDb.exec(`DROP TRIGGER IF EXISTS legacy_ro_${table}_${op}`);
+    }
+    if (rawDb.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='legacy_${table}'`).get()) {
+      rawDb.exec(`DROP TABLE IF EXISTS ${table}`);
+      rawDb.exec(`ALTER TABLE legacy_${table} RENAME TO ${table}`);
+    }
+  }
+  // A contract test may leave task_events contracted (task_id NOT NULL);
+  // rebuild it back to the pre-2d nullable shape once markers are cleared.
+  const taskEventCols = rawDb.prepare("PRAGMA table_info(task_events)").all() as { name: string; notnull: number }[];
+  if (taskEventCols.length && taskEventCols.find((c) => c.name === "task_id")?.notnull) {
+    rawDb.exec(`
+      CREATE TABLE __task_events_expand (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id TEXT NOT NULL DEFAULT 'default',
+        task_key     TEXT NOT NULL,
+        task_id      INTEGER REFERENCES tasks(id),
+        type         TEXT NOT NULL,
+        body         TEXT,
+        visibility   TEXT NOT NULL CHECK (visibility IN ('shared', 'private')),
+        author_type  TEXT NOT NULL CHECK (author_type IN ('manager', 'developer', 'copilot', 'system')),
+        author_id    TEXT,
+        meta_json    TEXT,
+        source_table TEXT,
+        source_id    INTEGER,
+        dedupe_key   TEXT,
+        occurred_at  TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        redacted_at  TEXT,
+        redacted_by  TEXT
+      );
+      INSERT INTO __task_events_expand (id, workspace_id, task_key, task_id, type, body, visibility, author_type, author_id, meta_json, source_table, source_id, dedupe_key, occurred_at, created_at, redacted_at, redacted_by)
+        SELECT id, workspace_id, task_key, task_id, type, body, visibility, author_type, author_id, meta_json, source_table, source_id, dedupe_key, occurred_at, created_at, redacted_at, redacted_by FROM task_events;
+      DROP TABLE task_events;
+      ALTER TABLE __task_events_expand RENAME TO task_events;
+    `);
+  }
   rawDb.exec(`
     DROP TABLE IF EXISTS manager_desk_item_history;
   `);

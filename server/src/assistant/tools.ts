@@ -19,6 +19,8 @@ import type { WorkSavedViewsService } from "../services/work-saved-views.service
 import type { WorkloadService } from "../services/workload.service";
 import type { SyncEngine } from "../sync/engine";
 import type { LlmToolDefinition } from "./llm-client";
+import { canonicalTaskTools } from "./task-tools";
+import { TaskService } from "../services/task.service";
 
 export type AssistantSyncEngine = Pick<
   SyncEngine,
@@ -173,7 +175,7 @@ function dateProperty(description: string): Record<string, unknown> {
   return { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description };
 }
 
-export function createAssistantTools(): AssistantToolDefinition[] {
+export function createAssistantTools(canonical = false): AssistantToolDefinition[] {
   const taskKeys = new TaskKeysService();
   const eventsService = new TaskEventsService(taskKeys);
   const readTools: AssistantToolDefinition[] = [
@@ -186,7 +188,8 @@ export function createAssistantTools(): AssistantToolDefinition[] {
         const args = parseArgs(z.object({ taskKey: z.string().regex(/^[Tt]-\d{1,9}$/) }), rawArgs);
         const task = await taskKeys.resolveTask(ctx.workspaceId, args.taskKey);
         const timeline = await eventsService.list(task.taskKey, { kind: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }, { limit: 10 });
-        return { result: compact({ task, events: timeline.events }), summary: `Loaded ${task.taskKey}` };
+        const native = await taskKeys.canonicalEnabled(ctx.workspaceId) ? await new TaskService().toDto(await new TaskService().requireTask(task.taskKey, { type: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }, true), { type: "manager", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId }) : task;
+        return { result: compact({ task: native, events: timeline.events }), summary: `Loaded ${task.taskKey}` };
       },
     },
     {
@@ -1429,7 +1432,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
       summarize: (args) => `Delete tracker item #${String(args.itemId ?? "?")} permanently`,
       execute: async (rawArgs, ctx) => {
         const args = parseArgs(z.object({ itemId: z.number().int().positive() }), rawArgs);
-        await ctx.services.teamTrackerService.deleteItem(args.itemId, undefined, ctx.workspaceId);
+        await ctx.services.teamTrackerService.deleteItem(args.itemId, undefined, ctx.workspaceId, { type: "copilot", accountId: ctx.managerAccountId });
         return { result: { ok: true, itemId: args.itemId }, summary: `Deleted tracker item #${args.itemId}` };
       },
     },
@@ -1610,6 +1613,7 @@ export function createAssistantTools(): AssistantToolDefinition[] {
                 args.toDate,
                 {
                   itemIds: args.itemIds,
+                  actor: { type: "copilot", accountId: ctx.managerAccountId },
                   carryManagerDeskItems: (params) =>
                     ctx.services.managerDeskService.moveLinkedItemsToDate(
                       ctx.managerAccountId,
@@ -1921,7 +1925,10 @@ export function createAssistantTools(): AssistantToolDefinition[] {
     },
   ];
 
-  return [...readTools, ...writeTools];
+  const legacy = [...readTools, ...writeTools];
+  if (!canonical) return legacy;
+  const retired = new Set(["list_desk_items", "get_desk_item_detail", "get_tracker_item_detail", "preview_carry_forward", "create_desk_item", "assign_tracker_task", "update_desk_item", "update_tracker_item", "delete_desk_item", "delete_tracker_item", "link_desk_item", "unlink_desk_item", "promote_tracker_item", "cancel_delegated_task", "carry_forward"]);
+  return [...legacy.filter((tool) => !retired.has(tool.name)), ...canonicalTaskTools()];
 }
 
 export function toLlmToolDefinitions(tools: AssistantToolDefinition[]): LlmToolDefinition[] {

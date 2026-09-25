@@ -1,3 +1,4 @@
+vi.mock("../src/services/task-keys.service", () => ({ TaskKeysService: class { async canonicalEnabled() { return false; } } }));
 import { describe, expect, it, vi } from "vitest";
 import { WorkloadService } from "../src/services/workload.service";
 

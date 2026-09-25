@@ -3,6 +3,7 @@ import { Reorder } from 'framer-motion';
 import type { TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from '@/components/team-tracker/TrackerItemRow';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
+import { TaskTimelineDisclosure } from '@/components/tasks/TaskTimeline';
 
 interface PlannedQueueProps {
   viewDate?: string;
@@ -104,6 +105,7 @@ export function PlannedQueue({
             }}
           >
             <TrackerItemRow item={item} viewDate={viewDate} readOnly />
+            {item.taskKey && <TaskTimelineDisclosure taskKey={item.taskKey} mode="developer" />}
           </div>
         ))}
       </div>
@@ -144,6 +146,7 @@ export function PlannedQueue({
               ) : undefined
             }
           />
+          {item.taskKey && <TaskTimelineDisclosure taskKey={item.taskKey} mode="developer" />}
         </Reorder.Item>
       ))}
     </Reorder.Group>

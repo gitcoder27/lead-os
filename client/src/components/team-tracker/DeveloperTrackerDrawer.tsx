@@ -326,11 +326,12 @@ export function DeveloperTrackerDrawer({
           >
             <DrawerHeader
               day={day}
+              date={date}
+              tasks={checkInTasks}
               loadLabel={loadLabel}
               isOverCapacity={isOverCapacity}
               readOnly={readOnly}
               onClose={onClose}
-              onUpdateDay={onUpdateDay}
               onMarkInactive={onMarkInactive}
             />
 

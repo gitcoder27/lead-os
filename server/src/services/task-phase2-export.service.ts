@@ -1,7 +1,10 @@
-import { and, eq } from "drizzle-orm";
-import { db } from "../db/connection";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
+import { db, rawDb } from "../db/connection";
 import {
   configTable,
+  dailyNoteFollowUps,
+  dailyNoteTaskRefs,
+  developerNotes,
   dayFocus,
   managerDeskDays,
   managerDeskItems,
@@ -46,6 +49,7 @@ interface PlannedDeskRow {
 }
 
 interface PlannedTrackerRow {
+  trackerItemId?: number;
   taskKey: string;
   dayId: number;
   managerDeskItemId: number | null;
@@ -89,7 +93,7 @@ export class TaskPhase2ExportService {
    */
   async plan(workspaceId: string) {
     const scope = normalizeWorkspaceId(workspaceId);
-    const allTasks = await db.select().from(tasks).where(eq(tasks.workspaceId, scope));
+    const allTasks = await db.select().from(tasks).where(and(eq(tasks.workspaceId, scope), isNull(tasks.deletedAt)));
     const links = await db.select().from(taskLinks).where(eq(taskLinks.workspaceId, scope));
     const focus = await db.select().from(dayFocus).where(eq(dayFocus.workspaceId, scope));
     const legacyMap = await db.select().from(taskLegacyMap).where(eq(taskLegacyMap.workspaceId, scope));
@@ -127,7 +131,7 @@ export class TaskPhase2ExportService {
           createdById: task.createdById,
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
-          deskItemId: mappedDesk?.sourceId,
+          deskItemId: mappedDesk?.sourceId ?? task.id,
         });
         if (mappedDesk) deskIdByTask.set(task.id, mappedDesk.sourceId);
       }
@@ -135,6 +139,7 @@ export class TaskPhase2ExportService {
         const jira = links.filter((link) => link.taskId === task.id && link.kind === "jira");
         const primary = jira.find((link) => link.role === "primary") ?? jira[0];
         trackerRows.push({
+          trackerItemId: legacyMap.find((row) => row.taskId === task.id && row.sourceTable === "team_tracker_items" && (row.role === "canonical" || row.role === "mirror"))?.sourceId ?? task.id,
           taskKey: task.taskKey,
           dayId: -1,
           managerDeskItemId: wantsDesk ? (mappedDesk?.sourceId ?? -1) : null,
@@ -163,12 +168,21 @@ export class TaskPhase2ExportService {
   /** Apply: wipe the legacy rows for the workspace and regenerate from tasks. */
   async apply(workspaceId: string): Promise<{ deskRows: number; trackerRows: number; links: number }> {
     const scope = normalizeWorkspaceId(workspaceId);
-    const planned = await this.plan(scope);
     const today = todayIsoDate();
     return runInTransaction(async () => {
+      const stage = (await db.select().from(configTable).where(and(eq(configTable.workspaceId, scope), eq(configTable.key, "tasks_phase2_stage"))).limit(1))[0]?.value;
+      if (stage === "2d") throw new Error("Contracted workspaces require a forward fix");
+      const planned = await this.plan(scope);
+      // §2.3.5: rollback physically drops the legacy read-only guards before
+      // regenerating legacy rows — it does not just disable them via stage.
+      for (const table of ["team_tracker_items", "manager_desk_items", "manager_desk_links"] as const) {
+        for (const operation of ["insert", "update", "delete"] as const) {
+          rawDb.exec(`DROP TRIGGER IF EXISTS legacy_ro_${table}_${operation}`);
+        }
+      }
+      await db.insert(configTable).values({ workspaceId: scope, key: "tasks_phase2_stage", value: "rolled_back" }).onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: "rolled_back" } });
       await db.delete(managerDeskLinks).where(eq(managerDeskLinks.workspaceId, scope));
       await db.delete(teamTrackerItems).where(eq(teamTrackerItems.workspaceId, scope));
-      await db.delete(managerDeskItems).where(eq(managerDeskItems.workspaceId, scope));
 
       const deskDayIds = new Map<string, number>();
       const trackerDayIds = new Map<string, number>();
@@ -202,6 +216,7 @@ export class TaskPhase2ExportService {
         const manager = task.trackedByManagerId ?? task.ownerId ?? "unknown";
         const dayId = await ensureDeskDay(task.scheduledOn ?? today, manager);
         const inserted = await db.insert(managerDeskItems).values({
+          id: row.deskItemId,
           workspaceId: scope, dayId, taskKey: row.taskKey,
           createdByType: row.createdByType, createdById: row.createdById,
           assigneeDeveloperAccountId: row.assigneeDeveloperAccountId,
@@ -209,9 +224,25 @@ export class TaskPhase2ExportService {
           participants: row.participants, nextAction: row.nextAction, outcome: row.outcome,
           plannedStartAt: row.plannedStartAt, plannedEndAt: row.plannedEndAt, followUpAt: row.followUpAt,
           completedAt: row.completedAt, createdAt: row.createdAt, updatedAt: row.updatedAt,
-        }).returning({ id: managerDeskItems.id });
+        }).onConflictDoUpdate({ target: managerDeskItems.id, set: {
+          dayId, taskKey: row.taskKey, title: row.title, kind: row.kind, category: row.category,
+          status: row.status, priority: row.priority, assigneeDeveloperAccountId: row.assigneeDeveloperAccountId,
+          participants: row.participants, nextAction: row.nextAction, outcome: row.outcome,
+          plannedStartAt: row.plannedStartAt, plannedEndAt: row.plannedEndAt, followUpAt: row.followUpAt,
+          completedAt: row.completedAt, createdByType: row.createdByType, createdById: row.createdById,
+          createdAt: row.createdAt, updatedAt: row.updatedAt,
+        } }).returning({ id: managerDeskItems.id });
         deskIdByKey.set(row.taskKey, inserted[0]!.id);
+        await db.update(dailyNoteFollowUps).set({ itemId: inserted[0]!.id }).where(and(eq(dailyNoteFollowUps.workspaceId, scope), eq(dailyNoteFollowUps.taskId, task.id)));
+        const references = await db.select().from(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, scope), eq(dailyNoteTaskRefs.taskId, task.id), eq(dailyNoteTaskRefs.relation, "created_from")));
+        for (const ref of references) {
+          if (!ref.requestId || !ref.payloadHash) continue;
+          await db.insert(dailyNoteFollowUps).values({ workspaceId: scope, managerAccountId: ref.managerAccountId, noteId: ref.noteId, itemId: inserted[0]!.id, taskId: task.id,
+            requestId: ref.requestId, payloadHash: ref.payloadHash, createdAt: ref.createdAt }).onConflictDoNothing();
+        }
       }
+      const retainedDeskIds = [...deskIdByKey.values()];
+      await db.delete(managerDeskItems).where(and(eq(managerDeskItems.workspaceId, scope), retainedDeskIds.length ? notInArray(managerDeskItems.id, retainedDeskIds) : undefined));
       for (const row of planned.trackerRows) {
         const task = taskByKey.get(row.taskKey)!;
         const ownerId = task.ownerId ?? "unknown";
@@ -220,6 +251,7 @@ export class TaskPhase2ExportService {
         ))).map((r) => r.date);
         const dayId = await ensureTrackerDay(focusDates.sort().at(-1) ?? today, ownerId);
         await db.insert(teamTrackerItems).values({
+          id: row.trackerItemId,
           workspaceId: scope, dayId, taskKey: row.taskKey,
           managerDeskItemId: deskIdByKey.get(row.taskKey) ?? null,
           itemType: row.jiraKey ? "jira" : "custom",
@@ -241,6 +273,11 @@ export class TaskPhase2ExportService {
           externalLabel: link.linkType === "external_group" ? link.ref : null,
           createdAt: today,
         });
+      }
+      const notes = await db.select().from(developerNotes).where(eq(developerNotes.workspaceId, scope));
+      for (const note of notes) {
+        const dayId = await ensureTrackerDay(today, note.developerAccountId);
+        await db.update(teamTrackerDays).set({ managerNotes: note.body, updatedAt: note.updatedAt }).where(eq(teamTrackerDays.id, dayId));
       }
       await db.insert(configTable).values({ workspaceId: scope, key: "tasks_phase2_stage", value: "rolled_back" })
         .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: "rolled_back" } });

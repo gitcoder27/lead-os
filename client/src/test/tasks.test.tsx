@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { TaskEvent } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { TaskPicker, parseTaskKeys, taskKeysForSubmit, tasksFromItems } from '@/components/tasks/TaskPicker';
-import { TaskTimeline } from '@/components/tasks/TaskTimeline';
+import { TaskTimeline, TaskTimelineDisclosure } from '@/components/tasks/TaskTimeline';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import type { TrackerWorkItem } from '@/types';
 
@@ -234,6 +234,43 @@ describe('TaskTimeline', () => {
     mockRedactMutate.mockReset();
   });
 
+  it('renders system changes and references without exposing redacted metadata', () => {
+    const changes: Partial<TaskEvent>[] = [
+      { type: 'created', meta: { title: 'Investigate API', ownerId: 'dev-1' } },
+      { type: 'status', meta: { from: 'planned', to: 'in_progress', reason: 'user' } },
+      { type: 'assign', meta: { fromId: 'dev-1', toId: 'dev-2', stateReset: { from: 'in_progress', to: 'planned' } } },
+      { type: 'focus', meta: { action: 'set_current', date: '2026-09-24' } },
+      { type: 'title', meta: { from: 'Old title', to: 'New title' } },
+      { type: 'schedule', meta: { field: 'follow_up_at', from: null, to: '2026-09-25' } },
+      { type: 'link', meta: { action: 'added', kind: 'jira', ref: 'APP-1', role: 'primary' } },
+      { type: 'checkin_ref', meta: { date: '2026-09-24', developerAccountId: 'dev-1', excerpt: 'Ready for review' } },
+      { type: 'note_ref', meta: { noteDate: '2026-09-23', relation: 'created_from', excerpt: 'Private context' }, visibility: 'private' },
+      { type: 'merged', meta: { mergedKey: 'T-9', survivorKey: 'T-5', decisionRef: 'M-1' } },
+      { type: 'title', redacted: true, meta: { from: 'Hidden old title', to: 'Hidden new title' } },
+    ];
+    mockManagerEvents = { pages: [{ events: changes.map((event, index) => makeEvent({ id: index + 1, body: null, author: { type: 'system', id: 'mgr-1' }, ...event })), nextCursor: null }] };
+    render(<TaskTimeline taskKey="T-5" mode="manager" />, { wrapper: Wrapper });
+    for (const description of [
+      'Created Investigate API for dev-1', 'planned → in progress (user)',
+      'dev-1 → dev-2 (in progress → planned)', 'Set as current work on 2026-09-24',
+      'Old title → New title', 'follow up at: Not set → 2026-09-25',
+      'Added jira: APP-1 (primary)', 'Check-in on 2026-09-24 for dev-1: Ready for review',
+      'Created from note on 2026-09-23: Private context', 'T-9 → T-5 (M-1)',
+    ]) expect(screen.getByText(description)).toBeInTheDocument();
+    expect(screen.queryByText(/Hidden old title/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/System \(mgr-1\)/).length).toBeGreaterThan(0);
+  });
+
+  it('offers redaction for own Copilot and system events within the correction window', () => {
+    mockManagerEvents = { pages: [{ events: [
+      makeEvent({ id: 1, author: { type: 'copilot', id: 'mgr-1' } }),
+      makeEvent({ id: 2, type: 'note_ref', author: { type: 'system', id: 'mgr-1' } }),
+      makeEvent({ id: 3, author: { type: 'copilot', id: 'mgr-1' }, occurredAt: new Date(Date.now() - 31 * 86400000).toISOString() }),
+    ], nextCursor: null }] };
+    render(<TaskTimeline taskKey="T-5" mode="manager" />, { wrapper: Wrapper });
+    expect(screen.getAllByRole('button', { name: 'Redact event' })).toHaveLength(2);
+  });
+
   it('renders events with type labels, privacy badge, and redacted placeholder', () => {
     mockManagerEvents = {
       pages: [
@@ -301,6 +338,19 @@ describe('TaskTimeline', () => {
     expect(screen.getByText('Dev-visible update')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /make event private/i })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Redact event' })).toBeNull();
+  });
+
+  it('loads developer activity on expansion and uses only the developer feed', () => {
+    mockManagerEvents = { pages: [{ events: [makeEvent({ body: 'Manager-only content' })], nextCursor: null }] };
+    mockMyDayEvents = { pages: [{ events: [makeEvent({ body: 'Earlier shared update' })], nextCursor: null }] };
+    render(<TaskTimelineDisclosure taskKey="T-5" mode="developer" />, { wrapper: Wrapper });
+    expect(screen.queryByText('Earlier shared update')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-5' }));
+    expect(screen.getByText('Earlier shared update')).toBeInTheDocument();
+    expect(screen.queryByText('Manager-only content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redact event' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-5' }));
+    expect(screen.queryByText('Earlier shared update')).not.toBeInTheDocument();
   });
 
   it('shows the empty label when there are no events', () => {

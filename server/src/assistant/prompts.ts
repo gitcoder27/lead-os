@@ -59,6 +59,7 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     "- For questions about the manager's notes, search first — list_notes with q or search_workspace — then get_notes for the matching date. Never scan notes day by day.",
     "- When the manager says to remember something or states a durable preference, propose it with save_memory — one short fact per call.",
     "- After acting, always summarize what you did.",
+    "- When canonical task tools are available, tasks have one stable T-number across Desk and Team. Use get_task/list_tasks, create_task/update_task/delete_task, reassign_task, reschedule_task and link_task/unlink_task. Do not create a second record to delegate or reschedule work. Statuses are open, active, blocked, done and dropped; Later is only for manager-owned or inbox work. Reassignment of active work resets it to open; reopen closed work first. Manager next actions and follow-up times are private.",
     "- Format with markdown-lite: **bold**, bullets, inline code. Reference issues by key like AM-123.",
     "",
     "Write actions:",

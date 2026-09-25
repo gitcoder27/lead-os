@@ -3,15 +3,19 @@ import { beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import { invoke } from "./helpers/http";
 import { db, resetDatabase } from "./helpers/db";
-import { dailyNotes, developers } from "../src/db/schema";
+import { configTable, dailyNotes, developers } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { createNotesRouter } from "../src/routes/notes";
 import { DailyNotesService } from "../src/services/daily-notes.service";
+import { TaskEventsService } from "../src/services/task-events.service";
+import { TeamTrackerService } from "../src/services/team-tracker.service";
 
 const authService = new AuthService();
 const service = new DailyNotesService();
+const trackerService = new TeamTrackerService();
+const eventsService = new TaskEventsService();
 
 function createTestApp() {
   const app = express();
@@ -331,5 +335,201 @@ describe("notes routes validation", () => {
 
     const list = await invoke(app, { method: "GET", url: "/api/notes", headers: { cookie: otherCookie } });
     expect(list.body.notes).toEqual([]);
+  });
+});
+
+describe("notes task routes", () => {
+  async function enableTaskKeys() {
+    await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+  }
+
+  async function managerSession() {
+    const { sessionId, user } = await authService.authenticate("manager", "secret123");
+    return { cookie: serializeSessionCookie(sessionId, authService.sessionMaxAgeSeconds), accountId: user.accountId };
+  }
+
+  async function createNote(cookie: string, body = "Standup scratchpad") {
+    const res = await invoke(createTestApp(), {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body, revision: 0 },
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+  }
+
+  it("POST /api/notes/:date/task-updates appends an event and is idempotent", async () => {
+    await enableTaskKeys();
+    const { cookie, accountId } = await managerSession();
+    const item = await trackerService.addItem("dev-1", DATE, { title: "Queue review" });
+    await createNote(cookie);
+    const app = createTestApp();
+    const requestId = randomUUID();
+
+    const res = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: item.taskKey, text: "Selected excerpt", type: "instruction", visibility: "shared", requestId },
+      headers: { cookie },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      taskKey: item.taskKey,
+      type: "instruction",
+      body: "Selected excerpt",
+      visibility: "shared",
+      author: { type: "manager", id: accountId },
+    });
+
+    const replay = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: item.taskKey, text: "Selected excerpt", type: "instruction", visibility: "shared", requestId },
+      headers: { cookie },
+    });
+    expect(replay.status).toBe(201);
+    expect(replay.body.id).toBe(res.body.id);
+
+    const events = await eventsService.list(item.taskKey!, { kind: "manager", accountId });
+    expect(events.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining(["instruction", "note_ref", "created"])
+    );
+  });
+
+  it("POST /api/notes/:date/task-updates rejects a reused requestId with a different payload", async () => {
+    await enableTaskKeys();
+    const { cookie } = await managerSession();
+    const item = await trackerService.addItem("dev-1", DATE, { title: "Queue review" });
+    await createNote(cookie);
+    const app = createTestApp();
+    const requestId = randomUUID();
+
+    const first = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: item.taskKey, text: "First", requestId },
+      headers: { cookie },
+    });
+    expect(first.status).toBe(201);
+
+    const conflict = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: item.taskKey, text: "Different", requestId },
+      headers: { cookie },
+    });
+    expect(conflict.status).toBe(409);
+  });
+
+  it("POST /api/notes/:date/task-updates returns 404 without a note or a real task", async () => {
+    await enableTaskKeys();
+    const { cookie } = await managerSession();
+    const app = createTestApp();
+
+    const noNote = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: "T-1", text: "x", requestId: randomUUID() },
+      headers: { cookie },
+    });
+    expect(noNote.status).toBe(404);
+
+    await createNote(cookie);
+    const unknownTask = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: "T-999", text: "x", requestId: randomUUID() },
+      headers: { cookie },
+    });
+    expect(unknownTask.status).toBe(404);
+  });
+
+  it("POST /api/notes/:date/tasks creates a developer task and is idempotent", async () => {
+    await enableTaskKeys();
+    const { cookie, accountId } = await managerSession();
+    await createNote(cookie);
+    const app = createTestApp();
+    const requestId = randomUUID();
+
+    const res = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Follow up on blocked review", developerAccountId: "dev-1", context: "From notes", requestId },
+      headers: { cookie },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      title: "Follow up on blocked review",
+      developer: expect.objectContaining({ accountId: "dev-1" }),
+    });
+    expect(res.body.taskKey).toMatch(/^T-\d+$/);
+
+    const replay = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Follow up on blocked review", developerAccountId: "dev-1", context: "From notes", requestId },
+      headers: { cookie },
+    });
+    expect(replay.status).toBe(201);
+    expect(replay.body.taskKey).toBe(res.body.taskKey);
+
+    const events = await eventsService.list(res.body.taskKey, { kind: "manager", accountId });
+    expect(events.events.map((event) => event.type)).toEqual(
+      expect.arrayContaining(["created", "update", "note_ref"])
+    );
+  });
+
+  it("POST /api/notes/:date/tasks returns 404 without a note and 409 on requestId reuse with a different payload", async () => {
+    await enableTaskKeys();
+    const { cookie } = await managerSession();
+    const app = createTestApp();
+    const requestId = randomUUID();
+
+    const noNote = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Task", requestId },
+      headers: { cookie },
+    });
+    expect(noNote.status).toBe(404);
+
+    await createNote(cookie);
+    const first = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Task", requestId },
+      headers: { cookie },
+    });
+    expect(first.status).toBe(201);
+
+    const conflict = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Different title", requestId },
+      headers: { cookie },
+    });
+    expect(conflict.status).toBe(409);
+  });
+
+  it("returns 404 for task routes when the phase 1 flag is off", async () => {
+    const { cookie } = await managerSession();
+    await createNote(cookie);
+    const app = createTestApp();
+
+    const update = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/task-updates`,
+      body: { taskKey: "T-1", text: "x", requestId: randomUUID() },
+      headers: { cookie },
+    });
+    expect(update.status).toBe(404);
+
+    const create = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/tasks`,
+      body: { title: "Task", requestId: randomUUID() },
+      headers: { cookie },
+    });
+    expect(create.status).toBe(404);
   });
 });

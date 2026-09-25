@@ -5,6 +5,7 @@ import { runInTransaction } from "../src/db/transaction";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
+import { ManagerDeskService } from "../src/services/manager-desk.service";
 
 const keys = new TaskKeysService();
 const events = new TaskEventsService(keys);
@@ -16,6 +17,45 @@ beforeEach(async () => {
 });
 
 describe("task keys and events", () => {
+  it("retains the initiating actor on focus, demotion, deletion, and mirror events", async () => {
+    const tracker = new TeamTrackerService();
+    const desk = new ManagerDeskService(tracker);
+    const manager = { type: "manager" as const, accountId: "manager-a" };
+    const developer = { type: "developer" as const, accountId: "dev-1" };
+    const first = await tracker.addItem("dev-1", "2026-09-24", { title: "First", actor: manager });
+    const second = await tracker.addItem("dev-1", "2026-09-24", { title: "Second", actor: manager });
+    await tracker.setCurrentItem(first.id, undefined, "default", manager);
+    await tracker.updateItem(second.id, { state: "in_progress" }, "default", developer);
+    const firstEvents = (await events.list(first.taskKey!, { kind: "manager", accountId: "manager-a" })).events;
+    expect(firstEvents.filter((event) => event.type === "focus").map((event) => event.author.id)).toEqual(["dev-1", "manager-a"]);
+    await tracker.carryForward("2026-09-24", "2026-09-25", { itemIds: [first.id], actor: manager });
+    expect((await events.list(first.taskKey!, { kind: "manager", accountId: "manager-a" })).events[0]).toMatchObject({ type: "schedule", author: { type: "system", id: "manager-a" } });
+    await tracker.deleteItem(second.id, undefined, "default", developer);
+    expect((await events.list(second.taskKey!, { kind: "manager", accountId: "manager-a" })).events[0]).toMatchObject({ type: "status", author: { type: "system", id: "dev-1" }, meta: { to: "deleted" } });
+    const delegated = await desk.createItem("manager-a", { date: "2026-09-24", title: "Delegated", assigneeDeveloperAccountId: "dev-1", actor: manager });
+    await desk.updateItem("manager-a", delegated.id, { assigneeDeveloperAccountId: "dev-2", title: "Renamed" });
+    await desk.cancelDelegatedTask("manager-a", delegated.id);
+    const mirroredEvents = (await events.list(delegated.taskKey!, { kind: "manager", accountId: "manager-a" })).events;
+    expect(mirroredEvents.every((event) => event.author.id === "manager-a")).toBe(true);
+    expect(mirroredEvents).toContainEqual(expect.objectContaining({ type: "status", meta: expect.objectContaining({ domain: "tracker_state", to: "dropped" }) }));
+  });
+
+  it("lets managers redact their own Copilot updates and note references, but not another actor's events", async () => {
+    const key = await runInTransaction(async () => keys.allocate("default"));
+    const copilot = await events.append({ taskKey: key, type: "update", body: "Remove this", meta: { via: "copilot" } }, { type: "copilot", accountId: "manager-a" });
+    const note = await events.append({ taskKey: key, type: "note_ref", body: null, meta: { noteId: 1, noteDate: "2026-09-24", relation: "mentioned", excerpt: "Private excerpt" } }, { type: "system", accountId: "manager-a" });
+    await expect(events.redact(key, copilot.id, "manager-b")).rejects.toMatchObject({ status: 403 });
+    const old = await events.append({ taskKey: key, type: "update", body: "Old", meta: { via: "copilot" }, occurredAt: new Date(Date.now() - 31 * 86400000).toISOString() }, { type: "copilot", accountId: "manager-a" });
+    await expect(events.redact(key, old.id, "manager-a")).rejects.toMatchObject({ status: 403 });
+    for (const event of [copilot, note]) {
+      await events.redact(key, event.id, "manager-a");
+      const redacted = await events.get(event.id, { kind: "manager", accountId: "manager-a" });
+      expect(redacted.redacted).toBe(true);
+      expect(redacted).not.toHaveProperty("body");
+      expect(redacted).not.toHaveProperty("meta");
+    }
+  });
+
   it("allocates monotonically inside transactions and resolves case-insensitive aliases", async () => {
     expect(() => keys.allocate("default")).toThrow("transaction");
     expect(await runInTransaction(async () => keys.allocate("default"))).toBe("T-1");

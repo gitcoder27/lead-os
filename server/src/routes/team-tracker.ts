@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 import { ManagerDeskService } from "../services/manager-desk.service";
+import { TaskService } from "../services/task.service";
 import { TeamTrackerService } from "../services/team-tracker.service";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
@@ -160,9 +161,11 @@ const issueAssignmentSchema = z.object({
   body: z.any().optional(),
 });
 
+const itemRefSchema = z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key");
+
 const updateItemSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: itemRefSchema,
   }),
   body: z.object({
     title: z.string().trim().min(1).max(500).optional(),
@@ -174,14 +177,14 @@ const updateItemSchema = z.object({
 });
 
 const reassignItemSchema = z.object({
-  params: z.object({ itemId: z.string().regex(/^\d+$/) }),
+  params: z.object({ itemId: itemRefSchema }),
   body: z.object({ toAccountId: z.string().min(1), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), requestId: z.string().uuid() }),
   query: z.any().optional(),
 });
 
 const deleteItemSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: itemRefSchema,
   }),
   body: z.any().optional(),
   query: z.any().optional(),
@@ -189,7 +192,7 @@ const deleteItemSchema = z.object({
 
 const setCurrentSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: itemRefSchema,
   }),
   body: z.object({
     ifNoCurrent: z.boolean().optional(),
@@ -251,6 +254,9 @@ export function createTeamTrackerRouter(
   managerDeskService?: ManagerDeskService
 ): Router {
   const router = Router();
+  const tasks = new TaskService();
+  const itemRefToId = (ref: string, workspaceId?: string) =>
+    tasks.surfaceIdForRef("team_tracker_items", ref, workspaceId);
 
   // GET /api/team-tracker?date=YYYY-MM-DD
   router.get("/", validate(dateQuerySchema), async (req, res, next) => {
@@ -290,7 +296,22 @@ export function createTeamTrackerRouter(
             : undefined,
         },
       });
-      res.json(board);
+      // Phase 2c: canonical transport empties the legacy per-day item arrays;
+      // canonical surface tasks ride `developers[].tasks`.
+      res.json(
+        board.taskModel === "canonical"
+          ? {
+              ...board,
+              developers: board.developers.map((day) => ({
+                ...day,
+                currentItem: undefined,
+                plannedItems: [],
+                completedItems: [],
+                droppedItems: [],
+              })),
+            }
+          : board
+      );
     } catch (error) {
       next(error);
     }
@@ -424,7 +445,7 @@ export function createTeamTrackerRouter(
     validate(updateItemSchema),
     async (req, res, next) => {
       try {
-        const itemId = parseInt(req.params.itemId as string, 10);
+        const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
         const item = await trackerService.updateItem(itemId, req.body, req.auth!.user.workspaceId, { type: "manager", accountId: req.auth!.user.accountId });
         res.json(item);
       } catch (error) {
@@ -435,7 +456,7 @@ export function createTeamTrackerRouter(
 
   router.post("/items/:itemId/reassign", validate(reassignItemSchema), async (req, res, next) => {
     try {
-      res.json(await trackerService.reassignItem(Number(req.params.itemId), req.body.toAccountId, req.body.date, req.body.requestId, req.auth!.user.workspaceId, req.auth!.user.accountId));
+      res.json(await trackerService.reassignItem(await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId), req.body.toAccountId, req.body.date, req.body.requestId, req.auth!.user.workspaceId, req.auth!.user.accountId));
     } catch (error) { next(error); }
   });
 
@@ -445,8 +466,8 @@ export function createTeamTrackerRouter(
     validate(deleteItemSchema),
     async (req, res, next) => {
       try {
-        const itemId = parseInt(req.params.itemId as string, 10);
-        await trackerService.deleteItem(itemId, undefined, req.auth!.user.workspaceId);
+        const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
+        await trackerService.deleteItem(itemId, undefined, req.auth!.user.workspaceId, { type: "manager", accountId: req.auth!.user.accountId });
         res.json({ deleted: true });
       } catch (error) {
         next(error);
@@ -460,10 +481,10 @@ export function createTeamTrackerRouter(
     validate(setCurrentSchema),
     async (req, res, next) => {
       try {
-        const itemId = parseInt(req.params.itemId as string, 10);
+        const itemId = await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId);
         const item = await trackerService.setCurrentItem(itemId, {
           ifNoCurrent: req.body?.ifNoCurrent,
-        }, req.auth!.user.workspaceId);
+        }, req.auth!.user.workspaceId, { type: "manager", accountId: req.auth!.user.accountId });
         res.json(item);
       } catch (error) {
         next(error);
@@ -571,6 +592,7 @@ export function createTeamTrackerRouter(
         const { fromDate, toDate, itemIds } = req.body;
         const carried = await trackerService.carryForward(fromDate, toDate, {
           itemIds,
+          actor: { type: "manager", accountId: req.auth!.user.accountId },
           carryManagerDeskItems: async (params) => {
             if (!managerDeskService) {
               throw new HttpError(

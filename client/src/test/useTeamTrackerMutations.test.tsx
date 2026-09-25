@@ -7,6 +7,7 @@ import {
   useAddTrackerItem,
   useCarryForward,
   useDeleteTrackerItem,
+  useReassignTrackerItem,
   useSetCurrentItem,
   useStatusUpdate,
   useUpdateAvailability,
@@ -195,5 +196,28 @@ describe('useTeamTrackerMutations', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['team-tracker', 'carry-forward-context'] });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['manager-desk'] });
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['workload'] });
+  });
+
+  it('reassigns tracker items with a uuid request id and refreshes task views', async () => {
+    const queryClient = createQueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    mockPost.mockResolvedValue({ id: 12, taskKey: 'T-4' });
+    const wrapper = createWrapper(queryClient);
+    const reassign = renderHook(() => useReassignTrackerItem('2026-03-09'), { wrapper });
+
+    await act(async () => {
+      await reassign.result.current.mutateAsync({ itemId: 12, toAccountId: 'bob-2' });
+    });
+
+    expect(mockPost).toHaveBeenCalledWith('/team-tracker/items/12/reassign', {
+      toAccountId: 'bob-2',
+      date: '2026-03-09',
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['team-tracker'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['task-events'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['my-day'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['today'] });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['manager-desk'] });
   });
 });

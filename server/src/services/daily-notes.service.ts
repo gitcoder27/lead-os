@@ -29,6 +29,8 @@ import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService } from "./task-events.service";
 import { todayIsoDate } from "../utils/date";
 import { normalizeWorkspaceId } from "./workspace.service";
+import { TaskService } from "./task.service";
+import { taskStatusToDeskStatus } from "./task.service";
 
 const MAX_BODY_LENGTH = 50000;
 const DEFAULT_LIST_LIMIT = 30;
@@ -109,6 +111,25 @@ export class DailyNotesService {
 
   constructor(private readonly managerDesk = new ManagerDeskService(), private readonly tracker = new TeamTrackerService()) {}
   private readonly taskKeys = new TaskKeysService();
+  private readonly tasks = new TaskService();
+
+  private async canonicalTaskId(key: string, workspaceId: string): Promise<number | undefined> {
+    return await this.taskKeys.canonicalEnabled(workspaceId) ? (await this.tasks.getByKey(key, workspaceId))?.id : undefined;
+  }
+
+  private async canonicalFollowUps(managerId: string, workspaceId: string, noteId?: number): Promise<Array<DailyNoteFollowUp & { noteId: number }>> {
+    const refs = await db.select().from(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, workspaceId), eq(dailyNoteTaskRefs.managerAccountId, managerId), eq(dailyNoteTaskRefs.relation, "created_from"), noteId ? eq(dailyNoteTaskRefs.noteId, noteId) : undefined));
+    const migrated = await db.select().from(dailyNoteFollowUps).where(and(eq(dailyNoteFollowUps.workspaceId, workspaceId), eq(dailyNoteFollowUps.managerAccountId, managerId), noteId ? eq(dailyNoteFollowUps.noteId, noteId) : undefined));
+    const references = [...refs, ...migrated.map((ref) => ({ ...ref, taskKey: "" }))];
+    const result: Array<DailyNoteFollowUp & { noteId: number }> = [];
+    for (const ref of references) {
+      const task = ref.taskId ? await this.tasks.getById(ref.taskId, workspaceId) : await this.tasks.getByKey(ref.taskKey, workspaceId);
+      if (!task || task.deletedAt || task.trackedByManagerId !== managerId) continue;
+      const itemId = await this.tasks.surfaceId(task, "manager_desk_items");
+      if (!result.some((entry) => entry.itemId === itemId && entry.noteId === ref.noteId)) result.push({ noteId: ref.noteId, itemId, date: task.scheduledOn ?? todayIsoDate(), title: task.title, status: taskStatusToDeskStatus(task.status, task.later) as ManagerDeskStatus, followUpAt: task.followUpAt ?? undefined });
+    }
+    return result;
+  }
   private readonly eventsService = new TaskEventsService(this.taskKeys);
 
   private async scanMentions(note: DailyNoteRow): Promise<void> {
@@ -117,7 +138,7 @@ export class DailyNotesService {
       const key = await this.taskKeys.resolve(note.workspaceId, match[0]);
       if (!key) continue;
       try { if ((await this.taskKeys.resolveTask(note.workspaceId, key)).deleted) continue; } catch { continue; }
-      const inserted = await db.insert(dailyNoteTaskRefs).values({ workspaceId: note.workspaceId, managerAccountId: note.managerAccountId, noteId: note.id, taskKey: key, relation: "mentioned", createdAt: nowIso() }).onConflictDoNothing().returning();
+      const inserted = await db.insert(dailyNoteTaskRefs).values({ workspaceId: note.workspaceId, managerAccountId: note.managerAccountId, noteId: note.id, taskKey: key, taskId: await this.canonicalTaskId(key, note.workspaceId), relation: "mentioned", createdAt: nowIso() }).onConflictDoNothing().returning();
       if (!inserted.length) continue;
       const index = match.index ?? 0;
       await this.eventsService.append({ workspaceId: note.workspaceId, taskKey: key, type: "note_ref", body: null, meta: { noteId: note.id, noteDate: note.date, relation: "mentioned", excerpt: note.body.slice(Math.max(0, index - 80), index + match[0].length + 80) } }, { type: "system", accountId: note.managerAccountId });
@@ -228,6 +249,7 @@ export class DailyNotesService {
       return { note: null, followUps: [] };
     }
 
+    if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) return { note: toNote(note), followUps: await this.canonicalFollowUps(managerAccountId, normalizedWorkspaceId, note.id) };
     const followUpRows = await db
       .select({
         itemId: dailyNoteFollowUps.itemId,
@@ -451,7 +473,7 @@ export class DailyNotesService {
       if (task.deleted) throw new HttpError(410, "Task was deleted");
       const type = input.type ?? "update";
       const event = await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type, body: input.text, meta: { via: "notes_page" }, visibility: input.visibility ?? "private", requestId: input.requestId }, { type: "manager", accountId: managerAccountId });
-      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: task.taskKey, relation: "update_from", requestId: input.requestId, createdAt: nowIso() }).onConflictDoNothing();
+      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: task.taskKey, taskId: await this.canonicalTaskId(task.taskKey, workspaceId), relation: "update_from", requestId: input.requestId, createdAt: nowIso() }).onConflictDoNothing();
       await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "update_from" }, dedupeKey: `note:ref:${input.requestId}` }, { type: "system", accountId: managerAccountId });
       return event;
     });
@@ -462,20 +484,28 @@ export class DailyNotesService {
     return runInTransaction(async () => {
       const note = await this.findNote(managerAccountId, noteDate, workspaceId);
       if (!note) throw new HttpError(404, "Note not found");
+      const payloadHash = hashPayload({
+        route: "task",
+        noteId: note.id,
+        noteDate,
+        title: input.title.trim(),
+        developerAccountId: input.developerAccountId ?? null,
+        jiraKey: input.jiraKey?.trim().toUpperCase() || null,
+        context: input.context?.trim() || null,
+      });
       const receipt = (await db.select().from(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, workspaceId), eq(dailyNoteTaskRefs.managerAccountId, managerAccountId), eq(dailyNoteTaskRefs.requestId, input.requestId))).limit(1))[0];
       if (receipt) {
-        const existing = await this.taskKeys.resolveTask(workspaceId, receipt.taskKey);
-        if (receipt.relation !== "created_from" || existing.title !== input.title.trim() || existing.developer?.accountId !== input.developerAccountId) throw new HttpError(409, "requestId was already used with a different payload");
-        return existing;
+        if (receipt.relation !== "created_from" || receipt.payloadHash !== payloadHash) throw new HttpError(409, "requestId was already used with a different payload");
+        return this.taskKeys.resolveTask(workspaceId, receipt.taskKey);
       }
       const actor = { type: "manager" as const, accountId: managerAccountId };
       const created = input.developerAccountId
         ? await this.tracker.addItem(input.developerAccountId, todayIsoDate(), { title: input.title, jiraKey: input.jiraKey, source: "note", actor }, workspaceId)
-        : await this.managerDesk.createItem(managerAccountId, { date: todayIsoDate(), title: input.title, status: "inbox", source: "note", actor }, workspaceId);
+        : await this.managerDesk.createItem(managerAccountId, { date: todayIsoDate(), title: input.title, status: "inbox", source: "note", actor, links: input.jiraKey ? [{ linkType: "issue", issueKey: input.jiraKey }] : undefined }, workspaceId);
       const key = created.taskKey;
       if (!key) throw new Error("Task key was not allocated");
       if (input.context?.trim()) await this.eventsService.append({ workspaceId, taskKey: key, type: "update", body: input.context, meta: { via: "notes_page" }, visibility: "private" }, actor);
-      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: key, relation: "created_from", requestId: input.requestId, createdAt: nowIso() });
+      await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskKey: key, taskId: await this.canonicalTaskId(key, workspaceId), relation: "created_from", requestId: input.requestId, payloadHash, createdAt: nowIso() });
       await this.eventsService.append({ workspaceId, taskKey: key, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
       return this.taskKeys.resolveTask(workspaceId, key);
     });
@@ -518,6 +548,15 @@ export class DailyNotesService {
     const ids = [...new Set(itemIds.filter((id) => Number.isInteger(id) && id > 0))];
     if (ids.length === 0) {
       return { sources: [] };
+    }
+    if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) {
+      const linked = (await this.canonicalFollowUps(managerAccountId, normalizedWorkspaceId)).filter((item) => ids.includes(item.itemId));
+      const sources = [];
+      for (const item of linked) {
+        const note = (await db.select().from(dailyNotes).where(and(eq(dailyNotes.id, item.noteId), eq(dailyNotes.workspaceId, normalizedWorkspaceId), eq(dailyNotes.managerAccountId, managerAccountId))).limit(1))[0];
+        if (note) sources.push({ itemId: item.itemId, noteId: note.id, date: note.date });
+      }
+      return { sources };
     }
 
     const rows = await db
@@ -565,6 +604,26 @@ export class DailyNotesService {
     });
 
     return runInTransaction(async () => {
+      if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) {
+        const migratedReceipt = (await db.select().from(dailyNoteFollowUps).where(and(eq(dailyNoteFollowUps.workspaceId, normalizedWorkspaceId), eq(dailyNoteFollowUps.managerAccountId, managerAccountId), eq(dailyNoteFollowUps.requestId, input.requestId))).limit(1))[0];
+        if (migratedReceipt) {
+          if (migratedReceipt.payloadHash !== payloadHash) throw new HttpError(409, "requestId was already used with a different payload");
+          const existing = (await this.canonicalFollowUps(managerAccountId, normalizedWorkspaceId, note.id)).find((entry) => entry.itemId === migratedReceipt.itemId);
+          if (!existing) throw new HttpError(410, "Follow-up was deleted");
+          return existing;
+        }
+        const receipt = (await db.select().from(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, normalizedWorkspaceId), eq(dailyNoteTaskRefs.managerAccountId, managerAccountId), eq(dailyNoteTaskRefs.requestId, input.requestId))).limit(1))[0];
+        if (receipt) {
+          if (receipt.payloadHash !== payloadHash) throw new HttpError(409, "requestId was already used with a different payload");
+          const existing = (await this.canonicalFollowUps(managerAccountId, normalizedWorkspaceId, note.id)).find((entry) => entry.itemId === receipt.taskId);
+          if (existing) return existing;
+          throw new HttpError(410, "Follow-up was deleted");
+        }
+        const task = await this.tasks.create({ title, scheduledOn: input.date, followUpAt: input.followUpAt, labels: ["category:follow_up"] }, { type: "manager", accountId: managerAccountId, workspaceId: normalizedWorkspaceId });
+        await db.insert(dailyNoteTaskRefs).values({ workspaceId: normalizedWorkspaceId, managerAccountId, noteId: note.id, taskId: task.id, taskKey: task.taskKey, relation: "created_from", requestId: input.requestId, payloadHash, createdAt: nowIso() });
+        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: task.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
+        return { itemId: task.id, title: task.title, date: input.date, status: "planned" as const, followUpAt: task.followUpAt ?? undefined };
+      }
       const receiptRows = await db
         .select()
         .from(dailyNoteFollowUps)

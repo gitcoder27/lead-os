@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "../db/connection";
+import { db, rawDb } from "../db/connection";
 import {
   assistantConversations,
   assistantMessages,
@@ -9,6 +9,7 @@ import {
   dailyNoteTaskRefs,
   dailyNotes,
   dataMigrations,
+  configTable,
   dayFocus,
   developerNotes,
   managerDeskDays,
@@ -25,6 +26,7 @@ import {
 } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
+import type { ManagerDeskItem } from "shared/types";
 import { isoDatePart } from "../utils/date";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { formatDatedNoteHeading } from "./task-notes-import";
@@ -150,6 +152,8 @@ export interface TaskPhase2VerifyResult {
   multiActiveViolations: string[];
   unfilledRefs: { checkin: number; noteTask: number; noteFollowUp: number };
   parityDiffs: { surface: string; owner: string; date: string; field: string; legacy: string; tasks: string }[];
+  /** Field diffs fully explained by recorded task events (point-in-time replay drift), informational only. */
+  explainedDrift: { surface: string; owner: string; date: string; field: string; legacy: string; tasks: string }[];
 }
 
 const marker = (name: string, workspaceId: string) => (workspaceId === "default" ? name : `${name}:${workspaceId}`);
@@ -213,22 +217,10 @@ export class TaskPhase2BackfillService {
 
   async computeInputHash(workspaceId: string): Promise<string> {
     const scope = normalizeWorkspaceId(workspaceId);
-    const fingerprint = async (table: "team_tracker_items" | "manager_desk_items" | "manager_desk_links" | "manager_desk_item_history" | "task_key_aliases", tsColumn: string) => {
-      const result = await db.all<{ count: number; maxId: number | null; maxTs: string | null }>(
-        sql`SELECT COUNT(*) AS count, MAX(rowid) AS maxId, MAX(${sql.raw(tsColumn)}) AS maxTs FROM ${sql.raw(table)} WHERE ${sql.raw("workspace_id")} = ${scope}`
-      );
-      const r = result[0]!;
-      return { count: r.count, maxId: r.maxId ?? 0, maxTs: r.maxTs ?? "" };
-    };
-    const parts = await Promise.all([
-      fingerprint("team_tracker_items", "updated_at"),
-      fingerprint("manager_desk_items", "updated_at"),
-      fingerprint("manager_desk_links", "created_at"),
-      fingerprint("manager_desk_item_history", "recorded_at"),
-      this.events.fingerprint(scope),
-      fingerprint("task_key_aliases", "created_at"),
-    ]);
-    return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+    const tables = ["team_tracker_items", "manager_desk_items", "manager_desk_links", "manager_desk_item_history", "task_key_aliases", "team_tracker_days", "manager_desk_days", "checkin_task_refs", "daily_note_task_refs", "daily_note_follow_ups"] as const;
+    const parts = await Promise.all(tables.map(async (table) => ({ table, rows: await db.all(sql`SELECT * FROM ${sql.raw(table)} WHERE workspace_id = ${scope} ORDER BY rowid`) })));
+    const events = (await this.events.listRawForWorkspace(scope)).sort((left, right) => left.id - right.id);
+    return createHash("sha256").update(JSON.stringify({ parts, events })).digest("hex");
   }
 
   private async load(workspaceId: string): Promise<LoadedData> {
@@ -373,6 +365,10 @@ export class TaskPhase2BackfillService {
   private deriveTask(group: KeyGroup, data: LoadedData, findings: TaskPhase2Report["findings"], statusMapping: Record<string, number>): TaskPlan {
     const desk = group.desk;
     const tLast = group.tracker.at(-1);
+    // Rows merged from a ghost/alias key keep their original taskKey — the
+    // survivor's own latest row decides status, so a later ghost 'planned'
+    // row cannot mask an 'in_progress'/'done' survivor row.
+    const tLastOwn = group.tracker.filter((row) => row.taskKey === group.key).at(-1) ?? tLast;
     // A mirror may link any row of the desk lineage (Phase 0 linked whichever
     // row existed at the time), not only the canonical one.
     const lineageIds = new Set([desk?.id, ...group.deskLineage.map((row) => row.id)].filter((id): id is number => id !== undefined));
@@ -415,11 +411,12 @@ export class TaskPhase2BackfillService {
         }
       }
     } else if (group.tracker.length) {
+      // The task's state is the latest lineage row's state: carry-forward
+      // writes a fresh row per day, so `tLast` (most recent day) is what the
+      // board renders. Older 'planned' rows must not mask a later 'done'.
       rule = "tracker_only";
-      if (group.tracker.some((row) => row.state === "in_progress")) status = "active";
-      else if (group.tracker.some((row) => row.state === "planned")) status = "open";
-      else if (tLast!.state === "done") status = "done";
-      else status = "dropped";
+      const last = tLastOwn!.state;
+      status = last === "in_progress" ? "active" : last === "done" ? "done" : last === "dropped" ? "dropped" : "open";
     } else {
       rule = `desk_${desk!.status}`;
       switch (desk!.status) {
@@ -461,8 +458,8 @@ export class TaskPhase2BackfillService {
     const updatedAt = allRows.reduce((max, row) => (row.updatedAt > max ? row.updatedAt : max), allRows[0]?.updatedAt ?? "");
     const earliest = [...allRows].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id)[0];
     let closedAt: string | null = null;
-    if (status === "done") closedAt = tLast?.completedAt ?? desk?.completedAt ?? null;
-    else if (status === "dropped") closedAt = tLast && (tLast.state === "dropped" || tLast.state === "done") ? tLast.updatedAt : desk?.completedAt ?? desk?.updatedAt ?? null;
+    if (status === "done") closedAt = tLastOwn?.completedAt ?? desk?.completedAt ?? null;
+    else if (status === "dropped") closedAt = tLastOwn && (tLastOwn.state === "dropped" || tLastOwn.state === "done") ? tLastOwn.updatedAt : desk?.completedAt ?? desk?.updatedAt ?? null;
 
     return {
       key: group.key,
@@ -635,6 +632,7 @@ export class TaskPhase2BackfillService {
    */
   async apply(workspaceId: string, decisionsFile: Phase2DecisionsFile, opts: { resume?: boolean } = {}): Promise<TaskPhase2Report> {
     const scope = normalizeWorkspaceId(workspaceId);
+    if (await this.keys.canonicalEnabled(scope)) throw new HttpError(409, "Backfill cannot run after write cutover");
     const { inputHash, alreadyApplied } = await this.preflight(scope, { resume: opts.resume });
     // The decisions hash guards against data drift between the reviewed
     // dry-run and the apply. After a successful apply our own writes (synth
@@ -642,6 +640,10 @@ export class TaskPhase2BackfillService {
     // idempotent re-run keys off the p2_backfill marker instead.
     if (!alreadyApplied && decisionsFile.inputHash !== inputHash) {
       throw new HttpError(409, "Decisions inputHash does not match the current data fingerprint; regenerate the dry-run report");
+    }
+    if (alreadyApplied) {
+      const previousHash = (await db.select().from(configTable).where(and(eq(configTable.workspaceId, scope), eq(configTable.key, "tasks_phase2_backfill_hash"))).limit(1))[0]?.value;
+      if (previousHash !== inputHash && (!opts.resume || decisionsFile.inputHash !== inputHash)) throw new HttpError(409, "Backfill snapshot changed; review fresh decisions and resume explicitly");
     }
 
     const data = await this.load(scope);
@@ -668,6 +670,7 @@ export class TaskPhase2BackfillService {
     const p1At = (await db.select({ appliedAt: dataMigrations.appliedAt }).from(dataMigrations).where(eq(dataMigrations.name, marker("p1_assign_task_keys", scope))).limit(1))[0]?.appliedAt ?? new Date().toISOString();
 
     return runInTransaction(async () => {
+      if (await this.computeInputHash(scope) !== inputHash || await this.keys.canonicalEnabled(scope)) throw new HttpError(409, "Migration input changed before the transaction");
       // Wipe any prior run when resuming. task_id FKs (events + ref tables)
       // point into tasks, so clear them before deleting the canonical rows.
       await this.events.clearTaskIds(scope);
@@ -679,6 +682,9 @@ export class TaskPhase2BackfillService {
       await db.delete(taskLegacyMap).where(eq(taskLegacyMap.workspaceId, scope));
       await db.delete(developerNotes).where(eq(developerNotes.workspaceId, scope));
       await db.delete(tasks).where(eq(tasks.workspaceId, scope));
+      const legacySeed = (rawDb.prepare("SELECT MAX(value) AS value FROM (SELECT COALESCE(MAX(id),0) AS value FROM team_tracker_items UNION ALL SELECT COALESCE(MAX(id),0) FROM manager_desk_items)").get() as { value: number }).value;
+      rawDb.prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'tasks'").run(legacySeed);
+      if (!rawDb.prepare("SELECT 1 FROM sqlite_sequence WHERE name = 'tasks'").get()) rawDb.prepare("INSERT INTO sqlite_sequence(name,seq) VALUES ('tasks',?)").run(legacySeed);
 
       // ── B0: apply decisions ──
       for (const proposal of mergeProposals) {
@@ -1082,6 +1088,9 @@ export class TaskPhase2BackfillService {
 
       const report = await this.planReport(scope, inputHash, findings, true);
       await db.insert(dataMigrations).values({ name: marker("p2_backfill", scope), appliedAt: new Date().toISOString(), reportJson: JSON.stringify(report) }).onConflictDoNothing();
+      const snapshotHash = await this.computeInputHash(scope);
+      await db.delete(configTable).where(and(eq(configTable.workspaceId, scope), eq(configTable.key, "tasks_phase2_verified")));
+      await db.insert(configTable).values({ workspaceId: scope, key: "tasks_phase2_backfill_hash", value: snapshotHash }).onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: snapshotHash } });
       return report;
     });
   }
@@ -1141,12 +1150,13 @@ export class TaskPhase2BackfillService {
     const multiActiveViolations = [...actives.entries()].filter(([, count]) => count > 1).map(([owner]) => owner);
     return {
       workspaceId: scope,
-      ok: !missingLegacyMap.length && unrepointed === 0 && !multiActiveViolations.length,
+      ok: !missingLegacyMap.length && unrepointed === 0 && !multiActiveViolations.length && !checkinNulls.length && !noteNulls.length && !followUpNulls.length,
       missingLegacyMap,
       unrepointedEvents: unrepointed,
       multiActiveViolations,
       unfilledRefs: { checkin: checkinNulls.length, noteTask: noteNulls.length, noteFollowUp: followUpNulls.length },
       parityDiffs: [],
+      explainedDrift: [],
     };
   }
 
@@ -1192,6 +1202,24 @@ export class TaskPhase2BackfillService {
     // Historical dev days: rows on that day vs day_focus.
     const trackerDayRows = await db.select().from(teamTrackerDays).where(eq(teamTrackerDays.workspaceId, scope));
     const trackerItemRows = await db.select().from(teamTrackerItems).where(eq(teamTrackerItems.workspaceId, scope));
+    const taskRows = await db.select().from(tasks).where(eq(tasks.workspaceId, scope));
+    const allEventRows = await this.events.listRawForWorkspace(scope);
+    const currentByKey = new Map(taskRows.map((row) => [row.taskKey, row]));
+    const eventsByKey = new Map<string, typeof allEventRows>();
+    for (const event of allEventRows) {
+      eventsByKey.set(event.taskKey, [...(eventsByKey.get(event.taskKey) ?? []), event]);
+    }
+    const explainedDrift: TaskPhase2VerifyResult["parityDiffs"] = [];
+    // Legacy history views show the day's rows with their *current* mutated
+    // values; canonical replays events to true point-in-time state (the §2.3.3
+    // B9 fix). A field diff is explained drift — not a parity violation — when
+    // the canonical task's current value equals the legacy row's current value
+    // and a recorded task event after the day's end accounts for the change.
+    const explainedField = (key: string, field: "title" | "status", legacyValue: string, dayEndIso: string): boolean => {
+      const current = currentByKey.get(key);
+      if (!current || current[field] !== legacyValue) return false;
+      return (eventsByKey.get(key) ?? []).some((event) => event.type === field && event.occurredAt >= dayEndIso);
+    };
     for (const date of dates.slice(1)) {
       for (const day of trackerDayRows.filter((row) => row.date === date)) {
         const legacyKeys = new Map<string, { title: string; status: string }>();
@@ -1205,12 +1233,20 @@ export class TaskPhase2BackfillService {
           legacyKeys.set(key, { title: latest.title, status: legacyDevStatus(latest.state) });
         }
         const projected = new Map((await this.taskService.projectDeveloperHistoryDay(day.developerAccountId, date, scope)).map((p) => [p.taskKey, p]));
+        const [year, month, dayNum] = date.split("-").map(Number);
+        const dayEndIso = new Date(year!, month! - 1, dayNum! + 1).toISOString();
         for (const [key, item] of legacyKeys) {
           const task = projected.get(key);
           if (!task) parityDiffs.push({ surface: "board", owner: day.developerAccountId, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
           else {
-            if (task.title !== item.title) parityDiffs.push({ surface: "board", owner: day.developerAccountId, date, field: "title", legacy: item.title, tasks: task.title });
-            if (task.status !== item.status) parityDiffs.push({ surface: "board", owner: day.developerAccountId, date, field: "status", legacy: item.status, tasks: task.status });
+            if (task.title !== item.title) {
+              (explainedField(key, "title", item.title, dayEndIso) ? explainedDrift : parityDiffs)
+                .push({ surface: "board", owner: day.developerAccountId, date, field: "title", legacy: item.title, tasks: task.title });
+            }
+            if (task.status !== item.status) {
+              (explainedField(key, "status", item.status, dayEndIso) ? explainedDrift : parityDiffs)
+                .push({ surface: "board", owner: day.developerAccountId, date, field: "status", legacy: item.status, tasks: task.status });
+            }
           }
         }
       }
@@ -1236,7 +1272,155 @@ export class TaskPhase2BackfillService {
       }
     }
 
+    // Desk day views: live/planning/history parity per manager per date.
+    // Closed-date coverage comes through live+history including items
+    // closedAt === date.
+    const deskDayRows = await db.select().from(managerDeskDays).where(eq(managerDeskDays.workspaceId, scope));
+    const deskItemRows = await db.select().from(managerDeskItems).where(eq(managerDeskItems.workspaceId, scope));
+    const deskLinkRows = await db.select().from(managerDeskLinks).where(eq(managerDeskLinks.workspaceId, scope));
+    const taskLinkRows = await db.select().from(taskLinks).where(eq(taskLinks.workspaceId, scope));
+    const mappedRows = await db.select().from(taskLegacyMap).where(eq(taskLegacyMap.workspaceId, scope));
+    const deskManagerByDay = new Map(deskDayRows.map((row) => [row.id, row.managerAccountId]));
+    const developerIds = [...new Set(trackerDayRows.map((row) => row.developerAccountId))];
+    // History snapshots predate the taskKey field — resolve legacy item ids to
+    // task keys through task_legacy_map for all three desk views.
+    const taskKeyById = new Map(taskRows.map((row) => [row.id, row.taskKey]));
+    const deskKeyByItemId = new Map<number, string>();
+    for (const row of mappedRows.filter((r) => r.sourceTable === "manager_desk_items")) {
+      const key = taskKeyById.get(row.taskId);
+      if (key && !deskKeyByItemId.has(row.sourceId)) deskKeyByItemId.set(row.sourceId, key);
+    }
+    const deskDayViews = [
+      {
+        view: "live" as const,
+        surface: "desk_live",
+        project: (m: string, d: string) => this.taskService.projectDeskDay(m, d, scope),
+      },
+      {
+        view: "planning" as const,
+        surface: "desk_planning",
+        project: (m: string, d: string) => this.taskService.projectDeskPlanningDay(m, d, scope),
+      },
+      {
+        view: "history" as const,
+        surface: "desk_history",
+        project: async (m: string, d: string) =>
+          (await this.taskService.history(m, d, scope)).map((row) => ({ taskKey: row.taskKey, title: row.title, status: row.status })),
+      },
+    ];
+    for (const manager of managers) {
+      const managerItemRows = deskItemRows.filter((row) => deskManagerByDay.get(row.dayId) === manager);
+      for (const date of dates) {
+        for (const { view, surface, project } of deskDayViews) {
+          const legacyItems = (await deskService.parityDayView(manager, date, view, scope))
+            .map((item) => ({ item, key: item.taskKey ?? deskKeyByItemId.get(item.id) }))
+            .filter((entry): entry is { item: ManagerDeskItem; key: string } => Boolean(entry.key));
+          const legacy = new Map(legacyItems.map(({ item, key }) => [key, { title: item.title, status: legacyDeskStatus(item.status) }]));
+          const projected = new Map((await project(manager, date)).map((p) => [p.taskKey, p]));
+          for (const [key, item] of legacy) {
+            const task = projected.get(key);
+            if (!task) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
+            else {
+              if (task.title !== item.title) parityDiffs.push({ surface, owner: manager, date, field: "title", legacy: item.title, tasks: task.title });
+              if (task.status !== item.status) parityDiffs.push({ surface, owner: manager, date, field: "status", legacy: item.status, tasks: task.status });
+            }
+          }
+          for (const key of projected.keys()) {
+            if (!legacy.has(key)) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: "(absent)", tasks: key });
+          }
+        }
+      }
+
+      // Follow-ups + meetings parity (§2.3.3 #7 memory surfaces).
+      const compareSets = (surface: string, legacyKeys: Set<string>, projectedKeys: Set<string>) => {
+        for (const key of legacyKeys) {
+          if (!projectedKeys.has(key)) {
+            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: key, tasks: "(absent)" });
+          }
+        }
+        for (const key of projectedKeys) {
+          if (!legacyKeys.has(key)) {
+            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: "(absent)", tasks: key });
+          }
+        }
+      };
+      compareSets(
+        "follow_ups",
+        new Set(managerItemRows.filter((row) => row.taskKey && (row.category === "follow_up" || row.followUpAt)).map((row) => row.taskKey as string)),
+        new Set((await this.taskService.projectFollowUps(manager, scope)).map((p) => p.taskKey))
+      );
+      compareSets(
+        "meetings",
+        new Set(managerItemRows.filter((row) => row.taskKey && row.kind === "meeting").map((row) => row.taskKey as string)),
+        new Set((await this.taskService.projectMeetings(manager, scope)).map((p) => p.taskKey))
+      );
+    }
+
+    // Task links parity: manager_desk_links rows must map 1:1 onto task_links
+    // for the mapped task, and tracker jira keys must appear as jira links.
+    const taskLinksByTask = new Map<number, (typeof taskLinkRows)[number][]>();
+    for (const link of taskLinkRows) {
+      const bucket = taskLinksByTask.get(link.taskId) ?? [];
+      bucket.push(link);
+      taskLinksByTask.set(link.taskId, bucket);
+    }
+    const deskLinksByItem = new Map<number, number>();
+    for (const link of deskLinkRows) {
+      deskLinksByItem.set(link.itemId, (deskLinksByItem.get(link.itemId) ?? 0) + 1);
+    }
+    for (const row of mappedRows.filter((r) => r.sourceTable === "manager_desk_items" && r.role !== "superseded")) {
+      const expected = deskLinksByItem.get(row.sourceId) ?? 0;
+      const actual = (taskLinksByTask.get(row.taskId) ?? []).length;
+      if (expected !== actual) {
+        parityDiffs.push({
+          surface: "links",
+          owner: "workspace",
+          date: today,
+          field: "desk_link_count",
+          legacy: `item:${row.sourceId} links:${expected}`,
+          tasks: `task:${row.taskId} links:${actual}`,
+        });
+      }
+    }
+    const trackerItemsById = new Map(trackerItemRows.map((row) => [row.id, row]));
+    for (const row of mappedRows.filter((r) => r.sourceTable === "team_tracker_items")) {
+      const item = trackerItemsById.get(row.sourceId);
+      if (!item) continue;
+      let related: string[] = [];
+      try {
+        related = item.relatedJiraKeys ? (JSON.parse(item.relatedJiraKeys) as string[]) : [];
+      } catch {
+        related = [];
+      }
+      const keys = [item.jiraKey, ...related].filter((k): k is string => Boolean(k));
+      const jiraRefs = new Set((taskLinksByTask.get(row.taskId) ?? []).filter((link) => link.kind === "jira").map((link) => link.ref));
+      for (const key of keys) {
+        if (!jiraRefs.has(key)) {
+          parityDiffs.push({ surface: "links", owner: "workspace", date: today, field: "jira_link", legacy: `item:${row.sourceId} ${key}`, tasks: "(absent)" });
+        }
+      }
+    }
+
+    // §2.3.2 privacy: developer surface DTOs must not expose manager-private
+    // fields on tracked tasks.
+    const trackedSample = taskRows.find((row) => row.trackedByManagerId);
+    if (trackedSample) {
+      const developerViewer = developerIds[0] ?? (trackedSample.ownerType === "developer" ? trackedSample.ownerId as string : trackedSample.trackedByManagerId as string);
+      const dto = (
+        await this.taskService.surfaceDtos([trackedSample], {
+          date: today,
+          principal: { type: "developer", accountId: developerViewer, workspaceId: scope },
+        })
+      )[0] as Record<string, unknown> | undefined;
+      for (const field of ["trackedByManagerId", "labels", "later", "parentId", "nextAction", "followUpAt", "legacyDeskItemId"]) {
+        if (dto && Object.prototype.hasOwnProperty.call(dto, field)) {
+          parityDiffs.push({ surface: "privacy", owner: developerViewer, date: today, field, legacy: "leaked", tasks: "(exposed)" });
+        }
+      }
+    }
+
     result.parityDiffs = parityDiffs;
+    result.explainedDrift = explainedDrift;
     result.ok = result.ok && (opts.strict ? parityDiffs.length === 0 : true);
     return result;
   }

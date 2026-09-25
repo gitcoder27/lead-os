@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { createMyDayRouter } from "../src/routes/my-day";
@@ -5,16 +6,19 @@ import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { MyDayService } from "../src/services/my-day.service";
+import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
+import { todayIsoDate } from "../src/utils/date";
 import { IssueService } from "../src/services/issue.service";
 import { resetDatabase, db } from "./helpers/db";
-import { developers, issues, teamTrackerDays } from "../src/db/schema";
+import { configTable, developers, issues, teamTrackerDays } from "../src/db/schema";
 import { invoke } from "./helpers/http";
 
 const authService = new AuthService();
 const trackerService = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(trackerService);
 const myDayService = new MyDayService(trackerService);
+const eventsService = new TaskEventsService();
 const issueService = new IssueService();
 
 async function seedDevelopers() {
@@ -663,5 +667,120 @@ describe("my day routes", () => {
         }),
       ])
     );
+  });
+
+  describe("phase 1 task events", () => {
+    async function enableTaskKeys() {
+      await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    }
+
+    it("GET /api/my-day/tasks/:key/events returns shared events only", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Alice task",
+      });
+      const manager = await authService.createUser({
+        username: "mgr",
+        displayName: "Manager",
+        password: "secret123",
+        role: "manager",
+      });
+      await eventsService.append(
+        { taskKey: item.taskKey!, type: "instruction", body: "Shared note", meta: { via: "task_drawer" }, visibility: "shared" },
+        { type: "manager", accountId: manager.accountId }
+      );
+      await eventsService.append(
+        { taskKey: item.taskKey!, type: "update", body: "Private note", meta: { via: "task_drawer" }, visibility: "private" },
+        { type: "manager", accountId: manager.accountId }
+      );
+
+      const app = createTestApp();
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${item.taskKey}/events`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      const types = res.body.events.map((event: { type: string }) => event.type);
+      expect(types).toEqual(["instruction", "created"]);
+      expect(res.body.events.every((event: { visibility: string }) => event.visibility === "shared")).toBe(true);
+    });
+
+    it("GET /api/my-day/tasks/:key/events returns 404 for a non-owner", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", {
+        title: "Alice task",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${item.taskKey}/events`,
+        headers: { cookie: await loginCookie("bob", "secret123") },
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it("POST /api/my-day/tasks/:key/events rejects writes against history dates", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-06", {
+        title: "Yesterday task",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: `/api/my-day/tasks/${item.taskKey}/events`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+        body: {
+          date: "2026-03-06",
+          type: "update",
+          body: "Retroactive note",
+          requestId: randomUUID(),
+        },
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body?.error).toBe("My Day is read-only for past dates");
+    });
+
+    it("POST /api/my-day/checkins enforces ownership for taskKeys", async () => {
+      // /checkins is the last route layer in the router, so an error response
+      // defers through setImmediate — fake timers must be off for this path.
+      vi.useRealTimers();
+      const today = todayIsoDate();
+      await enableTaskKeys();
+      const bobItem = await trackerService.addItem("dev-2", today, {
+        title: "Bob's task",
+      });
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "POST",
+        url: "/api/my-day/checkins",
+        headers: { cookie: await loginCookie("alice", "secret123") },
+        body: {
+          date: today,
+          summary: "Standup note",
+          taskKeys: [bobItem.taskKey],
+        },
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body?.error).toBe("Unknown or unowned task key");
+
+      const own = await invoke(app, {
+        method: "POST",
+        url: "/api/my-day/checkins",
+        headers: { cookie: await loginCookie("alice", "secret123") },
+        body: {
+          date: today,
+          summary: "Standup note",
+        },
+      });
+      expect(own.status).toBe(201);
+    });
   });
 });

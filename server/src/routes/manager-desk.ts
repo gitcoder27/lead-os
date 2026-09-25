@@ -4,6 +4,7 @@ import { requireManager } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { AuthService } from "../services/auth.service";
 import { ManagerDeskService } from "../services/manager-desk.service";
+import { TaskService } from "../services/task.service";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 const isoDateTimeSchema = z.string().datetime({ offset: true });
@@ -130,7 +131,7 @@ const createItemSchema = z.object({
 
 const itemIdParamSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   body: z.any().optional(),
   query: z.any().optional(),
@@ -138,7 +139,7 @@ const itemIdParamSchema = z.object({
 
 const trackerItemIdParamSchema = z.object({
   params: z.object({
-    trackerItemId: z.string().regex(/^\d+$/, "Invalid tracker item id"),
+    trackerItemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid tracker item id or task key"),
   }),
   body: z.any().optional(),
   query: z.any().optional(),
@@ -146,7 +147,7 @@ const trackerItemIdParamSchema = z.object({
 
 const updateItemSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   body: z
     .object({
@@ -183,7 +184,7 @@ const updateItemSchema = z.object({
 
 const linkSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
   }),
   body: managerDeskLinkSchema,
   query: z.any().optional(),
@@ -191,7 +192,7 @@ const linkSchema = z.object({
 
 const deleteLinkSchema = z.object({
   params: z.object({
-    itemId: z.string().regex(/^\d+$/, "Invalid item id"),
+    itemId: z.string().regex(/^(\d+|[Tt]-\d{1,9})$/, "Invalid item id or task key"),
     linkId: z.string().regex(/^\d+$/, "Invalid link id"),
   }),
   body: z.any().optional(),
@@ -241,12 +242,21 @@ export function createManagerDeskRouter(
   authService: AuthService
 ): Router {
   const router = Router();
+  const tasks = new TaskService();
+  const itemRefToId = (ref: string, workspaceId?: string) =>
+    tasks.surfaceIdForRef("manager_desk_items", ref, workspaceId);
+  const trackerItemRefToId = (ref: string, workspaceId?: string) =>
+    tasks.surfaceIdForRef("team_tracker_items", ref, workspaceId);
 
   router.use(requireManager(authService));
 
   router.get("/", validate(dateQuerySchema), async (req, res, next) => {
     try {
       const day = await managerDeskService.getDay(req.auth!.user.accountId, req.query.date as string, req.auth!.user.workspaceId);
+      if (day.taskModel === "canonical") {
+        day.items = [];
+        day.createdThatDayItems = [];
+      }
       res.json(day);
     } catch (error) {
       next(error);
@@ -260,7 +270,7 @@ export function createManagerDeskRouter(
       try {
         const detail = await managerDeskService.getTrackerTaskDetail(
           req.auth!.user.accountId,
-          parseInt(req.params.trackerItemId as string, 10),
+          await trackerItemRefToId(req.params.trackerItemId as string, req.auth!.user.workspaceId),
           req.auth!.user.workspaceId
         );
         res.json(detail);
@@ -277,7 +287,7 @@ export function createManagerDeskRouter(
       try {
         const detail = await managerDeskService.promoteTrackerTask(
           req.auth!.user.accountId,
-          parseInt(req.params.trackerItemId as string, 10),
+          await trackerItemRefToId(req.params.trackerItemId as string, req.auth!.user.workspaceId),
           req.auth!.user.workspaceId
         );
         res.json(detail);
@@ -291,7 +301,7 @@ export function createManagerDeskRouter(
     try {
       const detail = await managerDeskService.getTaskDetailByItemId(
         req.auth!.user.accountId,
-        parseInt(req.params.itemId as string, 10),
+        await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
         req.auth!.user.workspaceId
       );
       res.json(detail);
@@ -313,7 +323,7 @@ export function createManagerDeskRouter(
     try {
       const item = await managerDeskService.updateItem(
         req.auth!.user.accountId,
-        parseInt(req.params.itemId as string, 10),
+        await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
         req.body,
         req.auth!.user.workspaceId
       );
@@ -327,7 +337,7 @@ export function createManagerDeskRouter(
     try {
       await managerDeskService.deleteItem(
         req.auth!.user.accountId,
-        parseInt(req.params.itemId as string, 10),
+        await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
         req.auth!.user.workspaceId
       );
       res.json({ deleted: true });
@@ -343,7 +353,7 @@ export function createManagerDeskRouter(
       try {
         const item = await managerDeskService.cancelDelegatedTask(
           req.auth!.user.accountId,
-          parseInt(req.params.itemId as string, 10),
+          await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
           req.auth!.user.workspaceId
         );
         res.json(item);
@@ -357,7 +367,7 @@ export function createManagerDeskRouter(
     try {
       const link = await managerDeskService.addLink(
         req.auth!.user.accountId,
-        parseInt(req.params.itemId as string, 10),
+        await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
         req.body,
         req.auth!.user.workspaceId
       );
@@ -374,7 +384,7 @@ export function createManagerDeskRouter(
       try {
         await managerDeskService.deleteLink(
           req.auth!.user.accountId,
-          parseInt(req.params.itemId as string, 10),
+          await itemRefToId(req.params.itemId as string, req.auth!.user.workspaceId),
           parseInt(req.params.linkId as string, 10),
           req.auth!.user.workspaceId
         );

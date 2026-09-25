@@ -295,6 +295,75 @@ describe('TodayPage V2', () => {
     });
   });
 
+  it('sends the picked task key with a developer check-in', async () => {
+    const board = {
+      date: '2026-03-08',
+      viewMode: 'live',
+      developers: [
+        {
+          id: 1,
+          date: '2026-03-08',
+          developer: { accountId: 'dev-1', displayName: 'Alice Smith', isActive: true },
+          availability: { state: 'active' },
+          status: 'on_track',
+          plannedItems: [
+            {
+              id: 10,
+              dayId: 1,
+              lifecycle: 'tracker_only',
+              itemType: 'custom',
+              taskKey: 'T-10',
+              title: 'Refactor utils',
+              state: 'planned',
+              position: 0,
+              createdAt: '2026-03-08T08:00:00Z',
+              updatedAt: '2026-03-08T08:00:00Z',
+            },
+          ],
+          completedItems: [],
+          droppedItems: [],
+          checkIns: [],
+          recentCheckIns: [],
+          isStale: false,
+          signals: {
+            freshness: { staleThresholdHours: 4, noCurrentThresholdHours: 2, statusFollowUpThresholdHours: 2 },
+            risk: { openRisk: false, overdueLinkedWork: false, overdueLinkedCount: 0, overCapacity: false, capacityDelta: 0 },
+          },
+          statusUpdatedAt: '2026-03-08T08:00:00Z',
+          createdAt: '2026-03-08T08:00:00Z',
+          updatedAt: '2026-03-08T08:00:00Z',
+        },
+      ],
+      inactiveDevelopers: [],
+      summary: {},
+      visibleSummary: {},
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/today')) {
+        return new Response(JSON.stringify(todayResponse()), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url.includes('/api/team-tracker')) {
+        return new Response(JSON.stringify(board), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderToday();
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Check-in$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'T-10' }));
+    fireEvent.change(screen.getByLabelText('Check-in note'), { target: { value: 'How is this going?' } });
+    fireEvent.click(screen.getByRole('button', { name: /save check-in/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"taskKeys":["T-10"]'),
+      }));
+    });
+  });
+
   it('shows Open developer after a same-day check-in clears the check-in action', async () => {
     const devTarget = target({ type: 'developer', view: 'team', developerAccountId: 'dev-1', date: '2026-03-08' });
     const beforeAction = actionItem(1, {

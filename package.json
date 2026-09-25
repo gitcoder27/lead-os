@@ -19,6 +19,7 @@
     "guard:data": "bash scripts/check-db-artifacts.sh",
     "backup:restore": "npm run backup:restore --workspace=server --",
     "manager-desk:cleanup-carry-forward": "npm run manager-desk:cleanup-carry-forward --workspace=server --",
+    "tasks:cutover": "npm run tasks:cutover --workspace=server --",
     "start": "npm run start --workspace=server",
     "test": "npm run test:server && npm run test:client",
     "test:server": "npm run test --workspace=server",

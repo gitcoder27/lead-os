@@ -7,6 +7,13 @@ const mockAddToast = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockUpdateMutate = vi.fn();
 const mockRefetch = vi.fn();
+const mockNativeMutate = vi.fn();
+let mockNativeItems: ManagerDeskItem[] = [];
+
+vi.mock('@/hooks/useCanonicalTasks', () => ({
+  useCanonicalMemoryTasks: () => ({ data: mockNativeItems, isLoading: false, error: null, refetch: vi.fn() }),
+  useCanonicalTaskMutation: () => ({ mutate: mockNativeMutate, isPending: false }),
+}));
 
 let mockDay: ManagerDeskDayResponse | undefined;
 let mockDayError: Error | null = null;
@@ -66,6 +73,8 @@ describe('ManagerMemoryPage', () => {
     mockCreateMutate.mockReset();
     mockUpdateMutate.mockReset();
     mockRefetch.mockReset();
+    mockNativeMutate.mockReset();
+    mockNativeItems = [];
     mockDayError = null;
     mockDayLoading = false;
     mockNoteSources = [];
@@ -113,6 +122,17 @@ describe('ManagerMemoryPage', () => {
 
     expect(screen.queryByText('Check in with QA')).not.toBeInTheDocument();
     expect(screen.getByText('Release owner follow-up')).toBeInTheDocument();
+  });
+
+  it('uses canonical closed history and task-key mutations after cutover', () => {
+    mockDay!.taskModel = 'canonical';
+    mockNativeItems = [baseItem({ id: 300, taskKey: 'T-300', canonicalTask: true, title: 'Earlier closed follow-up', status: 'done', completedAt: '2026-04-20T09:00:00Z' }), baseItem({ id: 301, taskKey: 'T-301', canonicalTask: true, title: 'Native open follow-up' })];
+    renderMemory('follow-ups');
+    expect(screen.getByText('Earlier closed follow-up')).toBeInTheDocument();
+    const row = screen.getByText('Native open follow-up').closest('article')!;
+    fireEvent.click(within(row).getByRole('button', { name: /^done$/i }));
+    expect(mockNativeMutate).toHaveBeenCalledWith({ taskKey: 'T-301', updates: { status: 'done' } }, expect.any(Object));
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
   });
 
   it('creates a follow-up through the focused screen composer', () => {

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, dailyNoteTaskRefs, developers } from "../src/db/schema";
+import { configTable, dailyNoteTaskRefs, developers, issues, managerDeskItems, managerDeskLinks } from "../src/db/schema";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
@@ -17,6 +18,26 @@ beforeEach(async () => {
 });
 
 describe("note task references", () => {
+  it("preserves Jira links and checks the original complete task request on replay", async () => {
+    const now = new Date().toISOString();
+    await db.insert(issues).values({ jiraKey: "APP-1", summary: "Issue", priorityName: "Medium", priorityId: "3", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now });
+    await service.save("manager-a", date, { revision: 0, body: "Scratchpad" }, "default");
+    await service.save("manager-a", "2026-09-23", { revision: 0, body: "Other note" }, "default");
+    const input = { title: "From note", jiraKey: "APP-1", context: "Private context", requestId: randomUUID() };
+    const created = await service.createTask("manager-a", date, input, "default");
+    expect(await db.select().from(managerDeskLinks)).toEqual([expect.objectContaining({ itemId: created.managerDeskItemId, issueKey: "APP-1" })]);
+    await db.update(managerDeskItems).set({ title: "Renamed later" }).where(eq(managerDeskItems.id, created.managerDeskItemId!));
+    expect(await service.createTask("manager-a", date, input, "default")).toMatchObject({ taskKey: created.taskKey, title: "Renamed later" });
+    for (const changed of [{ context: "Changed" }, { jiraKey: "APP-2" }, { title: "Another" }, { developerAccountId: "dev-1" }]) {
+      await expect(service.createTask("manager-a", date, { ...input, ...changed }, "default")).rejects.toMatchObject({ status: 409 });
+    }
+    await expect(service.createTask("manager-a", "2026-09-23", input, "default")).rejects.toMatchObject({ status: 409 });
+    expect(await db.select().from(managerDeskItems)).toHaveLength(1);
+    const timeline = await events.list(created.taskKey, { kind: "manager", accountId: "manager-a" });
+    expect(timeline.events.filter((event) => event.body === input.context)).toHaveLength(1);
+    expect((await events.list(created.taskKey, { kind: "manager", accountId: "manager-b" })).events.some((event) => event.body === input.context)).toBe(false);
+  });
+
   it("records mentions once, keeps them after edits, and hides private excerpts", async () => {
     const item = await new TeamTrackerService().addItem("dev-1", date, { title: "Review" });
     await service.save("manager-a", date, { revision: 0, body: `See ${item.taskKey} for private plans. And t-99999 is unknown.` }, "default");

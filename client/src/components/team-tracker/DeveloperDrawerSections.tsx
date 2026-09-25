@@ -1,11 +1,16 @@
-import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, UserMinus, X } from 'lucide-react';
 import type { TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import type { TrackerWorkItem } from '@/types';
 import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
+import { useToast } from '@/context/ToastContext';
+import { useStatusUpdate } from '@/hooks/useTeamTrackerMutations';
+import type { TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TrackerItemRow } from './TrackerItemRow';
 import { TrackerSignalBadges } from './TrackerSignalBadges';
 import { TrackerStatusPill } from './TrackerStatusPill';
+import { StatusRationaleDialog } from './StatusRationaleDialog';
 
 const statusOptions: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];
 const statusLabels: Record<TrackerDeveloperStatus, string> = {
@@ -33,21 +38,23 @@ type UpdateDayHandler = (params: {
 
 interface DrawerHeaderProps {
   day: TrackerDeveloperDay;
+  date: string;
+  tasks?: TaskPickerTask[];
   loadLabel: string;
   isOverCapacity: boolean;
   readOnly: boolean;
   onClose: () => void;
-  onUpdateDay: UpdateDayHandler;
   onMarkInactive?: (day: TrackerDeveloperDay) => void;
 }
 
 export function DrawerHeader({
   day,
+  date,
+  tasks = [],
   loadLabel,
   isOverCapacity,
   readOnly,
   onClose,
-  onUpdateDay,
   onMarkInactive,
 }: DrawerHeaderProps) {
   const initials = day.developer.displayName
@@ -79,7 +86,7 @@ export function DrawerHeader({
               {day.developer.displayName}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-              <StatusPillSelect day={day} readOnly={readOnly} onUpdateDay={onUpdateDay} />
+              <StatusPillSelect day={day} date={date} tasks={tasks} readOnly={readOnly} />
               <span className="inline-flex items-center gap-1">
                 <span>Load</span>
                 <span className="font-mono font-semibold tabular-nums" style={{ color: isOverCapacity ? 'var(--danger)' : 'var(--text-primary)' }}>
@@ -138,22 +145,43 @@ export function DrawerHeader({
 
 interface StatusPillSelectProps {
   day: TrackerDeveloperDay;
+  date: string;
+  tasks: TaskPickerTask[];
   readOnly: boolean;
-  onUpdateDay: UpdateDayHandler;
 }
 
-function StatusPillSelect({ day, readOnly, onUpdateDay }: StatusPillSelectProps) {
+const DIALOG_STATUSES: TrackerDeveloperStatus[] = ['at_risk', 'blocked', 'waiting'];
+
+function StatusPillSelect({ day, date, tasks, readOnly }: StatusPillSelectProps) {
+  const { addToast } = useToast();
+  const statusUpdate = useStatusUpdate(date);
+  const [pendingStatus, setPendingStatus] = useState<TrackerDeveloperStatus | null>(null);
+
   if (readOnly) {
     return <TrackerStatusPill status={day.status} size="sm" />;
   }
 
   const style = statusStyles[day.status];
 
+  const handleChange = (status: TrackerDeveloperStatus) => {
+    if (status === day.status) {
+      return;
+    }
+    if (DIALOG_STATUSES.includes(status)) {
+      setPendingStatus(status);
+      return;
+    }
+    statusUpdate.mutate(
+      { accountId: day.developer.accountId, status },
+      { onError: (error) => addToast(error.message, 'error') },
+    );
+  };
+
   return (
     <span className="relative inline-flex shrink-0">
       <select
         value={day.status}
-        onChange={(event) => onUpdateDay({ accountId: day.developer.accountId, status: event.target.value as TrackerDeveloperStatus })}
+        onChange={(event) => handleChange(event.target.value as TrackerDeveloperStatus)}
         className="h-7 appearance-none rounded-lg py-0 pl-2.5 pr-6 text-[12px] font-semibold outline-none transition-colors focus:ring-2 focus:ring-[var(--border-active)]"
         style={{
           color: style.color,
@@ -174,6 +202,37 @@ function StatusPillSelect({ day, readOnly, onUpdateDay }: StatusPillSelectProps)
         className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
         style={{ color: style.color }}
       />
+      <AnimatePresence>
+        {pendingStatus && (
+          <StatusRationaleDialog
+            status={pendingStatus}
+            developerName={day.developer.displayName}
+            tasks={tasks}
+            isPending={statusUpdate.isPending}
+            error={statusUpdate.error?.message}
+            onClose={() => {
+              if (!statusUpdate.isPending) {
+                statusUpdate.reset();
+                setPendingStatus(null);
+              }
+            }}
+            onSubmit={({ rationale, taskKey, nextFollowUpAt }) =>
+              statusUpdate.mutate(
+                {
+                  accountId: day.developer.accountId,
+                  status: pendingStatus,
+                  rationale,
+                  taskKey,
+                  nextFollowUpAt,
+                },
+                {
+                  onSuccess: () => setPendingStatus(null),
+                },
+              )
+            }
+          />
+        )}
+      </AnimatePresence>
     </span>
   );
 }

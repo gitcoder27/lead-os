@@ -854,12 +854,25 @@ export interface TrackerWorkItem {
   updatedAt: string;
 }
 
+/**
+ * Phase 3 (P3-D11): hybrid person-day status. When a developer's current
+ * work carries a blocked task but their manual status says otherwise, the
+ * board suggests setting the person status. Accepting writes the manual
+ * status with `reason` linking the task and emits a `blocker` event.
+ */
+export interface TrackerStatusSuggestion {
+  status: "blocked";
+  reasonTaskKey: string;
+  reasonTaskTitle?: string;
+}
+
 export interface TrackerDeveloperDay {
   id: number;
   date: string;
   developer: Developer;
   availability: DeveloperAvailability;
   status: TrackerDeveloperStatus;
+  statusSuggestion?: TrackerStatusSuggestion;
   capacityUnits?: number;
   managerNotes?: string;
   lastCheckInAt?: string;
@@ -1021,6 +1034,32 @@ export interface TeamTrackerBoardResponse {
 export interface InactiveDeveloperListItem {
   developer: Developer;
   availability: DeveloperAvailability;
+}
+
+/**
+ * Phase 3 (P3-D5/D6, §6): the standup rolling-window feed. Task events on
+ * the developer's owned tasks (status, blocker, shared update, assign,
+ * created) plus check-ins recorded against their day.
+ */
+export interface StandupFeedEntry {
+  /** `event:<id>` for task events, `checkin:<id>` for check-ins. */
+  id: string;
+  kind: "event" | "checkin";
+  occurredAt: string;
+  taskKey?: string;
+  taskTitle?: string;
+  type?: TaskEventType;
+  body?: string | null;
+  authorType?: TaskEvent["author"]["type"];
+  /** Check-in summary text (kind === "checkin"). */
+  summary?: string;
+}
+
+export interface StandupFeedResponse {
+  entries: StandupFeedEntry[];
+  /** ISO timestamp the feed starts at (rolling 24h; 72h on Mondays). */
+  windowStart: string;
+  windowHours: number;
 }
 
 export interface MyDayResponse {

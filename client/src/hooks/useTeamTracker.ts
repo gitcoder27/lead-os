@@ -8,6 +8,7 @@ import type {
   TrackerIssueAssignment,
   TrackerCarryForwardContextResponse,
   TrackerCarryForwardPreviewResponse,
+  StandupFeedResponse,
 } from '@/types';
 
 interface TrackerIssueAssignmentsResponse {
@@ -51,6 +52,16 @@ export function useTeamTracker(date: string, query?: TeamTrackerBoardQuery, enab
         }),
       };
     },
+  });
+}
+
+/** Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed for one developer. */
+export function useStandupFeed(accountId: string | undefined, enabled = true) {
+  const authScopeKey = useAuthScopeKey();
+  return useQuery<StandupFeedResponse>({
+    queryKey: ['team-tracker', 'standup-feed', accountId, authScopeKey],
+    queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?accountId=${encodeURIComponent(accountId!)}`),
+    enabled: enabled && Boolean(accountId),
   });
 }
 

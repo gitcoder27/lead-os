@@ -14,6 +14,8 @@ interface TrackerRosterBoardProps {
   onOpenDrawer: (accountId: string) => void;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
+  /** Phase 3 (P3-D11): accept the hybrid person-day status suggestion. */
+  onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   issues?: Issue[];
   attentionItems?: TrackerAttentionItem[];
   attentionSorted?: boolean;
@@ -185,6 +187,7 @@ function RosterRow({
   onOpenDrawer,
   onOpenTaskDetail,
   onCaptureFollowUp,
+  onAcceptSuggestion,
   readOnly,
   attentionMeta,
 }: {
@@ -193,6 +196,7 @@ function RosterRow({
   onOpenDrawer: (accountId: string) => void;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
+  onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   readOnly?: boolean;
   attentionMeta?: AttentionMeta;
 }) {
@@ -240,8 +244,29 @@ function RosterRow({
           <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             {day.developer.displayName}
           </div>
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-1.5">
             <TrackerStatusPill status={day.status} />
+            {day.statusSuggestion && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAcceptSuggestion?.(day);
+                }}
+                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
+                style={{
+                  background: 'color-mix(in srgb, var(--warning) 12%, transparent)',
+                  color: 'var(--warning)',
+                  border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)',
+                }}
+                title={`${day.statusSuggestion.reasonTaskKey} is blocked — set status to blocked`}
+                aria-label={`Accept suggested blocked status for ${day.developer.displayName}`}
+                data-testid={`suggestion-${day.developer.accountId}`}
+              >
+                <AlertTriangle size={9} />
+                Suggested
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -305,6 +330,7 @@ function RosterSection({
   onOpenDrawer,
   onOpenTaskDetail,
   onCaptureFollowUp,
+  onAcceptSuggestion,
   readOnly,
   attentionMeta,
   attentionSorted,
@@ -314,6 +340,7 @@ function RosterSection({
   onOpenDrawer: (accountId: string) => void;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
+  onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   readOnly?: boolean;
   attentionMeta: Map<string, AttentionMeta>;
   attentionSorted: boolean;
@@ -339,6 +366,7 @@ function RosterSection({
           onOpenDrawer={onOpenDrawer}
           onOpenTaskDetail={onOpenTaskDetail}
           onCaptureFollowUp={onCaptureFollowUp}
+          onAcceptSuggestion={onAcceptSuggestion}
           readOnly={readOnly}
           attentionMeta={attentionMeta.get(day.developer.accountId)}
         />
@@ -355,6 +383,7 @@ export function TrackerRosterBoard({
   onOpenDrawer,
   onOpenTaskDetail,
   onCaptureFollowUp,
+  onAcceptSuggestion,
   attentionItems = [],
   attentionSorted = false,
   readOnly = false,
@@ -387,6 +416,7 @@ export function TrackerRosterBoard({
         onOpenDrawer={onOpenDrawer}
         onOpenTaskDetail={onOpenTaskDetail}
         onCaptureFollowUp={onCaptureFollowUp}
+        onAcceptSuggestion={onAcceptSuggestion}
         readOnly={readOnly}
         attentionMeta={attentionMeta}
         attentionSorted={attentionSorted}
@@ -420,6 +450,7 @@ export function TrackerRosterBoard({
               onOpenDrawer={onOpenDrawer}
               onOpenTaskDetail={onOpenTaskDetail}
               onCaptureFollowUp={onCaptureFollowUp}
+              onAcceptSuggestion={onAcceptSuggestion}
               readOnly={readOnly}
               attentionMeta={attentionMeta}
               attentionSorted={attentionSorted}

@@ -211,9 +211,14 @@ export function DeveloperTrackerDrawer({
     onReorderPlannedItem({ itemId: movedItemId, position: targetPosition });
   }, [day, onReorderPlannedItem]);
 
+  // Canonical transport carries `day.tasks`; the legacy item arrays are the
+  // pre-canonical fallback (and stay populated under Phase 2 transport).
   const checkInTasks = useMemo(
-    () => tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, localPlannedItems),
-    [day?.currentItem, localPlannedItems],
+    () =>
+      day?.tasks?.length
+        ? day.tasks.map((task) => ({ taskKey: task.taskKey, title: task.title }))
+        : tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, localPlannedItems),
+    [day?.tasks, day?.currentItem, localPlannedItems],
   );
 
   const composerOrder = useMemo(
@@ -235,7 +240,7 @@ export function DeveloperTrackerDrawer({
   );
 
   const registerComposer = useCallback(
-    (itemId: number) => (api: { expand: () => void; focus: () => void } | null) => {
+    (itemId: number) => (api: { expand: () => void; focus: () => void; togglePrivate: () => void } | null) => {
       if (api) {
         composerApisRef.current.set(itemId, api);
       } else {

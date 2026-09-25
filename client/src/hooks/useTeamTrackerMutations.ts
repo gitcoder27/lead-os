@@ -141,8 +141,10 @@ export function useDeleteTrackerItem(date: string) {
 export function useSetCurrentItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (itemId: number) =>
-      api.post<TrackerWorkItem>(`/team-tracker/items/${taskRefFor('tracker', itemId)}/set-current`),
+    // A string ref is an explicit task key (`T-<n>`); numeric ids resolve
+    // through the surface-task registry populated by the board normalizer.
+    mutationFn: (itemRef: number | string) =>
+      api.post<TrackerWorkItem>(`/team-tracker/items/${typeof itemRef === 'string' ? encodeURIComponent(itemRef) : taskRefFor('tracker', itemRef)}/set-current`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
@@ -156,8 +158,8 @@ export function useSetCurrentItem(date: string) {
 export function useReassignTrackerItem(date: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: { itemId: number; toAccountId: string }) =>
-      api.post<TrackerWorkItem>(`/team-tracker/items/${taskRefFor('tracker', params.itemId)}/reassign`, {
+    mutationFn: (params: { itemId: number | string; toAccountId: string }) =>
+      api.post<TrackerWorkItem>(`/team-tracker/items/${typeof params.itemId === 'string' ? encodeURIComponent(params.itemId) : taskRefFor('tracker', params.itemId)}/reassign`, {
         toAccountId: params.toAccountId,
         date,
         requestId: crypto.randomUUID(),

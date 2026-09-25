@@ -32,8 +32,8 @@ interface TaskUpdateComposerProps {
   inputRef?: RefObject<HTMLTextAreaElement | null>;
   /** Arrow-key navigation between stacked composers (standup rows). */
   onArrowNav?: (direction: 'up' | 'down') => void;
-  /** Registers expand/focus handles so a parent can move focus into this composer. */
-  registerComposer?: (api: { expand: () => void; focus: () => void } | null) => void;
+  /** Registers expand/focus/privacy handles so a parent can drive this composer. */
+  registerComposer?: (api: { expand: () => void; focus: () => void; togglePrivate: () => void } | null) => void;
   autoFocus?: boolean;
 }
 
@@ -75,6 +75,10 @@ export function TaskUpdateComposer({
         window.setTimeout(() => localRef.current?.focus(), 0);
       },
       focus: () => localRef.current?.focus(),
+      togglePrivate: () => {
+        setExpanded(true);
+        setIsPrivate((value) => !value);
+      },
     });
     return () => registerComposer?.(null);
   }, [registerComposer]);

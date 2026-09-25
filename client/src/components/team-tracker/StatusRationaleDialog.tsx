@@ -11,6 +11,8 @@ interface StatusRationaleDialogProps {
   tasks: TaskPickerTask[];
   isPending: boolean;
   error?: string | null;
+  /** Pre-picked task keys (e.g. the task that triggered a status suggestion). */
+  initialSelectedKeys?: string[];
   onClose: () => void;
   onSubmit: (params: { rationale: string; taskKey?: string; nextFollowUpAt?: string | null }) => void;
 }
@@ -23,6 +25,7 @@ export function StatusRationaleDialog({
   tasks,
   isPending,
   error,
+  initialSelectedKeys,
   onClose,
   onSubmit,
 }: StatusRationaleDialogProps) {
@@ -30,7 +33,7 @@ export function StatusRationaleDialog({
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const [rationale, setRationale] = useState('');
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(initialSelectedKeys ?? []);
   const [followUpAt, setFollowUpAt] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 

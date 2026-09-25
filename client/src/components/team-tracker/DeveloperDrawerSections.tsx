@@ -208,6 +208,11 @@ function StatusPillSelect({ day, date, tasks, readOnly }: StatusPillSelectProps)
             status={pendingStatus}
             developerName={day.developer.displayName}
             tasks={tasks}
+            initialSelectedKeys={
+              day.statusSuggestion?.status === pendingStatus
+                ? [day.statusSuggestion.reasonTaskKey]
+                : undefined
+            }
             isPending={statusUpdate.isPending}
             error={statusUpdate.error?.message}
             onClose={() => {

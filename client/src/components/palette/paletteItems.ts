@@ -51,15 +51,27 @@ const NAVIGATION_COMMANDS: Array<{ view: AppView; title: string; keywords?: stri
 ];
 
 export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): PaletteItem[] {
-  return NAVIGATION_COMMANDS.map((command) => ({
+  const commands: PaletteItem[] = NAVIGATION_COMMANDS.map((command) => ({
     id: `nav-${command.view}`,
-    group: 'actions',
+    group: 'actions' as const,
     // P3-D1: under Phase 3 the desk surface is named Tasks.
     title: command.view === 'desk' && options?.tasksPhase3 ? 'Go to Tasks' : command.title,
     keywords: command.view === 'desk' && options?.tasksPhase3 ? `${command.keywords ?? ''} tasks` : command.keywords,
     view: command.view,
-    target: command.targetView ? { type: 'view', view: command.targetView } : undefined,
+    target: command.targetView ? { type: 'view' as const, view: command.targetView } : undefined,
   }));
+  if (options?.tasksPhase3) {
+    // P3-D5: standup mode is a deep-linked overlay on the Team page.
+    commands.push({
+      id: 'action-standup',
+      group: 'actions',
+      title: 'Start standup',
+      description: 'Keyboard-driven standup over the team board',
+      keywords: 'standup scrum daily team keyboard',
+      href: '/team?mode=standup',
+    });
+  }
+  return commands;
 }
 
 /** §5.2: every task view (built-in + saved) is a palette destination. */

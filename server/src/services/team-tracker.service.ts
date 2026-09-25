@@ -29,6 +29,8 @@ import type {
   TeamTrackerSavedView,
   TeamTrackerViewMode,
   MyDayViewMode,
+  StandupFeedEntry,
+  StandupFeedResponse,
 } from "shared/types";
 import { db } from "../db/connection";
 import {
@@ -1302,6 +1304,51 @@ export class TeamTrackerService {
 
   async getAvailabilityForDate(accountId: string, date: string, workspaceId?: string) {
     return this.availability.getAvailabilityForDate(accountId, date, workspaceId);
+  }
+
+  /**
+   * Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed for one developer —
+   * shared task events on their owned tasks plus check-ins on their days.
+   * Window: last 24h, or 72h when today is Monday (covers the weekend).
+   */
+  async getStandupFeed(developerAccountId: string, workspaceId?: string): Promise<StandupFeedResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    await this.taskKeys.assertPhase3Enabled(scope);
+    await this.getDeveloperByAccountId(developerAccountId, scope);
+    const isMonday = new Date(`${todayIsoDate()}T12:00:00`).getDay() === 1;
+    const windowHours = isMonday ? 72 : 24;
+    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const [eventRows, checkInRows] = await Promise.all([
+      this.eventsService.feedForOwner(developerAccountId, windowStart, scope),
+      db.select({ checkIn: teamTrackerCheckIns })
+        .from(teamTrackerCheckIns)
+        .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerCheckIns.dayId))
+        .where(and(
+          eq(teamTrackerCheckIns.workspaceId, scope),
+          eq(teamTrackerDays.developerAccountId, developerAccountId),
+          gte(teamTrackerCheckIns.createdAt, windowStart),
+        ))
+        .orderBy(desc(teamTrackerCheckIns.createdAt)),
+    ]);
+    const entries: StandupFeedEntry[] = [
+      ...eventRows.map((row): StandupFeedEntry => ({
+        id: `event:${row.id}`,
+        kind: "event",
+        occurredAt: row.occurredAt,
+        taskKey: row.taskKey,
+        taskTitle: row.taskTitle,
+        type: row.type as StandupFeedEntry["type"],
+        body: row.body,
+        authorType: row.authorType as StandupFeedEntry["authorType"],
+      })),
+      ...checkInRows.map((row): StandupFeedEntry => ({
+        id: `checkin:${row.checkIn.id}`,
+        kind: "checkin",
+        occurredAt: row.checkIn.createdAt,
+        summary: row.checkIn.summary,
+      })),
+    ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+    return { entries, windowStart, windowHours };
   }
 
   async updateAvailability(
@@ -2813,7 +2860,8 @@ export class TeamTrackerService {
       this.getRecentCheckInsByDeveloper(ownerIds, date, scope),
     ]);
     const exactIds = days.filter((day) => day.date === date).map((day) => day.id);
-    const [surfaceTasks, checkIns] = await Promise.all([
+    const [phase3, surfaceTasks, checkIns] = await Promise.all([
+      this.taskKeys.phase3Enabled(scope),
       this.tasks.surfaceDtos(taskRows, { date, principal }),
       exactIds.length ? db.select().from(teamTrackerCheckIns).where(and(eq(teamTrackerCheckIns.workspaceId, scope), inArray(teamTrackerCheckIns.dayId, exactIds))) : Promise.resolve([]),
     ]);
@@ -2843,8 +2891,15 @@ export class TeamTrackerService {
       const currentItem = mapped.find((item) => item.state === "in_progress");
       const plannedItems = mapped.filter((item) => item.state === "planned");
       const status = (day?.status ?? "on_track") as TrackerDeveloperStatus;
+      // P3-D11: a blocked canonical task suggests the person-day status is
+      // blocked too, even though the task maps to "planned" in tracker DTOs.
+      const blockedTask = phase3 && status !== "blocked"
+        ? [...(surfaceByOwner.get(developer.accountId) ?? [])].sort((left, right) => left.position - right.position).find((task) => task.status === "blocked")
+        : undefined;
       const signals = buildSignals({ date, status, lastCheckInAt: day?.lastCheckInAt, statusUpdatedAt: day?.statusUpdatedAt, updatedAt: day?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, capacityUnits: day?.capacityUnits ?? undefined, config });
-      return { id: exact?.id ?? 0, date, developer, availability: developer.availability ?? { state: "active" }, status, capacityUnits: day?.capacityUnits ?? undefined,
+      return { id: exact?.id ?? 0, date, developer, availability: developer.availability ?? { state: "active" }, status,
+        statusSuggestion: blockedTask ? { status: "blocked", reasonTaskKey: blockedTask.taskKey, reasonTaskTitle: blockedTask.title } : undefined,
+        capacityUnits: day?.capacityUnits ?? undefined,
         managerNotes: notesByOwner.get(developer.accountId), lastCheckInAt: day?.lastCheckInAt ?? undefined, nextFollowUpAt: day?.nextFollowUpAt ?? undefined,
         currentItem, plannedItems, completedItems: mapped.filter((item) => item.state === "done"), droppedItems: mapped.filter((item) => item.state === "dropped"),
         tasks: (surfaceByOwner.get(developer.accountId) ?? []).sort((left, right) => left.position - right.position),

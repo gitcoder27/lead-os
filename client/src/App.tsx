@@ -20,6 +20,7 @@ import {
   taskKeyFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
+  teamModeFromParams,
 } from '@/lib/view-params';
 import {
   taskViewParamsFromState,
@@ -435,6 +436,12 @@ function AppContent() {
       : undefined,
   );
   const [teamBoardQueryNonce, setTeamBoardQueryNonce] = useState(0);
+  // Phase 3 (P3-D5): `/team?mode=standup`.
+  const [teamMode, setTeamMode] = useState<'standup' | undefined>(() =>
+    pathToView(window.location.pathname) === 'team'
+      ? teamModeFromParams(new URLSearchParams(window.location.search))
+      : undefined,
+  );
   // Phase 3 (P3-D1): `/tasks` URL state — selected view + overrides.
   const [tasksUrlState, setTasksUrlState] = useState<TaskViewUrlState | undefined>(() =>
     pathToView(window.location.pathname) === 'desk'
@@ -490,6 +497,8 @@ function AppContent() {
     const nextView = canonicalizeView(view);
     clearTodayTargets();
     setDeskDateParam(undefined);
+    // Standup mode only survives navigation when it's still in the URL.
+    if (nextView === 'team') setTeamMode(undefined);
     if (nextView === 'notes') {
       setNotesDate(getLocalIsoDate());
     }
@@ -682,6 +691,7 @@ function AppContent() {
       if (nextView === 'team') {
         setTeamBoardQuery(teamBoardQueryFromParams(params));
         setTeamBoardQueryNonce((nonce) => nonce + 1);
+        setTeamMode(teamModeFromParams(params));
         const taskKey = taskKeyFromParams(params);
         if (taskKey) {
           setTodayTeamTarget((prev) => ({ taskKey, nonce: prev.nonce + 1 }));
@@ -709,6 +719,20 @@ function AppContent() {
 
   const handleTeamBoardQueryChange = useCallback((query: TeamTrackerBoardQuery) => {
     setTeamBoardQuery(query);
+  }, []);
+
+  // Phase 3 (P3-D5): standup is URL state so Esc/back both leave it cleanly.
+  const handleStandupModeChange = useCallback((open: boolean) => {
+    setTeamMode(open ? 'standup' : undefined);
+    const params = new URLSearchParams(window.location.search);
+    if (open) params.set('mode', 'standup');
+    else params.delete('mode');
+    const search = params.toString();
+    const target = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    if (!sameLocation(target)) {
+      if (open) window.history.pushState(null, '', target);
+      else window.history.replaceState(null, '', target);
+    }
   }, []);
 
   const handleDeskDateChange = useCallback((date: string) => {
@@ -740,6 +764,7 @@ function AppContent() {
     const target = `${window.location.pathname}${buildSearchFromParams({
       ...teamBoardQueryToParams(teamBoardQuery),
       task: taskKey,
+      mode: teamMode,
     })}`;
     if (sameLocation(target)) {
       return;
@@ -748,7 +773,7 @@ function AppContent() {
       window.history.replaceState(null, '', target);
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [activeView, teamBoardQuery]);
+  }, [activeView, teamBoardQuery, teamMode]);
 
   // Phase 3: `/tasks` keeps its view+override params shareable (§5.2).
   useEffect(() => {
@@ -982,6 +1007,8 @@ function AppContent() {
             urlBoardQuery={teamBoardQuery}
             urlBoardQueryNonce={teamBoardQueryNonce}
             onBoardQueryChange={handleTeamBoardQueryChange}
+            standupMode={teamMode === 'standup'}
+            onStandupModeChange={handleStandupModeChange}
           />
         </Suspense>
       </WorkspaceShell>

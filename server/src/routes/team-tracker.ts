@@ -317,6 +317,24 @@ export function createTeamTrackerRouter(
     }
   });
 
+  // Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed per developer.
+  // 404 while the Phase 3 flag is off so the endpoint can't leak early.
+  router.get(
+    "/standup/feed",
+    validate(z.object({ query: z.object({ accountId: z.string().min(1) }) })),
+    async (req, res, next) => {
+      try {
+        const feed = await trackerService.getStandupFeed(
+          req.query.accountId as string,
+          req.auth!.user.workspaceId
+        );
+        res.json(feed);
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
   router.get("/views", async (req, res, next) => {
     try {
       const views = await trackerService.listSavedViews(req.auth!.user.accountId, req.auth!.user.workspaceId);

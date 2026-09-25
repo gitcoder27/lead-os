@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, lt, max, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, lt, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
@@ -271,6 +271,31 @@ export class TaskEventsService {
   async historyForTasks(taskIds: number[], workspaceId?: string): Promise<EventRow[]> {
     if (!taskIds.length) return [];
     return db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
+  }
+
+  /**
+   * Phase 3 (P3-D6, §6.1): rolling-window events on the developer's owned
+   * tasks for the standup feed. Shared visibility only — manager-private
+   * events never surface here. Caller supplies the window start.
+   */
+  async feedForOwner(ownerId: string, since: string, workspaceId?: string, limit = 120): Promise<(EventRow & { taskTitle: string })[]> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    return db
+      .select({ event: taskEvents, taskTitle: tasks.title })
+      .from(taskEvents)
+      .innerJoin(tasks, eq(tasks.id, taskEvents.taskId))
+      .where(and(
+        eq(taskEvents.workspaceId, scope),
+        eq(tasks.ownerType, "developer"),
+        eq(tasks.ownerId, ownerId),
+        eq(taskEvents.visibility, "shared"),
+        isNull(taskEvents.redactedAt),
+        inArray(taskEvents.type, ["status", "blocker", "update", "assign", "created"]),
+        sql`${taskEvents.occurredAt} >= ${since}`,
+      ))
+      .orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id))
+      .limit(limit)
+      .then((rows) => rows.map((row) => ({ ...row.event, taskTitle: row.taskTitle })));
   }
 
   /** Phase 3 (P3-D9 stale view): newest event timestamp per task, batched. */

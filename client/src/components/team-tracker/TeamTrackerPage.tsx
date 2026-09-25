@@ -11,6 +11,7 @@ import {
   useUpdateTrackerItem,
   useAddTrackerItem,
   useAddCheckIn,
+  useStatusUpdate,
 } from '@/hooks/useTeamTrackerMutations';
 import { useBoardQueryState } from '@/hooks/useBoardQueryState';
 import { useIssues } from '@/hooks/useIssues';
@@ -25,6 +26,9 @@ import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
 import { AvailabilityDialog } from './AvailabilityDialog';
 import { TrackerTaskDetailDrawer } from './TrackerTaskDetailDrawer';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
+import { StandupMode } from './StandupMode';
+import { StatusRationaleDialog } from './StatusRationaleDialog';
+import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { describeTeamTrackerView } from './SavedViewItem';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
@@ -56,6 +60,9 @@ interface TeamTrackerPageProps {
   urlBoardQuery?: TeamTrackerBoardQuery;
   urlBoardQueryNonce?: number;
   onBoardQueryChange?: (query: TeamTrackerBoardQuery) => void;
+  /** Phase 3 (P3-D5): `/team?mode=standup` — the keyboard-driven standup overlay. */
+  standupMode?: boolean;
+  onStandupModeChange?: (open: boolean) => void;
 }
 
 function useTeamTrackerWorkflow({
@@ -287,6 +294,8 @@ export function TeamTrackerPage({
   urlBoardQuery,
   urlBoardQueryNonce,
   onBoardQueryChange,
+  standupMode,
+  onStandupModeChange,
 }: TeamTrackerPageProps) {
   const { addToast } = useToast();
   const tasksPhase3 = useTasksPhase3();
@@ -328,6 +337,10 @@ export function TeamTrackerPage({
   const setCurrent = useSetCurrentItem(date);
   const updateItem = useUpdateTrackerItem(date);
   const addCheckIn = useAddCheckIn(date);
+  const statusUpdate = useStatusUpdate(date);
+  // P3-D11: roster badge accept → rationale dialog pre-picked to the
+  // blocked task that raised the suggestion.
+  const [suggestionTarget, setSuggestionTarget] = useState<TrackerDeveloperDay | null>(null);
 
   const groups = board?.groups ?? [];
   const viewMode = board?.viewMode ?? (isToday ? 'live' : 'history');
@@ -543,6 +556,11 @@ export function TeamTrackerPage({
                 onUpdateView={qs.handleUpdateView}
                 onDeleteView={qs.handleDeleteView}
                 isSaving={qs.isSaving}
+                onStartStandup={
+                  tasksPhase3 && isToday && !readOnly
+                    ? () => onStandupModeChange?.(true)
+                    : undefined
+                }
               />
             </div>
 
@@ -586,6 +604,11 @@ export function TeamTrackerPage({
                 onOpenDrawer={workflow.setDrawerAccountId}
                 onOpenTaskDetail={readOnly ? undefined : workflow.handleOpenTaskDetail}
                 onCaptureFollowUp={workflow.handleCaptureFollowUp}
+                onAcceptSuggestion={
+                  tasksPhase3 && !readOnly
+                    ? (day) => setSuggestionTarget(day)
+                    : undefined
+                }
                 issues={issues}
                 attentionItems={workflow.attentionItems}
                 attentionSorted={resolvedSortBy === 'attention'}
@@ -615,6 +638,54 @@ export function TeamTrackerPage({
         )}
       </div>
 
+      {/* Phase 3 (P3-D5/D6): keyboard-driven standup overlay. */}
+      {standupMode && tasksPhase3 && board && !readOnly && (
+        <StandupMode
+          date={date}
+          board={board}
+          onClose={() => onStandupModeChange?.(false)}
+          onOpenTask={(taskKey) => workflow.setSelectedTask({ trackerItemId: null, taskKey })}
+          suspended={Boolean(workflow.selectedTask) || Boolean(workflow.drawerAccountId)}
+        />
+      )}
+      {/* P3-D11: accepting a roster suggestion opens the shared rationale
+          dialog with the blocked task pre-picked; the submit posts the
+          person status + taskKey (server writes the blocker event). */}
+      {suggestionTarget?.statusSuggestion && (
+        <StatusRationaleDialog
+          status={suggestionTarget.statusSuggestion.status}
+          developerName={suggestionTarget.developer.displayName}
+          tasks={
+            suggestionTarget.tasks?.length
+              ? suggestionTarget.tasks.map((task) => ({ taskKey: task.taskKey, title: task.title }))
+              : tasksFromItems(
+                  suggestionTarget.currentItem ? [suggestionTarget.currentItem] : [],
+                  suggestionTarget.plannedItems,
+                )
+          }
+          initialSelectedKeys={[suggestionTarget.statusSuggestion.reasonTaskKey]}
+          isPending={statusUpdate.isPending}
+          error={statusUpdate.error?.message}
+          onClose={() => {
+            if (!statusUpdate.isPending) {
+              statusUpdate.reset();
+              setSuggestionTarget(null);
+            }
+          }}
+          onSubmit={({ rationale, taskKey, nextFollowUpAt }) =>
+            statusUpdate.mutate(
+              {
+                accountId: suggestionTarget.developer.accountId,
+                status: 'blocked',
+                rationale,
+                taskKey: taskKey ?? suggestionTarget.statusSuggestion!.reasonTaskKey,
+                nextFollowUpAt,
+              },
+              { onSuccess: () => setSuggestionTarget(null) },
+            )
+          }
+        />
+      )}
       {/* Detail drawer */}
       <DeveloperTrackerDrawer
         date={date}
@@ -640,7 +711,7 @@ export function TeamTrackerPage({
       {tasksPhase3 && workflow.selectedTask?.taskKey ? (
         <TaskDrawer
           taskKey={workflow.selectedTask.taskKey}
-          stacked={Boolean(workflow.drawerAccountId)}
+          stacked={Boolean(workflow.drawerAccountId) || Boolean(standupMode)}
           onClose={() => workflow.setSelectedTask(null)}
           onNavigateTask={(key) => workflow.setSelectedTask({ trackerItemId: null, taskKey: key })}
         />

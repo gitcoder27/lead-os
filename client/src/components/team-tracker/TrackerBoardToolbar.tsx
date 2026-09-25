@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { TeamTrackerBoardSort, TeamTrackerBoardGroupBy, TeamTrackerSavedView } from '@/types';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import type { SavedViewsMenuProps } from './SavedViewsMenu';
@@ -13,6 +13,8 @@ interface TrackerBoardToolbarProps extends SavedViewsMenuProps<TeamTrackerSavedV
   onGroupChange: (group: TeamTrackerBoardGroupBy) => void;
   visibleCount: number;
   totalCount: number;
+  /** Phase 3 (P3-D5): present only when standup mode is available. */
+  onStartStandup?: () => void;
 }
 
 const sortOptions: Array<{ value: TeamTrackerBoardSort; label: string }> = [
@@ -38,6 +40,7 @@ export function TrackerBoardToolbar({
   onGroupChange,
   visibleCount,
   totalCount,
+  onStartStandup,
   ...savedViewProps
 }: TrackerBoardToolbarProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -87,6 +90,24 @@ export function TrackerBoardToolbar({
           >
             {visibleCount}/{totalCount}
           </span>
+        )}
+
+        {onStartStandup && (
+          <button
+            type="button"
+            onClick={onStartStandup}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
+            style={{
+              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+              color: 'var(--accent)',
+            }}
+            aria-label="Start standup"
+            title="Start standup"
+          >
+            <Presentation size={12} />
+            Standup
+          </button>
         )}
 
         <ViewOptionsMenu

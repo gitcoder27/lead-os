@@ -129,6 +129,11 @@ export function teamBoardQueryFromParams(params: URLSearchParams): TeamTrackerBo
   };
 }
 
+/** Phase 3 (P3-D5): `/team?mode=standup` opens the standup overlay. */
+export function teamModeFromParams(params: URLSearchParams): 'standup' | undefined {
+  return firstParam(params, 'mode') === 'standup' ? 'standup' : undefined;
+}
+
 export function deskDateFromParams(params: URLSearchParams): string | undefined {
   return dateParam(params, 'date');
 }

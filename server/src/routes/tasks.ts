@@ -5,6 +5,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { TaskEventsService } from "../services/task-events.service";
 import { TaskKeysService } from "../services/task-keys.service";
 import { TaskService, taskCreateSchema, taskUpdateSchema, taskLinkSchema, type TaskPrincipal } from "../services/task.service";
+import { TaskViewsService, decodeTaskViewDefinition } from "../services/task-views.service";
 import type { Request } from "express";
 
 const key = z.string().trim().regex(/^[Tt]-\d{1,9}$/);
@@ -32,12 +33,19 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
   const assertCanonical = async (req: Request) => {
     if (!(await keys.canonicalEnabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Canonical tasks are not enabled");
   };
-  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional() }) })), async (req, res, next) => {
+  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional(), viewDef: z.string().max(8000).optional() }) })), async (req, res, next) => {
     try {
       await assertCanonical(req);
       const actor = principal(req);
+      // Phase 3 (P3-D9, §5.2): a base64url TaskViewDefinition takes precedence
+      // over the legacy `view` enum and is gated on tasks_phase3_enabled.
+      if (req.query.viewDef) {
+        if (!(await keys.phase3Enabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Task views are not enabled");
+        res.json({ tasks: await new TaskViewsService().run(actor, decodeTaskViewDefinition(req.query.viewDef as string)) });
+        return;
+      }
       const rows = await tasks.list(actor, req.query as Parameters<TaskService["list"]>[1]);
-      res.json({ tasks: await Promise.all(rows.map((row) => tasks.toDto(row, actor))) });
+      res.json({ tasks: await tasks.toDtos(rows, actor) });
     } catch (error) { next(error); }
   });
   router.post("/", validate(z.object({ body: taskCreateSchema, params: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {

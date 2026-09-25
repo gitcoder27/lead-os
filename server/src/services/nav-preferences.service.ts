@@ -9,6 +9,7 @@ import {
 import { db } from "../db/connection";
 import { userNavPreferences } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
+import { TaskKeysService } from "./task-keys.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 function nowIso(): string {
@@ -24,8 +25,13 @@ function parseStoredList(raw: string): unknown {
 }
 
 export class NavPreferencesService {
+  private readonly keys = new TaskKeysService();
+
   async get(managerAccountId: string, workspaceId?: string): Promise<NavPreferences> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    // P3-D1: persisted `desk`/`tasks` entries are rewritten on read to the id
+    // that matches this workspace's flag.
+    const tasksNav = await this.keys.phase3Enabled(normalizedWorkspaceId);
     const rows = await db
       .select()
       .from(userNavPreferences)
@@ -38,14 +44,8 @@ export class NavPreferencesService {
       .limit(1);
 
     const row = rows[0];
-    if (!row) {
-      return {
-        topNav: [...DEFAULT_NAV_PREFERENCES.topNav],
-        moreNav: [...DEFAULT_NAV_PREFERENCES.moreNav],
-      };
-    }
-
-    return sanitizeNavPreferences(parseStoredList(row.topNav), parseStoredList(row.moreNav));
+    const stored = row ? { topNav: parseStoredList(row.topNav), moreNav: parseStoredList(row.moreNav) } : DEFAULT_NAV_PREFERENCES;
+    return sanitizeNavPreferences(stored.topNav, stored.moreNav, { tasksNav });
   }
 
   async save(
@@ -53,17 +53,20 @@ export class NavPreferencesService {
     input: SaveNavPreferencesPayload,
     workspaceId?: string
   ): Promise<NavPreferences> {
-    if (!isCompleteNavPreferences(input)) {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const tasksNav = await this.keys.phase3Enabled(normalizedWorkspaceId);
+    if (!isCompleteNavPreferences(input, { tasksNav })) {
       throw new HttpError(
         400,
         "Navigation preferences must place each page in the top navigation or More menu exactly once"
       );
     }
 
-    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const now = nowIso();
-    const topNav = JSON.stringify(input.topNav);
-    const moreNav = JSON.stringify(input.moreNav);
+    // Persist the canonical live id so a flag flip never leaves a stale alias.
+    const sanitized = sanitizeNavPreferences(input.topNav, input.moreNav, { tasksNav });
+    const topNav = JSON.stringify(sanitized.topNav);
+    const moreNav = JSON.stringify(sanitized.moreNav);
 
     await db
       .insert(userNavPreferences)
@@ -80,6 +83,6 @@ export class NavPreferencesService {
         set: { topNav, moreNav, updatedAt: now },
       });
 
-    return { topNav: [...input.topNav], moreNav: [...input.moreNav] };
+    return sanitized;
   }
 }

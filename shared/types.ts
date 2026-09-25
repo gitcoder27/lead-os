@@ -674,6 +674,79 @@ export type TaskDetailResponse = (ManagerTask | DeveloperTask) & {
   children: TaskChildRef[];
   parent: TaskChildRef | null;
 };
+
+// ── Task saved views (P3-D9/D10) ─────────────────────────────────────────
+// Built-in view ids are defined in code; saved views live in
+// `task_saved_views` and are private to the owning manager.
+
+export interface TaskViewDateRange {
+  /** Inclusive ISO date bounds; either side may be open. */
+  from?: string;
+  to?: string;
+}
+
+export interface TaskViewFilters {
+  /** "me" = my manager tasks, "team" = developer-owned, "inbox" = unowned,
+   *  or an explicit account-id list. */
+  owner?: "me" | "team" | "inbox" | string[];
+  status?: TaskStatus[];
+  /** All listed labels must be present. */
+  labels?: string[];
+  linkedJira?: boolean;
+  kind?: "task" | "meeting";
+  later?: boolean;
+  /** scheduled_on within the range (nulls excluded). */
+  scheduled?: TaskViewDateRange;
+  /** Closed tasks only appear when this range is supplied — the closed_at
+   *  date must fall inside it. */
+  closed?: TaskViewDateRange;
+  /** Follow-up predicate (D13): follow_up_at set or the category:follow_up label. */
+  followUp?: boolean;
+  /** No task event in this many days (updated_at fallback). */
+  staleDays?: number;
+}
+
+export type TaskViewSort = "scheduled" | "updated" | "created" | "priority";
+export type TaskViewGroup = "owner" | "status" | "label" | "scheduled";
+
+export interface TaskViewDefinition {
+  filters?: TaskViewFilters;
+  sort?: TaskViewSort;
+  group?: TaskViewGroup;
+}
+
+export interface TaskViewMeta {
+  /** `builtin-id` for built-ins, `saved:<id>` for saved views. */
+  id: string;
+  name: string;
+  builtin: boolean;
+  definition: TaskViewDefinition;
+}
+
+export interface TaskViewsResponse {
+  views: TaskViewMeta[];
+}
+
+export interface TaskSavedView {
+  id: number;
+  name: string;
+  definition: TaskViewDefinition;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveTaskViewRequest {
+  name: string;
+  definition: TaskViewDefinition;
+}
+
+export interface UpdateTaskViewRequest {
+  name?: string;
+  definition?: TaskViewDefinition;
+  position?: number;
+}
+
 export interface CreateTaskRequest {
   title: string;
   kind?: "task" | "meeting";
@@ -1427,7 +1500,7 @@ export interface DailyNoteSourcesResponse {
 
 // ── Navigation preferences ────────────────────────────
 
-export type NavPageId = "work" | "team" | "desk" | "follow-ups" | "notes" | "meetings";
+export type NavPageId = "work" | "team" | "desk" | "tasks" | "follow-ups" | "notes" | "meetings";
 
 export interface NavPreferences {
   topNav: NavPageId[];
@@ -1435,6 +1508,8 @@ export interface NavPreferences {
 }
 
 export const NAV_PAGE_IDS: readonly NavPageId[] = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
+/** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
+export const NAV_PAGE_IDS_TASKS: readonly NavPageId[] = ["work", "team", "tasks", "follow-ups", "notes", "meetings"];
 
 export const DEFAULT_NAV_PREFERENCES: NavPreferences = {
   topNav: ["work", "team", "desk"],
@@ -1447,10 +1522,27 @@ export interface NavPreferencesResponse {
 
 export type SaveNavPreferencesPayload = NavPreferences;
 
-const NAV_PAGE_ID_SET: ReadonlySet<string> = new Set(NAV_PAGE_IDS);
+const NAV_PAGE_ID_SET: ReadonlySet<string> = new Set<NavPageId>([...NAV_PAGE_IDS, ...NAV_PAGE_IDS_TASKS]);
 
 export function isNavPageId(value: unknown): value is NavPageId {
   return typeof value === "string" && NAV_PAGE_ID_SET.has(value);
+}
+
+export interface NavSanitizeOptions {
+  /** Phase 3 (P3-D1): the Desk page is named Tasks. Stored `desk`/`tasks` ids
+   * are rewritten to the live id for this workspace's flag state on read. */
+  tasksNav?: boolean;
+}
+
+function liveNavPageIds(tasksNav?: boolean): readonly NavPageId[] {
+  return tasksNav ? NAV_PAGE_IDS_TASKS : NAV_PAGE_IDS;
+}
+
+function normalizeNavPageId(id: unknown, tasksNav?: boolean): unknown {
+  if (tasksNav) {
+    return id === "desk" ? "tasks" : id;
+  }
+  return id === "tasks" ? "desk" : id;
 }
 
 /**
@@ -1458,26 +1550,28 @@ export function isNavPageId(value: unknown): value is NavPageId {
  * their zones, drops unknown ids, and appends never-seen pages to the More menu
  * so new pages surface without a migration.
  */
-export function sanitizeNavPreferences(topNav: unknown, moreNav: unknown): NavPreferences {
-  const top = Array.isArray(topNav) ? topNav : [];
-  const more = Array.isArray(moreNav) ? moreNav : [];
+export function sanitizeNavPreferences(topNav: unknown, moreNav: unknown, options: NavSanitizeOptions = {}): NavPreferences {
+  const liveIds = liveNavPageIds(options.tasksNav);
+  const liveSet = new Set<NavPageId>(liveIds);
+  const top = Array.isArray(topNav) ? topNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
+  const more = Array.isArray(moreNav) ? moreNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
   const seen = new Set<NavPageId>();
   const nextTop: NavPageId[] = [];
   const nextMore: NavPageId[] = [];
 
   for (const id of top) {
-    if (isNavPageId(id) && !seen.has(id)) {
-      seen.add(id);
-      nextTop.push(id);
+    if (liveSet.has(id as NavPageId) && !seen.has(id as NavPageId)) {
+      seen.add(id as NavPageId);
+      nextTop.push(id as NavPageId);
     }
   }
   for (const id of more) {
-    if (isNavPageId(id) && !seen.has(id)) {
-      seen.add(id);
-      nextMore.push(id);
+    if (liveSet.has(id as NavPageId) && !seen.has(id as NavPageId)) {
+      seen.add(id as NavPageId);
+      nextMore.push(id as NavPageId);
     }
   }
-  for (const id of NAV_PAGE_IDS) {
+  for (const id of liveIds) {
     if (!seen.has(id)) {
       nextMore.push(id);
     }
@@ -1487,7 +1581,7 @@ export function sanitizeNavPreferences(topNav: unknown, moreNav: unknown): NavPr
 }
 
 /** Strict check: a complete partition of every page across the two zones. */
-export function isCompleteNavPreferences(value: unknown): value is NavPreferences {
+export function isCompleteNavPreferences(value: unknown, options: NavSanitizeOptions = {}): value is NavPreferences {
   if (!value || typeof value !== "object") {
     return false;
   }
@@ -1495,8 +1589,10 @@ export function isCompleteNavPreferences(value: unknown): value is NavPreference
   if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav)) {
     return false;
   }
-  const combined = [...prefs.topNav, ...prefs.moreNav];
-  if (combined.length !== NAV_PAGE_IDS.length || combined.some((id) => !isNavPageId(id))) {
+  const liveIds = liveNavPageIds(options.tasksNav);
+  const liveSet = new Set<string>(liveIds);
+  const combined = [...prefs.topNav, ...prefs.moreNav].map((id) => normalizeNavPageId(id, options.tasksNav));
+  if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {
     return false;
   }
   return new Set(combined).size === combined.length;

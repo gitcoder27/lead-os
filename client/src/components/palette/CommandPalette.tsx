@@ -33,11 +33,13 @@ import {
   buildQuickActions,
   buildQuickAddItem,
   buildResultGroups,
+  buildTaskViewCommands,
   filterCommands,
   pinExactTaskKey,
   placeQuickAddItem,
   type PaletteItem,
 } from './paletteItems';
+import { useTaskViews } from '@/hooks/useTaskViews';
 
 interface CommandPaletteProps {
   onClose: () => void;
@@ -100,11 +102,13 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const isSearching = searchQuery.isFetching;
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
 
-  const navigationCommands = useMemo(buildNavigationCommands, []);
+  const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3 }), [tasksPhase3]);
   const quickActions = useMemo(buildQuickActions, []);
+  const taskViews = useTaskViews(tasksPhase3);
 
   const items = useMemo<PaletteItem[]>(() => {
-    const actions = filterCommands([...navigationCommands, ...quickActions], query);
+    const viewCommands = tasksPhase3 ? buildTaskViewCommands(taskViews.data?.views ?? []) : [];
+    const actions = filterCommands([...navigationCommands, ...quickActions, ...viewCommands], query);
     const resultRows = hasResults
       ? buildResultGroups({
           issues: searchQuery.data?.issues ?? [],
@@ -117,7 +121,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         }, { showTaxonomy: !tasksPhase3 }).flatMap((group) => group.items)
       : [];
     return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query)), query);
-  }, [hasResults, navigationCommands, query, quickActions, searchQuery.data, tasksPhase3]);
+  }, [hasResults, navigationCommands, query, quickActions, searchQuery.data, tasksPhase3, taskViews.data]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -194,6 +198,12 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
             },
           },
         );
+        return;
+      }
+      if (item.href) {
+        onClose();
+        window.history.pushState(null, '', item.href);
+        window.dispatchEvent(new PopStateEvent('popstate'));
         return;
       }
       if (item.target) {

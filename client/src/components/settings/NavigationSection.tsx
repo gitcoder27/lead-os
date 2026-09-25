@@ -3,7 +3,8 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Home, Loader2, RotateCcw, Sa
 import { useNavPreferences, useSaveNavPreferences } from '@/hooks/useNavPreferences';
 import { useToast } from '@/context/ToastContext';
 import { NAV_PAGE_META } from '@/lib/nav-pages';
-import { DEFAULT_NAV_PREFERENCES, type NavPageId, type NavPreferences } from '@/types';
+import { DEFAULT_NAV_PREFERENCES, sanitizeNavPreferences, type NavPageId, type NavPreferences } from '@/types';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 type NavZone = 'topNav' | 'moreNav';
 
@@ -15,6 +16,7 @@ export function NavigationSection() {
   const { preferences } = useNavPreferences();
   const saveMutation = useSaveNavPreferences();
   const { addToast } = useToast();
+  const tasksPhase3 = useTasksPhase3();
   const [draft, setDraft] = useState<NavPreferences>(preferences);
   const [touched, setTouched] = useState(false);
 
@@ -74,10 +76,7 @@ export function NavigationSection() {
 
   const handleReset = () => {
     setTouched(true);
-    setDraft({
-      topNav: [...DEFAULT_NAV_PREFERENCES.topNav],
-      moreNav: [...DEFAULT_NAV_PREFERENCES.moreNav],
-    });
+    setDraft(sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3 }));
   };
 
   return (

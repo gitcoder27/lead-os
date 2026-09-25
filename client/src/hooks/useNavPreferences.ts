@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { readNavPreferencesCache, writeNavPreferencesCache } from '@/lib/nav-preferences-cache';
-import { DEFAULT_NAV_PREFERENCES, type NavPreferences, type NavPreferencesResponse } from '@/types';
+import { DEFAULT_NAV_PREFERENCES, sanitizeNavPreferences, type NavPreferences, type NavPreferencesResponse } from '@/types';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
 export function useNavPreferences(): { preferences: NavPreferences } {
   const { user } = useAuth();
   const isManager = user?.role === 'manager';
   const authScopeKey = useAuthScopeKey();
+  const tasksPhase3 = useTasksPhase3();
 
   const query = useQuery<NavPreferences>({
     queryKey: ['nav-preferences', authScopeKey],
@@ -17,7 +19,7 @@ export function useNavPreferences(): { preferences: NavPreferences } {
     staleTime: 60_000,
   });
 
-  const cached = useMemo(() => (isManager ? readNavPreferencesCache(authScopeKey) : null), [authScopeKey, isManager]);
+  const cached = useMemo(() => (isManager ? readNavPreferencesCache(authScopeKey, { tasksNav: tasksPhase3 }) : null), [authScopeKey, isManager, tasksPhase3]);
 
   useEffect(() => {
     if (query.data && isManager) {
@@ -25,7 +27,9 @@ export function useNavPreferences(): { preferences: NavPreferences } {
     }
   }, [authScopeKey, isManager, query.data]);
 
-  const preferences = (isManager ? query.data ?? cached : null) ?? DEFAULT_NAV_PREFERENCES;
+  const preferences =
+    (isManager ? query.data ?? cached : null) ??
+    sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3 });
   return { preferences };
 }
 

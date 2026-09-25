@@ -1,4 +1,4 @@
-import { sanitizeNavPreferences, type NavPreferences } from '@/types';
+import { sanitizeNavPreferences, type NavPreferences, type NavSanitizeOptions } from '@/types';
 
 const KEY_PREFIX = 'lead-os:nav-preferences:';
 
@@ -11,7 +11,7 @@ function cacheKey(scope: string): string {
  * header can render the customized layout before the preferences query lands.
  * The server remains the source of truth; this only prevents a layout flash.
  */
-export function readNavPreferencesCache(scope: string): NavPreferences | null {
+export function readNavPreferencesCache(scope: string, options: NavSanitizeOptions = {}): NavPreferences | null {
   if (typeof window === 'undefined' || !scope) {
     return null;
   }
@@ -28,7 +28,7 @@ export function readNavPreferencesCache(scope: string): NavPreferences | null {
       return null;
     }
     const candidate = parsed as NavPreferences;
-    return sanitizeNavPreferences(candidate.topNav, candidate.moreNav);
+    return sanitizeNavPreferences(candidate.topNav, candidate.moreNav, options);
   } catch {
     try {
       window.localStorage.removeItem(key);

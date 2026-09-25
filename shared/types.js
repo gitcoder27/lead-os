@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
@@ -30,38 +30,51 @@ exports.TASK_EVENT_TYPES = [
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
 ];
 exports.NAV_PAGE_IDS = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
+/** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
+exports.NAV_PAGE_IDS_TASKS = ["work", "team", "tasks", "follow-ups", "notes", "meetings"];
 exports.DEFAULT_NAV_PREFERENCES = {
     topNav: ["work", "team", "desk"],
     moreNav: ["follow-ups", "notes", "meetings"],
 };
-const NAV_PAGE_ID_SET = new Set(exports.NAV_PAGE_IDS);
+const NAV_PAGE_ID_SET = new Set([...exports.NAV_PAGE_IDS, ...exports.NAV_PAGE_IDS_TASKS]);
 function isNavPageId(value) {
     return typeof value === "string" && NAV_PAGE_ID_SET.has(value);
+}
+function liveNavPageIds(tasksNav) {
+    return tasksNav ? exports.NAV_PAGE_IDS_TASKS : exports.NAV_PAGE_IDS;
+}
+function normalizeNavPageId(id, tasksNav) {
+    if (tasksNav) {
+        return id === "desk" ? "tasks" : id;
+    }
+    return id === "tasks" ? "desk" : id;
 }
 /**
  * Leniently rebuild preferences from stored/cached lists: keeps known pages in
  * their zones, drops unknown ids, and appends never-seen pages to the More menu
  * so new pages surface without a migration.
  */
-function sanitizeNavPreferences(topNav, moreNav) {
-    const top = Array.isArray(topNav) ? topNav : [];
-    const more = Array.isArray(moreNav) ? moreNav : [];
+function sanitizeNavPreferences(topNav, moreNav, options = {}) {
+    const liveIds = liveNavPageIds(options.tasksNav);
+    const liveSet = new Set(liveIds);
+    const top = Array.isArray(topNav) ? topNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
+    const more = Array.isArray(moreNav) ? moreNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
     const seen = new Set();
     const nextTop = [];
     const nextMore = [];
     for (const id of top) {
-        if (isNavPageId(id) && !seen.has(id)) {
+        if (liveSet.has(id) && !seen.has(id)) {
             seen.add(id);
             nextTop.push(id);
         }
     }
     for (const id of more) {
-        if (isNavPageId(id) && !seen.has(id)) {
+        if (liveSet.has(id) && !seen.has(id)) {
             seen.add(id);
             nextMore.push(id);
         }
     }
-    for (const id of exports.NAV_PAGE_IDS) {
+    for (const id of liveIds) {
         if (!seen.has(id)) {
             nextMore.push(id);
         }
@@ -69,7 +82,7 @@ function sanitizeNavPreferences(topNav, moreNav) {
     return { topNav: nextTop, moreNav: nextMore };
 }
 /** Strict check: a complete partition of every page across the two zones. */
-function isCompleteNavPreferences(value) {
+function isCompleteNavPreferences(value, options = {}) {
     if (!value || typeof value !== "object") {
         return false;
     }
@@ -77,8 +90,10 @@ function isCompleteNavPreferences(value) {
     if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav)) {
         return false;
     }
-    const combined = [...prefs.topNav, ...prefs.moreNav];
-    if (combined.length !== exports.NAV_PAGE_IDS.length || combined.some((id) => !isNavPageId(id))) {
+    const liveIds = liveNavPageIds(options.tasksNav);
+    const liveSet = new Set(liveIds);
+    const combined = [...prefs.topNav, ...prefs.moreNav].map((id) => normalizeNavPageId(id, options.tasksNav));
+    if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {
         return false;
     }
     return new Set(combined).size === combined.length;

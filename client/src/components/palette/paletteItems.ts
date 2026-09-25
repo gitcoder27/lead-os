@@ -8,6 +8,7 @@ import type {
   GlobalSearchIssueItem,
   GlobalSearchTaskItem,
   GlobalSearchTrackerItem,
+  TaskViewMeta,
   TodayActionTarget,
 } from '@/types';
 import { KIND_LABELS } from '@/types/manager-desk';
@@ -24,6 +25,8 @@ export interface PaletteItem {
   keywords?: string;
   /** Plain view switch (for surfaces not addressable by TodayActionTarget). */
   view?: AppView;
+  /** Deep link — navigated directly via history (e.g. `/tasks?view=stale`). */
+  href?: string;
   /** Navigation targets handed to the app's shared target handler. */
   target?: TodayActionTarget;
   /** Non-navigation actions the palette host executes (capture, sync, quick add). */
@@ -47,14 +50,26 @@ const NAVIGATION_COMMANDS: Array<{ view: AppView; title: string; keywords?: stri
   { view: 'settings', title: 'Go to Settings', keywords: 'config jira users backups', targetView: 'settings' },
 ];
 
-export function buildNavigationCommands(): PaletteItem[] {
+export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): PaletteItem[] {
   return NAVIGATION_COMMANDS.map((command) => ({
     id: `nav-${command.view}`,
     group: 'actions',
-    title: command.title,
-    keywords: command.keywords,
+    // P3-D1: under Phase 3 the desk surface is named Tasks.
+    title: command.view === 'desk' && options?.tasksPhase3 ? 'Go to Tasks' : command.title,
+    keywords: command.view === 'desk' && options?.tasksPhase3 ? `${command.keywords ?? ''} tasks` : command.keywords,
     view: command.view,
     target: command.targetView ? { type: 'view', view: command.targetView } : undefined,
+  }));
+}
+
+/** §5.2: every task view (built-in + saved) is a palette destination. */
+export function buildTaskViewCommands(views: TaskViewMeta[]): PaletteItem[] {
+  return views.map((view) => ({
+    id: `taskview-${view.id}`,
+    group: 'actions' as const,
+    title: `Tasks: ${view.name}`,
+    keywords: `tasks view ${view.name.toLowerCase()}${view.builtin ? '' : ' saved'}`,
+    href: `/tasks?view=${encodeURIComponent(view.id)}`,
   }));
 }
 
@@ -182,7 +197,7 @@ export function deskItemToPaletteItem(item: GlobalSearchDeskItem, index: number,
     title: item.title,
     // Phase 3 (P3-D13): kind/category retire — desk results lead with the date.
     description: [...(showTaxonomy ? [kindLabel] : []), item.date, statusLabel].join(' · '),
-    target: { type: 'manager_desk_item', view: 'desk', managerDeskItemId: item.itemId, date: item.date },
+    target: { type: 'manager_desk_item', view: 'desk', managerDeskItemId: item.itemId, date: item.date, taskKey: item.taskKey ?? undefined },
   };
 }
 

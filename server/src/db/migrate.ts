@@ -440,6 +440,19 @@ CREATE TABLE IF NOT EXISTS task_labels (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_labels_unique ON task_labels(workspace_id, name);
 CREATE INDEX IF NOT EXISTS idx_task_labels_workspace ON task_labels(workspace_id);
 
+CREATE TABLE IF NOT EXISTS task_saved_views (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL,
+  manager_account_id TEXT NOT NULL,
+  name               TEXT NOT NULL,
+  definition_json    TEXT NOT NULL,
+  position           INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_saved_views_unique ON task_saved_views(workspace_id, manager_account_id, name);
+CREATE INDEX IF NOT EXISTS idx_task_saved_views_owner ON task_saved_views(workspace_id, manager_account_id);
+
 CREATE TABLE IF NOT EXISTS developer_notes (
   workspace_id         TEXT NOT NULL,
   developer_account_id TEXT NOT NULL,

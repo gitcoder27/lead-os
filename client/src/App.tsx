@@ -21,6 +21,11 @@ import {
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
 } from '@/lib/view-params';
+import {
+  taskViewParamsFromState,
+  taskViewStateFromParams,
+  type TaskViewUrlState,
+} from '@/lib/task-views';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
@@ -40,6 +45,7 @@ const loadSetupWizard = () => import('@/components/setup/SetupWizard');
 const loadMyDayPage = () => import('@/components/my-day/MyDayPage');
 const loadLoginPage = () => import('@/components/my-day/LoginPage');
 const loadManagerDeskPage = () => import('@/components/manager-desk');
+const loadTasksPage = () => import('@/components/tasks/TasksPage');
 const loadTaskPage = () => import('@/components/tasks/TaskPage');
 const loadManagerMemoryPage = () => import('@/components/manager-memory');
 const loadNotesPage = () => import('@/components/notes/NotesPage');
@@ -74,6 +80,11 @@ const LoginPage = lazy(async () => {
 const ManagerDeskPage = lazy(async () => {
   const module = await loadManagerDeskPage();
   return { default: module.ManagerDeskPage };
+});
+
+const TasksPage = lazy(async () => {
+  const module = await loadTasksPage();
+  return { default: module.TasksPage };
 });
 
 const TaskPage = lazy(async () => {
@@ -112,7 +123,9 @@ function pathToView(pathname: string): ResolvedAppView {
   if (TASK_LINK_PATH_PATTERN.test(pathname)) return 'task';
   if (pathname === '/my-day' || pathname === '/my-day/') return 'my-day';
   if (pathname === '/team' || pathname === '/team/' || pathname === '/team-tracker' || pathname === '/team-tracker/') return 'team';
-  if (pathname === '/desk' || pathname === '/desk/' || pathname === '/manager-desk' || pathname === '/manager-desk/') return 'desk';
+  // P3-D1: `/tasks` is the Phase 3 name; `/desk`/`/manager-desk` normalize to
+  // whichever path the workspace flag names canonical.
+  if (pathname === '/tasks' || pathname === '/tasks/' || pathname === '/desk' || pathname === '/desk/' || pathname === '/manager-desk' || pathname === '/manager-desk/') return 'desk';
   if (pathname === '/follow-ups' || pathname === '/follow-ups/' || pathname === '/followups' || pathname === '/followups/') return 'follow-ups';
   if (pathname === '/meetings' || pathname === '/meetings/' || pathname === '/meeting' || pathname === '/meeting/') return 'meetings';
   if (pathname === '/notes' || pathname === '/notes/') return 'notes';
@@ -122,12 +135,20 @@ function pathToView(pathname: string): ResolvedAppView {
   return 'not-found';
 }
 
+// P3-D1: the canonical desk path is flag-scoped — `/tasks` when Phase 3 is
+// on, `/desk` otherwise. `AppShell` syncs this once per render, before any
+// event handler can navigate.
+let tasksNavEnabled = false;
+function setTasksNavEnabled(enabled: boolean) {
+  tasksNavEnabled = enabled;
+}
+
 function viewToPath(view: AppView): string {
   const canonicalView = canonicalizeView(view);
 
   if (canonicalView === 'my-day') return '/my-day';
   if (canonicalView === 'team') return '/team';
-  if (canonicalView === 'desk') return '/desk';
+  if (canonicalView === 'desk') return tasksNavEnabled ? '/tasks' : '/desk';
   if (canonicalView === 'follow-ups') return '/follow-ups';
   if (canonicalView === 'meetings') return '/meetings';
   if (canonicalView === 'notes') return '/notes';
@@ -156,6 +177,7 @@ function preloadView(view: AppView) {
       break;
     case 'desk':
       void loadManagerDeskPage();
+      void loadTasksPage();
       break;
     case 'follow-ups':
     case 'meetings':
@@ -398,6 +420,9 @@ function AppContent() {
   const isAuthenticatedManager = isAuthenticated && user?.role === 'manager';
   const isBootstrapPending = !isAuthenticatedManager && (bootstrapQuery.isLoading || !bootstrapState);
 
+  // P3-D1: sync the flag-scoped canonical desk path before any navigation runs.
+  setTasksNavEnabled(Boolean(features?.tasksPhase3));
+
   const [activeView, setActiveView] = useState<ResolvedAppView>(() => pathToView(window.location.pathname));
   const [dashboardFilterState, setDashboardFilterState] = useState<DashboardFilterState>(() =>
     pathToView(window.location.pathname) === 'work'
@@ -410,6 +435,13 @@ function AppContent() {
       : undefined,
   );
   const [teamBoardQueryNonce, setTeamBoardQueryNonce] = useState(0);
+  // Phase 3 (P3-D1): `/tasks` URL state — selected view + overrides.
+  const [tasksUrlState, setTasksUrlState] = useState<TaskViewUrlState | undefined>(() =>
+    pathToView(window.location.pathname) === 'desk'
+      ? taskViewStateFromParams(new URLSearchParams(window.location.search))
+      : undefined,
+  );
+  const [tasksUrlNonce, setTasksUrlNonce] = useState(0);
   const [deskDateParam, setDeskDateParam] = useState<string | undefined>(() =>
     pathToView(window.location.pathname) === 'desk'
       ? deskDateFromParams(new URLSearchParams(window.location.search))
@@ -658,6 +690,10 @@ function AppContent() {
       if (nextView === 'desk') {
         const taskKey = taskKeyFromParams(params);
         const date = deskDateFromParams(params);
+        // Phase 3: TasksPage owns view state; the date param only feeds the
+        // legacy desk. Push both and let the active page pick what it needs.
+        setTasksUrlState(taskViewStateFromParams(params));
+        setTasksUrlNonce((nonce) => nonce + 1);
         if (taskKey) {
           setTodayDeskTarget((prev) => ({ taskKey, date, nonce: prev.nonce + 1 }));
         }
@@ -713,6 +749,24 @@ function AppContent() {
     }, 200);
     return () => window.clearTimeout(timer);
   }, [activeView, teamBoardQuery]);
+
+  // Phase 3: `/tasks` keeps its view+override params shareable (§5.2).
+  useEffect(() => {
+    if (activeView !== 'desk' || !features?.tasksPhase3 || !tasksUrlState) {
+      return;
+    }
+    const taskKey = taskKeyFromParams(new URLSearchParams(window.location.search));
+    const params = taskViewParamsFromState(tasksUrlState);
+    if (taskKey) params.set('task', taskKey);
+    const target = `${window.location.pathname}${params.size ? `?${params.toString()}` : ''}`;
+    if (sameLocation(target)) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      window.history.replaceState(null, '', target);
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [activeView, features?.tasksPhase3, tasksUrlState]);
 
   useEffect(() => {
     if (authLoading || isBootstrapPending) {
@@ -889,14 +943,24 @@ function AppContent() {
     return (
       <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
         <Suspense fallback={<PanelLoading />}>
-          <ManagerDeskPage
-            initialItemId={todayDeskTarget.itemId}
-            initialDate={todayDeskTarget.date}
-            initialTaskKey={todayDeskTarget.taskKey}
-            initialItemNonce={todayDeskTarget.nonce}
-            onInitialItemHandled={() => setTodayDeskTarget((prev) => ({ nonce: prev.nonce + 1 }))}
-            onDateChange={handleDeskDateChange}
-          />
+          {features?.tasksPhase3 ? (
+            <TasksPage
+              urlState={tasksUrlState}
+              urlStateNonce={tasksUrlNonce}
+              onUrlStateChange={setTasksUrlState}
+              openTaskKey={todayDeskTarget.taskKey}
+              openTaskNonce={todayDeskTarget.nonce}
+            />
+          ) : (
+            <ManagerDeskPage
+              initialItemId={todayDeskTarget.itemId}
+              initialDate={todayDeskTarget.date}
+              initialTaskKey={todayDeskTarget.taskKey}
+              initialItemNonce={todayDeskTarget.nonce}
+              onInitialItemHandled={() => setTodayDeskTarget((prev) => ({ nonce: prev.nonce + 1 }))}
+              onDateChange={handleDeskDateChange}
+            />
+          )}
         </Suspense>
       </WorkspaceShell>
     );

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, lt, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
@@ -271,6 +271,17 @@ export class TaskEventsService {
   async historyForTasks(taskIds: number[], workspaceId?: string): Promise<EventRow[]> {
     if (!taskIds.length) return [];
     return db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
+  }
+
+  /** Phase 3 (P3-D9 stale view): newest event timestamp per task, batched. */
+  async latestActivityByTask(taskIds: number[], workspaceId?: string): Promise<Map<number, string>> {
+    if (!taskIds.length) return new Map();
+    const rows = await db
+      .select({ taskId: taskEvents.taskId, last: max(taskEvents.occurredAt) })
+      .from(taskEvents)
+      .where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds)))
+      .groupBy(taskEvents.taskId);
+    return new Map(rows.map((row) => [row.taskId!, row.last!]));
   }
 
   private async identity(key: string, workspaceId?: string) {

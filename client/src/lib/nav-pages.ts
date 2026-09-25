@@ -40,6 +40,16 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     href: '/desk',
     matches: ['desk', 'manager-desk'],
   },
+  // Phase 3 (P3-D1): the same page under its new name/path.
+  tasks: {
+    id: 'tasks',
+    view: 'desk',
+    label: 'Tasks',
+    icon: Briefcase,
+    accentColor: 'var(--md-accent)',
+    href: '/tasks',
+    matches: ['desk', 'manager-desk'],
+  },
   'follow-ups': {
     id: 'follow-ups',
     view: 'follow-ups',

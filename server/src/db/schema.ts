@@ -496,6 +496,24 @@ export const taskLabels = sqliteTable("task_labels", {
   index("idx_task_labels_workspace").on(table.workspaceId),
 ]);
 
+/**
+ * Phase 3 (P3-D9/D10): saved task views. Private to the owning manager —
+ * manager_account_id is part of the primary access path, never shared.
+ */
+export const taskSavedViews = sqliteTable("task_saved_views", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  name: text("name").notNull(),
+  definitionJson: text("definition_json").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_task_saved_views_unique").on(table.workspaceId, table.managerAccountId, table.name),
+  index("idx_task_saved_views_owner").on(table.workspaceId, table.managerAccountId),
+]);
+
 export const developerNotes = sqliteTable("developer_notes", {
   workspaceId: text("workspace_id").notNull(),
   developerAccountId: text("developer_account_id").notNull(),

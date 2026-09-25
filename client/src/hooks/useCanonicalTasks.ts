@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { api } from '@/lib/api';
-import type { CreateTaskRequest, ManagerTask, UpdateTaskRequest } from '@/types';
+import { encodeTaskViewDefinition } from '@/lib/task-views';
+import type { CreateTaskRequest, ManagerTask, TaskViewDefinition, UpdateTaskRequest } from '@/types';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 
 export function canonicalDeskItem(task: ManagerTask): ManagerDeskItem {
@@ -18,11 +20,29 @@ export function canonicalDeskItem(task: ManagerTask): ManagerDeskItem {
   };
 }
 
+/** §5.2: /follow-ups and /meetings are fed by the canonical view definitions. */
+function memoryViewDefinitions(view: 'follow-ups' | 'meetings', closedFrom: string, closedTo: string): { open: TaskViewDefinition; closed: TaskViewDefinition } {
+  const filters = view === 'follow-ups' ? { followUp: true } : { kind: 'meeting' as const };
+  return {
+    open: { filters, sort: 'scheduled' },
+    closed: { filters: { ...filters, closed: { from: closedFrom, to: closedTo } }, sort: 'updated' },
+  };
+}
+
 export function useCanonicalMemoryTasks(view: 'follow-ups' | 'meetings', date: string, closedFrom: string, enabled: boolean) {
   const scope = useAuthScopeKey();
+  const phase3 = useTasksPhase3();
   return useQuery({
-    queryKey: ['tasks', scope, view, date, closedFrom], enabled,
+    queryKey: ['tasks', scope, view, date, closedFrom, phase3], enabled,
     queryFn: async () => {
+      if (phase3) {
+        const defs = memoryViewDefinitions(view, closedFrom, date);
+        const [open, closed] = await Promise.all([
+          api.get<{ tasks: ManagerTask[] }>(`/tasks?viewDef=${encodeURIComponent(encodeTaskViewDefinition(defs.open))}`),
+          api.get<{ tasks: ManagerTask[] }>(`/tasks?viewDef=${encodeURIComponent(encodeTaskViewDefinition(defs.closed))}`),
+        ]);
+        return [...new Map([...open.tasks, ...closed.tasks].map((task) => [task.id, task])).values()].map(canonicalDeskItem);
+      }
       const [open, closed] = await Promise.all([
         api.get<{ tasks: ManagerTask[] }>(`/tasks?view=${view}&date=${date}`),
         api.get<{ tasks: ManagerTask[] }>(`/tasks?view=${view}&closedFrom=${closedFrom}&closedTo=${date}`),

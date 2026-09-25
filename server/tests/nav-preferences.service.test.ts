@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_NAV_PREFERENCES, NAV_PAGE_IDS } from "shared/types";
 import { db, resetDatabase } from "./helpers/db";
-import { userNavPreferences } from "../src/db/schema";
+import { configTable, userNavPreferences } from "../src/db/schema";
 import { NavPreferencesService } from "../src/services/nav-preferences.service";
 
 const service = new NavPreferencesService();
@@ -59,6 +59,30 @@ describe("NavPreferencesService.get", () => {
     expect(prefs.moreNav).toEqual([...NAV_PAGE_IDS]);
   });
 
+  it("rewrites desk↔tasks ids to the live Phase 3 flag (P3-D1)", async () => {
+    await db.insert(userNavPreferences).values({
+      workspaceId: "default",
+      managerAccountId: MANAGER,
+      topNav: JSON.stringify(["tasks", "work"]),
+      moreNav: JSON.stringify(["meetings"]),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    // Flag off: the stored Phase 3 id falls back to the desk.
+    let prefs = await service.get(MANAGER);
+    expect(prefs.topNav).toEqual(["desk", "work"]);
+
+    await db.insert(configTable).values([
+      { workspaceId: "default", key: "tasks_phase2_stage", value: "2c" },
+      { workspaceId: "default", key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    // Flag on: stored `desk` entries surface as `tasks` without a rewrite.
+    prefs = await service.get(MANAGER);
+    expect(prefs.topNav).toEqual(["tasks", "work"]);
+    expect(prefs.moreNav).toContain("meetings");
+    expect(prefs.topNav.concat(prefs.moreNav)).not.toContain("desk");
+  });
+
   it("scopes preferences per manager and workspace", async () => {
     await service.save(MANAGER, { topNav: ["notes"], moreNav: ["work", "team", "desk", "follow-ups", "meetings"] });
     await service.save(
@@ -112,6 +136,24 @@ describe("NavPreferencesService.save", () => {
     await expect(
       service.save(MANAGER, { topNav: ["work", "team"], moreNav: ["follow-ups", "notes", "meetings"] })
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("accepts the live tasks id under Phase 3 and persists it canonically", async () => {
+    await db.insert(configTable).values([
+      { workspaceId: "default", key: "tasks_phase2_stage", value: "2c" },
+      { workspaceId: "default", key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    const saved = await service.save(MANAGER, {
+      topNav: ["tasks", "work"],
+      moreNav: ["team", "follow-ups", "notes", "meetings"],
+    });
+    expect(saved.topNav).toEqual(["tasks", "work"]);
+    // Under Phase 3, submitting the legacy id normalizes to `tasks`.
+    const aliased = await service.save(MANAGER, {
+      topNav: ["desk", "work"],
+      moreNav: ["team", "follow-ups", "notes", "meetings"],
+    });
+    expect(aliased.topNav).toEqual(["tasks", "work"]);
   });
 
   it("rejects unknown page ids", async () => {

@@ -44,6 +44,7 @@ import { TaskEventsService } from "./services/task-events.service";
 import { TaskLabelsService } from "./services/task-labels.service";
 import { CaptureService } from "./services/capture.service";
 import { createCaptureRouter } from "./routes/capture";
+import { createTaskViewsRouter } from "./routes/task-views";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
 import { TagService } from "./services/tag.service";
 import { TeamTrackerService } from "./services/team-tracker.service";
@@ -172,6 +173,7 @@ export function createApp(services: AppServices) {
   app.use("/api/tasks", requireManager(services.authService), createTasksRouter(taskKeysService, taskEventsService));
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
   app.use("/api/capture", requireManager(services.authService), createCaptureRouter(new CaptureService()));
+  app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(
     "/api/preferences",

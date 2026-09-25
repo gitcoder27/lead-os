@@ -114,19 +114,49 @@ export class TaskService {
     return row;
   }
 
-  async toDto(row: TaskRow, principal: TaskPrincipal): Promise<DeveloperTask | ManagerTask> {
-    const links = (await this.listLinks([row.id], row.workspaceId)).map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] }));
+  private rowToDto(row: TaskRow, links: TaskLinkRow[], legacyDeskItemId: number | undefined, principal: TaskPrincipal): DeveloperTask | ManagerTask {
     const shared: DeveloperTask = {
       id: row.id, taskKey: row.taskKey, title: row.title, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
       ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId, priority: row.priority as DeveloperTask["priority"],
       scheduledOn: row.scheduledOn, dueAt: row.dueAt, startsAt: row.startsAt, endsAt: row.endsAt, participants: row.participants, outcome: row.outcome,
-      createdByType: row.createdByType, createdById: row.createdById, createdAt: row.createdAt, updatedAt: row.updatedAt, closedAt: row.closedAt, deletedAt: row.deletedAt, links,
+      createdByType: row.createdByType, createdById: row.createdById, createdAt: row.createdAt, updatedAt: row.updatedAt, closedAt: row.closedAt, deletedAt: row.deletedAt,
+      links: links.map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] })),
     };
     if (principal.type === "developer") return shared;
-    const mapped = (await db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, row.workspaceId), eq(taskLegacyMap.taskId, row.id), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))).limit(1))[0];
     const ownsPrivate = row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
-    return { ...shared, legacyDeskItemId: mapped?.sourceId ?? row.id, later: row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
+    return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
       labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
+  }
+
+  async toDto(row: TaskRow, principal: TaskPrincipal): Promise<DeveloperTask | ManagerTask> {
+    const links = await this.listLinks([row.id], row.workspaceId);
+    if (principal.type === "developer") return this.rowToDto(row, links, undefined, principal);
+    const mapped = (await db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, row.workspaceId), eq(taskLegacyMap.taskId, row.id), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))).limit(1))[0];
+    return this.rowToDto(row, links, mapped?.sourceId, principal);
+  }
+
+  /**
+   * Batched `toDto` for list views (Phase 3, §5.2): links and legacy-map rows
+   * are fetched once for the whole set instead of per task.
+   */
+  async toDtos(rows: TaskRow[], principal: TaskPrincipal): Promise<(DeveloperTask | ManagerTask)[]> {
+    if (!rows.length) return [];
+    const scope = normalizeWorkspaceId(principal.workspaceId);
+    const ids = rows.map((row) => row.id);
+    const [linkRows, mappedRows] = await Promise.all([
+      this.listLinks(ids, scope),
+      principal.type === "developer"
+        ? Promise.resolve([])
+        : db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, scope), inArray(taskLegacyMap.taskId, ids), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))),
+    ]);
+    const linksByTask = new Map<number, TaskLinkRow[]>();
+    for (const link of linkRows) {
+      const list = linksByTask.get(link.taskId);
+      if (list) list.push(link);
+      else linksByTask.set(link.taskId, [link]);
+    }
+    const legacyByTask = new Map(mappedRows.map((entry) => [entry.taskId, entry.sourceId]));
+    return rows.map((row) => this.rowToDto(row, linksByTask.get(row.id) ?? [], legacyByTask.get(row.id), principal));
   }
 
   async list(principal: TaskPrincipal, filter: { view?: "desk" | "follow-ups" | "meetings" | "developer" | "all"; ownerId?: string; date?: string; closedFrom?: string; closedTo?: string } = {}): Promise<TaskRow[]> {

@@ -35,6 +35,7 @@ import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskKeyChip } from './TaskKeyChip';
 import { TaskLabelChip, TaskLabelPicker } from './TaskLabelPicker';
 import { useTaskLabels } from '@/hooks/useTaskLabels';
+import { parseCapture, resolveCapture } from 'shared/capture-grammar';
 import { TaskTimeline } from './TaskTimeline';
 import { TaskUpdateComposer } from './TaskUpdateComposer';
 
@@ -716,9 +717,13 @@ function TaskChildrenSection({
   const createChild = useCreateChildTask(task.taskKey);
   const developers = useDevelopers();
   const [draft, setDraft] = useState('');
-  const [ownerValue, setOwnerValue] = useState('');
   const isMeeting = task.kind === 'meeting';
   const canAdd = mode === 'manager' && !readOnly;
+  // §5.3: action-item owners come from `@person` via the capture grammar.
+  const people = useMemo(
+    () => (developers.data ?? []).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
+    [developers.data],
+  );
 
   // Only show the section when there's something to show, or when a meeting
   // can accept new action items.
@@ -727,13 +732,27 @@ function TaskChildrenSection({
   }
 
   const submit = () => {
-    const title = draft.trim();
-    if (!title || createChild.isPending) return;
-    const [ownerType, ownerId] = ownerValue ? ownerValue.split(':') as ['manager' | 'developer', string] : [undefined, undefined];
+    if (createChild.isPending) return;
+    const resolved = resolveCapture(parseCapture(draft, getLocalIsoDate()), { people });
+    const blocking = resolved.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
+    if (blocking) {
+      addToast(blocking.message, 'error');
+      return;
+    }
+    const title = resolved.title.trim();
+    if (!title) return;
     createChild.mutate(
-      { title, kind: 'task', parentId: task.id, ...(ownerType ? { ownerType, ownerId } : {}) },
       {
-        onSuccess: () => { setDraft(''); setOwnerValue(''); },
+        title,
+        kind: 'task',
+        parentId: task.id,
+        ...(resolved.owner ? { ownerType: 'developer' as const, ownerId: resolved.owner.accountId } : {}),
+        ...(resolved.scheduledOn ? { scheduledOn: resolved.scheduledOn } : {}),
+        ...(resolved.priority === 'high' ? { priority: 'high' as const } : {}),
+        ...(resolved.labels.length ? { labels: resolved.labels } : {}),
+      },
+      {
+        onSuccess: () => setDraft(''),
         onError: (err) => addToast(err.message, 'error'),
       },
     );
@@ -771,23 +790,11 @@ function TaskChildrenSection({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-            placeholder="Add an action item…"
+            placeholder="Add an action item — @dev for owner, !fri for a date…"
             className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[12px] outline-none"
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             aria-label="New action item"
           />
-          <select
-            value={ownerValue}
-            onChange={(e) => setOwnerValue(e.target.value)}
-            className="rounded-lg px-1.5 py-1.5 text-[12px] outline-none"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-            aria-label="Action item owner"
-          >
-            <option value="">Me</option>
-            {(developers.data ?? []).map((dev) => (
-              <option key={dev.accountId} value={`developer:${dev.accountId}`}>{dev.displayName}</option>
-            ))}
-          </select>
           <button
             type="button"
             onClick={submit}

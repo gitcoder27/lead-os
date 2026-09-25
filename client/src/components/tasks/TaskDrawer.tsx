@@ -17,6 +17,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { navigateToTaskPage } from '@/lib/task-nav';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
@@ -59,12 +60,7 @@ function statusStyle(status: TaskStatus): Record<string, string> {
   }
 }
 
-export function navigateToTaskPage(taskKey: string, replace = false) {
-  const target = `/t/${encodeURIComponent(taskKey)}`;
-  if (replace) window.history.replaceState(null, '', target);
-  else window.history.pushState(null, '', target);
-  window.dispatchEvent(new PopStateEvent('popstate'));
-}
+export { navigateToTaskPage };
 
 interface TaskDrawerProps {
   taskKey: string | null;

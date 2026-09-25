@@ -17,6 +17,21 @@ export async function resetDatabase(): Promise<void> {
       rawDb.exec(`ALTER TABLE legacy_${table} RENAME TO ${table}`);
     }
   }
+  // Recover from drop-legacy tests: after `legacy_*` tables are dropped,
+  // daily_note_follow_ups may hold a dangling FK to them, which breaks even
+  // plain DELETEs under foreign_keys=ON. Drop it so migrate() recreates a
+  // clean copy against the restored originals.
+  const followUpSql = rawDb.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='daily_note_follow_ups'").get() as { sql?: string } | undefined;
+  const danglingRefs = [...(followUpSql?.sql ?? "").matchAll(/references\s+"?legacy_(team_tracker_items|manager_desk_items|manager_desk_links)"?\s*\(/gi)]
+    .map((match) => `legacy_${match[1]}`)
+    .filter((name) => !rawDb.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
+  const referencesDeskItems = /references\s+"?(?:legacy_)?manager_desk_items"?\s*\(/i.test(followUpSql?.sql ?? "");
+  // Drop it when the FK dangles to a dropped archive OR when a drop-legacy
+  // rebuild removed the desk-items reference while the table is being
+  // restored to its pre-contract shape (migrate() recreates it).
+  if (danglingRefs.length || (followUpSql && !referencesDeskItems)) {
+    rawDb.exec("DROP TABLE IF EXISTS daily_note_follow_ups");
+  }
   // A contract test may leave task_events contracted (task_id NOT NULL);
   // rebuild it back to the pre-2d nullable shape once markers are cleared.
   const taskEventCols = rawDb.prepare("PRAGMA table_info(task_events)").all() as { name: string; notnull: number }[];

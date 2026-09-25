@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
-import { developers, issues, managerDeskDays, teamTrackerDays } from "../src/db/schema";
+import { configTable, developers, issues, managerDeskDays, teamTrackerDays } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
@@ -387,5 +387,47 @@ describe("TodayService", () => {
       context: "No current work",
       primaryAction: expect.objectContaining({ kind: "open", label: "Open developer" }),
     });
+  });
+
+  it("surfaces Jira drift as read-only attention items when Phase 3 is enabled (§8.1)", async () => {
+    const { TaskService } = await import("../src/services/task.service");
+    const tasks = new TaskService();
+    const manager = { type: "manager" as const, accountId: "manager-1", workspaceId: "default" };
+    await seedIssue("APP-7", { statusCategory: "done", statusName: "Done" });
+    await db.insert(configTable).values([
+      { key: "tasks_phase1_enabled", value: "true" },
+      { key: "tasks_phase2_stage", value: "2c" },
+      { key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    const row = await tasks.create({ title: "Checkout follow-up" }, manager);
+    await tasks.addLink(row.taskKey, { kind: "jira", ref: "APP-7", role: "primary" }, manager);
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const driftItem = response.actionItems.find((item) => item.type === "jira_drift");
+    expect(driftItem).toMatchObject({
+      id: `jira-drift-${row.taskKey}`,
+      type: "jira_drift",
+      severity: "warning",
+      title: `${row.taskKey} Checkout follow-up`,
+      signal: "Done in Jira, open here",
+      target: { type: "view", view: "tasks", taskKey: row.taskKey },
+      primaryAction: { kind: "open", label: "Open task" },
+      secondaryActions: [],
+    });
+    expect(response.sourceStatus).toMatchObject({ drift: "ready" });
+  });
+
+  it("skips Jira drift entirely while Phase 3 is disabled", async () => {
+    const { TaskService } = await import("../src/services/task.service");
+    const tasks = new TaskService();
+    const manager = { type: "manager" as const, accountId: "manager-1", workspaceId: "default" };
+    await seedIssue("APP-8", { statusCategory: "done", statusName: "Done" });
+    await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    const row = await tasks.create({ title: "Hidden drift" }, manager);
+    await tasks.addLink(row.taskKey, { kind: "jira", ref: "APP-8", role: "primary" }, manager);
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    expect(response.actionItems.some((item) => item.type === "jira_drift")).toBe(false);
+    expect(response.sourceStatus).toMatchObject({ drift: "ready" });
   });
 });

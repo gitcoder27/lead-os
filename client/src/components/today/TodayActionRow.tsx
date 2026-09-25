@@ -24,6 +24,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   desk_carry_forward: Rows3,
   manual_work: Target,
   sync_attention: AlertTriangle,
+  jira_drift: AlertTriangle,
   calm: CheckCircle2,
 };
 

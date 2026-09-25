@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers, taskSavedViews } from "../src/db/schema";
+import { configTable, developers, issues, tasks, taskSavedViews } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { createTasksRouter } from "../src/routes/tasks";
@@ -69,7 +70,7 @@ describe("task saved view routes (P3-D9/D10)", () => {
     const response = await invoke(app, { method: "GET", url: "/api/task-views", headers });
     expect(response.status).toBe(200);
     const ids = response.body.views.map((view: { id: string }) => view.id);
-    for (const builtin of ["today-plan", "my-tasks", "watching", "inbox", "follow-ups", "meetings", "blocked", "stale", "later", "closed-week"]) {
+    for (const builtin of ["today-plan", "my-tasks", "watching", "inbox", "follow-ups", "meetings", "blocked", "stale", "jira-drift", "later", "closed-week"]) {
       expect(ids).toContain(builtin);
     }
     expect(response.body.views.every((view: { builtin: boolean }) => view.builtin)).toBe(true);
@@ -209,6 +210,45 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
 
     const response = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { followUp: true } })}`, headers });
     expect(response.body.tasks.map((t: { title: string }) => t.title).sort()).toEqual(["Labeled", "Scheduled follow-up"]);
+  });
+
+  it("filters to drifted Jira-linked tasks (§8.1)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const now = new Date().toISOString();
+    await db.insert(issues).values([
+      { jiraKey: "APP-1", summary: "Done in Jira", priorityName: "High", priorityId: "1", statusName: "Done", statusCategory: "done", createdAt: now, updatedAt: now, syncedAt: now, labels: "[]" },
+      { jiraKey: "APP-2", summary: "Aligned", priorityName: "High", priorityId: "1", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now, labels: "[]" },
+    ]);
+    const drifted = await createTask(headers, { title: "Drifted" });
+    await invoke(app, { method: "POST", url: `/api/tasks/${drifted.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-1", role: "primary" } });
+    const aligned = await createTask(headers, { title: "Aligned" });
+    await invoke(app, { method: "POST", url: `/api/tasks/${aligned.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-2", role: "primary" } });
+    await createTask(headers, { title: "Unlinked" });
+
+    const response = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { jiraDrift: true } })}`, headers });
+    expect(response.status).toBe(200);
+    expect(response.body.tasks.map((t: { title: string }) => t.title)).toEqual(["Drifted"]);
+  });
+
+  it("surfaces recently closed drifted tasks but not stale ones", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const now = new Date().toISOString();
+    await db.insert(issues).values([
+      { jiraKey: "APP-3", summary: "Open in Jira", priorityName: "High", priorityId: "1", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now, labels: "[]" },
+      { jiraKey: "APP-4", summary: "Old", priorityName: "High", priorityId: "1", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now, labels: "[]" },
+    ]);
+    const recent = await createTask(headers, { title: "Recent done" });
+    await invoke(app, { method: "POST", url: `/api/tasks/${recent.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-3", role: "primary" } });
+    await invoke(app, { method: "PATCH", url: `/api/tasks/${recent.taskKey}`, headers, body: { status: "done" } });
+    const stale = await createTask(headers, { title: "Stale done" });
+    await invoke(app, { method: "POST", url: `/api/tasks/${stale.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-4", role: "primary" } });
+    await invoke(app, { method: "PATCH", url: `/api/tasks/${stale.taskKey}`, headers, body: { status: "done" } });
+    await db.update(tasks).set({ closedAt: "2000-01-01T00:00:00.000Z" }).where(eq(tasks.taskKey, stale.taskKey));
+
+    const response = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { jiraDrift: true } })}`, headers });
+    expect(response.body.tasks.map((t: { title: string }) => t.title)).toEqual(["Recent done"]);
   });
 
   it("does not leak another manager's private tasks", async () => {

@@ -6,6 +6,7 @@ import { taskLinks, taskSavedViews, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { todayIsoDate } from "../utils/date";
 import { TaskEventsService } from "./task-events.service";
+import { JiraDriftService } from "./jira-drift.service";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
@@ -28,6 +29,7 @@ export const taskViewDefinitionSchema = z.object({
     closed: dateRange.optional(),
     followUp: z.boolean().optional(),
     staleDays: z.number().int().min(1).max(365).optional(),
+    jiraDrift: z.boolean().optional(),
   }).strict().optional(),
   sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
   group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
@@ -78,6 +80,8 @@ export function builtinTaskViews(today: string): { id: string; name: string; def
     { id: "meetings", name: "Meetings", definition: { filters: { kind: "meeting" }, sort: "scheduled", group: "scheduled" } },
     { id: "blocked", name: "Blocked", definition: { filters: { status: ["blocked"] }, sort: "updated", group: "owner" } },
     { id: "stale", name: "Stale", definition: { filters: { status: ["open", "active", "blocked"], staleDays: 5 }, sort: "updated" } },
+    // §8.1: tasks whose primary Jira link disagrees on done-ness.
+    { id: "jira-drift", name: "Jira drift", definition: { filters: { jiraDrift: true }, sort: "updated" } },
     { id: "later", name: "Later", definition: { filters: { later: true }, sort: "created" } },
     { id: "closed-week", name: "Closed this week", definition: { filters: { closed: { from: weekStart(today), to: today } }, sort: "updated" } },
   ];
@@ -122,10 +126,11 @@ function rowMatchesFilters(row: TaskRow, filters: TaskViewFilters, principal: Ta
   if (filters.kind && row.kind !== filters.kind) return false;
   if (filters.later !== undefined && (row.later === 1) !== filters.later) return false;
   if (filters.scheduled && !inRange(row.scheduledOn, filters.scheduled)) return false;
-  // Closed tasks are only reachable through a bounded closed range (§5.2).
+  // Closed tasks are only reachable through a bounded closed range (§5.2);
+  // the jiraDrift predicate applies its own 7-day closed window (§8.1).
   if (filters.closed) {
     if (!inRange(row.closedAt ? row.closedAt.slice(0, 10) : null, filters.closed)) return false;
-  } else if (row.closedAt) {
+  } else if (row.closedAt && !filters.jiraDrift) {
     return false;
   }
   return true;
@@ -151,6 +156,7 @@ export class TaskViewsService {
   constructor(
     private readonly taskService = new TaskService(),
     private readonly events = new TaskEventsService(),
+    private readonly drift = new JiraDriftService(),
   ) {}
 
   /**
@@ -181,6 +187,13 @@ export class TaskViewsService {
           .map((row) => row.taskId),
       );
       rows = rows.filter((row) => linked.has(row.id));
+    }
+
+    if (filters.jiraDrift && rows.length) {
+      const drifted = new Set(
+        (await this.drift.list(principal, scope, undefined, rows.map((row) => row.id))).map((entry) => entry.taskId),
+      );
+      rows = rows.filter((row) => drifted.has(row.id));
     }
 
     if (filters.staleDays !== undefined && rows.length) {

@@ -231,7 +231,7 @@ function TodayPartialDataNotice({
   isFetching: boolean;
   onRetry: () => void;
 }) {
-  const labels = { issues: 'Work', team: 'Team', desk: 'Desk', sync: 'Sync' } as const;
+  const labels = { issues: 'Work', team: 'Team', desk: 'Desk', sync: 'Sync', drift: 'Jira drift' } as const;
   const unavailable = sourceStatus
     ? (Object.entries(sourceStatus) as Array<[keyof typeof labels, 'ready' | 'unavailable']>)
         .filter(([, status]) => status === 'unavailable')

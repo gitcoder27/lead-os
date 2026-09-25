@@ -50,6 +50,7 @@ const BUILTIN_VIEWS: TaskViewMeta[] = [
   { id: 'my-tasks', name: 'My tasks', builtin: true, definition: { filters: { owner: 'me' }, sort: 'scheduled', group: 'status' } },
   { id: 'inbox', name: 'Inbox', builtin: true, definition: { filters: { owner: 'inbox', status: ['open'] }, sort: 'created' } },
   { id: 'blocked', name: 'Blocked', builtin: true, definition: { filters: { status: ['blocked'] }, sort: 'updated', group: 'owner' } },
+  { id: 'jira-drift', name: 'Jira drift', builtin: true, definition: { filters: { jiraDrift: true }, sort: 'updated' } },
 ];
 
 function task(overrides: Partial<ManagerTask> = {}): ManagerTask {
@@ -175,6 +176,14 @@ describe('TasksPage (P3-D1/D9)', () => {
     fireEvent.change(screen.getByLabelText('Saved view name'), { target: { value: 'My filter' } });
     fireEvent.click(screen.getByLabelText('Save view'));
     expect(mockSaveView).toHaveBeenCalledWith({ name: 'My filter', definition: BUILTIN_VIEWS[0]!.definition });
+  });
+
+  it('shows the Jira drift built-in view and runs its definition (§8.1)', () => {
+    render(<TasksPage />);
+    const rail = within(screen.getByRole('listbox'));
+    fireEvent.click(rail.getByRole('option', { name: 'Jira drift' }).querySelector('button')!);
+    expect(lastDefinition()).toEqual({ filters: { jiraDrift: true }, sort: 'updated' });
+    expect(screen.getByRole('heading', { name: 'Jira drift' })).toBeTruthy();
   });
 
   it('opens the TaskDrawer for the ?task= deep link', () => {

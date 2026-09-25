@@ -27,6 +27,7 @@ import {
   taskViewStateFromParams,
   type TaskViewUrlState,
 } from '@/lib/task-views';
+import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
@@ -566,6 +567,21 @@ function AppContent() {
 
     if (target.view === 'notes') {
       handleOpenNotes(target.date);
+      return;
+    }
+
+    if (target.view === 'tasks') {
+      // Phase 3 (P3-D14): Jira drift items deep-link to the canonical task page;
+      // without a key, open the Tasks surface on the Jira drift built-in view.
+      if (target.taskKey) {
+        navigateToTaskPage(target.taskKey);
+        return;
+      }
+      setTasksUrlState({ view: 'jira-drift', overrides: {} });
+      setTasksUrlNonce((nonce) => nonce + 1);
+      preloadView('desk');
+      setActiveView('desk');
+      navigateToView('desk', { params: { view: 'jira-drift' } });
       return;
     }
 

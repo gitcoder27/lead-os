@@ -163,6 +163,53 @@ describe('TodayPage V2', () => {
     });
   });
 
+  it('routes a Jira drift item to the tasks target without mutating (§8.1)', async () => {
+    const driftTarget = target({ type: 'view', view: 'tasks', taskKey: 'T-7' });
+    const fetchMock = mockFetch(todayResponse({
+      actionItems: [
+        actionItem(1, {
+          id: 'jira-drift-T-7',
+          type: 'jira_drift',
+          title: 'T-7 Checkout follow-up',
+          context: 'AM-7 is done in Jira — this task is still open',
+          signal: 'Done in Jira, open here',
+          severity: 'warning',
+          target: driftTarget,
+          primaryAction: command('open', 'Open task', driftTarget),
+          secondaryActions: [],
+        }),
+      ],
+    }));
+    const onOpenTodayTarget = vi.fn();
+    renderToday(todayResponse({
+      actionItems: [
+        actionItem(1, {
+          id: 'jira-drift-T-7',
+          type: 'jira_drift',
+          title: 'T-7 Checkout follow-up',
+          context: 'AM-7 is done in Jira — this task is still open',
+          signal: 'Done in Jira, open here',
+          severity: 'warning',
+          target: driftTarget,
+          primaryAction: command('open', 'Open task', driftTarget),
+          secondaryActions: [],
+        }),
+      ],
+    }), onOpenTodayTarget);
+
+    fireEvent.click(await screen.findByRole('button', { name: /open task/i }));
+
+    await waitFor(() => {
+      expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ view: 'tasks', taskKey: 'T-7' }));
+    });
+    // Read-only signal — no manager-action command is posted.
+    expect(
+      fetchMock.mock.calls.some(([input, init]) =>
+        String(input) === '/api/manager-actions/commands' && (init as RequestInit | undefined)?.method === 'POST',
+      ),
+    ).toBe(false);
+  });
+
   it('confirms a follow-up done action before mutating through the manager action command endpoint', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm');
     const fetchMock = mockFetch(todayResponse());

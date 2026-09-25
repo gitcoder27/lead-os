@@ -219,6 +219,7 @@ export type TodayActionItemType =
   | "meeting_outcome"
   | "desk_carry_forward"
   | "manual_work"
+  | "jira_drift"
   | "sync_attention"
   | "calm";
 
@@ -245,7 +246,7 @@ export type TodayActionGroup = "now" | "next" | "later";
 
 export interface TodayActionTarget {
   type: TodayActionTargetType;
-  view: "work" | "team" | "desk" | "follow-ups" | "meetings" | "notes" | "settings";
+  view: "work" | "team" | "desk" | "tasks" | "follow-ups" | "meetings" | "notes" | "settings";
   /** Settings sub-section to open when view === "settings" (e.g. "assistant"). */
   section?: string;
   issueKey?: string;
@@ -340,7 +341,7 @@ export interface TodayMeetingPrompt {
   secondaryActions: TodayActionCommand[];
 }
 
-export type TodaySourceName = "issues" | "team" | "desk" | "sync";
+export type TodaySourceName = "issues" | "team" | "desk" | "sync" | "drift";
 export type TodaySourceStatus = Record<TodaySourceName, "ready" | "unavailable">;
 
 export interface TodayResponse {
@@ -712,6 +713,10 @@ export interface TaskViewFilters {
   followUp?: boolean;
   /** No task event in this many days (updated_at fallback). */
   staleDays?: number;
+  /** Jira reconciliation signal (§8.1): the task's primary Jira link disagrees
+   *  on done-ness — resolved in Jira but open here, or closed here (within the
+   *  last 7 days) while the Jira issue stays open. */
+  jiraDrift?: boolean;
 }
 
 export type TaskViewSort = "scheduled" | "updated" | "created" | "priority";

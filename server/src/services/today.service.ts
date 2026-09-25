@@ -1,5 +1,6 @@
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
+import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
 import { performance } from "node:perf_hooks";
 import type {
   FilterType,
@@ -55,6 +56,7 @@ type TodaySourceTimings = {
   team: number;
   desk: number;
   sync: number;
+  drift: number;
 };
 
 type TimedSourceResult<T> =
@@ -203,17 +205,23 @@ export class TodayService {
 
   private async buildToday(managerAccountId: string, date: string, workspaceId?: string): Promise<TodayBuildResult> {
     const buildStartedAt = performance.now();
-    const [issueResult, teamResult, deskResult, syncResult] = await Promise.all([
+    const [issueResult, teamResult, deskResult, syncResult, driftResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
       measureSource(() => this.teamTrackerService.getBoard(date, { managerAccountId, workspaceId })),
       measureSource(() => this.managerDeskService.getTodayItems(managerAccountId, date, workspaceId)),
       measureSource(() => this.getSyncStatus(workspaceId)),
+      // §8.1: the Jira drift signal only exists once Phase 3 is enabled — the
+      // attention items deep-link into the canonical task drawer.
+      measureSource(async () => (await new TaskKeysService().phase3Enabled(workspaceId))
+        ? new JiraDriftService().list({ type: "manager", accountId: managerAccountId }, workspaceId, date)
+        : []),
     ]);
     const sourceStatus: TodaySourceStatus = {
       issues: issueResult.status === "fulfilled" ? "ready" : "unavailable",
       team: teamResult.status === "fulfilled" ? "ready" : "unavailable",
       desk: deskResult.status === "fulfilled" ? "ready" : "unavailable",
       sync: syncResult.status === "fulfilled" ? "ready" : "unavailable",
+      drift: driftResult.status === "fulfilled" ? "ready" : "unavailable",
     };
     const unavailableSources = Object.entries(sourceStatus)
       .filter(([, status]) => status === "unavailable")
@@ -241,6 +249,7 @@ export class TodayService {
     const teamBoard = teamResult.status === "fulfilled" ? teamResult.value : emptyTeamBoard(date);
     const deskItems = deskResult.status === "fulfilled" ? deskResult.value : [];
     const syncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
+    const jiraDrift = driftResult.status === "fulfilled" ? driftResult.value : [];
     const issues = issueSnapshot.issues;
 
     const followUps = getDueFollowUps(deskItems, date);
@@ -251,6 +260,7 @@ export class TodayService {
       ...buildFollowUpActions(followUps, date),
       ...buildMeetingActions(meetings),
       ...buildDeskCarryForwardActions(deskItems, date),
+      ...buildJiraDriftActions(jiraDrift),
       ...buildSyncActions(syncStatus),
     ]);
     const visibleActions = actionItems.slice(0, 20);
@@ -287,6 +297,7 @@ export class TodayService {
       team: teamResult.durationMs,
       desk: deskResult.durationMs,
       sync: syncResult.durationMs,
+      drift: driftResult.durationMs,
     };
 
     if (buildDurationMs >= 1_000) {
@@ -828,6 +839,32 @@ function buildDeskCarryForwardActions(items: ManagerDeskItem[], date: string): T
     });
 }
 
+/**
+ * §8.1: read-only Jira drift signals — one attention item per drifted task.
+ * The signal never writes; the manager resolves the disagreement manually.
+ */
+function buildJiraDriftActions(entries: JiraDriftEntry[]): TodayActionItem[] {
+  return entries.slice(0, 5).map((entry) =>
+    action({
+      id: `jira-drift-${entry.taskKey}`,
+      type: "jira_drift",
+      title: `${entry.taskKey} ${entry.title}`,
+      context:
+        entry.direction === "jira_done_task_open"
+          ? `${entry.jiraKey} is done in Jira — this task is still open`
+          : `${entry.jiraKey} is still open in Jira — this task was closed`,
+      signal: entry.direction === "jira_done_task_open" ? "Done in Jira, open here" : "Closed here, open in Jira",
+      severity: "warning",
+      priority: 55,
+      group: "next",
+      target: target("view", "tasks", { taskKey: entry.taskKey }),
+      primaryKind: "open",
+      primaryLabel: "Open task",
+      secondaryKinds: [],
+    }),
+  );
+}
+
 function buildSyncActions(syncStatus?: SyncStatus): TodayActionItem[] {
   if (syncStatus?.status !== "error") {
     return [];
@@ -1258,6 +1295,7 @@ async function measureSource<T>(operation: () => Promise<T>): Promise<TimedSourc
 
 function roundSourceTimings(timings: TodaySourceTimings): TodaySourceTimings {
   return {
+    drift: Math.round(timings.drift),
     issues: Math.round(timings.issues),
     team: Math.round(timings.team),
     desk: Math.round(timings.desk),

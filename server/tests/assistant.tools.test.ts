@@ -151,11 +151,11 @@ describe("assistant tools", () => {
     }
   });
 
-  it("registers 38 canonical tools with confirmation for every task write", () => {
+  it("registers 39 canonical tools with confirmation for every task write", () => {
     const canonical = createAssistantTools(true);
-    expect(canonical).toHaveLength(38);
+    expect(canonical).toHaveLength(39);
     expect(canonical.some((tool) => tool.name === "carry_forward" || tool.name === "promote_tracker_item")).toBe(false);
-    for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
+    for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task", "capture"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
   });
 
   it("get_today_snapshot returns a compact projection", async () => {

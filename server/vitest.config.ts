@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "../shared/**/*.test.ts"],
     fileParallelism: false,
     env: {
       DASHBOARD_DB_PATH: path.resolve(__dirname, "../data/dashboard.test.db"),

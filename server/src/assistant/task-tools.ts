@@ -2,7 +2,8 @@ import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskService, taskCreateSchema, taskUpdateSchema, taskLinkSchema } from "../services/task.service";
 import { TaskKeysService } from "../services/task-keys.service";
-import type { AssistantToolDefinition, AssistantToolContext } from "./tools";
+import { CaptureService } from "../services/capture.service";
+import { compact, type AssistantToolDefinition, type AssistantToolContext } from "./tools";
 
 const key = z.string().regex(/^[Tt]-\d{1,9}$/);
 const taskKeyProperty = { type: "string", pattern: "^[Tt]-[0-9]{1,9}$" };
@@ -46,5 +47,35 @@ export function canonicalTaskTools(): AssistantToolDefinition[] {
       async ({ taskKey, ...args }, ctx) => service.addLink(taskKey, args, principal(ctx))),
     tool("unlink_task", "Unlink task", z.object({ taskKey: key, linkId: z.number().int().positive() }).strict(), { taskKey: taskKeyProperty, linkId: { type: "integer" } }, ["taskKey", "linkId"], true,
       async ({ taskKey, linkId }, ctx) => { await service.removeLink(taskKey, linkId, principal(ctx)); return { deleted: true }; }),
+    // Phase 3 (P3-D8): the shared capture grammar as a confirm-gated tool.
+    {
+      name: "capture",
+      description:
+        "Capture text through the shared grammar: 'T-n: …' logs an update, '/note …' appends to today's daily note, and anything else creates a task. Tokens: @person (owner), #JIRA-KEY, ^T-n (parent), T-n (link), !today/!tomorrow/!weekday/!+Nd/!+Nw/!YYYY-MM-DD, !! (high priority), /later, /meeting, /f [date] (follow-up), +label.",
+      parameters: {
+        type: "object",
+        properties: { text: { type: "string" } },
+        required: ["text"],
+        additionalProperties: false,
+      },
+      confirm: "always",
+      invalidate: ["tasks", "task-events", "task-resolution", "today", "team-tracker", "my-day", "manager-desk", "daily-notes"],
+      label: () => "Capturing…",
+      summarize: (args) => `Capture "${String(args.text ?? "")}"`,
+      execute: async (raw, ctx) => {
+        if (!(await new TaskKeysService().phase3Enabled(ctx.workspaceId))) throw new HttpError(409, "Phase 3 capture is not enabled");
+        const parsed = z.object({ text: z.string().min(1).max(4000) }).strict().safeParse(raw);
+        if (!parsed.success) throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join(", "));
+        const outcome = await new CaptureService().run(
+          { text: parsed.data.text, confirm: true },
+          { type: "copilot", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId },
+        );
+        if (outcome.blocked) {
+          const first = outcome.diagnostics.find((entry) => entry.severity === "error");
+          throw new HttpError(400, first?.message ?? "Capture is blocked");
+        }
+        return { result: compact(outcome), summary: outcome.task ? `Captured ${outcome.task.taskKey}: ${outcome.task.title}` : outcome.event ? `Logged update on ${outcome.event.taskKey}` : "Captured note" };
+      },
+    },
   ];
 }

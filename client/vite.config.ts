@@ -22,6 +22,7 @@ export default defineConfig(({ command, mode }) => {
         // artifact for the server, and its named exports can't flow through
         // `export *` in dev mode.
         'shared/types': path.resolve(__dirname, '../shared/types.ts'),
+        'shared/capture-grammar': path.resolve(__dirname, '../shared/capture-grammar.ts'),
       },
     },
     build: {

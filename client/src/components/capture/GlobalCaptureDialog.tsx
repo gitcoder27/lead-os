@@ -5,9 +5,11 @@ import { Briefcase, CalendarDays, NotebookPen, Users, X, Zap } from 'lucide-reac
 import { format, parseISO } from 'date-fns';
 import { getLocalIsoDate } from '@/lib/utils';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { DeskCaptureForm } from './DeskCaptureForm';
 import { NoteCaptureForm } from './NoteCaptureForm';
 import { TrackerCaptureForm } from './TrackerCaptureForm';
+import { CaptureBox } from './CaptureBox';
 
 export type CaptureTarget = 'manager-desk' | 'team-tracker' | 'notes';
 
@@ -61,9 +63,19 @@ export function GlobalCaptureDialog({
   const storageKeyRef = useRef(storageKey);
   const date = useMemo(() => getLocalIsoDate(), []);
   const formattedDate = useMemo(() => format(parseISO(date), 'EEEE, MMM d'), [date]);
+  // Phase 3 (P3-D8, §4.3): one CaptureBox replaces the per-target forms.
+  const phase3 = useTasksPhase3();
+  const phase3Prefill = useMemo(() => {
+    if (!phase3) return '';
+    if (context?.defaultTarget === 'notes') return '/note ';
+    const parts: string[] = [];
+    if (context?.developer?.accountId) parts.push(`@${context.developer.accountId}`);
+    if (context?.issue?.jiraKey) parts.push(`#${context.issue.jiraKey}`);
+    return parts.length ? `${parts.join(' ')} ` : '';
+  }, [phase3, context]);
 
-  const isDesk = target === 'manager-desk';
-  const isTracker = target === 'team-tracker';
+  const isDesk = phase3 || target === 'manager-desk';
+  const isTracker = !phase3 && target === 'team-tracker';
 
   useEffect(() => {
     if (storageKeyRef.current !== storageKey) {
@@ -221,7 +233,8 @@ export function GlobalCaptureDialog({
             </button>
           </div>
 
-          {/* Segmented control */}
+          {/* Segmented control — retired under Phase 3 (P3-D8): one box. */}
+          {!phase3 && (
           <div
             className="relative flex rounded-xl p-1 gap-0.5"
             style={{
@@ -275,9 +288,13 @@ export function GlobalCaptureDialog({
               );
             })}
           </div>
+          )}
         </div>
 
-        {/* Body — switches per target */}
+        {/* Body — one CaptureBox under Phase 3, per-target forms otherwise */}
+        {phase3 ? (
+          <CaptureBox prefill={phase3Prefill} onClose={onClose} />
+        ) : (
         <AnimatePresence mode="wait">
           {isDesk ? (
             <DeskCaptureForm
@@ -307,6 +324,7 @@ export function GlobalCaptureDialog({
             />
           )}
         </AnimatePresence>
+        )}
       </motion.div>
     </>,
     document.body,

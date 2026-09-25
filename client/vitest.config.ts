@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       'shared/types': path.resolve(__dirname, '../shared/types.ts'),
+      'shared/capture-grammar': path.resolve(__dirname, '../shared/capture-grammar.ts'),
     },
   },
   test: {
@@ -16,6 +17,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Phase 3 (P3 §11): the shared capture-grammar suite runs in both workspaces.
+    include: ['src/**/*.{test,spec}.?(c|m)[jt]s?(x)', '../shared/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

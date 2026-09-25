@@ -327,7 +327,7 @@ describe('TodayPage V2', () => {
           isStale: false,
           signals: {
             freshness: { staleThresholdHours: 4, noCurrentThresholdHours: 2, statusFollowUpThresholdHours: 2 },
-            risk: { openRisk: false, overdueLinkedWork: false, overdueLinkedCount: 0, overCapacity: false, capacityDelta: 0 },
+            risk: { openRisk: false, overdueLinkedWork: false, overdueLinkedCount: 0 },
           },
           statusUpdatedAt: '2026-03-08T08:00:00Z',
           createdAt: '2026-03-08T08:00:00Z',

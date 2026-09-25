@@ -8,6 +8,7 @@ import { useToast } from '@/context/ToastContext';
 import { useMyDay } from '@/hooks/useMyDay';
 import { useTaskResolution } from '@/hooks/useTasks';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
+import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 import { useMyDayHandlers } from './useMyDayHandlers';
 
 import { MyDayLeftColumn } from './MyDayLeftColumn';
@@ -55,6 +56,14 @@ export function MyDayPage() {
     }
     const resolution = taskResolution.data;
     if (!resolution) {
+      return;
+    }
+    // Phase 3 (P3-D15): a former owner resolving a deep link gets the
+    // restricted read-only task page instead of a My Day row.
+    if ('access' in resolution && resolution.access === 'former-owner') {
+      deepLinkHandledRef.current = true;
+      writeTaskParam(undefined);
+      navigateToTaskPage(resolution.taskKey);
       return;
     }
     if (resolution.date && resolution.date !== date) {

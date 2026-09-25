@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { getLocalIsoDate } from '@/lib/utils';
-import type { CreateTaskRequest, ManagerTask, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
+import type { CreateTaskRequest, FormerOwnerTaskDetail, ManagerTask, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
 
 /**
  * Phase 3 (P3-D2): shared task detail. Managers hit `/api/tasks/:key/detail`;
  * developer principals use the `/api/my-day` equivalent, which returns the
- * developer DTO with children scoped to tasks they own.
+ * developer DTO with children scoped to tasks they own. A developer who
+ * previously authored events on a task they no longer own gets the restricted
+ * `FormerOwnerTaskDetail` projection (P3-D15).
  */
 export function useTaskDetail(taskKey: string | undefined) {
   const { user } = useAuth();
@@ -16,7 +18,7 @@ export function useTaskDetail(taskKey: string | undefined) {
   return useQuery({
     queryKey: ['task-detail', scope, role, taskKey],
     queryFn: () =>
-      api.get<TaskDetailResponse>(
+      api.get<TaskDetailResponse | FormerOwnerTaskDetail>(
         role === 'developer'
           ? `/my-day/tasks/${encodeURIComponent(taskKey!)}/detail`
           : `/tasks/${encodeURIComponent(taskKey!)}/detail`,

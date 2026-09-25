@@ -95,7 +95,7 @@ describe("WorkloadService", () => {
         blocked: 0,
         score: 3,
         level: "light" as const,
-        signals: { idle: false, noCurrentItem: false, overCapacity: false, backlogTrackerMismatch: false },
+        signals: { idle: false, noCurrentItem: false, backlogTrackerMismatch: false },
       },
       {
         developer: { accountId: "dev-2", displayName: "Bob", isActive: true },
@@ -104,7 +104,7 @@ describe("WorkloadService", () => {
         blocked: 0,
         score: 0,
         level: "light" as const,
-        signals: { idle: true, noCurrentItem: false, overCapacity: false, backlogTrackerMismatch: false },
+        signals: { idle: true, noCurrentItem: false, backlogTrackerMismatch: false },
       },
     ];
     const idle = team.filter((entry) => entry.signals?.idle === true).map((entry) => entry.developer.accountId);
@@ -120,8 +120,8 @@ describe("WorkloadService", () => {
     expect(team.find((entry) => entry.developer.accountId === "dev-2")?.activeDefects).toBe(1);
     expect(team.find((entry) => entry.developer.accountId === "dev-3")?.activeDefects).toBe(0);
     expect(team.find((entry) => entry.developer.accountId === "dev-1")?.assignedTodayCount).toBe(2);
-    expect(team.find((entry) => entry.developer.accountId === "dev-1")?.capacityUnits).toBe(3);
-    expect(team.find((entry) => entry.developer.accountId === "dev-2")?.signals?.overCapacity).toBe(true);
+    expect(team.find((entry) => entry.developer.accountId === "dev-1")).not.toHaveProperty("capacityUnits");
+    expect(team.find((entry) => entry.developer.accountId === "dev-2")?.signals).not.toHaveProperty("overCapacity");
     expect(team.find((entry) => entry.developer.accountId === "dev-3")?.signals?.idle).toBe(false);
     expect(team.find((entry) => entry.developer.accountId === "dev-4")?.signals?.idle).toBe(true);
     expect(team.find((entry) => entry.developer.accountId === "dev-5")?.signals?.idle).toBe(false);

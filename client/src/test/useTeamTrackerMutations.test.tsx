@@ -49,7 +49,7 @@ describe('useTeamTrackerMutations', () => {
     mockDelete.mockReset();
   });
 
-  it('updates day status/capacity and developer availability with the selected date', async () => {
+  it('updates day status and developer availability with the selected date', async () => {
     const queryClient = createQueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
     mockPatch.mockResolvedValue({});
@@ -61,7 +61,6 @@ describe('useTeamTrackerMutations', () => {
       await updateDay.result.current.mutateAsync({
         accountId: 'alice-1',
         status: 'blocked',
-        capacityUnits: 2,
         managerNotes: 'Pair on deploy',
       });
       await updateAvailability.result.current.mutateAsync({
@@ -74,7 +73,6 @@ describe('useTeamTrackerMutations', () => {
     expect(mockPatch).toHaveBeenCalledWith('/team-tracker/alice-1/day', {
       date: '2026-03-09',
       status: 'blocked',
-      capacityUnits: 2,
       managerNotes: 'Pair on deploy',
     });
     expect(mockPatch).toHaveBeenCalledWith('/team-tracker/bob-2/availability', {

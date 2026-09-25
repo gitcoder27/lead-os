@@ -335,14 +335,6 @@ function buildTeamMetrics(board?: TeamTrackerBoardResponse): ManagerPulseMetric[
       target: 'team',
     },
     {
-      id: 'over-capacity',
-      label: 'Over capacity',
-      value: summary?.overCapacity ?? 0,
-      detail: 'load pressure',
-      severity: 'warning',
-      target: 'team',
-    },
-    {
       id: 'stale-checkins',
       label: 'Stale check-ins',
       value: summary?.stale ?? 0,
@@ -430,7 +422,7 @@ function getPulseTone(day: TrackerDeveloperDay): ManagerTeamPulseItem['tone'] {
     return 'critical';
   }
 
-  if (day.status === 'at_risk' || day.signals?.risk.overCapacity || day.signals?.freshness.staleWithoutCurrentWork || day.isStale) {
+  if (day.status === 'at_risk' || day.signals?.freshness.staleWithoutCurrentWork || day.isStale) {
     return 'warning';
   }
 
@@ -450,7 +442,7 @@ function getPulseStatus(day: TrackerDeveloperDay): string {
     return 'Stale';
   }
 
-  if (day.status === 'at_risk' || day.signals?.risk.overCapacity) {
+  if (day.status === 'at_risk') {
     return 'At risk';
   }
 
@@ -466,19 +458,17 @@ function getPulseStatus(day: TrackerDeveloperDay): string {
 }
 
 function getPulseDetail(day: TrackerDeveloperDay): string {
-  const topReason = day.signals?.risk.overCapacity
-    ? 'Over capacity'
-    : day.signals?.freshness.staleWithoutCurrentWork
-      ? 'No check-in or current work'
-      : day.signals?.freshness.staleWithOpenRisk
-        ? 'Risk needs update'
-        : day.signals?.freshness.staleByTime
-          ? 'Check-in is stale'
-          : day.currentItem
-            ? 'Current work active'
-            : day.plannedItems.length > 0
-              ? 'Planned work ready'
-              : 'Needs plan';
+  const topReason = day.signals?.freshness.staleWithoutCurrentWork
+    ? 'No check-in or current work'
+    : day.signals?.freshness.staleWithOpenRisk
+      ? 'Risk needs update'
+      : day.signals?.freshness.staleByTime
+        ? 'Check-in is stale'
+        : day.currentItem
+          ? 'Current work active'
+          : day.plannedItems.length > 0
+            ? 'Planned work ready'
+            : 'Needs plan';
 
   return topReason;
 }

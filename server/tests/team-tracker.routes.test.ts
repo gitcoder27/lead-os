@@ -496,7 +496,7 @@ describe("team tracker routes", () => {
     ]);
   });
 
-  it("PATCH /api/team-tracker/:accountId/day updates capacity", async () => {
+  it("PATCH /api/team-tracker/:accountId/day ignores capacity payloads (removed in Phase 3)", async () => {
     const app = createTestApp();
 
     const res = await invoke(app, {
@@ -504,12 +504,20 @@ describe("team tracker routes", () => {
       url: "/api/team-tracker/dev-1/day",
       body: {
         date: "2026-03-07",
+        status: "on_track",
         capacityUnits: 4,
       },
     });
 
     expect(res.status).toBe(200);
-    expect(res.body?.capacityUnits).toBe(4);
+    expect(res.body?.capacityUnits).toBeNull();
+
+    const capacityOnly = await invoke(app, {
+      method: "PATCH",
+      url: "/api/team-tracker/dev-1/day",
+      body: { date: "2026-03-07", capacityUnits: 4 },
+    });
+    expect(capacityOnly.status).toBe(400);
   });
 
   it("PATCH /api/team-tracker/:accountId/day rejects empty updates", async () => {

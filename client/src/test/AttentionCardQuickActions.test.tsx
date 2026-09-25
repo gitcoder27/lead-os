@@ -23,8 +23,6 @@ function buildSignals(overrides?: {
       openRisk: false,
       overdueLinkedWork: false,
       overdueLinkedCount: 0,
-      overCapacity: false,
-      capacityDelta: 0,
       ...overrides?.risk,
     },
   };

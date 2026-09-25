@@ -7,6 +7,7 @@ import { AuthService, serializeSessionCookie } from "../src/services/auth.servic
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { MyDayService } from "../src/services/my-day.service";
 import { TaskEventsService } from "../src/services/task-events.service";
+import { TaskService } from "../src/services/task.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { todayIsoDate } from "../src/utils/date";
 import { IssueService } from "../src/services/issue.service";
@@ -781,6 +782,188 @@ describe("my day routes", () => {
         },
       });
       expect(own.status).toBe(201);
+    });
+  });
+
+  describe("former-owner access (P3-D15)", () => {
+    const taskService = new TaskService();
+    const today = "2026-03-07";
+
+    async function enableCanonical() {
+      await db.insert(configTable).values([
+        { key: "tasks_phase1_enabled", value: "true" },
+        { key: "tasks_phase2_stage", value: "2c" },
+        { key: "tasks_phase3_enabled", value: "true" },
+      ]);
+    }
+
+    async function seedReassignedTask() {
+      const managerPrincipal = { type: "manager" as const, accountId: "mgr-1" };
+      const row = await taskService.create({ title: "Reassigned task", ownerType: "developer", ownerId: "dev-1", labels: ["team"] }, managerPrincipal);
+      // Alice posts a shared update while she owns the task.
+      const app = createTestApp();
+      const posted = await invoke(app, {
+        method: "POST",
+        url: `/api/my-day/tasks/${row.taskKey}/events`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+        body: { date: today, type: "update", body: "Alice progress note", requestId: randomUUID() },
+      });
+      expect(posted.status).toBe(201);
+      // Manager-only private note + shared instruction Alice must never see.
+      await eventsService.append(
+        { taskKey: row.taskKey, type: "instruction", body: "Manager shared note", meta: { via: "task_drawer" }, visibility: "shared" },
+        { type: "manager", accountId: "mgr-1" },
+      );
+      await eventsService.append(
+        { taskKey: row.taskKey, type: "instruction", body: "Manager private note", meta: { via: "task_drawer" }, visibility: "private" },
+        { type: "manager", accountId: "mgr-1" },
+      );
+      // Reassign to Bob — Alice becomes a former owner.
+      await taskService.update(row.taskKey, { ownerType: "developer", ownerId: "dev-2" }, managerPrincipal);
+      return row;
+    }
+
+    it("GET /api/my-day/tasks/:key returns the restricted projection for a former owner", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${row.taskKey}`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        taskKey: row.taskKey,
+        title: "Reassigned task",
+        status: "open",
+        access: "former-owner",
+      });
+      expect(res.body).not.toHaveProperty("managerDeskItemId");
+      expect(res.body).not.toHaveProperty("trackerItemId");
+      expect(res.body).not.toHaveProperty("developer");
+      expect(res.body).not.toHaveProperty("kind");
+    });
+
+    it("GET /api/my-day/tasks/:key/detail returns key/title/status only for a former owner", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${row.taskKey}/detail`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        taskKey: row.taskKey,
+        title: "Reassigned task",
+        status: "open",
+        access: "former-owner",
+      });
+      for (const field of ["links", "children", "parent", "labels", "ownerId", "ownerType", "nextAction", "followUpAt", "trackedByManagerId", "id"]) {
+        expect(res.body).not.toHaveProperty(field);
+      }
+    });
+
+    it("GET /api/my-day/tasks/:key/events returns only the former owner's own shared events", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      // The new owner's shared event must also be hidden from Alice.
+      const app = createTestApp();
+      await invoke(app, {
+        method: "POST",
+        url: `/api/my-day/tasks/${row.taskKey}/events`,
+        headers: { cookie: await loginCookie("bob", "secret123") },
+        body: { date: today, type: "update", body: "Bob picked this up", requestId: randomUUID() },
+      });
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${row.taskKey}/events`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.events).toHaveLength(1);
+      expect(res.body.events[0].body).toBe("Alice progress note");
+      expect(res.body.events[0].author).toMatchObject({ type: "developer", id: "dev-1" });
+    });
+
+    it("the new owner still sees the full shared timeline", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks/${row.taskKey}/events`,
+        headers: { cookie: await loginCookie("bob", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      const bodies = res.body.events.map((event: { body: string | null }) => event.body);
+      expect(bodies).toContain("Alice progress note");
+      expect(bodies).toContain("Manager shared note");
+      expect(bodies).not.toContain("Manager private note");
+    });
+
+    it("rejects former-owner writes with 403", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+      const cookie = await loginCookie("alice", "secret123");
+
+      const patch = await invoke(app, {
+        method: "PATCH",
+        url: `/api/my-day/tasks/${row.taskKey}`,
+        headers: { cookie },
+        body: { date: today, status: "done" },
+      });
+      expect(patch.status).toBe(403);
+
+      const post = await invoke(app, {
+        method: "POST",
+        url: `/api/my-day/tasks/${row.taskKey}/events`,
+        headers: { cookie },
+        body: { date: today, type: "update", body: "Sneaky update", requestId: randomUUID() },
+      });
+      expect(post.status).toBe(403);
+    });
+
+    it("returns 404 for a developer who never authored an event", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      await db.insert(developers).values({ accountId: "dev-3", displayName: "Carol", email: null, avatarUrl: null, isActive: 1 });
+      await authService.createUser({ username: "carol", displayName: "Carol", password: "secret123", role: "developer", developerAccountId: "dev-3" });
+      const app = createTestApp();
+      const cookie = await loginCookie("carol", "secret123");
+
+      const get = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}`, headers: { cookie } });
+      expect(get.status).toBe(404);
+      const events = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}/events`, headers: { cookie } });
+      expect(events.status).toBe(404);
+      const detail = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}/detail`, headers: { cookie } });
+      expect(detail.status).toBe(404);
+    });
+
+    it("does not list former-owner tasks in My Day", async () => {
+      await enableCanonical();
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: `/api/my-day/tasks?date=${today}`,
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.tasks.map((task: { taskKey: string }) => task.taskKey)).not.toContain(row.taskKey);
     });
   });
 });

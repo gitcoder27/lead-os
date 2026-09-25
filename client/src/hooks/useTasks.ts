@@ -17,6 +17,8 @@ export function useTaskResolution(key: string | undefined, options?: { role?: 'm
   return useQuery({
     queryKey: ['task-resolution', authScopeKey, role, key],
     queryFn: () =>
+      // Developer requests can also return the restricted former-owner
+      // projection (P3-D15): { taskKey, title, status, access: 'former-owner' }.
       api.get<TaskResolution>(role === 'developer' ? `/my-day/tasks/${encodeURIComponent(key!)}` : `/tasks/${encodeURIComponent(key!)}`),
     enabled: Boolean(key),
     retry: false,

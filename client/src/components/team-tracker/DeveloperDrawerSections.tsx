@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, UserMinus, X } from 'lucide-react';
 import type { TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
@@ -29,19 +29,11 @@ const statusStyles: Record<TrackerDeveloperStatus, { color: string; background: 
   done_for_today: { color: 'var(--accent)', background: 'rgba(6, 182, 212, 0.15)' },
 };
 
-type UpdateDayHandler = (params: {
-  accountId: string;
-  status?: TrackerDeveloperStatus;
-  capacityUnits?: number | null;
-  managerNotes?: string;
-}) => void;
-
 interface DrawerHeaderProps {
   day: TrackerDeveloperDay;
   date: string;
   tasks?: TaskPickerTask[];
   loadLabel: string;
-  isOverCapacity: boolean;
   readOnly: boolean;
   onClose: () => void;
   onMarkInactive?: (day: TrackerDeveloperDay) => void;
@@ -52,7 +44,6 @@ export function DrawerHeader({
   date,
   tasks = [],
   loadLabel,
-  isOverCapacity,
   readOnly,
   onClose,
   onMarkInactive,
@@ -89,7 +80,7 @@ export function DrawerHeader({
               <StatusPillSelect day={day} date={date} tasks={tasks} readOnly={readOnly} />
               <span className="inline-flex items-center gap-1">
                 <span>Load</span>
-                <span className="font-mono font-semibold tabular-nums" style={{ color: isOverCapacity ? 'var(--danger)' : 'var(--text-primary)' }}>
+                <span className="font-mono font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
                   {loadLabel}
                 </span>
               </span>
@@ -242,23 +233,7 @@ function StatusPillSelect({ day, date, tasks, readOnly }: StatusPillSelectProps)
   );
 }
 
-interface StatusSummaryProps {
-  day: TrackerDeveloperDay;
-  readOnly: boolean;
-  capacityText: string;
-  setCapacityText: Dispatch<SetStateAction<string>>;
-  onUpdateDay: UpdateDayHandler;
-  onSaveCapacity: () => void;
-}
-
-export function StatusSummary({
-  day,
-  readOnly,
-  capacityText,
-  setCapacityText,
-  onUpdateDay,
-  onSaveCapacity,
-}: StatusSummaryProps) {
+export function StatusSummary({ day }: { day: TrackerDeveloperDay }) {
   return (
     <div className="shrink-0 px-6 pb-4">
       <div
@@ -273,46 +248,6 @@ export function StatusSummary({
             Attention signals
           </div>
           <TrackerSignalBadges day={day} compact maxItems={3} />
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1" style={{ background: 'color-mix(in srgb, var(--bg-primary) 42%, transparent)' }}>
-          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Capacity</span>
-          <input
-            type="number"
-            min={1}
-            inputMode="numeric"
-            value={capacityText}
-            onChange={(event) => setCapacityText(event.target.value)}
-            disabled={readOnly}
-            placeholder="-"
-            className="w-11 rounded-lg px-1.5 py-1 text-center text-[13px] font-mono outline-none"
-            style={{
-              background: 'color-mix(in srgb, var(--bg-elevated) 52%, var(--bg-tertiary))',
-              color: 'var(--text-primary)',
-              border: '1px solid color-mix(in srgb, var(--border) 55%, transparent)',
-            }}
-          />
-          <button
-            type="button"
-            onClick={onSaveCapacity}
-            disabled={readOnly}
-            className="rounded-lg px-2 py-1 text-[12px] font-medium transition-colors disabled:opacity-40"
-            style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)' }}
-          >
-            Save
-          </button>
-          {!readOnly && day.capacityUnits !== undefined && day.capacityUnits !== null && (
-            <button
-              type="button"
-              onClick={() => {
-                setCapacityText('');
-                onUpdateDay({ accountId: day.developer.accountId, capacityUnits: null });
-              }}
-              className="px-1 text-[12px]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Clear
-            </button>
-          )}
         </div>
       </div>
     </div>

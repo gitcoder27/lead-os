@@ -116,11 +116,6 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {dev.signals?.overCapacity && (
-            <span className="text-[11px] uppercase rounded-full px-2 py-1" style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.10)', letterSpacing: '0.08em' }}>
-              Over
-            </span>
-          )}
           <span className="text-[12px] uppercase rounded-full px-2 py-1" style={{ color, background: `${color}14`, letterSpacing: '0.08em' }}>
             {dev.level}
           </span>
@@ -138,11 +133,6 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
               {stat.label}: <span className="font-mono">{stat.value}</span>
             </span>
           ))}
-          {dev.capacityUnits && (
-            <span className="rounded-xl px-2 py-2" style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}>
-              Capacity: <span className="font-mono">{dev.capacityUnits}</span>
-            </span>
-          )}
           <span className="rounded-xl px-2 py-2" style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}>
             Due: <span className="font-mono">{dev.dueToday}</span>
           </span>

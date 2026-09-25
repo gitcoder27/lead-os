@@ -153,4 +153,26 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.queryByTestId('composer')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
   });
+
+  it('renders the restricted former-owner view (P3-D15)', () => {
+    mockUser.mockReturnValue({ accountId: 'u-dev', role: 'developer', developerAccountId: 'dev-1' });
+    mockUseTaskDetail.mockReturnValue(queryFor({
+      taskKey: 'T-9',
+      title: 'No longer mine',
+      status: 'blocked',
+      access: 'former-owner',
+    } as unknown as TaskDetailResponse));
+    render(<TaskDetailBody taskKey="T-9" onNavigateTask={() => {}} />);
+    expect(screen.getByText('No longer mine')).toBeTruthy();
+    expect(screen.getByText('Blocked')).toBeTruthy();
+    expect(screen.getByText(/no longer own this task/i)).toBeTruthy();
+    // Restricted projection: own timeline only — no editing or other sections.
+    expect(screen.getByTestId('timeline')).toBeTruthy();
+    expect(screen.queryByTestId('composer')).toBeNull();
+    expect(screen.queryByText('Owner & tracking')).toBeNull();
+    expect(screen.queryByText('Links')).toBeNull();
+    expect(screen.queryByText('Action items')).toBeNull();
+    expect(screen.queryByText('Properties')).toBeNull();
+    expect(screen.queryByLabelText('Delete task')).toBeNull();
+  });
 });

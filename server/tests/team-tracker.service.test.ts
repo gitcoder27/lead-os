@@ -101,12 +101,9 @@ describe("TeamTrackerService", () => {
         },
         { type: "manager", accountId: "manager-1" }
       );
-      await service.updateDay("dev-1", "2026-03-06", { capacityUnits: 3 });
-
       const day = await service.ensureDay("2026-03-07", "dev-1");
 
       expect(day.status).toBe("blocked");
-      expect(day.capacityUnits).toBe(3);
       expect(day.nextFollowUpAt).toBe("2026-03-07T10:00:00.000Z");
     });
 
@@ -238,7 +235,6 @@ describe("TeamTrackerService", () => {
       await seedIssue({ developmentDueDate: "2026-03-06", dueDate: "2026-03-09" });
       await service.updateDay("dev-1", "2026-03-07", {
         status: "blocked",
-        capacityUnits: 1,
       });
       const jiraItem = await service.addItem("dev-1", "2026-03-07", {
         jiraKey: "AM-123",
@@ -261,17 +257,15 @@ describe("TeamTrackerService", () => {
       expect(devDay.signals.freshness.statusChangeWithoutFollowUp).toBe(true);
       expect(devDay.signals.risk.overdueLinkedWork).toBe(true);
       expect(devDay.signals.risk.overdueLinkedCount).toBe(1);
-      expect(devDay.signals.risk.overCapacity).toBe(true);
-      expect(devDay.signals.risk.capacityDelta).toBe(1);
+      expect(devDay.signals.risk).not.toHaveProperty("overCapacity");
       expect(board.summary.overdueLinkedWork).toBe(1);
-      expect(board.summary.overCapacity).toBe(1);
+      expect(board.summary).not.toHaveProperty("overCapacity");
       expect(board.summary.statusFollowUp).toBe(1);
       expect(board.attentionQueue[0]?.reasons.map((reason) => reason.code)).toEqual([
         "blocked",
         "stale_with_open_risk",
         "overdue_linked_work",
         "status_change_without_follow_up",
-        "over_capacity",
       ]);
       expect(board.attentionQueue[0]?.availableQuickActions).toEqual([
         "update_status",
@@ -1200,17 +1194,16 @@ describe("TeamTrackerService", () => {
       expect(devDay.statusUpdatedAt).toBeDefined();
     });
 
-    it("stores daily capacity when provided", async () => {
-      await service.updateDay("dev-1", "2026-03-07", {
-        capacityUnits: 5,
-      });
+    it("no longer exposes daily capacity on the board DTO", async () => {
+      await service.updateDay("dev-1", "2026-03-07", { status: "on_track" });
 
       const board = await service.getBoard("2026-03-07");
       const devDay = board.developers.find(
         (d) => d.developer.accountId === "dev-1"
       )!;
 
-      expect(devDay.capacityUnits).toBe(5);
+      expect(devDay).not.toHaveProperty("capacityUnits");
+      expect(devDay.signals.risk).not.toHaveProperty("capacityDelta");
     });
 
     it("rejects day updates for an inactive developer", async () => {

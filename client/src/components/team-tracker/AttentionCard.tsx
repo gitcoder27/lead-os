@@ -18,7 +18,6 @@ type SeverityTone = 'danger' | 'warning' | 'neutral';
 const reasonToTone: Record<TrackerAttentionReasonCode, SeverityTone> = {
   blocked: 'danger',
   overdue_linked_work: 'danger',
-  over_capacity: 'danger',
   at_risk: 'warning',
   stale_with_open_risk: 'warning',
   stale_without_current_work: 'warning',

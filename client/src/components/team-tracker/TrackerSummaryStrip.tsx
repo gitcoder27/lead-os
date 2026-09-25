@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, CalendarClock, CheckCircle2, CircleOff, Clock, MessageCircleWarning, Pause, Scale, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, CircleOff, Clock, MessageCircleWarning, Pause, ShieldAlert } from 'lucide-react';
 import type { TrackerBoardSummary, TrackerBoardSummaryFilter } from '@/types';
 
 interface TrackerSummaryStripProps {
@@ -20,7 +20,6 @@ const chips: Array<{
   { key: 'at_risk', label: 'At Risk', icon: AlertTriangle, countKey: 'atRisk', color: 'var(--warning)' },
   { key: 'waiting', label: 'Waiting', icon: Pause, countKey: 'waiting', color: 'var(--info)' },
   { key: 'overdue_linked', label: 'Overdue Jira', icon: CalendarClock, countKey: 'overdueLinkedWork', color: 'var(--danger)' },
-  { key: 'over_capacity', label: 'Over Cap', icon: Scale, countKey: 'overCapacity', color: 'var(--warning)' },
   { key: 'status_follow_up', label: 'Needs Follow-up', icon: MessageCircleWarning, countKey: 'statusFollowUp', color: 'var(--info)' },
   { key: 'no_current', label: 'No Current', icon: CircleOff, countKey: 'noCurrent', color: 'var(--text-muted)' },
   { key: 'done_for_today', label: 'Done', icon: CheckCircle2, countKey: 'doneForToday', color: 'var(--success)' },

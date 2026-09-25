@@ -14,8 +14,7 @@ const mockWorkload: DeveloperWorkload[] = [
     level: 'medium',
     assignedTodayCount: 2,
     completedTodayCount: 1,
-    capacityUnits: 5,
-    signals: { idle: false, noCurrentItem: false, overCapacity: false, backlogTrackerMismatch: false },
+    signals: { idle: false, noCurrentItem: false, backlogTrackerMismatch: false },
   },
   {
     developer: { accountId: 'eve-5', displayName: 'Eve', isActive: true },
@@ -25,7 +24,7 @@ const mockWorkload: DeveloperWorkload[] = [
     score: 0,
     level: 'light',
     assignedTodayCount: 0,
-    signals: { idle: true, noCurrentItem: false, overCapacity: false, backlogTrackerMismatch: false },
+    signals: { idle: true, noCurrentItem: false, backlogTrackerMismatch: false },
   },
 ];
 
@@ -71,7 +70,7 @@ describe('WorkloadBar', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText('2/5')).toBeInTheDocument();
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('S9')).toBeInTheDocument();
   });
 

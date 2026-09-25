@@ -114,14 +114,9 @@ export interface DeveloperWorkload {
   trackerStatus?: TrackerDeveloperStatus;
   isTrackerStale?: boolean;
   hasCurrentItem?: boolean;
-  capacityUnits?: number;
-  capacityUsed?: number;
-  capacityRemaining?: number;
-  capacityUtilization?: number;
   signals?: {
     idle: boolean;
     noCurrentItem: boolean;
-    overCapacity: boolean;
     backlogTrackerMismatch: boolean;
   };
 }
@@ -675,6 +670,19 @@ export type TaskDetailResponse = (ManagerTask | DeveloperTask) & {
   parent: TaskChildRef | null;
 };
 
+/**
+ * Phase 3 (P3-D15, §7.2): a developer who previously authored an event on a
+ * task they no longer own gets this restricted projection — key, title and
+ * status only. Their own shared events remain readable via the events
+ * endpoint; links, children, labels and private fields are never exposed.
+ */
+export interface FormerOwnerTaskDetail {
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  access: "former-owner";
+}
+
 // ── Task saved views (P3-D9/D10) ─────────────────────────────────────────
 // Built-in view ids are defined in code; saved views live in
 // `task_saved_views` and are private to the owning manager.
@@ -873,7 +881,6 @@ export interface TrackerDeveloperDay {
   availability: DeveloperAvailability;
   status: TrackerDeveloperStatus;
   statusSuggestion?: TrackerStatusSuggestion;
-  capacityUnits?: number;
   managerNotes?: string;
   lastCheckInAt?: string;
   nextFollowUpAt?: string;
@@ -901,7 +908,6 @@ export type TrackerAttentionReasonCode =
   | "stale_with_open_risk"
   | "stale_without_current_work"
   | "overdue_linked_work"
-  | "over_capacity"
   | "status_change_without_follow_up"
   | "no_current"
   | "waiting";
@@ -965,7 +971,6 @@ export type TrackerBoardSummaryFilter =
   | "at_risk"
   | "waiting"
   | "overdue_linked"
-  | "over_capacity"
   | "status_follow_up"
   | "no_current"
   | "done_for_today";
@@ -1072,7 +1077,6 @@ export interface MyDayResponse {
   readOnlyReason?: MyDayReadOnlyReason;
   developer: Developer;
   status: TrackerDeveloperStatus;
-  capacityUnits?: number;
   availability: DeveloperAvailability;
   isReadOnly: boolean;
   lastCheckInAt?: string;
@@ -1102,7 +1106,6 @@ export interface TrackerBoardSummary {
   waiting: number;
   noCurrent: number;
   overdueLinkedWork: number;
-  overCapacity: number;
   statusFollowUp: number;
   doneForToday: number;
 }
@@ -1123,8 +1126,6 @@ export interface TrackerRiskSignals {
   openRisk: boolean;
   overdueLinkedWork: boolean;
   overdueLinkedCount: number;
-  overCapacity: boolean;
-  capacityDelta: number;
 }
 
 export interface TrackerDeveloperSignals {

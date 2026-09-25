@@ -58,7 +58,6 @@ const teamBoard = {
     waiting: 0,
     noCurrent: 1,
     overdueLinkedWork: 0,
-    overCapacity: 1,
     statusFollowUp: 0,
     doneForToday: 0,
   },

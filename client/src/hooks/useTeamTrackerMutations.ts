@@ -25,13 +25,11 @@ export function useUpdateDay(date: string) {
     mutationFn: (params: {
       accountId: string;
       status?: TrackerDeveloperStatus;
-      capacityUnits?: number | null;
       managerNotes?: string;
     }) =>
       api.patch(`/team-tracker/${params.accountId}/day`, {
         date,
         status: params.status,
-        capacityUnits: params.capacityUnits,
         managerNotes: params.managerNotes,
       }),
     onSuccess: () => {

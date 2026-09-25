@@ -58,14 +58,6 @@ function getSignalBadges(day: TrackerDeveloperDay): SignalBadge[] {
     badges.push({ key: 'needs-follow-up', label: 'Needs follow-up', tone: 'info' });
   }
 
-  if (day.signals.risk.overCapacity) {
-    badges.push({
-      key: 'over-capacity',
-      label: `+${day.signals.risk.capacityDelta} over cap`,
-      tone: 'danger',
-    });
-  }
-
   if (!day.currentItem && day.status !== 'done_for_today' && !day.signals.freshness.staleWithoutCurrentWork) {
     badges.push({ key: 'no-current', label: 'No current', tone: 'accent' });
   }

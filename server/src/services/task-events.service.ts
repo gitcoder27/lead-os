@@ -131,11 +131,16 @@ export class TaskEventsService {
 
   private async visibility(viewer: TaskViewer) {
     if (viewer.kind === "developer" && await this.keys.canonicalEnabled(viewer.workspaceId)) {
-      return and(eq(taskEvents.visibility, "shared"), sql`EXISTS (
-        SELECT 1 FROM tasks owned WHERE owned.id = ${taskEvents.taskId}
-        AND owned.workspace_id = ${normalizeWorkspaceId(viewer.workspaceId)}
-        AND owned.owner_type = 'developer' AND owned.owner_id = ${viewer.accountId}
-        AND owned.deleted_at IS NULL
+      // Phase 3 (P3-D15): shared events on owned tasks, plus the developer's
+      // own shared events on tasks they used to own (or otherwise authored).
+      return and(eq(taskEvents.visibility, "shared"), sql`(
+        EXISTS (
+          SELECT 1 FROM tasks owned WHERE owned.id = ${taskEvents.taskId}
+          AND owned.workspace_id = ${normalizeWorkspaceId(viewer.workspaceId)}
+          AND owned.owner_type = 'developer' AND owned.owner_id = ${viewer.accountId}
+          AND owned.deleted_at IS NULL
+        )
+        OR (${taskEvents.authorType} = 'developer' AND ${taskEvents.authorId} = ${viewer.accountId})
       )`)!;
     }
     return viewer.kind === "manager"
@@ -149,25 +154,45 @@ export class TaskEventsService {
         AND td.developer_account_id = ${viewer.accountId})`)!;
   }
 
-  private async assertDeveloperOwns(key: string, viewer: TaskViewer): Promise<void> {
+  /**
+   * Phase 3 (P3-D15, §7.2): developer access tier for a task — "owner" (current
+   * owner), "former" (authored at least one event but no longer owns it), or
+   * "none". Reads are allowed for both owner and former; writes require owner.
+   */
+  async developerAccess(key: string, viewer: TaskViewer): Promise<"owner" | "former" | "none"> {
     if (await this.keys.canonicalEnabled(viewer.workspaceId)) {
       const resolved = await this.keys.resolve(normalizeWorkspaceId(viewer.workspaceId), key);
       const task = (await db.select().from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(tasks.taskKey, resolved ?? ""))).limit(1))[0];
-      if (!task || task.deletedAt || task.ownerType !== "developer" || task.ownerId !== viewer.accountId) throw new HttpError(404, "Task not found");
-      return;
+      if (!task || task.deletedAt) return "none";
+      if (task.ownerType === "developer" && task.ownerId === viewer.accountId) return "owner";
+      const authored = await db.select({ id: taskEvents.id }).from(taskEvents).where(and(
+        eq(taskEvents.workspaceId, task.workspaceId), eq(taskEvents.taskId, task.id),
+        eq(taskEvents.authorType, "developer"), eq(taskEvents.authorId, viewer.accountId),
+      )).limit(1);
+      return authored.length ? "former" : "none";
     }
     const rows = await db.select({ accountId: teamTrackerDays.developerAccountId }).from(teamTrackerItems)
       .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerItems.dayId))
       .where(and(eq(teamTrackerItems.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(teamTrackerItems.taskKey, key)))
       .orderBy(desc(teamTrackerDays.date), desc(teamTrackerItems.updatedAt), desc(teamTrackerItems.id)).limit(1);
-    if (rows[0]?.accountId !== viewer.accountId) throw new HttpError(404, "Task not found");
+    return rows[0]?.accountId === viewer.accountId ? "owner" : "none";
+  }
+
+  private async assertDeveloperCanRead(key: string, viewer: TaskViewer): Promise<void> {
+    if (await this.developerAccess(key, viewer) === "none") throw new HttpError(404, "Task not found");
+  }
+
+  private async assertDeveloperOwns(key: string, viewer: TaskViewer): Promise<void> {
+    const access = await this.developerAccess(key, viewer);
+    if (access === "former") throw new HttpError(403, "Only the current owner can modify this task");
+    if (access === "none") throw new HttpError(404, "Task not found");
   }
 
   async list(taskKey: string, viewer: TaskViewer, options: { cursor?: string; limit?: number } = {}): Promise<{ events: TaskEvent[]; nextCursor: string | null }> {
     await this.keys.assertEnabled(viewer.workspaceId);
     const key = await this.keys.resolve(normalizeWorkspaceId(viewer.workspaceId), taskKey);
     if (!key) throw new HttpError(404, "Task not found");
-    if (viewer.kind === "developer") await this.assertDeveloperOwns(key, viewer);
+    if (viewer.kind === "developer") await this.assertDeveloperCanRead(key, viewer);
     const limit = Math.min(100, Math.max(1, options.limit ?? 50));
     const cursor = options.cursor ? Number(options.cursor) : undefined;
     if (cursor !== undefined && (!Number.isSafeInteger(cursor) || cursor < 1)) throw new HttpError(400, "Invalid cursor");
@@ -178,7 +203,7 @@ export class TaskEventsService {
 
   async latestOfType(taskKey: string, type: TaskEventType, viewer: TaskViewer): Promise<TaskEvent | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
-    if (viewer.kind === "developer") await this.assertDeveloperOwns(taskKey, viewer);
+    if (viewer.kind === "developer") await this.assertDeveloperCanRead(taskKey, viewer);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), await this.identity(taskKey, viewer.workspaceId), eq(taskEvents.type, type), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(1);
     return rows[0] ? mapEvent(rows[0]) : null;
   }

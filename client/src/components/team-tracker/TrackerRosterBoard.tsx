@@ -46,10 +46,7 @@ const getInitials = (name: string) =>
 
 const getAssignedCount = (day: TrackerDeveloperDay) => (day.currentItem ? 1 : 0) + day.plannedItems.length;
 
-const getLoadLabel = (day: TrackerDeveloperDay) => {
-  const assigned = getAssignedCount(day);
-  return day.capacityUnits ? `${assigned}/${day.capacityUnits}` : `${assigned}`;
-};
+const getLoadLabel = (day: TrackerDeveloperDay) => `${getAssignedCount(day)}`;
 
 const getFreshnessLabel = (day: TrackerDeveloperDay) => {
   if (day.lastCheckInAt) {
@@ -66,7 +63,6 @@ const getRiskLabel = (day: TrackerDeveloperDay) => {
       ? '1 overdue'
       : `${day.signals.risk.overdueLinkedCount} overdue`;
   }
-  if (day.signals.risk.overCapacity) return `+${day.signals.risk.capacityDelta} over cap`;
   if (day.signals.freshness.staleWithOpenRisk) return 'Stale risk';
   if (day.signals.freshness.staleWithoutCurrentWork) return 'Needs current';
   if (day.signals.freshness.statusChangeWithoutFollowUp) return 'Needs follow-up';
@@ -76,7 +72,7 @@ const getRiskLabel = (day: TrackerDeveloperDay) => {
 };
 
 const getRiskTone = (day: TrackerDeveloperDay) => {
-  if (day.status === 'blocked' || day.signals.risk.overdueLinkedWork || day.signals.risk.overCapacity) return 'var(--danger)';
+  if (day.status === 'blocked' || day.signals.risk.overdueLinkedWork) return 'var(--danger)';
   if (day.signals.freshness.staleByTime || day.signals.freshness.staleWithoutCurrentWork) return 'var(--warning)';
   if (day.status === 'done_for_today') return 'var(--success)';
   return 'var(--text-muted)';
@@ -90,7 +86,7 @@ type AttentionMeta = {
 
 const attentionReasonTone = (item: TrackerAttentionItem): AttentionMeta['tone'] => {
   const firstCode = item.reasons[0]?.code;
-  if (firstCode === 'blocked' || firstCode === 'overdue_linked_work' || firstCode === 'over_capacity') {
+  if (firstCode === 'blocked' || firstCode === 'overdue_linked_work') {
     return 'danger';
   }
   if (firstCode) {
@@ -201,7 +197,6 @@ function RosterRow({
   attentionMeta?: AttentionMeta;
 }) {
   const assignedCount = getAssignedCount(day);
-  const loadIsHigh = Boolean(day.capacityUnits && assignedCount > day.capacityUnits);
   const firstPlanned = day.plannedItems[0];
   const freshnessTitle = day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : undefined;
   const freshnessIsStale = day.signals.freshness.staleByTime || !day.lastCheckInAt;
@@ -284,7 +279,7 @@ function RosterRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[13px] font-semibold tabular-nums" style={{ color: loadIsHigh ? 'var(--danger)' : 'var(--text-secondary)' }}>
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>
         <Zap size={13} />
         {getLoadLabel(day)}
       </div>

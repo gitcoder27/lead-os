@@ -17,6 +17,14 @@ export function normalizeBoardSearchQuery(value: string | null | undefined): str
   return value?.trim() ?? "";
 }
 
+/** Phase 3 (§7.1): capacity tracking is removed; stored "over_capacity"
+ *  filters (saved views, old URLs) degrade to the unfiltered board. */
+function normalizeSummaryFilter(value: TrackerBoardSummaryFilter | string | undefined): TrackerBoardSummaryFilter {
+  return !value || (value as string) === "over_capacity"
+    ? DEFAULT_BOARD_QUERY.summaryFilter
+    : (value as TrackerBoardSummaryFilter);
+}
+
 export function resolveUnsavedBoardQuery(
   rawQuery?: TeamTrackerBoardQuery
 ): TeamTrackerBoardResolvedQuery {
@@ -25,7 +33,7 @@ export function resolveUnsavedBoardQuery(
   return {
     ...DEFAULT_BOARD_QUERY,
     q: normalizeBoardSearchQuery(normalizedRawQuery.q),
-    summaryFilter: normalizedRawQuery.summaryFilter ?? DEFAULT_BOARD_QUERY.summaryFilter,
+    summaryFilter: normalizeSummaryFilter(normalizedRawQuery.summaryFilter),
     sortBy: normalizedRawQuery.sortBy ?? DEFAULT_BOARD_QUERY.sortBy,
     groupBy: normalizedRawQuery.groupBy ?? DEFAULT_BOARD_QUERY.groupBy,
   };
@@ -39,7 +47,7 @@ export function normalizeSavedViewQuery(input: {
 }): Omit<TeamTrackerBoardResolvedQuery, "viewId"> {
   return {
     q: normalizeBoardSearchQuery(input.q),
-    summaryFilter: input.summaryFilter ?? DEFAULT_BOARD_QUERY.summaryFilter,
+    summaryFilter: normalizeSummaryFilter(input.summaryFilter),
     sortBy: input.sortBy ?? DEFAULT_BOARD_QUERY.sortBy,
     groupBy: input.groupBy ?? DEFAULT_BOARD_QUERY.groupBy,
   };

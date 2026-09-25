@@ -48,9 +48,7 @@ function getTrackerAvailabilityRank(status?: DeveloperWorkload["trackerStatus"])
 }
 
 function buildSuggestionReason(entry: DeveloperWorkload): string {
-  const loadSummary = entry.capacityUnits !== undefined
-    ? `${entry.assignedTodayCount ?? 0}/${entry.capacityUnits} planned today`
-    : `${entry.assignedTodayCount ?? 0} planned today`;
+  const loadSummary = `${entry.assignedTodayCount ?? 0} planned today`;
   const issueLabel = entry.activeDefects === 1 ? "issue" : "issues";
   const statusNote = entry.trackerStatus === "done_for_today"
     ? ", marked done for today"
@@ -144,16 +142,7 @@ export class WorkloadService {
       const completedTodayCount = canonicalDay?.completedItems.length ?? trackerDayItems.filter((item) => item.state === "done").length;
       const droppedTodayCount = canonicalDay?.droppedItems.length ?? trackerDayItems.filter((item) => item.state === "dropped").length;
       const assignedTodayCount = currentCount + plannedCount;
-      const capacityUnits = canonicalDay?.capacityUnits ?? trackerDay?.capacityUnits ?? undefined;
-      const capacityUsed = assignedTodayCount;
-      const capacityRemaining = capacityUnits !== undefined
-        ? capacityUnits - capacityUsed
-        : undefined;
-      const capacityUtilization = capacityUnits !== undefined && capacityUnits > 0
-        ? capacityUsed / capacityUnits
-        : undefined;
       const hasCurrentItem = currentCount === 1;
-      const overCapacity = capacityUnits !== undefined && capacityUsed > capacityUnits;
       const noCurrentItem = assignedTodayCount > 0 && !hasCurrentItem;
       const idle = assignedTodayCount === 0 && trackerDay?.status !== "done_for_today";
 
@@ -172,14 +161,9 @@ export class WorkloadService {
         trackerStatus: trackerDay?.status as DeveloperWorkload["trackerStatus"],
         isTrackerStale: trackerDay ? isTrackerStale(trackerDay.lastCheckInAt) : false,
         hasCurrentItem,
-        capacityUnits,
-        capacityUsed,
-        capacityRemaining,
-        capacityUtilization,
         signals: {
           idle,
           noCurrentItem,
-          overCapacity,
           backlogTrackerMismatch: mine.length > 0 && assignedTodayCount === 0,
         },
       };
@@ -209,20 +193,6 @@ export class WorkloadService {
           getTrackerAvailabilityRank(a.trackerStatus) - getTrackerAvailabilityRank(b.trackerStatus);
         if (trackerAvailabilityDelta !== 0) {
           return trackerAvailabilityDelta;
-        }
-
-        const overCapacityDelta =
-          Number(a.signals?.overCapacity === true) - Number(b.signals?.overCapacity === true);
-        if (overCapacityDelta !== 0) {
-          return overCapacityDelta;
-        }
-
-        if (
-          a.capacityUtilization !== undefined &&
-          b.capacityUtilization !== undefined &&
-          a.capacityUtilization !== b.capacityUtilization
-        ) {
-          return a.capacityUtilization - b.capacityUtilization;
         }
 
         const assignedDelta = (a.assignedTodayCount ?? 0) - (b.assignedTodayCount ?? 0);

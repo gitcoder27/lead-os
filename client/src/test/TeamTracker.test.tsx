@@ -44,8 +44,6 @@ function buildSignals(overrides?: {
       openRisk: false,
       overdueLinkedWork: false,
       overdueLinkedCount: 0,
-      overCapacity: false,
-      capacityDelta: 0,
       ...overrides?.risk,
     },
   };
@@ -80,7 +78,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
         id: 2,
         developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
         status: 'blocked',
-        capacityUnits: 2,
         isStale: true,
         lastCheckInAt: '2026-03-07T07:00:00Z',
         statusUpdatedAt: '2026-03-07T08:30:00Z',
@@ -96,8 +93,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
             openRisk: true,
             overdueLinkedWork: true,
             overdueLinkedCount: 1,
-            overCapacity: true,
-            capacityDelta: 1,
           },
         }),
         currentItem: {
@@ -163,7 +158,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
       waiting: 0,
       noCurrent: 1,
       overdueLinkedWork: 1,
-      overCapacity: 1,
       statusFollowUp: 1,
       doneForToday: 0,
     },
@@ -175,7 +169,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
       waiting: 0,
       noCurrent: 1,
       overdueLinkedWork: 1,
-      overCapacity: 1,
       statusFollowUp: 1,
       doneForToday: 0,
     },
@@ -188,7 +181,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
           id: 2,
           developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
           status: 'blocked',
-          capacityUnits: 2,
           isStale: true,
           lastCheckInAt: '2026-03-07T07:00:00Z',
           statusUpdatedAt: '2026-03-07T08:30:00Z',
@@ -204,8 +196,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
               openRisk: true,
               overdueLinkedWork: true,
               overdueLinkedCount: 1,
-              overCapacity: true,
-              capacityDelta: 1,
             },
           }),
           currentItem: {
@@ -280,8 +270,6 @@ function buildMockBoard(): TeamTrackerBoardResponse {
             openRisk: true,
             overdueLinkedWork: true,
             overdueLinkedCount: 1,
-            overCapacity: true,
-            capacityDelta: 1,
           },
         }),
         hasCurrentItem: true,
@@ -820,7 +808,7 @@ describe('TeamTrackerPage', () => {
     expect(screen.getByRole('button', { name: /1 blocked/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /1 stale/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /1 overdue jira/i }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByRole('button', { name: /1 over cap/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /over cap/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /1 needs follow-up/i })).toBeInTheDocument();
   });
 
@@ -1536,7 +1524,7 @@ describe('TeamTrackerPage', () => {
     expect(mockAddToast).toHaveBeenLastCalledWith('Task restored', 'success');
   });
 
-  it('saves daily capacity from the drawer', () => {
+  it('does not render a capacity editor in the drawer', () => {
     render(
       <TestWrapper>
         <TeamTrackerPage />
@@ -1544,15 +1532,7 @@ describe('TeamTrackerPage', () => {
     );
 
     clickDeveloperRow('Bob Jones');
-    fireEvent.change(screen.getByDisplayValue('2'), {
-      target: { value: '5' },
-    });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0]!);
-
-    expect(mockUpdateDayMutate).toHaveBeenCalledWith({
-      accountId: 'dev-2',
-      capacityUnits: 5,
-    });
+    expect(screen.queryByText('Capacity')).not.toBeInTheDocument();
   });
 
   it('closes the shared task detail drawer from its close action', () => {

@@ -342,7 +342,6 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
             developer: { accountId: day.developer.accountId, displayName: day.developer.displayName },
             availability: day.availability,
             status: day.status,
-            capacityUnits: day.capacityUnits,
             isStale: day.isStale,
             signals: day.signals,
             lastCheckInAt: day.lastCheckInAt,
@@ -608,7 +607,7 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
     },
     {
       name: "get_workload",
-      description: "Get per-developer workload for a date: active defects, due-today counts, capacity, and load level.",
+      description: "Get per-developer workload for a date: active defects, due-today counts, and load level.",
       parameters: {
         type: "object",
         properties: { date: dateProperty("YYYY-MM-DD; defaults to today") },
@@ -637,9 +636,6 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
               hasCurrentItem: entry.hasCurrentItem,
               assignedTodayCount: entry.assignedTodayCount,
               completedTodayCount: entry.completedTodayCount,
-              capacityUnits: entry.capacityUnits,
-              capacityUsed: entry.capacityUsed,
-              capacityUtilization: entry.capacityUtilization,
               signals: entry.signals,
             }))
           ),
@@ -1439,14 +1435,13 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
     {
       name: "update_developer_day",
       description:
-        "Update a developer's day on the Team Tracker: status (on_track/at_risk/blocked/waiting/done_for_today), capacity units, or manager notes.",
+        "Update a developer's day on the Team Tracker: status (on_track/at_risk/blocked/waiting/done_for_today) or manager notes.",
       parameters: {
         type: "object",
         properties: {
           accountId: { type: "string", description: "Developer account id" },
           date: dateProperty("YYYY-MM-DD; defaults to today"),
           status: { type: "string", enum: ["on_track", "at_risk", "blocked", "waiting", "done_for_today"] },
-          capacityUnits: { type: ["integer", "null"] },
           managerNotes: { type: "string" },
         },
         required: ["accountId"],
@@ -1462,7 +1457,6 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
             accountId: z.string().trim().min(1),
             date: dateSchema.optional(),
             status: z.enum(["on_track", "at_risk", "blocked", "waiting", "done_for_today"]).optional(),
-            capacityUnits: z.number().int().min(1).nullable().optional(),
             managerNotes: z.string().trim().optional(),
           }),
           rawArgs
@@ -1470,7 +1464,7 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
         const day = await ctx.services.teamTrackerService.updateDay(
           args.accountId,
           args.date ?? ctx.date,
-          { status: args.status, capacityUnits: args.capacityUnits, managerNotes: args.managerNotes },
+          { status: args.status, managerNotes: args.managerNotes },
           ctx.workspaceId
         );
         return {

@@ -10,7 +10,7 @@ import { TeamTrackerService } from "./team-tracker.service";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
-import type { TaskEvent } from "shared/types";
+import type { TaskEvent, TaskStatus } from "shared/types";
 import { TaskService } from "./task.service";
 import type { CreateTaskRequest, UpdateTaskRequest } from "shared/types";
 
@@ -35,8 +35,15 @@ export class MyDayService {
   private readonly eventsService = new TaskEventsService(this.taskKeys);
 
   async resolveTask(accountId: string, key: string, workspaceId?: string) {
-    await this.eventsService.list(key, { kind: "developer", accountId, workspaceId }, { limit: 1 });
+    // Phase 3 (P3-D15): former owners (authored ≥1 event) can resolve the task
+    // but get the restricted key/title/status projection.
+    const access = await this.eventsService.developerAccess(key, { kind: "developer", accountId, workspaceId });
+    if (access === "none") throw new HttpError(404, "Task not found");
     const task = await this.taskKeys.resolveTask(workspaceId ?? "default", key);
+    if (access === "former") {
+      const row = await new TaskService().getByKey(task.taskKey, workspaceId);
+      return { taskKey: task.taskKey, title: task.title, status: (row?.status ?? "open") as TaskStatus, access: "former-owner" as const };
+    }
     return { ...task, status: undefined, managerDeskItemId: undefined };
   }
 
@@ -71,7 +78,6 @@ export class MyDayService {
       readOnlyReason,
       developer: day.developer,
       status: day.status,
-      capacityUnits: day.capacityUnits,
       availability: day.availability,
       isReadOnly: readOnlyReason !== undefined,
       lastCheckInAt: day.lastCheckInAt,

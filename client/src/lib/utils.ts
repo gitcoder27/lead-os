@@ -92,13 +92,12 @@ export function workloadColor(level: string): string {
   }
 }
 
-export function workloadAssignedLabel(workload: Pick<DeveloperWorkload, 'assignedTodayCount' | 'capacityUnits' | 'activeDefects'>): string {
-  const assigned = workload.assignedTodayCount ?? workload.activeDefects;
-  return workload.capacityUnits ? `${assigned}/${workload.capacityUnits}` : `${assigned}`;
+export function workloadAssignedLabel(workload: Pick<DeveloperWorkload, 'assignedTodayCount' | 'activeDefects'>): string {
+  return `${workload.assignedTodayCount ?? workload.activeDefects}`;
 }
 
 export function workloadAccent(workload: Pick<DeveloperWorkload, 'activeDefects' | 'blocked' | 'level' | 'trackerStatus' | 'isTrackerStale' | 'signals' | 'assignedTodayCount'>): string {
-  if (workload.trackerStatus === 'blocked' || workload.blocked > 0 || workload.signals?.overCapacity) {
+  if (workload.trackerStatus === 'blocked' || workload.blocked > 0) {
     return 'var(--danger)';
   }
 

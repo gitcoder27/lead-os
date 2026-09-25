@@ -84,7 +84,7 @@ export class WorkspaceMaintenanceService {
           await db.delete(developerNotes).where(eq(developerNotes.workspaceId, normalizedWorkspaceId));
           await db.delete(developerAvailabilityPeriods).where(eq(developerAvailabilityPeriods.workspaceId, normalizedWorkspaceId));
           await db.delete(teamTrackerSavedViews).where(and(eq(teamTrackerSavedViews.workspaceId, normalizedWorkspaceId), eq(teamTrackerSavedViews.managerAccountId, managerAccountId)));
-          await db.update(teamTrackerDays).set({ status: "on_track", capacityUnits: null, managerNotes: null, lastCheckInAt: null, nextFollowUpAt: null }).where(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId));
+          await db.update(teamTrackerDays).set({ status: "on_track", managerNotes: null, lastCheckInAt: null, nextFollowUpAt: null }).where(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId));
         }
         return;
       }

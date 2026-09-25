@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { TrackerBoardSummaryFilter } from "shared/types";
 import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 import { ManagerDeskService } from "../services/manager-desk.service";
@@ -21,7 +22,6 @@ const trackerSummaryFilterSchema = z.enum([
   "at_risk",
   "waiting",
   "overdue_linked",
-  "over_capacity",
   "status_follow_up",
   "no_current",
   "done_for_today",
@@ -99,9 +99,8 @@ const updateDaySchema = z.object({
   body: z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     status: trackerStatusSchema.optional(),
-    capacityUnits: z.number().int().min(1).nullable().optional(),
     managerNotes: z.string().trim().optional(),
-  }).refine((value) => value.status !== undefined || value.capacityUnits !== undefined || value.managerNotes !== undefined, {
+  }).refine((value) => value.status !== undefined || value.managerNotes !== undefined, {
     message: "At least one day field is required",
   }),
   query: z.any().optional(),
@@ -267,18 +266,7 @@ export function createTeamTrackerRouter(
         managerAccountId: req.auth?.user.accountId,
         query: {
           q: req.query.q as string | undefined,
-          summaryFilter: req.query.summaryFilter as
-            | "all"
-            | "stale"
-            | "blocked"
-            | "at_risk"
-            | "waiting"
-            | "overdue_linked"
-            | "over_capacity"
-            | "status_follow_up"
-            | "no_current"
-            | "done_for_today"
-            | undefined,
+          summaryFilter: req.query.summaryFilter as TrackerBoardSummaryFilter | undefined,
           sortBy: req.query.sortBy as
             | "name"
             | "attention"
@@ -408,10 +396,9 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, status, capacityUnits, managerNotes } = req.body;
+        const { date, status, managerNotes } = req.body;
         const day = await trackerService.updateDay(accountId, date, {
           status,
-          capacityUnits,
           managerNotes,
         }, req.auth!.user.workspaceId);
         res.json(day);

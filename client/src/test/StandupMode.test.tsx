@@ -139,8 +139,7 @@ function signals(): TrackerDeveloperDay['signals'] {
       openRisk: false,
       overdueLinkedWork: false,
       overdueLinkedCount: 0,
-      overCapacity: false,
-      capacityDelta: 0,
+
     },
   };
 }
@@ -189,11 +188,11 @@ function buildBoard(): TeamTrackerBoardResponse {
     attentionQueue: [],
     summary: {
       total: 2, stale: 0, blocked: 0, atRisk: 0, waiting: 0, noCurrent: 0,
-      overdueLinkedWork: 0, overCapacity: 0, statusFollowUp: 0, doneForToday: 0,
+      overdueLinkedWork: 0, statusFollowUp: 0, doneForToday: 0,
     },
     visibleSummary: {
       total: 2, stale: 0, blocked: 0, atRisk: 0, waiting: 0, noCurrent: 0,
-      overdueLinkedWork: 0, overCapacity: 0, statusFollowUp: 0, doneForToday: 0,
+      overdueLinkedWork: 0, statusFollowUp: 0, doneForToday: 0,
     },
     groups: [],
     query: { summaryFilter: 'all', sortBy: 'name', groupBy: 'none' },

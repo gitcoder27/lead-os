@@ -345,7 +345,6 @@ function buildSignals(params: {
   updatedAt: string;
   currentItem?: TrackerWorkItem;
   plannedItems: TrackerWorkItem[];
-  capacityUnits?: number;
   config: TrackerSignalConfig;
   now?: Date;
 }): TrackerDeveloperSignals {
@@ -369,11 +368,6 @@ function buildSignals(params: {
     (item): item is TrackerWorkItem =>
       Boolean(item?.jiraDueDate && item.jiraDueDate < params.date)
   ).length;
-  const assignedTodayCount =
-    (params.currentItem ? 1 : 0) + params.plannedItems.length;
-  const capacityDelta = params.capacityUnits
-    ? assignedTodayCount - params.capacityUnits
-    : 0;
   const hasFollowUpAfterStatusChange = Boolean(
     effectiveStatusUpdatedAt &&
       params.lastCheckInAt &&
@@ -403,8 +397,6 @@ function buildSignals(params: {
       openRisk,
       overdueLinkedWork: overdueLinkedCount > 0,
       overdueLinkedCount,
-      overCapacity: capacityDelta > 0,
-      capacityDelta: Math.max(0, capacityDelta),
     },
   };
 }
@@ -631,7 +623,6 @@ const ATTENTION_REASON_META: Record<
   at_risk: { label: "At Risk", priority: 4 },
   status_change_without_follow_up: { label: "Status changed, no follow-up", priority: 5 },
   stale_without_current_work: { label: "Stale without current work", priority: 6 },
-  over_capacity: { label: "Over capacity", priority: 7 },
   stale_by_time: { label: "Stale by time", priority: 8 },
   no_current: { label: "No current item", priority: 9 },
   waiting: { label: "Waiting", priority: 10 },
@@ -659,9 +650,6 @@ function buildAttentionReasons(
   }
   if (day.signals.freshness.staleWithoutCurrentWork) {
     reasons.push("stale_without_current_work");
-  }
-  if (day.signals.risk.overCapacity) {
-    reasons.push("over_capacity");
   }
   if (
     day.signals.freshness.staleByTime &&
@@ -761,8 +749,6 @@ function matchesSummaryFilter(
       return day.status === "waiting";
     case "overdue_linked":
       return day.signals.risk.overdueLinkedWork;
-    case "over_capacity":
-      return day.signals.risk.overCapacity;
     case "status_follow_up":
       return day.signals.freshness.statusChangeWithoutFollowUp;
     case "no_current":
@@ -857,12 +843,7 @@ function sortDeveloperDays(
     if (sortBy === "load") {
       const leftOpenCount = (left.currentItem ? 1 : 0) + left.plannedItems.length;
       const rightOpenCount = (right.currentItem ? 1 : 0) + right.plannedItems.length;
-      const capacityDeltaDiff =
-        right.signals.risk.capacityDelta - left.signals.risk.capacityDelta;
 
-      if (capacityDeltaDiff !== 0) {
-        return capacityDeltaDiff;
-      }
       if (rightOpenCount !== leftOpenCount) {
         return rightOpenCount - leftOpenCount;
       }
@@ -1382,7 +1363,6 @@ export class TeamTrackerService {
         date,
         developerAccountId,
         status: seededStatus,
-        capacityUnits: priorDay?.capacityUnits ?? null,
         managerNotes: priorDay?.managerNotes ?? null,
         nextFollowUpAt: priorDay?.nextFollowUpAt ?? null,
         statusUpdatedAt:
@@ -1422,7 +1402,6 @@ export class TeamTrackerService {
     date: string,
     updates: {
       status?: TrackerDeveloperStatus;
-      capacityUnits?: number | null;
       managerNotes?: string;
     },
     workspaceId?: string
@@ -1445,9 +1424,6 @@ export class TeamTrackerService {
       .set({
         ...(nextStatus !== undefined && { status: nextStatus }),
         ...(statusChanged && { statusUpdatedAt: now }),
-        ...(updates.capacityUnits !== undefined && {
-          capacityUnits: updates.capacityUnits,
-        }),
         ...(!canonical && updates.managerNotes !== undefined && {
           managerNotes: updates.managerNotes,
         }),
@@ -2343,7 +2319,6 @@ export class TeamTrackerService {
       waiting: days.filter((d) => d.status === "waiting").length,
       noCurrent: days.filter((d) => !d.currentItem && d.status !== "done_for_today").length,
       overdueLinkedWork: days.filter((d) => d.signals.risk.overdueLinkedWork).length,
-      overCapacity: days.filter((d) => d.signals.risk.overCapacity).length,
       statusFollowUp: days.filter((d) => d.signals.freshness.statusChangeWithoutFollowUp).length,
       doneForToday: days.filter((d) => d.status === "done_for_today").length,
     };
@@ -2454,7 +2429,6 @@ export class TeamTrackerService {
       updatedAt: day.updatedAt,
       currentItem,
       plannedItems,
-      capacityUnits: day.capacityUnits ?? undefined,
       config: signalConfig,
     });
 
@@ -2464,7 +2438,6 @@ export class TeamTrackerService {
       developer,
       availability: developer.availability ?? { state: "active" },
       status: day.status as TrackerDeveloperStatus,
-      capacityUnits: day.capacityUnits ?? undefined,
       managerNotes: day.managerNotes ?? undefined,
       lastCheckInAt: day.lastCheckInAt ?? undefined,
       nextFollowUpAt: day.nextFollowUpAt ?? undefined,
@@ -2528,7 +2501,6 @@ export class TeamTrackerService {
       updatedAt: day?.updatedAt ?? `${date}T00:00:00.000Z`,
       currentItem,
       plannedItems,
-      capacityUnits: day?.capacityUnits ?? undefined,
       config: signalConfig,
       now: endOfIsoDate(date),
     });
@@ -2539,7 +2511,6 @@ export class TeamTrackerService {
       developer,
       availability: developer.availability ?? { state: "active" },
       status: (day?.status as TrackerDeveloperStatus | undefined) ?? "on_track",
-      capacityUnits: day?.capacityUnits ?? undefined,
       managerNotes: day?.managerNotes ?? undefined,
       lastCheckInAt: day?.lastCheckInAt ?? undefined,
       nextFollowUpAt: day?.nextFollowUpAt ?? undefined,
@@ -2622,7 +2593,6 @@ export class TeamTrackerService {
       updatedAt: effectiveDay?.updatedAt ?? `${date}T00:00:00.000Z`,
       currentItem,
       plannedItems,
-      capacityUnits: effectiveDay?.capacityUnits ?? undefined,
       config: signalConfig,
     });
 
@@ -2632,7 +2602,6 @@ export class TeamTrackerService {
       developer,
       availability: developer.availability ?? { state: "active" },
       status: (effectiveDay?.status as TrackerDeveloperStatus | undefined) ?? "on_track",
-      capacityUnits: effectiveDay?.capacityUnits ?? undefined,
       managerNotes: effectiveDay?.managerNotes ?? undefined,
       lastCheckInAt: effectiveDay?.lastCheckInAt ?? undefined,
       nextFollowUpAt: effectiveDay?.nextFollowUpAt ?? undefined,
@@ -2788,7 +2757,6 @@ export class TeamTrackerService {
         updatedAt: effectiveDay?.updatedAt ?? `${date}T00:00:00.000Z`,
         currentItem,
         plannedItems,
-        capacityUnits: effectiveDay?.capacityUnits ?? undefined,
         config: signalConfig,
       });
 
@@ -2798,7 +2766,6 @@ export class TeamTrackerService {
         developer,
         availability: developer.availability ?? { state: "active" },
         status: (effectiveDay?.status as TrackerDeveloperStatus | undefined) ?? "on_track",
-        capacityUnits: effectiveDay?.capacityUnits ?? undefined,
         managerNotes: effectiveDay?.managerNotes ?? undefined,
         lastCheckInAt: effectiveDay?.lastCheckInAt ?? undefined,
         nextFollowUpAt: effectiveDay?.nextFollowUpAt ?? undefined,
@@ -2839,9 +2806,9 @@ export class TeamTrackerService {
     const notes = (await db.select().from(developerNotes).where(and(eq(developerNotes.workspaceId, scope), eq(developerNotes.developerAccountId, developer.accountId))).limit(1))[0];
     const effective = history ? exact : day;
     const status = (effective?.status ?? "on_track") as TrackerDeveloperStatus;
-    const signals = buildSignals({ date, status, lastCheckInAt: effective?.lastCheckInAt, statusUpdatedAt: effective?.statusUpdatedAt, updatedAt: effective?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, capacityUnits: effective?.capacityUnits ?? undefined, config, ...(history && { now: endOfIsoDate(date) }) });
+    const signals = buildSignals({ date, status, lastCheckInAt: effective?.lastCheckInAt, statusUpdatedAt: effective?.statusUpdatedAt, updatedAt: effective?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, config, ...(history && { now: endOfIsoDate(date) }) });
     return { id: exact?.id ?? 0, date, developer, availability: developer.availability ?? { state: "active" }, status,
-      capacityUnits: effective?.capacityUnits ?? undefined, managerNotes: notes?.body, lastCheckInAt: effective?.lastCheckInAt ?? undefined,
+      managerNotes: notes?.body, lastCheckInAt: effective?.lastCheckInAt ?? undefined,
       nextFollowUpAt: effective?.nextFollowUpAt ?? undefined, currentItem, plannedItems, completedItems: mapped.filter((item) => item.state === "done"), droppedItems: mapped.filter((item) => item.state === "dropped"),
       tasks: surfaceTasks,
       checkIns: checkIns.map(mapCheckIn), recentCheckIns: (await this.getRecentCheckInsByDeveloper([developer.accountId], date, scope)).get(developer.accountId) ?? [],
@@ -2896,10 +2863,9 @@ export class TeamTrackerService {
       const blockedTask = phase3 && status !== "blocked"
         ? [...(surfaceByOwner.get(developer.accountId) ?? [])].sort((left, right) => left.position - right.position).find((task) => task.status === "blocked")
         : undefined;
-      const signals = buildSignals({ date, status, lastCheckInAt: day?.lastCheckInAt, statusUpdatedAt: day?.statusUpdatedAt, updatedAt: day?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, capacityUnits: day?.capacityUnits ?? undefined, config });
+      const signals = buildSignals({ date, status, lastCheckInAt: day?.lastCheckInAt, statusUpdatedAt: day?.statusUpdatedAt, updatedAt: day?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, config });
       return { id: exact?.id ?? 0, date, developer, availability: developer.availability ?? { state: "active" }, status,
         statusSuggestion: blockedTask ? { status: "blocked", reasonTaskKey: blockedTask.taskKey, reasonTaskTitle: blockedTask.title } : undefined,
-        capacityUnits: day?.capacityUnits ?? undefined,
         managerNotes: notesByOwner.get(developer.accountId), lastCheckInAt: day?.lastCheckInAt ?? undefined, nextFollowUpAt: day?.nextFollowUpAt ?? undefined,
         currentItem, plannedItems, completedItems: mapped.filter((item) => item.state === "done"), droppedItems: mapped.filter((item) => item.state === "dropped"),
         tasks: (surfaceByOwner.get(developer.accountId) ?? []).sort((left, right) => left.position - right.position),

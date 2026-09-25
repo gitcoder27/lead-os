@@ -25,7 +25,7 @@ interface DeveloperTrackerDrawerProps {
   day: TrackerDeveloperDay | undefined;
   open: boolean;
   onClose: () => void;
-  onUpdateDay: (params: { accountId: string; status?: TrackerDeveloperStatus; capacityUnits?: number | null; managerNotes?: string }) => void;
+  onUpdateDay: (params: { accountId: string; status?: TrackerDeveloperStatus; managerNotes?: string }) => void;
   onAddItem: (params: { accountId: string; jiraKey?: string; relatedIssueKeys?: string[]; title: string; note?: string }) => void;
   onOpenTaskDetail: (itemId: number, managerDeskItemId?: number) => void;
   onReorderPlannedItem: (params: { itemId: number; position: number }) => void;
@@ -144,7 +144,6 @@ export function DeveloperTrackerDrawer({
   const [checkInText, setCheckInText] = useState('');
   const [checkInTaskKeys, setCheckInTaskKeys] = useState<string[]>([]);
   const [notesText, setNotesText] = useState('');
-  const [capacityText, setCapacityText] = useState('');
   const [notesEditing, setNotesEditing] = useState(false);
   const [localPlannedItems, setLocalPlannedItems] = useState<TrackerWorkItem[]>([]);
   const [deskCaptureOpen, setDeskCaptureOpen] = useState(false);
@@ -155,8 +154,7 @@ export function DeveloperTrackerDrawer({
   const draggedItemIdRef = useRef<number | null>(null);
   const composerApisRef = useRef(new Map<number, { expand: () => void; focus: () => void }>());
   const assignedTodayCount = (day?.currentItem ? 1 : 0) + (day?.plannedItems.length ?? 0);
-  const loadLabel = day?.capacityUnits ? `${assignedTodayCount}/${day.capacityUnits}` : `${assignedTodayCount}`;
-  const isOverCapacity = day?.capacityUnits !== undefined && assignedTodayCount > day.capacityUnits;
+  const loadLabel = `${assignedTodayCount}`;
   const managerDesk = useManagerDesk(date, open && Boolean(day) && !readOnly);
   const updateManagerDeskItem = useUpdateManagerDeskItem(date);
   const managerFollowUps = day
@@ -173,11 +171,10 @@ export function DeveloperTrackerDrawer({
 
   useEffect(() => {
     if (day) {
-      setCapacityText(day.capacityUnits ? String(day.capacityUnits) : '');
       setCompletedOpen(false);
       setDroppedOpen(false);
     }
-  }, [day?.id, day?.capacityUnits]);
+  }, [day?.id]);
 
   const handleDragReorder = useCallback(
     (newOrder: TrackerWorkItem[]) => {
@@ -276,23 +273,6 @@ export function DeveloperTrackerDrawer({
     setCheckInTaskKeys([]);
   };
 
-  const handleSaveCapacity = () => {
-    if (!day) return;
-
-    const trimmed = capacityText.trim();
-    if (!trimmed) {
-      onUpdateDay({ accountId: day.developer.accountId, capacityUnits: null });
-      return;
-    }
-
-    const nextValue = Number.parseInt(trimmed, 10);
-    if (Number.isNaN(nextValue) || nextValue < 1) {
-      return;
-    }
-
-    onUpdateDay({ accountId: day.developer.accountId, capacityUnits: nextValue });
-  };
-
   const issueList = issues?.map((i) => ({
     jiraKey: i.jiraKey,
     summary: i.summary,
@@ -334,20 +314,12 @@ export function DeveloperTrackerDrawer({
               date={date}
               tasks={checkInTasks}
               loadLabel={loadLabel}
-              isOverCapacity={isOverCapacity}
               readOnly={readOnly}
               onClose={onClose}
               onMarkInactive={onMarkInactive}
             />
 
-            <StatusSummary
-              day={day}
-              readOnly={readOnly}
-              capacityText={capacityText}
-              setCapacityText={setCapacityText}
-              onUpdateDay={onUpdateDay}
-              onSaveCapacity={handleSaveCapacity}
-            />
+            <StatusSummary day={day} />
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <DrawerSection title="Current work">

@@ -528,7 +528,6 @@ function emptyTeamBoard(date: string): TeamTrackerBoardResponse {
     stale: 0,
     noCurrent: 0,
     overdueLinkedWork: 0,
-    overCapacity: 0,
     statusFollowUp: 0,
     doneForToday: 0,
   };

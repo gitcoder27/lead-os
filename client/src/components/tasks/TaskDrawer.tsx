@@ -197,6 +197,54 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
   }
 
   const task = query.data;
+
+  // Phase 3 (P3-D15): former owners get a restricted projection — key, title,
+  // status, and their own shared timeline events. No editing, links, or labels.
+  if ('access' in task) {
+    return (
+      <>
+        <div className="flex items-center gap-2 border-b px-5 py-3" style={{ borderColor: 'var(--border)' }}>
+          <TaskKeyChip taskKey={task.taskKey} />
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+            style={statusStyle(task.status)}
+          >
+            {STATUS_OPTIONS.find((option) => option.value === task.status)?.label ?? task.status}
+          </span>
+          <span className="flex-1" />
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 transition-colors hover:bg-[var(--bg-tertiary)]"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="px-5 pt-4">
+            <h2 className="text-[15px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{task.title}</h2>
+            <p className="mt-2 rounded-lg px-3 py-2 text-[12px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+              You no longer own this task. Only your own shared updates are shown.
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+              <History size={11} />
+              Your updates
+            </div>
+            <div className="mt-2">
+              <TaskTimeline taskKey={task.taskKey} mode="developer" emptyLabel="No updates from you yet." />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   const deleted = Boolean(task.deletedAt);
   const canEditTitle =
     mode === 'manager' ||

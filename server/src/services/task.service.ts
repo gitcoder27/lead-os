@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
+import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
@@ -106,10 +106,16 @@ export class TaskService {
   private readonly keys = new TaskKeysService();
   private readonly events = new TaskEventsService(this.keys);
 
-  async requireTask(key: string, principal: TaskPrincipal, includeDeleted = false): Promise<TaskRow> {
+  async requireTask(key: string, principal: TaskPrincipal, includeDeleted = false, access: "read" | "write" = "write"): Promise<TaskRow> {
     const resolved = await this.keys.resolve(normalizeWorkspaceId(principal.workspaceId), key);
     const row = resolved ? await this.getByKey(resolved, principal.workspaceId) : undefined;
-    if (!row || (principal.type === "developer" && (row.ownerType !== "developer" || row.ownerId !== principal.accountId || row.deletedAt))) throw new HttpError(404, "Task not found");
+    if (principal.type === "developer") {
+      if (!row || row.deletedAt) throw new HttpError(404, "Task not found");
+      // Phase 3 (P3-D15): former owners (authored ≥1 event) may read, not write.
+      const level = await this.events.developerAccess(resolved!, { kind: "developer", accountId: principal.accountId, workspaceId: principal.workspaceId });
+      if (level === "none") throw new HttpError(404, "Task not found");
+      if (level === "former" && access === "write") throw new HttpError(403, "Only the current owner can modify this task");
+    } else if (!row) throw new HttpError(404, "Task not found");
     if (row.deletedAt && !includeDeleted) throw new HttpError(410, "Task was deleted");
     return row;
   }
@@ -372,8 +378,13 @@ export class TaskService {
    * tombstone DTO (manager only — `requireTask` already excludes deleted rows
    * for developers).
    */
-  async detail(key: string, principal: TaskPrincipal): Promise<TaskDetailResponse> {
-    const row = await this.requireTask(key, principal, true);
+  async detail(key: string, principal: TaskPrincipal): Promise<TaskDetailResponse | FormerOwnerTaskDetail> {
+    const row = await this.requireTask(key, principal, true, "read");
+    if (principal.type === "developer" && (row.ownerType !== "developer" || row.ownerId !== principal.accountId)) {
+      // Phase 3 (P3-D15): former owners get key/title/status only — no links,
+      // children, labels, or private fields.
+      return { taskKey: row.taskKey, title: row.title, status: row.status as TaskStatus, access: "former-owner" };
+    }
     const dto = await this.toDto(row, principal);
     const scope = row.workspaceId;
     const childRows = await db.select().from(tasks).where(and(

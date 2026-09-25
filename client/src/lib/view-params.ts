@@ -28,7 +28,6 @@ const SUMMARY_FILTERS: TrackerBoardSummaryFilter[] = [
   'at_risk',
   'waiting',
   'overdue_linked',
-  'over_capacity',
   'status_follow_up',
   'no_current',
   'done_for_today',

@@ -1653,6 +1653,8 @@ These use fixture databases built with the existing helpers (`server/tests/helpe
 
 # PART IV: Phase 3 spec outline (to be written after Phase 2 completes)
 
+> **Answered in `TASK_TEAM_MANAGEMENT_PHASE3_IMPLEMENTATION.md`** (decision record P3-D1…D16, waves 3a–3f).
+
 The Phase 3 interaction spec must answer each of these explicitly.
 
 **A. Screen inventory**

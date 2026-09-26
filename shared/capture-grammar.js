@@ -210,6 +210,15 @@ function parseCapture(text, today) {
     if (!title) {
         pushDiagnostic(diagnostics, "error", "empty-title", "Add a title for the task");
     }
+    if (title.length > 500) {
+        pushDiagnostic(diagnostics, "error", "title-too-long", "Title is too long — keep it under 500 characters");
+    }
+    // Only the first non-followup !date schedules; extra dates are consumed but
+    // ignored — warn instead of silently discarding them.
+    const dateTokens = tokens.filter((entry) => entry.kind === "date" && !entry.forFollowup);
+    for (const extra of dateTokens.slice(1)) {
+        pushDiagnostic(diagnostics, "warning", "extra-date", `Only the first !date applies — "${extra.raw}" is ignored`, extra, tokens.indexOf(extra));
+    }
     if (hasLater && scheduled) {
         pushDiagnostic(diagnostics, "error", "later-with-date", "Later tasks have no date", tokens.find((entry) => entry.kind === "date" && !entry.forFollowup));
     }

@@ -30,7 +30,14 @@ vi.mock('@/hooks/useDevelopers', () => ({
 }));
 
 vi.mock('@/hooks/useTaskLabels', () => ({
-  useTaskLabels: () => ({ data: { labels: [{ name: 'escalation', color: 'red', system: false, createdAt: '' }] } }),
+  useTaskLabels: () => ({
+    data: {
+      labels: [
+        { name: 'escalation', color: 'red', system: false, createdAt: '' },
+        { name: 'category:follow_up', color: 'teal', system: true, createdAt: '' },
+      ],
+    },
+  }),
 }));
 
 vi.mock('@/components/tasks/TaskLabelPicker', () => ({
@@ -148,6 +155,15 @@ describe('TasksPage (P3-D1/D9)', () => {
     expect(definition.filters.owner).toBe('team');
     expect(definition.group).toBe('owner');
     expect(screen.getByRole('heading', { name: 'My tasks' })).toBeTruthy();
+  });
+
+  it('renders system labels prefix-free in the label filter (D8)', () => {
+    render(<TasksPage />);
+    const filter = screen.getByLabelText('Label filter') as HTMLSelectElement;
+    const followUp = within(filter).getByRole('option', { name: 'follow up' }) as HTMLOptionElement;
+    // Display is prefix-free; the filter value stays the canonical name.
+    expect(followUp.value).toBe('category:follow_up');
+    expect(within(filter).queryByRole('option', { name: 'category:follow_up' })).toBeNull();
   });
 
   it('renders saved views separately and offers delete', () => {

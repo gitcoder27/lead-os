@@ -158,6 +158,23 @@ describe("assistant tools", () => {
     for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task", "capture"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
   });
 
+  it("gates the capture tool on tasks_phase3_enabled (D11)", async () => {
+    // Flag off → the tool is not even registered for the LLM.
+    const gated = createAssistantTools(true, { phase3: false });
+    expect(gated).toHaveLength(38);
+    expect(gated.some((tool) => tool.name === "capture")).toBe(false);
+
+    // Defense in depth: a stale registration still 409s at execution while
+    // canonical tasks are on but Phase 3 is off.
+    await db.insert(configTable).values([
+      { key: "tasks_phase1_enabled", value: "true" },
+      { key: "tasks_phase2_stage", value: "2c" },
+      { key: "tasks_phase3_enabled", value: "false" },
+    ]);
+    const capture = createAssistantTools(true).find((tool) => tool.name === "capture")!;
+    await expect(capture.execute({ text: "anything" }, ctx())).rejects.toMatchObject({ status: 409 });
+  });
+
   it("get_today_snapshot returns a compact projection", async () => {
     const { result, summary } = await run("get_today_snapshot", {});
     const snapshot = result as Record<string, unknown>;

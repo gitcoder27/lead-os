@@ -163,6 +163,21 @@ describe("parseCapture — dates", () => {
     expect(parsed.diagnostics.some((d) => d.code === "unparsed-date")).toBe(true);
   });
 
+  it("a second non-followup !date warns instead of being silently ignored", () => {
+    const parsed = resolved("Ship it !fri !mon");
+    expect(parsed.scheduledOn).toBe("2026-09-25");
+    const warning = parsed.diagnostics.find((d) => d.code === "extra-date");
+    expect(warning?.severity).toBe("warning");
+    expect(warning?.token).toBe("!mon");
+    expect(parsed.blocked).toBe(false);
+  });
+
+  it("titles over 500 chars are a structured blocked diagnostic, not a generic 400", () => {
+    const parsed = resolved(`x${"y".repeat(600)}`);
+    expect(parsed.diagnostics.some((d) => d.code === "title-too-long" && d.severity === "error")).toBe(true);
+    expect(parsed.blocked).toBe(true);
+  });
+
   it("token-shaped words that don't parse stay in the title with a warning", () => {
     const parsed = resolved("Email @@ops and ##help now");
     expect(parsed.title).toBe("Email @@ops and ##help now");

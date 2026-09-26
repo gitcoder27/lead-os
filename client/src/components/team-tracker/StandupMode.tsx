@@ -31,6 +31,7 @@ import {
 } from '@/hooks/useTeamTrackerMutations';
 import { useUpdateTaskDetail } from '@/hooks/useTaskDetail';
 import { useDevelopers } from '@/hooks/useDevelopers';
+import { useModalFocus } from '@/hooks/useModalFocus';
 import { useToast } from '@/context/ToastContext';
 import { formatRelativeTime } from '@/lib/utils';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
@@ -101,6 +102,7 @@ const KEY_HELP: Array<[string, string]> = [
   ['r', 'Reassign'],
   ['y', 'Accept status suggestion'],
   ['Enter', 'Open task drawer'],
+  ['?', 'Keyboard shortcuts'],
   ['Esc', 'Close layer / exit'],
 ];
 
@@ -850,6 +852,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
 
 /** Small modal shell for capture / check-in / reassign / help layers. */
 function LayerShell({ children, onClose, label }: { children: React.ReactNode; onClose: () => void; label: string }) {
+  // §6.2: Tab/Shift+Tab stay inside the top layer; focus returns to the
+  // standup surface when it unmounts.
+  const panelRef = useModalFocus<HTMLDivElement>();
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -875,6 +880,7 @@ function LayerShell({ children, onClose, label }: { children: React.ReactNode; o
       />
       <div className="pointer-events-none fixed inset-0 z-[71] flex items-start justify-center pt-[14vh]">
         <motion.div
+          ref={panelRef}
           initial={{ opacity: 0, y: 14, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.97 }}

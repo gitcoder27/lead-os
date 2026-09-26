@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type WorkloadLevel = "light" | "medium" | "heavy";
 export type TeamScopeState = "in_team" | "out_of_team" | "unassigned";
 export type SyncScopeState = "active" | "inaccessible" | "out_of_scope";
@@ -727,6 +729,37 @@ export interface TaskViewDefinition {
   sort?: TaskViewSort;
   group?: TaskViewGroup;
 }
+
+const taskViewIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const taskViewDateRange = z.object({
+  from: taskViewIsoDate.optional(),
+  to: taskViewIsoDate.optional(),
+}).strict()
+  // Open-ended ranges are fine, but an empty range would scan all history (§5.2).
+  .refine((range) => range.from !== undefined || range.to !== undefined, { message: "Date range needs at least one bound" });
+
+/**
+ * Phase 3 (P3-D9, §5.2): the validated view-definition schema, shared between
+ * the server's `/api/task-views` validation and any client-side view editing.
+ * Closed tasks require a bounded `closed` range so no view can scan all history.
+ */
+export const taskViewDefinitionSchema = z.object({
+  filters: z.object({
+    owner: z.union([z.enum(["me", "team", "inbox"]), z.array(z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
+    status: z.array(z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
+    labels: z.array(z.string().trim().min(1).max(64)).min(1).max(20).optional(),
+    linkedJira: z.boolean().optional(),
+    kind: z.enum(["task", "meeting"]).optional(),
+    later: z.boolean().optional(),
+    scheduled: taskViewDateRange.optional(),
+    closed: taskViewDateRange.optional(),
+    followUp: z.boolean().optional(),
+    staleDays: z.number().int().min(1).max(365).optional(),
+    jiraDrift: z.boolean().optional(),
+  }).strict().optional(),
+  sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
+  group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
+}).strict();
 
 export interface TaskViewMeta {
   /** `builtin-id` for built-ins, `saved:<id>` for saved views. */

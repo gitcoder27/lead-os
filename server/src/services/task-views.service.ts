@@ -1,39 +1,13 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { z } from "zod";
-import type { ManagerTask, TaskSavedView, TaskStatus, TaskViewDefinition, TaskViewFilters, TaskViewMeta } from "shared/types";
+import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
+import { taskViewDefinitionSchema, type ManagerTask, type TaskSavedView, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta } from "shared/types";
 import { db } from "../db/connection";
-import { taskLinks, taskSavedViews, tasks } from "../db/schema";
+import { taskSavedViews, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { todayIsoDate } from "../utils/date";
 import { TaskEventsService } from "./task-events.service";
 import { JiraDriftService } from "./jira-drift.service";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
 import { normalizeWorkspaceId } from "./workspace.service";
-
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const dateRange = z.object({ from: isoDate.optional(), to: isoDate.optional() }).strict();
-
-/**
- * Phase 3 (P3-D9, §5.2): the validated view-definition schema. Closed tasks
- * require an explicit `closed` range so no view can scan all history.
- */
-export const taskViewDefinitionSchema = z.object({
-  filters: z.object({
-    owner: z.union([z.enum(["me", "team", "inbox"]), z.array(z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
-    status: z.array(z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
-    labels: z.array(z.string().trim().min(1).max(64)).min(1).max(20).optional(),
-    linkedJira: z.boolean().optional(),
-    kind: z.enum(["task", "meeting"]).optional(),
-    later: z.boolean().optional(),
-    scheduled: dateRange.optional(),
-    closed: dateRange.optional(),
-    followUp: z.boolean().optional(),
-    staleDays: z.number().int().min(1).max(365).optional(),
-    jiraDrift: z.boolean().optional(),
-  }).strict().optional(),
-  sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
-  group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
-}).strict();
 
 export function parseTaskViewDefinition(raw: unknown): TaskViewDefinition {
   const result = taskViewDefinitionSchema.safeParse(raw);
@@ -72,7 +46,7 @@ function weekStart(today: string): string {
  */
 export function builtinTaskViews(today: string): { id: string; name: string; definition: TaskViewDefinition }[] {
   return [
-    { id: "today-plan", name: "Today plan", definition: { filters: { owner: "me", status: ["open", "active", "blocked"] }, sort: "scheduled", group: "scheduled" } },
+    { id: "today-plan", name: "Today plan", definition: { filters: { owner: "me", status: ["open", "active", "blocked"], later: false }, sort: "scheduled", group: "scheduled" } },
     { id: "my-tasks", name: "My tasks", definition: { filters: { owner: "me" }, sort: "scheduled", group: "status" } },
     { id: "watching", name: "Watching", definition: { filters: { owner: "team" }, sort: "updated", group: "owner" } },
     { id: "inbox", name: "Inbox", definition: { filters: { owner: "inbox", status: ["open"] }, sort: "created" } },
@@ -95,45 +69,6 @@ function labelsOf(row: TaskRow): string[] {
   } catch {
     return [];
   }
-}
-
-function inRange(value: string | null, range: { from?: string; to?: string }): boolean {
-  if (!value) return false;
-  if (range.from && value < range.from) return false;
-  if (range.to && value > range.to) return false;
-  return true;
-}
-
-function rowMatchesFilters(row: TaskRow, filters: TaskViewFilters, principal: TaskPrincipal): boolean {
-  if (filters.owner !== undefined) {
-    const owner = filters.owner;
-    if (owner === "me") {
-      if (!(row.ownerType === "manager" && row.ownerId === principal.accountId)) return false;
-    } else if (owner === "team") {
-      if (row.ownerType !== "developer") return false;
-    } else if (owner === "inbox") {
-      if (row.ownerType !== null) return false;
-    } else if (!owner.includes(row.ownerId ?? "")) {
-      return false;
-    }
-  }
-  if (filters.status && !filters.status.includes(row.status as TaskStatus)) return false;
-  if (filters.labels) {
-    const labels = labelsOf(row);
-    if (!filters.labels.every((label) => labels.includes(label))) return false;
-  }
-  if (filters.followUp && !row.followUpAt && !labelsOf(row).includes(FOLLOW_UP_LABEL)) return false;
-  if (filters.kind && row.kind !== filters.kind) return false;
-  if (filters.later !== undefined && (row.later === 1) !== filters.later) return false;
-  if (filters.scheduled && !inRange(row.scheduledOn, filters.scheduled)) return false;
-  // Closed tasks are only reachable through a bounded closed range (§5.2);
-  // the jiraDrift predicate applies its own 7-day closed window (§8.1).
-  if (filters.closed) {
-    if (!inRange(row.closedAt ? row.closedAt.slice(0, 10) : null, filters.closed)) return false;
-  } else if (row.closedAt && !filters.jiraDrift) {
-    return false;
-  }
-  return true;
 }
 
 function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] {
@@ -161,39 +96,81 @@ export class TaskViewsService {
 
   /**
    * Manager-scoped rows: tasks I track, tasks I own, and unowned inbox tasks —
-   * never another manager's private tasks.
+   * never another manager's private tasks. Every bounded view predicate is
+   * pushed into SQL (§5.2: batched and indexed, no all-history scans); only
+   * JSON-label matching and the batched staleness/drift lookups filter in
+   * memory afterwards.
    */
-  private async candidateRows(principal: TaskPrincipal): Promise<TaskRow[]> {
+  private async candidateRows(principal: TaskPrincipal, filters: TaskViewFilters): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
-    return db.select().from(tasks).where(and(
+    const conditions: SQL[] = [
       eq(tasks.workspaceId, scope),
       isNull(tasks.deletedAt),
       principal.type === "developer"
-        ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))
+        ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!
         : sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL)`,
-    ));
+    ];
+
+    if (filters.owner !== undefined) {
+      const owner = filters.owner;
+      conditions.push(
+        owner === "me" ? and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, principal.accountId))!
+          : owner === "team" ? eq(tasks.ownerType, "developer")
+            : owner === "inbox" ? isNull(tasks.ownerType)
+              : inArray(tasks.ownerId, owner),
+      );
+    }
+    if (filters.status?.length) conditions.push(inArray(tasks.status, filters.status));
+    if (filters.kind) conditions.push(eq(tasks.kind, filters.kind));
+    // `later` is tracking-manager-private like the other private fields — a
+    // parked row only reads as later to the manager tracking it.
+    if (filters.later !== undefined) {
+      conditions.push(filters.later
+        ? and(eq(tasks.later, 1), eq(tasks.trackedByManagerId, principal.accountId))!
+        : sql`NOT (${tasks.later} = 1 AND ${tasks.trackedByManagerId} = ${principal.accountId})`);
+    }
+    if (filters.scheduled) {
+      if (filters.scheduled.from) conditions.push(gte(tasks.scheduledOn, filters.scheduled.from));
+      if (filters.scheduled.to) conditions.push(lte(tasks.scheduledOn, filters.scheduled.to));
+    }
+    if (filters.linkedJira !== undefined) {
+      const linked = sql`EXISTS (SELECT 1 FROM task_links tl WHERE tl.task_id = ${tasks.id} AND tl.workspace_id = ${scope} AND tl.kind = 'jira')`;
+      conditions.push(filters.linkedJira ? linked : sql`NOT ${linked}`);
+    }
+    // COALESCE keeps NULL labels_json rows out of three-valued-logic traps:
+    // `NOT (x OR NULL)` would wrongly exclude unlabeled rows for followUp:false.
+    const followUpPred = sql`(${tasks.followUpAt} IS NOT NULL OR COALESCE(${tasks.labelsJson}, '') LIKE ${`%"${FOLLOW_UP_LABEL}"%`})`;
+    if (filters.followUp !== undefined) conditions.push(filters.followUp ? followUpPred : sql`NOT ${followUpPred}`);
+    // Closed tasks are only reachable through a bounded closed range (§5.2);
+    // the jiraDrift predicate applies its own 7-day closed window (§8.1).
+    if (filters.closed) {
+      const closedDate = sql`substr(${tasks.closedAt}, 1, 10)`;
+      if (filters.closed.from) conditions.push(gte(closedDate, filters.closed.from));
+      if (filters.closed.to) conditions.push(lte(closedDate, filters.closed.to));
+    } else if (filters.jiraDrift !== true) {
+      conditions.push(isNull(tasks.closedAt));
+    }
+    return db.select().from(tasks).where(and(...conditions));
   }
 
   /** Execute a validated view definition — batched link/event lookups, no per-row scans. */
   async run(principal: TaskPrincipal, definition: TaskViewDefinition): Promise<ManagerTask[]> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const filters = definition.filters ?? {};
-    let rows = (await this.candidateRows(principal)).filter((row) => rowMatchesFilters(row, filters, principal));
+    let rows = await this.candidateRows(principal, filters);
 
-    if (filters.linkedJira && rows.length) {
-      const linked = new Set(
-        (await db.select({ taskId: taskLinks.taskId }).from(taskLinks)
-          .where(and(eq(taskLinks.workspaceId, scope), inArray(taskLinks.taskId, rows.map((row) => row.id)), eq(taskLinks.kind, "jira"))))
-          .map((row) => row.taskId),
-      );
-      rows = rows.filter((row) => linked.has(row.id));
+    // JSON labels can't be indexed; AND-match stays in memory on the
+    // SQL-bounded candidate set.
+    if (filters.labels?.length) {
+      const wanted = filters.labels;
+      rows = rows.filter((row) => wanted.every((label) => labelsOf(row).includes(label)));
     }
 
-    if (filters.jiraDrift && rows.length) {
+    if (filters.jiraDrift !== undefined && rows.length) {
       const drifted = new Set(
         (await this.drift.list(principal, scope, undefined, rows.map((row) => row.id))).map((entry) => entry.taskId),
       );
-      rows = rows.filter((row) => drifted.has(row.id));
+      rows = rows.filter((row) => drifted.has(row.id) === filters.jiraDrift);
     }
 
     if (filters.staleDays !== undefined && rows.length) {

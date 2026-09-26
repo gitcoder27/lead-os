@@ -13,7 +13,7 @@ const approx = { approximateTime: z.literal(true).optional() };
 const via = z.enum(["standup", "task_drawer", "notes_page", "copilot"]);
 const messageMeta = z.object({ via: via.optional(), ...approx }).nullable();
 const eventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional(), parentKey: z.string().optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import", "capture"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional(), parentKey: z.string().optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("update"), meta: z.object({ via: z.enum(["standup", "task_drawer", "my_day", "notes_page", "copilot", "note_field", "context_note_field", "capture"]).optional(), imported: imported.optional(), checkInId: z.number().int().positive().optional(), labelRenamed: z.object({ from: z.string().min(1), to: z.string().min(1) }).optional(), labelRemoved: z.object({ name: z.string().min(1) }).optional() }).nullable(), body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("instruction"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("decision"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),
@@ -133,6 +133,11 @@ export class TaskEventsService {
     if (viewer.kind === "developer" && await this.keys.canonicalEnabled(viewer.workspaceId)) {
       // Phase 3 (P3-D15): shared events on owned tasks, plus the developer's
       // own shared events on tasks they used to own (or otherwise authored).
+      // The authored-events arm is former-owner read access — Phase 3 only
+      // (§7.2); flag-off keeps the Phase 2 owner-only projection.
+      const ownAuthored = await this.keys.phase3Enabled(viewer.workspaceId)
+        ? sql`OR (${taskEvents.authorType} = 'developer' AND ${taskEvents.authorId} = ${viewer.accountId})`
+        : sql``;
       return and(eq(taskEvents.visibility, "shared"), sql`(
         EXISTS (
           SELECT 1 FROM tasks owned WHERE owned.id = ${taskEvents.taskId}
@@ -140,7 +145,7 @@ export class TaskEventsService {
           AND owned.owner_type = 'developer' AND owned.owner_id = ${viewer.accountId}
           AND owned.deleted_at IS NULL
         )
-        OR (${taskEvents.authorType} = 'developer' AND ${taskEvents.authorId} = ${viewer.accountId})
+        ${ownAuthored}
       )`)!;
     }
     return viewer.kind === "manager"
@@ -165,6 +170,8 @@ export class TaskEventsService {
       const task = (await db.select().from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(tasks.taskKey, resolved ?? ""))).limit(1))[0];
       if (!task || task.deletedAt) return "none";
       if (task.ownerType === "developer" && task.ownerId === viewer.accountId) return "owner";
+      // Former-owner reads are Phase 3 only (§7.2); flag-off is Phase 2 parity.
+      if (!(await this.keys.phase3Enabled(viewer.workspaceId))) return "none";
       const authored = await db.select({ id: taskEvents.id }).from(taskEvents).where(and(
         eq(taskEvents.workspaceId, task.workspaceId), eq(taskEvents.taskId, task.id),
         eq(taskEvents.authorType, "developer"), eq(taskEvents.authorId, viewer.accountId),

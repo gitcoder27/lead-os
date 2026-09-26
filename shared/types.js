@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
 exports.isCompleteNavPreferences = isCompleteNavPreferences;
+const zod_1 = require("zod");
 exports.TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
 exports.TASK_LABEL_COLORS = [
     "slate",
@@ -25,6 +26,35 @@ function taskLabelDisplayName(name) {
     const stripped = name.replace(/^(category|kind|priority):/, "");
     return stripped.replace(/_/g, " ");
 }
+const taskViewIsoDate = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const taskViewDateRange = zod_1.z.object({
+    from: taskViewIsoDate.optional(),
+    to: taskViewIsoDate.optional(),
+}).strict()
+    // Open-ended ranges are fine, but an empty range would scan all history (§5.2).
+    .refine((range) => range.from !== undefined || range.to !== undefined, { message: "Date range needs at least one bound" });
+/**
+ * Phase 3 (P3-D9, §5.2): the validated view-definition schema, shared between
+ * the server's `/api/task-views` validation and any client-side view editing.
+ * Closed tasks require a bounded `closed` range so no view can scan all history.
+ */
+exports.taskViewDefinitionSchema = zod_1.z.object({
+    filters: zod_1.z.object({
+        owner: zod_1.z.union([zod_1.z.enum(["me", "team", "inbox"]), zod_1.z.array(zod_1.z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
+        status: zod_1.z.array(zod_1.z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
+        labels: zod_1.z.array(zod_1.z.string().trim().min(1).max(64)).min(1).max(20).optional(),
+        linkedJira: zod_1.z.boolean().optional(),
+        kind: zod_1.z.enum(["task", "meeting"]).optional(),
+        later: zod_1.z.boolean().optional(),
+        scheduled: taskViewDateRange.optional(),
+        closed: taskViewDateRange.optional(),
+        followUp: zod_1.z.boolean().optional(),
+        staleDays: zod_1.z.number().int().min(1).max(365).optional(),
+        jiraDrift: zod_1.z.boolean().optional(),
+    }).strict().optional(),
+    sort: zod_1.z.enum(["scheduled", "updated", "created", "priority"]).optional(),
+    group: zod_1.z.enum(["owner", "status", "label", "scheduled"]).optional(),
+}).strict();
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",

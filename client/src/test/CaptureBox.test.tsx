@@ -26,6 +26,18 @@ vi.mock('@/hooks/useDevelopers', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useTaskLabels', () => ({
+  useTaskLabels: () => ({
+    data: {
+      labels: [
+        { name: 'category:follow_up', color: 'teal', system: true, createdAt: '' },
+        { name: 'escalation', color: 'red', system: false, createdAt: '' },
+        { name: 'urgent', color: 'red', system: false, createdAt: '' },
+      ],
+    },
+  }),
+}));
+
 function renderBox(prefill = '') {
   const onClose = vi.fn();
   const utils = render(
@@ -177,6 +189,65 @@ describe('CaptureBox (P3-D8)', () => {
     );
 
     expect(screen.getByTestId('capture-diagnostics').textContent).toContain('Task T-999 was not found');
+  });
+
+  it('toasts non-blocking warnings after a successful capture (D3)', () => {
+    const { input, onClose } = renderBox();
+    fireEvent.change(input, { target: { value: 'Investigate #LEAD-99' } });
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+
+    const body = lastBody();
+    const options = mockMutate.mock.calls.at(-1)?.[1] as {
+      onSuccess: (res: CaptureResponseBody) => void;
+    };
+    act(() =>
+      options.onSuccess({
+        intent: 'create',
+        blocked: false,
+        confirmRequired: false,
+        diagnostics: [{ severity: 'warning', code: 'jira-not-synced', message: '#LEAD-99 is not synced — kept as text.' }],
+        task: { taskKey: 'T-7', title: 'Investigate #LEAD-99' } as CaptureResponseBody['task'],
+      } as CaptureResponseBody),
+    );
+
+    // Success toast plus a separate warning toast — the dialog still closes.
+    expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
+    expect(mockAddToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'warning', message: expect.stringContaining('#LEAD-99') }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('suggests registered labels for a +fragment and inserts on Enter (D7)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Call the vendor +es' } });
+
+    const suggestion = screen.getByRole('option', { name: /escalation/i });
+    expect(suggestion).toBeTruthy();
+    // Display name is shown prefix-free; the raw +name is the insert value.
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect((input as HTMLTextAreaElement).value).toBe('Call the vendor +escalation ');
+  });
+
+  it('shows prefix-free display names for system labels in suggestions (D7/D8)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Ping me +fo' } });
+
+    const suggestion = screen.getByRole('option', { name: /follow up/i });
+    expect(suggestion.textContent).toContain('category:follow_up');
+    expect(suggestion.textContent).toContain('follow up');
+  });
+
+  it('Tab applies the highlighted label suggestion', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Something +ur' } });
+    fireEvent.keyDown(input, { key: 'Tab' });
+    expect((input as HTMLTextAreaElement).value).toBe('Something +urgent ');
+  });
+
+  it('does not fire the empty-note diagnostic on a bare /note prefill', () => {
+    renderBox('/note ');
+    expect(screen.queryByTestId('capture-diagnostics')).toBeNull();
   });
 
   it('prefills developer and issue context as tokens', () => {

@@ -175,7 +175,7 @@ function dateProperty(description: string): Record<string, unknown> {
   return { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description };
 }
 
-export function createAssistantTools(canonical = false): AssistantToolDefinition[] {
+export function createAssistantTools(canonical = false, { phase3 = true }: { phase3?: boolean } = {}): AssistantToolDefinition[] {
   const taskKeys = new TaskKeysService();
   const eventsService = new TaskEventsService(taskKeys);
   const readTools: AssistantToolDefinition[] = [
@@ -1922,7 +1922,7 @@ export function createAssistantTools(canonical = false): AssistantToolDefinition
   const legacy = [...readTools, ...writeTools];
   if (!canonical) return legacy;
   const retired = new Set(["list_desk_items", "get_desk_item_detail", "get_tracker_item_detail", "preview_carry_forward", "create_desk_item", "assign_tracker_task", "update_desk_item", "update_tracker_item", "delete_desk_item", "delete_tracker_item", "link_desk_item", "unlink_desk_item", "promote_tracker_item", "cancel_delegated_task", "carry_forward"]);
-  return [...legacy.filter((tool) => !retired.has(tool.name)), ...canonicalTaskTools()];
+  return [...legacy.filter((tool) => !retired.has(tool.name)), ...canonicalTaskTools({ phase3 })];
 }
 
 export function toLlmToolDefinitions(tools: AssistantToolDefinition[]): LlmToolDefinition[] {

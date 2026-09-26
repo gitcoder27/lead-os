@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
@@ -96,7 +97,9 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     expect(task.trackedByManagerId).toBeTruthy();
     expect(task.priority).toBe("high");
     expect(task.labels).toEqual(expect.arrayContaining(["urgent", "category:follow_up"]));
-    expect(task.followUpAt).toBeTruthy();
+    // G6: the trailing /f has no attached date, so follow_up_at stays NULL —
+    // the category:follow_up label carries the follow-up flag.
+    expect(task.followUpAt).toBeNull();
     const tomorrow = new Date(Date.parse(`${todayIsoDate()}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
     expect(task.scheduledOn).toBe(tomorrow);
     // The label auto-registered.
@@ -207,5 +210,83 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     const headers = { cookie: await cookie("manager-a") };
     expect((await capture(headers, "Idea /later !fri")).body.blocked).toBe(true);
     expect((await capture(headers, "Idea /later @dev-1")).body.blocked).toBe(true);
+  });
+
+  it("/later stores scheduled_on as NULL (G2)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await capture(headers, "Someday idea /later");
+    expect(res.status).toBe(200);
+    expect(res.body.task.later).toBe(true);
+    expect(res.body.task.scheduledOn).toBeNull();
+    const row = (await db.select().from(tasks).where(eq(tasks.taskKey, res.body.task.taskKey)))[0]!;
+    expect(row.scheduledOn).toBeNull();
+  });
+
+  it("dateless /f keeps the follow_up label with follow_up_at NULL (G6)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await capture(headers, "Circle back with Sam /f");
+    expect(res.status).toBe(200);
+    expect(res.body.task.labels).toContain("category:follow_up");
+    expect(res.body.task.followUpAt).toBeNull();
+  });
+
+  it("/f with a date stores a local 9am follow-up timestamp (G6)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await capture(headers, "Check in on the rollout /f !tomorrow");
+    expect(res.status).toBe(200);
+    const tomorrow = new Date(Date.parse(`${todayIsoDate()}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+    // Local-time convention: 09:00 local on the follow-up date, not UTC.
+    expect(res.body.task.followUpAt).toBe(new Date(`${tomorrow}T09:00:00`).toISOString());
+    expect(res.body.task.labels).toContain("category:follow_up");
+  });
+
+  it("replays a repeated requestId to the same task (nit: requestId on create)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const requestId = "3f4c2a1e-9b1d-4c8a-b7e2-0a1b2c3d4e5f";
+    const first = await capture(headers, "Retry-safe task", { requestId });
+    expect(first.status).toBe(200);
+    const second = await capture(headers, "Retry-safe task", { requestId });
+    expect(second.status).toBe(200);
+    expect(second.body.task.taskKey).toBe(first.body.task.taskKey);
+    expect((await db.select().from(tasks))).toHaveLength(1);
+  });
+
+  it("records meta.source:'capture' on the created event", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await capture(headers, "Source-tagged task");
+    const eventsList = await invoke(app, { method: "GET", url: `/api/tasks/${res.body.task.taskKey}/events`, headers });
+    const created = eventsList.body.events.find((event: { type: string }) => event.type === "created");
+    expect(created).toBeTruthy();
+    expect(created.meta).toMatchObject({ source: "capture" });
+  });
+
+  it("rolls back the task row when a link write fails mid-transaction", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const target = await invoke(app, { method: "POST", url: "/api/tasks", headers, body: { title: "Link target" } });
+    const before = await db.select().from(tasks);
+
+    // A TaskService whose link write throws inside the transaction must take
+    // the whole create (task + created event + links) down with it.
+    const { CaptureService } = await import("../src/services/capture.service");
+    const { TaskService } = await import("../src/services/task.service");
+    const { HttpError } = await import("../src/middleware/errorHandler");
+    class FailingLinkService extends TaskService {
+      override async addLink(): Promise<never> {
+        throw new HttpError(500, "simulated link failure");
+      }
+    }
+    const service = new CaptureService(new TaskKeysService(), new FailingLinkService(), new TaskEventsService());
+    await expect(service.run(
+      { text: `Rollmeback ${target.body.taskKey}`, clientToday: todayIsoDate() },
+      { type: "manager", accountId: "manager-a", workspaceId: "default" },
+    )).rejects.toMatchObject({ status: 500 });
+
+    expect((await db.select().from(tasks))).toHaveLength(before.length);
   });
 });

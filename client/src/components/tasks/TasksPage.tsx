@@ -29,7 +29,7 @@ import {
 } from '@/lib/task-views';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
 import { getLocalIsoDate } from '@/lib/utils';
-import type { ManagerTask, TaskStatus, TaskViewGroup, TaskViewMeta, TaskViewSort } from '@/types';
+import { taskLabelDisplayName, type ManagerTask, type TaskStatus, type TaskViewGroup, type TaskViewMeta, type TaskViewSort } from '@/types';
 import { TaskDrawer, navigateToTaskPage } from './TaskDrawer';
 import { TaskLabelChip } from './TaskLabelPicker';
 
@@ -57,8 +57,7 @@ const SORT_OPTIONS: { value: TaskViewSort; label: string }[] = [
   { value: 'priority', label: 'Priority' },
 ];
 
-const GROUP_OPTIONS: { value: '' | TaskViewGroup; label: string }[] = [
-  { value: '', label: 'No grouping' },
+const GROUP_OPTIONS: { value: TaskViewGroup; label: string }[] = [
   { value: 'owner', label: 'Owner' },
   { value: 'status', label: 'Status' },
   { value: 'label', label: 'Label' },
@@ -342,7 +341,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             >
               <option value="">Any label</option>
               {(labels.data?.labels ?? []).map((label) => (
-                <option key={label.name} value={label.name}>{label.name}</option>
+                <option key={label.name} value={label.name}>{taskLabelDisplayName(label.name)}</option>
               ))}
             </select>
             <span className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
@@ -366,7 +365,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               aria-label="Group by"
             >
               <option value="">Default grouping</option>
-              {GROUP_OPTIONS.filter((option) => option.value !== '').map((option) => (
+              {GROUP_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>Group: {option.label}</option>
               ))}
             </select>

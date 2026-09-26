@@ -2858,8 +2858,9 @@ export class TeamTrackerService {
       const currentItem = mapped.find((item) => item.state === "in_progress");
       const plannedItems = mapped.filter((item) => item.state === "planned");
       const status = (day?.status ?? "on_track") as TrackerDeveloperStatus;
-      // P3-D11: a blocked canonical task suggests the person-day status is
-      // blocked too, even though the task maps to "planned" in tracker DTOs.
+      // P3-D11 (§6.3): the highest-positioned blocked canonical task drives
+      // the suggestion — blocked tasks map to "planned" in tracker DTOs, so
+      // the spec's "current task" resolves to the top-of-plan blocked task.
       const blockedTask = phase3 && status !== "blocked"
         ? [...(surfaceByOwner.get(developer.accountId) ?? [])].sort((left, right) => left.position - right.position).find((task) => task.status === "blocked")
         : undefined;

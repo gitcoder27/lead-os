@@ -9,6 +9,8 @@ interface DevelopersResponse {
 
 interface UseDevelopersOptions {
   includeUnavailable?: boolean;
+  /** Set false to skip the request (e.g. developer principals hit a 403). */
+  enabled?: boolean;
 }
 
 function isLegacyPlaceholder(dev: Developer): boolean {
@@ -33,6 +35,7 @@ export function useDevelopers(date?: string, options: UseDevelopersOptions = {})
     select: (developers) => developers
       .filter((dev) => !isLegacyPlaceholder(dev))
       .filter((dev) => options.includeUnavailable || dev.availability?.state !== 'inactive'),
+    enabled: options.enabled !== false,
     staleTime: 0,
     refetchOnMount: true,
   });

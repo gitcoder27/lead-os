@@ -19,7 +19,12 @@ async function main(): Promise<void> {
   let workspace = "default";
   let apply = false;
   for (let index = 0; index < args.length; index++) {
-    if (args[index] === "--workspace" && args[index + 1]) workspace = args[++index]!;
+    if (args[index] === "--workspace") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--workspace requires a value");
+      workspace = value;
+      index++;
+    }
     else if (args[index] === "--apply") apply = true;
     else if (args[index] !== "--dry-run") throw new Error(`Unknown argument: ${args[index]}`);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { TaskDetailResponse } from '@/types';
 
 const mockUseTaskDetail = vi.fn();
@@ -47,7 +47,7 @@ vi.mock('@/components/JiraIssueLink', () => ({
   JiraIssueLink: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
-import { TaskDetailBody } from '@/components/tasks/TaskDrawer';
+import { TaskDetailBody, TaskDrawer } from '@/components/tasks/TaskDrawer';
 
 function managerTask(overrides: Partial<TaskDetailResponse> = {}): TaskDetailResponse {
   return {
@@ -152,6 +152,8 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.getByText(/was deleted/)).toBeTruthy();
     expect(screen.queryByTestId('composer')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
+    // G7: the status control is a read-only pill on tombstones — no live select.
+    expect(screen.queryByRole('combobox', { name: 'Task status' })).toBeNull();
   });
 
   it('renders the restricted former-owner view (P3-D15)', () => {
@@ -174,5 +176,50 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.queryByText('Action items')).toBeNull();
     expect(screen.queryByText('Properties')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
+  });
+});
+
+describe('TaskDrawer modal focus (D4/D5)', () => {
+  it('traps Tab inside the drawer and restores focus to the opener on close', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    const onClose = vi.fn();
+    // jsdom has no layout: offsetParent is always null, so pretend every
+    // element is laid out for the focusables scan.
+    const layout = vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockReturnValue(document.body);
+    const { rerender } = render(
+      <div>
+        <button data-testid="opener">Open</button>
+      </div>,
+    );
+    const opener = screen.getByTestId('opener');
+    opener.focus();
+
+    rerender(
+      <div>
+        <button data-testid="opener">Open</button>
+        <TaskDrawer taskKey="T-7" onClose={onClose} />
+      </div>,
+    );
+    const dialog = screen.getByRole('dialog', { name: /task t-7/i });
+
+    // Tab with focus outside cycles into the panel…
+    fireEvent.keyDown(opener, { key: 'Tab' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    // …and Shift+Tab at the first focusable wraps to the last.
+    const inside = document.activeElement as HTMLElement;
+    fireEvent.keyDown(inside, { key: 'Tab', shiftKey: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(inside);
+
+    // Escape closes; unmounting restores focus to the originating element.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+    rerender(
+      <div>
+        <button data-testid="opener">Open</button>
+      </div>,
+    );
+    expect(document.activeElement).toBe(opener);
+    layout.mockRestore();
   });
 });

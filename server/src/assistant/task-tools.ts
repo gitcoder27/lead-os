@@ -16,7 +16,7 @@ const fields = {
   nextAction: { type: ["string", "null"] }, outcome: { type: ["string", "null"] }, parentId: { type: ["integer", "null"] },
 };
 
-export function canonicalTaskTools(): AssistantToolDefinition[] {
+export function canonicalTaskTools({ phase3 = true }: { phase3?: boolean } = {}): AssistantToolDefinition[] {
   const service = new TaskService();
   const principal = (ctx: AssistantToolContext) => ({ type: "copilot" as const, accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId });
   function tool<T>(name: string, description: string, schema: z.ZodType<T>, properties: Record<string, unknown>, required: string[], write: boolean, execute: (args: T, ctx: AssistantToolContext) => Promise<unknown>): AssistantToolDefinition {
@@ -47,8 +47,9 @@ export function canonicalTaskTools(): AssistantToolDefinition[] {
       async ({ taskKey, ...args }, ctx) => service.addLink(taskKey, args, principal(ctx))),
     tool("unlink_task", "Unlink task", z.object({ taskKey: key, linkId: z.number().int().positive() }).strict(), { taskKey: taskKeyProperty, linkId: { type: "integer" } }, ["taskKey", "linkId"], true,
       async ({ taskKey, linkId }, ctx) => { await service.removeLink(taskKey, linkId, principal(ctx)); return { deleted: true }; }),
-    // Phase 3 (P3-D8): the shared capture grammar as a confirm-gated tool.
-    {
+    // Phase 3 (P3-D8): the shared capture grammar as a confirm-gated tool —
+    // registered only while tasks_phase3_enabled is on.
+    ...(phase3 ? [{
       name: "capture",
       description:
         "Capture text through the shared grammar: 'T-n: …' logs an update, '/note …' appends to today's daily note, and anything else creates a task. Tokens: @person (owner), #JIRA-KEY, ^T-n (parent), T-n (link), !today/!tomorrow/!weekday/!+Nd/!+Nw/!YYYY-MM-DD, !! (high priority), /later, /meeting, /f [date] (follow-up), +label.",
@@ -76,6 +77,6 @@ export function canonicalTaskTools(): AssistantToolDefinition[] {
         }
         return { result: compact(outcome), summary: outcome.task ? `Captured ${outcome.task.taskKey}: ${outcome.task.title}` : outcome.event ? `Logged update on ${outcome.event.taskKey}` : "Captured note" };
       },
-    },
+    } satisfies AssistantToolDefinition] : []),
   ];
 }

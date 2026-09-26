@@ -6,11 +6,15 @@ import { HttpError } from "../middleware/errorHandler";
 import { BackupService } from "./backup.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
-/** The three Phase 2d archive tables removed by `tasks:drop-legacy` (§8.2). */
+/**
+ * The three Phase 2d archive tables removed by `tasks:drop-legacy` (§8.2).
+ * Order matters for the drop loop: `legacy_manager_desk_links` foreign-keys
+ * into `legacy_manager_desk_items`, so the child must drop before the parent.
+ */
 export const LEGACY_DROP_TABLES = [
   "legacy_team_tracker_items",
-  "legacy_manager_desk_items",
   "legacy_manager_desk_links",
+  "legacy_manager_desk_items",
 ] as const;
 
 /** Originals the archives were renamed from — referenced by older table SQL. */

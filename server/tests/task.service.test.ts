@@ -114,6 +114,30 @@ describe("canonical tasks", () => {
     expect(await db.select().from(tasks)).toHaveLength(2);
   });
 
+  it("enforces Later semantics — no date, manager-owned only (G2)", async () => {
+    // Create: /later stores scheduled_on as NULL, not today.
+    const parked = await service.create({ title: "Park it", later: true }, manager);
+    expect(parked.scheduledOn).toBeNull();
+    expect(parked.later).toBe(1);
+
+    // later + an explicit date is invalid either direction.
+    await expect(service.create({ title: "Bad", later: true, scheduledOn: "2099-01-01" }, manager)).rejects.toMatchObject({ status: 409 });
+    // Developer-owned Later is invalid — Later is a manager/inbox concept.
+    await expect(service.create({ title: "Dev later", later: true, ownerType: "developer", ownerId: "dev-1" }, manager)).rejects.toMatchObject({ status: 409 });
+
+    // Update: parking clears the scheduled date…
+    const dated = await service.create({ title: "Scheduled", scheduledOn: "2099-01-01" }, manager);
+    const updated = await service.update(dated.taskKey, { later: true }, manager);
+    expect(updated.later).toBe(1);
+    expect(updated.scheduledOn).toBeNull();
+    // …but an explicit date in the same patch is still rejected.
+    await expect(service.update(dated.taskKey, { later: true, scheduledOn: "2099-01-01" }, manager)).rejects.toMatchObject({ status: 409 });
+
+    // Explicit scheduledOn:null on create is honored (stays unscheduled, not today).
+    const unscheduled = await service.create({ title: "No date", scheduledOn: null }, manager);
+    expect(unscheduled.scheduledOn).toBeNull();
+  });
+
   it("rejects closed reassignment and invalid ownership without partial writes", async () => {
     const row = await service.create({ title: "Closed", status: "done" }, manager);
     await expect(service.update(row.taskKey, { ownerType: "developer", ownerId: "dev-1" }, manager)).rejects.toMatchObject({ status: 409 });

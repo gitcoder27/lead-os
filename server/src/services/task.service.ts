@@ -130,7 +130,7 @@ export class TaskService {
     };
     if (principal.type === "developer") return shared;
     const ownsPrivate = row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
-    return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
+    return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: ownsPrivate && row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
       labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
   }
 
@@ -192,6 +192,7 @@ export class TaskService {
 
   private async validateShape(row: Pick<TaskRow, "ownerType" | "ownerId" | "later" | "startsAt" | "endsAt" | "parentId" | "workspaceId" | "scheduledOn">, id?: number): Promise<void> {
     if (Boolean(row.ownerType) !== Boolean(row.ownerId)) throw new HttpError(400, "Owner type and ID must be supplied together");
+    if (row.later && row.scheduledOn) throw new HttpError(409, "Later tasks have no date");
     if (row.ownerType === "developer") {
       if (row.later) throw new HttpError(409, "Developer tasks cannot be Later");
       const owner = (await db.select().from(developers).where(and(eq(developers.workspaceId, row.workspaceId), eq(developers.accountId, row.ownerId!), eq(developers.isActive, 1))).limit(1))[0];
@@ -234,7 +235,7 @@ export class TaskService {
     }
   }
 
-  async create(input: CreateTaskRequest, principal: TaskPrincipal): Promise<TaskRow> {
+  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" } = {}): Promise<TaskRow> {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);
@@ -247,7 +248,8 @@ export class TaskService {
       const ownerType = principal.type === "developer" ? "developer" : data.ownerType === undefined ? "manager" : data.ownerType;
       const ownerId = principal.type === "developer" ? principal.accountId : data.ownerId === undefined && ownerType === "manager" ? principal.accountId : data.ownerId ?? null;
       const values = { ...data, labels: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
-        startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, scheduledOn: data.scheduledOn ?? todayIsoDate(),
+        startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null,
+        scheduledOn: data.scheduledOn === undefined ? (data.later ? null : todayIsoDate()) : data.scheduledOn,
         taskKey: this.keys.allocate(scope), trackedByManagerId: principal.type === "developer" ? null : principal.accountId,
         labelsJson: data.labels ? JSON.stringify(data.labels) : null, status: data.status ?? "open", createdByType: principal.type, createdById: principal.accountId, createdAt: now, updatedAt: now,
         closedAt: data.status === "done" || data.status === "dropped" ? now : null };
@@ -256,7 +258,7 @@ export class TaskService {
       const row = (await db.insert(tasks).values(values).returning())[0]!;
       await this.focus(row, row.scheduledOn ?? todayIsoDate());
       const parent = row.parentId ? await this.getById(row.parentId, scope) : undefined;
-      await this.emit(row, { type: "created", body: null, meta: { source: principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk", ownerType, ownerId, title: row.title, ...(parent && { parentKey: parent.taskKey }) } }, principal);
+      await this.emit(row, { type: "created", body: null, requestId: options.requestId, meta: { source: options.source ?? (principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk"), ownerType, ownerId, title: row.title, ...(parent && { parentKey: parent.taskKey }) } }, principal);
       if (row.status !== "open") await this.emit(row, { type: "status", body: null, meta: { domain: "task_status", from: "open", to: row.status, reason: "user" } }, principal);
       if (row.status === "active") await this.emit(row, { type: "focus", body: null, meta: { action: "set_current", date: todayIsoDate() } }, principal);
       return row;
@@ -267,7 +269,7 @@ export class TaskService {
     const data = parseInput(taskUpdateSchema, input);
     return runInTransaction(async () => {
       const before = await this.requireTask(key, principal);
-      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
+      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
       if (principal.type === "developer") {
         if (Object.keys(data).some((field) => !["title", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
@@ -278,6 +280,9 @@ export class TaskService {
         await new TaskLabelsService().ensureRegistered(before.workspaceId, labels);
       }
       const next = { ...before, ...fields, labelsJson: labels === undefined ? before.labelsJson : JSON.stringify(labels), later: later === undefined ? before.later : Number(later) };
+      // "Later ⇒ no date" (§4.2): parking without an explicit date drops the
+      // scheduled date; validateShape rejects an explicit later+date pair.
+      if (later === true && data.scheduledOn === undefined) next.scheduledOn = null;
       const reassigned = next.ownerType !== before.ownerType || next.ownerId !== before.ownerId;
       if (reassigned) {
         if (["done", "dropped"].includes(before.status)) throw new HttpError(409, "Reopen closed work before reassigning");

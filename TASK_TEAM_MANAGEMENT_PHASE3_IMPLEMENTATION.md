@@ -23,14 +23,14 @@ Status: **planned, not started.**
 | P3-D1 | Desk fate (A1) | **Desk becomes "Tasks"** (`/tasks`): a general task list driven by saved views. Today stays the lean daily command view. `/desk` → `/tasks` alias. |
 | P3-D2 | Task view (A3, A4) | **One shared `TaskDrawer` everywhere + full-page `/t/:key`**, which can be bookmarked and linked. |
 | P3-D3 | Meetings (A5, D14) | **Meetings stay tasks** (`kind='meeting'`). Action items are child tasks via `parent_id`. No new entity. |
-| P3-D4 | 1:1 notes location (A6) | `developer_notes` gets a tab in the Team developer drawer. The full 1:1 workspace is deferred (§9). |
+| P3-D4 | 1:1 notes location (A6) | `developer_notes` gets an editable section in the Team developer drawer. The full 1:1 workspace is deferred (§9). |
 | P3-D5 | Standup entry (B1) | **A mode of the Team page**: `/team?mode=standup`. Developer order follows the active board sort/saved view. |
 | P3-D6 | Since last standup (B3) | **Rolling window**: last 24h, or last 72h on Mondays. No stored state. |
 | P3-D7 | Capture default owner (C3) | **The manager (me)**, `status=open`, `scheduled_on=today`. `@person` makes a developer the owner, with me as tracking manager. |
 | P3-D8 | Parser location (C6) | **Shared pure parser** in `shared/capture-grammar.ts`. The client uses it for a live preview; the server re-parses on submit and is authoritative. |
 | P3-D9 | Saved views (D1) | **New `task_saved_views` only.** Team and Work saved views are untouched. |
 | P3-D10 | View sharing (D4) | **Per manager** (private). |
-| P3-D11 | Person-day status (E1, D26) | **Hybrid.** Status stays manual; a suggestion badge appears when the current task is `blocked`. Accept with one key/click. |
+| P3-D11 | Person-day status (E1, D26) | **Hybrid.** Status stays manual; a suggestion badge appears when the developer's highest-positioned open task is `blocked` (blocked canonical tasks map to 'planned' in tracker DTOs, so the "current" canonical candidate is the top-of-plan blocked task). Accept with one key/click. |
 | P3-D12 | Capacity (E2) | **Remove `capacityUnits`** from the UI and DTOs, and remove the `overCapacity` signal. The DB column stays inert. |
 | P3-D13 | Kind/category (E3, D13) | **Remove from every UI** and add a **label manager** (add / rename / color). |
 | P3-D14 | Developer Later (E4, D31) | **No.** Later stays manager/inbox only. |
@@ -183,7 +183,7 @@ These are plain keys, active only when focus is not in a text field. There are n
 
 ### 6.3 Hybrid person-day status
 
-- The board DTO gains `statusSuggestion?: { status: "blocked"; reasonTaskKey: string }` when the developer's current task is `blocked` and their manual status is not.
+- The board DTO gains `statusSuggestion?: { status: "blocked"; reasonTaskKey: string }` when the developer's highest-positioned blocked task exists and their manual status is not `blocked`. ("Current" resolves to the top-of-plan blocked task — blocked canonical tasks have no `active` tracker mapping.)
 - A badge appears on the roster card and in standup mode. Accepting it (click or `y`) sets the manual status with `reason` linking the task, as a `blocker` event. Attention signals are unchanged.
 
 ---
@@ -197,7 +197,7 @@ These are plain keys, active only when focus is not in a text field. There are n
 
 ### 7.2 Former-owner read access (revises D8)
 
-- A developer can `GET /api/tasks/:key` and `/events` when they are the current owner **or** they authored at least one event on the task.
+- A developer can read a task and its events when they are the current owner **or** they authored at least one event on the task. The developer path is `GET /api/my-day/tasks/:key` and `GET /api/my-day/tasks/:key/events` (developer API access stays under `/api/my-day`; `/api/tasks` remains manager-only).
 - The former-owner projection returns key, title, status, their own **shared** events, and nothing else: no other people's events, no private fields, no links, no children. Writes are rejected with 403.
 - Reachable through deep links and the developer's own event references. My Day does not list these tasks.
 - Privacy tests cover private events by the new owner or manager, links, and labels, all absent.

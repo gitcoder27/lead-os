@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
 import type { TrackerDeveloperStatus } from '@/types';
+import { useModalFocus } from '@/hooks/useModalFocus';
 import { TaskPicker, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TrackerStatusPill } from './TrackerStatusPill';
 
@@ -30,6 +31,9 @@ export function StatusRationaleDialog({
   onSubmit,
 }: StatusRationaleDialogProps) {
   const rationaleRef = useRef<HTMLTextAreaElement>(null);
+  // §6.2: the rationale dialog is a modal layer — Tab cycles inside it and
+  // focus returns to the element that opened it.
+  const dialogRef = useModalFocus<HTMLDivElement>();
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const [rationale, setRationale] = useState('');
@@ -109,6 +113,7 @@ export function StatusRationaleDialog({
         style={{ pointerEvents: 'none' }}
       >
         <motion.div
+          ref={dialogRef}
           initial={{ opacity: 0, y: 14, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.97 }}

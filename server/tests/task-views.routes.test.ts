@@ -187,6 +187,64 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
     expect(later.body.tasks.map((t: { title: string }) => t.title)).toEqual(["Later item"]);
   });
 
+  it("applies later/followUp/linkedJira bidirectionally (G4)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const now = new Date().toISOString();
+    await db.insert(issues).values([
+      { jiraKey: "APP-9", summary: "Linked", priorityName: "High", priorityId: "1", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now, labels: "[]" },
+    ]);
+    await createTask(headers, { title: "Plain open" });
+    await createTask(headers, { title: "Later parked", later: true });
+    await createTask(headers, { title: "Follow-up task", labels: ["category:follow_up"] });
+    const linked = await createTask(headers, { title: "Jira linked" });
+    await invoke(app, { method: "POST", url: `/api/tasks/${linked.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-9", role: "primary" } });
+    const titles = (res: { body: { tasks: { title: string }[] } }) => res.body.tasks.map((t) => t.title).sort();
+
+    // later:false keeps everything except my parked rows.
+    const notLater = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { later: false } })}`, headers });
+    expect(titles(notLater)).toEqual(["Follow-up task", "Jira linked", "Plain open"]);
+
+    // followUp:false excludes both the labeled task and follow_up_at rows.
+    const notFollowUp = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { followUp: false } })}`, headers });
+    expect(titles(notFollowUp)).toEqual(["Jira linked", "Later parked", "Plain open"]);
+
+    // linkedJira both ways.
+    const linkedOnly = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { linkedJira: true } })}`, headers });
+    expect(titles(linkedOnly)).toEqual(["Jira linked"]);
+    const unlinkedOnly = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { linkedJira: false } })}`, headers });
+    expect(titles(unlinkedOnly)).toEqual(["Follow-up task", "Later parked", "Plain open"]);
+  });
+
+  it("rejects a closed filter with no bounds (G5)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    expect((await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { closed: {} } })}`, headers })).status).toBe(400);
+    // One bound is enough — an open-ended range is valid.
+    const res = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { closed: { from: "2000-01-01" } } })}`, headers });
+    expect(res.status).toBe(200);
+  });
+
+  it("the today-plan built-in excludes Later tasks (G3)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    await createTask(headers, { title: "Today's work" });
+    await createTask(headers, { title: "Parked", later: true });
+
+    const listed = await invoke(app, { method: "GET", url: "/api/task-views", headers });
+    const todayPlan = listed.body.views.find((view: { id: string }) => view.id === "today-plan");
+    expect(todayPlan).toBeTruthy();
+
+    const res = await invoke(app, {
+      method: "GET",
+      url: `/api/tasks?viewDef=${encodeViewDef(todayPlan.definition)}`,
+      headers,
+    });
+    const titles = res.body.tasks.map((t: { title: string }) => t.title);
+    expect(titles).toContain("Today's work");
+    expect(titles).not.toContain("Parked");
+  });
+
   it("only returns closed tasks inside an explicit closed range", async () => {
     await enablePhase3();
     const headers = { cookie: await cookie("manager-a") };

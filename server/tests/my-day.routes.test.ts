@@ -965,5 +965,26 @@ describe("my day routes", () => {
       expect(res.status).toBe(200);
       expect(res.body.tasks.map((task: { taskKey: string }) => task.taskKey)).not.toContain(row.taskKey);
     });
+
+    it("returns 404 for former-owner reads when tasks_phase3_enabled is off (G1)", async () => {
+      // Canonical tasks exist (phase 1 + stage 2c) but Phase 3 is off —
+      // former-owner access is a Phase 3 feature, so reads must 404 and
+      // preserve the Phase 2 owner-only behavior.
+      await db.insert(configTable).values([
+        { key: "tasks_phase1_enabled", value: "true" },
+        { key: "tasks_phase2_stage", value: "2c" },
+        { key: "tasks_phase3_enabled", value: "false" },
+      ]);
+      const row = await seedReassignedTask();
+      const app = createTestApp();
+      const cookie = await loginCookie("alice", "secret123");
+
+      const get = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}`, headers: { cookie } });
+      expect(get.status).toBe(404);
+      const events = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}/events`, headers: { cookie } });
+      expect(events.status).toBe(404);
+      const detail = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${row.taskKey}/detail`, headers: { cookie } });
+      expect(detail.status).toBe(404);
+    });
   });
 });

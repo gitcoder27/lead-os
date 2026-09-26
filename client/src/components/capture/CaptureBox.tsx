@@ -12,6 +12,7 @@ import { taskLabelDisplayName } from '@/types';
 import { useToast } from '@/context/ToastContext';
 import { useCapture } from '@/hooks/useCapture';
 import { useDevelopers } from '@/hooks/useDevelopers';
+import { useTaskLabels } from '@/hooks/useTaskLabels';
 import { getLocalIsoDate } from '@/lib/utils';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 
@@ -119,7 +120,11 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
   const { addToast } = useToast();
   const capture = useCapture();
   const developers = useDevelopers();
+  const labelRegistry = useTaskLabels();
   const [text, setText] = useState(prefill);
+  const [caret, setCaret] = useState(prefill.length);
+  const [suggestDismissed, setSuggestDismissed] = useState(false);
+  const [activeLabelIndex, setActiveLabelIndex] = useState(0);
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [serverDiagnostics, setServerDiagnostics] = useState<CaptureDiagnostic[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -143,20 +148,59 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
   // their diagnostics so users don't see a spurious "nobody matches" flash.
   const holdPeopleDiagnostics = developers.isPending;
   const allDiagnostics = serverDiagnostics.length ? serverDiagnostics : resolved?.diagnostics ?? [];
-  const diagnostics = holdPeopleDiagnostics
+  const heldDiagnostics = holdPeopleDiagnostics
     ? allDiagnostics.filter((d) => d.code !== 'unknown-person' && d.code !== 'ambiguous-person')
     : allDiagnostics;
+  // Cosmetic: "/note "/"/T-5: " prefills fire empty-* errors before a body is
+  // typed. Hide those while the body is blank — the server still enforces.
+  const diagnostics = heldDiagnostics.filter((d) => {
+    if (resolved?.title.trim()) return true;
+    return d.code !== 'empty-note' && d.code !== 'empty-update' && d.code !== 'empty-title';
+  });
   const blocked = diagnostics.some((d) => d.severity === 'error');
+
+  // §3.3: `+label` typeahead — the fragment under the caret suggests
+  // registered label names, mirroring the @person ambiguity chooser.
+  const labelFragment = useMemo(() => {
+    const before = text.slice(0, caret);
+    const match = /(?:^|\s)\+([a-zA-Z0-9:_-]*)$/.exec(before);
+    return match ? { start: caret - match[1]!.length - 1, fragment: match[1]! } : null;
+  }, [text, caret]);
+
+  const labelSuggestions = useMemo(() => {
+    if (!labelFragment || suggestDismissed) return [];
+    const fragment = labelFragment.fragment.toLowerCase();
+    const names = (labelRegistry.data?.labels ?? []).map((label) => label.name);
+    const prefix = names.filter((name) => name.startsWith(fragment) && name !== fragment);
+    const contains = names.filter((name) => !prefix.includes(name) && name.includes(fragment));
+    return [...prefix, ...contains].slice(0, 6);
+  }, [labelFragment, labelRegistry.data, suggestDismissed]);
+
+  const applyLabel = (name: string) => {
+    if (!labelFragment) return;
+    const next = `${text.slice(0, labelFragment.start)}+${name} ${text.slice(caret)}`;
+    const nextCaret = labelFragment.start + name.length + 2;
+    setText(next);
+    setCaret(nextCaret);
+    setActiveLabelIndex(0);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => inputRef.current?.focus(), 120);
     return () => window.clearTimeout(timer);
   }, []);
 
-  // New edits clear server diagnostics and the armed confirm.
+  // New edits clear server diagnostics, the armed confirm, and dismissed
+  // label suggestions.
   useEffect(() => {
     setServerDiagnostics([]);
     setConfirmArmed(false);
+    setSuggestDismissed(false);
+    setActiveLabelIndex(0);
   }, [text]);
 
   const syncScroll = () => {
@@ -195,6 +239,16 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
             message: res.task?.title,
             action: key ? { label: 'Open task', onClick: () => navigateToTaskPage(key) } : undefined,
           });
+          // Non-blocking warnings (e.g. an unsynced #KEY demoted to text)
+          // still surface — the dialog closes on success, so toast them.
+          const warnings = res.diagnostics.filter((d) => d.severity !== 'error');
+          if (warnings.length) {
+            addToast({
+              type: 'warning',
+              title: 'Captured with warnings',
+              message: warnings.map((d) => d.message).join(' '),
+            });
+          }
           onClose();
         },
         onError: (error) => {
@@ -249,11 +303,25 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
         <textarea
           ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setCaret(e.target.selectionStart);
+          }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onScroll={syncScroll}
           onKeyDown={(e) => {
+            if (labelSuggestions.length) {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setActiveLabelIndex((i) => (i + 1) % labelSuggestions.length); return; }
+              if (e.key === 'ArrowUp') { e.preventDefault(); setActiveLabelIndex((i) => (i - 1 + labelSuggestions.length) % labelSuggestions.length); return; }
+              if (e.key === 'Tab') { e.preventDefault(); applyLabel(labelSuggestions[activeLabelIndex]!); return; }
+              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSuggestDismissed(true); return; }
+            }
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
+              if (labelSuggestions.length) {
+                applyLabel(labelSuggestions[activeLabelIndex]!);
+                return;
+              }
               submit(confirmArmed);
             }
           }}
@@ -269,6 +337,34 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
             border: '1px solid var(--border)',
           }}
         />
+        {labelSuggestions.length > 0 && (
+          <div
+            className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl"
+            role="listbox"
+            aria-label="Label suggestions"
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', boxShadow: '0 12px 32px rgba(0,0,0,0.28)' }}
+          >
+            {labelSuggestions.map((name, index) => (
+              <button
+                key={name}
+                type="button"
+                role="option"
+                aria-selected={index === activeLabelIndex}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyLabel(name)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors"
+                style={{
+                  background: index === activeLabelIndex ? 'var(--accent-glow)' : 'transparent',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <Tags size={10} style={{ color: 'var(--accent)' }} />
+                <span className="font-mono font-semibold">+{name}</span>
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{taskLabelDisplayName(name)}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Structured summary */}

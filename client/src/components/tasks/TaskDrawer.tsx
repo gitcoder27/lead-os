@@ -21,6 +21,7 @@ import { navigateToTaskPage } from '@/lib/task-nav';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
+import { useModalFocus } from '@/hooks/useModalFocus';
 import {
   useAddTaskDetailLink,
   useCreateChildTask,
@@ -78,6 +79,9 @@ interface TaskDrawerProps {
  */
 export function TaskDrawer({ taskKey, onClose, onNavigateTask, stacked = false }: TaskDrawerProps) {
   const open = Boolean(taskKey);
+  // §6.2: the drawer traps Tab while open and restores focus to the element
+  // that opened it (a task row, deep-link target, or nothing) on close.
+  const panelRef = useModalFocus<HTMLElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -103,6 +107,7 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, stacked = false }
           onClick={onClose}
         />
         <motion.aside
+          ref={panelRef}
           key={`panel-${taskKey}`}
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
@@ -417,7 +422,7 @@ function TaskDetailHeader({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {canEditTitle || mode === 'manager' ? (
+        {!task.deletedAt && (canEditTitle || mode === 'manager') ? (
           <StatusSelect task={task} onPatch={onPatch} />
         ) : (
           <span
@@ -474,7 +479,9 @@ function TaskOwnerSection({
   readOnly: boolean;
 }) {
   const { user } = useAuth();
-  const developers = useDevelopers();
+  // Manager-only endpoint (P3 §3.3): developers get an empty list rather than
+  // a guaranteed 403. The hook still runs to keep call order stable.
+  const developers = useDevelopers(undefined, { enabled: mode === 'manager' });
   const id = useId();
 
   if (mode === 'developer') {
@@ -602,7 +609,7 @@ function TaskLinksSection({
   const { addToast } = useToast();
   const addLink = useAddTaskDetailLink(task.taskKey);
   const removeLink = useRemoveTaskDetailLink(task.taskKey);
-  const developers = useDevelopers();
+  const developers = useDevelopers(undefined, { enabled: mode === 'manager' });
   const [adding, setAdding] = useState<'jira' | 'person' | 'external' | 'task' | null>(null);
   const [draft, setDraft] = useState('');
   const editable = mode === 'manager' && !readOnly;
@@ -759,7 +766,7 @@ function TaskChildrenSection({
 }) {
   const { addToast } = useToast();
   const createChild = useCreateChildTask(task.taskKey);
-  const developers = useDevelopers();
+  const developers = useDevelopers(undefined, { enabled: mode === 'manager' });
   const [draft, setDraft] = useState('');
   const isMeeting = task.kind === 'meeting';
   const canAdd = mode === 'manager' && !readOnly;
@@ -886,7 +893,9 @@ function TaskPropertiesSection({
   onPatch: (updates: UpdateTaskRequest) => void;
   readOnly: boolean;
 }) {
-  const registry = useTaskLabels();
+  // The label registry is a manager endpoint — developers keep chip names
+  // with the default color instead of issuing a 403'd request.
+  const registry = useTaskLabels({ enabled: mode === 'manager' });
   const isMeeting = task.kind === 'meeting';
   const labels = 'labels' in task ? task.labels : [];
   const colorByName = useMemo(() => {

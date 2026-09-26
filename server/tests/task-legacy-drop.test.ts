@@ -105,6 +105,33 @@ describe("TaskLegacyDropService (§8.2)", () => {
     expect(tableExists("task_events")).toBe(true);
   });
 
+  it("applies with seeded legacy_manager_desk_links rows (child drops before parent)", async () => {
+    await markContracted();
+    archiveLegacyTables();
+    // Seed a parent row plus a link row referencing it — with
+    // foreign_keys=ON, dropping legacy_manager_desk_items first raises an FK
+    // violation, so apply() only succeeds when links drop first (B1).
+    const now = new Date().toISOString();
+    rawDb.prepare(
+      "INSERT INTO manager_desk_days (workspace_id, date, manager_account_id, created_at, updated_at) VALUES ('default', '2024-01-01', 'mgr-1', ?, ?)",
+    ).run(now, now);
+    const dayId = rawDb.prepare("SELECT id FROM manager_desk_days LIMIT 1").pluck().get() as number;
+    rawDb.prepare(
+      "INSERT INTO legacy_manager_desk_items (workspace_id, day_id, title, kind, category, status, priority, created_at, updated_at) VALUES ('default', ?, 'linked item', 'task', 'task', 'done', 'medium', ?, ?)",
+    ).run(dayId, now, now);
+    const itemId = rawDb.prepare("SELECT id FROM legacy_manager_desk_items LIMIT 1").pluck().get() as number;
+    rawDb.prepare(
+      "INSERT INTO legacy_manager_desk_links (workspace_id, item_id, link_type, issue_key, created_at) VALUES ('default', ?, 'issue', 'LEAD-1', ?)",
+    ).run(itemId, now);
+
+    const service = new TaskLegacyDropService({
+      createManualBackup: vi.fn(async () => ({ name: "b", path: "/tmp/b.db", sizeBytes: 1, createdAt: "", reason: "pre-legacy-drop" })),
+    });
+    const result = await service.apply("default");
+    expect(result.applied).toBe(true);
+    for (const name of LEGACY_DROP_TABLES) expect(tableExists(name)).toBe(false);
+  });
+
   it("is idempotent — repeat apply reports alreadyApplied", async () => {
     await markContracted();
     archiveLegacyTables();

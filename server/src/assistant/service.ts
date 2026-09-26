@@ -653,7 +653,10 @@ export class AssistantService {
       config.customInstructions
     );
     const context = this.toolContext(auth, date, currentView);
-    const llmTools = !this.deps.tools && await new TaskKeysService().canonicalEnabled(auth.workspaceId) ? toLlmToolDefinitions(createAssistantTools(true)) : this.llmTools;
+    const taskKeys = new TaskKeysService();
+    const llmTools = !this.deps.tools && await taskKeys.canonicalEnabled(auth.workspaceId)
+      ? toLlmToolDefinitions(createAssistantTools(true, { phase3: await taskKeys.phase3Enabled(auth.workspaceId) }))
+      : this.llmTools;
     // Reserve ~40% of the window for system/tools/output; history gets the rest (~4 chars/token).
     const historyCharBudget = config.contextWindow ? Math.floor(config.contextWindow * 0.6 * 4) : undefined;
 

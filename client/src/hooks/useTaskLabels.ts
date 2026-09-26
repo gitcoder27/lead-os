@@ -4,14 +4,14 @@ import { api } from '@/lib/api';
 import type { TaskLabel, TaskLabelColor, TaskLabelListResponse } from '@/types';
 import { useTasksPhase3 } from './useTasksPhase3';
 
-/** Phase 3 (P3-D13): the workspace label registry. */
-export function useTaskLabels() {
+/** Phase 3 (P3-D13): the workspace label registry (manager-only endpoint). */
+export function useTaskLabels(options: { enabled?: boolean } = {}) {
   const scope = useAuthScopeKey();
   const phase3 = useTasksPhase3();
   return useQuery({
     queryKey: ['task-labels', scope],
     queryFn: () => api.get<TaskLabelListResponse>('/task-labels'),
-    enabled: phase3,
+    enabled: phase3 && options.enabled !== false,
     staleTime: 30_000,
   });
 }

@@ -140,26 +140,26 @@ export class TaskLabelsService {
       if (input.color) {
         await db.update(taskLabels).set({ color: input.color }).where(eq(taskLabels.id, row.id));
       }
+      // One private `update` event per rewritten task (P3 §3.3), inside the
+      // same transaction so the rewrite and its audit trail commit or roll
+      // back together. Authored by the acting manager so it stays visible to
+      // them — system-authored private events are hidden from everyone.
+      if (renameTo && renameTo !== name) {
+        const actor = { type: "manager" as const, accountId: actorAccountId ?? "system" };
+        for (const task of affected) {
+          await this.events.append({
+            taskKey: task.taskKey,
+            workspaceId: scope,
+            type: "update",
+            body: `Label renamed: "${name}" → "${renameTo}"`,
+            meta: { labelRenamed: { from: name, to: renameTo } },
+            visibility: "private",
+            dedupeKey: `p3:label-rename:${scope}:${name}->${renameTo}:${task.taskKey}`,
+          }, actor);
+        }
+      }
       return (await db.select().from(taskLabels).where(eq(taskLabels.id, row.id)).limit(1))[0]!;
     });
-
-    // One private `update` event per rewritten task (P3 §3.3). Authored by the
-    // acting manager so it stays visible to them — system-authored private
-    // events are hidden from everyone.
-    const actor = { type: "manager" as const, accountId: actorAccountId ?? "system" };
-    if (renameTo && renameTo !== name) {
-      for (const task of affected) {
-        await this.events.append({
-          taskKey: task.taskKey,
-          workspaceId: scope,
-          type: "update",
-          body: `Label renamed: "${name}" → "${renameTo}"`,
-          meta: { labelRenamed: { from: name, to: renameTo } },
-          visibility: "private",
-          dedupeKey: `p3:label-rename:${scope}:${name}->${renameTo}:${task.taskKey}`,
-        }, actor);
-      }
-    }
     return mapRow(result);
   }
 
@@ -180,18 +180,17 @@ export class TaskLabelsService {
         await db.update(tasks).set({ labelsJson: JSON.stringify(labels) }).where(eq(tasks.id, task.id));
       }
       await db.delete(taskLabels).where(eq(taskLabels.id, row.id));
+      for (const task of affected) {
+        await this.events.append({
+          taskKey: task.taskKey,
+          workspaceId: scope,
+          type: "update",
+          body: `Label removed: "${name}"`,
+          meta: { labelRemoved: { name } },
+          visibility: "private",
+          dedupeKey: `p3:label-remove:${scope}:${name}:${task.taskKey}`,
+        }, { type: "manager", accountId: actorAccountId ?? "system" });
+      }
     });
-
-    for (const task of affected) {
-      await this.events.append({
-        taskKey: task.taskKey,
-        workspaceId: scope,
-        type: "update",
-        body: `Label removed: "${name}"`,
-        meta: { labelRemoved: { name } },
-        visibility: "private",
-        dedupeKey: `p3:label-remove:${scope}:${name}:${task.taskKey}`,
-      }, { type: "manager", accountId: actorAccountId ?? "system" });
-    }
   }
 }

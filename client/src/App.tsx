@@ -591,16 +591,16 @@ function AppContent() {
 
     if (target.view === 'tasks') {
       // Phase 3 (P3-D14): Jira drift items deep-link to the canonical task page;
-      // without a key, open the Tasks surface on the Jira drift built-in view.
+      // without a key, open Needs attention filtered to the drift signal (docs/49 §3).
       if (target.taskKey) {
         navigateToTaskPage(target.taskKey);
         return;
       }
-      setTasksUrlState({ view: 'jira-drift', overrides: {} });
+      setTasksUrlState({ view: 'attention', overrides: { signal: ['drift'] } });
       setTasksUrlNonce((nonce) => nonce + 1);
       preloadView('desk');
       setActiveView('desk');
-      navigateToView('desk', { params: { view: 'jira-drift' } });
+      navigateToView('desk', { params: { view: 'attention', signal: 'drift' } });
       return;
     }
 

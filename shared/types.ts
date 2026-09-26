@@ -725,6 +725,59 @@ export interface TaskViewFilters {
    *  on done-ness — resolved in Jira but open here, or closed here (within the
    *  last 7 days) while the Jira issue stays open. */
   jiraDrift?: boolean;
+  /** docs/49 D1: "today" = plan date (earlier of scheduledOn and the dueAt
+   *  date) <= today; "upcoming" = plan date > today (a date is required). */
+  horizon?: "today" | "upcoming";
+  /** docs/49 §2: waiting on others — developer-owned, blocked, follow-up
+   *  predicate, or the kind:waiting label. */
+  waiting?: boolean;
+  /** docs/49 §2: needs attention — any of the listed signals (OR). */
+  attention?: TaskAttentionSignal[];
+}
+
+export type TaskAttentionSignal = "overdue" | "stale" | "drift";
+
+/** docs/49 D9: days without activity before an open task reads as stale. */
+export const TASK_STALE_DAYS = 5;
+
+/** docs/49 §2: per-row signals computed by the view engine. */
+export interface TaskSignals {
+  overdue: boolean;
+  /** Days since the plan date when overdue. */
+  overdueDays: number | null;
+  /** Which date made the task overdue (D2): a hard `dueAt` or a slipped plan. */
+  overdueSource: "due" | "scheduled" | null;
+  stale: boolean;
+  /** Days since the last task event (updatedAt fallback); open statuses only. */
+  staleDays: number | null;
+  drift: boolean;
+  followUpDue: boolean;
+}
+
+export type TaskViewTask = ManagerTask & { signals: TaskSignals };
+
+export interface TaskViewTasksResponse {
+  tasks: TaskViewTask[];
+}
+
+export interface TaskViewCount {
+  count: number;
+  overdue: number;
+}
+
+/** `GET /api/tasks/view-counts` (docs/49 §10). Keyed by view id. */
+export interface TaskViewCountsResponse {
+  today: string;
+  counts: Record<string, TaskViewCount>;
+}
+
+/** `POST /api/tasks/bulk` (docs/49 §10, D8): atomic per-task patches. */
+export interface BulkUpdateTasksRequest {
+  items: { key: string; changes: UpdateTaskRequest }[];
+}
+
+export interface BulkUpdateTasksResponse {
+  tasks: ManagerTask[];
 }
 
 export type TaskViewSort = "scheduled" | "updated" | "created" | "priority";
@@ -762,6 +815,9 @@ export const taskViewDefinitionSchema = z.object({
     followUp: z.boolean().optional(),
     staleDays: z.number().int().min(1).max(365).optional(),
     jiraDrift: z.boolean().optional(),
+    horizon: z.enum(["today", "upcoming"]).optional(),
+    waiting: z.boolean().optional(),
+    attention: z.array(z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
   }).strict().optional(),
   sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
   group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
@@ -773,6 +829,8 @@ export interface TaskViewMeta {
   name: string;
   builtin: boolean;
   definition: TaskViewDefinition;
+  /** docs/49 §4: rail section for built-ins. */
+  section?: "plan" | "review";
 }
 
 export interface TaskViewsResponse {

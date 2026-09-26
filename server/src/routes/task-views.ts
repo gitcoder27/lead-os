@@ -25,11 +25,12 @@ export function createTaskViewsRouter(keys: TaskKeysService): Router {
     if (!(await keys.phase3Enabled(workspaceId))) throw new HttpError(404, "Task views are not enabled");
   };
 
-  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
+  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }) })), async (req, res, next) => {
     try {
       await assertPhase3(req.auth!.user.workspaceId);
       const { accountId, workspaceId } = scope(req);
-      res.json({ views: await service.list(accountId, workspaceId) });
+      // docs/49 D3: the client's local date resolves relative built-ins.
+      res.json({ views: await service.list(accountId, workspaceId, req.query.today as string | undefined) });
     } catch (error) { next(error); }
   });
 

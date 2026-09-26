@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
@@ -26,6 +26,8 @@ function taskLabelDisplayName(name) {
     const stripped = name.replace(/^(category|kind|priority):/, "");
     return stripped.replace(/_/g, " ");
 }
+/** docs/49 D9: days without activity before an open task reads as stale. */
+exports.TASK_STALE_DAYS = 5;
 const taskViewIsoDate = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const taskViewDateRange = zod_1.z.object({
     from: taskViewIsoDate.optional(),
@@ -51,6 +53,9 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
         followUp: zod_1.z.boolean().optional(),
         staleDays: zod_1.z.number().int().min(1).max(365).optional(),
         jiraDrift: zod_1.z.boolean().optional(),
+        horizon: zod_1.z.enum(["today", "upcoming"]).optional(),
+        waiting: zod_1.z.boolean().optional(),
+        attention: zod_1.z.array(zod_1.z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
     }).strict().optional(),
     sort: zod_1.z.enum(["scheduled", "updated", "created", "priority"]).optional(),
     group: zod_1.z.enum(["owner", "status", "label", "scheduled"]).optional(),

@@ -70,9 +70,9 @@ describe("task saved view routes (P3-D9/D10)", () => {
     const response = await invoke(app, { method: "GET", url: "/api/task-views", headers });
     expect(response.status).toBe(200);
     const ids = response.body.views.map((view: { id: string }) => view.id);
-    for (const builtin of ["today-plan", "my-tasks", "watching", "inbox", "follow-ups", "meetings", "blocked", "stale", "jira-drift", "later", "closed-week"]) {
-      expect(ids).toContain(builtin);
-    }
+    // docs/49 §3: consolidated rail order.
+    expect(ids).toEqual(["today", "inbox", "my-tasks", "waiting", "upcoming", "later", "attention", "closed-week"]);
+    expect(response.body.views.map((view: { section: string }) => view.section)).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "review", "review"]);
     expect(response.body.views.every((view: { builtin: boolean }) => view.builtin)).toBe(true);
   });
 
@@ -225,14 +225,14 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
     expect(res.status).toBe(200);
   });
 
-  it("the today-plan built-in excludes Later tasks (G3)", async () => {
+  it("the today built-in excludes Later tasks (G3)", async () => {
     await enablePhase3();
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Today's work" });
     await createTask(headers, { title: "Parked", later: true });
 
     const listed = await invoke(app, { method: "GET", url: "/api/task-views", headers });
-    const todayPlan = listed.body.views.find((view: { id: string }) => view.id === "today-plan");
+    const todayPlan = listed.body.views.find((view: { id: string }) => view.id === "today");
     expect(todayPlan).toBeTruthy();
 
     const res = await invoke(app, {

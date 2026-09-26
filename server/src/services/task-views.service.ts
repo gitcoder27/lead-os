@@ -1,11 +1,11 @@
 import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
-import { taskViewDefinitionSchema, type ManagerTask, type TaskSavedView, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta } from "shared/types";
+import { TASK_STALE_DAYS, taskViewDefinitionSchema, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
-import { taskSavedViews, tasks } from "../db/schema";
+import { taskLinks, taskSavedViews, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
-import { todayIsoDate } from "../utils/date";
+import { isoDatePart, todayIsoDate } from "../utils/date";
 import { TaskEventsService } from "./task-events.service";
-import { JiraDriftService } from "./jira-drift.service";
+import { JIRA_DRIFT_CLOSED_WINDOW_DAYS, JiraDriftService } from "./jira-drift.service";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
@@ -41,27 +41,27 @@ function weekStart(today: string): string {
 }
 
 /**
- * Built-in views (§5.2) — code, not rows. Dynamic ranges (closed this week)
- * resolve against the caller's today.
+ * Built-in views (§5.2, docs/49 §3) — code, not rows. Relative horizons and
+ * the closed-this-week range resolve against the caller's today.
  */
-export function builtinTaskViews(today: string): { id: string; name: string; definition: TaskViewDefinition }[] {
+export function builtinTaskViews(today: string): { id: string; name: string; section: "plan" | "review"; definition: TaskViewDefinition }[] {
+  const openish: TaskStatus[] = ["open", "active", "blocked"];
   return [
-    { id: "today-plan", name: "Today plan", definition: { filters: { owner: "me", status: ["open", "active", "blocked"], later: false }, sort: "scheduled", group: "scheduled" } },
-    { id: "my-tasks", name: "My tasks", definition: { filters: { owner: "me" }, sort: "scheduled", group: "status" } },
-    { id: "watching", name: "Watching", definition: { filters: { owner: "team" }, sort: "updated", group: "owner" } },
-    { id: "inbox", name: "Inbox", definition: { filters: { owner: "inbox", status: ["open"] }, sort: "created" } },
-    { id: "follow-ups", name: "Follow-ups", definition: { filters: { followUp: true }, sort: "scheduled", group: "scheduled" } },
-    { id: "meetings", name: "Meetings", definition: { filters: { kind: "meeting" }, sort: "scheduled", group: "scheduled" } },
-    { id: "blocked", name: "Blocked", definition: { filters: { status: ["blocked"] }, sort: "updated", group: "owner" } },
-    { id: "stale", name: "Stale", definition: { filters: { status: ["open", "active", "blocked"], staleDays: 5 }, sort: "updated" } },
-    // §8.1: tasks whose primary Jira link disagrees on done-ness.
-    { id: "jira-drift", name: "Jira drift", definition: { filters: { jiraDrift: true }, sort: "updated" } },
-    { id: "later", name: "Later", definition: { filters: { later: true }, sort: "created" } },
-    { id: "closed-week", name: "Closed this week", definition: { filters: { closed: { from: weekStart(today), to: today } }, sort: "updated" } },
+    { id: "today", name: "Today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today" }, sort: "scheduled", group: "scheduled" } },
+    { id: "inbox", name: "Inbox", section: "plan", definition: { filters: { owner: "inbox", status: ["open"] }, sort: "created" } },
+    { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
+    { id: "waiting", name: "Waiting on others", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "updated", group: "owner" } },
+    { id: "upcoming", name: "Upcoming", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "upcoming" }, sort: "scheduled", group: "scheduled" } },
+    { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
+    // §8.1 drift, overdue plan dates, and stale work in one review queue.
+    { id: "attention", name: "Needs attention", section: "review", definition: { filters: { attention: ["overdue", "stale", "drift"] }, sort: "scheduled" } },
+    { id: "closed-week", name: "Closed this week", section: "review", definition: { filters: { closed: { from: weekStart(today), to: today } }, sort: "updated" } },
   ];
 }
 
 const FOLLOW_UP_LABEL = "category:follow_up";
+const WAITING_LABEL = "kind:waiting";
+const OPEN_STATUSES = new Set(["open", "active", "blocked"]);
 
 function labelsOf(row: TaskRow): string[] {
   try {
@@ -71,9 +71,125 @@ function labelsOf(row: TaskRow): string[] {
   }
 }
 
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * docs/49 D1: the plan date is the earlier of `scheduledOn` and the local
+ * date of `dueAt`. A tie counts as the deadline so it drives the overdue tone.
+ */
+export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">): { date: string | null; source: "due" | "scheduled" | null } {
+  const due = isoDatePart(row.dueAt) ?? null;
+  const scheduled = row.scheduledOn;
+  if (due && (!scheduled || due <= scheduled)) return { date: due, source: "due" };
+  if (scheduled) return { date: scheduled, source: "scheduled" };
+  return { date: null, source: null };
+}
+
+/** Batched per-row facts the matcher and signals need beyond the row itself. */
+interface RowFacts {
+  lastActivity: Map<number, string>;
+  drifted: Set<number>;
+  jiraLinked: Set<number> | null;
+}
+
+export function taskSignals(row: TaskRow, facts: RowFacts, today: string): TaskSignals {
+  const open = OPEN_STATUSES.has(row.status);
+  const plan = taskPlanDate(row);
+  const overdue = open && plan.date !== null && plan.date < today;
+  const lastActivity = (facts.lastActivity.get(row.id) ?? row.updatedAt).slice(0, 10);
+  const idleDays = daysBetween(lastActivity, today);
+  const stale = open && idleDays >= TASK_STALE_DAYS;
+  const followUpDate = isoDatePart(row.followUpAt);
+  return {
+    overdue,
+    overdueDays: overdue ? daysBetween(plan.date!, today) : null,
+    overdueSource: overdue ? plan.source : null,
+    stale,
+    staleDays: stale ? idleDays : null,
+    drift: facts.drifted.has(row.id),
+    followUpDue: open && Boolean(followUpDate && followUpDate <= today),
+  };
+}
+
+function followUpMatch(row: TaskRow): boolean {
+  return row.followUpAt !== null || labelsOf(row).includes(FOLLOW_UP_LABEL);
+}
+
+/**
+ * docs/49 D4: the single source of truth for view membership. SQL bounds the
+ * candidate set in `run()`; this predicate decides. `counts()` evaluates every
+ * view against one shared universe with the same function, so badge counts
+ * can never disagree with the rendered list.
+ */
+export function matchesTaskViewFilters(
+  row: TaskRow,
+  filters: TaskViewFilters,
+  context: { principal: TaskPrincipal; today: string; facts: RowFacts; signals: TaskSignals },
+): boolean {
+  const { principal, today, facts, signals } = context;
+  if (row.deletedAt) return false;
+  if (filters.owner !== undefined) {
+    const owner = filters.owner;
+    const ok = owner === "me" ? row.ownerType === "manager" && row.ownerId === principal.accountId
+      : owner === "team" ? row.ownerType === "developer"
+        : owner === "inbox" ? row.ownerType === null
+          : row.ownerId !== null && owner.includes(row.ownerId);
+    if (!ok) return false;
+  }
+  if (filters.status?.length && !filters.status.includes(row.status as TaskStatus)) return false;
+  if (filters.kind && row.kind !== filters.kind) return false;
+  if (filters.later !== undefined) {
+    const parked = row.later === 1 && row.trackedByManagerId === principal.accountId;
+    if (parked !== filters.later) return false;
+  }
+  if (filters.scheduled) {
+    if (!row.scheduledOn) return false;
+    if (filters.scheduled.from && row.scheduledOn < filters.scheduled.from) return false;
+    if (filters.scheduled.to && row.scheduledOn > filters.scheduled.to) return false;
+  }
+  if (filters.linkedJira !== undefined && (facts.jiraLinked?.has(row.id) ?? false) !== filters.linkedJira) return false;
+  if (filters.followUp !== undefined && followUpMatch(row) !== filters.followUp) return false;
+  // Closed tasks are only reachable through a bounded closed range (§5.2) or
+  // the drift signal's own 7-day window (§8.1).
+  if (filters.closed) {
+    if (!row.closedAt) return false;
+    const closedDate = row.closedAt.slice(0, 10);
+    if (filters.closed.from && closedDate < filters.closed.from) return false;
+    if (filters.closed.to && closedDate > filters.closed.to) return false;
+  } else if (row.closedAt && filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
+    return false;
+  }
+  if (filters.labels?.length) {
+    const labels = labelsOf(row);
+    if (!filters.labels.every((label) => labels.includes(label))) return false;
+  }
+  if (filters.jiraDrift !== undefined && signals.drift !== filters.jiraDrift) return false;
+  if (filters.staleDays !== undefined) {
+    const lastActivity = (facts.lastActivity.get(row.id) ?? row.updatedAt).slice(0, 10);
+    if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
+  }
+  if (filters.horizon) {
+    const plan = taskPlanDate(row).date;
+    if (!plan) return false;
+    if (filters.horizon === "today" ? plan > today : plan <= today) return false;
+  }
+  if (filters.waiting !== undefined) {
+    const waiting = row.ownerType === "developer" || row.status === "blocked" || followUpMatch(row) || labelsOf(row).includes(WAITING_LABEL);
+    if (waiting !== filters.waiting) return false;
+  }
+  if (filters.attention?.length) {
+    const hit = filters.attention.some((reason) => (reason === "overdue" ? signals.overdue : reason === "stale" ? signals.stale : signals.drift));
+    if (!hit) return false;
+  }
+  return true;
+}
+
 function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] {
+  const planKey = (row: TaskRow) => taskPlanDate(row).date ?? "9999-12-31";
   const byScheduled = (a: TaskRow, b: TaskRow) =>
-    (a.scheduledOn ?? "9999-12-31").localeCompare(b.scheduledOn ?? "9999-12-31") || a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
+    planKey(a).localeCompare(planKey(b)) || (a.startsAt ?? "").localeCompare(b.startsAt ?? "") || a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
   const sorted = [...rows];
   switch (sort ?? "scheduled") {
     case "updated":
@@ -85,6 +201,10 @@ function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] 
     default:
       return sorted.sort(byScheduled);
   }
+}
+
+function needsJiraLinks(definitions: TaskViewDefinition[]): boolean {
+  return definitions.some((definition) => definition.filters?.linkedJira !== undefined);
 }
 
 export class TaskViewsService {
@@ -101,15 +221,15 @@ export class TaskViewsService {
    * JSON-label matching and the batched staleness/drift lookups filter in
    * memory afterwards.
    */
+  private scopePredicate(principal: TaskPrincipal): SQL {
+    return principal.type === "developer"
+      ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!
+      : sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL)`;
+  }
+
   private async candidateRows(principal: TaskPrincipal, filters: TaskViewFilters): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
-    const conditions: SQL[] = [
-      eq(tasks.workspaceId, scope),
-      isNull(tasks.deletedAt),
-      principal.type === "developer"
-        ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!
-        : sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL)`,
-    ];
+    const conditions: SQL[] = [eq(tasks.workspaceId, scope), isNull(tasks.deletedAt), this.scopePredicate(principal)];
 
     if (filters.owner !== undefined) {
       const owner = filters.owner;
@@ -147,48 +267,94 @@ export class TaskViewsService {
       const closedDate = sql`substr(${tasks.closedAt}, 1, 10)`;
       if (filters.closed.from) conditions.push(gte(closedDate, filters.closed.from));
       if (filters.closed.to) conditions.push(lte(closedDate, filters.closed.to));
-    } else if (filters.jiraDrift !== true) {
+    } else if (filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
       conditions.push(isNull(tasks.closedAt));
     }
     return db.select().from(tasks).where(and(...conditions));
   }
 
-  /** Execute a validated view definition — batched link/event lookups, no per-row scans. */
-  async run(principal: TaskPrincipal, definition: TaskViewDefinition): Promise<ManagerTask[]> {
+  /** Batched facts for a candidate set: last activity, drift, and (on demand) Jira links. */
+  private async facts(principal: TaskPrincipal, rows: TaskRow[], today: string, withJiraLinks: boolean): Promise<RowFacts> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
+    if (!rows.length) return { lastActivity: new Map(), drifted: new Set(), jiraLinked: withJiraLinks ? new Set() : null };
+    const ids = rows.map((row) => row.id);
+    const [lastActivity, drift, links] = await Promise.all([
+      this.events.latestActivityByTask(ids, scope),
+      this.drift.list(principal, scope, today, ids),
+      withJiraLinks
+        ? db.selectDistinct({ taskId: taskLinks.taskId }).from(taskLinks).where(and(eq(taskLinks.workspaceId, scope), eq(taskLinks.kind, "jira"), inArray(taskLinks.taskId, ids)))
+        : Promise.resolve(null),
+    ]);
+    return {
+      lastActivity,
+      drifted: new Set(drift.map((entry) => entry.taskId)),
+      jiraLinked: links ? new Set(links.map((link) => link.taskId)) : null,
+    };
+  }
+
+  private matching(principal: TaskPrincipal, rows: TaskRow[], definition: TaskViewDefinition, facts: RowFacts, today: string) {
     const filters = definition.filters ?? {};
-    let rows = await this.candidateRows(principal, filters);
-
-    // JSON labels can't be indexed; AND-match stays in memory on the
-    // SQL-bounded candidate set.
-    if (filters.labels?.length) {
-      const wanted = filters.labels;
-      rows = rows.filter((row) => wanted.every((label) => labelsOf(row).includes(label)));
+    const matched: { row: TaskRow; signals: TaskSignals }[] = [];
+    for (const row of rows) {
+      const signals = taskSignals(row, facts, today);
+      if (matchesTaskViewFilters(row, filters, { principal, today, facts, signals })) matched.push({ row, signals });
     }
+    return matched;
+  }
 
-    if (filters.jiraDrift !== undefined && rows.length) {
-      const drifted = new Set(
-        (await this.drift.list(principal, scope, undefined, rows.map((row) => row.id))).map((entry) => entry.taskId),
-      );
-      rows = rows.filter((row) => drifted.has(row.id) === filters.jiraDrift);
+  private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string) {
+    const rows = await this.candidateRows(principal, definition.filters ?? {});
+    const facts = await this.facts(principal, rows, today, needsJiraLinks([definition]));
+    return this.matching(principal, rows, definition, facts, today);
+  }
+
+  /** Execute a validated view definition — batched link/event lookups, no per-row scans. */
+  async run(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate()): Promise<TaskViewTask[]> {
+    const matched = await this.evaluate(principal, definition, today);
+    const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
+    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort);
+    const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
+    return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)! }));
+  }
+
+  /**
+   * docs/49 §10: counts for every built-in and saved view from one candidate
+   * universe (open rows plus rows closed since the earliest bounded closed
+   * range or the drift window) and one batched facts pass. A saved view with
+   * an open-ended `closed.to` range falls back to its own bounded query.
+   */
+  async counts(principal: TaskPrincipal, today = todayIsoDate()): Promise<Record<string, TaskViewCount>> {
+    const scope = normalizeWorkspaceId(principal.workspaceId);
+    const views = await this.list(principal.accountId, principal.workspaceId, today);
+    let closedFloor = shiftDays(today, -JIRA_DRIFT_CLOSED_WINDOW_DAYS);
+    for (const view of views) {
+      const from = view.definition.filters?.closed?.from;
+      if (from && from < closedFloor) closedFloor = from;
     }
-
-    if (filters.staleDays !== undefined && rows.length) {
-      const lastEventByTask = await this.events.latestActivityByTask(rows.map((row) => row.id), scope);
-      const cutoff = shiftDays(todayIsoDate(), -filters.staleDays);
-      rows = rows.filter((row) => (lastEventByTask.get(row.id) ?? row.updatedAt).slice(0, 10) <= cutoff);
+    const universe = await db.select().from(tasks).where(and(
+      eq(tasks.workspaceId, scope),
+      isNull(tasks.deletedAt),
+      this.scopePredicate(principal),
+      sql`(${tasks.closedAt} IS NULL OR substr(${tasks.closedAt}, 1, 10) >= ${closedFloor})`,
+    ));
+    const facts = await this.facts(principal, universe, today, needsJiraLinks(views.map((view) => view.definition)));
+    const counts: Record<string, TaskViewCount> = {};
+    for (const view of views) {
+      const closed = view.definition.filters?.closed;
+      const matched = closed && !closed.from
+        ? await this.evaluate(principal, view.definition, today)
+        : this.matching(principal, universe, view.definition, facts, today);
+      counts[view.id] = { count: matched.length, overdue: matched.filter((entry) => entry.signals.overdue).length };
     }
-
-    return (await this.taskService.toDtos(sortRows(rows, definition.sort), principal)) as ManagerTask[];
+    return counts;
   }
 
   /** Built-ins + this manager's saved views (P3-D10: saved views are private). */
-  async list(managerAccountId: string, workspaceId?: string): Promise<TaskViewMeta[]> {
+  async list(managerAccountId: string, workspaceId?: string, today = todayIsoDate()): Promise<TaskViewMeta[]> {
     const scope = normalizeWorkspaceId(workspaceId);
-    const today = todayIsoDate();
     const saved = await this.savedRows(managerAccountId, scope);
     return [
-      ...builtinTaskViews(today).map((view) => ({ id: view.id, name: view.name, builtin: true, definition: view.definition })),
+      ...builtinTaskViews(today).map((view) => ({ id: view.id, name: view.name, builtin: true, section: view.section, definition: view.definition })),
       ...saved.map((row) => ({ id: `saved:${row.id}`, name: row.name, builtin: false, definition: parseTaskViewDefinition(JSON.parse(row.definitionJson)) })),
     ];
   }

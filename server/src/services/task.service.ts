@@ -309,6 +309,28 @@ export class TaskService {
     });
   }
 
+  /**
+   * docs/49 §10 (D8): atomic multi-task patch. Every item runs through
+   * `update` inside one transaction — any failure rolls back the whole batch
+   * and the error names the offending key.
+   */
+  async bulkUpdate(items: { key: string; changes: UpdateTaskRequest }[], principal: TaskPrincipal): Promise<TaskRow[]> {
+    const keys = items.map((item) => item.key.toUpperCase());
+    if (new Set(keys).size !== keys.length) throw new HttpError(400, "Duplicate task keys in bulk update");
+    return runInTransaction(async () => {
+      const rows: TaskRow[] = [];
+      for (const item of items) {
+        try {
+          rows.push(await this.update(item.key, item.changes, principal));
+        } catch (error) {
+          if (error instanceof HttpError) throw new HttpError(error.status, `${item.key}: ${error.message}`);
+          throw error;
+        }
+      }
+      return rows;
+    });
+  }
+
   async remove(key: string, principal: TaskPrincipal): Promise<void> {
     await runInTransaction(async () => {
       const row = await this.requireTask(key, principal);

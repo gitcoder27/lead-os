@@ -4,6 +4,7 @@ import type { TrackerBoardSummaryFilter } from "shared/types";
 import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 import { ManagerDeskService } from "../services/manager-desk.service";
+import { OneOnOneService } from "../services/one-on-one.service";
 import { TaskService } from "../services/task.service";
 import { TeamTrackerService } from "../services/team-tracker.service";
 
@@ -254,6 +255,7 @@ export function createTeamTrackerRouter(
 ): Router {
   const router = Router();
   const tasks = new TaskService();
+  const oneOnOnes = new OneOnOneService();
   const itemRefToId = (ref: string, workspaceId?: string) =>
     tasks.surfaceIdForRef("team_tracker_items", ref, workspaceId);
 
@@ -284,6 +286,21 @@ export function createTeamTrackerRouter(
             : undefined,
         },
       });
+      // docs/48 §4.4: read-only 1:1 badge signal — only when the flag is on.
+      if (await oneOnOnes.enabled(req.auth!.user.workspaceId)) {
+        const signals = await oneOnOnes.dueSignals(req.auth!.user.workspaceId, date);
+        const byDeveloper = new Map(signals.map((s) => [s.developerAccountId, s]));
+        for (const day of board.developers) {
+          const signal = byDeveloper.get(day.developer.accountId);
+          if (signal) {
+            day.oneOnOne = {
+              seriesId: signal.seriesId,
+              scheduledFor: signal.scheduledFor,
+              overdueDays: signal.overdueDays,
+            };
+          }
+        }
+      }
       // Phase 2c: canonical transport empties the legacy per-day item arrays;
       // canonical surface tasks ride `developers[].tasks`.
       res.json(

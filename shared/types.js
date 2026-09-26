@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
@@ -59,6 +59,51 @@ exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
 ];
+const oneOnOneIsoDate = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+exports.oneOnOneCadenceSchema = zod_1.z.enum(["weekly", "biweekly", "monthly", "ad_hoc"]);
+exports.oneOnOneSeriesCreateSchema = zod_1.z.object({
+    developerAccountId: zod_1.z.string().trim().min(1).max(200),
+    cadence: exports.oneOnOneCadenceSchema,
+    preferredWeekday: zod_1.z.number().int().min(0).max(6).nullable().optional(),
+}).strict();
+exports.oneOnOneSeriesUpdateSchema = zod_1.z.object({
+    cadence: exports.oneOnOneCadenceSchema.optional(),
+    preferredWeekday: zod_1.z.number().int().min(0).max(6).nullable().optional(),
+    active: zod_1.z.boolean().optional(),
+}).strict();
+exports.oneOnOneSessionCreateSchema = zod_1.z.object({
+    scheduledFor: oneOnOneIsoDate.optional(),
+}).strict();
+exports.oneOnOneSessionUpdateSchema = zod_1.z.object({
+    status: zod_1.z.enum(["scheduled", "done", "skipped"]).optional(),
+    notes: zod_1.z.string().max(20000).optional(),
+    scheduledFor: oneOnOneIsoDate.optional(),
+    /** Start marks a scheduled session live (`startedAt`). */
+    started: zod_1.z.boolean().optional(),
+    /**
+     * 48 §4.2: when completing (`status: "done"`), `false` detaches the still-open
+     *  agenda items instead of carrying them to the next session. Default: keep
+     *  open — they auto-carry.
+     */
+    reopenCarried: zod_1.z.boolean().optional(),
+}).strict();
+exports.oneOnOneAgendaAttachSchema = zod_1.z.object({
+    /** Attach an existing canonical task by id or key. */
+    taskId: zod_1.z.number().int().positive().optional(),
+    taskKey: zod_1.z.string().trim().min(1).max(32).optional(),
+    /** Freeform capture — creates a canonical task and attaches it (48 §4.2). */
+    title: zod_1.z.string().trim().min(1).max(500).optional(),
+}).strict();
+exports.oneOnOneAgendaReorderSchema = zod_1.z.object({
+    itemIds: zod_1.z.array(zod_1.z.number().int().positive()).min(1).max(1000),
+}).strict();
+exports.oneOnOneSessionActionSchema = zod_1.z.object({
+    title: zod_1.z.string().trim().min(1).max(500),
+    /** Defaults to the series developer (48 §4.2, OO-D8). */
+    ownerType: zod_1.z.enum(["manager", "developer"]).optional(),
+    ownerId: zod_1.z.string().trim().min(1).max(200).optional(),
+    scheduledOn: oneOnOneIsoDate.nullable().optional(),
+}).strict();
 exports.NAV_PAGE_IDS = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
 /** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
 exports.NAV_PAGE_IDS_TASKS = ["work", "team", "tasks", "follow-ups", "notes", "meetings"];

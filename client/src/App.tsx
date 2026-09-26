@@ -21,6 +21,9 @@ import {
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
   teamModeFromParams,
+  teamPanelDevFromParams,
+  teamPanelFromParams,
+  type TeamPanel,
 } from '@/lib/view-params';
 import {
   taskViewParamsFromState,
@@ -443,6 +446,18 @@ function AppContent() {
       ? teamModeFromParams(new URLSearchParams(window.location.search))
       : undefined,
   );
+  // docs/48 (OO-D7): `/team?panel=one-on-ones` overview / `?dev=<id>&panel=one-on-one` workspace.
+  const [teamPanel, setTeamPanel] = useState<TeamPanel | undefined>(() =>
+    pathToView(window.location.pathname) === 'team'
+      ? teamPanelFromParams(new URLSearchParams(window.location.search))
+      : undefined,
+  );
+  const [teamPanelDev, setTeamPanelDev] = useState<string | undefined>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return pathToView(window.location.pathname) === 'team' && teamPanelFromParams(params) === 'one-on-one'
+      ? teamPanelDevFromParams(params)
+      : undefined;
+  });
   // Phase 3 (P3-D1): `/tasks` URL state — selected view + overrides.
   const [tasksUrlState, setTasksUrlState] = useState<TaskViewUrlState | undefined>(() =>
     pathToView(window.location.pathname) === 'desk'
@@ -500,6 +515,10 @@ function AppContent() {
     setDeskDateParam(undefined);
     // Standup mode only survives navigation when it's still in the URL.
     if (nextView === 'team') setTeamMode(undefined);
+    if (nextView === 'team') {
+      setTeamPanel(undefined);
+      setTeamPanelDev(undefined);
+    }
     if (nextView === 'notes') {
       setNotesDate(getLocalIsoDate());
     }
@@ -586,6 +605,15 @@ function AppContent() {
     }
 
     if (target.view === 'team') {
+      // docs/48 §4.4: 1:1 attention items deep-link into the workspace panel.
+      if (target.panel === 'one-on-one' && target.developerAccountId) {
+        setTeamPanel('one-on-one');
+        setTeamPanelDev(target.developerAccountId);
+        preloadView('team');
+        setActiveView('team');
+        navigateToView('team', { params: { dev: target.developerAccountId, panel: 'one-on-one' } });
+        return;
+      }
       setTodayTeamTarget((prev) => ({
         developerAccountId: target.developerAccountId,
         trackerItemId: target.trackerItemId,
@@ -708,6 +736,9 @@ function AppContent() {
         setTeamBoardQuery(teamBoardQueryFromParams(params));
         setTeamBoardQueryNonce((nonce) => nonce + 1);
         setTeamMode(teamModeFromParams(params));
+        const panel = teamPanelFromParams(params);
+        setTeamPanel(panel);
+        setTeamPanelDev(panel === 'one-on-one' ? teamPanelDevFromParams(params) : undefined);
         const taskKey = taskKeyFromParams(params);
         if (taskKey) {
           setTodayTeamTarget((prev) => ({ taskKey, nonce: prev.nonce + 1 }));
@@ -751,6 +782,28 @@ function AppContent() {
     }
   }, []);
 
+  // docs/48 (OO-D7): the 1:1 panels are URL state — open pushes history so
+  // back exits, close rewrites the URL without the params.
+  const handleOneOnOnePanelChange = useCallback((panel: TeamPanel | undefined, developerAccountId?: string) => {
+    setTeamPanel(panel);
+    setTeamPanelDev(panel === 'one-on-one' ? developerAccountId : undefined);
+    const params = new URLSearchParams(window.location.search);
+    if (panel) {
+      params.set('panel', panel);
+      if (panel === 'one-on-one' && developerAccountId) params.set('dev', developerAccountId);
+      else params.delete('dev');
+    } else {
+      params.delete('panel');
+      params.delete('dev');
+    }
+    const search = params.toString();
+    const target = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    if (!sameLocation(target)) {
+      if (panel) window.history.pushState(null, '', target);
+      else window.history.replaceState(null, '', target);
+    }
+  }, []);
+
   const handleDeskDateChange = useCallback((date: string) => {
     setDeskDateParam(date);
   }, []);
@@ -781,6 +834,8 @@ function AppContent() {
       ...teamBoardQueryToParams(teamBoardQuery),
       task: taskKey,
       mode: teamMode,
+      panel: teamPanel,
+      dev: teamPanel === 'one-on-one' ? teamPanelDev : undefined,
     })}`;
     if (sameLocation(target)) {
       return;
@@ -789,7 +844,7 @@ function AppContent() {
       window.history.replaceState(null, '', target);
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [activeView, teamBoardQuery, teamMode]);
+  }, [activeView, teamBoardQuery, teamMode, teamPanel, teamPanelDev]);
 
   // Phase 3: `/tasks` keeps its view+override params shareable (§5.2).
   useEffect(() => {
@@ -1025,6 +1080,9 @@ function AppContent() {
             onBoardQueryChange={handleTeamBoardQueryChange}
             standupMode={teamMode === 'standup'}
             onStandupModeChange={handleStandupModeChange}
+            oneOnOnePanel={teamPanel}
+            oneOnOneDeveloperId={teamPanelDev}
+            onOneOnOnePanelChange={handleOneOnOnePanelChange}
           />
         </Suspense>
       </WorkspaceShell>

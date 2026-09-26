@@ -13,7 +13,7 @@ const approx = { approximateTime: z.literal(true).optional() };
 const via = z.enum(["standup", "task_drawer", "notes_page", "copilot"]);
 const messageMeta = z.object({ via: via.optional(), ...approx }).nullable();
 const eventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import", "capture"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional(), parentKey: z.string().optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("created"), meta: z.object({ source: z.enum(["desk", "tracker", "my_day", "note", "copilot", "today", "promote", "import", "capture", "one_on_one"]), ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().nullable(), title: z.string().min(1), jiraKeys: z.array(z.string()).optional(), parentKey: z.string().optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("update"), meta: z.object({ via: z.enum(["standup", "task_drawer", "my_day", "notes_page", "copilot", "note_field", "context_note_field", "capture"]).optional(), imported: imported.optional(), checkInId: z.number().int().positive().optional(), labelRenamed: z.object({ from: z.string().min(1), to: z.string().min(1) }).optional(), labelRemoved: z.object({ name: z.string().min(1) }).optional() }).nullable(), body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("instruction"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),
   z.object({ type: z.literal("decision"), meta: messageMeta, body: z.string().trim().min(1).max(4000) }),

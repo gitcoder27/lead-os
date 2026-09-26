@@ -133,6 +133,24 @@ export function teamModeFromParams(params: URLSearchParams): 'standup' | undefin
   return firstParam(params, 'mode') === 'standup' ? 'standup' : undefined;
 }
 
+export type TeamPanel = 'one-on-one' | 'one-on-ones';
+
+const TEAM_PANELS: readonly string[] = ['one-on-one', 'one-on-ones'];
+
+/**
+ * docs/48 (OO-D7): `/team?panel=one-on-ones` is the series overview;
+ * `/team?dev=<accountId>&panel=one-on-one` is a developer's workspace.
+ */
+export function teamPanelFromParams(params: URLSearchParams): TeamPanel | undefined {
+  const panel = firstParam(params, 'panel');
+  return panel && TEAM_PANELS.includes(panel) ? (panel as TeamPanel) : undefined;
+}
+
+/** The `dev` param only carries meaning alongside `panel=one-on-one`. */
+export function teamPanelDevFromParams(params: URLSearchParams): string | undefined {
+  return firstParam(params, 'dev');
+}
+
 export function deskDateFromParams(params: URLSearchParams): string | undefined {
   return dateParam(params, 'date');
 }

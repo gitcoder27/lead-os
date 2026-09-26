@@ -73,6 +73,9 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM daily_note_task_refs;
     DELETE FROM checkin_task_refs;
     DELETE FROM task_events;
+    DELETE FROM one_on_one_agenda_items;
+    DELETE FROM one_on_one_sessions;
+    DELETE FROM one_on_one_series;
     DELETE FROM task_key_aliases;
     DELETE FROM task_key_sequences;
     DELETE FROM data_migrations;

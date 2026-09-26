@@ -27,6 +27,10 @@ import { AvailabilityDialog } from './AvailabilityDialog';
 import { TrackerTaskDetailDrawer } from './TrackerTaskDetailDrawer';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import { StandupMode } from './StandupMode';
+import { OneOnOneSeriesPanel } from './OneOnOneSeriesPanel';
+import { OneOnOneWorkspace } from './OneOnOneWorkspace';
+import { useOneOnOneEnabled } from '@/hooks/useOneOnOne';
+import type { TeamPanel } from '@/lib/view-params';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
@@ -63,6 +67,10 @@ interface TeamTrackerPageProps {
   /** Phase 3 (P3-D5): `/team?mode=standup` — the keyboard-driven standup overlay. */
   standupMode?: boolean;
   onStandupModeChange?: (open: boolean) => void;
+  /** docs/48 (OO-D7): `/team?panel=` — the 1:1 overview/workspace panels. */
+  oneOnOnePanel?: TeamPanel;
+  oneOnOneDeveloperId?: string;
+  onOneOnOnePanelChange?: (panel: TeamPanel | undefined, developerAccountId?: string) => void;
 }
 
 function useTeamTrackerWorkflow({
@@ -296,9 +304,13 @@ export function TeamTrackerPage({
   onBoardQueryChange,
   standupMode,
   onStandupModeChange,
+  oneOnOnePanel,
+  oneOnOneDeveloperId,
+  onOneOnOnePanelChange,
 }: TeamTrackerPageProps) {
   const { addToast } = useToast();
   const tasksPhase3 = useTasksPhase3();
+  const oneOnOneEnabled = useOneOnOneEnabled();
   const [date, setDate] = useState(getLocalIsoDate);
   const [activeLens, setActiveLens] = useState<TeamTrackerLens>('team');
 
@@ -561,6 +573,11 @@ export function TeamTrackerPage({
                     ? () => onStandupModeChange?.(true)
                     : undefined
                 }
+                onOpenOneOnOnes={
+                  oneOnOneEnabled && !readOnly
+                    ? () => onOneOnOnePanelChange?.('one-on-ones')
+                    : undefined
+                }
               />
             </div>
 
@@ -570,7 +587,25 @@ export function TeamTrackerPage({
       </motion.div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
-        {isLoading ? (
+        {/* docs/48: 1:1 panels take over the board area while their URL
+            params are set; the flag gate keeps flag-off URLs inert. */}
+        {oneOnOneEnabled && oneOnOnePanel === 'one-on-ones' ? (
+          <div className="mx-auto h-full max-w-[1600px]">
+            <OneOnOneSeriesPanel
+              developers={board?.developers.map((day) => day.developer) ?? []}
+              onOpenDeveloper={(accountId) => onOneOnOnePanelChange?.('one-on-one', accountId)}
+              onClose={() => onOneOnOnePanelChange?.(undefined)}
+            />
+          </div>
+        ) : oneOnOneEnabled && oneOnOnePanel === 'one-on-one' && oneOnOneDeveloperId ? (
+          <div className="mx-auto h-full max-w-[1600px]">
+            <OneOnOneWorkspace
+              developerAccountId={oneOnOneDeveloperId}
+              onClose={() => onOneOnOnePanelChange?.(undefined)}
+              onOpenTask={(taskKey) => workflow.setSelectedTask({ trackerItemId: null, taskKey })}
+            />
+          </div>
+        ) : isLoading ? (
           <TeamTrackerSkeleton />
         ) : isError ? (
           <div className="flex items-center justify-center py-20">
@@ -703,6 +738,7 @@ export function TeamTrackerPage({
         onAddCheckIn={(params) => addCheckIn.mutate(params)}
         onMarkInactive={workflow.handleMarkInactive}
         onOpenManagerDesk={onViewChange ? () => onViewChange('desk') : undefined}
+        onOpenOneOnOne={oneOnOneEnabled ? (accountId) => onOneOnOnePanelChange?.('one-on-one', accountId) : undefined}
         issues={issues}
         isAddItemPending={addTrackerItem.isPending}
         readOnly={readOnly}

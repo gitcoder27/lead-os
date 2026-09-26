@@ -17,6 +17,7 @@
     "tasks:contract": "tsx src/scripts/task-contract.ts",
     "tasks:phase3": "tsx src/scripts/task-phase3.ts",
     "tasks:drop-legacy": "tsx src/scripts/task-drop-legacy.ts",
+    "one-on-one": "tsx src/scripts/one-on-one.ts",
     "auth:create-user": "tsx src/scripts/create-auth-user.ts",
     "auth:delete-user": "tsx src/scripts/delete-auth-user.ts",
     "test": "vitest run",

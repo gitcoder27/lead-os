@@ -1,4 +1,5 @@
 import { TaskKeysService } from "../services/task-keys.service";
+import { OneOnOneService } from "../services/one-on-one.service";
 import { and, count, desc, eq, gt, inArray } from "drizzle-orm";
 import type {
   AssistantActionConfirmRequest,
@@ -655,7 +656,11 @@ export class AssistantService {
     const context = this.toolContext(auth, date, currentView);
     const taskKeys = new TaskKeysService();
     const llmTools = !this.deps.tools && await taskKeys.canonicalEnabled(auth.workspaceId)
-      ? toLlmToolDefinitions(createAssistantTools(true, { phase3: await taskKeys.phase3Enabled(auth.workspaceId) }))
+      ? toLlmToolDefinitions(createAssistantTools(true, {
+          phase3: await taskKeys.phase3Enabled(auth.workspaceId),
+          // docs/48 §4.5: 1:1 tools are only advertised while the flag is on.
+          oneOnOne: await new OneOnOneService().enabled(auth.workspaceId),
+        }))
       : this.llmTools;
     // Reserve ~40% of the window for system/tools/output; history gets the rest (~4 chars/token).
     const historyCharBudget = config.contextWindow ? Math.floor(config.contextWindow * 0.6 * 4) : undefined;

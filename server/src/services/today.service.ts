@@ -1,6 +1,7 @@
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
 import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
+import { OneOnOneService } from "./one-on-one.service";
 import { performance } from "node:perf_hooks";
 import type {
   FilterType,
@@ -20,6 +21,7 @@ import type {
   TodayActionSeverity,
   TodayActionTarget,
   TodayMeetingPrompt,
+  OneOnOneDueSignal,
   TodayPromiseItem,
   TodayResponse,
   TodayRhythmState,
@@ -57,6 +59,7 @@ type TodaySourceTimings = {
   desk: number;
   sync: number;
   drift: number;
+  one_on_one: number;
 };
 
 type TimedSourceResult<T> =
@@ -76,6 +79,7 @@ export type TodayRequestResult = TodayBuildResult & {
 
 type TodayServiceOptions = {
   todayCacheTtlMs?: number;
+  oneOnOneService?: OneOnOneService;
 };
 
 const defaultTodayCacheTtlMs = 10_000;
@@ -113,6 +117,7 @@ const statusLabels: Record<string, string> = {
 export class TodayService {
   private readonly todayCache = new Map<string, TodayCacheEntry>();
   private readonly todayCacheTtlMs: number;
+  private readonly oneOnOneService?: OneOnOneService;
 
   constructor(
     private readonly issueService: IssueService,
@@ -122,6 +127,7 @@ export class TodayService {
     options: TodayServiceOptions = {},
   ) {
     this.todayCacheTtlMs = Math.max(0, options.todayCacheTtlMs ?? defaultTodayCacheTtlMs);
+    this.oneOnOneService = options.oneOnOneService;
   }
 
   async getToday(managerAccountId: string, date: string, workspaceId?: string): Promise<TodayResponse> {
@@ -205,7 +211,7 @@ export class TodayService {
 
   private async buildToday(managerAccountId: string, date: string, workspaceId?: string): Promise<TodayBuildResult> {
     const buildStartedAt = performance.now();
-    const [issueResult, teamResult, deskResult, syncResult, driftResult] = await Promise.all([
+    const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
       measureSource(() => this.teamTrackerService.getBoard(date, { managerAccountId, workspaceId })),
       measureSource(() => this.managerDeskService.getTodayItems(managerAccountId, date, workspaceId)),
@@ -215,6 +221,13 @@ export class TodayService {
       measureSource(async () => (await new TaskKeysService().phase3Enabled(workspaceId))
         ? new JiraDriftService().list({ type: "manager", accountId: managerAccountId }, workspaceId, date)
         : []),
+      // docs/48 §4.4: read-only due/overdue 1:1 sessions — empty when the flag
+      // is off or the service wasn't wired.
+      measureSource(async () =>
+        this.oneOnOneService && (await this.oneOnOneService.enabled(workspaceId))
+          ? this.oneOnOneService.dueSignals(workspaceId, date)
+          : [],
+      ),
     ]);
     const sourceStatus: TodaySourceStatus = {
       issues: issueResult.status === "fulfilled" ? "ready" : "unavailable",
@@ -222,6 +235,7 @@ export class TodayService {
       desk: deskResult.status === "fulfilled" ? "ready" : "unavailable",
       sync: syncResult.status === "fulfilled" ? "ready" : "unavailable",
       drift: driftResult.status === "fulfilled" ? "ready" : "unavailable",
+      one_on_one: oneOnOneResult.status === "fulfilled" ? "ready" : "unavailable",
     };
     const unavailableSources = Object.entries(sourceStatus)
       .filter(([, status]) => status === "unavailable")
@@ -250,6 +264,7 @@ export class TodayService {
     const deskItems = deskResult.status === "fulfilled" ? deskResult.value : [];
     const syncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
     const jiraDrift = driftResult.status === "fulfilled" ? driftResult.value : [];
+    const oneOnOneSignals = oneOnOneResult.status === "fulfilled" ? oneOnOneResult.value : [];
     const issues = issueSnapshot.issues;
 
     const followUps = getDueFollowUps(deskItems, date);
@@ -261,6 +276,7 @@ export class TodayService {
       ...buildMeetingActions(meetings),
       ...buildDeskCarryForwardActions(deskItems, date),
       ...buildJiraDriftActions(jiraDrift),
+      ...buildOneOnOneActions(oneOnOneSignals),
       ...buildSyncActions(syncStatus),
     ]);
     const visibleActions = actionItems.slice(0, 20);
@@ -298,6 +314,7 @@ export class TodayService {
       desk: deskResult.durationMs,
       sync: syncResult.durationMs,
       drift: driftResult.durationMs,
+      one_on_one: oneOnOneResult.durationMs,
     };
 
     if (buildDurationMs >= 1_000) {
@@ -865,6 +882,33 @@ function buildJiraDriftActions(entries: JiraDriftEntry[]): TodayActionItem[] {
   );
 }
 
+/** docs/48 §4.4: read-only 1:1 signals deep-link to /team?dev=<id>&panel=one-on-one. */
+function buildOneOnOneActions(signals: OneOnOneDueSignal[]): TodayActionItem[] {
+  return signals.map((signal) => {
+    const overdue = signal.overdueDays > 0;
+    return action({
+      id: `one-on-one-${signal.sessionId}`,
+      type: "one_on_one",
+      title: overdue ? `1:1 with ${signal.developerName} overdue` : `1:1 with ${signal.developerName} today`,
+      context: overdue
+        ? `Scheduled ${signal.scheduledFor} — ${signal.overdueDays}d overdue`
+        : "Scheduled for today",
+      signal: overdue ? `Overdue ${signal.overdueDays}d` : "1:1 today",
+      severity: overdue ? "warning" : "info",
+      priority: overdue ? 82 + Math.min(signal.overdueDays, 10) : 74,
+      group: "next",
+      target: target("developer", "team", {
+        developerAccountId: signal.developerAccountId,
+        date: signal.scheduledFor,
+        panel: "one-on-one",
+      }),
+      primaryKind: "open",
+      primaryLabel: "Open 1:1",
+      secondaryKinds: [],
+    });
+  });
+}
+
 function buildSyncActions(syncStatus?: SyncStatus): TodayActionItem[] {
   if (syncStatus?.status !== "error") {
     return [];
@@ -1300,6 +1344,7 @@ function roundSourceTimings(timings: TodaySourceTimings): TodaySourceTimings {
     team: Math.round(timings.team),
     desk: Math.round(timings.desk),
     sync: Math.round(timings.sync),
+    one_on_one: Math.round(timings.one_on_one),
   };
 }
 

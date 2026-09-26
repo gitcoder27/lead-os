@@ -5,6 +5,7 @@ import { validate } from "../middleware/validate";
 import { requireAuth, requireManager } from "../middleware/auth";
 import { AuthService, clearSessionCookie, serializeSessionCookie, SESSION_COOKIE_NAME } from "../services/auth.service";
 import { TaskKeysService } from "../services/task-keys.service";
+import { OneOnOneService } from "../services/one-on-one.service";
 import { HttpError } from "../middleware/errorHandler";
 
 const loginSchema = z.object({
@@ -86,9 +87,14 @@ export function createAuthRouter(authService: AuthService): Router {
   const router = Router();
   const throttle = new AuthAttemptThrottle();
   const taskKeys = new TaskKeysService();
+  const oneOnOnes = new OneOnOneService();
   const sessionResponse = async (user: AuthUser): Promise<AuthSessionResponse> => ({
     user,
-    features: { tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId) },
+    // docs/48: `oneOnOne` is manager-only — developer sessions never receive it.
+    features: {
+      tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId),
+      ...(user.role === "manager" ? { oneOnOne: await oneOnOnes.enabled(user.workspaceId) } : {}),
+    },
   });
 
   router.get("/bootstrap", async (_req, res, next) => {

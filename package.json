@@ -22,6 +22,7 @@
     "tasks:cutover": "npm run tasks:cutover --workspace=server --",
     "tasks:drop-legacy": "npm run tasks:drop-legacy --workspace=server --",
     "tasks:phase3": "npm run tasks:phase3 --workspace=server --",
+    "one-on-one": "npm run one-on-one --workspace=server --",
     "start": "npm run start --workspace=server",
     "test": "npm run test:server && npm run test:client",
     "test:server": "npm run test --workspace=server",

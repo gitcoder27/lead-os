@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -37,6 +37,11 @@ import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskKeyChip } from './TaskKeyChip';
 import { TaskLabelChip, TaskLabelPicker } from './TaskLabelPicker';
 import { useTaskLabels } from '@/hooks/useTaskLabels';
+import {
+  useAttachOneOnOneAgendaItemToSeries,
+  useOneOnOneEnabled,
+  useOneOnOneSeriesList,
+} from '@/hooks/useOneOnOne';
 import { parseCapture, resolveCapture } from 'shared/capture-grammar';
 import { TaskTimeline } from './TaskTimeline';
 import { TaskUpdateComposer } from './TaskUpdateComposer';
@@ -362,6 +367,7 @@ function TaskDetailHeader({
           )}
         </div>
         <div className="flex items-center gap-0.5">
+          {mode === 'manager' && !task.deletedAt && <OneOnOneAttachButton task={task} />}
           {onOpenFullPage && (
             <button
               type="button"
@@ -1066,4 +1072,117 @@ function formatSafe(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/**
+ * docs/48 §4.3: "Add to 1:1 agenda" — manager-only, flag-gated series picker.
+ * The task owner's series (if any) is listed first.
+ */
+function OneOnOneAttachButton({ task }: { task: TaskDetailResponse }) {
+  // Flag-off renders nothing — the inner component owns the query hooks so a
+  // disabled feature never mounts React Query calls.
+  const enabled = useOneOnOneEnabled();
+  if (!enabled) return null;
+  return <OneOnOneAttachMenu task={task} />;
+}
+
+function OneOnOneAttachMenu({ task }: { task: TaskDetailResponse }) {
+  const { addToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const list = useOneOnOneSeriesList(open);
+  const attach = useAttachOneOnOneAgendaItemToSeries();
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  const ownerId = task.ownerType === 'developer' ? task.ownerId : null;
+  const series = (list.data?.series ?? []).slice().sort((a, b) => {
+    if (a.developerAccountId === ownerId) return -1;
+    if (b.developerAccountId === ownerId) return 1;
+    return a.developerName.localeCompare(b.developerName);
+  });
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex h-7 w-7 items-center justify-center rounded-lg transition-opacity hover:opacity-70"
+        style={{ color: 'var(--text-secondary)' }}
+        title="Add to 1:1 agenda"
+        aria-label="Add to 1:1 agenda"
+        aria-expanded={open}
+      >
+        <CalendarDays size={13} />
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-8 z-30 w-56 rounded-xl border p-1 shadow-xl"
+          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border)' }}
+          role="menu"
+          aria-label="1:1 series"
+        >
+          <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+            Add to 1:1 agenda
+          </div>
+          {list.isLoading ? (
+            <div className="px-2 py-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+          ) : series.length === 0 ? (
+            <div className="px-2 py-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              No 1:1 series yet — start one from the developer's drawer.
+            </div>
+          ) : (
+            series.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                disabled={attach.isPending}
+                onClick={() =>
+                  attach.mutate(
+                    { seriesId: entry.id, taskKey: task.taskKey },
+                    {
+                      onSuccess: () => {
+                        setOpen(false);
+                        addToast(`Added to ${entry.developerName}'s 1:1 agenda`, 'success');
+                      },
+                      onError: (error) =>
+                        addToast(error instanceof Error ? error.message : 'Could not add to the 1:1 agenda', 'error'),
+                    },
+                  )
+                }
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                role="menuitem"
+              >
+                <span className="truncate" style={{ color: 'var(--text-primary)' }}>
+                  {entry.developerName}
+                </span>
+                {entry.developerAccountId === ownerId && (
+                  <span className="ml-auto shrink-0 text-[10px]" style={{ color: 'var(--accent)' }}>
+                    owner
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

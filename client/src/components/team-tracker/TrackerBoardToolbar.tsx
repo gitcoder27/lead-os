@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
+import { CalendarDays, Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { TeamTrackerBoardSort, TeamTrackerBoardGroupBy, TeamTrackerSavedView } from '@/types';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import type { SavedViewsMenuProps } from './SavedViewsMenu';
@@ -15,6 +15,8 @@ interface TrackerBoardToolbarProps extends SavedViewsMenuProps<TeamTrackerSavedV
   totalCount: number;
   /** Phase 3 (P3-D5): present only when standup mode is available. */
   onStartStandup?: () => void;
+  /** docs/48 (OO-D7): present only when `one_on_one_enabled` is on. */
+  onOpenOneOnOnes?: () => void;
 }
 
 const sortOptions: Array<{ value: TeamTrackerBoardSort; label: string }> = [
@@ -41,6 +43,7 @@ export function TrackerBoardToolbar({
   visibleCount,
   totalCount,
   onStartStandup,
+  onOpenOneOnOnes,
   ...savedViewProps
 }: TrackerBoardToolbarProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -90,6 +93,24 @@ export function TrackerBoardToolbar({
           >
             {visibleCount}/{totalCount}
           </span>
+        )}
+
+        {onOpenOneOnOnes && (
+          <button
+            type="button"
+            onClick={onOpenOneOnOnes}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+            }}
+            aria-label="Open 1:1s"
+            title="1:1s"
+          >
+            <CalendarDays size={12} />
+            1:1s
+          </button>
         )}
 
         {onStartStandup && (

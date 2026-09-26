@@ -545,6 +545,43 @@ END;
 
 INSERT INTO daily_notes_fts(rowid, date, body)
 SELECT id, date, body FROM daily_notes WHERE id NOT IN (SELECT rowid FROM daily_notes_fts);
+
+-- One-on-One workspace (docs/48 §2): additive tables, gated by
+-- the one_on_one_enabled flag at the route layer.
+CREATE TABLE IF NOT EXISTS one_on_one_series (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id          TEXT NOT NULL DEFAULT 'default',
+  developer_account_id  TEXT NOT NULL,
+  cadence               TEXT NOT NULL,
+  preferred_weekday     INTEGER,
+  active                INTEGER NOT NULL DEFAULT 1,
+  created_at            TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_on_one_series_unique ON one_on_one_series(workspace_id, developer_account_id);
+
+CREATE TABLE IF NOT EXISTS one_on_one_sessions (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id   TEXT NOT NULL DEFAULT 'default',
+  series_id      INTEGER NOT NULL REFERENCES one_on_one_series(id) ON DELETE CASCADE,
+  scheduled_for  TEXT NOT NULL,
+  status         TEXT NOT NULL,
+  notes          TEXT NOT NULL DEFAULT '',
+  started_at     TEXT,
+  completed_at   TEXT,
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_one_on_one_sessions_series ON one_on_one_sessions(workspace_id, series_id, scheduled_for);
+
+CREATE TABLE IF NOT EXISTS one_on_one_agenda_items (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL DEFAULT 'default',
+  series_id    INTEGER NOT NULL REFERENCES one_on_one_series(id) ON DELETE CASCADE,
+  task_id      INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  position     INTEGER NOT NULL,
+  added_at     TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_on_one_agenda_unique ON one_on_one_agenda_items(workspace_id, series_id, task_id);
+CREATE INDEX IF NOT EXISTS idx_one_on_one_agenda_series ON one_on_one_agenda_items(workspace_id, series_id, position);
 `;
 
 // Phase 2d: these tables are renamed to legacy_* archives by the contract

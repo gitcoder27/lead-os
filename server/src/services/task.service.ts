@@ -235,7 +235,7 @@ export class TaskService {
     }
   }
 
-  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" } = {}): Promise<TaskRow> {
+  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one" } = {}): Promise<TaskRow> {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);

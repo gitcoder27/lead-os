@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Bell,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
   MessageSquare,
   Rows3,
@@ -25,6 +26,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   manual_work: Target,
   sync_attention: AlertTriangle,
   jira_drift: AlertTriangle,
+  one_on_one: CalendarDays,
   calm: CheckCircle2,
 };
 

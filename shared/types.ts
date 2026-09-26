@@ -222,6 +222,7 @@ export type TodayActionItemType =
   | "desk_carry_forward"
   | "manual_work"
   | "jira_drift"
+  | "one_on_one"
   | "sync_attention"
   | "calm";
 
@@ -259,6 +260,8 @@ export interface TodayActionTarget {
   taskKey?: string;
   date?: string;
   filter?: FilterType;
+  /** Team-page panel to open when view === "team" (e.g. "one-on-one"). */
+  panel?: string;
 }
 
 export interface TodayActionCommand {
@@ -343,7 +346,7 @@ export interface TodayMeetingPrompt {
   secondaryActions: TodayActionCommand[];
 }
 
-export type TodaySourceName = "issues" | "team" | "desk" | "sync" | "drift";
+export type TodaySourceName = "issues" | "team" | "desk" | "sync" | "drift" | "one_on_one";
 export type TodaySourceStatus = Record<TodaySourceName, "ready" | "unavailable">;
 
 export interface TodayResponse {
@@ -521,6 +524,9 @@ export interface AuthUser {
 export interface SessionFeatures {
   /** Phase 3 workspace flag (P3 §0): one flag drives every Phase 3 surface. */
   tasksPhase3: boolean;
+  /** 48 §0: `one_on_one_enabled`. Only ever true for manager principals —
+   *  developer sessions omit the field entirely (OO-D6). */
+  oneOnOne?: boolean;
 }
 
 export interface AuthSessionResponse {
@@ -930,6 +936,12 @@ export interface TrackerDeveloperDay {
    *  the surface. The legacy item arrays are emptied at the transport
    *  boundary; consumers should read `tasks`. */
   tasks?: SurfaceTask[];
+  /**
+   * 48 §4.4: present when `one_on_one_enabled` and the developer's series has a
+   *  scheduled session due today or overdue. Read-only signal — never written
+   *  from the board.
+   */
+  oneOnOne?: OneOnOneBoardSignal;
   checkIns: TrackerCheckIn[];
   recentCheckIns: TrackerCheckIn[];
   isStale: boolean;
@@ -1575,6 +1587,167 @@ export interface DailyNoteSource {
 export interface DailyNoteSourcesResponse {
   sources: DailyNoteSource[];
 }
+
+// ── One-on-One workspace (docs/48) ────────────────────
+
+export type OneOnOneCadence = "weekly" | "biweekly" | "monthly" | "ad_hoc";
+export type OneOnOneSessionStatus = "scheduled" | "done" | "skipped";
+
+/** Minimal canonical-task projection embedded in agenda items (48 §3). */
+export interface OneOnOneAgendaTask {
+  taskId: number;
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  ownerType: TaskOwnerType | null;
+  ownerId: string | null;
+  /** Tombstone marker — deleted tasks never render in the open agenda. */
+  deletedAt: string | null;
+}
+
+export interface OneOnOneAgendaItem {
+  id: number;
+  seriesId: number;
+  taskId: number;
+  position: number;
+  addedAt: string;
+  /**
+   * `scheduledFor` of the most recent closed (done/skipped) session that ended
+   * while this item was on the agenda — the "carried from <date>" marker.
+   * Null for items attached after the last session closed.
+   */
+  carriedFrom: string | null;
+  task: OneOnOneAgendaTask;
+}
+
+export interface OneOnOneSession {
+  id: number;
+  seriesId: number;
+  /** ISO date (YYYY-MM-DD). */
+  scheduledFor: string;
+  status: OneOnOneSessionStatus;
+  /** Manager-private markdown notes — autosaved via PATCH. */
+  notes: string;
+  /** Set by the Start button; a `scheduled` session with `startedAt` is live. */
+  startedAt: string | null;
+  /** Close timestamp for both `done` and `skipped` sessions. */
+  completedAt: string | null;
+  createdAt: string;
+  /**
+   * Approximate agenda snapshot: link rows attached when the session closed
+   * (closed tasks still count; detached links are gone). For the live session
+   * it is the current open-agenda count.
+   */
+  agendaCount: number;
+}
+
+export interface OneOnOneSeriesSummary {
+  id: number;
+  developerAccountId: string;
+  developerName: string;
+  cadence: OneOnOneCadence;
+  preferredWeekday: number | null;
+  active: boolean;
+  /** `scheduledFor` of the current scheduled session, if any. */
+  nextSessionDate: string | null;
+  /** Days past `nextSessionDate` relative to the board date (0 when not overdue). */
+  nextSessionOverdueDays: number | null;
+  openAgendaCount: number;
+  createdAt: string;
+}
+
+export interface OneOnOneSeriesListResponse {
+  series: OneOnOneSeriesSummary[];
+}
+
+export interface OneOnOneSeriesDetail {
+  series: OneOnOneSeriesSummary;
+  /** The live `scheduled` session — lazily created when cadence applies. */
+  upcoming: OneOnOneSession | null;
+  /** All sessions, newest `scheduledFor` first. */
+  sessions: OneOnOneSession[];
+  /** Ordered agenda links, including links to closed tasks (48 §5). */
+  agenda: OneOnOneAgendaItem[];
+}
+
+/** Manager-only board/Today signal: a scheduled session due today or overdue. */
+export interface OneOnOneDueSignal {
+  seriesId: number;
+  sessionId: number;
+  developerAccountId: string;
+  developerName: string;
+  scheduledFor: string;
+  overdueDays: number;
+}
+
+/** 48 §4.4: the per-developer subset attached to `TrackerDeveloperDay`. */
+export interface OneOnOneBoardSignal {
+  seriesId: number;
+  scheduledFor: string;
+  overdueDays: number;
+}
+
+const oneOnOneIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const oneOnOneCadenceSchema = z.enum(["weekly", "biweekly", "monthly", "ad_hoc"]);
+
+export const oneOnOneSeriesCreateSchema = z.object({
+  developerAccountId: z.string().trim().min(1).max(200),
+  cadence: oneOnOneCadenceSchema,
+  preferredWeekday: z.number().int().min(0).max(6).nullable().optional(),
+}).strict();
+
+export const oneOnOneSeriesUpdateSchema = z.object({
+  cadence: oneOnOneCadenceSchema.optional(),
+  preferredWeekday: z.number().int().min(0).max(6).nullable().optional(),
+  active: z.boolean().optional(),
+}).strict();
+
+export const oneOnOneSessionCreateSchema = z.object({
+  scheduledFor: oneOnOneIsoDate.optional(),
+}).strict();
+
+export const oneOnOneSessionUpdateSchema = z.object({
+  status: z.enum(["scheduled", "done", "skipped"]).optional(),
+  notes: z.string().max(20000).optional(),
+  scheduledFor: oneOnOneIsoDate.optional(),
+  /** Start marks a scheduled session live (`startedAt`). */
+  started: z.boolean().optional(),
+  /**
+   * 48 §4.2: when completing (`status: "done"`), `false` detaches the still-open
+   *  agenda items instead of carrying them to the next session. Default: keep
+   *  open — they auto-carry.
+   */
+  reopenCarried: z.boolean().optional(),
+}).strict();
+
+export const oneOnOneAgendaAttachSchema = z.object({
+  /** Attach an existing canonical task by id or key. */
+  taskId: z.number().int().positive().optional(),
+  taskKey: z.string().trim().min(1).max(32).optional(),
+  /** Freeform capture — creates a canonical task and attaches it (48 §4.2). */
+  title: z.string().trim().min(1).max(500).optional(),
+}).strict();
+
+export const oneOnOneAgendaReorderSchema = z.object({
+  itemIds: z.array(z.number().int().positive()).min(1).max(1000),
+}).strict();
+
+export const oneOnOneSessionActionSchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  /** Defaults to the series developer (48 §4.2, OO-D8). */
+  ownerType: z.enum(["manager", "developer"]).optional(),
+  ownerId: z.string().trim().min(1).max(200).optional(),
+  scheduledOn: oneOnOneIsoDate.nullable().optional(),
+}).strict();
+
+export type OneOnOneSeriesCreateRequest = z.infer<typeof oneOnOneSeriesCreateSchema>;
+export type OneOnOneSeriesUpdateRequest = z.infer<typeof oneOnOneSeriesUpdateSchema>;
+export type OneOnOneSessionCreateRequest = z.infer<typeof oneOnOneSessionCreateSchema>;
+export type OneOnOneSessionUpdateRequest = z.infer<typeof oneOnOneSessionUpdateSchema>;
+export type OneOnOneAgendaAttachRequest = z.infer<typeof oneOnOneAgendaAttachSchema>;
+export type OneOnOneAgendaReorderRequest = z.infer<typeof oneOnOneAgendaReorderSchema>;
+export type OneOnOneSessionActionRequest = z.infer<typeof oneOnOneSessionActionSchema>;
 
 // ── Navigation preferences ────────────────────────────
 

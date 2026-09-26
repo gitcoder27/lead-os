@@ -6,6 +6,7 @@ import {
   Ban,
   BellRing,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
   Clock3,
   ExternalLink,
@@ -60,6 +61,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   manual_work: Target,
   sync_attention: AlertTriangle,
   jira_drift: AlertTriangle,
+  one_on_one: CalendarDays,
   calm: CheckCircle2,
 };
 

@@ -19,6 +19,7 @@ import { createManagerDeskRouter } from "./routes/manager-desk";
 import { createManagerActionsRouter } from "./routes/manager-actions";
 import { createTodayRouter } from "./routes/today";
 import { createSearchRouter } from "./routes/search";
+import { createOneOnOnesRouter } from "./routes/one-on-ones";
 import { createTasksRouter } from "./routes/tasks";
 import { createTaskLabelsRouter } from "./routes/task-labels";
 import { createNotesRouter } from "./routes/notes";
@@ -47,6 +48,7 @@ import { createCaptureRouter } from "./routes/capture";
 import { createTaskViewsRouter } from "./routes/task-views";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
 import { TagService } from "./services/tag.service";
+import { OneOnOneService } from "./services/one-on-one.service";
 import { TeamTrackerService } from "./services/team-tracker.service";
 import { TodayService } from "./services/today.service";
 import { SyncEngine } from "./sync/engine";
@@ -115,6 +117,7 @@ export interface AppServices {
   dailyNotesService?: DailyNotesService;
   navPreferencesService?: NavPreferencesService;
   assistantService?: AssistantService;
+  oneOnOneService?: OneOnOneService;
 }
 
 export function createApp(services: AppServices) {
@@ -171,6 +174,8 @@ export function createApp(services: AppServices) {
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
   app.use("/api/tasks", requireManager(services.authService), createTasksRouter(taskKeysService, taskEventsService));
+  // docs/48: 1:1 workspace API — manager-only mount, flag-gated to 404 inside.
+  app.use("/api/one-on-ones", requireManager(services.authService), createOneOnOnesRouter(services.oneOnOneService));
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
   app.use("/api/capture", requireManager(services.authService), createCaptureRouter(new CaptureService()));
   app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));

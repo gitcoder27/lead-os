@@ -151,17 +151,17 @@ describe("assistant tools", () => {
     }
   });
 
-  it("registers 39 canonical tools with confirmation for every task write", () => {
+  it("registers 42 canonical tools with confirmation for every task write", () => {
     const canonical = createAssistantTools(true);
-    expect(canonical).toHaveLength(39);
+    expect(canonical).toHaveLength(42);
     expect(canonical.some((tool) => tool.name === "carry_forward" || tool.name === "promote_tracker_item")).toBe(false);
-    for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task", "capture"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
+    for (const name of ["create_task", "update_task", "delete_task", "reassign_task", "reschedule_task", "link_task", "unlink_task", "capture", "one_on_one_add_agenda"]) expect(canonical.find((tool) => tool.name === name)?.confirm).toBe("always");
   });
 
   it("gates the capture tool on tasks_phase3_enabled (D11)", async () => {
     // Flag off → the tool is not even registered for the LLM.
     const gated = createAssistantTools(true, { phase3: false });
-    expect(gated).toHaveLength(38);
+    expect(gated).toHaveLength(41);
     expect(gated.some((tool) => tool.name === "capture")).toBe(false);
 
     // Defense in depth: a stale registration still 409s at execution while
@@ -173,6 +173,20 @@ describe("assistant tools", () => {
     ]);
     const capture = createAssistantTools(true).find((tool) => tool.name === "capture")!;
     await expect(capture.execute({ text: "anything" }, ctx())).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("gates the 1:1 tools on one_on_one_enabled (48 §7)", async () => {
+    // Flag off → the tools are not registered for the LLM.
+    const gated = createAssistantTools(true, { oneOnOne: false });
+    expect(gated).toHaveLength(39);
+    for (const name of ["one_on_one_list", "one_on_one_agenda", "one_on_one_add_agenda"]) {
+      expect(gated.some((tool) => tool.name === name)).toBe(false);
+    }
+
+    // Defense in depth: a stale registration still 409s at execution while
+    // the flag is off.
+    const list = createAssistantTools(true).find((tool) => tool.name === "one_on_one_list")!;
+    await expect(list.execute({}, ctx())).rejects.toMatchObject({ status: 409 });
   });
 
   it("get_today_snapshot returns a compact projection", async () => {

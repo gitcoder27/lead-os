@@ -20,6 +20,7 @@ import type { WorkloadService } from "../services/workload.service";
 import type { SyncEngine } from "../sync/engine";
 import type { LlmToolDefinition } from "./llm-client";
 import { canonicalTaskTools } from "./task-tools";
+import { oneOnOneTools } from "./one-on-one-tools";
 import { TaskService } from "../services/task.service";
 
 export type AssistantSyncEngine = Pick<
@@ -175,7 +176,7 @@ function dateProperty(description: string): Record<string, unknown> {
   return { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description };
 }
 
-export function createAssistantTools(canonical = false, { phase3 = true }: { phase3?: boolean } = {}): AssistantToolDefinition[] {
+export function createAssistantTools(canonical = false, { phase3 = true, oneOnOne = true }: { phase3?: boolean; oneOnOne?: boolean } = {}): AssistantToolDefinition[] {
   const taskKeys = new TaskKeysService();
   const eventsService = new TaskEventsService(taskKeys);
   const readTools: AssistantToolDefinition[] = [
@@ -1922,7 +1923,8 @@ export function createAssistantTools(canonical = false, { phase3 = true }: { pha
   const legacy = [...readTools, ...writeTools];
   if (!canonical) return legacy;
   const retired = new Set(["list_desk_items", "get_desk_item_detail", "get_tracker_item_detail", "preview_carry_forward", "create_desk_item", "assign_tracker_task", "update_desk_item", "update_tracker_item", "delete_desk_item", "delete_tracker_item", "link_desk_item", "unlink_desk_item", "promote_tracker_item", "cancel_delegated_task", "carry_forward"]);
-  return [...legacy.filter((tool) => !retired.has(tool.name)), ...canonicalTaskTools({ phase3 })];
+  // docs/48 §4.5: flag-scoped 1:1 tools ride the canonical tool set.
+  return [...legacy.filter((tool) => !retired.has(tool.name)), ...canonicalTaskTools({ phase3 }), ...(oneOnOne ? oneOnOneTools() : [])];
 }
 
 export function toLlmToolDefinitions(tools: AssistantToolDefinition[]): LlmToolDefinition[] {

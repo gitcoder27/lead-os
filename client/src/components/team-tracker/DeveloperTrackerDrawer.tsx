@@ -13,6 +13,8 @@ import { TaskPicker, taskKeysForSubmit, tasksFromItems } from '@/components/task
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { DrawerHeader, DrawerSection, HistorySection, StatusSummary } from './DeveloperDrawerSections';
 import { ManagerFollowUpRow } from './ManagerFollowUpsSection';
+import { useCreateOneOnOneSeries, useOneOnOneEnabled, useOneOnOneSeriesForDeveloper } from '@/hooks/useOneOnOne';
+import { useToast } from '@/context/ToastContext';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import {
   formatTrackerIssueContextNote,
@@ -36,6 +38,8 @@ interface DeveloperTrackerDrawerProps {
   onAddCheckIn: (params: { accountId: string; summary: string; status?: TrackerDeveloperStatus; taskKeys?: string[] }) => void;
   onMarkInactive?: (day: TrackerDeveloperDay) => void;
   onOpenManagerDesk?: () => void;
+  /** docs/48 §4.3: opens the 1:1 workspace panel for this developer. */
+  onOpenOneOnOne?: (accountId: string) => void;
   issues?: Issue[];
   isAddItemPending?: boolean;
   readOnly?: boolean;
@@ -137,6 +141,7 @@ export function DeveloperTrackerDrawer({
   onAddCheckIn,
   onMarkInactive,
   onOpenManagerDesk,
+  onOpenOneOnOne,
   issues,
   isAddItemPending,
   readOnly = false,
@@ -515,6 +520,8 @@ export function DeveloperTrackerDrawer({
                 )}
               </DrawerSection>
 
+              <OneOnOneSection accountId={day.developer.accountId} onOpenWorkspace={onOpenOneOnOne} />
+
               <HistorySection
                 title="Completed"
                 items={day.completedItems}
@@ -662,4 +669,90 @@ function getDeveloperManagerFollowUps(items: ManagerDeskItem[], developerAccount
 
       return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
     });
+}
+
+/** docs/48 §4.3: the drawer "1:1" section — next session, agenda count, and
+ * a link into the workspace. Hidden entirely while the flag is off. */
+function OneOnOneSection({
+  accountId,
+  onOpenWorkspace,
+}: {
+  accountId: string;
+  onOpenWorkspace?: (accountId: string) => void;
+}) {
+  // Flag-off renders nothing — the inner component owns the query hooks so a
+  // disabled feature never mounts React Query calls.
+  const enabled = useOneOnOneEnabled();
+  if (!enabled) return null;
+  return <OneOnOneSectionBody accountId={accountId} onOpenWorkspace={onOpenWorkspace} />;
+}
+
+function OneOnOneSectionBody({
+  accountId,
+  onOpenWorkspace,
+}: {
+  accountId: string;
+  onOpenWorkspace?: (accountId: string) => void;
+}) {
+  const { addToast } = useToast();
+  const { series, isLoading } = useOneOnOneSeriesForDeveloper(accountId);
+  const createSeries = useCreateOneOnOneSeries();
+
+  const overdue = (series?.nextSessionOverdueDays ?? 0) > 0;
+
+  return (
+    <DrawerSection title="1:1">
+      {isLoading ? (
+        <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          Loading…
+        </div>
+      ) : series ? (
+        <div className="flex items-center gap-2 text-[13px]">
+          <div className="min-w-0 flex-1">
+            <div style={{ color: 'var(--text-secondary)' }}>
+              {series.nextSessionDate ? `Next: ${series.nextSessionDate}` : 'No session scheduled'}
+              {overdue && (
+                <span className="ml-1.5 text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
+                  overdue {series.nextSessionOverdueDays}d
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {series.openAgendaCount} on agenda{series.active ? '' : ' · paused'}
+            </div>
+          </div>
+          {onOpenWorkspace && (
+            <button
+              type="button"
+              onClick={() => onOpenWorkspace(accountId)}
+              className="text-[12px] font-medium"
+              style={{ color: 'var(--accent)' }}
+              data-testid="one-on-one-open-workspace"
+            >
+              Open workspace
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() =>
+            createSeries.mutate(
+              { developerAccountId: accountId, cadence: 'weekly' },
+              {
+                onSuccess: () => onOpenWorkspace?.(accountId),
+                onError: (error) =>
+                  addToast(error instanceof Error ? error.message : 'Could not create the 1:1 series', 'error'),
+              },
+            )
+          }
+          disabled={createSeries.isPending}
+          className="rounded-lg px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
+          style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)' }}
+        >
+          {createSeries.isPending ? 'Starting…' : 'Start a 1:1 series'}
+        </button>
+      )}
+    </DrawerSection>
+  );
 }

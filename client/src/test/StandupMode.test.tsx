@@ -230,6 +230,20 @@ describe('StandupMode', () => {
     expect(screen.getByTestId('status-suggestion')).toBeInTheDocument();
   });
 
+  it('shows a read-only 1:1 badge when a session is due', () => {
+    const board = buildBoard();
+    board.developers[0]!.oneOnOne = { seriesId: 5, scheduledFor: '2026-03-07', overdueDays: 0 };
+    board.developers[1]!.oneOnOne = { seriesId: 6, scheduledFor: '2026-03-04', overdueDays: 3 };
+    render(
+      <TestWrapper>
+        <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
+      </TestWrapper>,
+    );
+    expect(screen.getByText('1:1 today')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'n' });
+    expect(screen.getByText('1:1 overdue 3d')).toBeInTheDocument();
+  });
+
   it.each([
     ['n', 1],
     ['ArrowRight', 1],

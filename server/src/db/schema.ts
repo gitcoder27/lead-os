@@ -567,3 +567,46 @@ export const userNavPreferences = sqliteTable("user_nav_preferences", {
 }, (table) => [
   primaryKey({ name: "pk_user_nav_preferences_workspace_manager", columns: [table.workspaceId, table.managerAccountId] }),
 ]);
+
+// ── One-on-One workspace (docs/48 §2): three new tables, additive only. ──
+
+export const oneOnOneSeries = sqliteTable("one_on_one_series", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  developerAccountId: text("developer_account_id").notNull(),
+  cadence: text("cadence").notNull(),
+  preferredWeekday: integer("preferred_weekday"),
+  active: integer("active").notNull().default(1),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_one_on_one_series_unique").on(table.workspaceId, table.developerAccountId),
+]);
+
+export const oneOnOneSessions = sqliteTable("one_on_one_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  seriesId: integer("series_id").notNull().references(() => oneOnOneSeries.id, { onDelete: "cascade" }),
+  scheduledFor: text("scheduled_for").notNull(),
+  status: text("status").notNull(),
+  notes: text("notes").notNull().default(""),
+  // Started flag for the workspace "Start" button; `scheduled` + startedAt
+  // means the session is live. Not in the spec's column list — additive on a
+  // new table (OO-D9 only freezes existing tables).
+  startedAt: text("started_at"),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_one_on_one_sessions_series").on(table.workspaceId, table.seriesId, table.scheduledFor),
+]);
+
+export const oneOnOneAgendaItems = sqliteTable("one_on_one_agenda_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  seriesId: integer("series_id").notNull().references(() => oneOnOneSeries.id, { onDelete: "cascade" }),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  addedAt: text("added_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_one_on_one_agenda_unique").on(table.workspaceId, table.seriesId, table.taskId),
+  index("idx_one_on_one_agenda_series").on(table.workspaceId, table.seriesId, table.position),
+]);

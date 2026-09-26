@@ -494,6 +494,21 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                     {day.developer.displayName}
                   </span>
                   <TrackerStatusPill status={day.status} />
+                  {/* docs/48 §4.4: read-only 1:1 badge — "1:1 today" / overdue. */}
+                  {day.oneOnOne && (
+                    <span
+                      className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                      style={{
+                        color: day.oneOnOne.overdueDays > 0 ? 'var(--danger)' : 'var(--accent)',
+                        background: day.oneOnOne.overdueDays > 0
+                          ? 'color-mix(in srgb, var(--danger) 12%, transparent)'
+                          : 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                      }}
+                      title={`1:1 scheduled ${day.oneOnOne.scheduledFor}`}
+                    >
+                      {day.oneOnOne.overdueDays > 0 ? `1:1 overdue ${day.oneOnOne.overdueDays}d` : '1:1 today'}
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <select

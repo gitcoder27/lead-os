@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import type {
   AppendDailyNotePayload,
   CreateDailyNoteFollowUpPayload,
+  DailyNote,
+  DailyNoteDayContext,
   DailyNoteFollowUp,
   DailyNoteResponse,
   DailyNoteSource,
@@ -16,18 +19,64 @@ import type {
 
 const LIST_PAGE_SIZE = 30;
 const SOURCE_BATCH_SIZE = 100;
+const DAY_REFETCH_INTERVAL_MS = 60_000;
+const CONTEXT_STALE_TIME_MS = 30_000;
 
 function useIsManager(): boolean {
   const { user } = useAuth();
   return user?.role === 'manager';
 }
 
+/** Full invalidation — for explicit user writes that came from outside the editor. */
 export function invalidateDailyNotesViews(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['daily-notes'] });
   qc.invalidateQueries({ queryKey: ['global-search'] });
 }
 
-export function useDailyNote(date: string) {
+/**
+ * Sidebar list, search, day-context, and source rows — everything under
+ * ['daily-notes'] except open day documents. Used on auto-save commit
+ * boundaries (blur / date switch) so a routine PUT doesn't refetch the day
+ * document the editor is currently editing (docs/52 P1).
+ */
+export function invalidateDailyNoteListViews(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'daily-notes' && query.queryKey[2] !== 'day',
+  });
+  qc.invalidateQueries({ queryKey: ['global-search'] });
+}
+
+/** Patch (or remove, when `note` is null) a saved note inside every cached list page. */
+export function patchDailyNoteInLists(
+  qc: ReturnType<typeof useQueryClient>,
+  scope: string,
+  date: string,
+  note: DailyNote | null,
+) {
+  const matches = qc.getQueriesData<InfiniteData<DailyNotesResponse>>({
+    queryKey: ['daily-notes', scope, 'list'],
+  });
+  for (const [queryKey, data] of matches) {
+    if (!data) {
+      continue;
+    }
+    qc.setQueryData<InfiniteData<DailyNotesResponse>>(queryKey, {
+      ...data,
+      pages: data.pages.map((page) => ({
+        ...page,
+        notes: page.notes.flatMap((row) =>
+          row.date === date
+            ? note
+              ? [{ ...row, title: note.title, excerpt: note.excerpt, updatedAt: note.updatedAt }]
+              : []
+            : [row],
+        ),
+      })),
+    });
+  }
+}
+
+export function useDailyNote(date: string, options?: { pollPaused?: boolean }) {
   const authScopeKey = useAuthScopeKey();
   const isManager = useIsManager();
 
@@ -37,7 +86,20 @@ export function useDailyNote(date: string) {
     enabled: isManager,
     staleTime: 0,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: options?.pollPaused ? false : DAY_REFETCH_INTERVAL_MS,
+  });
+}
+
+/** Day-context strip for the notes header (docs/52 §5); cheap + cache-friendly. */
+export function useDailyNoteContext(date: string) {
+  const authScopeKey = useAuthScopeKey();
+  const isManager = useIsManager();
+
+  return useQuery<DailyNoteDayContext>({
+    queryKey: ['daily-notes', authScopeKey, 'context', date],
+    queryFn: () => api.get<DailyNoteDayContext>(`/notes/${encodeURIComponent(date)}/context`),
+    enabled: isManager,
+    staleTime: CONTEXT_STALE_TIME_MS,
   });
 }
 
@@ -106,7 +168,7 @@ export function useAppendDailyNote() {
         return;
       }
       qc.setQueryData(['daily-notes', authScopeKey, 'day', variables.date], data);
-      invalidateDailyNotesViews(qc);
+      invalidateDailyNoteListViews(qc);
     },
   });
 }

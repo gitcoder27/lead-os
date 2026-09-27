@@ -1676,6 +1676,8 @@ export interface DailyNoteSummary {
   title: string;
   excerpt: string;
   updatedAt: string;
+  /** FTS5 snippet() output with ⟦…⟧ match markers; present only on FTS hits. */
+  snippet?: string;
 }
 
 export interface DailyNote extends DailyNoteSummary {
@@ -1692,9 +1694,31 @@ export interface DailyNoteFollowUp {
   followUpAt?: string;
 }
 
+export type DailyNoteRefRelation = "created_from" | "update_from" | "mentioned";
+
+/** A task/Desk item this note produced, updated, or referenced (docs/52 F9). */
+export interface DailyNoteRef {
+  taskKey?: string;
+  itemId?: number;
+  relation: DailyNoteRefRelation;
+  title: string;
+  status: ManagerDeskStatus;
+  owner?: string;
+  due?: string;
+}
+
 export interface DailyNoteResponse {
   note: DailyNote | null;
   followUps: DailyNoteFollowUp[];
+  refs: DailyNoteRef[];
+}
+
+/** docs/52 §5: day-context strip data for GET /api/notes/:date/context. */
+export interface DailyNoteDayContext {
+  standup: { endedAt: string; reviewed: number; flagged: number } | null;
+  carriedFrom: number;
+  followUpsDue: number;
+  oneOnOnes: number;
 }
 
 export interface DailyNotesResponse {

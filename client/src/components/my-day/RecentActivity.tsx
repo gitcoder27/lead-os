@@ -1,85 +1,111 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { format } from 'date-fns';
 import type { TrackerCheckIn } from '@/types';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatAbsoluteDateTime } from '@/lib/utils';
+import { getStatusInfo } from './status-config';
+import { HAIRLINE } from './MyDayUI';
 
 interface RecentActivityProps {
   checkIns: TrackerCheckIn[];
+  isToday?: boolean;
 }
 
-export function RecentActivity({ checkIns }: RecentActivityProps) {
+/**
+ * The day's check-in log — what you told your lead, and anything your lead
+ * wrote back. A thin rail with time on the left keeps it scannable.
+ */
+export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps) {
   if (checkIns.length === 0) {
     return (
-      <div className="flex items-center justify-center p-6 rounded-2xl border border-dashed border-[var(--border)]">
-        <p className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
-          No recent activity
+      <div className="px-4 py-5">
+        <p className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {isToday ? 'Nothing logged yet' : 'No check-ins this day'}
         </p>
+        {isToday && (
+          <p className="mt-1 text-[12.5px] leading-[18px]" style={{ color: 'var(--text-muted)' }}>
+            Updates you send show up here — and on your lead’s team board.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-0 pl-2">
+    <ol className="relative px-4 py-3" aria-label="Check-ins">
       <AnimatePresence initial={false}>
-        {checkIns.map((ci, idx) => (
-          <motion.div
-            key={ci.id}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            className="flex gap-4 py-3 relative"
-          >
-            {/* Timeline connector */}
-            <div className="flex flex-col items-center shrink-0 pt-1.5">
-              <div
-                className="w-2.5 h-2.5 rounded-full shrink-0 z-10"
-                style={{
-                  background: idx === 0 ? 'var(--accent)' : 'var(--bg-tertiary)',
-                  border: `2px solid ${idx === 0 ? 'var(--bg-canvas)' : 'var(--border)'}`,
-                  boxShadow: idx === 0 ? '0 0 12px var(--accent-glow)' : 'none',
-                }}
-              />
-              {idx < checkIns.length - 1 && (
-                <div
-                  className="w-[2px] flex-1 mt-2 rounded-full"
-                  style={{ background: 'var(--border)' }}
-                />
-              )}
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0 bg-[var(--bg-primary)] p-3 rounded-2xl border border-[var(--border)] shadow-sm">
-              <p
-                className="text-[13px] leading-relaxed font-medium"
-                style={{ color: 'var(--text-primary)' }}
+        {checkIns.map((ci, idx) => {
+          const fromLead = ci.authorType === 'manager';
+          const status = ci.status ? getStatusInfo(ci.status) : null;
+          const isLast = idx === checkIns.length - 1;
+          return (
+            <motion.li
+              key={ci.id}
+              layout="position"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="relative grid grid-cols-[58px_12px_minmax(0,1fr)] gap-x-2"
+            >
+              <time
+                dateTime={ci.createdAt}
+                title={formatAbsoluteDateTime(ci.createdAt)}
+                className="pt-[1px] text-right text-[11.5px] tabular-nums leading-5"
+                style={{ color: 'var(--text-muted)' }}
               >
-                {ci.summary}
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <Clock size={10} style={{ color: 'var(--text-muted)' }} />
-                <span className="text-[12px] tracking-wide font-medium" style={{ color: 'var(--text-muted)' }}>
-                  {formatRelativeTime(ci.createdAt)}
-                </span>
-                {ci.authorType && (
-                  <span
-                    className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-md"
-                    style={{
-                      color: ci.authorType === 'manager' ? 'var(--warning)' : 'var(--accent)',
-                      background:
-                        ci.authorType === 'manager'
-                          ? 'rgba(245, 158, 11, 0.1)'
-                          : 'rgba(6, 182, 212, 0.1)',
-                      letterSpacing: '0.05em',
-                    }}
-                  >
-                    {ci.authorType}
-                  </span>
+                {format(new Date(ci.createdAt), 'h:mm a')}
+              </time>
+
+              <span className="relative flex justify-center" aria-hidden="true">
+                <span
+                  className="relative z-[1] mt-[7px] h-[7px] w-[7px] rounded-full"
+                  style={{
+                    background: fromLead ? 'var(--md-accent)' : idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
+                    boxShadow: idx === 0 ? `0 0 0 3px color-mix(in srgb, ${fromLead ? 'var(--md-accent)' : 'var(--accent)'} 18%, transparent)` : undefined,
+                  }}
+                />
+                {!isLast && <span className="absolute bottom-0 top-[18px] w-px" style={{ background: HAIRLINE }} />}
+              </span>
+
+              <div className={`min-w-0 ${isLast ? '' : 'pb-4'}`}>
+                {(fromLead || status) && (
+                  <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] font-medium leading-5">
+                    {fromLead && <span style={{ color: 'var(--md-accent)' }}>From your lead</span>}
+                    {status && (
+                      <span className="inline-flex items-center gap-1" style={{ color: status.color }}>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} aria-hidden="true" />
+                        {status.label}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <p
+                  className={`whitespace-pre-line break-words text-[13px] leading-5 ${fromLead ? 'rounded-lg px-2.5 py-1.5' : ''}`}
+                  style={{
+                    color: 'var(--text-primary)',
+                    background: fromLead ? 'var(--md-accent-dim)' : undefined,
+                    border: fromLead ? '1px solid color-mix(in srgb, var(--md-accent) 20%, transparent)' : undefined,
+                  }}
+                >
+                  {ci.summary}
+                </p>
+                {(ci.taskKeys ?? []).length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {(ci.taskKeys ?? []).map((key) => (
+                      <span
+                        key={key}
+                        className="rounded-md px-1.5 py-[1px] font-mono text-[10.5px] font-bold"
+                        style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)', border: `1px solid ${HAIRLINE}` }}
+                      >
+                        {key}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.li>
+          );
+        })}
       </AnimatePresence>
-    </div>
+    </ol>
   );
 }

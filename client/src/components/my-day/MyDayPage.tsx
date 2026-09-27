@@ -1,27 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { XCircle, LogOut } from 'lucide-react';
-import { format } from 'date-fns';
+import { MotionConfig, motion } from 'framer-motion';
+import { CheckCircle2, ListTodo, LogOut, Radio, ScrollText, Target, XCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
 import { useMyDay } from '@/hooks/useMyDay';
 import { useTaskResolution } from '@/hooks/useTasks';
+import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
+import { tasksFromItems } from '@/components/tasks/TaskPicker';
+import { formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
+import type { MyDayReadOnlyReason, MyDayResponse } from '@/types';
 import { useMyDayHandlers } from './useMyDayHandlers';
+import { useMyDayShortcuts } from './useMyDayShortcuts';
+import { MyDayHeader } from './MyDayHeader';
+import { MyDayInactiveBanner, MyDayReadOnlyBanner } from './MyDayInactiveBanner';
+import { StatusSelector } from './StatusSelector';
+import { QuickUpdates } from './QuickUpdates';
+import { CurrentTask } from './CurrentTask';
+import { PlannedQueue } from './PlannedQueue';
+import { AddTaskForm } from './AddTaskForm';
+import { FinishedWork } from './FinishedWork';
+import { RecentActivity } from './RecentActivity';
+import { HAIRLINE, Kbd, MyDaySection, pageVariants, sectionVariants, surfaceStyle } from './MyDayUI';
 
-import { MyDayLeftColumn } from './MyDayLeftColumn';
-import { MyDayRightColumn } from './MyDayRightColumn';
+function readOnlyReasonFor(day: MyDayResponse | undefined): MyDayReadOnlyReason | undefined {
+  if (!day) return undefined;
+  if (day.readOnlyReason) return day.readOnlyReason;
+  if (day.viewMode === 'history') return 'history';
+  if (day.viewMode === 'planning') return 'future';
+  return undefined;
+}
 
+/**
+ * The developer's side of the dev ↔ lead link. Reads top to bottom as the
+ * day itself: how it's going, what you're on, what's next, what's done —
+ * with the running log beside it. Everything here lands on the lead's board.
+ */
 export function MyDayPage() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { addToast } = useToast();
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [date, setDate] = useState(() => getLocalIsoDate());
   const [deepLinkTaskKey] = useState(() => taskKeyFromParams(new URLSearchParams(window.location.search)));
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  // Background polling refetches every 30s; only a manual refresh spins the icon.
+  const [refreshing, setRefreshing] = useState(false);
+  const quickUpdateRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const { data: day, isLoading, isFetching, error, refetch } = useMyDay(date);
+  const { data: day, isLoading, error, refetch } = useMyDay(date);
   const isReadOnly = Boolean(
     day && (day.viewMode !== 'live' || day.readOnlyReason || day.isReadOnly)
   );
@@ -30,6 +58,7 @@ export function MyDayPage() {
     handleStatusUpdate,
     handleMarkDone,
     handleDrop,
+    handleReopen,
     handleSetCurrent,
     handleReorder,
     handleUpdateItemTitle,
@@ -38,7 +67,18 @@ export function MyDayPage() {
     updateStatusPending,
     addItemPending,
     addCheckInPending,
-  } = useMyDayHandlers(date, isReadOnly);
+  } = useMyDayHandlers(date, isReadOnly, day);
+
+  const goToday = () => setDate(getLocalIsoDate());
+  useMyDayShortcuts({
+    onFocusUpdate: isReadOnly ? undefined : () => quickUpdateRef.current?.focus(),
+    onAddTask: isReadOnly ? undefined : () => setAddTaskOpen(true),
+    onPrevDay: () => setDate((d) => shiftLocalIsoDate(d, -1)),
+    onNextDay: () => setDate((d) => shiftLocalIsoDate(d, 1)),
+    onToday: goToday,
+  });
+
+  useEffect(() => setAddTaskOpen(false), [date]);
 
   // /my-day?task=T-n deep link: resolve ownership, move to the task's date,
   // then scroll to and highlight its row. Unknown/non-owned keys 404.
@@ -84,46 +124,51 @@ export function MyDayPage() {
   }, [taskResolution.data, taskResolution.isError, day, date, addToast]);
 
   const handleRefresh = async () => {
+    setRefreshing(true);
     try {
       await refetch();
-      addToast('My Day refreshed', 'success');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Refresh failed', 'error');
+    } finally {
+      setRefreshing(false);
     }
   };
 
   if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg-canvas)' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-          <span className="text-[14px] font-medium tracking-wide shadow-sm" style={{ color: 'var(--text-secondary)' }}>
-            Loading your day…
-          </span>
-        </div>
-      </div>
-    );
+    return <MyDaySkeleton />;
   }
 
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center p-4" style={{ background: 'var(--bg-canvas)' }}>
-        <div className="text-center max-w-sm bg-[var(--bg-primary)] p-8 rounded-3xl border border-[var(--border)] shadow-sm">
-          <div className="h-14 w-14 rounded-2xl flex items-center justify-center mx-auto mb-5 bg-[rgba(239,68,68,0.12)] text-[var(--danger)]">
-            <XCircle size={26} />
+      <div className="flex h-full items-center justify-center p-4" style={{ background: 'var(--bg-canvas)' }}>
+        <div className="w-full max-w-sm rounded-2xl p-7 text-center" style={{ ...surfaceStyle, boxShadow: 'var(--panel-shadow)' }}>
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--danger)' }}>
+            <XCircle size={22} />
           </div>
-          <h2 className="text-[18px] font-bold mb-2 text-[var(--text-primary)] tracking-tight">Failed to load</h2>
-          <p className="text-[13px] mb-6 text-[var(--text-secondary)]">{error.message}</p>
-          <div className="flex flex-col gap-3">
-            <button onClick={() => refetch()} className="rounded-xl px-4 py-2.5 text-[13px] font-bold bg-[var(--accent-glow)] text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)]">
-              Retry
+          <h2 className="mb-1.5 text-[16px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>Couldn’t load your day</h2>
+          <p className="mb-6 text-[13px]" style={{ color: 'var(--text-secondary)' }}>{error.message}</p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => refetch()}
+              className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
+              style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+            >
+              Try again
             </button>
-            <div className="flex gap-3">
-              <button onClick={() => { window.history.pushState(null, '', '/'); window.location.reload(); }} className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-bold bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border)]">
+            <div className="flex gap-2">
+              <button
+                onClick={() => { window.history.pushState(null, '', '/'); window.location.reload(); }}
+                className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-medium"
+                style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              >
                 Today
               </button>
-              <button onClick={async () => { await logout(); window.location.reload(); }} className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-bold flex justify-center items-center gap-1.5 bg-[rgba(239,68,68,0.08)] text-[var(--danger)] border border-[rgba(239,68,68,0.2)]">
-                <LogOut size={14} /> Logout
+              <button
+                onClick={async () => { await logout(); window.location.reload(); }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-medium"
+                style={{ color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.24)' }}
+              >
+                <LogOut size={14} /> Sign out
               </button>
             </div>
           </div>
@@ -132,54 +177,210 @@ export function MyDayPage() {
     );
   }
 
-  const completedCount = day?.completedItems.length ?? 0;
-  const plannedCount = day?.plannedItems.length ?? 0;
-  const totalTasks = completedCount + plannedCount + (day?.currentItem ? 1 : 0);
-  return (
-    <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
-      <div className="max-w-[1280px] mx-auto px-4 py-6 md:px-8 md:py-8 lg:py-10">
-        <motion.div initial="hidden" animate="visible" className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 pl-1 pr-1">
-          {/* Left Column */}
-          <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full">
-            <MyDayLeftColumn
-              date={date}
-              user={user}
-              day={day}
-              isFetching={isFetching}
-              theme={theme}
-              onRefresh={handleRefresh}
-              onToggleTheme={toggleTheme}
-              onLogout={logout}
-              handleStatusUpdate={handleStatusUpdate}
-              updateStatusPending={updateStatusPending}
-              handleMarkDone={handleMarkDone}
-              handleDrop={handleDrop}
-              handleUpdateItemTitle={handleUpdateItemTitle}
-              handleAddCheckIn={handleAddCheckIn}
-              addCheckInPending={addCheckInPending}
-              readOnly={isReadOnly}
-            />
-          </div>
+  const isToday = date === getLocalIsoDate();
+  const plannedItems = day?.plannedItems ?? [];
+  const completedItems = day?.completedItems ?? [];
+  const droppedItems = day?.droppedItems ?? [];
+  const checkIns = day?.checkIns ?? [];
+  const readOnlyReason = readOnlyReasonFor(day);
+  const isInactive = day?.availability.state === 'inactive';
+  const nudge = Boolean(day?.isStale) && !isReadOnly;
 
-          {/* Right Column */}
-          <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full pl-2">
-            <MyDayRightColumn
-              date={date}
-              setDate={setDate}
-              day={day}
-              handleSetCurrent={handleSetCurrent}
-              handleMarkDone={handleMarkDone}
-              handleDrop={handleDrop}
-              handleReorder={handleReorder}
-              handleUpdateItemTitle={handleUpdateItemTitle}
-              handleAddItem={handleAddItem}
-              addItemPending={addItemPending}
-              completedCount={completedCount}
-              totalTasks={totalTasks}
-              readOnly={isReadOnly}
-            />
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
+        <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
+          <MyDayHeader
+            date={date}
+            setDate={setDate}
+            user={user}
+            day={day}
+            isFetching={refreshing}
+            theme={theme}
+            onRefresh={handleRefresh}
+            onToggleTheme={toggleTheme}
+            onLogout={logout}
+          />
+
+          <motion.div
+            key={date}
+            variants={pageVariants}
+            initial="hidden"
+            animate="visible"
+            className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_344px]"
+          >
+            <div className="flex min-w-0 flex-col gap-8">
+              {(isInactive || readOnlyReason === 'history' || readOnlyReason === 'future') && (
+                <motion.div variants={sectionVariants} className="flex flex-col gap-2">
+                  {day && <MyDayInactiveBanner availability={day.availability} />}
+                  {!isInactive && <MyDayReadOnlyBanner reason={readOnlyReason} onToday={goToday} />}
+                </motion.div>
+              )}
+
+              <MyDaySection
+                id="check-in"
+                icon={<Radio size={14} />}
+                title="Check in"
+                hint={
+                  nudge ? (
+                    <span style={{ color: 'var(--warning)' }}>Your lead hasn’t heard from you in a while</span>
+                  ) : (
+                    <span className="hidden sm:inline">Shared with your lead</span>
+                  )
+                }
+                action={
+                  day?.lastCheckInAt ? (
+                    <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      Last check-in {formatCompactRelative(day.lastCheckInAt)}
+                    </span>
+                  ) : undefined
+                }
+                readOnly={isReadOnly}
+              >
+                <div
+                  className="overflow-hidden rounded-2xl shadow-[var(--soft-shadow)] ring-0 ring-[var(--border-active)] transition-shadow focus-within:ring-1"
+                  style={surfaceStyle}
+                >
+                  <div className="p-1.5">
+                    <StatusSelector
+                      current={day?.status ?? 'on_track'}
+                      onUpdate={handleStatusUpdate}
+                      isPending={updateStatusPending}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div style={{ borderTop: `1px solid ${HAIRLINE}` }}>
+                    <QuickUpdates
+                      onAddCheckIn={handleAddCheckIn}
+                      tasks={tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, plannedItems)}
+                      status={day?.status}
+                      isPending={addCheckInPending}
+                      disabled={isReadOnly}
+                      inputRef={quickUpdateRef}
+                    />
+                  </div>
+                </div>
+              </MyDaySection>
+
+              <MyDaySection id="now" icon={<Target size={14} />} title="Now" readOnly={isReadOnly}>
+                <CurrentTask
+                  viewDate={date}
+                  item={day?.currentItem}
+                  nextItem={plannedItems[0]}
+                  onMarkDone={handleMarkDone}
+                  onDrop={handleDrop}
+                  onUpdateTitle={handleUpdateItemTitle}
+                  onSetCurrent={handleSetCurrent}
+                  onAddTask={() => setAddTaskOpen(true)}
+                  readOnly={isReadOnly}
+                />
+              </MyDaySection>
+
+              <MyDaySection
+                id="up-next"
+                icon={<ListTodo size={14} />}
+                title="Up next"
+                count={plannedItems.length}
+                hint={!isReadOnly && plannedItems.length > 1 ? 'Drag to reorder' : undefined}
+                readOnly={isReadOnly}
+              >
+                <div className="overflow-hidden rounded-2xl" style={surfaceStyle}>
+                  <PlannedQueue
+                    viewDate={date}
+                    items={plannedItems}
+                    onSetCurrent={handleSetCurrent}
+                    onMarkDone={handleMarkDone}
+                    onDrop={handleDrop}
+                    onReorder={handleReorder}
+                    onUpdateTitle={handleUpdateItemTitle}
+                    readOnly={isReadOnly}
+                    footer={
+                      isReadOnly ? undefined : (
+                        <AddTaskForm
+                          onAdd={handleAddItem}
+                          isPending={addItemPending}
+                          open={addTaskOpen}
+                          onOpenChange={setAddTaskOpen}
+                        />
+                      )
+                    }
+                  />
+                </div>
+              </MyDaySection>
+
+              {completedItems.length + droppedItems.length > 0 && (
+                <MyDaySection
+                  id="done"
+                  icon={<CheckCircle2 size={14} />}
+                  title={isToday ? 'Done today' : 'Done'}
+                  count={completedItems.length}
+                  hint={droppedItems.length > 0 ? `· ${droppedItems.length} dropped` : undefined}
+                >
+                  <div className="overflow-hidden rounded-2xl" style={surfaceStyle}>
+                    <FinishedWork
+                      viewDate={date}
+                      completedItems={completedItems}
+                      droppedItems={droppedItems}
+                      onReopen={handleReopen}
+                      readOnly={isReadOnly}
+                    />
+                  </div>
+                </MyDaySection>
+              )}
+            </div>
+
+            <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
+              <MyDaySection
+                id="log"
+                icon={<ScrollText size={14} />}
+                title={isToday ? 'Today’s log' : 'Log'}
+                count={checkIns.length > 0 ? checkIns.length : undefined}
+              >
+                <div className="overflow-hidden rounded-2xl" style={surfaceStyle}>
+                  <div className="lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">
+                    <RecentActivity checkIns={checkIns} isToday={isToday} />
+                  </div>
+                </div>
+              </MyDaySection>
+              <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[11.5px] md:flex" style={{ color: 'var(--text-muted)' }}>
+                {!isReadOnly && (
+                  <>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>U</Kbd> update</span>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>N</Kbd> new task</span>
+                  </>
+                )}
+                <span className="inline-flex items-center gap-1.5"><Kbd>[</Kbd><Kbd>]</Kbd> change day</span>
+                <span className="inline-flex items-center gap-1.5"><Kbd>T</Kbd> today</span>
+              </motion.div>
+            </aside>
+          </motion.div>
+        </div>
+      </div>
+    </MotionConfig>
+  );
+}
+
+/** Mirrors the real layout so the page doesn't jump when data lands. */
+function MyDaySkeleton() {
+  const block = 'animate-pulse rounded-2xl';
+  const fill = { background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' };
+  return (
+    <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }} aria-busy="true">
+      <span className="sr-only" role="status">Loading your day…</span>
+      <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10" aria-hidden="true">
+        <div className="space-y-2.5">
+          <div className="h-3 w-40 animate-pulse rounded-full" style={fill} />
+          <div className="h-7 w-72 max-w-full animate-pulse rounded-lg" style={fill} />
+          <div className="h-2 w-44 animate-pulse rounded-full" style={fill} />
+        </div>
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_344px]">
+          <div className="flex flex-col gap-8">
+            <div className={`${block} h-[150px]`} style={fill} />
+            <div className={`${block} h-[168px]`} style={fill} />
+            <div className={`${block} h-[132px]`} style={fill} />
           </div>
-        </motion.div>
+          <div className={`${block} h-[220px]`} style={fill} />
+        </div>
       </div>
     </div>
   );

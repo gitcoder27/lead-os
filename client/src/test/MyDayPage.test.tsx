@@ -117,6 +117,9 @@ vi.mock('framer-motion', async () => {
     values?: unknown;
     value?: unknown;
     as?: unknown;
+    layoutId?: unknown;
+    dragListener?: unknown;
+    dragControls?: unknown;
   };
 
   function stripMotionProps(props: MotionLikeProps): React.HTMLAttributes<HTMLElement> {
@@ -133,6 +136,9 @@ vi.mock('framer-motion', async () => {
       values,
       value,
       as,
+      layoutId,
+      dragListener,
+      dragControls,
       ...rest
     } = props;
     void initial;
@@ -147,6 +153,9 @@ vi.mock('framer-motion', async () => {
     void values;
     void value;
     void as;
+    void layoutId;
+    void dragListener;
+    void dragControls;
     return rest;
   }
 
@@ -163,6 +172,8 @@ vi.mock('framer-motion', async () => {
       }
     ),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    MotionConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useDragControls: () => ({ start: vi.fn() }),
     Reorder: {
       Group: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
         <div {...stripMotionProps(props)}>{children}</div>
@@ -305,7 +316,7 @@ describe('MyDayPage', () => {
       </TestWrapper>
     );
 
-    const upNextSection = screen.getByText('Up Next').closest('section');
+    const upNextSection = screen.getByText('Up next').closest('section');
     expect(upNextSection).toBeTruthy();
 
     fireEvent.click(within(upNextSection as HTMLElement).getByText('Add an update…'));
@@ -384,7 +395,6 @@ describe('MyDayPage', () => {
     expect(mockUpdateItemMutate).toHaveBeenCalledWith(
       { itemId: 101, title: 'Review production PR comments' },
       expect.objectContaining({
-        onSuccess: expect.any(Function),
         onError: expect.any(Function),
       })
     );

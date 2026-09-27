@@ -84,6 +84,28 @@ describe('useMyDay hooks', () => {
     expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['team-tracker', '2026-03-09'] });
   });
 
+  it('shows a status change immediately and rolls it back if the server refuses', async () => {
+    const queryClient = createQueryClient();
+    const key = ['my-day', '2026-03-09', 'dev-1'];
+    queryClient.setQueryData(key, { date: '2026-03-09', status: 'on_track' });
+    let rejectPatch: (error: Error) => void = () => undefined;
+    mockPatch.mockReturnValue(new Promise((_resolve, reject) => { rejectPatch = reject; }));
+
+    const { result } = renderHook(() => useUpdateMyDayStatus('2026-03-09'), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      result.current.mutate('blocked');
+    });
+    await waitFor(() => expect(queryClient.getQueryData<{ status: string }>(key)?.status).toBe('blocked'));
+
+    await act(async () => {
+      rejectPatch(new Error('nope'));
+    });
+    await waitFor(() => expect(queryClient.getQueryData<{ status: string }>(key)?.status).toBe('on_track'));
+  });
+
   it('adds developer work items with Jira and related issue context', async () => {
     const queryClient = createQueryClient();
     const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');

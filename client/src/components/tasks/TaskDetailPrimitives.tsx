@@ -11,7 +11,7 @@ import { avatarHue, initials, toneColor, type DateDisplay } from './task-detail-
 
 export const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]';
 
-export function SectionHeader({ icon, title, count, hint, action, id }: {
+export function SectionHeader({ icon, title, count, hint, action, id, as: Heading = 'h3' }: {
   icon?: ReactNode;
   title: string;
   count?: ReactNode;
@@ -19,13 +19,15 @@ export function SectionHeader({ icon, title, count, hint, action, id }: {
   hint?: ReactNode;
   action?: ReactNode;
   id?: string;
+  /** Heading level — pages that own their outline use h2. */
+  as?: 'h2' | 'h3';
 }) {
   return (
     <div className="flex min-h-[28px] items-center gap-2">
       {icon && <span className="flex items-center" style={{ color: 'var(--text-muted)' }}>{icon}</span>}
-      <h3 id={id} className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
+      <Heading id={id} className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
         {title}
-      </h3>
+      </Heading>
       {count !== undefined && count !== null && (
         <span
           className="rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[18px]"

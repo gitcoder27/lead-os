@@ -40,6 +40,19 @@ export function useUpdateMyDayStatus(date: string) {
   return useMutation({
     mutationFn: (status: TrackerDeveloperStatus) =>
       api.patch('/my-day', { date, status }),
+    // Status is the developer's most-used control: reflect it immediately and
+    // roll back if the server refuses.
+    onMutate: async (status) => {
+      await qc.cancelQueries({ queryKey: ['my-day', date] });
+      const previous = qc.getQueriesData<MyDayResponse>({ queryKey: ['my-day', date] });
+      qc.setQueriesData<MyDayResponse>({ queryKey: ['my-day', date] }, (day) => (day ? { ...day, status } : day));
+      return { previous };
+    },
+    onError: (_error, _status, context) => {
+      for (const [queryKey, day] of context?.previous ?? []) {
+        qc.setQueryData(queryKey, day);
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['my-day', date] });
       qc.invalidateQueries({ queryKey: ['team-tracker', date] });

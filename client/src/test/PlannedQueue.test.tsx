@@ -6,13 +6,14 @@ import type { TrackerWorkItem } from '@/types';
 
 const activeDragEndCallbacks = new Map<number, () => void>();
 
-vi.mock('@/components/team-tracker/TrackerItemRow', () => ({
-  TrackerItemRow: ({ item }: { item: TrackerWorkItem }) => (
+vi.mock('@/components/my-day/MyDayTaskRow', () => ({
+  MyDayTaskRow: ({ item }: { item: TrackerWorkItem }) => (
     <div data-testid={`planned-row-${item.id}`}>{item.title}</div>
   ),
 }));
 
 vi.mock('framer-motion', () => ({
+  useDragControls: () => ({ start: vi.fn() }),
   Reorder: {
     Group: ({
       children,
@@ -54,6 +55,8 @@ vi.mock('framer-motion', () => ({
       children,
       value,
       whileDrag,
+      dragListener,
+      dragControls,
       onDragStart,
       onDragEnd,
       ...props
@@ -61,10 +64,14 @@ vi.mock('framer-motion', () => ({
       children: ReactNode;
       value: TrackerWorkItem;
       whileDrag?: unknown;
+      dragListener?: unknown;
+      dragControls?: unknown;
       onDragStart?: () => void;
       onDragEnd?: () => void;
     } & HTMLAttributes<HTMLDivElement>) => {
       void whileDrag;
+      void dragListener;
+      void dragControls;
       return (
         <div
           data-testid={`item-${value.id}`}

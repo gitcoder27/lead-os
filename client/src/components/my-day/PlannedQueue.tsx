@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Reorder } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Reorder, useDragControls } from 'framer-motion';
 import type { TrackerWorkItem } from '@/types';
-import { TrackerItemRow } from '@/components/team-tracker/TrackerItemRow';
-import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
-import { TaskTimelineDisclosure } from '@/components/tasks/TaskTimeline';
+import { HAIRLINE } from './MyDayUI';
+import { MyDayTaskRow } from './MyDayTaskRow';
 
 interface PlannedQueueProps {
   viewDate?: string;
@@ -14,10 +13,14 @@ interface PlannedQueueProps {
   onReorder: (itemId: number, newPosition: number) => void;
   onUpdateTitle: (id: number, title: string) => void;
   readOnly?: boolean;
+  /** Rendered as the list's last row (the add-task affordance). */
+  footer?: ReactNode;
 }
 
+const listClass = 'flex flex-col [&>*+*]:border-t';
+
 export function PlannedQueue({
-  viewDate,
+  viewDate = '',
   items,
   onSetCurrent,
   onMarkDone,
@@ -25,12 +28,14 @@ export function PlannedQueue({
   onReorder,
   onUpdateTitle,
   readOnly,
+  footer,
 }: PlannedQueueProps) {
   const [orderedItems, setOrderedItems] = useState(items);
   const orderedItemsRef = useRef(items);
   const isDraggingRef = useRef(false);
   const dragStartItemsRef = useRef(items);
   const draggedItemIdRef = useRef<number | null>(null);
+  const refocusItemIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isDraggingRef.current) {
@@ -41,6 +46,14 @@ export function PlannedQueue({
     orderedItemsRef.current = items;
     dragStartItemsRef.current = items;
   }, [items]);
+
+  // Keyboard moves re-parent the focused handle; put focus back on it.
+  useEffect(() => {
+    const itemId = refocusItemIdRef.current;
+    if (itemId === null) return;
+    refocusItemIdRef.current = null;
+    document.querySelector<HTMLElement>(`[data-reorder-handle="${itemId}"]`)?.focus();
+  }, [orderedItems]);
 
   const handleReorder = useCallback((newOrder: TrackerWorkItem[]) => {
     orderedItemsRef.current = newOrder;
@@ -76,36 +89,40 @@ export function PlannedQueue({
     onReorder(draggedItemId, targetPosition);
   }, [onReorder]);
 
+  /** Same contract as a drag: the moved item takes the position of the slot it lands in. */
+  const handleMove = useCallback((itemId: number, direction: 'up' | 'down') => {
+    const current = orderedItemsRef.current;
+    const index = current.findIndex((item) => item.id === itemId);
+    const targetIndex = index + (direction === 'up' ? -1 : 1);
+    if (index === -1 || targetIndex < 0 || targetIndex >= current.length) return;
+    const next = [...current];
+    const [moved] = next.splice(index, 1);
+    next.splice(targetIndex, 0, moved!);
+    orderedItemsRef.current = next;
+    refocusItemIdRef.current = itemId;
+    setOrderedItems(next);
+    onReorder(itemId, current[targetIndex]?.position ?? targetIndex);
+  }, [onReorder]);
+
+  const borderStyle = { borderColor: HAIRLINE };
+
   if (items.length === 0) {
     return (
-      <div
-        className="rounded-xl p-4 text-center"
-        style={{
-          background: 'var(--bg-tertiary)',
-          border: '1px dashed var(--border)',
-        }}
-      >
-        <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
-          No planned tasks — add one below
+      <div className={listClass}>
+        <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          {readOnly ? 'Nothing was queued.' : 'Your queue is clear. Add what’s next so your lead can see the plan.'}
         </p>
+        {footer && <div style={borderStyle}>{footer}</div>}
       </div>
     );
   }
 
   if (readOnly) {
     return (
-      <div className="space-y-1">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="rounded-xl px-1"
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <TrackerItemRow item={item} viewDate={viewDate} readOnly />
-            {item.taskKey && <TaskTimelineDisclosure taskKey={item.taskKey} mode="developer" />}
+      <div className={listClass}>
+        {items.map((item, index) => (
+          <div key={item.id} style={borderStyle}>
+            <MyDayTaskRow item={item} variant="planned" index={index} viewDate={viewDate} readOnly />
           </div>
         ))}
       </div>
@@ -113,42 +130,88 @@ export function PlannedQueue({
   }
 
   return (
-    <Reorder.Group axis="y" values={orderedItems} onReorder={handleReorder} className="space-y-1">
-      {orderedItems.map((item) => (
-        <Reorder.Item
-          key={item.id}
-          value={item}
-          onDragStart={() => handleDragStart(item.id)}
-          onDragEnd={handleDragEnd}
-          className="rounded-xl px-1"
-          whileDrag={{
-            scale: 1.02,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-            zIndex: 50,
-          }}
-          style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <TrackerItemRow
+    <div className={listClass}>
+      <Reorder.Group axis="y" values={orderedItems} onReorder={handleReorder} className={listClass}>
+        {orderedItems.map((item, index) => (
+          <PlannedRow
+            key={item.id}
             item={item}
+            index={index}
             viewDate={viewDate}
-            draggable
+            isLast={index === orderedItems.length - 1}
+            onDragStart={() => handleDragStart(item.id)}
+            onDragEnd={handleDragEnd}
             onSetCurrent={onSetCurrent}
             onMarkDone={onMarkDone}
             onDrop={onDrop}
             onUpdateTitle={onUpdateTitle}
-            readOnly={readOnly}
-            composer={
-              !readOnly && item.taskKey && viewDate ? (
-                <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed />
-              ) : undefined
-            }
+            onMove={handleMove}
           />
-          {item.taskKey && <TaskTimelineDisclosure taskKey={item.taskKey} mode="developer" />}
-        </Reorder.Item>
-      ))}
-    </Reorder.Group>
+        ))}
+      </Reorder.Group>
+      {footer && <div style={borderStyle}>{footer}</div>}
+    </div>
+  );
+}
+
+function PlannedRow({
+  item,
+  index,
+  viewDate,
+  isLast,
+  onDragStart,
+  onDragEnd,
+  onSetCurrent,
+  onMarkDone,
+  onDrop,
+  onUpdateTitle,
+  onMove,
+}: {
+  item: TrackerWorkItem;
+  index: number;
+  viewDate: string;
+  isLast: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onSetCurrent: (id: number) => void;
+  onMarkDone: (id: number) => void;
+  onDrop: (id: number) => void;
+  onUpdateTitle: (id: number, title: string) => void;
+  onMove: (id: number, direction: 'up' | 'down') => void;
+}) {
+  // Only the handle starts a drag, so typing an update or selecting text
+  // never picks the row up.
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={controls}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      whileDrag={{
+        scale: 1.015,
+        boxShadow: 'var(--panel-shadow)',
+        background: 'var(--bg-elevated)',
+        borderRadius: '12px',
+        zIndex: 50,
+      }}
+      style={{ position: 'relative', borderColor: HAIRLINE }}
+    >
+      <MyDayTaskRow
+        item={item}
+        variant="planned"
+        index={index}
+        viewDate={viewDate}
+        onSetCurrent={onSetCurrent}
+        onMarkDone={onMarkDone}
+        onDrop={onDrop}
+        onUpdateTitle={onUpdateTitle}
+        onMove={onMove}
+        canMoveUp={index > 0}
+        canMoveDown={!isLast}
+        onDragHandlePointerDown={(event) => controls.start(event)}
+      />
+    </Reorder.Item>
   );
 }

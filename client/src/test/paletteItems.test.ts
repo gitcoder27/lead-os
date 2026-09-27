@@ -76,6 +76,7 @@ const deskOnlyTask: GlobalSearchTaskItem = {
 const dailyNote: DailyNoteSummary = {
   id: 9,
   date: '2026-03-08',
+  kind: 'scratchpad',
   title: 'Retro prep thoughts',
   excerpt: 'Draft agenda for Thursday retro',
   updatedAt: '2026-03-08T09:00:00.000Z',
@@ -127,7 +128,7 @@ describe('palette item builders', () => {
   it('maps a note summary to the notes day target', () => {
     const item = noteToPaletteItem(dailyNote, 0);
 
-    expect(item.target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08' });
+    expect(item.target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08', kind: 'scratchpad' });
     expect(item.title).toBe('Retro prep thoughts');
     expect(item.description).toContain('Mar 8');
     expect(item.description).toContain('Draft agenda');
@@ -186,7 +187,7 @@ describe('palette item builders', () => {
     });
 
     expect(groups.map((group) => group.id)).toEqual(['notes']);
-    expect(groups[0].items[0].target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08' });
+    expect(groups[0].items[0].target).toEqual({ type: 'view', view: 'notes', date: '2026-03-08', kind: 'scratchpad' });
   });
 });
 

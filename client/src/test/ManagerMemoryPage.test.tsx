@@ -200,7 +200,7 @@ describe('ManagerMemoryPage', () => {
   });
 
   it('renders a private note source link only for owned associations', () => {
-    mockNoteSources = [{ itemId: 1, noteId: 42, date: '2026-04-27' }];
+    mockNoteSources = [{ itemId: 1, noteId: 42, date: '2026-04-27', kind: 'scratchpad' as const }];
 
     renderMemory('follow-ups');
 

@@ -16,6 +16,7 @@ import {
   type WrapUpCandidate,
 } from '@/lib/note-markdown';
 import type { NoteLineEdit } from './editor/NoteEditor';
+import type { DailyNoteKind } from '@/types';
 
 export type WrapUpChoice = 'task' | 'follow-up' | 'carry' | 'drop';
 
@@ -41,6 +42,7 @@ function carryTargetLabel(target: string, today: string): string {
 interface NotesWrapUpDialogProps {
   open: boolean;
   noteDate: string;
+  noteKind?: DailyNoteKind;
   today: string;
   candidates: WrapUpCandidate[];
   developers: NoteDeveloper[];
@@ -55,7 +57,7 @@ interface NotesWrapUpDialogProps {
  * Request ids are stable per row+choice for the life of the dialog, so a
  * retry after a partial failure never creates duplicates.
  */
-export function NotesWrapUpDialog({ open, noteDate, today, candidates, developers, onClose, onApplyEdits }: NotesWrapUpDialogProps) {
+export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates, developers, onClose, onApplyEdits }: NotesWrapUpDialogProps) {
   const { addToast } = useToast();
   const createTask = useCreateDailyNoteTask(noteDate);
   const createFollowUp = useCreateDailyNoteFollowUp(noteDate);
@@ -127,6 +129,7 @@ export function NotesWrapUpDialog({ open, noteDate, today, candidates, developer
             developerAccountId: inferred.developer?.accountId,
             jiraKey: inferred.jiraKey ?? undefined,
             requestId: requestId(candidate, 'task'),
+            kind: noteKind,
           });
           edits.push({ line: candidate.line, raw: candidate.raw, next: appendProvenance(candidate.raw, task.taskKey) });
           done.add(candidate.line);
@@ -136,6 +139,7 @@ export function NotesWrapUpDialog({ open, noteDate, today, candidates, developer
             title: candidate.text.slice(0, 500),
             followUpAt,
             requestId: requestId(candidate, 'follow-up'),
+            kind: noteKind,
           });
           if (created?.taskKey) {
             edits.push({ line: candidate.line, raw: candidate.raw, next: appendProvenance(candidate.raw, created.taskKey) });

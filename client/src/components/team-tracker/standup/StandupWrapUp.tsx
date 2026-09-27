@@ -18,6 +18,8 @@ export function StandupWrapUp({
   days,
   session,
   sealing = false,
+  saveToNote = true,
+  onSaveToNoteChange,
   onJump,
   onBack,
   onEnd,
@@ -29,6 +31,9 @@ export function StandupWrapUp({
   session: StandupSession;
   /** True while the End request is in flight. */
   sealing?: boolean;
+  /** Whether ending files the summary as a standup note (docs/50 v2). */
+  saveToNote?: boolean;
+  onSaveToNoteChange?: (save: boolean) => void;
   onJump: (accountId: string) => void;
   onBack: () => void;
   onEnd: () => void;
@@ -79,9 +84,23 @@ export function StandupWrapUp({
           </h2>
           <p className="mt-0.5 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
             {complete ? 'Everyone was covered.' : 'You can still jump back to anyone below, or wrap up now.'}
-            {' '}Ending seals this session, saves the summary to today&rsquo;s note
+            {' '}Ending seals this session{saveToNote ? ' and files the summary under Notes → Standups' : ''}
             {flagged.size > 0 ? `, and creates ${flagged.size} follow-up task${flagged.size === 1 ? '' : 's'}` : ''}.
           </p>
+          <label
+            className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-[12.5px]"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <input
+              type="checkbox"
+              checked={saveToNote}
+              onChange={(event) => onSaveToNoteChange?.(event.target.checked)}
+              disabled={sealing}
+              className="h-3.5 w-3.5 accent-[var(--accent)]"
+            />
+            Save summary to notes
+            <span style={{ color: 'var(--text-muted)' }}>— standup archive, not your scratchpad</span>
+          </label>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <WrapButton onClick={onCopy} icon={<ClipboardCopy size={13} />} disabled={sealing}>Copy summary</WrapButton>

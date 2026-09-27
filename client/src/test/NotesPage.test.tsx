@@ -13,6 +13,8 @@ const mockTaskCreateMutate = vi.fn();
 const mockTaskCreateMutateAsync = vi.fn();
 const mockAppendMutateAsync = vi.fn();
 const editorDatesSeen = vi.hoisted(() => [] as string[]);
+const editorKindsSeen = vi.hoisted(() => [] as (string | undefined)[]);
+const listCalls = vi.hoisted(() => [] as { query: string; kind: string | undefined }[]);
 const editorCalls = vi.hoisted(() => ({
   appendMarker: [] as Array<{ source: unknown; key: string }>,
   lineEdits: [] as unknown[],
@@ -22,6 +24,7 @@ const editorCalls = vi.hoisted(() => ({
 const savedNote = {
   id: 7,
   date: '2026-09-12',
+  kind: 'scratchpad' as const,
   title: 'Saved note',
   excerpt: '',
   body: 'existing saved note text',
@@ -61,10 +64,11 @@ vi.mock('@/hooks/useDailyNoteEditor', async () => {
   const react = await import('react');
   return {
     DAILY_NOTE_MAX_LENGTH: 50000,
-    useDailyNoteEditor: (date: string) => {
+    useDailyNoteEditor: (date: string, kind?: string) => {
       react.useEffect(() => {
         editorDatesSeen.push(date);
-      }, [date]);
+        editorKindsSeen.push(kind);
+      }, [date, kind]);
       return editorState;
     },
   };
@@ -104,7 +108,9 @@ vi.mock('@/components/notes/editor/NoteEditor', async () => {
 });
 
 vi.mock('@/hooks/useDailyNotes', () => ({
-  useDailyNotes: () => ({
+  useDailyNotes: (query: string, kind?: string) => {
+    listCalls.push({ query, kind });
+    return {
     data: { pages: [{ notes: listNotes, nextCursor: null }], pageParams: [null] },
     isLoading: listLoading,
     isError: listError,
@@ -112,7 +118,8 @@ vi.mock('@/hooks/useDailyNotes', () => ({
     hasNextPage: false,
     fetchNextPage: vi.fn(),
     isFetchingNextPage: false,
-  }),
+    };
+  },
   useDailyNoteContext: () => ({ data: dayContext }),
   useCreateDailyNoteFollowUp: () => ({ mutate: mockFollowUpMutate, mutateAsync: mockFollowUpMutateAsync, isPending: false }),
   useAddDailyNoteTaskUpdate: () => ({ mutate: mockTaskUpdateMutate, isPending: false }),
@@ -173,7 +180,18 @@ function wrap(children: ReactNode) {
 }
 
 function renderPage(props: Partial<React.ComponentProps<typeof NotesPage>> = {}) {
-  return render(wrap(<NotesPage date="2026-09-12" onDateChange={vi.fn()} onOpenTarget={vi.fn()} {...props} />));
+  return render(
+    wrap(
+      <NotesPage
+        date="2026-09-12"
+        kind="scratchpad"
+        onDateChange={vi.fn()}
+        onKindChange={vi.fn()}
+        onOpenTarget={vi.fn()}
+        {...props}
+      />,
+    ),
+  );
 }
 
 function editorEl() {
@@ -194,6 +212,8 @@ describe('NotesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     editorDatesSeen.length = 0;
+    editorKindsSeen.length = 0;
+    listCalls.length = 0;
     editorCalls.appendMarker.length = 0;
     editorCalls.lineEdits.length = 0;
     editorCalls.highlighted.length = 0;
@@ -222,13 +242,13 @@ describe('NotesPage', () => {
 
   it('renders a one-line heading, trimmed sidebar chrome, and the editor', () => {
     listNotes = [
-      { id: 1, date: '2026-09-11', title: 'First line of Friday', excerpt: 'excerpt', updatedAt: '2026-09-11T10:00:00.000Z' },
+      { id: 1, date: '2026-09-11', kind: 'scratchpad' as const, title: 'First line of Friday', excerpt: 'excerpt', updatedAt: '2026-09-11T10:00:00.000Z' },
     ];
 
     renderPage();
 
     expect(screen.getByRole('heading', { name: 'Saturday, September 12' })).toBeInTheDocument();
-    expect(screen.getByText('Notes')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument();
     expect(screen.queryByText('A little space to clear your head.')).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: /only you can see your notes/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Search all notes')).toBeInTheDocument();
@@ -241,7 +261,7 @@ describe('NotesPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       vi.setSystemTime(new Date('2026-09-12T10:00:00'));
-      listNotes = [{ id: 1, date: '2026-09-12', title: 'Standup notes', excerpt: '', updatedAt: '2026-09-12T10:00:00.000Z' }];
+      listNotes = [{ id: 1, date: '2026-09-12', kind: 'scratchpad' as const, title: 'Standup notes', excerpt: '', updatedAt: '2026-09-12T10:00:00.000Z' }];
       renderPage();
       const heading = screen.getByRole('heading', { name: /Saturday, September 12/ });
       expect(within(heading).getByText('Today')).toHaveClass('notes-today-pill');
@@ -273,9 +293,46 @@ describe('NotesPage', () => {
     expect(onDateChange).not.toHaveBeenCalled();
   });
 
+  // ── Notes / Standups facet ───────────────────────────────────────────
+
+  it('lists scratchpad notes by default and switches facets via the toggle', async () => {
+    const onKindChange = vi.fn();
+    renderPage({ onKindChange });
+
+    const toggle = screen.getByRole('group', { name: 'Note kind' });
+    expect(within(toggle).getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-pressed', 'true');
+    expect(listCalls.some((call) => call.kind === 'scratchpad')).toBe(true);
+
+    fireEvent.click(within(toggle).getByRole('button', { name: 'Standups' }));
+    await waitFor(() => expect(onKindChange).toHaveBeenCalledWith('standup'));
+    expect(editorState.flush).toHaveBeenCalled();
+  });
+
+  it('reads and edits the standup kind when the standups facet is active', () => {
+    renderPage({ kind: 'standup' });
+
+    const toggle = screen.getByRole('group', { name: 'Note kind' });
+    expect(within(toggle).getByRole('button', { name: 'Standups' })).toHaveAttribute('aria-pressed', 'true');
+    expect(listCalls.some((call) => call.kind === 'standup')).toBe(true);
+    expect(editorKindsSeen).toContain('standup');
+    expect(screen.getByText('Standup')).toHaveClass('notes-kind-pill');
+    expect(screen.queryByText('Start writing')).not.toBeInTheDocument();
+  });
+
+  it('keeps the facet when the note cannot be flushed before switching', async () => {
+    editorState.flush.mockResolvedValue(false);
+    const onKindChange = vi.fn();
+    renderPage({ onKindChange });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Standups' }));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+    expect(onKindChange).not.toHaveBeenCalled();
+  });
+
   it('selects a history row', async () => {
     listNotes = [
-      { id: 1, date: '2026-09-10', title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
+      { id: 1, date: '2026-09-10', kind: 'scratchpad' as const, title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
     ];
     const onDateChange = vi.fn();
     renderPage({ onDateChange });
@@ -302,7 +359,7 @@ describe('NotesPage', () => {
     expect(editorDatesSeen).toContain('2026-09-12');
 
     editorState.body = 'day B text';
-    rerender(wrap(<NotesPage date="2026-09-13" onDateChange={vi.fn()} onOpenTarget={vi.fn()} />));
+    rerender(wrap(<NotesPage date="2026-09-13" kind="scratchpad" onDateChange={vi.fn()} onKindChange={vi.fn()} onOpenTarget={vi.fn()} />));
 
     expect(editorDatesSeen).toContain('2026-09-13');
     expect(screen.getByLabelText(/Notes for Sunday/)).toHaveValue('day B text');
@@ -330,7 +387,7 @@ describe('NotesPage', () => {
   it('mobile history selection flushes the still-mounted editor before switching days', async () => {
     stubViewport(true);
     listNotes = [
-      { id: 1, date: '2026-09-10', title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
+      { id: 1, date: '2026-09-10', kind: 'scratchpad' as const, title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
     ];
     const onDateChange = vi.fn();
     renderPage({ onDateChange });
@@ -346,7 +403,7 @@ describe('NotesPage', () => {
     stubViewport(true);
     editorState.flush.mockResolvedValue(false);
     listNotes = [
-      { id: 1, date: '2026-09-10', title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
+      { id: 1, date: '2026-09-10', kind: 'scratchpad' as const, title: 'Thursday notes', excerpt: 'excerpt', updatedAt: '2026-09-10T10:00:00.000Z' },
     ];
     const onDateChange = vi.fn();
     renderPage({ onDateChange });
@@ -747,10 +804,10 @@ describe('NotesPage', () => {
     try {
       vi.setSystemTime(new Date('2026-09-27T10:00:00'));
       listNotes = [
-        { id: 1, date: '2026-09-25', title: 'Friday', excerpt: '', updatedAt: '', produced: { tasks: 2, carried: 1 } },
-        { id: 2, date: '2026-09-16', title: 'Mid September', excerpt: '', updatedAt: '' },
-        { id: 4, date: '2026-09-08', title: 'Early September', excerpt: '', updatedAt: '' },
-        { id: 3, date: '2026-08-30', title: 'Late summer', excerpt: '', updatedAt: '' },
+        { id: 1, date: '2026-09-25', kind: 'scratchpad' as const, title: 'Friday', excerpt: '', updatedAt: '', produced: { tasks: 2, carried: 1 } },
+        { id: 2, date: '2026-09-16', kind: 'scratchpad' as const, title: 'Mid September', excerpt: '', updatedAt: '' },
+        { id: 4, date: '2026-09-08', kind: 'scratchpad' as const, title: 'Early September', excerpt: '', updatedAt: '' },
+        { id: 3, date: '2026-08-30', kind: 'scratchpad' as const, title: 'Late summer', excerpt: '', updatedAt: '' },
       ];
       renderPage({ date: '2026-09-25' });
       const history = screen.getByRole('list', { name: 'Recent notes' });

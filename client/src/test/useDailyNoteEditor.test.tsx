@@ -45,6 +45,7 @@ function note(overrides: Partial<DailyNote> = {}): DailyNote {
   return {
     id: 7,
     date: DATE,
+    kind: 'scratchpad',
     title: 'First line',
     excerpt: 'First line',
     body: 'saved body',
@@ -202,10 +203,10 @@ describe('useDailyNoteEditor', () => {
 
     act(() => result.current.changeBody('morning notes\n\nlocal typing'));
 
-    // Server appends a standup summary while the draft is dirty.
+    // The server appends a captured line while the draft is dirty.
     act(() => {
       queryClient.setQueryData(
-        ['daily-notes', SCOPE, 'day', DATE],
+        ['daily-notes', SCOPE, 'day', DATE, 'scratchpad'],
         dayResponse(note({ body: 'morning notes\n\nstandup summary', revision: 2 })),
       );
     });
@@ -412,7 +413,7 @@ describe('useDailyNoteEditor', () => {
 
     const remote = dayResponse(note({ body: 'remote edit', revision: 2 }));
     act(() => {
-      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE], remote);
+      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE, 'scratchpad'], remote);
     });
     await until(() => result.current.body === 'remote edit');
 
@@ -423,7 +424,7 @@ describe('useDailyNoteEditor', () => {
 
     const remote2 = dayResponse(note({ body: 'someone else', revision: 3 }));
     act(() => {
-      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE], remote2);
+      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE, 'scratchpad'], remote2);
     });
     await until(() => result.current.saveState === 'conflict');
     expect(result.current.body).toBe('dirty again');
@@ -438,7 +439,7 @@ describe('useDailyNoteEditor', () => {
     act(() => result.current.changeBody('local draft'));
     const remote = dayResponse(note({ body: 'remote rewrite', revision: 2 }));
     act(() => {
-      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE], remote);
+      queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE, 'scratchpad'], remote);
     });
     await until(() => result.current.saveState === 'conflict');
 
@@ -596,7 +597,7 @@ describe('useDailyNoteEditor', () => {
       release(dayResponse(note({ body: 'pending write', revision: 2 })));
     });
 
-    const cached = queryClient.getQueryData<DailyNoteResponse>(['daily-notes', SCOPE, 'day', DATE]);
+    const cached = queryClient.getQueryData<DailyNoteResponse>(['daily-notes', SCOPE, 'day', DATE, 'scratchpad']);
     expect(cached?.note?.body).toBe('saved body');
     expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('pending write');
   });

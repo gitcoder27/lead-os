@@ -3,11 +3,13 @@ import { differenceInCalendarWeeks, format, parseISO } from 'date-fns';
 import { ArrowLeft, Lock, PenLine, Search } from 'lucide-react';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
 import { snippetSegments } from '@/lib/note-markdown';
-import type { DailyNoteSummary } from '@/types';
+import type { DailyNoteKind, DailyNoteSummary } from '@/types';
 
 interface NotesSidebarProps {
   selectedDate: string;
   today: string;
+  kind: DailyNoteKind;
+  onKindChange: (kind: DailyNoteKind) => void;
   /** `query` is set when the row came from a search, so the note can land at the match (F12). */
   onSelectDate: (date: string, query?: string) => void;
   mobile?: boolean;
@@ -62,9 +64,9 @@ function rowExcerpt(note: DailyNoteSummary): string {
   return excerpt;
 }
 
-export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false, onBack, searchInputRef }: NotesSidebarProps) {
+export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelectDate, mobile = false, onBack, searchInputRef }: NotesSidebarProps) {
   const [query, setQuery] = useState('');
-  const listQuery = useDailyNotes(query);
+  const listQuery = useDailyNotes(query, kind);
 
   const notes = useMemo(
     () => listQuery.data?.pages.flatMap((page) => page.notes) ?? [],
@@ -95,9 +97,27 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
             <Lock size={11} aria-hidden="true" />
           </span>
         </div>
-        <label className="notes-search-wrap mt-2.5">
+        <div className="notes-kind-toggle" role="group" aria-label="Note kind">
+          <button
+            type="button"
+            className={kind === 'scratchpad' ? 'active' : undefined}
+            aria-pressed={kind === 'scratchpad'}
+            onClick={() => onKindChange('scratchpad')}
+          >
+            Notes
+          </button>
+          <button
+            type="button"
+            className={kind === 'standup' ? 'active' : undefined}
+            aria-pressed={kind === 'standup'}
+            onClick={() => onKindChange('standup')}
+          >
+            Standups
+          </button>
+        </div>
+        <label className="notes-search-wrap mt-2">
           <Search size={12} className="notes-search-icon" aria-hidden="true" />
-          <span className="sr-only">Search all notes</span>
+          <span className="sr-only">{kind === 'standup' ? 'Search standup notes' : 'Search all notes'}</span>
           <input
             ref={searchInputRef}
             type="search"
@@ -109,8 +129,8 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
                 setQuery('');
               }
             }}
-            placeholder="Search all notes"
-            aria-label="Search all notes"
+            placeholder={kind === 'standup' ? 'Search standups' : 'Search all notes'}
+            aria-label={kind === 'standup' ? 'Search standup notes' : 'Search all notes'}
             aria-keyshortcuts="Meta+Shift+F Control+Shift+F"
             maxLength={200}
             className="notes-search-input"
@@ -121,8 +141,12 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
         </label>
       </div>
 
-      <div className="notes-sidebar-list" role="list" aria-label={searching ? 'Search results' : 'Recent notes'}>
-        {!searching && !hasToday && !listQuery.isLoading ? (
+      <div
+        className="notes-sidebar-list"
+        role="list"
+        aria-label={searching ? 'Search results' : kind === 'standup' ? 'Recent standups' : 'Recent notes'}
+      >
+        {!searching && kind === 'scratchpad' && !hasToday && !listQuery.isLoading ? (
           <div role="listitem">
             <button
               type="button"
@@ -156,7 +180,11 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
             </button>
           </div>
         ) : notes.length === 0 ? (
-          searching ? <div className="notes-sidebar-empty">No notes match that search.</div> : null
+          searching ? (
+            <div className="notes-sidebar-empty">No notes match that search.</div>
+          ) : kind === 'standup' ? (
+            <div className="notes-sidebar-empty">No standup summaries yet — ending a standup files one here.</div>
+          ) : null
         ) : (
           <>
             {notes.map((note, index) => {

@@ -271,6 +271,8 @@ export interface TodayActionTarget {
   trackerItemId?: number;
   taskKey?: string;
   date?: string;
+  /** Notes facet to open when view === "notes" (defaults to the scratchpad). */
+  kind?: DailyNoteKind;
   filter?: FilterType;
   /** Team-page panel to open when view === "team" (e.g. "one-on-one"). */
   panel?: string;
@@ -1692,9 +1694,18 @@ export interface ManagerDeskCarryForwardPayload {
   itemIds?: number[];
 }
 
+/**
+ * Which document a `daily_notes` row is: the manager's free-form scratchpad
+ * (default) or the archived standup summary written by "End standup" (docs/50
+ * v2). Kinds are isolated per (workspace, manager, date) — a day can hold one
+ * note of each kind.
+ */
+export type DailyNoteKind = "scratchpad" | "standup";
+
 export interface DailyNoteSummary {
   id: number;
   date: string;
+  kind: DailyNoteKind;
   title: string;
   excerpt: string;
   updatedAt: string;
@@ -1757,11 +1768,13 @@ export interface DailyNotesResponse {
 export interface SaveDailyNotePayload {
   body: string;
   revision: number;
+  kind?: DailyNoteKind;
 }
 
 export interface AppendDailyNotePayload {
   text: string;
   requestId: string;
+  kind?: DailyNoteKind;
 }
 
 export interface CreateDailyNoteFollowUpPayload {
@@ -1769,12 +1782,14 @@ export interface CreateDailyNoteFollowUpPayload {
   title: string;
   followUpAt: string;
   requestId: string;
+  kind?: DailyNoteKind;
 }
 
 export interface DailyNoteSource {
   itemId: number;
   noteId: number;
   date: string;
+  kind: DailyNoteKind;
 }
 
 export interface DailyNoteSourcesResponse {

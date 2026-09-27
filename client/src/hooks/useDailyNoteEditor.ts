@@ -9,11 +9,13 @@ import {
 } from '@/lib/daily-note-drafts';
 import { mergeNoteBodies } from '@/lib/daily-note-merge';
 import {
+  dailyNoteDayKey,
+  dailyNoteDayPath,
   invalidateDailyNoteListViews,
   patchDailyNoteInLists,
   useDailyNote,
 } from './useDailyNotes';
-import type { DailyNote, DailyNoteFollowUp, DailyNoteRef, DailyNoteResponse } from '@/types';
+import type { DailyNote, DailyNoteFollowUp, DailyNoteKind, DailyNoteRef, DailyNoteResponse } from '@/types';
 
 export const DAILY_NOTE_MAX_LENGTH = 50000;
 const AUTOSAVE_DELAY_MS = 700;
@@ -53,7 +55,7 @@ export interface DailyNoteEditor {
   recoveryUnavailable: boolean;
 }
 
-export function useDailyNoteEditor(date: string): DailyNoteEditor {
+export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchpad'): DailyNoteEditor {
   const scope = useAuthScopeKey();
   const queryClient = useQueryClient();
 
@@ -87,7 +89,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
 
   // P1: pause the 60s day poll while the editor is dirty or a save is in flight.
   const pollPaused = saveState === 'dirty' || saveState === 'saving';
-  const dayQuery = useDailyNote(date, { pollPaused });
+  const dayQuery = useDailyNote(date, { pollPaused, kind });
 
   const setStatus = useCallback((next: DailyNoteSaveState) => {
     saveStateRef.current = next;
@@ -100,12 +102,12 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         body: nextBody,
         baseBody: baseBodyRef.current,
         revision: baseRevisionRef.current,
-      });
+      }, kind);
       if (!ok) {
         setRecoveryUnavailable(true);
       }
     },
-    [date, scope],
+    [date, kind, scope],
   );
 
   const adoptServerNote = useCallback(
@@ -134,9 +136,9 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
   );
 
   const fetchLatest = useCallback(async (): Promise<DailyNote | null> => {
-    const res = await api.get<DailyNoteResponse>(`/notes/${encodeURIComponent(date)}`);
+    const res = await api.get<DailyNoteResponse>(dailyNoteDayPath(date, kind));
     return res.note;
-  }, [date]);
+  }, [date, kind]);
 
   const attemptSaveRef = useRef<() => Promise<void>>(async () => {});
 
@@ -166,12 +168,12 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       setLatest(note);
       setConflict(null);
       setOffline(false);
-      queryClient.setQueryData(['daily-notes', scopeRef.current, 'day', date], res);
+      queryClient.setQueryData(dailyNoteDayKey(scopeRef.current, date, kind), res);
       // P1: patch the saved row into cached list pages instead of invalidating
       // the whole ['daily-notes'] prefix on every keystroke-save.
-      patchDailyNoteInLists(queryClient, scopeRef.current, date, note);
+      patchDailyNoteInLists(queryClient, scopeRef.current, date, note, kind);
       if (bodyRef.current === acknowledgedBody) {
-        clearDailyNoteDraft(scopeRef.current, date);
+        clearDailyNoteDraft(scopeRef.current, date, kind);
         setStatus('saved');
       } else {
         persistDraft(bodyRef.current);
@@ -179,7 +181,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         scheduleSave();
       }
     },
-    [date, persistDraft, queryClient, scheduleSave, setStatus],
+    [date, kind, persistDraft, queryClient, scheduleSave, setStatus],
   );
 
   /**
@@ -265,7 +267,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
 
     const flight = (async () => {
       try {
-        const res = await api.put<DailyNoteResponse>(`/notes/${encodeURIComponent(date)}`, {
+        const res = await api.put<DailyNoteResponse>(dailyNoteDayPath(date, kind), {
           body: submittedBody,
           revision: submittedRevision,
         });
@@ -334,7 +336,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     } finally {
       inFlightRef.current = null;
     }
-  }, [acknowledge, date, enterConflict, fetchLatest, reconcileRemote, scheduleSave, setStatus]);
+  }, [acknowledge, date, enterConflict, fetchLatest, kind, reconcileRemote, scheduleSave, setStatus]);
 
   useEffect(() => {
     attemptSaveRef.current = attemptSave;
@@ -351,11 +353,11 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     if (!initializedRef.current) {
       initializedRef.current = true;
       const serverBody = note?.body ?? '';
-      const draft = readDailyNoteDraft(scope, date);
+      const draft = readDailyNoteDraft(scope, date, kind);
 
       if (!draft || draft.body === serverBody) {
         if (draft) {
-          clearDailyNoteDraft(scope, date);
+          clearDailyNoteDraft(scope, date, kind);
         }
         adoptServerNote(note);
         setStatus('idle');
@@ -402,7 +404,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       return;
     }
     reconcileRemote(note);
-  }, [adoptServerNote, date, dayQuery.data, dayQuery.isLoading, enterConflict, reconcileRemote, scheduleSave, scope, setStatus]);
+  }, [adoptServerNote, date, dayQuery.data, dayQuery.isLoading, enterConflict, kind, reconcileRemote, scheduleSave, scope, setStatus]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -438,7 +440,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         typeof fetch === 'function'
       ) {
         try {
-          void fetch(`/api/notes/${encodeURIComponent(date)}`, {
+          void fetch(`/api${dailyNoteDayPath(date, kind)}`, {
             method: 'PUT',
             keepalive: true,
             headers: { 'Content-Type': 'application/json' },
@@ -449,7 +451,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         }
       }
     };
-  }, [cancelPendingTimer, date, scheduleSave]);
+  }, [cancelPendingTimer, date, kind, scheduleSave]);
 
   useEffect(() => {
     if (!['dirty', 'saving', 'error', 'conflict'].includes(saveState)) {
@@ -478,7 +480,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
           return;
         }
         cancelPendingTimer();
-        clearDailyNoteDraft(scope, date);
+        clearDailyNoteDraft(scope, date, kind);
         setError(null);
         setStatus('idle');
         return;
@@ -487,7 +489,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       setStatus('dirty');
       scheduleSave();
     },
-    [cancelPendingTimer, date, persistDraft, scheduleSave, scope, setStatus],
+    [cancelPendingTimer, date, kind, persistDraft, scheduleSave, scope, setStatus],
   );
 
   const flush = useCallback(async (): Promise<boolean> => {
@@ -554,14 +556,14 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     }
     const remote = conflict;
     adoptServerNote(remote);
-    clearDailyNoteDraft(scope, date);
+    clearDailyNoteDraft(scope, date, kind);
     setStatus('idle');
     setMergeNotice(null);
     retryCountRef.current = 0;
-    queryClient.setQueryData(['daily-notes', scope, 'day', date], (existing: DailyNoteResponse | undefined) =>
+    queryClient.setQueryData(dailyNoteDayKey(scope, date, kind), (existing: DailyNoteResponse | undefined) =>
       existing ? { ...existing, note: remote } : existing,
     );
-  }, [adoptServerNote, conflict, date, queryClient, scope, setStatus]);
+  }, [adoptServerNote, conflict, date, kind, queryClient, scope, setStatus]);
 
   const retrySave = useCallback(() => {
     setError(null);

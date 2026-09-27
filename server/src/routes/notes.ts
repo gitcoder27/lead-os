@@ -1,9 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
+import type { DailyNoteKind } from "shared/types";
 import { validate } from "../middleware/validate";
 import type { DailyNotesService } from "../services/daily-notes.service";
 
 const MAX_BODY_LENGTH = 50000;
+
+const noteKindSchema = z.enum(["scratchpad", "standup"]);
 
 function isRealDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -20,6 +23,7 @@ const listQuerySchema = z.object({
     q: z.string().max(200).optional(),
     before: dateSchema.optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
+    kind: noteKindSchema.optional(),
   }),
   params: z.any().optional(),
   body: z.any().optional(),
@@ -48,7 +52,7 @@ const sourcesQuerySchema = z.object({
 const dateParamSchema = z.object({
   params: z.object({ date: dateSchema }),
   body: z.any().optional(),
-  query: z.any().optional(),
+  query: z.object({ kind: noteKindSchema.optional() }).optional(),
 });
 
 const saveNoteSchema = z.object({
@@ -56,8 +60,9 @@ const saveNoteSchema = z.object({
   body: z.object({
     body: z.string().max(MAX_BODY_LENGTH),
     revision: z.number().int().min(0),
+    kind: noteKindSchema.optional(),
   }),
-  query: z.any().optional(),
+  query: z.object({ kind: noteKindSchema.optional() }).optional(),
 });
 
 const appendNoteSchema = z.object({
@@ -65,6 +70,7 @@ const appendNoteSchema = z.object({
   body: z.object({
     text: z.string().trim().min(1).max(MAX_BODY_LENGTH),
     requestId: z.string().uuid(),
+    kind: noteKindSchema.optional(),
   }),
   query: z.any().optional(),
 });
@@ -76,18 +82,19 @@ const createFollowUpSchema = z.object({
     title: z.string().trim().min(1).max(500),
     followUpAt: z.string().datetime({ offset: true }),
     requestId: z.string().uuid(),
+    kind: noteKindSchema.optional(),
   }),
   query: z.any().optional(),
 });
 
 const taskUpdateSchema = z.object({
   params: z.object({ date: dateSchema }), query: z.any().optional(),
-  body: z.object({ taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/), text: z.string().trim().min(1).max(4000), type: z.enum(["update", "instruction", "decision"]).optional(), visibility: z.enum(["shared", "private"]).optional(), requestId: z.string().uuid() }),
+  body: z.object({ taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/), text: z.string().trim().min(1).max(4000), type: z.enum(["update", "instruction", "decision"]).optional(), visibility: z.enum(["shared", "private"]).optional(), requestId: z.string().uuid(), kind: noteKindSchema.optional() }),
 });
 
 const createTaskSchema = z.object({
   params: z.object({ date: dateSchema }), query: z.any().optional(),
-  body: z.object({ title: z.string().trim().min(1).max(500), developerAccountId: z.string().min(1).optional(), jiraKey: z.string().min(1).optional(), context: z.string().trim().max(4000).optional(), requestId: z.string().uuid() }),
+  body: z.object({ title: z.string().trim().min(1).max(500), developerAccountId: z.string().min(1).optional(), jiraKey: z.string().min(1).optional(), context: z.string().trim().max(4000).optional(), requestId: z.string().uuid(), kind: noteKindSchema.optional() }),
 });
 
 export function createNotesRouter(service: DailyNotesService): Router {
@@ -106,6 +113,7 @@ export function createNotesRouter(service: DailyNotesService): Router {
           q: req.query.q as string | undefined,
           before: req.query.before as string | undefined,
           limit: req.query.limit as number | undefined,
+          kind: req.query.kind as DailyNoteKind | undefined,
         },
         req.auth!.user.workspaceId
       );
@@ -133,7 +141,8 @@ export function createNotesRouter(service: DailyNotesService): Router {
       const result = await service.getDay(
         req.auth!.user.accountId,
         req.params.date as string,
-        req.auth!.user.workspaceId
+        req.auth!.user.workspaceId,
+        req.query?.kind as DailyNoteKind | undefined
       );
       res.json(result);
     } catch (error) {
@@ -156,11 +165,13 @@ export function createNotesRouter(service: DailyNotesService): Router {
 
   router.put("/:date", validate(saveNoteSchema), async (req, res, next) => {
     try {
+      const kind = (req.body.kind ?? req.query?.kind) as DailyNoteKind | undefined;
       const result = await service.save(
         req.auth!.user.accountId,
         req.params.date as string,
         req.body,
-        req.auth!.user.workspaceId
+        req.auth!.user.workspaceId,
+        kind
       );
       res.json(result);
     } catch (error) {
@@ -174,7 +185,8 @@ export function createNotesRouter(service: DailyNotesService): Router {
         req.auth!.user.accountId,
         req.params.date as string,
         req.body,
-        req.auth!.user.workspaceId
+        req.auth!.user.workspaceId,
+        req.body.kind as DailyNoteKind | undefined
       );
       res.json(result);
     } catch (error) {

@@ -296,7 +296,7 @@ export function noteToPaletteItem(note: DailyNoteSummary, index: number): Palett
     group: 'notes',
     title: note.title || 'Daily note',
     description: note.excerpt ? `${dateLabel} · ${note.excerpt}` : dateLabel,
-    target: { type: 'view', view: 'notes', date: note.date },
+    target: { type: 'view', view: 'notes', date: note.date, kind: note.kind },
   };
 }
 

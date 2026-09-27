@@ -1,3 +1,4 @@
+import type { DailyNoteKind } from '@/types';
 import { isValidIsoDate } from './view-params';
 
 const DRAFT_PREFIX = 'lead-os:daily-note-draft:';
@@ -22,8 +23,9 @@ function scopePrefix(scope: string): string {
   return `${DRAFT_PREFIX}${encodeURIComponent(scope)}:`;
 }
 
-function draftKey(scope: string, date: string): string {
-  return `${scopePrefix(scope)}${date}`;
+function draftKey(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): string {
+  // Scratchpad keeps the bare-date key so pre-kind drafts still resolve.
+  return `${scopePrefix(scope)}${kind === 'scratchpad' ? date : `${date}#${kind}`}`;
 }
 
 function captureDraftKey(scope: string): string {
@@ -210,27 +212,27 @@ function enforceDraftCap(scope: string): void {
   }
 }
 
-export function readDailyNoteDraft(scope: string, date: string): DailyNoteDraft | null {
+export function readDailyNoteDraft(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): DailyNoteDraft | null {
   if (!scope || !date) {
     return null;
   }
-  const draft = readStored(draftKey(scope, date), isDailyNoteDraftFields);
+  const draft = readStored(draftKey(scope, date, kind), isDailyNoteDraftFields);
   return draft ? { body: draft.body, baseBody: draft.baseBody, revision: draft.revision } : null;
 }
 
-export function writeDailyNoteDraft(scope: string, date: string, draft: DailyNoteDraft): boolean {
+export function writeDailyNoteDraft(scope: string, date: string, draft: DailyNoteDraft, kind: DailyNoteKind = 'scratchpad'): boolean {
   if (!scope || !date) {
     return false;
   }
-  const ok = writeStored(draftKey(scope, date), draft);
+  const ok = writeStored(draftKey(scope, date, kind), draft);
   if (ok) {
     enforceDraftCap(scope);
   }
   return ok;
 }
 
-export function clearDailyNoteDraft(scope: string, date: string): void {
-  removeStored(draftKey(scope, date));
+export function clearDailyNoteDraft(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): void {
+  removeStored(draftKey(scope, date, kind));
 }
 
 export function readDailyNoteCaptureDraft(scope: string): DailyNoteCaptureDraft | null {

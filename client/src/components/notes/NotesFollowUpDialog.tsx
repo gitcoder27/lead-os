@@ -6,7 +6,7 @@ import { useCreateDailyNoteFollowUp } from '@/hooks/useDailyNotes';
 import { followUpPresets, toLocalDateTimeInputValue } from '@/components/tasks/task-detail-format';
 import { getLocalIsoDate } from '@/lib/utils';
 import { prettyNoteDate, splitTitleAndContext } from '@/lib/note-markdown';
-import type { CreateDailyNoteFollowUpPayload } from '@/types';
+import type { CreateDailyNoteFollowUpPayload, DailyNoteKind } from '@/types';
 import {
   NOTES_INPUT_CLASS,
   NOTES_INPUT_STYLE,
@@ -20,6 +20,7 @@ import {
 interface NotesFollowUpDialogProps {
   open: boolean;
   noteDate: string;
+  noteKind?: DailyNoteKind;
   selectedText: string;
   onClose: () => void;
   /** Called with the created follow-up's key so the note can mark the line (F7). */
@@ -28,7 +29,7 @@ interface NotesFollowUpDialogProps {
 
 const TITLE_MAX = 500;
 
-export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose, onDone }: NotesFollowUpDialogProps) {
+export function NotesFollowUpDialog({ open, noteDate, noteKind, selectedText, onClose, onDone }: NotesFollowUpDialogProps) {
   const { addToast } = useToast();
   const createFollowUp = useCreateDailyNoteFollowUp(noteDate);
   const [title, setTitle] = useState('');
@@ -81,6 +82,7 @@ export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose, onD
       title: trimmedTitle,
       followUpAt: followUpAtIso,
       requestId: requestKeyRef.current.id,
+      kind: noteKind,
     };
 
     createFollowUp.mutate(payload, {

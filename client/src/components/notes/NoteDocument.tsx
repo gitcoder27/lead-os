@@ -9,7 +9,7 @@ import { DatePickerPopover, isEditable } from '@/components/tasks/TaskDetailPrim
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import { CARRIED_PATTERN, inferFromText, prettyNoteDate, wrapUpCandidates, type WrapUpCandidate } from '@/lib/note-markdown';
 import { isValidIsoDate } from '@/lib/view-params';
-import type { DailyNoteRef, TodayActionTarget } from '@/types';
+import type { DailyNoteKind, DailyNoteRef, TodayActionTarget } from '@/types';
 import { NoteEditor, type NoteActionSource, type NoteEditorHandle, type NoteLineEdit } from './editor/NoteEditor';
 import type { NoteEditorHandlers, NoteEntityContext, NoteLineAction } from './editor/note-editor-extensions';
 import { NotesConflictPanel } from './NotesConflictPanel';
@@ -23,6 +23,7 @@ import { NotesWrapUpDialog } from './NotesWrapUpDialog';
 interface NoteDocumentProps {
   date: string;
   today: string;
+  kind?: DailyNoteKind;
   hidden?: boolean;
   mobile?: boolean;
   onNavigateDate: (date: string) => void;
@@ -50,6 +51,7 @@ function hasOpenLayer(): boolean {
 export function NoteDocument({
   date,
   today,
+  kind = 'scratchpad',
   hidden = false,
   mobile = false,
   onNavigateDate,
@@ -58,7 +60,7 @@ export function NoteDocument({
   onOpenHistory,
   jumpTerms,
 }: NoteDocumentProps) {
-  const editor = useDailyNoteEditor(date);
+  const editor = useDailyNoteEditor(date, kind);
   const { addToast } = useToast();
   const lookups = useNoteEntityLookups();
   const rosterQuery = useManagerDeskDeveloperLookup('', date);
@@ -216,14 +218,14 @@ export function NoteDocument({
   };
 
   return (
-    <section className="notes-document" aria-label={`Note for ${headingDate}`} hidden={hidden}>
+    <section className="notes-document" aria-label={kind === 'standup' ? `Standup note for ${headingDate}` : `Note for ${headingDate}`} hidden={hidden}>
       <div className="notes-document-inner">
         <header className="notes-doc-toolbar">
           <div className="min-w-0 flex-1">
             {mobile ? (
               <p className="notes-doc-mobile-label">
                 <Lock size={10} aria-hidden="true" />
-                Notes · Only you
+                {kind === 'standup' ? 'Standup · Only you' : 'Notes · Only you'}
               </p>
             ) : null}
             <div className="flex min-w-0 items-center gap-2">
@@ -235,6 +237,7 @@ export function NoteDocument({
               ) : null}
               <h2 className="notes-doc-heading">
                 {heading}
+                {kind === 'standup' ? <span className="notes-kind-pill">Standup</span> : null}
                 {isToday ? <span className="notes-today-pill">Today</span> : null}
               </h2>
             </div>
@@ -326,8 +329,14 @@ export function NoteDocument({
               onBlur={() => void editor.flush()}
               handlers={handlers}
               entityContext={entityContext}
-              placeholder={isToday ? 'What’s on your mind today?' : 'Thoughts, observations, things to come back to…'}
-              ariaLabel={`Notes for ${headingDate}`}
+              placeholder={
+                kind === 'standup'
+                  ? 'Standup notes for this day…'
+                  : isToday
+                    ? 'What’s on your mind today?'
+                    : 'Thoughts, observations, things to come back to…'
+              }
+              ariaLabel={kind === 'standup' ? `Standup note for ${headingDate}` : `Notes for ${headingDate}`}
               actionsDisabled={actionsDisabledReason !== null}
               mobile={mobile}
             />
@@ -401,6 +410,7 @@ export function NoteDocument({
       <NotesFollowUpDialog
         open={actionDialog?.kind === 'follow-up'}
         noteDate={date}
+        noteKind={kind}
         selectedText={actionDialog?.kind === 'follow-up' ? actionDialog.text : ''}
         onClose={closeActionDialog}
         onDone={({ taskKey }) => markSourceLine(taskKey)}
@@ -409,6 +419,7 @@ export function NoteDocument({
         open={actionDialog?.kind === 'task' || actionDialog?.kind === 'update'}
         mode={actionDialog?.kind === 'update' ? 'update' : 'create'}
         noteDate={date}
+        noteKind={kind}
         selectedText={actionDialog && actionDialog.kind !== 'follow-up' ? actionDialog.text : ''}
         inference={actionDialog?.inference}
         onClose={closeActionDialog}
@@ -417,6 +428,7 @@ export function NoteDocument({
       <NotesWrapUpDialog
         open={wrapUp !== null}
         noteDate={date}
+        noteKind={kind}
         today={today}
         candidates={wrapUp ?? []}
         developers={developers}

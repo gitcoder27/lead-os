@@ -7,6 +7,7 @@ import { DeveloperPicker } from '@/components/capture/DeveloperPicker';
 import { TaskPicker, parseTaskKeys, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { lineContent, prettyNoteDate, splitTitleAndContext } from '@/lib/note-markdown';
 import type { ManagerDeskDeveloperLookupItem } from '@/types/manager-desk';
+import type { DailyNoteKind } from '@/types';
 import {
   NOTES_INPUT_CLASS,
   NOTES_INPUT_STYLE,
@@ -29,6 +30,7 @@ interface NotesTaskActionDialogProps {
   open: boolean;
   mode: NotesTaskActionMode;
   noteDate: string;
+  noteKind?: DailyNoteKind;
   selectedText: string;
   /** F8: targets pre-picked from what the line says. */
   inference?: NotesTaskActionInference;
@@ -56,7 +58,7 @@ function updateText(text: string): string {
     .slice(0, TEXT_MAX);
 }
 
-export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, inference, onClose, onDone }: NotesTaskActionDialogProps) {
+export function NotesTaskActionDialog({ open, mode, noteDate, noteKind, selectedText, inference, onClose, onDone }: NotesTaskActionDialogProps) {
   const { addToast } = useToast();
   const addUpdate = useAddDailyNoteTaskUpdate(noteDate);
   const createTask = useCreateDailyNoteTask(noteDate);
@@ -143,6 +145,7 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, infe
         type: eventType,
         visibility,
         requestId: requestKeyRef.current.id,
+        kind: noteKind,
       },
       {
         onSuccess: () => {
@@ -179,6 +182,7 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, infe
         jiraKey: jiraKey.trim() || undefined,
         context,
         requestId: requestKeyRef.current.id,
+        kind: noteKind,
       },
       {
         onSuccess: (task) => {

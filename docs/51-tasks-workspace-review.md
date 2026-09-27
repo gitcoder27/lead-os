@@ -68,6 +68,8 @@ In screenshot 2, the Waiting groups include both **Me** and **Ayan Saha**. The m
 Today filters `status ∈ open/active/blocked` (`:50`). A completed task lingers only until focus moves, then it's gone. The only place to see today's progress is "Closed this week", which is split at Monday. For a daily planning surface, "what did I get done" is half the ritual. Spec §0 bans progress bars, fine, but it doesn't require hiding completions.
 *Fix:* append a collapsed "Done today (n)" group to Today, filtered by `closedAt` = today. This costs one filter clause and zero chrome when collapsed.
 
+**Implemented —** Today fires a second `viewDef` query (`owner:me`, `closed` today) and appends a collapsible "Done today" group; zero chrome when empty, hidden while filtered/searched, and excluded from the toolbar count.
+
 **F6 — "Closed this week" resets on Monday. S3.**
 `weekStart()` (`:38-41`). On Monday morning, which is exactly when you prep the week, the view is empty. A rolling "Closed · last 7 days" is more useful. The closed date is also `closedAt.slice(0,10)` (`:158`), a UTC date compared with the client's local `today`. For IST, anything closed between 00:00 and 05:30 is filed under the previous day.
 
@@ -79,12 +81,18 @@ Today filters `status ∈ open/active/blocked` (`:50`). A completed task lingers
 Sort is `planDate → startsAt → createdAt → id` (`task-views.service.ts:189-205`). The manager can't say "this first". Spec §13 puts drag-and-drop out of scope, which is fair. But ordering doesn't need drag: `Alt+↑/↓` (or `Shift+Alt+j/k`) on a per-day `position` would do.
 *Why it matters:* a daily plan without order is a list, not a plan. This is the single biggest gap for "builds and maintains the daily plan".
 
+**Implemented —** `tasks.schedule_position` (nullable, NULL = unpositioned-sorts-last) orders rows inside each plan-date bucket of the `scheduled` sort; `Alt+↑/↓` on a focused row rewrites the same-date block densely via `/tasks/bulk` with full inverse-patch undo. Views that don't group by schedule are untouched.
+
 **F8 — The schedule menu has presets only, no date picker. S1.**
 `TaskMenus.tsx:82-88` offers Today, Tomorrow, Next Monday, Later, and Clear. There is no way to schedule "Thursday" from the list. You have to open the drawer, whose `DatePickerPopover` (`TaskDetailPrimitives.tsx:160`) already supports presets plus a picked date.
 *Fix:* reuse `DatePickerPopover` as the list's schedule menu, keeping the `t/m/w/l/c` accelerators and adding a date field. Consider adding weekday accelerators (`1`–`7`).
 
+**Implemented —** the list menu is now `DatePickerPopover`: same `t/m/w/l/c` accelerators, a date field that commits on Set/Enter, and `1`–`7` jump to the next weekday.
+
 **F9 — No priority action on the list. S3.**
 You can sort by priority and the row shows a high-priority flag, but you can only set priority in the drawer (`p`). Add `p` to the list keyboard map and the ⋯ menu for parity.
+
+**Implemented —** `p` opens a Normal/High radio menu (multi-select aware); the ⋯ menu has a matching Priority… item.
 
 ### 1.3 Actions, undo, lingering
 
@@ -94,21 +102,31 @@ What works well: every list mutation goes through `/tasks/bulk` with an inverse-
 `TasksPage.tsx:525-543`. The page's own rule is "undo instead of confirm", and this is the one destructive action that has neither. `window.prompt` is also the only native dialog in the app.
 *Fix:* rename inline in the rail (the save-view form already exists at `TaskViewRail.tsx:100-128`), and make delete undoable via a toast that re-creates the view.
 
+**Implemented —** the pencil opens an inline rename field (Enter/blur commits, Esc cancels); delete shows an Undo toast that re-saves the view with its original definition. `window.prompt` is gone.
+
 **F11 — "Link copied" shows even when copying failed. S3.**
 `TasksPage.tsx:723-727`: `navigator.clipboard?.writeText` is neither awaited nor checked. On a non-secure origin, or when permission is denied, you get a success toast and an empty clipboard.
+
+**Implemented —** the promise result gates the toast; missing/denied clipboard gets an error toast instead.
 
 **F12 — Toast copy and noise. S3.**
 - `setStatus` produces "1 task → blocked" (`:302`), a raw lowercase enum. Use the status labels from `TASK_STATUS_META`.
 - Choosing the status a task already has fires an info toast, "Nothing to change — skipped 1 task" (`:272`). Silence is correct there.
 
+**Implemented —** status toasts use `TASK_STATUS_META` labels ("3 tasks → Blocked"), and all-skip actions are silent.
+
 **F13 — The lingering hint is vaguer than the spec, and lingering rows lose contrast. S3.**
 The spec's R1 says "Moved → Tomorrow". The code renders an italic "moved" (`TaskListRow.tsx:143-145`). The whole lingering row, including its actions, drops to `opacity: 0.55` (`:94`), which pushes muted text below legible contrast. Dim only the title and metadata, and name the destination.
+
+**Implemented —** the hint names the destination ("moved → Tomorrow", "done", "assigned → Inbox") and only the title/meta content dims — the status glyph, selection box, and hover actions stay full-opacity.
 
 ### 1.4 Inline add
 
 **F14 — `n` does nothing on an empty view. S2.**
 When `flatRows` is empty, the page renders a second `TaskList` whose only group is keyed `'empty'` (`TasksPage.tsx:620-639`). But `n` sets `addingGroup` to `groups[0].key`, which is `'all'` for ungrouped views, and is undefined for grouped ones, because an empty grouped list has no groups (`:459-463`). An empty Today is exactly when you want `n` ("Nothing planned for today" → add). The second-`TaskList` pattern is itself a hack; it passes a no-op `onMoveOverdueToToday` and an empty `selected`.
 *Fix:* render a standalone `InlineAddRow` under the empty state, keyed so that `n` opens it.
+
+**Implemented —** the fake second `TaskList` is gone; a standalone `InlineAddRow` renders under the empty copy and `n` opens it via the `empty-view` key (still suppressed on filtered/searched or read-only queues).
 
 **F15 — Inline-add inheritance is sound.** `inlineAddDefaults` (`task-list.ts:214-253`) plus the server default `ownerType = manager` (`task.service.ts:248`) correctly land a task typed into Today in Today. One quirk: adding into a **Done** status group creates a task that is already done. Hide the `+` on closed status groups.
 
@@ -140,6 +158,8 @@ Tasks/Meetings has its own toolbar chip, but meetings have their own route and t
 **F19 — The drawer can't step to the next task. S2.**
 The drawer is a modal with a scrim (`TaskDrawer.tsx:100-125`). The list's key handler is disabled while it's open (`TasksPage.tsx:411`), and the drawer's shortcuts are `e s a p l u` only (`TaskDrawer.tsx:279-284`). Reviewing Inbox one task at a time costs Esc → j → Enter per item.
 *Fix:* add `j/k` (or `[`/`]`) to the drawer when it's opened from the list, passing the list order in. This is the cheapest way to get "triage mode" (spec §13 punts a dedicated one).
+
+**Implemented —** the page hands the visible row order (`orderedKeys`) plus an `onStepTask` callback to the drawer; `j`/`k` step through it, closing returns focus to the last-viewed row. Dead inside inputs and popovers as usual.
 
 **F20 — Shortcut vocabulary differs between list and drawer. S3.**
 - The list uses Space / `e` for done. The drawer uses `E`.
@@ -225,22 +245,37 @@ The new TaskDrawer uses the same tokens and a `TaskPopover` / `MenuItem` vocabul
 The design is fine at current scale (tens to low hundreds of rows). There is no S1 here.
 
 - **P1 — Every mutation invalidates nine query roots.** `useTaskListMutations.ts:24-28` invalidates `tasks`, `task-view-counts`, `task-detail`, `task-events`, `today`, `manager-desk`, `team-tracker`, `my-day`, and `workload`. On `/tasks`, that means a view refetch plus a counts refetch. The counts call is one universe query, one drift list, one latest-activity batch, and the saved-view list (`task-views.service.ts:326-351`). Triaging 20 items with `Space` makes ~40 server round-trips. Acceptable, but debounce the counts invalidation (e.g. 500ms trailing) or patch counts optimistically. **S3.**
+
+  **Implemented —** `task-view-counts` is invalidated on a shared 500ms trailing timer; the other roots still invalidate immediately.
 - **P2 — Invalidating `['tasks']` marks every cached view stale.** Switching views after a mutation always refetches. `keepPreviousData` hides it. Fine. **S3.**
 - **P3 — No virtualisation, and there's a motion wrapper per row.** Every row sits inside a `motion.div` under `AnimatePresence` (`TaskList.tsx:66-89`), and every status glyph is a spring-animated `motion.span` keyed by status with an `initial` scale of 0.6 (`TaskMenus.tsx:38-53`). Newly mounted rows after a view switch will pop their glyphs *(code-inferred)*, which the spec reserved for the toggle only. "Closed this week" or a saved "all team" view with several hundred rows will feel it. Drop the glyph `initial` unless the status changed, and virtualise above ~200 rows. **S3.**
+
+  **Implemented (glyph) —** the status glyph only plays its scale-in when the status actually changed, not on mount. Row virtualisation remains open.
 - **P4 — Good:** `TaskListRow` is memoised with ref-stable handlers (`TasksPage.tsx:391-405`), and the popover is portalled. Row re-renders on selection are bounded.
 
 ### 4.2 Accessibility
 
 - **A1 — The listbox structure is invalid. S2.** `role="listbox"` (`TaskList.tsx:49`) directly contains `<section>`, `<header>`, `<h2>`, and buttons ("Move all to today", "+", inline add). A listbox may only own `option` / `group`. Each `role="option"` row (`TaskListRow.tsx:83`) contains buttons, and option children are presentational, so assistive tech may not expose them at all. *Fix:* sections → `role="group"` with `aria-labelledby`, and move header controls outside the listbox. Or switch to `role="grid"` with rows and cells, which is the right pattern for rows with actions.
+
+  **Implemented —** each section is now `role="group"` labelled by its `h2`; the `listbox` holds only `option` rows and group headers (with their buttons) and inline-add rows sit outside it.
+
 - **A2 — Row names omit what sighted users scan for. S2.** The row's `aria-label` is `"T-12 title, Open"` (`TaskListRow.tsx:86`). The date or overdue state, owner, and signals are absent, and because it's an `aria-label` it overrides the inner text. Build it from the same parts as the visual row ("…, Open, 2 days overdue, Deepak, follow-up due").
+
+  **Implemented —** the label is built from the visible parts: key + title, status label, the relative date, owner (when shown), every rendered signal, and the lingering destination hint.
+
 - **A3 — Contrast failures. S2.**
   - Task keys and the dropped glyph use `--text-disabled`: `#5F687A` on the dark background ≈ 3.4:1, and `#94A3B8` on white ≈ 2.6:1 (`index.css:23`, `:60`). Both are below 4.5:1 for 11px text.
   - Lingering rows at 0.55 opacity push muted text lower still.
   - The rail's zero-state numerals and `--text-muted` 10.5px headings should be checked too.
+
+  **Implemented —** `--text-disabled` is now `#64748B` light (≈4.6:1) and `#7B8598` dark (≈5.1:1); lingering rows no longer dim their actions and the dimmed span sits at 0.6 over fixed muted tones. `--text-muted` was already ≥6:1 in both themes; rail numerals use it at 11px.
+
 - **A4 — Actions are not reachable from the keyboard via Tab. S3 (mitigated).** Every row button is `tabIndex={-1}`. The key map covers all actions, so keyboard users are fine, but screen-reader users navigating by Tab or virtual cursor can't reach status/schedule/⋯. A grid pattern (A1) fixes this.
 - **A5 — Focus management gaps. S3.**
   - The toolbar filter popovers close on outside mousedown without restoring focus (`TaskPopover.tsx:62-70` calls `onClose`, not `close`).
   - The shortcuts dialog is `aria-modal` but doesn't trap Tab (`TaskListStates.tsx:132-167`). `useModalFocus` exists; use it.
+
+  **Implemented —** outside clicks now go through the same focus-restoring `close()` as Esc/Tab, and `TaskShortcutsDialog` uses `useModalFocus` (Tab cycles, unmount restores).
 - **A6 — Reduced motion is handled** for rows, the bulk bar, the glyph, and the drawer. Good.
 
 ### 4.3 Behaviour and resilience
@@ -249,13 +284,26 @@ The design is fine at current scale (tens to low hundreds of rows). There is no 
 - **B2 — Server/client date skew.** The server buckets `dueAt` with `isoDatePart` in *server* local time (`utils/date.ts:24-36`). The client uses browser local time (`task-list.ts:19-24`), and `closedAt` is sliced as UTC (`task-views.service.ts:158`). This is harmless while the server and every user are in IST. It breaks D3's "the client supplies today" promise for any other timezone, because a row can be a member (server) of a bucket it doesn't render in (client). Pass the client's IANA zone alongside `today`. **S3 today, S2 if the team spans zones.**
 - **B3 — The error state keeps stale data visible**, per spec. Good. Counts fail silently, per spec. Acceptable.
 - **B4 — Selection survives on lingering rows.** After "Mark 5 done", the bar still says "5 selected" and Space reopens them. That's defensible as a second undo, but surprising. Clear the selection after a bulk action that removes rows from the view.
+
+  **Implemented —** applying `done`/`dropped`/`later:true` drops those keys from the selection, so the bulk bar never counts rows that are leaving.
+
 - **B5 — The g-chord timer isn't cleared on unmount** (`TasksPage.tsx:443-444`). Trivial.
+
+  **Implemented —** an unmount effect clears it.
 
 ### 4.4 Responsiveness
 
 - **R1 — Below `md` the rail becomes an unlabeled `<select>` without counts** (`TaskToolbar.tsx:85-93`). On a phone you lose the Inbox and Needs-attention badges, the main reasons to open the page. **S2.**
+
+  **Implemented —** the `<select>` options now carry each view's count ("Inbox (3)").
+
 - **R2 — The bulk bar overflows on phones.** It's five labelled buttons plus a count and a close, with no wrap (`TaskBulkBar.tsx:15-38`), about 480px wide, centred in an `overflow-hidden` section. On a 375px screen it's clipped *(code-inferred)*. Go icon-only below `sm`. **S2.**
+
+  **Implemented —** bulk buttons are icon-only below `sm` (labels remain via aria-label/title).
+
 - **R3 — The toolbar wraps to 2–3 lines on phones** (search min 180px, plus four chips and Display). Collapse the filters behind one "Filter" button below `sm`. **S3.**
+
+  **Implemented —** chips and Display hide below `sm` behind a single "Filter (n)" button that opens one combined popover (Owner · Status · Label · Signal · Sort · Group · Clear all).
 - **R4 — There's no touch path to selection or hover actions** (U4). Mobile is effectively read, open, and status-menu only. Given the persona (a desk-bound manager), it's acceptable to *declare* mobile read-mostly, but then do it on purpose: larger row targets and a long-press to select. **S3.**
 
 ---

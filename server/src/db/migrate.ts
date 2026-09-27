@@ -363,6 +363,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority              TEXT NOT NULL DEFAULT 'normal',
   labels_json           TEXT,
   scheduled_on          TEXT,
+  schedule_position     INTEGER,
   due_at                TEXT,
   follow_up_at          TEXT,
   starts_at             TEXT,
@@ -726,6 +727,8 @@ const alterStatements = [
   "CREATE TABLE IF NOT EXISTS standup_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, date TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT NOT NULL, reviewed_json TEXT NOT NULL DEFAULT '[]', flagged_json TEXT NOT NULL DEFAULT '[]', log_json TEXT NOT NULL DEFAULT '[]', summary TEXT NOT NULL DEFAULT '', request_id TEXT, created_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_standup_sessions_manager_end ON standup_sessions(workspace_id, manager_account_id, ended_at)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_sessions_request ON standup_sessions(workspace_id, manager_account_id, request_id)",
+  // docs/51 F7: per-day manual ordering for schedule-grouped task views.
+  "ALTER TABLE tasks ADD COLUMN schedule_position INTEGER",
 ];
 
 const constraintRepairStatements = [

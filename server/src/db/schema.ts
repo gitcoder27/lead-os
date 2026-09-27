@@ -442,6 +442,9 @@ export const tasks = sqliteTable("tasks", {
   priority: text("priority").notNull().default("normal"),
   labelsJson: text("labels_json"),
   scheduledOn: text("scheduled_on"),
+  // docs/51 F7: manual order within a plan-date bucket. NULL = unpositioned
+  // (sorts after positioned rows within the same bucket).
+  schedulePosition: integer("schedule_position"),
   dueAt: text("due_at"),
   followUpAt: text("follow_up_at"),
   startsAt: text("starts_at"),

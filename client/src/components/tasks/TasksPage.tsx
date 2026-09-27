@@ -29,22 +29,26 @@ import {
   inlineAddDefaults,
   isOpenStatus,
   lingerEntriesFor,
+  lingerHint,
   optimisticTask,
   scheduleChanges,
   searchTasks,
+  taskPlanDate,
+  shortDay,
   toggledDoneStatus,
   type LingerEntry,
+  type ListTask,
   type RenderGroup,
   type SchedulePreset,
 } from '@/lib/task-list';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
-import type { ManagerTask, TaskStatus, TaskViewMeta, UpdateTaskRequest } from '@/types';
+import type { ManagerTask, TaskStatus, TaskViewDefinition, TaskViewMeta, UpdateTaskRequest } from '@/types';
 import { TaskDrawer, navigateToTaskPage } from './TaskDrawer';
 import { TaskBulkBar } from './TaskBulkBar';
-import { TaskList } from './TaskList';
+import { InlineAddRow, TaskList } from './TaskList';
 import type { TaskRowHandlers } from './TaskListRow';
 import { TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
-import { AssignMenu, LabelMenu, MoreMenu, ScheduleMenu, StatusMenu, type AssignTarget, type TaskMenuKind } from './TaskMenus';
+import { AssignMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
 import { TaskToolbar } from './TaskToolbar';
 import { TaskViewRail } from './TaskViewRail';
 
@@ -83,6 +87,9 @@ const GO_CHORD_VIEWS: Record<string, string> = {
   c: 'closed-week',
 };
 const GO_CHORD_TIMEOUT_MS = 1200;
+
+/** docs/51 F14: pseudo-group key for the standalone add row on empty views. */
+const EMPTY_ADD_KEY = 'empty-view';
 
 function isEditable(element: HTMLElement): boolean {
   return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
@@ -135,6 +142,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const [menu, setMenu] = useState<OpenMenuState | null>(null);
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [doneTodayOpen, setDoneTodayOpen] = useState(false);
 
   // External URL changes (popstate, palette deep links) replace local state.
   useEffect(() => {
@@ -158,6 +166,11 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     onUrlStateChange?.(state);
   }, [onUrlStateChange, state]);
 
+  // docs/51 B5: an armed `g` chord must not outlive the page.
+  useEffect(() => () => {
+    if (goChordTimer.current) window.clearTimeout(goChordTimer.current);
+  }, []);
+
   // ── View + data ──────────────────────────────────────────────────────────
   const allViews = useMemo(() => views.data?.views ?? [], [views.data]);
   const selectedId = state.view ?? DEFAULT_TASK_VIEW_ID;
@@ -170,6 +183,20 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const tasks = useTaskViewTasks(definition, Boolean(definition), today);
   const taskList = useMemo(() => tasks.data?.tasks ?? [], [tasks.data]);
   const overridesActive = hasTaskViewOverrides(state.overrides);
+
+  // docs/51 F5: the Today view appends a collapsed "Done today" group — tasks
+  // closed today stay visible as progress instead of vanishing. Hidden while
+  // the view is filtered or searched.
+  const doneTodayEnabled = selectedView?.id === 'today' && !overridesActive && !state.q;
+  const doneTodayDefinition = useMemo<TaskViewDefinition>(
+    () => ({ filters: { owner: 'me', closed: { from: today, to: today } }, sort: 'updated' }),
+    [today],
+  );
+  const doneTodayQuery = useTaskViewTasks(doneTodayDefinition, doneTodayEnabled, today);
+  const doneTodayRows = useMemo(
+    () => (doneTodayEnabled ? (doneTodayQuery.data?.tasks ?? []) : []),
+    [doneTodayEnabled, doneTodayQuery.data],
+  );
 
   const developerList = useMemo(() => developers.data ?? [], [developers.data]);
   // docs/51 F3: my linked developer account is me — same identity the server
@@ -198,7 +225,23 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     [taskList, state.q, definition?.group, today, ownerName, selfAccountId],
   );
   const groups = useMemo(() => applyLingering(baseGroups, lingering), [baseGroups, lingering]);
-  const flatRows = useMemo(() => groups.flatMap((group) => group.tasks), [groups]);
+  const displayGroups = useMemo<RenderGroup[]>(() => {
+    if (!doneTodayRows.length) return groups;
+    return [
+      ...groups,
+      {
+        key: 'done-today',
+        label: 'Done today',
+        context: { mode: 'none' },
+        tasks: doneTodayOpen ? (doneTodayRows as ListTask[]) : [],
+        collapsible: true,
+        collapsed: !doneTodayOpen,
+        count: doneTodayRows.length,
+      },
+    ];
+  }, [groups, doneTodayRows, doneTodayOpen]);
+  const doneTodayKeys = useMemo(() => new Set(doneTodayRows.map((task) => task.taskKey)), [doneTodayRows]);
+  const flatRows = useMemo(() => displayGroups.flatMap((group) => group.tasks), [displayGroups]);
   const rowByKey = useMemo(() => new Map(flatRows.map((row) => [row.taskKey, row])), [flatRows]);
 
   // ── Lingering / selection / focus housekeeping ───────────────────────────
@@ -209,6 +252,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     // R2(b): view, overrides or search changes drop lingering rows.
     clearLingering();
     setAddingGroup(null);
+    setDoneTodayOpen(false);
   }, [viewSignature, clearLingering]);
   useEffect(() => {
     setSelected((current) => (current.size ? new Set() : current));
@@ -275,15 +319,36 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       if (changes) items.push({ task, changes });
     }
     const skipped = targets.length - items.length;
-    if (!items.length) {
-      if (skipped) addToast({ type: 'info', title: `Nothing to change — skipped ${plural(skipped)}` });
-      return;
+    // docs/51 F12: an all-skip action is a no-op — say nothing.
+    if (!items.length) return;
+    // docs/51 B4: a bulk action that removes rows from the view drops their
+    // selection too, so the bulk bar never counts invisible rows.
+    const removedKeys = items
+      .filter((item) => item.changes.status === 'done' || item.changes.status === 'dropped' || item.changes.later === true)
+      .map((item) => item.task.taskKey);
+    if (removedKeys.length) {
+      setSelected((current) => {
+        if (!removedKeys.some((key) => current.has(key))) return current;
+        const next = new Set(current);
+        for (const key of removedKeys) next.delete(key);
+        return next;
+      });
     }
-    // R1: pin acted-on rows where they are, showing their new state.
-    const entries = lingerEntriesFor(groups, items.map((item) => optimisticTask(item.task, item.changes)));
+    // R1 + docs/51 F13: pin acted-on rows where they are, showing their new
+    // state and a hint naming where the change sent them. Done-today rows
+    // don't pin — the appended group only exists in displayGroups.
+    const lingerable = items.filter((item) => !doneTodayKeys.has(item.task.taskKey));
+    const entries = lingerEntriesFor(
+      groups,
+      lingerable.map((item) => optimisticTask(item.task, item.changes)),
+      new Map(lingerable.map((item) => [item.task.taskKey, lingerHint(item.changes, today, ownerName)])),
+    );
     setLingering((current) => {
       const next = new Map(current);
-      for (const [key, entry] of entries) next.set(key, current.get(key) ? { ...current.get(key)!, task: entry.task } : entry);
+      for (const [key, entry] of entries) {
+        const pinned = current.get(key);
+        next.set(key, pinned ? { ...pinned, task: entry.task, hint: entry.hint ?? pinned.hint } : entry);
+      }
       return next;
     });
     await mutations.apply(items, {
@@ -291,7 +356,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       undoable: options.undoable,
       onUndo: clearLingering,
     });
-  }, [addToast, clearLingering, groups, mutations]);
+  }, [clearLingering, groups, mutations, today, ownerName, doneTodayKeys]);
 
   const toggleDone = useCallback((targets: ManagerTask[]) => {
     const reopen = targets.every((task) => !isOpenStatus(task.status));
@@ -306,9 +371,49 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     void applyChanges(
       targets,
       (task) => (task.status === status ? null : { status }),
-      (count) => `${plural(count)} → ${status}`,
+      // docs/51 F12: toasts name the status label, not the raw enum value.
+      (count) => `${plural(count)} → ${TASK_STATUS_META[status].label}`,
     );
   }, [applyChanges]);
+
+  const setPriority = useCallback((targets: ManagerTask[], priority: TaskPriority) => {
+    void applyChanges(
+      targets,
+      (task) => (task.priority === priority ? null : { priority }),
+      (count) => `${plural(count)} → ${priority === 'high' ? 'High' : 'Normal'} priority`,
+    );
+  }, [applyChanges]);
+
+  /**
+   * docs/51 F7: Alt+↑/↓ reorders the focused task inside its plan-date block
+   * (only on schedule-grouped views). The whole same-date block is rewritten
+   * with dense positions so new inserts land predictably. Reorder goes through
+   * `mutations.apply` directly — pinning rows would defeat the point.
+   */
+  const reorderInBucket = useCallback((taskKey: string, delta: -1 | 1) => {
+    if (definition?.group !== 'scheduled') return;
+    const group = groups.find(
+      (candidate) => candidate.context.mode === 'scheduled' && candidate.tasks.some((row) => row.taskKey === taskKey),
+    );
+    if (!group) return;
+    const rows = group.tasks;
+    const index = rows.findIndex((row) => row.taskKey === taskKey);
+    if (index < 0) return;
+    const planDate = taskPlanDate(rows[index]!).date;
+    let lo = index;
+    let hi = index;
+    while (lo > 0 && taskPlanDate(rows[lo - 1]!).date === planDate) lo -= 1;
+    while (hi < rows.length - 1 && taskPlanDate(rows[hi + 1]!).date === planDate) hi += 1;
+    const target = index + delta;
+    if (target < lo || target > hi) return;
+    const order = rows.slice(lo, hi + 1).map((row) => row.taskKey);
+    order.splice(target - lo, 0, ...order.splice(index - lo, 1));
+    const items: TaskChangeItem[] = order
+      .map((key, position) => ({ task: rowByKey.get(key)!, changes: { schedulePosition: position } }))
+      .filter((item) => item.task.schedulePosition !== item.changes.schedulePosition);
+    if (!items.length) return;
+    void mutations.apply(items, { label: 'Reordered tasks' });
+  }, [definition?.group, groups, mutations, rowByKey]);
 
   const schedule = useCallback((targets: ManagerTask[], preset: SchedulePreset) => {
     const changes = scheduleChanges(preset, today);
@@ -434,6 +539,16 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     const focused = focusedKeyRef.current;
     const anchor = focused ? rowElement(focused) : null;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    // docs/51 F7: Alt+↑/↓ reorders the focused row within its day bucket on
+    // schedule-grouped views. Alt+anything-else keeps its normal behavior.
+    if (event.altKey) {
+      goChordArmed.current = false;
+      if (focused && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        reorderInBucket(focused, event.key === 'ArrowDown' ? 1 : -1);
+        event.preventDefault();
+      }
+      return;
+    }
     // `g` arms a view chord; the next letter switches the rail view. A
     // non-view key after `g` falls through and works normally.
     if (goChordArmed.current) {
@@ -462,10 +577,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       case 's': openMenu('schedule', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'a': openMenu('assign', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'l': openMenu('label', targetsFor().map((task) => task.taskKey), anchor); break;
+      case 'p': openMenu('priority', targetsFor().map((task) => task.taskKey), anchor); break;
       case '#': drop(targetsFor()); break;
       case 'n': {
         const group = groups.find((candidate) => candidate.tasks.some((row) => row.taskKey === focused)) ?? groups[0];
+        // docs/51 F14: an empty, unfiltered view still hosts an add row.
         if (group) setAddingGroup(group.key);
+        else if (canAddToEmptyView) setAddingGroup(EMPTY_ADD_KEY);
+        else handled = false;
         break;
       }
       case '/': searchRef.current?.focus(); break;
@@ -482,7 +601,9 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
+      // docs/51 F7: Alt pairs only with ↑/↓ — every other Alt combo is ignored.
+      if (event.altKey && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
       const active = document.activeElement as HTMLElement | null;
       if (active && active !== document.body && !mainRef.current?.contains(active)) return;
       if (active && isEditable(active)) return;
@@ -533,19 +654,35 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     try {
       await deleteView.mutateAsync(Number(view.id.slice(6)));
       if (view.id === selectedId) setState({ view: undefined, overrides: {} });
-      addToast('View deleted', 'success');
+      // docs/51 F10: deletes are undoable — Undo recreates the view with its
+      // original definition so nothing is lost.
+      addToast({
+        type: 'success',
+        title: `Deleted view "${view.name}"`,
+        duration: 6000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            void saveView.mutateAsync({ name: view.name, definition: view.definition }).then(
+              () => addToast('View restored', 'success'),
+              (error: Error) => addToast(error.message, 'error'),
+            );
+          },
+        },
+      });
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Could not delete view', 'error');
     }
   };
-  const handleRenameSaved = async (view: TaskViewMeta) => {
-    const name = window.prompt('Rename view', view.name)?.trim();
-    if (!name || name === view.name) return;
+  const handleRenameSaved = async (view: TaskViewMeta, name: string): Promise<boolean> => {
+    if (!name.trim() || name.trim() === view.name) return true;
     try {
-      await updateView.mutateAsync({ id: Number(view.id.slice(6)), updates: { name } });
+      await updateView.mutateAsync({ id: Number(view.id.slice(6)), updates: { name: name.trim() } });
       addToast('View renamed', 'success');
+      return true;
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Could not rename view', 'error');
+      return false;
     }
   };
 
@@ -564,8 +701,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const candidates = Math.max(0, (countData?.['my-tasks']?.count ?? 0) - (countData?.today?.count ?? 0)) + (countData?.inbox?.count ?? 0);
   const firstLoad = tasks.isLoading && !tasks.data;
   const updating = tasks.isFetching && tasks.isPlaceholderData;
-  const visibleCount = tasks.data ? flatRows.filter((row) => !row.lingering).length : undefined;
+  // docs/51 F14: add is offered on empty views unless filters/search narrowed
+  // the result or the view is a read-only queue.
+  const canAddToEmptyView = !overridesActive && !state.q && selectedView?.id !== 'attention' && selectedView?.id !== 'closed-week';
+  const visibleCount = tasks.data
+    ? flatRows.filter((row) => !row.lingering && !doneTodayKeys.has(row.taskKey)).length
+    : undefined;
   const menuTarget = menuTargets[0];
+  const orderedKeys = useMemo(() => flatRows.map((row) => row.taskKey), [flatRows]);
 
   return (
     <main ref={mainRef} className="flex min-h-0 flex-1 overflow-hidden" aria-label="Tasks">
@@ -588,6 +731,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           count={visibleCount}
           updating={updating}
           views={allViews}
+          counts={countData}
           viewId={selectedView?.id ?? selectedId}
           onSelectView={(id) => setView(id)}
           overrides={state.overrides}
@@ -614,7 +758,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           )}
           {firstLoad ? (
             <TaskListSkeleton />
-          ) : !tasks.data ? null : flatRows.length === 0 ? (
+          ) : !tasks.data ? null : flatRows.length === 0 && !doneTodayRows.length ? (
             <>
               <TaskListEmpty
                 viewId={selectedView?.id}
@@ -624,30 +768,22 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
                 onPlanDay={() => setView('my-tasks')}
                 onClearFilters={() => setState((current) => ({ view: current.view, overrides: {} }))}
               />
-              {!overridesActive && !state.q && selectedView?.id !== 'attention' && selectedView?.id !== 'closed-week' && (
-                <div className="mx-auto max-w-md">
-                  <TaskList
-                    groups={[{ key: 'empty', label: '', tasks: [], context: { mode: 'none' } }]}
-                    definition={definition}
-                    today={today}
-                    attentionMode={false}
-                    focusedKey={undefined}
-                    selected={selected}
-                    ownerName={ownerName}
-                    labelColor={labelColor}
-                    handlers={stableHandlers}
-                    addingGroup={addingGroup}
-                    onStartAdd={setAddingGroup}
-                    onCancelAdd={() => setAddingGroup(null)}
-                    onSubmitAdd={handleInlineAdd}
-                    onMoveOverdueToToday={() => {}}
+              {/* docs/51 F14: a real add row, not a fake second task list — `n` opens it. */}
+              {canAddToEmptyView && (
+                <div className="mx-auto w-full max-w-[1180px] px-4">
+                  <InlineAddRow
+                    active={addingGroup === EMPTY_ADD_KEY}
+                    onStart={() => setAddingGroup(EMPTY_ADD_KEY)}
+                    onCancel={() => setAddingGroup(null)}
+                    onSubmit={(title) => handleInlineAdd({ mode: 'none' }, title)}
+                    groupLabel=""
                   />
                 </div>
               )}
             </>
           ) : (
             <TaskList
-              groups={groups}
+              groups={displayGroups}
               definition={definition}
               today={today}
               attentionMode={selectedView?.id === 'attention'}
@@ -661,6 +797,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               onCancelAdd={() => setAddingGroup(null)}
               onSubmitAdd={handleInlineAdd}
               onMoveOverdueToToday={(rows) => schedule(rows, 'today')}
+              onToggleGroup={(key) => { if (key === 'done-today') setDoneTodayOpen((open) => !open); }}
             />
           )}
         </div>
@@ -691,9 +828,20 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       {menu?.kind === 'schedule' && (
         <ScheduleMenu
           anchor={menu.anchor}
+          today={today}
+          current={menuTargets.length === 1 ? menuTarget?.scheduledOn : undefined}
+          laterActive={menuTargets.length === 1 ? menuTarget?.later : undefined}
           allowLater={menuTargets.some((task) => task.ownerType !== 'developer')}
           onClose={closeMenu}
           onSelect={(preset) => { schedule(menuTargets, preset); closeMenu(); }}
+          onPickDate={(date) => {
+            void applyChanges(
+              menuTargets,
+              (task) => (task.scheduledOn === date && !task.later ? null : { scheduledOn: date, later: false }),
+              (count) => `Scheduled for ${shortDay(date, today)} · ${plural(count)}`,
+            );
+            closeMenu();
+          }}
         />
       )}
       {menu?.kind === 'assign' && (
@@ -716,6 +864,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onToggle={(name, on) => toggleLabel(menuTargets, name, on)}
         />
       )}
+      {menu?.kind === 'priority' && (
+        <PriorityMenu
+          anchor={menu.anchor}
+          current={menuTargets.length === 1 ? menuTarget?.priority : undefined}
+          onClose={closeMenu}
+          onSelect={(priority) => { setPriority(menuTargets, priority); closeMenu(); }}
+        />
+      )}
       {menu?.kind === 'more' && menuTarget && (
         <MoreMenu
           anchor={menu.anchor}
@@ -725,12 +881,21 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onStatus={() => setMenu({ ...menu, kind: 'status' })}
           onAssign={() => setMenu({ ...menu, kind: 'assign' })}
           onLabels={() => setMenu({ ...menu, kind: 'label' })}
+          onPriority={() => setMenu({ ...menu, kind: 'priority' })}
           onLater={() => { schedule(menuTargets, 'later'); closeMenu(); }}
           onDrop={() => { drop(menuTargets); closeMenu(); }}
           onCopyLink={() => {
-            void navigator.clipboard?.writeText(`${window.location.origin}/t/${menuTarget.taskKey}`);
-            addToast('Link copied', 'success');
+            // docs/51 F11: toast only after the clipboard write really lands.
+            const url = `${window.location.origin}/t/${menuTarget.taskKey}`;
             closeMenu();
+            if (!navigator.clipboard?.writeText) {
+              addToast('Clipboard unavailable — could not copy link', 'error');
+              return;
+            }
+            navigator.clipboard.writeText(url).then(
+              () => addToast('Link copied', 'success'),
+              () => addToast('Could not copy link', 'error'),
+            );
           }}
         />
       )}
@@ -738,6 +903,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
 
       <TaskDrawer
         taskKey={drawerTaskKey ?? null}
+        orderedKeys={orderedKeys}
+        onStepTask={(key) => {
+          // docs/51 F19: j/k inside the drawer steps through the list order.
+          drawerOrigin.current = key;
+          setDrawerTaskKey(key);
+          writeTaskParam(key);
+          focusRow(key);
+        }}
         onClose={closeDrawer}
         onNavigateTask={(key) => {
           closeDrawer();

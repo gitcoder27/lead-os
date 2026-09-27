@@ -219,6 +219,22 @@ export function groupTaskViewTasks(
   else if (group === 'scheduled') keys.sort((a, b) => SCHEDULED_GROUP_ORDER.indexOf(a as ScheduledBucket) - SCHEDULED_GROUP_ORDER.indexOf(b as ScheduledBucket));
   else if (group === 'owner') keys.sort((a, b) => ownerRank(a) - ownerRank(b) || buckets.get(a)!.label.localeCompare(buckets.get(b)!.label));
   else keys.sort((a, b) => (a === 'label:' ? 1 : b === 'label:' ? -1 : a.localeCompare(b)));
+  // docs/51 F7: mirror the server's scheduled sort — plan date first, then a
+  // manual rank, so an optimistic schedulePosition patch reorders rows without
+  // waiting for the refetch. Stable: untouched rows keep their server order.
+  if (group === 'scheduled') {
+    for (const key of keys) {
+      const bucket = buckets.get(key)!;
+      bucket.tasks = [...bucket.tasks].sort((a, b) => {
+        const plan = (taskPlanDate(a).date ?? '9999-12-31').localeCompare(taskPlanDate(b).date ?? '9999-12-31');
+        if (plan) return plan;
+        if (a.schedulePosition === null && b.schedulePosition === null) return 0;
+        if (a.schedulePosition === null) return 1;
+        if (b.schedulePosition === null) return -1;
+        return a.schedulePosition - b.schedulePosition;
+      });
+    }
+  }
   return keys.map((key) => {
     const bucket = buckets.get(key)!;
     return { key, label: bucket.label, tasks: bucket.tasks, context: bucket.context };

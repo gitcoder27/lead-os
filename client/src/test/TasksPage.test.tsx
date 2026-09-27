@@ -11,6 +11,14 @@ const mockDeleteView = vi.fn();
 const mockApply = vi.fn();
 const mockCreate = vi.fn();
 const mockUser = vi.fn();
+const mockAddToast = vi.fn();
+let mockDoneToday: TaskViewTask[] = [];
+let mockDrawerProps: {
+  taskKey: string | null;
+  onClose: () => void;
+  orderedKeys?: string[];
+  onStepTask?: (key: string) => void;
+} | null = null;
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({ user: mockUser(), features: { tasksPhase3: true } }),
@@ -18,7 +26,7 @@ vi.mock('@/context/AuthContext', () => ({
 }));
 
 vi.mock('@/context/ToastContext', () => ({
-  useToast: () => ({ addToast: vi.fn() }),
+  useToast: () => ({ addToast: mockAddToast }),
 }));
 
 vi.mock('@/hooks/useLocalDate', () => ({ useLocalDate: () => '2026-09-26' }));
@@ -52,8 +60,20 @@ vi.mock('@/hooks/useTaskLabels', () => ({
 }));
 
 vi.mock('@/components/tasks/TaskDrawer', () => ({
-  TaskDrawer: ({ taskKey, onClose }: { taskKey: string | null; onClose: () => void }) =>
-    taskKey ? <div data-testid="drawer">{taskKey}<button onClick={onClose}>close drawer</button></div> : null,
+  TaskDrawer: (props: {
+    taskKey: string | null;
+    onClose: () => void;
+    orderedKeys?: string[];
+    onStepTask?: (key: string) => void;
+  }) => {
+    mockDrawerProps = props;
+    return props.taskKey ? (
+      <div data-testid="drawer">
+        {props.taskKey}
+        <button onClick={props.onClose}>close drawer</button>
+      </div>
+    ) : null;
+  },
   navigateToTaskPage: vi.fn(),
 }));
 
@@ -77,7 +97,7 @@ function task(overrides: Partial<TaskViewTask> = {}): TaskViewTask {
     priority: 'normal', scheduledOn: TODAY, dueAt: null, startsAt: null, endsAt: null, participants: null, outcome: null,
     createdByType: 'manager', createdById: 'manager-a', createdAt: '2026-09-20T10:00:00Z', updatedAt: '2026-09-24T10:00:00Z',
     closedAt: null, deletedAt: null, links: [], later: false, parentId: null, trackedByManagerId: 'manager-a',
-    labels: [], nextAction: null, followUpAt: null, signals: { ...NO_SIGNALS },
+    labels: [], nextAction: null, followUpAt: null, signals: { ...NO_SIGNALS }, schedulePosition: null,
     ...overrides,
   } as TaskViewTask;
 }
@@ -87,8 +107,15 @@ function tasksResult(tasks: TaskViewTask[]) {
 }
 
 function lastDefinition() {
-  const calls = mockUseTaskViewTasks.mock.calls;
-  return calls[calls.length - 1]?.[0];
+  // The page also fires the F5 "Done today" query — skip it; it is the call
+  // whose definition carries filters.closed.
+  const calls = mockUseTaskViewTasks.mock.calls.filter((call) => !call[0]?.filters?.closed);
+  return calls.at(-1)?.[0];
+}
+
+function lastDoneTodayDefinition() {
+  const calls = mockUseTaskViewTasks.mock.calls.filter((call) => call[0]?.filters?.closed);
+  return calls.at(-1)?.[0];
 }
 
 function row(key: string): HTMLElement {
@@ -109,12 +136,17 @@ beforeEach(async () => {
   window.history.replaceState(null, '', '/tasks');
   mockApply.mockResolvedValue(true);
   mockCreate.mockResolvedValue({});
+  mockDoneToday = [];
+  mockDrawerProps = null;
   mockUseTaskViews.mockReturnValue({ data: { views: BUILTIN_VIEWS }, isLoading: false });
   mockUseTaskViewCounts.mockReturnValue({ data: { today: TODAY, counts: { today: { count: 2, overdue: 1 }, inbox: { count: 3, overdue: 0 }, 'my-tasks': { count: 7, overdue: 1 }, attention: { count: 0, overdue: 0 } } } });
-  mockUseTaskViewTasks.mockReturnValue(tasksResult([
+  const open = tasksResult([
     task(),
     task({ id: 2, taskKey: 'T-2', title: 'Old one', scheduledOn: '2026-09-23', nextAction: 'waiting on Priya', signals: { ...NO_SIGNALS, overdue: true, overdueDays: 3, overdueSource: 'scheduled' } }),
-  ]));
+  ]);
+  mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+    definition?.filters?.closed ? tasksResult(mockDoneToday) : open,
+  );
 });
 
 describe('TasksPage rail and views (docs/49 §3/§4)', () => {
@@ -222,6 +254,38 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Update view' })); });
     expect(mockUpdateView).toHaveBeenCalledWith({ id: 7, updates: { definition: { filters: { status: ['open'] } } } });
   });
+
+  it('renames a saved view inline — no window.prompt (docs/51 F10)', async () => {
+    mockUseTaskViews.mockReturnValue({
+      data: { views: [...BUILTIN_VIEWS, { id: 'saved:7', name: 'Escalations', builtin: false, definition: { filters: { status: ['blocked'] } } }] },
+      isLoading: false,
+    });
+    mockUpdateView.mockResolvedValue({});
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Escalations' }));
+    const input = screen.getByLabelText('Rename Escalations');
+    expect(input.tagName).toBe('INPUT');
+    fireEvent.change(input, { target: { value: '  Escalation triage  ' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    expect(mockUpdateView).toHaveBeenCalledWith({ id: 7, updates: { name: 'Escalation triage' } });
+  });
+
+  it('deleting a saved view offers Undo that recreates it (docs/51 F10)', async () => {
+    const definition = { filters: { status: ['blocked'] } };
+    mockUseTaskViews.mockReturnValue({
+      data: { views: [...BUILTIN_VIEWS, { id: 'saved:7', name: 'Escalations', builtin: false, definition }] },
+      isLoading: false,
+    });
+    mockDeleteView.mockResolvedValue({});
+    mockSaveView.mockResolvedValue({ id: 12, name: 'Escalations', definition, position: 0, createdAt: '', updatedAt: '' });
+    render(<TasksPage />);
+    await act(async () => { fireEvent.click(screen.getByLabelText('Delete Escalations')); });
+    expect(mockDeleteView).toHaveBeenCalledWith(7);
+    const toast = mockAddToast.mock.calls.at(-1)?.[0];
+    expect(toast.title).toBe('Deleted view "Escalations"');
+    await act(async () => { toast.action.onClick(); });
+    expect(mockSaveView).toHaveBeenCalledWith({ name: 'Escalations', definition });
+  });
 });
 
 describe('TasksPage rows (docs/49 §5)', () => {
@@ -260,6 +324,34 @@ describe('TasksPage rows (docs/49 §5)', () => {
     window.history.replaceState(null, '', '/tasks?task=T-2');
     render(<TasksPage />);
     expect(screen.getByTestId('drawer').textContent).toContain('T-2');
+  });
+
+  it('appends a collapsed Done today group; expanding shows closed rows (docs/51 F5)', () => {
+    mockDoneToday = [task({ taskKey: 'T-9', title: 'Shipped it', status: 'done', closedAt: `${TODAY}T11:00:00.000Z` })];
+    render(<TasksPage />);
+    expect(lastDoneTodayDefinition()).toEqual({ filters: { owner: 'me', closed: { from: TODAY, to: TODAY } }, sort: 'updated' });
+    // Collapsed: count in the header, rows hidden.
+    expect(screen.getByText('Done today')).toBeTruthy();
+    expect(screen.queryByText('Shipped it')).toBeNull();
+    // And the count doesn't leak into the toolbar count (2 open + 1 closed).
+    expect(screen.getByText('2 tasks')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Done today' }));
+    expect(screen.getByText('Shipped it')).toBeTruthy();
+  });
+
+  it('hides Done today entirely when nothing closed today (docs/51 F5)', () => {
+    render(<TasksPage />);
+    expect(screen.queryByText('Done today')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Done today/ })).toBeNull();
+  });
+
+  it('hides Done today while the view is filtered or searched (docs/51 F5)', () => {
+    window.history.replaceState(null, '', '/tasks?view=today&status=blocked');
+    mockDoneToday = [task({ taskKey: 'T-9', title: 'Shipped it', status: 'done', closedAt: `${TODAY}T11:00:00.000Z` })];
+    render(<TasksPage />);
+    expect(screen.queryByText('Done today')).toBeNull();
+    // The closed query is disabled — it still runs with the same definition but is inert.
+    expect(lastDoneTodayDefinition()?.filters?.closed).toBeTruthy();
   });
 });
 
@@ -365,17 +457,33 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Bulk actions' })).toBeNull());
   });
 
-  it('s then m schedules the focused task for tomorrow', async () => {
+  it('s opens the date-picker schedule menu and m schedules for tomorrow (docs/51 F8)', async () => {
     render(<TasksPage />);
     press('j');
     press('s');
-    const menu = screen.getByRole('menu', { name: 'Schedule' });
+    // The list reuses the drawer's DatePickerPopover: a dialog holding a
+    // preset menu plus a real date input.
+    const menu = screen.getByRole('dialog', { name: 'Schedule' });
+    expect(within(menu).getByLabelText('Pick a date')).toBeTruthy();
     await act(async () => { fireEvent.keyDown(menu, { key: 'm' }); });
     expect(mockApply).toHaveBeenCalledWith(
       [expect.objectContaining({ changes: { scheduledOn: '2026-09-27', later: false } })],
       expect.objectContaining({ label: 'Scheduled for tomorrow · 1 task' }),
     );
-    expect(screen.queryByRole('menu', { name: 'Schedule' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Schedule' })).toBeNull();
+  });
+
+  it('digit accelerators in the schedule menu pick the next weekday (docs/51 F8)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('s');
+    const menu = screen.getByRole('dialog', { name: 'Schedule' });
+    // TODAY = 2026-09-26 is a Saturday; 1 → next Monday 2026-09-28.
+    await act(async () => { fireEvent.keyDown(menu, { key: '1' }); });
+    expect(mockApply).toHaveBeenCalledWith(
+      [expect.objectContaining({ changes: { scheduledOn: '2026-09-28', later: false } })],
+      expect.objectContaining({ label: 'Scheduled for Mon · 1 task' }),
+    );
   });
 
   it('status glyph opens a five-status menu', async () => {
@@ -435,6 +543,167 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     fireEvent.change(input, { target: { value: 'Prep 1:1' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
     expect(mockCreate).toHaveBeenCalledWith({ title: 'Prep 1:1', scheduledOn: TODAY });
+  });
+
+  it('n opens the standalone add row on an empty view (docs/51 F14)', async () => {
+    mockUseTaskViewTasks.mockImplementation(() => tasksResult([]));
+    render(<TasksPage />);
+    // A real "Add task" row sits under the empty copy — no fake list.
+    expect(screen.getByRole('button', { name: 'Add task' })).toBeTruthy();
+    press('n');
+    const input = await screen.findByLabelText('New task');
+    fireEvent.change(input, { target: { value: 'Quick one' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    // The empty Today view's context still lands the task on today.
+    expect(mockCreate).toHaveBeenCalledWith({ title: 'Quick one', scheduledOn: TODAY });
+  });
+
+  it('n stays dead on an empty view that cannot host adds (docs/51 F14)', () => {
+    window.history.replaceState(null, '', '/tasks?view=attention');
+    mockUseTaskViewTasks.mockImplementation(() => tasksResult([]));
+    render(<TasksPage />);
+    expect(screen.queryByRole('button', { name: 'Add task' })).toBeNull();
+    press('n');
+    expect(screen.queryByLabelText('New task')).toBeNull();
+  });
+
+  it('Alt+↓ persists a per-day reorder through the bulk path (docs/51 F7)', async () => {
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed
+        ? tasksResult([])
+        : tasksResult([
+            task(),
+            task({ id: 2, taskKey: 'T-2', title: 'Second', scheduledOn: TODAY }),
+            task({ id: 3, taskKey: 'T-3', title: 'Third', scheduledOn: TODAY }),
+          ]),
+    );
+    render(<TasksPage />);
+    press('j');
+    await act(async () => { press('ArrowDown', { altKey: true }); });
+    const items = mockApply.mock.calls[0]![0] as { task: { taskKey: string }; changes: { schedulePosition: number } }[];
+    // The whole Today block is rewritten densely: [T-2, T-1, T-3].
+    expect(items.map((item) => [item.task.taskKey, item.changes.schedulePosition])).toEqual([['T-2', 0], ['T-1', 1], ['T-3', 2]]);
+    expect(mockApply.mock.calls[0]![1]).toMatchObject({ label: 'Reordered tasks' });
+  });
+
+  it('Alt+↑ at the top of a day bucket is a no-op (docs/51 F7)', async () => {
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult([task(), task({ id: 2, taskKey: 'T-2', scheduledOn: TODAY })]),
+    );
+    render(<TasksPage />);
+    press('j');
+    await act(async () => { press('ArrowUp', { altKey: true }); });
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it('Alt+↑/↓ is inert on views without schedule grouping (docs/51 F7)', async () => {
+    window.history.replaceState(null, '', '/tasks?view=inbox');
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult([task(), task({ id: 2, taskKey: 'T-2', scheduledOn: null })]),
+    );
+    render(<TasksPage />);
+    press('j');
+    await act(async () => { press('ArrowDown', { altKey: true }); });
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it('p opens a priority menu and sets High (docs/51 F9)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('p');
+    const menu = screen.getByRole('menu', { name: 'Set priority' });
+    await act(async () => { fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'High' })); });
+    expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ priority: 'high' });
+    // … menu parity: the same action lives in the More menu.
+    fireEvent.click(within(row('T-1')).getByRole('button', { name: 'More actions' }));
+    const more = screen.getByRole('menu', { name: 'More actions' });
+    fireEvent.click(within(more).getByRole('menuitem', { name: /Priority/ }));
+    expect(screen.getByRole('menu', { name: 'Set priority' })).toBeTruthy();
+  });
+
+  it('bulk status change clears the selection of removed rows (docs/51 B4)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('x');
+    expect(screen.getByRole('toolbar', { name: 'Bulk actions' })).toBeTruthy();
+    await act(async () => { press(' '); });
+    await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Bulk actions' })).toBeNull());
+    expect(row('T-2')).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('rescheduling appends a destination hint to the lingering row (docs/51 F13)', async () => {
+    const { rerender } = render(<TasksPage />);
+    press('j');
+    press('s');
+    const menu = screen.getByRole('dialog', { name: 'Schedule' });
+    await act(async () => { fireEvent.keyDown(menu, { key: 'm' }); });
+    // The refetch no longer returns T-2 — it lingers with the destination named.
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult([task()]),
+    );
+    rerender(<TasksPage />);
+    expect(row('T-2').textContent).toContain('moved → Tomorrow');
+    expect(row('T-2').getAttribute('aria-label')).toContain('moved → Tomorrow');
+    // Only the title/meta dims — the action cluster keeps full opacity.
+    const dimmed = row('T-2').querySelector('span[style*="opacity: 0.6"]');
+    expect(dimmed).toBeTruthy();
+    expect(row('T-2').style.opacity).toBe('');
+  });
+
+  it('opens the drawer with the visible list order for j/k stepping (docs/51 F19)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('Enter');
+    expect(mockDrawerProps?.taskKey).toBe('T-2');
+    expect(mockDrawerProps?.orderedKeys).toEqual(['T-2', 'T-1']);
+    await act(async () => { mockDrawerProps?.onStepTask?.('T-1'); });
+    expect(screen.getByTestId('drawer').textContent).toContain('T-1');
+    expect(row('T-1')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('sections are labelled groups owning clean listboxes (docs/51 A1)', () => {
+    render(<TasksPage />);
+    for (const section of screen.getAllByRole('group')) {
+      const headerId = section.getAttribute('aria-labelledby');
+      expect(headerId).toBeTruthy();
+      expect(document.getElementById(headerId!)?.tagName).toBe('H2');
+    }
+    for (const box of screen.getAllByRole('listbox')) {
+      // Only presentation wrappers and option rows inside the listbox.
+      for (const child of Array.from(box.children)) {
+        expect(['presentation', 'option'].includes(child.getAttribute('role') ?? '')).toBe(true);
+      }
+      expect(box.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+    }
+  });
+
+  it('row aria-labels carry the visible metadata (docs/51 A2)', () => {
+    render(<TasksPage />);
+    // T-2: overdue 3d, nextAction, owner hidden (manager-owned in a Me view).
+    expect(row('T-2').getAttribute('aria-label')).toBe('T-2 Old one, Open, 3d overdue');
+  });
+
+  it('popover outside-clicks restore focus to the row (docs/51 A5)', async () => {
+    render(<TasksPage />);
+    press('j');
+    // Let focusRow's rAF land so the popover captures the row as returnFocus.
+    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(null))));
+    press('s');
+    expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeTruthy();
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Schedule' })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(row('T-2')));
+  });
+
+  it('closing the shortcuts dialog restores focus (docs/51 A5)', async () => {
+    render(<TasksPage />);
+    press('j');
+    await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(null))));
+    press('?');
+    const dialog = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(row('T-2')));
   });
 
   it('? opens the shortcut cheat sheet', () => {

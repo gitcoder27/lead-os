@@ -1,6 +1,6 @@
 import { forwardRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { ChevronDown, Keyboard, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
-import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type TaskStatus, type TaskViewMeta, type TaskViewSort } from '@/types';
+import { Check, ChevronDown, Filter, Keyboard, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
+import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type TaskStatus, type TaskViewCount, type TaskViewMeta, type TaskViewSort } from '@/types';
 import { OWNER_TOKENS, type TaskViewGroupOverride, type TaskViewOverrides } from '@/lib/task-views';
 import { labelChipStyle } from './label-colors';
 import { FilterMenu, TASK_STATUS_META } from './TaskMenus';
@@ -28,13 +28,16 @@ const GROUPS: { value: TaskViewGroupOverride; label: string }[] = [
 ];
 
 // docs/51 F18: no 'kind' menu — the ?kind= URL param stays for the meetings alias.
-type OpenMenu = 'owner' | 'status' | 'label' | 'signal' | 'display' | null;
+// docs/51 R3: 'filters' is the combined below-sm popover.
+type OpenMenu = 'owner' | 'status' | 'label' | 'signal' | 'display' | 'filters' | null;
 
 interface TaskToolbarProps {
   title: string;
   count: number | undefined;
   updating: boolean;
   views: TaskViewMeta[];
+  /** docs/51 R1: the mobile view picker shows per-view counts. */
+  counts?: Record<string, TaskViewCount>;
   viewId: string;
   onSelectView: (id: string) => void;
   overrides: TaskViewOverrides;
@@ -55,7 +58,7 @@ interface TaskToolbarProps {
 /** docs/49 §9: search · filter chips · Display popover · view actions. */
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
-    title, count, updating, views, viewId, onSelectView, overrides, onOverrides, query, onQuery,
+    title, count, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
     effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
@@ -80,6 +83,12 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
     const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
     return next.length ? next : undefined;
   };
+  const activeFilterCount =
+    ownerValues.length
+    + (overrides.status?.length ?? 0)
+    + (overrides.label?.length ?? 0)
+    + (overrides.signal?.length ?? 0)
+    + (overrides.sort || overrides.group ? 1 : 0);
 
   return (
     <header className="shrink-0 px-5 pb-3 pt-4" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -91,7 +100,14 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
           aria-label="Task view"
         >
-          {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+          {views.map((view) => {
+            const count = counts?.[view.id]?.count;
+            return (
+              <option key={view.id} value={view.id}>
+                {count ? `${view.name} (${count})` : view.name}
+              </option>
+            );
+          })}
         </select>
         <h1 className="flex items-center gap-2 text-[19px] font-bold" style={{ color: 'var(--text-primary)' }}>
           {title}
@@ -153,42 +169,54 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
           )}
         </label>
 
-        <FilterChip
-          label="Owner"
-          values={ownerValues.map(ownerLabel)}
-          onOpen={open('owner')}
-          onClear={() => onOverrides({ owner: undefined })}
-        />
-        <FilterChip
-          label="Status"
-          values={(overrides.status ?? []).map((status) => TASK_STATUS_META[status].label)}
-          onOpen={open('status')}
-          onClear={() => onOverrides({ status: undefined })}
-        />
-        <FilterChip
-          label="Label"
-          values={(overrides.label ?? []).map(taskLabelDisplayName)}
-          onOpen={open('label')}
-          onClear={() => onOverrides({ label: undefined })}
-        />
-        {viewId === 'attention' && (
-          <FilterChip
-            label="Signal"
-            values={(overrides.signal ?? []).map((signal) => SIGNALS.find((entry) => entry.value === signal)?.label ?? signal)}
-            onOpen={open('signal')}
-            onClear={() => onOverrides({ signal: undefined })}
-          />
-        )}
-        <span className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
+        {/* docs/51 R3: below sm, every filter control folds into one Filter button. */}
         <button
           type="button"
-          onClick={open('display')}
+          onClick={open('filters')}
           aria-haspopup="menu"
-          className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
-          style={{ color: overrides.sort || overrides.group ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
+          className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] sm:hidden"
+          style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
         >
-          <SlidersHorizontal size={12} /> Display
+          <Filter size={12} /> Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}
         </button>
+        <div className="hidden items-center gap-1.5 sm:flex sm:flex-wrap">
+          <FilterChip
+            label="Owner"
+            values={ownerValues.map(ownerLabel)}
+            onOpen={open('owner')}
+            onClear={() => onOverrides({ owner: undefined })}
+          />
+          <FilterChip
+            label="Status"
+            values={(overrides.status ?? []).map((status) => TASK_STATUS_META[status].label)}
+            onOpen={open('status')}
+            onClear={() => onOverrides({ status: undefined })}
+          />
+          <FilterChip
+            label="Label"
+            values={(overrides.label ?? []).map(taskLabelDisplayName)}
+            onOpen={open('label')}
+            onClear={() => onOverrides({ label: undefined })}
+          />
+          {viewId === 'attention' && (
+            <FilterChip
+              label="Signal"
+              values={(overrides.signal ?? []).map((signal) => SIGNALS.find((entry) => entry.value === signal)?.label ?? signal)}
+              onOpen={open('signal')}
+              onClear={() => onOverrides({ signal: undefined })}
+            />
+          )}
+          <span className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
+          <button
+            type="button"
+            onClick={open('display')}
+            aria-haspopup="menu"
+            className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+            style={{ color: overrides.sort || overrides.group ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
+          >
+            <SlidersHorizontal size={12} /> Display
+          </button>
+        </div>
       </div>
 
       {menu.kind === 'owner' && menu.anchor && (
@@ -254,6 +282,78 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
             <>
               <MenuDivider />
               <MenuItem label="Use view defaults" onSelect={() => onOverrides({ sort: undefined, group: undefined })} />
+            </>
+          )}
+        </TaskPopover>
+      )}
+      {/* docs/51 R3: single combined filter popover for the below-sm Filter button. */}
+      {menu.kind === 'filters' && menu.anchor && (
+        <TaskPopover anchor={menu.anchor} onClose={close} label="Filters" width={240}>
+          <MenuHeading>Owner</MenuHeading>
+          {[
+            ...OWNER_TOKENS.map((token) => ({ value: token as string, label: ownerLabel(token) })),
+            ...developers.map((dev) => ({ value: dev.accountId, label: dev.displayName })),
+          ].map((option) => (
+            <MenuItem
+              key={option.value}
+              role="menuitemcheckbox"
+              checked={ownerValues.includes(option.value)}
+              label={option.label}
+              onSelect={() => toggleOwner(option.value)}
+            />
+          ))}
+          <MenuDivider />
+          <MenuHeading>Status</MenuHeading>
+          {STATUSES.map((status) => (
+            <MenuItem
+              key={status}
+              role="menuitemcheckbox"
+              checked={(overrides.status ?? []).includes(status)}
+              icon={<span className="h-2 w-2 rounded-full" style={{ background: TASK_STATUS_META[status].color }} />}
+              label={TASK_STATUS_META[status].label}
+              onSelect={() => onOverrides({ status: toggleIn(overrides.status, status) })}
+            />
+          ))}
+          <MenuDivider />
+          <MenuHeading>Label — has all of</MenuHeading>
+          {labels.map((label) => (
+            <MenuItem
+              key={label.name}
+              role="menuitemcheckbox"
+              checked={(overrides.label ?? []).includes(label.name)}
+              icon={<span className="h-2 w-2 rounded-full" style={{ background: labelChipStyle(label.color).color as string }} />}
+              label={taskLabelDisplayName(label.name)}
+              onSelect={() => onOverrides({ label: toggleIn(overrides.label, label.name) })}
+            />
+          ))}
+          {viewId === 'attention' && (
+            <>
+              <MenuDivider />
+              <MenuHeading>Signal</MenuHeading>
+              {SIGNALS.map((signal) => (
+                <MenuItem
+                  key={signal.value}
+                  role="menuitemcheckbox"
+                  checked={(overrides.signal ?? []).includes(signal.value)}
+                  label={signal.label}
+                  onSelect={() => onOverrides({ signal: toggleIn(overrides.signal, signal.value) })}
+                />
+              ))}
+            </>
+          )}
+          <MenuDivider />
+          <MenuHeading>Sort</MenuHeading>
+          {SORTS.map((sort) => (
+            <MenuItem key={sort.value} role="menuitemradio" checked={effectiveSort === sort.value} label={sort.label} onSelect={() => onOverrides({ sort: sort.value })} />
+          ))}
+          <MenuHeading>Group</MenuHeading>
+          {GROUPS.map((group) => (
+            <MenuItem key={group.value} role="menuitemradio" checked={effectiveGroup === group.value} label={group.label} onSelect={() => onOverrides({ group: group.value })} />
+          ))}
+          {activeFilterCount > 0 && (
+            <>
+              <MenuDivider />
+              <MenuItem icon={<Check size={13} />} label="Clear all filters" onSelect={() => onOverrides({ owner: undefined, status: undefined, label: undefined, signal: undefined, sort: undefined, group: undefined })} />
             </>
           )}
         </TaskPopover>

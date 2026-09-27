@@ -62,7 +62,8 @@ export function relativeTaskDate(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'
   return { label: shortDay(plan.date, today), tone: 'muted', title };
 }
 
-function shortDay(date: string, today: string): string {
+/** Short relative day name used in hints and toasts ("today", "Fri", "Oct 3"). */
+export function shortDay(date: string, today: string): string {
   const diff = daysBetween(today, date);
   if (diff === 0) return 'today';
   if (diff >= -6 && diff <= 6) return format(parseISO(date), 'EEE');
@@ -111,22 +112,34 @@ export interface LingerEntry {
   groupIndex: number;
   context: TaskGroupContext;
   index: number;
+  /** docs/51 F13: where the action sent the row, e.g. "moved → Tomorrow". */
+  hint?: string | null;
 }
 
-export type ListTask = ManagerTask & { lingering?: boolean };
+export type ListTask = ManagerTask & { lingering?: boolean; lingerHint?: string | null };
 
 export interface RenderGroup extends Omit<TaskViewGroupBucket, 'tasks'> {
   tasks: ListTask[];
+  /** docs/51 F5: collapsible groups (Done today) render a chevron header. */
+  collapsible?: boolean;
+  collapsed?: boolean;
+  /** Header count while collapsed (tasks stay hidden, so tasks.length lies). */
+  count?: number;
 }
 
 /** Record where each acted-on row sits right now so it can stay put. */
-export function lingerEntriesFor(groups: RenderGroup[], tasks: ManagerTask[]): Map<string, LingerEntry> {
+export function lingerEntriesFor(
+  groups: RenderGroup[],
+  items: ManagerTask[],
+  /** docs/51 F13: destination hint per task key ("moved → Tomorrow"). */
+  hints?: ReadonlyMap<string, string | null>,
+): Map<string, LingerEntry> {
   const entries = new Map<string, LingerEntry>();
-  for (const task of tasks) {
+  for (const task of items) {
     groups.forEach((group, groupIndex) => {
       const index = group.tasks.findIndex((row) => row.taskKey === task.taskKey);
       if (index >= 0 && !entries.has(task.taskKey)) {
-        entries.set(task.taskKey, { task, groupKey: group.key, groupLabel: group.label, groupIndex, context: group.context, index });
+        entries.set(task.taskKey, { task, groupKey: group.key, groupLabel: group.label, groupIndex, context: group.context, index, hint: hints?.get(task.taskKey) ?? null });
       }
     });
   }
@@ -151,7 +164,7 @@ export function applyLingering(groups: RenderGroup[], lingering: Map<string, Lin
       result.splice(Math.min(entry.groupIndex, result.length), 0, group);
     }
     const current = fresh.get(entry.task.taskKey);
-    const row: ListTask = current ? { ...current } : { ...entry.task, lingering: true };
+    const row: ListTask = current ? { ...current } : { ...entry.task, lingering: true, lingerHint: entry.hint ?? null };
     group.tasks.splice(Math.min(entry.index, group.tasks.length), 0, row);
   }
   return result;
@@ -171,6 +184,36 @@ export function nextMonday(today: string): string {
   const weekday = parseISO(today).getDay(); // 0 = Sunday
   const ahead = ((8 - weekday) % 7) || 7;
   return shiftLocalIsoDate(today, ahead);
+}
+
+/** docs/51 F8: next date with ISO weekday `dow` (1=Mon … 7=Sun), strictly after `today`. */
+export function nextWeekday(today: string, dow: number): string {
+  const ahead = ((dow % 7) - parseISO(today).getDay() + 7) % 7 || 7;
+  return shiftLocalIsoDate(today, ahead);
+}
+
+/**
+ * docs/51 F13: the destination a change sent a task to — rendered as the
+ * lingering row's hint ("moved → Tomorrow", "done", "assigned → Me").
+ */
+export function lingerHint(
+  changes: UpdateTaskRequest,
+  today: string,
+  ownerName: (ownerType: string | null, ownerId: string | null) => string,
+): string | null {
+  if (changes.status !== undefined) {
+    const hints: Partial<Record<TaskStatus, string>> = { done: 'done', dropped: 'dropped', blocked: 'blocked', active: 'active', open: 'reopened' };
+    return hints[changes.status] ?? changes.status;
+  }
+  if (changes.later === true) return 'moved → Later';
+  if (changes.scheduledOn !== undefined) {
+    if (!changes.scheduledOn) return 'date cleared';
+    // Reuse the row's own relative-date wording so the hint matches the UI.
+    const label = relativeTaskDate({ scheduledOn: changes.scheduledOn, dueAt: null, status: 'open', closedAt: null }, today)?.label;
+    return `moved → ${label ?? shortDay(changes.scheduledOn, today)}`;
+  }
+  if (changes.ownerType !== undefined) return `assigned → ${ownerName(changes.ownerType ?? null, changes.ownerId ?? null)}`;
+  return null;
 }
 
 export function scheduleChanges(preset: SchedulePreset, today: string): UpdateTaskRequest {

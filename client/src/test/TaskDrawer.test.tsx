@@ -98,6 +98,29 @@ beforeEach(() => {
 });
 
 describe('TaskDrawer body (P3-D2)', () => {
+  it('j/k step through the ordered list keys, dead inside inputs (docs/51 F19)', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    const onStepTask = vi.fn();
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} orderedKeys={['T-4', 'T-7', 'T-9']} onStepTask={onStepTask} />);
+    fireEvent.keyDown(document.body, { key: 'j' });
+    expect(onStepTask).toHaveBeenCalledWith('T-9');
+    fireEvent.keyDown(document.body, { key: 'k' });
+    expect(onStepTask).toHaveBeenCalledWith('T-4');
+    // Dead inside editable fields.
+    const title = screen.getByDisplayValue('Manager task');
+    title.focus();
+    fireEvent.keyDown(title, { key: 'j' });
+    expect(onStepTask).toHaveBeenCalledTimes(2);
+  });
+
+  it('j/k are inert without the list order', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    const onStepTask = vi.fn();
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} onStepTask={onStepTask} />);
+    fireEvent.keyDown(document.body, { key: 'j' });
+    expect(onStepTask).not.toHaveBeenCalled();
+  });
+
   it('renders all sections for a manager task', () => {
     mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
     const { container } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);

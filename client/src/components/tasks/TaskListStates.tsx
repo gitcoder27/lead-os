@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AlertTriangle, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
+import { useModalFocus } from '@/hooks/useModalFocus';
 
 /** docs/49 §11: skeleton rows — first load only (R5). */
 export function TaskListSkeleton() {
@@ -112,13 +113,15 @@ export function TaskListEmpty({
 const SHORTCUTS: [string, string][] = [
   ['j / ↓', 'Next task'],
   ['k / ↑', 'Previous task'],
+  ['Alt + ↑ / ↓', 'Reorder within the day (schedule groups)'],
   ['Enter / o', 'Open task'],
   ['x', 'Select / deselect'],
   ['Shift + j / k', 'Extend selection'],
   ['Space / e', 'Toggle done'],
-  ['s → t m w l c', 'Schedule: today, tomorrow, next week, later, clear'],
+  ['s → t m w l c 1–7', 'Schedule: today, tomorrow, next week, later, clear, or next weekday'],
   ['a', 'Assign'],
   ['l', 'Labels'],
+  ['p', 'Priority'],
   ['#', 'Drop'],
   ['g then letter', 'Jump views — t Planned today · i Inbox · m My tasks · w Waiting · l Later · a Attention · c Closed'],
   ['n', 'New task in this group'],
@@ -128,12 +131,12 @@ const SHORTCUTS: [string, string][] = [
 ];
 
 export function TaskShortcutsDialog({ onClose }: { onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // docs/51 A5: the cheat sheet is a modal — Tab cycles inside it and closing
+  // returns focus to wherever the `?` key was pressed.
+  const ref = useModalFocus<HTMLDivElement>();
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    return () => previous?.focus();
-  }, []);
+  }, [ref]);
   return (
     <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4" style={{ background: 'color-mix(in srgb, var(--bg-primary) 60%, transparent)' }} onMouseDown={onClose}>
       <div

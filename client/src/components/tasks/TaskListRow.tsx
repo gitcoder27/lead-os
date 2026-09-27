@@ -66,6 +66,33 @@ export const TaskListRow = memo(function TaskListRow({
   const signals = task.signals;
   const owner = task.ownerType ? ownerName(task.ownerType, task.ownerId) : 'Inbox';
 
+  // docs/51 A2: the row's aria-label, attention chips, and icon cluster all
+  // describe the same visible signals — compute the wording once.
+  const attentionReasons: { label: string; tone: 'danger' | 'warning' }[] = [];
+  const iconSignals: { label: string; color: string; icon: ReactNode }[] = [];
+  if (attentionMode && signals) {
+    if (signals.overdue) attentionReasons.push({ label: `Overdue ${signals.overdueDays}d`, tone: 'danger' });
+    if (signals.stale) attentionReasons.push({ label: `Stale ${signals.staleDays}d`, tone: 'warning' });
+    if (signals.drift) attentionReasons.push({ label: 'Jira drift', tone: 'warning' });
+  } else {
+    if (task.priority === 'high') iconSignals.push({ label: 'High priority', color: 'var(--danger)', icon: <Flag size={12} /> });
+    if (task.followUpAt || task.labels.includes('category:follow_up')) {
+      iconSignals.push({ label: signals?.followUpDue ? 'Follow-up due' : 'Follow-up', color: signals?.followUpDue ? 'var(--danger)' : 'var(--accent)', icon: <Bell size={12} /> });
+    }
+    if (signals?.stale) iconSignals.push({ label: `No activity for ${signals.staleDays}d`, color: 'var(--warning)', icon: <Hourglass size={12} /> });
+    if (signals?.drift) iconSignals.push({ label: 'Jira and task disagree on done-ness', color: 'var(--warning)', icon: <GitCompareArrows size={12} /> });
+  }
+  const signalText = attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label);
+
+  const ariaLabel = [
+    `${task.taskKey} ${task.title}`,
+    TASK_STATUS_META[task.status].label,
+    date?.label,
+    showOwner ? `owner ${owner}` : null,
+    ...signalText,
+    task.lingering ? (task.lingerHint ?? 'moved') : null,
+  ].filter(Boolean).join(', ');
+
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.shiftKey) {
       event.preventDefault();
@@ -83,7 +110,7 @@ export const TaskListRow = memo(function TaskListRow({
     <div
       role="option"
       aria-selected={selected}
-      aria-label={`${task.taskKey} ${task.title}, ${TASK_STATUS_META[task.status].label}`}
+      aria-label={ariaLabel}
       data-task-row={task.taskKey}
       tabIndex={focused ? 0 : -1}
       onClick={handleClick}
@@ -91,7 +118,6 @@ export const TaskListRow = memo(function TaskListRow({
       className="group relative cursor-pointer px-3 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
       style={{
         background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined,
-        opacity: task.lingering ? 0.55 : undefined,
       }}
     >
       <div className="flex min-h-[38px] items-center gap-2">
@@ -115,85 +141,82 @@ export const TaskListRow = memo(function TaskListRow({
         >
           <TaskStatusGlyph status={task.status} />
         </button>
-        <span className="hidden w-12 shrink-0 font-mono text-[11px] tabular-nums md:inline" style={{ color: 'var(--text-disabled)' }}>
-          {task.taskKey}
-        </span>
-        {time && (
-          <span className="shrink-0 font-mono text-[11.5px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>
-        )}
+        {/* docs/51 F13: only title/meta dim on a lingering row — actions and
+            controls stay fully opaque and clickable. */}
         <span
-          className="min-w-0 truncate text-[13px] font-medium"
-          style={{
-            color: closed ? 'var(--text-muted)' : 'var(--text-primary)',
-            textDecoration: closed ? 'line-through' : undefined,
-          }}
+          className="flex min-w-0 flex-1 items-center gap-2"
+          style={{ opacity: task.lingering ? 0.6 : undefined }}
         >
-          {task.title}
-        </span>
-        {task.labels.slice(0, 2).map((label) => (
-          <span key={label} className="hidden shrink-0 rounded-md px-1.5 py-px text-[10.5px] font-semibold sm:inline" style={labelChipStyle(labelColor(label))}>
-            {taskLabelDisplayName(label)}
+          <span className="hidden w-12 shrink-0 font-mono text-[11px] tabular-nums md:inline" style={{ color: 'var(--text-disabled)' }}>
+            {task.taskKey}
           </span>
-        ))}
-        {task.labels.length > 2 && (
-          <span className="hidden shrink-0 text-[10.5px] font-semibold sm:inline" style={{ color: 'var(--text-muted)' }} title={task.labels.slice(2).map(taskLabelDisplayName).join(', ')}>
-            +{task.labels.length - 2}
-          </span>
-        )}
-        {task.lingering && isOpenStatus(task.status) && (
-          <span className="shrink-0 text-[10.5px] italic" style={{ color: 'var(--text-muted)' }}>moved</span>
-        )}
-
-        <span className="flex-1" />
-
-        <span className="flex shrink-0 items-center gap-1.5">
-          {attentionMode && signals ? (
-            <>
-              {signals.overdue && <ReasonChip tone="danger" label={`Overdue ${signals.overdueDays}d`} />}
-              {signals.stale && <ReasonChip tone="warning" label={`Stale ${signals.staleDays}d`} />}
-              {signals.drift && <ReasonChip tone="warning" label="Jira drift" />}
-            </>
-          ) : (
-            <>
-              {task.priority === 'high' && <SignalIcon label="High priority" color="var(--danger)"><Flag size={12} /></SignalIcon>}
-              {(task.followUpAt || task.labels.includes('category:follow_up')) && (
-                <SignalIcon label={signals?.followUpDue ? 'Follow-up due' : 'Follow-up'} color={signals?.followUpDue ? 'var(--danger)' : 'var(--accent)'}><Bell size={12} /></SignalIcon>
-              )}
-              {signals?.stale && <SignalIcon label={`No activity for ${signals.staleDays}d`} color="var(--warning)"><Hourglass size={12} /></SignalIcon>}
-              {signals?.drift && <SignalIcon label="Jira and task disagree on done-ness" color="var(--warning)"><GitCompareArrows size={12} /></SignalIcon>}
-            </>
+          {time && (
+            <span className="shrink-0 font-mono text-[11.5px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>
           )}
-        </span>
-        {jira && (
-          <span className="hidden shrink-0 rounded px-1 py-px font-mono text-[10px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            {jira.ref}
-          </span>
-        )}
-        {showOwner && (
           <span
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+            className="min-w-0 truncate text-[13px] font-medium"
             style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-secondary)',
-              border: task.ownerType ? '1px solid var(--border)' : '1px dashed var(--border-strong)',
+              color: closed ? 'var(--text-muted)' : 'var(--text-primary)',
+              textDecoration: closed ? 'line-through' : undefined,
             }}
-            title={owner}
-            aria-label={`Owner: ${owner}`}
           >
-            {task.ownerType ? initials(owner) : ''}
+            {task.title}
           </span>
-        )}
-        <span className="flex w-[92px] shrink-0 justify-end text-[11.5px] tabular-nums" title={date?.title}>
-          {date && (date.tone === 'danger' || date.tone === 'warning' ? (
-            <span
-              className="rounded-md px-1.5 py-px font-semibold"
-              style={{ color: DATE_TONES[date.tone], background: `color-mix(in srgb, ${DATE_TONES[date.tone]} 13%, transparent)` }}
-            >
-              {date.label}
+          {task.labels.slice(0, 2).map((label) => (
+            <span key={label} className="hidden shrink-0 rounded-md px-1.5 py-px text-[10.5px] font-semibold sm:inline" style={labelChipStyle(labelColor(label))}>
+              {taskLabelDisplayName(label)}
             </span>
-          ) : (
-            <span style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>
           ))}
+          {task.labels.length > 2 && (
+            <span className="hidden shrink-0 text-[10.5px] font-semibold sm:inline" style={{ color: 'var(--text-muted)' }} title={task.labels.slice(2).map(taskLabelDisplayName).join(', ')}>
+              +{task.labels.length - 2}
+            </span>
+          )}
+          {task.lingering && isOpenStatus(task.status) && (
+            <span className="shrink-0 text-[10.5px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>
+          )}
+
+          <span className="flex-1" />
+
+          <span className="flex shrink-0 items-center gap-1.5">
+            {attentionReasons.map((reason) => (
+              <ReasonChip key={reason.label} tone={reason.tone} label={reason.label} />
+            ))}
+            {iconSignals.map((signal) => (
+              <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>
+            ))}
+          </span>
+          {jira && (
+            <span className="hidden shrink-0 rounded px-1 py-px font-mono text-[10px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              {jira.ref}
+            </span>
+          )}
+          {showOwner && (
+            <span
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+              style={{
+                background: 'var(--bg-tertiary)',
+                color: 'var(--text-secondary)',
+                border: task.ownerType ? '1px solid var(--border)' : '1px dashed var(--border-strong)',
+              }}
+              title={owner}
+              aria-label={`Owner: ${owner}`}
+            >
+              {task.ownerType ? initials(owner) : ''}
+            </span>
+          )}
+          <span className="flex w-[92px] shrink-0 justify-end text-[11.5px] tabular-nums" title={date?.title}>
+            {date && (date.tone === 'danger' || date.tone === 'warning' ? (
+              <span
+                className="rounded-md px-1.5 py-px font-semibold"
+                style={{ color: DATE_TONES[date.tone], background: `color-mix(in srgb, ${DATE_TONES[date.tone]} 13%, transparent)` }}
+              >
+                {date.label}
+              </span>
+            ) : (
+              <span style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>
+            ))}
+          </span>
         </span>
 
         <span
@@ -212,7 +235,7 @@ export const TaskListRow = memo(function TaskListRow({
         </span>
       </div>
       {task.nextAction && (
-        <p className="-mt-1.5 truncate pb-2 pl-[60px] text-[12px] md:pl-[108px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="-mt-1.5 truncate pb-2 pl-[60px] text-[12px] md:pl-[108px]" style={{ color: 'var(--text-muted)', opacity: task.lingering ? 0.6 : undefined }}>
           → {task.nextAction}
         </p>
       )}

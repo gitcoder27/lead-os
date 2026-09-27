@@ -21,10 +21,19 @@ export interface ApplyTaskChangesOptions {
 
 const UNDO_TOAST_MS = 6000;
 
+// docs/51 P1: counts aggregate across every view and re-run heavier queries —
+// debounce them (~500ms trailing) so rapid bulk edits trigger one recount.
+let countsTimer: ReturnType<typeof setTimeout> | null = null;
+
 function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
-  for (const key of ['tasks', 'task-view-counts', 'task-detail', 'task-events', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
+  for (const key of ['tasks', 'task-detail', 'task-events', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
     qc.invalidateQueries({ queryKey: [key] });
   }
+  if (countsTimer) clearTimeout(countsTimer);
+  countsTimer = setTimeout(() => {
+    countsTimer = null;
+    void qc.invalidateQueries({ queryKey: ['task-view-counts'] });
+  }, 500);
 }
 
 /**

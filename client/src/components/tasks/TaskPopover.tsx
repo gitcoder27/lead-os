@@ -59,21 +59,26 @@ export function TaskPopover({
     ref.current?.querySelector<HTMLElement>('[data-autofocus], [role^="menuitem"]')?.focus();
   }, []);
 
-  useEffect(() => {
-    const onDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (ref.current?.contains(target) || anchor?.contains(target)) return;
-      onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [anchor, onClose]);
-
-  const close = () => {
+  // docs/51 A5: every close path restores focus — Esc, Tab, item select and
+  // outside click alike. `closeRef` keeps the latest onClose without
+  // re-binding the mousedown listener every render.
+  const closeRef = useRef<() => void>(() => {});
+  closeRef.current = () => {
     onClose();
     const target = returnFocus.current;
     if (target && document.contains(target)) requestAnimationFrame(() => target.focus());
   };
+  const close = () => closeRef.current();
+
+  useEffect(() => {
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (ref.current?.contains(target) || anchor?.contains(target)) return;
+      closeRef.current();
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [anchor]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const items = [...(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])') ?? [])];

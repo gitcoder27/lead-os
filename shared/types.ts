@@ -589,6 +589,9 @@ export interface ManagerTask extends DeveloperTask {
   labels: string[];
   nextAction: string | null;
   followUpAt: string | null;
+  /** docs/51 F7: manual rank inside the task's plan-date bucket. Null means
+   *  never ordered — the row sorts after positioned rows via the view sort. */
+  schedulePosition: number | null;
 }
 
 /**
@@ -872,6 +875,8 @@ export interface CreateTaskRequest {
   priority?: "normal" | "high";
   labels?: string[];
   scheduledOn?: string | null;
+  /** docs/51 F7: manual order within the plan-date bucket (list Alt+↑/↓). */
+  schedulePosition?: number | null;
   dueAt?: string | null;
   followUpAt?: string | null;
   startsAt?: string | null;

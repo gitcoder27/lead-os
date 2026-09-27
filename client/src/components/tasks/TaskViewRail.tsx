@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BookmarkPlus, Check, Pencil, Trash2, X } from 'lucide-react';
 import type { TaskViewCount, TaskViewMeta } from '@/types';
+import { FOCUS_RING } from './TaskDetailPrimitives';
 
 /** docs/49 §4: colored badges only on actionable views. */
 function badgeStyle(viewId: string, count: TaskViewCount | undefined): { tone: string | null; value: number } {
@@ -28,7 +29,8 @@ export function TaskViewRail({
   counts: Record<string, TaskViewCount> | undefined;
   selectedId: string;
   onSelect: (id: string) => void;
-  onRename: (view: TaskViewMeta) => void;
+  /** docs/51 F10: commits the inline rename; return false to keep editing. */
+  onRename: (view: TaskViewMeta, name: string) => Promise<boolean>;
   onDelete: (view: TaskViewMeta) => void;
   onSaveView: (name: string) => Promise<boolean>;
   saving: boolean;
@@ -39,12 +41,53 @@ export function TaskViewRail({
   const saved = views.filter((view) => !view.builtin);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+
+  const commitRename = async (view: TaskViewMeta) => {
+    if (await onRename(view, editingName)) setEditingId(null);
+  };
 
   const renderItems = (items: TaskViewMeta[]) => (
     <ul className="space-y-px">
       {items.map((view) => {
         const selected = view.id === selectedId;
         const { tone, value } = badgeStyle(view.id, counts?.[view.id]);
+        if (editingId === view.id) {
+          return (
+            <li key={view.id} className="flex items-center rounded-lg px-1 py-0.5">
+              <form
+                className="flex min-w-0 flex-1 items-center gap-1.5"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  await commitRename(view);
+                }}
+              >
+                <input
+                  autoFocus
+                  value={editingName}
+                  onChange={(event) => setEditingName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setEditingId(null);
+                    }
+                  }}
+                  onBlur={() => { void commitRename(view); }}
+                  aria-label={`Rename ${view.name}`}
+                  className={`min-w-0 flex-1 rounded-lg px-2 py-1 text-[12.5px] ${FOCUS_RING}`}
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
+                />
+                <button type="submit" disabled={!editingName.trim()} className="flex h-6 w-6 items-center justify-center rounded-md disabled:opacity-40" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }} aria-label="Save name">
+                  <Check size={12} />
+                </button>
+                <button type="button" onClick={() => setEditingId(null)} className="flex h-6 w-6 items-center justify-center rounded-md" style={{ color: 'var(--text-muted)' }} aria-label="Cancel rename">
+                  <X size={12} />
+                </button>
+              </form>
+            </li>
+          );
+        }
         return (
           <li key={view.id} className="group flex items-center rounded-lg" style={{ background: selected ? 'var(--accent-glow)' : 'transparent' }}>
             <button
@@ -70,7 +113,16 @@ export function TaskViewRail({
             </button>
             {!view.builtin && (
               <span className="hidden shrink-0 items-center pr-1 group-hover:flex group-focus-within:flex">
-                <button type="button" onClick={() => onRename(view)} className="flex h-5 w-5 items-center justify-center rounded" style={{ color: 'var(--text-muted)' }} aria-label={`Rename ${view.name}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingId(view.id);
+                    setEditingName(view.name);
+                  }}
+                  className="flex h-5 w-5 items-center justify-center rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                  aria-label={`Rename ${view.name}`}
+                >
                   <Pencil size={10} />
                 </button>
                 <button type="button" onClick={() => onDelete(view)} className="flex h-5 w-5 items-center justify-center rounded" style={{ color: 'var(--text-muted)' }} aria-label={`Delete ${view.name}`}>

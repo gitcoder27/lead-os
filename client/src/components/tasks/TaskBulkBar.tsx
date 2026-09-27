@@ -51,11 +51,13 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       type="button"
       onClick={onClick}
       title={`${label} (${hint})`}
+      aria-label={`${label} (${hint})`}
       className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
       style={{ color: danger ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
       {children}
-      {label}
+      {/* docs/51 R2: icon-only below sm — the title/aria-label carry the name. */}
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

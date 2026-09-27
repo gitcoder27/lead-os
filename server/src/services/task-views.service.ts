@@ -203,8 +203,16 @@ export function matchesTaskViewFilters(
 
 function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] {
   const planKey = (row: TaskRow) => taskPlanDate(row).date ?? "9999-12-31";
+  // docs/51 F7: inside a plan-date bucket a manual rank wins; rows that were
+  // never ordered (NULL) keep their startsAt/createdAt order after it.
+  const byPosition = (a: TaskRow, b: TaskRow) => {
+    if (a.schedulePosition === null && b.schedulePosition === null) return 0;
+    if (a.schedulePosition === null) return 1;
+    if (b.schedulePosition === null) return -1;
+    return a.schedulePosition - b.schedulePosition;
+  };
   const byScheduled = (a: TaskRow, b: TaskRow) =>
-    planKey(a).localeCompare(planKey(b)) || (a.startsAt ?? "").localeCompare(b.startsAt ?? "") || a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
+    planKey(a).localeCompare(planKey(b)) || byPosition(a, b) || (a.startsAt ?? "").localeCompare(b.startsAt ?? "") || a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
   const sorted = [...rows];
   switch (sort ?? "scheduled") {
     case "updated":

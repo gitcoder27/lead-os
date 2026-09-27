@@ -32,6 +32,15 @@ export function getLocalIsoDate(date: Date = new Date()): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+/** docs/53 F5: the browser's IANA zone, sent so the server computes stage/day in it. */
+export function getLocalTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function shiftLocalIsoDate(dateStr: string, days: number): string {
   return format(addDays(parseISO(dateStr), days), 'yyyy-MM-dd');
 }

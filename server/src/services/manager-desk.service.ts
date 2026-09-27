@@ -430,12 +430,17 @@ export class ManagerDeskService {
     return this.buildLiveDayView(managerAccountId, date, normalizedWorkspaceId);
   }
 
-  async getTodayItems(managerAccountId: string, date: string, workspaceId?: string): Promise<ManagerDeskItem[]> {
+  async getTodayItems(
+    managerAccountId: string,
+    date: string,
+    workspaceId?: string,
+    options: { followUpHorizonMs?: number } = {},
+  ): Promise<ManagerDeskItem[]> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) {
       // docs/53 P1: one batched surface pass instead of a getByKey +
       // canonicalItem round-trip per row.
-      const rows = await this.tasks.projectTodayRows(managerAccountId, date, normalizedWorkspaceId);
+      const rows = await this.tasks.projectTodayRows(managerAccountId, date, normalizedWorkspaceId, options);
       if (!rows.length) {
         return [];
       }
@@ -545,7 +550,8 @@ export class ManagerDeskService {
       }
     }
 
-    const nowMs = Date.now();
+    // docs/53 F6: an optional horizon includes follow-ups coming due soon.
+    const nowMs = Date.now() + Math.max(0, options.followUpHorizonMs ?? 0);
     const filteredRows = this.dedupeCurrentLineageRows([...rowsById.values()]).filter((item) => {
       const status = item.status as ManagerDeskStatus;
       if (status === "done" || status === "cancelled") {

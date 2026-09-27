@@ -765,9 +765,10 @@ export class TaskService {
    * either a due follow-up, an undecided meeting due by the date, or open work
    * scheduled on/before it (the carry-forward analogue).
    */
-  async projectTodayRows(managerAccountId: string, date: string, workspaceId?: string): Promise<TaskRow[]> {
+  async projectTodayRows(managerAccountId: string, date: string, workspaceId?: string, options: { followUpHorizonMs?: number } = {}): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(workspaceId);
-    const nowMs = Date.now();
+    // docs/53 F6: Today's midday focus peeks at follow-ups coming due soon.
+    const nowMs = Date.now() + Math.max(0, options.followUpHorizonMs ?? 0);
     const rows = await db.select().from(tasks).where(and(
       eq(tasks.workspaceId, scope),
       eq(tasks.trackedByManagerId, managerAccountId),

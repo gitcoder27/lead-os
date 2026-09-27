@@ -54,7 +54,8 @@ describe('useToday', () => {
     expect(result.current.data).toEqual(cachedToday);
     await waitFor(() => expect(result.current.isFetching).toBe(true));
     expect(mockGet).toHaveBeenCalledWith(
-      '/today?date=2026-08-27',
+      // docs/53 F5: the browser zone rides along.
+      expect.stringMatching(/^\/today\?date=2026-08-27(&tz=[^&]+)?$/),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

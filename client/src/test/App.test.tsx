@@ -499,6 +499,33 @@ describe('App', () => {
     );
   });
 
+  it('opens Standup Mode from a Start standup target (docs/53 F7)', async () => {
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+    expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    const onOpenTodayTarget = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as
+      | ((target: import('@/types').TodayActionTarget) => void)
+      | undefined;
+
+    act(() => {
+      onOpenTodayTarget!({ type: 'view', view: 'team', mode: 'standup', date: '2026-03-08' });
+    });
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/team');
+      expect(window.location.search).toContain('mode=standup');
+    });
+    expect(teamTrackerPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ standupMode: true }));
+  });
+
   it('restores the developer drawer target from /team?dev= on cold load (docs/53 F2)', async () => {
     window.history.pushState(null, '', '/team?dev=dev-7');
     useAuthMock.mockReturnValue({

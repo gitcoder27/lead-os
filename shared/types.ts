@@ -225,6 +225,8 @@ export type TodayActionItemType =
   | "jira_drift"
   | "one_on_one"
   | "sync_attention"
+  /** docs/53 F7: "Start standup" row before/during the standup window. */
+  | "standup"
   | "calm";
 
 export type TodayActionKind =
@@ -237,7 +239,9 @@ export type TodayActionKind =
   | "snooze"
   | "mark_done"
   | "carry_forward"
-  | "capture_meeting_outcome";
+  | "capture_meeting_outcome"
+  /** docs/53 F11: applies a server-issued inverse patch (the Undo of a prior command). */
+  | "restore";
 
 export type TodayActionSeverity =
   | "critical"
@@ -274,6 +278,8 @@ export interface TodayActionTarget {
   filter?: FilterType;
   /** Team-page panel to open when view === "team" (e.g. "one-on-one"). */
   panel?: string;
+  /** docs/53 F7: Team-page mode to open when view === "team" (`/team?mode=standup`). */
+  mode?: "standup";
   context?: TodayActionTargetContext;
 }
 
@@ -282,6 +288,10 @@ export interface TodayActionCommand {
   label: string;
   target: TodayActionTarget;
   confirm?: boolean;
+  /** docs/53 F11: the write is reversible — the response carries an `undo` request. */
+  undoable?: boolean;
+  /** carry_forward only: destination day (defaults to the request date). */
+  toDate?: string;
 }
 
 export interface TodayActionItem {
@@ -298,12 +308,164 @@ export interface TodayActionItem {
   secondaryActions: TodayActionCommand[];
   freshness?: string;
   actionPreview?: string;
+  /** docs/53 F15: set on developer rows while an Ask for update is unanswered. */
+  askedAt?: string;
+}
+
+/** docs/53 F5/F6: local wall-clock boundaries ("HH:MM", 24h) between rhythm stages. */
+export interface TodayRhythmBoundaries {
+  /** morning_plan → standup_window */
+  standupStart: string;
+  /** standup_window → midday_check */
+  middayStart: string;
+  /** midday_check → wrap_up */
+  wrapUpStart: string;
+}
+
+export const DEFAULT_TODAY_RHYTHM_BOUNDARIES: TodayRhythmBoundaries = {
+  standupStart: "10:00",
+  middayStart: "12:00",
+  wrapUpStart: "16:00",
+};
+
+export interface TodayRhythmSettings {
+  boundaries: TodayRhythmBoundaries;
 }
 
 export interface TodayRhythmState {
   stage: TodayRhythmStage;
   label: string;
   detail: string;
+  /** IANA zone the stage and day boundaries were computed in. */
+  timeZone?: string;
+  /** Manager-local wall clock ("HH:MM") at build time. */
+  localTime?: string;
+  boundaries?: TodayRhythmBoundaries;
+  /** The next stage and when it starts (ISO), absent during wrap_up. */
+  nextStage?: { stage: TodayRhythmStage; startsAt: string };
+}
+
+// ── Today stage focus (docs/53 F6/F7) ───────────────────
+
+export type TodayStandupStatus = "not_started" | "completed";
+
+export interface TodayFocusPerson {
+  accountId: string;
+  displayName: string;
+  target: TodayActionTarget;
+  /** docs/53 F15: set while an "Ask for update" is unanswered. */
+  askedAt?: string;
+  /** Primary one-tap action (e.g. ask_check_in); absent when already asked. */
+  primaryAction?: TodayActionCommand;
+}
+
+export interface TodayStandupFocus {
+  status: TodayStandupStatus;
+  date: string;
+  /** Latest sealed round today (absent while not_started). */
+  startedAt?: string;
+  endedAt?: string;
+  sessionCount: number;
+  reviewedCount: number;
+  flaggedCount: number;
+  flagged: TodayFocusPerson[];
+  /** not_started → `/team?mode=standup`; completed → the flagged person (1) or Team. */
+  target: TodayActionTarget;
+}
+
+export interface TodayWrapUpFocus {
+  missingCheckIns: TodayFocusPerson[];
+  openPromises: TodayPromiseItem[];
+  carryCandidates: TodayActionItem[];
+  /** Deep link to the day's private note (`/notes?date=`) for the EOD note. */
+  eodNoteTarget: TodayActionTarget;
+}
+
+export interface TodayMorningFocus {
+  /** Absent when standup mode is unavailable (Phase 3 off) or its source failed. */
+  standup?: TodayStandupFocus;
+  /** Actionable rows in the "now" group across the full queue. */
+  nowCount: number;
+  /** 1:1 rows scheduled for today or overdue. */
+  oneOnOnes: TodayActionItem[];
+}
+
+export interface TodayMiddayFocus {
+  standup?: TodayStandupFocus;
+  /** Follow-ups coming due in the next two hours. */
+  dueSoon: TodayPromiseItem[];
+  /** People with no check-in since the latest standup round (or today). */
+  silentSinceStandup: TodayFocusPerson[];
+}
+
+export type TodayFocus =
+  | { stage: "morning_plan"; morning: TodayMorningFocus }
+  | { stage: "standup_window"; morning: TodayMorningFocus }
+  | { stage: "midday_check"; midday: TodayMiddayFocus }
+  | { stage: "wrap_up"; wrapUp: TodayWrapUpFocus };
+
+// ── Since-last-visit delta ──────────────────────────────
+
+export interface TodayDeltaIssue {
+  jiraKey: string;
+  summary: string;
+  target: TodayActionTarget;
+}
+
+export interface TodayDeltaCheckIn {
+  developerAccountId: string;
+  displayName: string;
+  count: number;
+  latestAt: string;
+  target: TodayActionTarget;
+}
+
+export interface TodayDelta {
+  /** Last time the manager was on `/` before the current visit; absent on first visit. */
+  since?: string;
+  newIssues: { count: number; items: TodayDeltaIssue[] };
+  /** Open issues whose due date passed between `since` and today. */
+  overdueOvernight: { count: number; items: TodayDeltaIssue[] };
+  newCheckIns: { count: number; people: TodayDeltaCheckIn[] };
+  followUpsNewlyDue: { count: number; items: TodayPromiseItem[] };
+  resolvedCount: number;
+}
+
+// ── Check-in asks (docs/53 F15) ─────────────────────────
+
+export interface TodayCheckInAsk {
+  id: number;
+  developerAccountId: string;
+  date: string;
+  askedAt: string;
+  title: string;
+  trackerItemId?: number;
+  taskKey?: string;
+}
+
+// ── Undo (docs/53 F11) ──────────────────────────────────
+
+export type ManagerActionRestore =
+  | {
+      type: "desk_item";
+      managerDeskItemId: number;
+      patch: { status?: ManagerDeskItem["status"]; followUpAt?: string | null; outcome?: string | null };
+      /** Follow-up created alongside the original write (e.g. F14 next action). */
+      alsoDeleteDeskItemId?: number;
+    }
+  | {
+      type: "task";
+      taskKey: string;
+      patch: { status?: "open" | "active" | "blocked" | "done" | "dropped"; followUpAt?: string | null; outcome?: string | null; scheduledOn?: string | null };
+      alsoDeleteDeskItemId?: number;
+    }
+  | { type: "delete_desk_item"; managerDeskItemId: number }
+  | { type: "check_in_ask"; askId: number };
+
+export interface ManagerActionUndo {
+  label: string;
+  /** POST this back to `/api/manager-actions/commands` to undo. */
+  request: ManagerActionCommandRequest;
 }
 
 export interface TodaySummaryMetric {
@@ -328,6 +490,8 @@ export interface TodayTeamPulseItem {
   primaryAction: TodayActionCommand;
   secondaryActions: TodayActionCommand[];
   actionPreview?: string;
+  /** docs/53 F15: "asked 9:12" — set while an Ask for update is unanswered. */
+  askedAt?: string;
 }
 
 export interface TodayPromiseItem {
@@ -376,6 +540,18 @@ export interface TodayResponse {
   syncStatus?: SyncStatus;
   isPartial?: boolean;
   sourceStatus?: TodaySourceStatus;
+  /** docs/53 F13: actionable rows before the 20-row cut (excludes calm). */
+  totalCount?: number;
+  /** docs/53 F13: actionable rows per group across the full queue. */
+  groupCounts?: Record<TodayActionGroup, number>;
+  /** docs/53 F13: rows beyond `actionItems` (capped) so "+N more" expands in place. */
+  overflowActionItems?: TodayActionItem[];
+  /** docs/53 F6: stage-specific block — consumers must not reorder on it yet. */
+  focus?: TodayFocus;
+  /** Since-last-visit delta; absent when the source is unavailable. */
+  delta?: TodayDelta;
+  /** docs/53 F15: today's open check-in asks, keyed by developer. */
+  checkInAsks?: TodayCheckInAsk[];
 }
 
 // ── Manager action engine contracts ─────────────────────
@@ -404,6 +580,14 @@ export interface ManagerActionCommandRequest {
   preset?: ManagerActionSnoozePreset;
   summary?: string;
   taskKeys?: string[];
+  /** docs/53 F5: manager IANA zone for snooze/default times. */
+  tz?: string;
+  /** docs/53 F14: capture_meeting_outcome — optional follow-up created with the outcome. */
+  nextAction?: string;
+  /** docs/53 F14: developer who owns the next action (linked on the follow-up). */
+  nextActionOwnerAccountId?: string;
+  /** docs/53 F11: kind === "restore" — the inverse patch issued by a prior response. */
+  restore?: ManagerActionRestore;
 }
 
 export interface ManagerActionCommandResponse {
@@ -411,6 +595,8 @@ export interface ManagerActionCommandResponse {
   command: ManagerActionKind;
   target: ManagerActionTarget;
   result?: unknown;
+  /** docs/53 F11: present when the write can be reversed. */
+  undo?: ManagerActionUndo;
 }
 
 export interface DashboardConfig {

@@ -231,4 +231,67 @@ describe("today routes", () => {
       developerAccountId: "dev-1",
     });
   });
+  it("GET /api/today accepts tz and returns the zoned stage plus additive contracts (docs/53)", async () => {
+    const cookie = await managerCookie();
+    const response = await invoke(createTestApp(), {
+      method: "GET",
+      url: "/api/today?date=2026-03-08&tz=Asia%2FKolkata",
+      headers: { cookie },
+    });
+    expect(response.status).toBe(200);
+    // 02:30Z = 08:00 IST.
+    expect(response.body.rhythm).toMatchObject({ stage: "morning_plan", timeZone: "Asia/Kolkata", localTime: "08:00" });
+    expect(response.body).toHaveProperty("totalCount");
+    expect(response.body).toHaveProperty("groupCounts");
+    expect(response.body.focus).toMatchObject({ stage: "morning_plan" });
+    expect(response.body.delta).toMatchObject({ newIssues: { count: 0 } });
+    expect(String(response.headers["server-timing"])).toContain("today-state;dur=");
+  });
+
+  it("GET/PUT /api/today/settings reads and validates stage boundaries", async () => {
+    // The validation error path schedules real timers; fake ones stall it.
+    vi.useRealTimers();
+    const cookie = await managerCookie();
+    const app = createTestApp();
+    const initial = await invoke(app, { method: "GET", url: "/api/today/settings", headers: { cookie } });
+    expect(initial.body).toEqual({ boundaries: { standupStart: "10:00", middayStart: "12:00", wrapUpStart: "16:00" } });
+
+    const bad = await invoke(app, {
+      method: "PUT",
+      url: "/api/today/settings",
+      headers: { cookie },
+      body: { boundaries: { standupStart: "13:00", middayStart: "12:00", wrapUpStart: "16:00" } },
+    });
+    expect(bad.status).toBe(400);
+    const malformed = await invoke(app, {
+      method: "PUT",
+      url: "/api/today/settings",
+      headers: { cookie },
+      body: { boundaries: { standupStart: "9am", middayStart: "12:00", wrapUpStart: "16:00" } },
+    });
+    expect(malformed.status).toBe(400);
+
+    const saved = await invoke(app, {
+      method: "PUT",
+      url: "/api/today/settings",
+      headers: { cookie },
+      body: { boundaries: { standupStart: "09:30", middayStart: "12:00", wrapUpStart: "17:00" } },
+    });
+    expect(saved.body).toEqual({ boundaries: { standupStart: "09:30", middayStart: "12:00", wrapUpStart: "17:00" } });
+  });
+
+  it("POST restore without a patch is rejected by validation", async () => {
+    vi.useRealTimers();
+    const cookie = await managerCookie();
+    const response = await invoke(createTestApp(), {
+      method: "POST",
+      url: "/api/manager-actions/commands",
+      headers: { cookie },
+      body: {
+        date: "2026-03-08",
+        command: { kind: "restore", label: "Undo", target: { type: "follow_up", view: "follow-ups", managerDeskItemId: 1 } },
+      },
+    });
+    expect(response.status).toBe(400);
+  });
 });

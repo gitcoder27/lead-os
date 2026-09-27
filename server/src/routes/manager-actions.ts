@@ -43,6 +43,7 @@ const actionTargetSchema = z.object({
   date: z.string().regex(dateRegex, "target date must be YYYY-MM-DD").optional(),
   filter: z.string().optional(),
   panel: z.string().optional(),
+  mode: z.literal("standup").optional(),
   context: actionTargetContextSchema.optional(),
 });
 
@@ -58,11 +59,45 @@ const actionCommandSchema = z.object({
     "mark_done",
     "carry_forward",
     "capture_meeting_outcome",
+    "restore",
   ]),
   label: z.string().min(1),
   target: actionTargetSchema,
   confirm: z.boolean().optional(),
+  undoable: z.boolean().optional(),
+  toDate: z.string().regex(dateRegex, "toDate must be YYYY-MM-DD").optional(),
 });
+
+// Restores echo the stored value back, whatever its legacy shape.
+const isoOrNull = z.string().max(40).nullable();
+
+// docs/53 F11: the inverse patches a prior response issued — deliberately
+// narrow (status / followUpAt / outcome / scheduledOn, or delete a created row).
+const restoreSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("desk_item"),
+    managerDeskItemId: z.number().int().positive(),
+    patch: z.object({
+      status: z.enum(["inbox", "planned", "in_progress", "waiting", "backlog", "done", "cancelled"]).optional(),
+      followUpAt: isoOrNull.optional(),
+      outcome: z.string().nullable().optional(),
+    }).strict(),
+    alsoDeleteDeskItemId: z.number().int().positive().optional(),
+  }),
+  z.object({
+    type: z.literal("task"),
+    taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/),
+    patch: z.object({
+      status: z.enum(["open", "active", "blocked", "done", "dropped"]).optional(),
+      followUpAt: isoOrNull.optional(),
+      outcome: z.string().nullable().optional(),
+      scheduledOn: z.string().regex(dateRegex).nullable().optional(),
+    }).strict(),
+    alsoDeleteDeskItemId: z.number().int().positive().optional(),
+  }),
+  z.object({ type: z.literal("delete_desk_item"), managerDeskItemId: z.number().int().positive() }),
+  z.object({ type: z.literal("check_in_ask"), askId: z.number().int().positive() }),
+]);
 
 const commandSchema = z.object({
   query: z.any().optional(),
@@ -75,6 +110,13 @@ const commandSchema = z.object({
     preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),
     summary: z.string().optional(),
     taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
+    tz: z.string().max(64).optional(),
+    nextAction: z.string().max(500).optional(),
+    nextActionOwnerAccountId: z.string().max(128).optional(),
+    restore: restoreSchema.optional(),
+  }).refine((body) => body.command.kind !== "restore" || Boolean(body.restore), {
+    message: "restore requires a restore patch",
+    path: ["restore"],
   }),
 });
 

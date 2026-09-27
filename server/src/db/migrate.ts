@@ -729,6 +729,11 @@ const alterStatements = [
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_sessions_request ON standup_sessions(workspace_id, manager_account_id, request_id)",
   // docs/51 F7: per-day manual ordering for schedule-grouped task views.
   "ALTER TABLE tasks ADD COLUMN schedule_position INTEGER",
+  // docs/53 §8.5-7: per-manager Today visit anchor (since-last-visit delta)
+  // and "Ask for update" records shown on the pulse row.
+  "CREATE TABLE IF NOT EXISTS today_visits (workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, visit_started_at TEXT NOT NULL, last_active_at TEXT NOT NULL, baseline_at TEXT, PRIMARY KEY (workspace_id, manager_account_id))",
+  "CREATE TABLE IF NOT EXISTS today_check_in_asks (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, developer_account_id TEXT NOT NULL, date TEXT NOT NULL, asked_at TEXT NOT NULL, title TEXT NOT NULL, tracker_item_id INTEGER, task_key TEXT, cancelled_at TEXT)",
+  "CREATE INDEX IF NOT EXISTS idx_today_check_in_asks_manager_date ON today_check_in_asks(workspace_id, manager_account_id, date)",
 ];
 
 const constraintRepairStatements = [

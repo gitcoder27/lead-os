@@ -612,6 +612,16 @@ function AppContent() {
     }
 
     if (target.view === 'team') {
+      // docs/53 F7: "Start standup" opens Standup Mode (`/team?mode=standup`).
+      if (target.mode === 'standup') {
+        setTeamPanel(undefined);
+        setTeamPanelDev(undefined);
+        setTeamMode('standup');
+        preloadView('team');
+        setActiveView('team');
+        navigateToView('team', { params: { mode: 'standup' } });
+        return;
+      }
       // docs/48 §4.4: 1:1 attention items deep-link into the workspace panel.
       if (target.panel === 'one-on-one' && target.developerAccountId) {
         setTeamPanel('one-on-one');

@@ -1,8 +1,12 @@
+import { useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import { getLocalTimeZone } from '@/lib/utils';
 import type {
+  ManagerActionCommandRequest,
   ManagerActionCommandResponse,
+  ManagerActionUndo,
   TodayActionCommand,
   TodayActionTarget,
   TodayResponse,
@@ -20,20 +24,30 @@ type TodayActionVariables = {
   preset?: 'later_today' | 'tomorrow' | 'next_week';
   summary?: string;
   taskKeys?: string[];
+  /** docs/53 F14: optional follow-up created with a meeting outcome. */
+  nextAction?: string;
+  nextActionOwnerAccountId?: string;
 };
+
+/** docs/53 F11: matches the /tasks Undo window. */
+export const TODAY_UNDO_WINDOW_MS = 6000;
 
 // docs/53 P4: navigation commands never hit the mutation pipeline — they just
 // open the target, so they can't invalidate/cancel the destination page's
 // fetches or flash a "Working" state.
-const NAVIGATION_KINDS = new Set<TodayActionCommand['kind']>(['open', 'assign_owner', 'ask_check_in']);
+const NAVIGATION_KINDS = new Set<TodayActionCommand['kind']>(['open', 'assign_owner']);
 
 function isNavigationCommand(command: TodayActionCommand): boolean {
   return NAVIGATION_KINDS.has(command.kind);
 }
 
+type PendingUndo = { undo: ManagerActionUndo; title: string; expiresAt: number };
+
 export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) {
   const qc = useQueryClient();
   const { addToast } = useToast();
+  // docs/53 U4: `z` undoes the most recent write still inside its window.
+  const undoStack = useRef<PendingUndo[]>([]);
 
   const invalidateToday = () => {
     qc.invalidateQueries({ queryKey: ['today'] });
@@ -57,14 +71,43 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         itemTarget.type === target.type;
 
       const actionItems = current.actionItems.filter((item) => !matchesTarget(item.target));
+      const removed = current.actionItems.length - actionItems.length;
       return {
         ...current,
         currentPriority: current.currentPriority && matchesTarget(current.currentPriority.target)
           ? actionItems[0]
           : current.currentPriority,
         actionItems,
+        overflowActionItems: current.overflowActionItems?.filter((item) => !matchesTarget(item.target)),
+        totalCount: current.totalCount === undefined ? undefined : Math.max(current.totalCount - removed, 0),
         promises: current.promises.filter((item) => !matchesTarget(item.target)),
         meetingPrompts: current.meetingPrompts.filter((item) => !matchesTarget(item.target)),
+      };
+    });
+  };
+
+  const markAskedOptimistically = (target: TodayActionTarget) => {
+    const accountId = target.developerAccountId;
+    if (!accountId) {
+      return;
+    }
+    const askedAt = new Date().toISOString();
+    qc.setQueriesData<TodayResponse>({ queryKey: ['today', date] }, (current) => {
+      if (!current) {
+        return current;
+      }
+      const withoutAsk = <T extends { secondaryActions: TodayActionCommand[] }>(entry: T): T => ({
+        ...entry,
+        secondaryActions: entry.secondaryActions.filter((action) => action.kind !== 'ask_check_in'),
+      });
+      return {
+        ...current,
+        actionItems: current.actionItems.map((item) =>
+          item.target.developerAccountId === accountId ? { ...withoutAsk(item), askedAt } : item,
+        ),
+        teamPulse: current.teamPulse.map((person) =>
+          person.accountId === accountId ? { ...withoutAsk(person), askedAt } : person,
+        ),
       };
     });
   };
@@ -130,45 +173,63 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     });
   };
 
+  const postCommand = (body: Omit<ManagerActionCommandRequest, 'date' | 'tz'> & { date?: string }) =>
+    api.post<ManagerActionCommandResponse>('/manager-actions/commands', {
+      date,
+      tz: getLocalTimeZone(),
+      ...body,
+    });
+
   const mutation = useMutation({
-    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys }: TodayActionVariables) => {
+    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, nextAction, nextActionOwnerAccountId }: TodayActionVariables) => {
       const { target } = command;
 
       if (command.kind === 'mark_done' && target.managerDeskItemId) {
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command });
+        return postCommand({ command });
       }
 
       if (command.kind === 'snooze' && target.managerDeskItemId) {
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, preset });
+        return postCommand({ command, preset });
       }
 
       if (command.kind === 'add_check_in' && target.developerAccountId) {
         if (!summary?.trim()) {
           return { cancelled: true };
         }
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, summary: summary.trim(), taskKeys });
+        return postCommand({ command, summary: summary.trim(), taskKeys });
+      }
+
+      // docs/53 F15: "Ask for update" is a write — a check-in request task on
+      // the developer's My Day plus an asked-at stamp on their row.
+      if (command.kind === 'ask_check_in' && target.developerAccountId) {
+        return postCommand({ command, title: title?.trim() || undefined });
       }
 
       if (command.kind === 'set_current_work' && target.trackerItemId) {
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command });
+        return postCommand({ command });
       }
 
       if (command.kind === 'capture_follow_up') {
         if (!title?.trim()) {
           return { cancelled: true };
         }
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, title: title.trim(), preset });
+        return postCommand({ command, title: title.trim(), preset });
       }
 
       if (command.kind === 'carry_forward' && target.managerDeskItemId) {
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command });
+        return postCommand({ command });
       }
 
       if (command.kind === 'capture_meeting_outcome' && target.managerDeskItemId) {
         if (!outcome?.trim()) {
           return { cancelled: true };
         }
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, outcome: outcome.trim() });
+        return postCommand({
+          command,
+          outcome: outcome.trim(),
+          nextAction: nextAction?.trim() || undefined,
+          nextActionOwnerAccountId: nextAction?.trim() ? nextActionOwnerAccountId || undefined : undefined,
+        });
       }
 
       onOpenTarget(target);
@@ -190,6 +251,9 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       if (command.kind === 'add_check_in' && summary?.trim()) {
         completeDeveloperCheckInOptimistically(command.target);
       }
+      if (command.kind === 'ask_check_in') {
+        markAskedOptimistically(command.target);
+      }
     },
     onSuccess: (result, variables) => {
       if (isActionResult(result, 'cancelled')) {
@@ -199,13 +263,57 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       if (isActionResult(result, 'skipToast')) {
         return;
       }
-      addToast(actionToastTitle(variables.command.kind), 'success');
+      const title = actionToastTitle(variables.command.kind);
+      const undo = (result as ManagerActionCommandResponse).undo;
+      if (undo) {
+        offerUndo(undo, title);
+        return;
+      }
+      addToast(title, 'success');
     },
     onError: (error) => {
       invalidateToday();
       addToast(error.message, 'error');
     },
   });
+
+  const runUndo = useCallback(async (entry: PendingUndo) => {
+    undoStack.current = undoStack.current.filter((candidate) => candidate !== entry);
+    await qc.cancelQueries({ queryKey: ['today', date] });
+    try {
+      await api.post<ManagerActionCommandResponse>('/manager-actions/commands', {
+        tz: getLocalTimeZone(),
+        ...entry.undo.request,
+      });
+      addToast('Undone', 'success');
+    } catch (error) {
+      addToast({ type: 'error', title: 'Could not undo', message: error instanceof Error ? error.message : undefined });
+    } finally {
+      invalidateToday();
+    }
+  }, [addToast, date, qc]);
+
+  function offerUndo(undo: ManagerActionUndo, title: string) {
+    const entry: PendingUndo = { undo, title, expiresAt: Date.now() + TODAY_UNDO_WINDOW_MS };
+    undoStack.current = [...pruneExpired(undoStack.current), entry];
+    addToast({
+      type: 'success',
+      title,
+      duration: TODAY_UNDO_WINDOW_MS,
+      action: { label: undo.label || 'Undo', onClick: () => void runUndo(entry) },
+    });
+  }
+
+  /** docs/53 U4 `z`: undo the latest write still inside its window. */
+  const undoLast = useCallback((): boolean => {
+    undoStack.current = pruneExpired(undoStack.current);
+    const latest = undoStack.current[undoStack.current.length - 1];
+    if (!latest) {
+      return false;
+    }
+    void runUndo(latest);
+    return true;
+  }, [runUndo]);
 
   const runAction = (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
     if (isNavigationCommand(command)) {
@@ -228,10 +336,15 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
   return {
     runAction,
     runActionAsync,
+    undoLast,
     isPending: mutation.isPending,
     pendingKind: mutation.variables?.command.kind,
     pendingTarget: mutation.variables?.command.target,
   };
+}
+
+function pruneExpired(entries: PendingUndo[], now = Date.now()): PendingUndo[] {
+  return entries.filter((entry) => entry.expiresAt > now);
 }
 
 function isActionResult(result: unknown, key: 'cancelled' | 'skipToast'): boolean {
@@ -242,6 +355,7 @@ function actionToastTitle(kind: TodayActionCommand['kind']): string {
   if (kind === 'mark_done') return 'Marked done';
   if (kind === 'snooze') return 'Snoozed';
   if (kind === 'add_check_in') return 'Check-in added';
+  if (kind === 'ask_check_in') return 'Asked for an update';
   if (kind === 'capture_follow_up') return 'Follow-up captured';
   if (kind === 'carry_forward') return 'Carried forward';
   if (kind === 'capture_meeting_outcome') return 'Outcome captured';

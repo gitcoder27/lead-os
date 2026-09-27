@@ -122,6 +122,7 @@ const SHORTCUTS: [string, string][] = [
   ['a', 'Assign'],
   ['l', 'Labels'],
   ['#', 'Drop'],
+  ['g then letter', 'Jump views — t Today · i Inbox · m My tasks · w Waiting · u Upcoming · l Later · a Attention · c Closed'],
   ['n', 'New task in this group'],
   ['/', 'Search'],
   ['?', 'This cheat sheet'],

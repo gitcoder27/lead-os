@@ -134,6 +134,19 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Waiting on others' })).toBeTruthy();
   });
 
+  it('g then w jumps to Waiting on others; an unknown chord key falls through', () => {
+    render(<TasksPage />);
+    press('g');
+    press('w');
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS[3]!.definition);
+    expect(screen.getByRole('heading', { level: 1, name: 'Waiting on others' })).toBeTruthy();
+    // Armed chord + unrecognized key: disarms, key behaves normally (j focuses a row).
+    press('g');
+    press('j');
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS[3]!.definition); // still waiting
+    expect(document.querySelector('[data-task-row][tabindex="0"]')).not.toBeNull();
+  });
+
   it('resolves retired view ids from the URL (D6)', () => {
     window.history.replaceState(null, '', '/tasks?view=blocked');
     render(<TasksPage />);

@@ -72,6 +72,19 @@ const SCHEDULE_LABELS: Record<SchedulePreset, string> = {
   clear: 'Date cleared',
 };
 
+/** §7: `g` then a letter jumps to a rail view — same target as clicking it. */
+const GO_CHORD_VIEWS: Record<string, string> = {
+  t: 'today',
+  i: 'inbox',
+  m: 'my-tasks',
+  w: 'waiting',
+  u: 'upcoming',
+  l: 'later',
+  a: 'attention',
+  c: 'closed-week',
+};
+const GO_CHORD_TIMEOUT_MS = 1200;
+
 function isEditable(element: HTMLElement): boolean {
   return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
 }
@@ -117,6 +130,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const lastFocusedIndex = useRef(0);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const selectionAnchor = useRef<string | undefined>(undefined);
+  const goChordArmed = useRef(false);
+  const goChordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lingering, setLingering] = useState<Map<string, LingerEntry>>(() => new Map());
   const [menu, setMenu] = useState<OpenMenuState | null>(null);
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
@@ -412,6 +427,24 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     const focused = focusedKeyRef.current;
     const anchor = focused ? rowElement(focused) : null;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    // `g` arms a view chord; the next letter switches the rail view. A
+    // non-view key after `g` falls through and works normally.
+    if (goChordArmed.current) {
+      goChordArmed.current = false;
+      const viewId = GO_CHORD_VIEWS[key];
+      if (viewId) {
+        setView(viewId);
+        event.preventDefault();
+        return;
+      }
+    }
+    if (key === 'g') {
+      goChordArmed.current = true;
+      if (goChordTimer.current) window.clearTimeout(goChordTimer.current);
+      goChordTimer.current = window.setTimeout(() => { goChordArmed.current = false; }, GO_CHORD_TIMEOUT_MS);
+      event.preventDefault();
+      return;
+    }
     let handled = true;
     switch (key) {
       case 'j': case 'ArrowDown': move(1, event.shiftKey); break;

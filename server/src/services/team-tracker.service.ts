@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte } from "drizzle-orm";
 import type {
   TrackerDeveloperStatus,
   TrackerItemState,
@@ -49,6 +49,7 @@ import {
   developerNotes,
   dayFocus,
   standupSessions,
+  tasks,
 } from "../db/schema";
 import { getEffectiveDueDate } from "./issue-rules";
 import { HttpError } from "../middleware/errorHandler";
@@ -1361,8 +1362,23 @@ export class TeamTrackerService {
         // A stale/unknown flagged id must not block sealing the round.
         try {
           const dev = await this.getDeveloperByAccountId(accountId, scope);
+          const title = `Standup follow-up: ${dev.displayName}`;
+          // docs/51 D6: sealing a second same-day round for the same person
+          // reuses the still-open follow-up instead of stacking duplicates.
+          const existing = (await db.select({ taskKey: tasks.taskKey }).from(tasks).where(and(
+            eq(tasks.workspaceId, scope),
+            eq(tasks.trackedByManagerId, managerAccountId),
+            eq(tasks.title, title),
+            eq(tasks.scheduledOn, input.date),
+            inArray(tasks.status, ["open", "active", "blocked"]),
+            isNull(tasks.deletedAt),
+          )).limit(1))[0];
+          if (existing) {
+            followUps.push({ accountId, taskKey: existing.taskKey });
+            continue;
+          }
           const task = await this.tasks.create(
-            { title: `Standup follow-up: ${dev.displayName}`, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"] },
+            { title, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"] },
             principal,
           );
           followUps.push({ accountId, taskKey: task.taskKey });

@@ -43,18 +43,26 @@ What to keep as-is: the view engine and counts contract, the bulk endpoint and u
 *Why it matters:* this is the view a manager opens before a 1:1 or standup to ask "who owes me what". Today it answers "what's everyone doing", which `/team` already answers better.
 *Fix:* make Waiting explicit. Include `kind:waiting` / `blocked` / a manager-tracked follow-up **on someone else's task** / an explicit "waiting on <person>" field. Exclude owner = me unless the task is blocked. Retire the blanket `ownerType = developer` clause. Rename the manager's own follow-ups to what they are: tasks in My tasks with a bell.
 
+**Implemented —** the waiting predicate is now `blocked` OR `kind:waiting` OR (follow-up predicate on a task owned by someone else); my own open work, my follow-ups, inbox follow-ups, and plain tracked dev tasks are out.
+
 **F2 — "Needs attention" flags parked (Later) work and idle dev tasks as stale. S1.**
 `task-views.service.ts:57` has no `later:false`. `:103` marks any open task idle for 5 days as stale. So everything parked in Later becomes "stale" after 5 days and shows up in the review queue. That's the opposite of why you park things. Tracked developer tasks idle for 5 days also land here, even though the Team page already shows them. In screenshot 1 the rail reads 7 for attention, the same as Waiting, and most of those are 1–2 day slipped plan dates.
 *Why it matters:* a review queue that is mostly noise trains the manager to ignore the amber badge. That's the only badge meant to demand action.
 *Fix:* add `later:false` to `attention`. Scope stale to manager-owned and Inbox tasks, or raise the developer threshold. Consider counting a plan date slipped by only a day or two as *not* attention-worthy on its own (see D1).
 
+**Implemented —** `attention` carries `later:false`, and the stale signal only applies to manager-owned and inbox tasks (self-owned dev rows count as mine via F3).
+
 **F3 — Manager identity splits into "Me" and a developer called "Ayan Saha". S2.**
 In screenshot 2, the Waiting groups include both **Me** and **Ayan Saha**. The manager also has a developer record (`ayan.dev`). The owner matcher (`task-views.service.ts:131-137`) and `ownerName` (`TasksPage.tsx:176-184`) treat these as different people, so "assign work to devs" (clearly the manager's own task) is filed under someone else.
 *Fix:* resolve the manager's linked developer account to "Me" in `owner:"me"`, in grouping, and in the assign menu. At minimum, don't list self in the Assign menu twice.
 
+**Implemented —** "me"/"team" match on `ownerId = accountId` (a linked manager's accountId IS the dev id) in matcher and SQL; owner grouping files dev-self rows under Me; assign menus (list + drawer) and the owner filter no longer list self.
+
 **F4 — Three views over one set: Today ⊂ My tasks ⊃ Upcoming. S2 (simplify).**
 `my-tasks` is grouped by schedule, so it already shows Overdue / Today / Tomorrow / Next 7 days / Beyond / Unscheduled. `upcoming` is exactly the "Tomorrow and later" part of it (`:54`). `today` is the "Overdue + Today" part. Three rail entries show slices of one list. Upcoming doesn't earn its slot (its count is even hidden when 0; see screenshot 1).
 *Fix:* remove **Upcoming** (keep the id as a retired alias → `my-tasks`). Keep Today, because it's the focus lens.
+
+**Implemented —** the built-in is gone; `upcoming → my-tasks` is in `RETIRED_TASK_VIEWS`, and the `g u` chord was dropped.
 
 **F5 — Finished work disappears from Today. S2.**
 Today filters `status ∈ open/active/blocked` (`:50`). A completed task lingers only until focus moves, then it's gone. The only place to see today's progress is "Closed this week", which is split at Monday. For a daily planning surface, "what did I get done" is half the ritual. Spec §0 bans progress bars, fine, but it doesn't require hiding completions.
@@ -62,6 +70,8 @@ Today filters `status ∈ open/active/blocked` (`:50`). A completed task lingers
 
 **F6 — "Closed this week" resets on Monday. S3.**
 `weekStart()` (`:38-41`). On Monday morning, which is exactly when you prep the week, the view is empty. A rolling "Closed · last 7 days" is more useful. The closed date is also `closedAt.slice(0,10)` (`:158`), a UTC date compared with the client's local `today`. For IST, anything closed between 00:00 and 05:30 is filed under the previous day.
+
+**Implemented —** the view is now `Closed · last 7 days` (`closed.from = today-6`), and the matcher compares `isoDatePart(closedAt)` (local date, same convention as `dueAt`) with SQL bounds widened a day as prefilter.
 
 ### 1.2 Planning primitives
 
@@ -115,11 +125,15 @@ When `flatRows` is empty, the page renders a second `TaskList` whose only group 
 Group headers also show the raw label name, e.g. `category:follow_up`, instead of `taskLabelDisplayName`.
 *Fix:* either remove Label from the Group options (see §7) or make grouping use the first/primary label only.
 
+**Implemented —** Label is gone from the Group options; `?group=label` still parses so saved views and old links don't break.
+
 **F17 — Search ignores display names and owners. S3.**
 `searchTasks` (`task-list.ts:95-102`) matches raw label names (`category:follow_up`, not "follow up") and doesn't match owner names. "Search this view" for "deepak" returns nothing in Waiting, where Deepak is a group header.
 
 **F18 — The Type filter is dead weight. S3 (remove).**
 Tasks/Meetings has its own toolbar chip, but meetings have their own route and the dataset has zero meeting tasks. Keep the `kind` URL param (the `?view=meetings` alias needs it) but take the chip off the toolbar.
+
+**Implemented —** the Type chip and its menu are gone; `?kind=` still parses and `view=meetings` still applies `kind:meeting`.
 
 ### 1.6 Drawer integration
 
@@ -141,6 +155,8 @@ Unify on one map and one legend component (`ShortcutLegend` already exists).
 **U1 — Two "Today"s. S1 (information architecture).**
 The top nav's **Today** is `/`, the command view. `/tasks` then lands on a rail view also called **Today** (`DEFAULT_TASK_VIEW_ID = 'today'`, `task-views.ts:19`), and both are visible in screenshot 1. Spec §0 says `/` *runs* the day and `/tasks` *builds* the plan. Landing the builder on a view with the runner's name blurs exactly that distinction.
 *Fix:* rename the rail view **Planned today** (or **Today's plan**), or default `/tasks` to **Inbox** when it's non-empty and to **My tasks** otherwise. Either way, the two surfaces should never share a label.
+
+**Implemented —** the built-in `today` view is now named "Planned today"; the id, URL contract, and `g t` chord are unchanged.
 
 **U2 — The focused row's date is hidden. S1.**
 The hover-action cluster is absolutely positioned over the right edge and is forced visible on the focused row (`TaskListRow.tsx:199-212`: `focused ? 'opacity-100' : …`). It covers the 92px date column (`:186`) and often the owner avatar. As you j/k through a list, the one row you're looking at is the one whose date you can't see. That's the field you most need when deciding between `s`, `Space`, and `#`. *(code-inferred)*
@@ -194,6 +210,8 @@ The list is `mx-auto max-w-[1180px] px-4` (`TaskList.tsx:49`), but the toolbar i
 
 **D6 — Raw data in titles. S2 (upstream, but visible here).**
 Screenshot 1, T-70: "working trading @712020:ef2911ef-332c-4493-b05a-1b1916fcff50". A Jira account id leaked from a mention into the title, and the row renders it raw (no mention handling in `components/tasks/`). T-71 and T-72 are also identical "Standup follow-up: Harsha Nallaiahgari" tasks created on the same day. Standup follow-up creation isn't idempotent. Neither bug originates in `/tasks`, but `/tasks` is where they become visible every day. Fix at the source (capture/notes mention serialisation; standup follow-up dedupe on person + day).
+
+**Implemented (partial) —** standup follow-ups dedupe on (manager, date, title): sealing a second same-day round for a flagged person reuses the existing open task's key instead of creating a duplicate; a done follow-up doesn't block a fresh one. The mention-serialisation half remains open.
 
 **D7 — Consistency with the rest of the app. S3.**
 The new TaskDrawer uses the same tokens and a `TaskPopover` / `MenuItem` vocabulary, which is good. Two divergences: the rail's rename/delete pencils are 10px icons in 20px targets (`TaskViewRail.tsx:73-78`), and the empty-state CTA styles are hand-rolled rather than shared with Today and standup buttons. These are minor.

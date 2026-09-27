@@ -67,7 +67,9 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
     const byId = new Map<string, string>();
     for (const dev of list ?? []) byId.set(dev.accountId, dev.displayName);
     return {
-      developers: (list ?? []).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
+      // docs/51 F3: my linked developer account is me — the "Me" option
+      // already covers it, so the assign menu doesn't list self twice.
+      developers: (list ?? []).filter((dev) => dev.accountId !== userId).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
       nameFor: (id) => (!id ? undefined : id === userId ? 'You' : byId.get(id)),
       userId,
       userName,

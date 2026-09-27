@@ -216,6 +216,32 @@ describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
     expect(sessions).toHaveLength(1);
   });
 
+  it("reuses the open follow-up when the same person is flagged again the same day (docs/51 D6)", async () => {
+    await enablePhase3();
+    const first = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload());
+    expect(first.status).toBe(201);
+    const second = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ summary: "second round" }));
+    expect(second.status).toBe(201);
+    expect(second.body.session.id).not.toBe(first.body.session.id);
+    // Same person, same day: the response points at the existing open task.
+    expect(second.body.followUps).toEqual([{ accountId: "dev-2", taskKey: first.body.followUps[0].taskKey }]);
+    const rows = await db.select().from(tasks).where(eq(tasks.title, "Standup follow-up: Bob Jones"));
+    expect(rows).toHaveLength(1);
+
+    // A different person still gets their own task.
+    const third = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-1"], summary: "third" }));
+    expect(third.body.followUps).toHaveLength(1);
+    expect(third.body.followUps[0].taskKey).not.toBe(first.body.followUps[0].taskKey);
+
+    // Once the follow-up is done, flagging again creates a fresh task.
+    await db.update(tasks).set({ status: "done" }).where(eq(tasks.taskKey, first.body.followUps[0].taskKey));
+    const fourth = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-2"], summary: "fourth" }));
+    expect(fourth.body.followUps).toHaveLength(1);
+    expect(fourth.body.followUps[0].taskKey).not.toBe(first.body.followUps[0].taskKey);
+    const all = await db.select().from(tasks).where(eq(tasks.title, "Standup follow-up: Bob Jones"));
+    expect(all).toHaveLength(2);
+  });
+
   it("anchors the next standup feed to the sealed session end", async () => {
     await enablePhase3();
     const task = await createDevTask("active", "Migration");

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, taskViewDefinitionSchema, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
@@ -34,28 +34,25 @@ function shiftDays(iso: string, days: number): string {
   return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Monday of the week containing `today` (ISO weeks). */
-function weekStart(today: string): string {
-  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
-  return shiftDays(today, -((weekday + 6) % 7));
-}
-
 /**
  * Built-in views (§5.2, docs/49 §3) — code, not rows. Relative horizons and
- * the closed-this-week range resolve against the caller's today.
+ * the rolling closed range resolve against the caller's today.
  */
 export function builtinTaskViews(today: string): { id: string; name: string; section: "plan" | "review"; definition: TaskViewDefinition }[] {
   const openish: TaskStatus[] = ["open", "active", "blocked"];
   return [
-    { id: "today", name: "Today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today" }, sort: "scheduled", group: "scheduled" } },
+    { id: "today", name: "Planned today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today" }, sort: "scheduled", group: "scheduled" } },
     { id: "inbox", name: "Inbox", section: "plan", definition: { filters: { owner: "inbox", status: ["open"] }, sort: "created" } },
     { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
     { id: "waiting", name: "Waiting on others", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "updated", group: "owner" } },
-    { id: "upcoming", name: "Upcoming", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "upcoming" }, sort: "scheduled", group: "scheduled" } },
     { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
     // §8.1 drift, overdue plan dates, and stale work in one review queue.
-    { id: "attention", name: "Needs attention", section: "review", definition: { filters: { attention: ["overdue", "stale", "drift"] }, sort: "scheduled" } },
-    { id: "closed-week", name: "Closed this week", section: "review", definition: { filters: { closed: { from: weekStart(today), to: today } }, sort: "updated" } },
+    // docs/51 F2: parked work is deliberate, and idle developer-owned tasks
+    // belong to /team — neither belongs in this queue.
+    { id: "attention", name: "Needs attention", section: "review", definition: { filters: { attention: ["overdue", "stale", "drift"], later: false }, sort: "scheduled" } },
+    // docs/51 F6: a rolling window, not a week bucket — Monday morning still
+    // shows last week's closes.
+    { id: "closed-week", name: "Closed · last 7 days", section: "review", definition: { filters: { closed: { from: shiftDays(today, -6), to: today } }, sort: "updated" } },
   ];
 }
 
@@ -118,6 +115,15 @@ function followUpMatch(row: TaskRow): boolean {
 }
 
 /**
+ * docs/51 F3: the manager's linked developer account is also "me" — the
+ * session's accountId IS that developer id (auth maps it onto the user), so
+ * `ownerId = accountId` covers both manager-owned and self-owned dev rows.
+ */
+function selfOwned(row: TaskRow, principal: TaskPrincipal): boolean {
+  return row.ownerId !== null && row.ownerId === principal.accountId;
+}
+
+/**
  * docs/49 D4: the single source of truth for view membership. SQL bounds the
  * candidate set in `run()`; this predicate decides. `counts()` evaluates every
  * view against one shared universe with the same function, so badge counts
@@ -132,8 +138,8 @@ export function matchesTaskViewFilters(
   if (row.deletedAt) return false;
   if (filters.owner !== undefined) {
     const owner = filters.owner;
-    const ok = owner === "me" ? row.ownerType === "manager" && row.ownerId === principal.accountId
-      : owner === "team" ? row.ownerType === "developer"
+    const ok = owner === "me" ? selfOwned(row, principal)
+      : owner === "team" ? row.ownerType === "developer" && row.ownerId !== null && !selfOwned(row, principal)
         : owner === "inbox" ? row.ownerType === null
           : row.ownerId !== null && owner.includes(row.ownerId);
     if (!ok) return false;
@@ -155,7 +161,9 @@ export function matchesTaskViewFilters(
   // the drift signal's own 7-day window (§8.1).
   if (filters.closed) {
     if (!row.closedAt) return false;
-    const closedDate = row.closedAt.slice(0, 10);
+    // docs/51 F6: the local close date, not the UTC slice — same convention
+    // as `dueAt` bucketing via isoDatePart.
+    const closedDate = isoDatePart(row.closedAt)!;
     if (filters.closed.from && closedDate < filters.closed.from) return false;
     if (filters.closed.to && closedDate > filters.closed.to) return false;
   } else if (row.closedAt && filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
@@ -176,11 +184,18 @@ export function matchesTaskViewFilters(
     if (filters.horizon === "today" ? plan > today : plan <= today) return false;
   }
   if (filters.waiting !== undefined) {
-    const waiting = row.ownerType === "developer" || row.status === "blocked" || followUpMatch(row) || labelsOf(row).includes(WAITING_LABEL);
+    // docs/51 F1: waiting = blocked, an explicit kind:waiting label, or a
+    // follow-up on somebody else's task. My own open tasks — including plain
+    // tracked dev work and follow-ups I owe — are not "waiting".
+    const waiting = row.status === "blocked" || labelsOf(row).includes(WAITING_LABEL)
+      || (followUpMatch(row) && row.ownerType !== null && !selfOwned(row, principal));
     if (waiting !== filters.waiting) return false;
   }
   if (filters.attention?.length) {
-    const hit = filters.attention.some((reason) => (reason === "overdue" ? signals.overdue : reason === "stale" ? signals.stale : signals.drift));
+    // docs/51 F2: the stale signal only applies to manager-owned and inbox
+    // tasks — idle developer-owned work is the Team page's job.
+    const staleApplies = signals.stale && (row.ownerType !== "developer" || selfOwned(row, principal));
+    const hit = filters.attention.some((reason) => (reason === "overdue" ? signals.overdue : reason === "stale" ? staleApplies : signals.drift));
     if (!hit) return false;
   }
   return true;
@@ -234,8 +249,10 @@ export class TaskViewsService {
     if (filters.owner !== undefined) {
       const owner = filters.owner;
       conditions.push(
-        owner === "me" ? and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, principal.accountId))!
-          : owner === "team" ? eq(tasks.ownerType, "developer")
+        // docs/51 F3: "me" matches any row whose ownerId is my account id —
+        // for a linked manager that IS the developer account id.
+        owner === "me" ? eq(tasks.ownerId, principal.accountId)
+          : owner === "team" ? and(eq(tasks.ownerType, "developer"), ne(tasks.ownerId, principal.accountId))!
             : owner === "inbox" ? isNull(tasks.ownerType)
               : inArray(tasks.ownerId, owner),
       );
@@ -264,9 +281,11 @@ export class TaskViewsService {
     // Closed tasks are only reachable through a bounded closed range (§5.2);
     // the jiraDrift predicate applies its own 7-day closed window (§8.1).
     if (filters.closed) {
+      // substr() is the UTC date; the matcher compares the local date
+      // (isoDatePart), so the SQL bound is widened by a day on each side.
       const closedDate = sql`substr(${tasks.closedAt}, 1, 10)`;
-      if (filters.closed.from) conditions.push(gte(closedDate, filters.closed.from));
-      if (filters.closed.to) conditions.push(lte(closedDate, filters.closed.to));
+      if (filters.closed.from) conditions.push(gte(closedDate, shiftDays(filters.closed.from, -1)));
+      if (filters.closed.to) conditions.push(lte(closedDate, shiftDays(filters.closed.to, 1)));
     } else if (filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
       conditions.push(isNull(tasks.closedAt));
     }
@@ -335,7 +354,7 @@ export class TaskViewsService {
       eq(tasks.workspaceId, scope),
       isNull(tasks.deletedAt),
       this.scopePredicate(principal),
-      sql`(${tasks.closedAt} IS NULL OR substr(${tasks.closedAt}, 1, 10) >= ${closedFloor})`,
+      sql`(${tasks.closedAt} IS NULL OR substr(${tasks.closedAt}, 1, 10) >= ${shiftDays(closedFloor, -1)})`,
     ));
     const facts = await this.facts(principal, universe, today, needsJiraLinks(views.map((view) => view.definition)));
     const counts: Record<string, TaskViewCount> = {};

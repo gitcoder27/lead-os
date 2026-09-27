@@ -96,7 +96,7 @@ describe("taskPlanDate (docs/49 D1)", () => {
 });
 
 describe("consolidated built-in views (docs/49 §3)", () => {
-  it("Today is plan date <= today; Upcoming is after today; both exclude Later and closed", async () => {
+  it("Today is plan date <= today, excluding Later and closed; Upcoming is retired (docs/51 F4)", async () => {
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Overdue", scheduledOn: shift(-3) });
     await createTask(headers, { title: "Now" });
@@ -109,24 +109,52 @@ describe("consolidated built-in views (docs/49 §3)", () => {
     await createTask(headers, { title: "Delegated", ownerType: "developer", ownerId: "dev-1" });
 
     expect(titles(await runView(headers, "today"))).toEqual(["Due today, planned later", "Now", "Overdue", "Standup"]);
-    expect(titles(await runView(headers, "upcoming"))).toEqual(["Tomorrow"]);
     expect(titles(await runView(headers, "my-tasks"))).toEqual(["Due today, planned later", "Now", "Overdue", "Standup", "Tomorrow", "Undated"]);
     expect(titles(await runView(headers, "later"))).toEqual(["Parked"]);
+    // docs/51 F4: Upcoming is gone — old links resolve to my-tasks on the client.
+    expect((await views(headers)).some((view) => view.id === "upcoming")).toBe(false);
   });
 
-  it("Waiting on others covers delegated, blocked, follow-up, and kind:waiting work", async () => {
+  it("Waiting on others is blocked, kind:waiting, or a follow-up on somebody else's task (docs/51 F1)", async () => {
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Delegated", ownerType: "developer", ownerId: "dev-1" });
+    await createTask(headers, { title: "Dev blocked", ownerType: "developer", ownerId: "dev-1", status: "blocked" });
+    await createTask(headers, { title: "Dev follow-up", ownerType: "developer", ownerId: "dev-2", followUpAt: `${shift(2)}T09:00:00.000Z` });
     await createTask(headers, { title: "Blocked", status: "blocked" });
-    await createTask(headers, { title: "Follow-up", followUpAt: `${shift(2)}T09:00:00.000Z` });
+    await createTask(headers, { title: "My follow-up", followUpAt: `${shift(2)}T09:00:00.000Z` });
+    await createTask(headers, { title: "My labeled follow-up", labels: ["category:follow_up"] });
     await createTask(headers, { title: "Waiting label", labels: ["kind:waiting"] });
+    await createTask(headers, { title: "Inbox follow-up", ownerType: null, ownerId: null, followUpAt: `${shift(2)}T09:00:00.000Z` });
     await createTask(headers, { title: "Plain" });
-    await createTask(headers, { title: "Parked follow-up", later: true, labels: ["category:follow_up"] });
+    await createTask(headers, { title: "Parked dev follow-up", ownerType: "developer", ownerId: "dev-1", labels: ["category:follow_up"] });
 
-    expect(titles(await runView(headers, "waiting"))).toEqual(["Blocked", "Delegated", "Follow-up", "Waiting label"]);
+    // Day-plan dev work, my own follow-ups, unowned inbox follow-ups, and
+    // parked work are all out — only what someone else owes me stays.
+    const parked = await db.select().from(tasks).where(eq(tasks.title, "Parked dev follow-up"));
+    await db.update(tasks).set({ later: 1 }).where(eq(tasks.id, parked[0]!.id));
+    expect(titles(await runView(headers, "waiting"))).toEqual(["Blocked", "Dev blocked", "Dev follow-up", "Waiting label"]);
   });
 
-  it("Needs attention unions overdue, stale, and drift with per-row signals", async () => {
+  it("resolves the manager's linked developer account as me (docs/51 F3)", async () => {
+    // A linked manager's accountId IS the developer account id.
+    await auth.createUser({ username: "linked", displayName: "L", password: "secret123", role: "manager", workspaceId: "default", developerAccountId: "dev-1" });
+    const headers = { cookie: await cookie("linked") };
+    await createTask(headers, { title: "Mine" });
+    await createTask(headers, { title: "My dev-side task", ownerType: "developer", ownerId: "dev-1" });
+    await createTask(headers, { title: "Follow-up on my dev task", ownerType: "developer", ownerId: "dev-1", followUpAt: `${shift(1)}T09:00:00.000Z` });
+    await createTask(headers, { title: "Teammate task", ownerType: "developer", ownerId: "dev-2" });
+    await createTask(headers, { title: "Teammate follow-up", ownerType: "developer", ownerId: "dev-2", followUpAt: `${shift(1)}T09:00:00.000Z` });
+
+    // owner:me spans manager-owned rows and my linked developer account.
+    expect(titles(await runView(headers, "my-tasks"))).toEqual(["Follow-up on my dev task", "Mine", "My dev-side task"]);
+    // owner:team excludes self.
+    const team = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { owner: "team" } })}&today=${today}`, headers });
+    expect(titles(team.body.tasks)).toEqual(["Teammate follow-up", "Teammate task"]);
+    // A follow-up on my own dev-side task is mine, not something I'm waiting on.
+    expect(titles(await runView(headers, "waiting"))).toEqual(["Teammate follow-up"]);
+  });
+
+  it("Needs attention unions overdue, stale, and drift with per-row signals (docs/51 F2)", async () => {
     const headers = { cookie: await cookie("manager-a") };
     const now = new Date().toISOString();
     await db.insert(issues).values([
@@ -139,6 +167,11 @@ describe("consolidated built-in views (docs/49 §3)", () => {
     await invoke(app, { method: "POST", url: `/api/tasks/${drifted.taskKey}/links`, headers, body: { kind: "jira", ref: "APP-1", role: "primary" } });
     await createTask(headers, { title: "Healthy" });
     const deadline = await createTask(headers, { title: "Missed deadline", scheduledOn: shift(2), dueAt: `${shift(-1)}T12:00:00.000Z` });
+    // Parked work and idle dev-owned tasks stay out of the review queue.
+    const parked = await createTask(headers, { title: "Parked stale", later: true });
+    await makeStale(parked.id);
+    const devStale = await createTask(headers, { title: "Dev stale", ownerType: "developer", ownerId: "dev-1" });
+    await makeStale(devStale.id);
 
     const rows = await runView(headers, "attention");
     expect(titles(rows)).toEqual(["Drifted", "Missed deadline", "Overdue", "Stale"]);

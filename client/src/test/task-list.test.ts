@@ -95,6 +95,22 @@ describe('scheduled grouping (docs/49 §3)', () => {
     expect(groups[1]!.context).toEqual({ mode: 'owner', ownerType: 'developer', ownerId: 'a' });
   });
 
+  it('files the manager\'s linked developer account under Me (docs/51 F3)', () => {
+    // A linked manager's accountId IS the developer account id, so dev-self
+    // rows share the manager-owned bucket key.
+    const groups = groupTaskViewTasks([
+      task({ taskKey: 'T-1', ownerType: 'developer', ownerId: 'm' }),
+      task({ taskKey: 'T-2' }),
+      task({ taskKey: 'T-3', ownerType: 'developer', ownerId: 'dev-2' }),
+    ], 'owner', TODAY, ownerName, 'm');
+    expect(groups.map((group) => [group.key, group.label, group.tasks.map((row) => row.taskKey)])).toEqual([
+      ['manager:m', 'Me', ['T-1', 'T-2']],
+      ['developer:dev-2', 'Dev dev-2', ['T-3']],
+    ]);
+    // The dev-self row reads as a manager context downstream (inline add → manager-owned).
+    expect(groups[0]!.context).toEqual({ mode: 'owner', ownerType: 'manager', ownerId: 'm' });
+  });
+
   it('ungrouped returns a single unlabeled bucket', () => {
     expect(groupTaskViewTasks([task()], undefined, TODAY, ownerName)).toEqual([{ key: 'all', label: '', tasks: [task()], context: { mode: 'none' } }]);
   });
@@ -122,6 +138,9 @@ describe('URL contract (docs/49 §9, D6)', () => {
     }
     expect(taskViewStateFromParams(new URLSearchParams('view=blocked&status=open')).overrides).toEqual({ status: ['open'] });
     expect(taskViewStateFromParams(new URLSearchParams('view=jira-drift'))).toEqual({ view: 'attention', overrides: { signal: ['drift'] } });
+    // docs/51 F4/F18: Upcoming resolves to My tasks; meetings still lands via kind.
+    expect(taskViewStateFromParams(new URLSearchParams('view=upcoming'))).toEqual({ view: 'my-tasks', overrides: {} });
+    expect(taskViewStateFromParams(new URLSearchParams('view=meetings'))).toEqual({ view: 'my-tasks', overrides: { kind: 'meeting' } });
   });
 
   it('applies overrides onto a definition', () => {

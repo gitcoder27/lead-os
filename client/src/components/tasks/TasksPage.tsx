@@ -78,7 +78,6 @@ const GO_CHORD_VIEWS: Record<string, string> = {
   i: 'inbox',
   m: 'my-tasks',
   w: 'waiting',
-  u: 'upcoming',
   l: 'later',
   a: 'attention',
   c: 'closed-week',
@@ -173,22 +172,30 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const overridesActive = hasTaskViewOverrides(state.overrides);
 
   const developerList = useMemo(() => developers.data ?? [], [developers.data]);
+  // docs/51 F3: my linked developer account is me — same identity the server
+  // uses (the session accountId IS the developer id for linked managers).
+  const selfAccountId = user?.accountId;
+  const assignableDevelopers = useMemo(
+    () => developerList.filter((dev) => dev.accountId !== selfAccountId),
+    [developerList, selfAccountId],
+  );
   const ownerName = useCallback(
     (ownerType: string | null, ownerId: string | null) => {
       if (ownerType === 'developer' && ownerId) {
+        if (ownerId === selfAccountId) return 'Me';
         return developerList.find((dev) => dev.accountId === ownerId)?.displayName ?? 'Developer';
       }
       return ownerType ? 'Me' : 'Inbox';
     },
-    [developerList],
+    [developerList, selfAccountId],
   );
   const labelRegistry = useMemo(() => labels.data?.labels ?? [], [labels.data]);
   const labelColors = useMemo(() => new Map(labelRegistry.map((label) => [label.name, label.color])), [labelRegistry]);
   const labelColor = useCallback((name: string) => labelColors.get(name), [labelColors]);
 
   const baseGroups = useMemo<RenderGroup[]>(
-    () => groupTaskViewTasks(searchTasks(taskList, state.q), definition?.group, today, ownerName),
-    [taskList, state.q, definition?.group, today, ownerName],
+    () => groupTaskViewTasks(searchTasks(taskList, state.q), definition?.group, today, ownerName, selfAccountId),
+    [taskList, state.q, definition?.group, today, ownerName, selfAccountId],
   );
   const groups = useMemo(() => applyLingering(baseGroups, lingering), [baseGroups, lingering]);
   const flatRows = useMemo(() => groups.flatMap((group) => group.tasks), [groups]);
@@ -589,7 +596,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))}
           effectiveSort={definition?.sort}
           effectiveGroup={definition?.group ?? 'none'}
-          developers={developerList}
+          developers={assignableDevelopers}
           labels={labelRegistry}
           isSavedView={Boolean(savedSelected)}
           hasOverrides={overridesActive}
@@ -692,7 +699,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       {menu?.kind === 'assign' && (
         <AssignMenu
           anchor={menu.anchor}
-          developers={developerList}
+          developers={assignableDevelopers}
           onClose={closeMenu}
           onSelect={(target) => { assign(menuTargets, target); closeMenu(); }}
         />

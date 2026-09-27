@@ -55,15 +55,13 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
       return { title: 'No open tasks', body: 'Add one below or capture with ⌘I.', Icon: CalendarCheck };
     case 'waiting':
       return { title: 'Nobody owes you anything right now.', Icon: CheckCheck, tone: 'success' };
-    case 'upcoming':
-      return { title: 'Nothing scheduled ahead.', Icon: CalendarCheck };
     case 'later':
       return { title: 'Nothing parked for later.', Icon: Inbox };
     case 'attention':
       if (signal?.length === 1 && signal[0] === 'drift') return { title: 'Jira and tasks agree.', Icon: CheckCheck, tone: 'success' };
       return { title: 'All clear — nothing overdue, stale, or drifting.', Icon: CheckCheck, tone: 'success' };
     case 'closed-week':
-      return { title: 'Nothing closed yet this week.', Icon: Inbox };
+      return { title: 'Nothing closed in the last 7 days.', Icon: Inbox };
     default:
       return { title: 'Nothing in this view', body: 'Capture a task with ⌘I, or loosen the filters.', Icon: Inbox };
   }
@@ -122,7 +120,7 @@ const SHORTCUTS: [string, string][] = [
   ['a', 'Assign'],
   ['l', 'Labels'],
   ['#', 'Drop'],
-  ['g then letter', 'Jump views — t Today · i Inbox · m My tasks · w Waiting · u Upcoming · l Later · a Attention · c Closed'],
+  ['g then letter', 'Jump views — t Planned today · i Inbox · m My tasks · w Waiting · l Later · a Attention · c Closed'],
   ['n', 'New task in this group'],
   ['/', 'Search'],
   ['?', 'This cheat sheet'],

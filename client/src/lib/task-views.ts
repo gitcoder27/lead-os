@@ -63,6 +63,7 @@ export const RETIRED_TASK_VIEWS: Record<string, { view: string; overrides: TaskV
   blocked: { view: 'waiting', overrides: { status: ['blocked'] } },
   'follow-ups': { view: 'waiting', overrides: {} },
   meetings: { view: 'my-tasks', overrides: { kind: 'meeting' } },
+  upcoming: { view: 'my-tasks', overrides: {} },
   stale: { view: 'attention', overrides: { signal: ['stale'] } },
   'jira-drift': { view: 'attention', overrides: { signal: ['drift'] } },
 };
@@ -169,12 +170,17 @@ export function scheduledBucket(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'>
   return 'Beyond';
 }
 
-/** Group task rows for the current `group` mode. Ungrouped → a single bucket. */
+/**
+ * Group task rows for the current `group` mode. Ungrouped → a single bucket.
+ * docs/51 F3: `selfAccountId` resolves the manager's linked developer account —
+ * tasks owned by it group under Me rather than a second self-named group.
+ */
 export function groupTaskViewTasks(
   tasks: ManagerTask[],
   group: TaskViewGroup | undefined,
   today: string,
   ownerName: (ownerType: string | null, ownerId: string | null) => string,
+  selfAccountId?: string,
 ): TaskViewGroupBucket[] {
   if (!group) return [{ key: 'all', label: '', tasks, context: { mode: 'none' } }];
   const buckets = new Map<string, { tasks: ManagerTask[]; context: TaskGroupContext; label: string }>();
@@ -186,8 +192,11 @@ export function groupTaskViewTasks(
   for (const task of tasks) {
     switch (group) {
       case 'owner': {
-        const key = task.ownerType ? `${task.ownerType}:${task.ownerId}` : 'inbox';
-        push(key, task.ownerType ? ownerName(task.ownerType, task.ownerId) : 'Inbox', { mode: 'owner', ownerType: task.ownerType, ownerId: task.ownerId }, task);
+        const ownerType = task.ownerType === 'developer' && task.ownerId !== null && task.ownerId === selfAccountId
+          ? 'manager'
+          : task.ownerType;
+        const key = ownerType ? `${ownerType}:${task.ownerId}` : 'inbox';
+        push(key, ownerType ? ownerName(ownerType, task.ownerId) : 'Inbox', { mode: 'owner', ownerType, ownerId: task.ownerId }, task);
         break;
       }
       case 'status':

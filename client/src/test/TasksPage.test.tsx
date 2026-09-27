@@ -10,9 +10,10 @@ const mockUpdateView = vi.fn();
 const mockDeleteView = vi.fn();
 const mockApply = vi.fn();
 const mockCreate = vi.fn();
+const mockUser = vi.fn();
 
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: { accountId: 'manager-a', role: 'manager' }, features: { tasksPhase3: true } }),
+  useAuth: () => ({ user: mockUser(), features: { tasksPhase3: true } }),
   useAuthScopeKey: () => 'ws:manager:manager',
 }));
 
@@ -61,11 +62,11 @@ import { TasksPage } from '@/components/tasks/TasksPage';
 const TODAY = '2026-09-26';
 const OPENISH = ['open', 'active', 'blocked'] as const;
 const BUILTIN_VIEWS: TaskViewMeta[] = [
-  { id: 'today', name: 'Today', builtin: true, section: 'plan', definition: { filters: { owner: 'me', status: [...OPENISH], later: false, horizon: 'today' }, sort: 'scheduled', group: 'scheduled' } },
+  { id: 'today', name: 'Planned today', builtin: true, section: 'plan', definition: { filters: { owner: 'me', status: [...OPENISH], later: false, horizon: 'today' }, sort: 'scheduled', group: 'scheduled' } },
   { id: 'inbox', name: 'Inbox', builtin: true, section: 'plan', definition: { filters: { owner: 'inbox', status: ['open'] }, sort: 'created' } },
   { id: 'my-tasks', name: 'My tasks', builtin: true, section: 'plan', definition: { filters: { owner: 'me', later: false }, sort: 'scheduled', group: 'scheduled' } },
   { id: 'waiting', name: 'Waiting on others', builtin: true, section: 'plan', definition: { filters: { waiting: true, later: false, status: [...OPENISH] }, sort: 'updated', group: 'owner' } },
-  { id: 'attention', name: 'Needs attention', builtin: true, section: 'review', definition: { filters: { attention: ['overdue', 'stale', 'drift'] }, sort: 'scheduled' } },
+  { id: 'attention', name: 'Needs attention', builtin: true, section: 'review', definition: { filters: { attention: ['overdue', 'stale', 'drift'], later: false }, sort: 'scheduled' } },
 ];
 
 const NO_SIGNALS = { overdue: false, overdueDays: null, overdueSource: null, stale: false, staleDays: null, drift: false, followUpDue: false } as const;
@@ -104,6 +105,7 @@ beforeEach(async () => {
   // Flush focus frames scheduled by the previous test's rows.
   await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
   vi.clearAllMocks();
+  mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
   window.history.replaceState(null, '', '/tasks');
   mockApply.mockResolvedValue(true);
   mockCreate.mockResolvedValue({});
@@ -116,15 +118,15 @@ beforeEach(async () => {
 });
 
 describe('TasksPage rail and views (docs/49 §3/§4)', () => {
-  it('renders plan + review sections with counts and runs the default Today view', () => {
+  it('renders plan + review sections with counts and runs the default Planned today view', () => {
     render(<TasksPage />);
     const rail = within(screen.getByRole('navigation', { name: 'Task views' }));
-    expect(rail.getByRole('button', { name: 'Today, 2 tasks' })).toHaveAttribute('aria-current', 'page');
+    expect(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).toHaveAttribute('aria-current', 'page');
     expect(rail.getByRole('button', { name: 'Inbox, 3 tasks' })).toBeTruthy();
     expect(rail.getByText('Review')).toBeTruthy();
     expect(lastDefinition()).toEqual(BUILTIN_VIEWS[0]!.definition);
     expect(mockUseTaskViewTasks.mock.calls.at(-1)?.[2]).toBe(TODAY);
-    expect(screen.getByRole('heading', { level: 1, name: 'Today' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Planned today' })).toBeTruthy();
   });
 
   it('selecting a view switches the definition and heading', () => {
@@ -154,6 +156,20 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     expect(lastDefinition().filters.status).toEqual(['blocked']);
   });
 
+  it('resolves the retired upcoming alias to My tasks (docs/51 F4)', () => {
+    window.history.replaceState(null, '', '/tasks?view=upcoming');
+    render(<TasksPage />);
+    expect(screen.getByRole('heading', { level: 1, name: 'My tasks' })).toBeTruthy();
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS[2]!.definition);
+  });
+
+  it('keeps the meetings alias working through the kind URL param (docs/51 F18)', () => {
+    window.history.replaceState(null, '', '/tasks?view=meetings');
+    render(<TasksPage />);
+    expect(screen.getByRole('heading', { level: 1, name: 'My tasks' })).toBeTruthy();
+    expect(lastDefinition().filters.kind).toBe('meeting');
+  });
+
   it('applies URL overrides and shows them as removable chips', () => {
     window.history.replaceState(null, '', '/tasks?view=my-tasks&owner=dev-1&group=owner&signal=drift');
     render(<TasksPage />);
@@ -170,6 +186,17 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     const menu = screen.getByRole('menu', { name: 'Label filter' });
     fireEvent.click(within(menu).getByRole('menuitemcheckbox', { name: 'follow up' }));
     expect(lastDefinition().filters.labels).toEqual(['category:follow_up']);
+  });
+
+  it('drops the Type chip and Label grouping while keeping their URL params (docs/51 F16/F18)', () => {
+    window.history.replaceState(null, '', '/tasks?view=my-tasks&kind=meeting');
+    render(<TasksPage />);
+    expect(screen.queryByRole('button', { name: 'Type filter' })).toBeNull();
+    expect(lastDefinition().filters.kind).toBe('meeting');
+    fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+    const menu = screen.getByRole('menu', { name: 'Display options' });
+    const groups = within(menu).getAllByRole('menuitemradio').map((item) => item.textContent);
+    expect(groups).toEqual(['Schedule', 'Recently updated', 'Recently created', 'Priority', 'None', 'Schedule', 'Owner', 'Status']);
   });
 
   it('saves, deletes, and updates saved views', async () => {
@@ -367,6 +394,31 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const menu = screen.getByRole('menu', { name: 'Assign' });
     await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: 'Dev One' })); });
     expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ ownerType: 'developer', ownerId: 'dev-1' });
+  });
+
+  it('resolves the manager\'s linked developer account as Me (docs/51 F3)', () => {
+    // A linked manager's accountId IS their developer account id.
+    mockUser.mockReturnValue({ accountId: 'dev-1', role: 'manager', developerAccountId: 'dev-1' });
+    window.history.replaceState(null, '', '/tasks?view=waiting');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([
+      task({ taskKey: 'T-5', title: 'On my dev account', ownerType: 'developer', ownerId: 'dev-1', status: 'blocked' }),
+      task({ id: 2, taskKey: 'T-6', title: 'On the team', ownerType: 'developer', ownerId: 'dev-9', status: 'blocked' }),
+    ]));
+    render(<TasksPage />);
+    // Owner grouping files dev-self work under Me, not a second self-named group.
+    const groupLabels = [...document.querySelectorAll('section h2')].map((el) => el.textContent);
+    expect(groupLabels).toEqual(['Me', 'Developer']);
+    // The assign menu and owner filter don't list self twice.
+    press('j');
+    press('a');
+    const menu = screen.getByRole('menu', { name: 'Assign' });
+    expect(within(menu).getByRole('menuitem', { name: 'Me' })).toBeTruthy();
+    expect(within(menu).queryByRole('menuitem', { name: 'Dev One' })).toBeNull();
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Owner filter' }));
+    const ownerMenu = screen.getByRole('menu', { name: 'Owner filter' });
+    expect(within(ownerMenu).queryByRole('menuitemcheckbox', { name: 'Dev One' })).toBeNull();
+    expect(within(ownerMenu).getByRole('menuitemcheckbox', { name: 'Me' })).toBeTruthy();
   });
 
   it('Overdue header moves every overdue task to today', async () => {

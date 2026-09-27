@@ -70,9 +70,14 @@ describe("task saved view routes (P3-D9/D10)", () => {
     const response = await invoke(app, { method: "GET", url: "/api/task-views", headers });
     expect(response.status).toBe(200);
     const ids = response.body.views.map((view: { id: string }) => view.id);
-    // docs/49 §3: consolidated rail order.
-    expect(ids).toEqual(["today", "inbox", "my-tasks", "waiting", "upcoming", "later", "attention", "closed-week"]);
-    expect(response.body.views.map((view: { section: string }) => view.section)).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "review", "review"]);
+    // docs/49 §3 + docs/51: consolidated rail order — Upcoming is retired
+    // (a strict subset of My tasks) and the closed view is a rolling window.
+    expect(ids).toEqual(["today", "inbox", "my-tasks", "waiting", "later", "attention", "closed-week"]);
+    expect(response.body.views.map((view: { section: string }) => view.section)).toEqual(["plan", "plan", "plan", "plan", "plan", "review", "review"]);
+    const names = Object.fromEntries(response.body.views.map((view: { id: string; name: string }) => [view.id, view.name]));
+    // docs/51 U1: the rail view is "Planned today" — Today is the command view at /.
+    expect(names.today).toBe("Planned today");
+    expect(names["closed-week"]).toBe("Closed · last 7 days");
     expect(response.body.views.every((view: { builtin: boolean }) => view.builtin)).toBe(true);
   });
 

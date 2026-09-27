@@ -18,15 +18,17 @@ const SORTS: { value: TaskViewSort; label: string }[] = [
   { value: 'created', label: 'Recently created' },
   { value: 'priority', label: 'Priority' },
 ];
+// docs/51 F16: no Label grouping — multi-label tasks would duplicate rows and
+// break counts, selection, and j/k. The `?group=label` URL param still parses.
 const GROUPS: { value: TaskViewGroupOverride; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'scheduled', label: 'Schedule' },
   { value: 'owner', label: 'Owner' },
   { value: 'status', label: 'Status' },
-  { value: 'label', label: 'Label' },
 ];
 
-type OpenMenu = 'owner' | 'status' | 'label' | 'kind' | 'signal' | 'display' | null;
+// docs/51 F18: no 'kind' menu — the ?kind= URL param stays for the meetings alias.
+type OpenMenu = 'owner' | 'status' | 'label' | 'signal' | 'display' | null;
 
 interface TaskToolbarProps {
   title: string;
@@ -169,12 +171,6 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
           onOpen={open('label')}
           onClear={() => onOverrides({ label: undefined })}
         />
-        <FilterChip
-          label="Type"
-          values={overrides.kind ? [overrides.kind === 'meeting' ? 'Meetings' : 'Tasks'] : []}
-          onOpen={open('kind')}
-          onClear={() => onOverrides({ kind: undefined })}
-        />
         {viewId === 'attention' && (
           <FilterChip
             label="Signal"
@@ -230,17 +226,6 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
           onClose={close}
           onToggle={(label) => onOverrides({ label: toggleIn(overrides.label, label) })}
           onClear={() => onOverrides({ label: undefined })}
-        />
-      )}
-      {menu.kind === 'kind' && menu.anchor && (
-        <FilterMenu
-          anchor={menu.anchor}
-          label="Type filter"
-          options={[{ value: 'task' as const, label: 'Tasks' }, { value: 'meeting' as const, label: 'Meetings' }]}
-          selected={overrides.kind ? [overrides.kind] : []}
-          onClose={close}
-          onToggle={(kind) => onOverrides({ kind: overrides.kind === kind ? undefined : kind })}
-          onClear={() => onOverrides({ kind: undefined })}
         />
       )}
       {menu.kind === 'signal' && menu.anchor && (

@@ -703,7 +703,9 @@ export interface TaskViewDateRange {
 }
 
 export interface TaskViewFilters {
-  /** "me" = my manager tasks, "team" = developer-owned, "inbox" = unowned,
+  /** "me" = tasks owned by my account id — manager-owned rows plus, for a
+   *  linked manager, rows on my own developer account (docs/51 F3).
+   *  "team" = tasks owned by other developers, "inbox" = unowned,
    *  or an explicit account-id list. */
   owner?: "me" | "team" | "inbox" | string[];
   status?: TaskStatus[];
@@ -728,10 +730,13 @@ export interface TaskViewFilters {
   /** docs/49 D1: "today" = plan date (earlier of scheduledOn and the dueAt
    *  date) <= today; "upcoming" = plan date > today (a date is required). */
   horizon?: "today" | "upcoming";
-  /** docs/49 §2: waiting on others — developer-owned, blocked, follow-up
-   *  predicate, or the kind:waiting label. */
+  /** docs/51 F1: waiting on others — blocked, the kind:waiting label, or a
+   *  follow-up on somebody else's task. My own open work (manager-owned or
+   *  on my linked developer account) and follow-ups I owe are not waiting. */
   waiting?: boolean;
-  /** docs/49 §2: needs attention — any of the listed signals (OR). */
+  /** docs/49 §2: needs attention — any of the listed signals (OR).
+   *  docs/51 F2: "stale" only applies to manager-owned and inbox tasks —
+   *  idle developer-owned work belongs to the Team page. */
   attention?: TaskAttentionSignal[];
 }
 

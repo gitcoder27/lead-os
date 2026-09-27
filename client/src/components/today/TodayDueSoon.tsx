@@ -6,12 +6,12 @@ import type { TodayPromiseItem } from '@/types';
 export function TodayDueSoon({ items, onRunCommand }: { items: TodayPromiseItem[]; onRunCommand: TodayRunCommand }) {
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="today-due-soon-heading">
-      <div className="today-section-head">
+    <section className="today-panel" aria-labelledby="today-due-soon-heading">
+      <div className="today-panel-head">
         <h2 id="today-due-soon-heading" className="today-section-title">Due in the next 2 hours</h2>
         <span className="today-section-count">{items.length}</span>
       </div>
-      <div className="today-list">
+      <div>
         {items.map((item) => {
           const snooze = item.secondaryActions.find((action) => action.kind === 'snooze');
           return (

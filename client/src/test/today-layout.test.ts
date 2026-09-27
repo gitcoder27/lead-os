@@ -7,7 +7,10 @@ import {
   railItems,
   signalChips,
   splitPulse,
-  todaySectionOrder,
+  todayPanelOrder,
+  groupQueueItems,
+  rowContext,
+  splitPanelRows,
   withoutWrapUpItems,
 } from '@/lib/today-layout';
 import { nextTodayProgress, EMPTY_TODAY_PROGRESS } from '@/lib/today-progress';
@@ -54,13 +57,48 @@ function promise(id: number): TodayPromiseItem {
   return { id: `promise-${id}`, title: `P${id}`, detail: '', severity: 'warning', target: desk(id), primaryAction: { kind: 'mark_done', label: 'Done', target: desk(id) }, secondaryActions: [] };
 }
 
-describe('todaySectionOrder (docs/53 F6)', () => {
-  it('orders blocks by stage around the queue', () => {
-    expect(todaySectionOrder('morning_plan')).toEqual(['delta', 'standup', 'queue']);
-    expect(todaySectionOrder('standup_window')).toEqual(['delta', 'standup', 'queue']);
-    expect(todaySectionOrder('midday_check')).toEqual(['delta', 'queue', 'dueSoon', 'standup']);
-    expect(todaySectionOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'queue']);
-    expect(todaySectionOrder(undefined)).toEqual(['delta', 'queue']);
+describe('todayPanelOrder (docs/53 F6)', () => {
+  it('fills the stage panel by stage; the queue always owns the left column', () => {
+    expect(todayPanelOrder('morning_plan')).toEqual(['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('standup_window')).toEqual(['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('midday_check')).toEqual(['dueSoon', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
+    expect(todayPanelOrder(undefined)).toEqual(['delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+  });
+});
+
+describe('groupQueueItems', () => {
+  const stale = (id: string, name: string, asked?: string) => row(id, {
+    type: 'stale_check_in',
+    title: name,
+    signal: 'Stale by time',
+    target: dev(id),
+    primaryAction: { kind: 'add_check_in', label: 'Add check-in', target: dev(id) },
+    secondaryActions: [{ kind: 'ask_check_in', label: 'Ask for update', target: dev(id) }],
+    askedAt: asked,
+  });
+
+  it('folds three or more same-reason people rows into one row at the first member\'s position', () => {
+    const items = [row('f1'), stale('a', 'Ayan Saha'), stale('b', 'Deepak Rao'), row('f2'), stale('c', 'Rohit', '2026-03-08T10:00:00Z')];
+    const { items: out, groups } = groupQueueItems(items);
+    expect(out.map((item) => item.id)).toEqual(['f1', 'group:people|stale_check_in|Stale by time|add_check_in', 'f2']);
+    const group = [...groups.values()][0]!;
+    expect(out[1]).toMatchObject({ title: '3 people', context: 'Ayan, Deepak, Rohit', signal: 'Stale by time', freshness: '1 asked' });
+    expect(out[1]?.primaryAction).toMatchObject({ kind: 'ask_check_in', label: 'Ask 2' });
+    expect(group.bulk?.commands.map((command) => command.target.developerAccountId)).toEqual(['a', 'b']);
+  });
+
+  it('leaves fewer than three alone', () => {
+    const items = [stale('a', 'A'), stale('b', 'B')];
+    expect(groupQueueItems(items).items).toBe(items);
+  });
+});
+
+describe('rowContext', () => {
+  it('drops server filler and says where old desk items came from', () => {
+    expect(rowContext({ context: 'Open Manager Desk item', type: 'desk_carry_forward', target: { type: 'manager_desk_item', view: 'desk', date: '2026-03-05' } }, '2026-03-08')).toBe('from Thu 5 Mar');
+    expect(rowContext({ context: 'Manager follow-up', type: 'follow_up_due', target: desk(1) }, '2026-03-08')).toBeUndefined();
+    expect(rowContext({ context: 'AM-4', type: 'follow_up_due', target: desk(1) }, '2026-03-08')).toBe('AM-4');
   });
 });
 
@@ -158,5 +196,32 @@ describe('session progress (docs/53 U2)', () => {
     expect(state.cleared).toEqual(['a']);
     state = nextTodayProgress(state, ['a', 'd']);
     expect(state.cleared.sort()).toEqual(['b', 'c']);
+  });
+});
+
+describe('splitPanelRows', () => {
+  it('hands standup, 1:1 and carry rows to the panel and keeps the rest in order', () => {
+    const items = [
+      row('f1'),
+      row('s', { type: 'standup', target: { type: 'view', view: 'team', mode: 'standup' } }),
+      row('o', { type: 'one_on_one', target: dev('x') }),
+      row('c', { type: 'desk_carry_forward', target: { ...desk(9), type: 'manager_desk_item' } }),
+      row('i', { type: 'overdue_issue', target: { type: 'issue', view: 'work', issueKey: 'AM-1' } }),
+    ];
+    const split = splitPanelRows(items);
+    expect(split.queue.map((item) => item.id)).toEqual(['f1', 'i']);
+    expect(split.standup?.id).toBe('s');
+    expect(split.oneOnOnes.map((item) => item.id)).toEqual(['o']);
+    expect(split.carry.map((item) => item.id)).toEqual(['c']);
+  });
+
+  it('folds identical follow-ups (two or more) with a Done-all bulk', () => {
+    const items = [row('p1', { title: 'Ping QA' }), row('p2', { title: 'ping qa ' }), row('p3', { title: 'Other' })];
+    const { items: out, groups } = groupQueueItems(items);
+    expect(out).toHaveLength(2);
+    const group = [...groups.values()][0]!;
+    expect(group).toMatchObject({ kind: 'duplicates', reason: '×2' });
+    expect(group.bulk?.label).toBe('Done all');
+    expect(out[0]?.primaryAction.label).toBe('Done all');
   });
 });

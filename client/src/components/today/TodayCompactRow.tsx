@@ -10,6 +10,7 @@ interface TodayCompactRowProps {
   primary: TodayActionCommand;
   /** A second one-tap action (e.g. snooze → tomorrow). */
   secondary?: { command: TodayActionCommand; label: string; preset?: 'tomorrow' };
+  icon?: LucideIcon;
   onRunCommand: TodayRunCommand;
 }
 
@@ -19,8 +20,8 @@ const iconByTarget: Partial<Record<TodayActionTarget['type'], LucideIcon>> = {
 };
 
 /** One-link rows for promises, meetings, due-soon and wrap-up lists. */
-export function TodayCompactRow({ title, detail, severity, target, primary, secondary, onRunCommand }: TodayCompactRowProps) {
-  const Icon = iconByTarget[target.type] ?? Bell;
+export function TodayCompactRow({ title, detail, severity, target, primary, secondary, icon, onRunCommand }: TodayCompactRowProps) {
+  const Icon = icon ?? iconByTarget[target.type] ?? Bell;
   return (
     <div className={`today-row today-tone-${severity}`} data-testid="today-compact-row">
       <span className="today-row-icon" aria-hidden="true">

@@ -1,5 +1,6 @@
 import { format, isSameDay, parseISO, subDays } from 'date-fns';
 import type {
+  TodayActionCommand,
   TodayActionItem,
   TodayActionTarget,
   TodayDelta,
@@ -13,24 +14,210 @@ import type {
 } from '@/types';
 
 /**
- * docs/53 §5/F6: the day drives the page — one section order per stage, built
- * from the same components. The server ranks the queue; the client only
- * decides which blocks sit around it.
+ * docs/53 §5/F6: the day drives the page. The queue always owns the left
+ * column; the stage panel on the right changes with the stage. The server
+ * ranks the queue — the client only decides which blocks fill the panel.
  */
-export type TodaySectionId = 'wrapUp' | 'standup' | 'delta' | 'queue' | 'dueSoon';
+export type TodayPanelSectionId =
+  | 'wrapUp'
+  | 'standup'
+  | 'delta'
+  | 'dueSoon'
+  | 'quiet'
+  | 'oneOnOnes'
+  | 'carry'
+  | 'promises'
+  | 'people';
 
-export function todaySectionOrder(stage: TodayRhythmStage | undefined): TodaySectionId[] {
+export function todayPanelOrder(stage: TodayRhythmStage | undefined): TodayPanelSectionId[] {
   switch (stage) {
     case 'morning_plan':
     case 'standup_window':
-      return ['delta', 'standup', 'queue'];
+      return ['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
     case 'midday_check':
-      return ['delta', 'queue', 'dueSoon', 'standup'];
+      return ['dueSoon', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people'];
     case 'wrap_up':
-      return ['wrapUp', 'delta', 'queue'];
+      return ['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people'];
     default:
-      return ['delta', 'queue'];
+      return ['delta', 'oneOnOnes', 'carry', 'promises', 'people'];
   }
+}
+
+// ── Queue vs panel ownership ──────────────────────────────────────────────
+
+export interface TodayPanelRows {
+  /** What the left column shows: people, work, promises, meetings, signals. */
+  queue: TodayActionItem[];
+  /** The server's "Start standup" row — the panel's standup card owns it. */
+  standup?: TodayActionItem;
+  oneOnOnes: TodayActionItem[];
+  carry: TodayActionItem[];
+}
+
+/**
+ * docs/53 U1: the stage panel owns the day's fixtures — standup, 1:1s and
+ * carry-forward — so the queue is only the things that need a decision.
+ */
+export function splitPanelRows(items: TodayActionItem[]): TodayPanelRows {
+  const out: TodayPanelRows = { queue: [], oneOnOnes: [], carry: [] };
+  for (const item of items) {
+    if (item.type === 'standup') out.standup ??= item;
+    else if (item.type === 'one_on_one') out.oneOnOnes.push(item);
+    else if (item.type === 'desk_carry_forward') out.carry.push(item);
+    else out.queue.push(item);
+  }
+  return out;
+}
+
+// ── Queue grouping ────────────────────────────────────────────────────────
+
+/** Rows about people that share one reason collapse into a single group row. */
+const PEOPLE_TYPES = new Set<TodayActionItem['type']>(['stale_check_in', 'developer_attention']);
+export const QUEUE_GROUP_MIN = 3;
+
+export interface TodayQueueGroup {
+  id: string;
+  kind: 'people' | 'duplicates';
+  /** The chip on the group row ("Stale by time", "×2"). */
+  reason: string;
+  members: TodayActionItem[];
+  /** The group row's one-tap write, fanned out per member. */
+  bulk?: { label: string; commands: TodayActionCommand[]; toast: (count: number) => string };
+}
+
+/**
+ * One row per fact: "5 people · Stale by time · Ask all" instead of five
+ * identical rows, and one "Standup follow-up: Harsha ×2 · Done all" instead
+ * of two. The group sits at its highest-ranked member's position and is a
+ * synthetic queue item, so limits, expansion and triage treat it as a row.
+ */
+export function groupQueueItems(items: TodayActionItem[]): { items: TodayActionItem[]; groups: Map<string, TodayQueueGroup> } {
+  const buckets = new Map<string, { kind: TodayQueueGroup['kind']; reason: string; members: TodayActionItem[] }>();
+  for (const item of items) {
+    let key: string | undefined;
+    let kind: TodayQueueGroup['kind'] = 'people';
+    let reason = '';
+    if (PEOPLE_TYPES.has(item.type)) {
+      reason = signalChips(item.signal)[0] ?? item.signal;
+      key = `people|${item.type}|${reason}|${item.primaryAction.kind}`;
+    } else if (item.type === 'follow_up_due' || item.type === 'meeting_outcome') {
+      kind = 'duplicates';
+      key = `dup|${item.type}|${item.title.trim().toLowerCase()}`;
+    }
+    if (!key) continue;
+    const bucket = buckets.get(key) ?? { kind, reason, members: [] };
+    bucket.members.push(item);
+    buckets.set(key, bucket);
+  }
+
+  const groups = new Map<string, TodayQueueGroup>();
+  const memberToGroup = new Map<string, string>();
+  for (const [key, bucket] of buckets) {
+    const min = bucket.kind === 'people' ? QUEUE_GROUP_MIN : 2;
+    if (bucket.members.length < min) continue;
+    const id = `group:${key}`;
+    groups.set(id, buildGroup(id, bucket.kind, bucket.reason, bucket.members));
+    for (const member of bucket.members) memberToGroup.set(member.id, id);
+  }
+  if (groups.size === 0) return { items, groups };
+
+  const out: TodayActionItem[] = [];
+  const emitted = new Set<string>();
+  for (const item of items) {
+    const groupId = memberToGroup.get(item.id);
+    if (!groupId) {
+      out.push(item);
+      continue;
+    }
+    if (emitted.has(groupId)) continue;
+    emitted.add(groupId);
+    out.push(groupItem(groups.get(groupId)!));
+  }
+  return { items: out, groups };
+}
+
+function buildGroup(id: string, kind: TodayQueueGroup['kind'], reason: string, members: TodayActionItem[]): TodayQueueGroup {
+  if (kind === 'duplicates') {
+    const lead = members[0]!;
+    const commands = members.map((member) => member.primaryAction).filter((command) => command.kind === lead.primaryAction.kind);
+    return {
+      id,
+      kind,
+      reason: `×${members.length}`,
+      members,
+      bulk: commands.length === members.length && lead.primaryAction.kind === 'mark_done'
+        ? { label: 'Done all', commands, toast: (count) => `Marked ${count} done` }
+        : undefined,
+    };
+  }
+  const asks = members
+    .filter((member) => !member.askedAt)
+    .map((member) => member.secondaryActions.find((action) => action.kind === 'ask_check_in'))
+    .filter((command): command is TodayActionCommand => Boolean(command));
+  return {
+    id,
+    kind,
+    reason,
+    members,
+    bulk: asks.length > 0
+      ? { label: asks.length === members.length ? 'Ask all' : `Ask ${asks.length}`, commands: asks, toast: (count) => `Asked ${count} for an update` }
+      : undefined,
+  };
+}
+
+function groupItem(group: TodayQueueGroup): TodayActionItem {
+  const lead = group.members[0]!;
+  const teamTarget: TodayActionTarget = { type: 'view', view: 'team', date: lead.target.date };
+  const asked = group.members.filter((member) => member.askedAt).length;
+  const base = {
+    id: group.id,
+    type: lead.type,
+    signal: group.reason,
+    severity: group.members.some((member) => member.severity === 'critical') ? 'critical' as const : lead.severity,
+    priority: lead.priority,
+    group: lead.group,
+    secondaryActions: [],
+  };
+  if (group.kind === 'duplicates') {
+    return {
+      ...base,
+      title: lead.title,
+      context: lead.context,
+      freshness: lead.freshness,
+      target: lead.target,
+      primaryAction: group.bulk
+        ? { kind: lead.primaryAction.kind, label: group.bulk.label, target: lead.target }
+        : lead.primaryAction,
+    };
+  }
+  return {
+    ...base,
+    title: `${group.members.length} people`,
+    context: group.members.map((member) => firstName(member.title)).join(', '),
+    freshness: asked > 0 ? `${asked} asked` : undefined,
+    target: teamTarget,
+    primaryAction: group.bulk
+      ? { kind: 'ask_check_in', label: group.bulk.label, target: teamTarget }
+      : { kind: 'open', label: 'Open Team', target: teamTarget },
+  };
+}
+
+export function isQueueGroupId(id: string): boolean {
+  return id.startsWith('group:');
+}
+
+/** Server placeholders that say nothing about the row. */
+const FILLER_CONTEXT = new Set(['Open Manager Desk item', 'Manager follow-up', 'Meeting memory', 'Needs captured outcome']);
+
+/** A row's second line: real context, or where it came from, never filler. */
+export function rowContext(item: Pick<TodayActionItem, 'context' | 'type' | 'target'>, today?: string): string | undefined {
+  if (item.context && !FILLER_CONTEXT.has(item.context)) return item.context;
+  const origin = item.target.date;
+  if (origin && origin !== today && (item.type === 'desk_carry_forward' || item.type === 'meeting_outcome')) {
+    const at = parseISO(origin);
+    if (!Number.isNaN(at.getTime())) return `from ${format(at, 'EEE d MMM')}`;
+  }
+  return undefined;
 }
 
 export function standupFocus(focus: TodayFocus | undefined): TodayStandupFocus | undefined {
@@ -221,7 +408,7 @@ export function headerMetrics(summary: TodayResponse['summary']) {
 }
 
 const METRIC_LABELS: Record<string, [string, string]> = {
-  attention: ['in queue', 'in queue'],
+  attention: ['open', 'open'],
   stale: ['stale', 'stale'],
   'due-work': ['due', 'due'],
   promises: ['follow-up', 'follow-ups'],

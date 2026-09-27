@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { TodayActionRow, type TodayRunCommand } from './TodayActionRow';
+import { TodayActionRow, TodayGroupRow, type TodayRunCommand } from './TodayActionRow';
+import type { TodayQueueGroup } from '@/lib/today-layout';
 import type { TodayQueueView } from '@/lib/today-triage';
 import type { TodayActionGroup, TodayActionItem } from '@/types';
 
@@ -14,6 +15,11 @@ interface TodayActionQueueProps {
   cleared: number;
   /** What comes next once the queue is empty (e.g. "Wrap-up at 16:00"). */
   nextUp?: string;
+  /** Same-reason people rows collapsed into one row (see groupQueueItems). */
+  groups?: Map<string, TodayQueueGroup>;
+  expandedGroups?: Set<string>;
+  onToggleGroup?: (id: string) => void;
+  today?: string;
   onRunCommand: TodayRunCommand;
 }
 
@@ -29,23 +35,43 @@ const groupLabels: Record<TodayActionGroup, string> = {
  * header shows what's been cleared, and an empty queue says so plainly.
  */
 export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueProps>(function TodayActionQueue(
-  { view, expanded, onToggleExpanded, activeItemId, pendingTargetKey, cleared, nextUp, onRunCommand },
+  { view, expanded, onToggleExpanded, activeItemId, pendingTargetKey, cleared, nextUp, groups, expandedGroups, onToggleGroup, today, onRunCommand },
   headingRef,
 ) {
   const actionable = view.head.filter((item) => item.type !== 'calm');
   const isDone = actionable.length === 0;
   const remaining = view.totalCount;
   const progress = cleared + remaining > 0 ? Math.round((cleared / (cleared + remaining)) * 100) : 100;
-  const renderRow = (item: TodayActionItem, featured: boolean) => (
-    <TodayActionRow
-      key={item.id}
-      item={item}
-      featured={featured}
-      isActive={activeItemId === item.id}
-      isPending={pendingTargetKey === targetKey(item)}
-      onRunCommand={onRunCommand}
-    />
-  );
+  const renderRow = (item: TodayActionItem, featured: boolean) => {
+    const group = groups?.get(item.id);
+    if (group) {
+      return (
+        <TodayGroupRow
+          key={item.id}
+          item={item}
+          group={group}
+          featured={featured}
+          today={today}
+          expanded={Boolean(expandedGroups?.has(item.id))}
+          isActive={activeItemId === item.id}
+          pendingKey={(member) => pendingTargetKey === targetKey(member)}
+          onToggle={() => onToggleGroup?.(item.id)}
+          onRunCommand={onRunCommand}
+        />
+      );
+    }
+    return (
+      <TodayActionRow
+        key={item.id}
+        item={item}
+        featured={featured}
+        today={today}
+        isActive={activeItemId === item.id}
+        isPending={pendingTargetKey === targetKey(item)}
+        onRunCommand={onRunCommand}
+      />
+    );
+  };
   const canExpand = expanded || view.hiddenCount > 0;
 
   return (

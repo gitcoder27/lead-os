@@ -21,41 +21,177 @@
   background: var(--bg-primary);
 }
 
-/* docs/53 R2: one scroll owner — queue, then pulse, then promises. */
-.today-scroll {
+/*
+ * Queue left, stage panel right. On desktop each column scrolls on its own so
+ * both stay above the fold; below `lg` the body is one scroll (queue, then
+ * panel — docs/53 R2).
+ */
+.today-body {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.today-layout {
-  display: grid;
-  gap: 28px;
-  width: 100%;
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 18px 16px 40px;
+.today-main-col {
+  min-width: 0;
+  padding: 14px 16px 28px;
 }
 
 @media (min-width: 768px) {
-  .today-layout { padding: 20px 24px 48px; }
+  .today-main-col { padding: 18px 24px 36px; }
 }
 
-@media (min-width: 1024px) {
-  .today-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-    gap: 36px;
-    padding: 22px 32px 56px;
-  }
+.today-main-col > * {
+  max-width: 1040px;
+  margin: 0 auto;
 }
 
-.today-main,
-.today-aside {
+.today-panel-col {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 22px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+@media (min-width: 1024px) {
+  .today-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 440px);
+    overflow: hidden;
+  }
+  .today-main-col,
+  .today-panel-col {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .today-main-col { padding: 18px 28px 40px; }
+  .today-panel-col { border-top: 0; border-left: 1px solid var(--border); }
+  /* No panel content → the queue gets the whole width. */
+  .today-body[data-panel='false'] { grid-template-columns: minmax(0, 1fr); }
+}
+
+.today-standup {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 8px 2px;
+}
+
+.today-standup-icon {
+  flex-shrink: 0;
+  margin-top: 5px;
+  color: var(--accent);
+}
+
+.today-standup-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Stage panel sections ────────────────────────────────────────────── */
+
+.today-panel {
+  padding: 12px 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.today-panel:last-child { border-bottom: 0; }
+
+.today-panel-head {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 4px;
+}
+
+.today-panel .today-row {
+  padding-left: 8px;
+  border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.today-panel .today-row:last-of-type { border-bottom: 0; }
+.today-panel .today-row:hover { background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent); }
+.today-panel .today-strip { padding: 2px 8px 4px; }
+.today-panel .today-subhead { padding: 10px 8px 2px; }
+.today-panel .today-people-row { padding: 4px 8px 6px; }
+
+.today-panel-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.today-panel-more {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.today-panel-more:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+
+.today-subhead-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.today-primary-sm {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.today-panel.today-status-line {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+/* ── Queue group rows ────────────────────────────────────────────────── */
+
+.today-group-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 140ms ease;
+}
+
+.today-group-chevron[data-open='true'] { transform: rotate(90deg); }
+
+.today-group-members {
+  margin-left: 22px;
+  border-left: 1px solid var(--border);
+}
+
+.today-group-members .today-row { padding-left: 12px; }
+
+.today-band-note {
+  flex-shrink: 0;
+  margin-left: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-group-chevron { transition: none; }
 }
 
 /* ── Header band (docs/53 D2): one 40px line, stage first ────────────── */
@@ -308,7 +444,8 @@
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 9px 8px 9px 10px;
+  min-height: 44px;
+  padding: 7px 8px 7px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   transition: background-color 120ms ease;
   animation: today-row-in 160ms ease-out both;
@@ -591,24 +728,12 @@
 
 .today-person-chip .today-avatar { width: 22px; height: 22px; font-size: 9px; }
 
-/* ── Wrap-up block ───────────────────────────────────────────────────── */
-
-.today-wrap {
-  border-radius: 12px;
-  padding: 12px 4px 4px;
-  background: var(--bg-secondary);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.today-wrap .today-section-head { padding: 0 8px 0 12px; }
-.today-wrap .today-row { border-bottom-color: color-mix(in srgb, var(--border) 55%, transparent); }
-.today-wrap .today-row:last-child { border-bottom: 0; }
+/* ── People chips (wrap-up asks) ─────────────────────────────────────── */
 
 .today-people-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 4px 12px 10px;
 }
 
 /* ── Partial data notice ─────────────────────────────────────────────── */
@@ -624,24 +749,6 @@
   font-size: 12px;
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--warning) 8%, transparent);
-}
-
-/* ── Footer (desktop only — docs/53 R2) ──────────────────────────────── */
-
-.today-footer {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .today-footer {
-    display: flex;
-    height: 40px;
-    flex-shrink: 0;
-    align-items: center;
-    gap: 8px;
-    border-top: 1px solid var(--border);
-    padding: 0 20px;
-  }
 }
 
 .today-kbd {

@@ -9,12 +9,12 @@ import type { TodayRailItem } from '@/lib/today-layout';
 export function TodayPromisesList({ items, onRunCommand }: { items: TodayRailItem[]; onRunCommand: TodayRunCommand }) {
   if (items.length === 0) return null;
   return (
-    <section aria-labelledby="today-promises-heading">
-      <div className="today-section-head">
+    <section className="today-panel" aria-labelledby="today-promises-heading">
+      <div className="today-panel-head">
         <h2 id="today-promises-heading" className="today-section-title">Promises &amp; meetings</h2>
         <span className="today-section-count">{items.length}</span>
       </div>
-      <div className="today-list">
+      <div>
         {items.slice(0, 8).map((entry) => {
           const { item } = entry;
           const secondary = entry.kind === 'promise'

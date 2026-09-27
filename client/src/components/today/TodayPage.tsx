@@ -9,18 +9,21 @@ import { useLocalDate } from '@/hooks/useLocalDate';
 import { buildTodayQueueView, shouldIgnoreTriageEvent } from '@/lib/today-triage';
 import {
   checkInPlaceholder,
+  deltaChips,
   defaultFollowUpTitle,
   developerNameFor,
   formatClock,
   railItems,
   splitPulse,
   standupFocus,
-  todaySectionOrder,
+  groupQueueItems,
+  splitPanelRows,
+  todayPanelOrder,
   withoutWrapUpItems,
-  type TodaySectionId,
+  type TodayPanelSectionId,
+  type TodayQueueGroup,
 } from '@/lib/today-layout';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
-import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 import type {
   FilterType,
   TodayActionCommand,
@@ -33,19 +36,22 @@ import type {
 import { snoozePresets } from './TodayActionMenu';
 import { TodayActionQueue, targetKey } from './TodayActionQueue';
 import { TodayCheckInDialog } from './TodayCheckInDialog';
-import { TodayCommandFooter } from './TodayCommandFooter';
 import { TodayConfirmDialog } from './TodayConfirmDialog';
 import { TodayDueSoon } from './TodayDueSoon';
 import { TodayPeoplePulse, pulsePersonFromFocus, pulsePersonFromItem } from './TodayPeoplePulse';
 import { TodayPromisesList } from './TodayPromisesList';
 import { TodayRhythmHeader } from './TodayRhythmHeader';
 import { TodaySinceStrip } from './TodaySinceStrip';
-import { TodayStandupStatus } from './TodayStandupStatus';
+import { TodayStandupCard } from './TodayStandupStatus';
+import { TodayPanelList } from './TodayPanelList';
 import { TodayTextCaptureDialog, type TodayCaptureExtras, type TodayCapturePreset } from './TodayTextCaptureDialog';
 import { TodayWrapUp } from './TodayWrapUp';
 import './today.css';
 
 type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
+
+/** Enough rows to fill a laptop-height column before "+N more". */
+const QUEUE_VISIBLE_ROWS = 12;
 
 interface TodayPageProps {
   onViewChange: (view: AppView) => void;
@@ -82,8 +88,11 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const [confirmDraft, setConfirmDraft] = useState<{
     command: TodayActionCommand;
     preset?: SnoozePreset;
+    /** A bulk write waiting on one confirmation (e.g. legacy "Carry all"). */
+    bulk?: { commands: TodayActionCommand[]; title: (count: number) => string };
     error?: string;
   } | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
   const [queueExpanded, setQueueExpanded] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const queueHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -137,16 +146,33 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     () => [...(snapshot?.actionItems ?? []), ...(snapshot?.overflowActionItems ?? [])],
     [snapshot?.actionItems, snapshot?.overflowActionItems],
   );
-  const queueView = useMemo(() => {
-    const items = withoutWrapUpItems(snapshot?.actionItems ?? [], focus);
+  // The panel owns standup, 1:1s and carry-forward (and wrap-up's promises);
+  // what's left is grouped one-row-per-fact. Totals shrink by exactly what
+  // moved or folded.
+  const { queueView, queueGroups, groupByCommand, panelRows } = useMemo(() => {
+    const visible = withoutWrapUpItems(snapshot?.actionItems ?? [], focus);
     const overflow = withoutWrapUpItems(snapshot?.overflowActionItems ?? [], focus);
-    const moved = (snapshot?.actionItems.length ?? 0) - items.length + (snapshot?.overflowActionItems?.length ?? 0) - overflow.length;
-    return buildTodayQueueView({
-      items,
-      overflowItems: overflow,
-      totalCount: snapshot?.totalCount === undefined ? undefined : Math.max(snapshot.totalCount - moved, 0),
-      expanded: queueExpanded,
-    });
+    const split = splitPanelRows([...visible, ...overflow]);
+    const grouped = groupQueueItems(split.queue);
+    const shipped = (snapshot?.actionItems.length ?? 0) + (snapshot?.overflowActionItems?.length ?? 0);
+    const removed = shipped - grouped.items.length;
+    // Group rows are synthetic: their primary command is recognised by identity.
+    const byCommand = new Map<TodayActionCommand, TodayQueueGroup>();
+    for (const item of grouped.items) {
+      const group = grouped.groups.get(item.id);
+      if (group) byCommand.set(item.primaryAction, group);
+    }
+    return {
+      panelRows: split,
+      queueGroups: grouped.groups,
+      groupByCommand: byCommand,
+      queueView: buildTodayQueueView({
+        items: grouped.items,
+        totalCount: snapshot?.totalCount === undefined ? undefined : Math.max(snapshot.totalCount - removed, 0),
+        expanded: queueExpanded,
+        visibleLimit: QUEUE_VISIBLE_ROWS,
+      }),
+    };
   }, [snapshot?.actionItems, snapshot?.overflowActionItems, snapshot?.totalCount, focus, queueExpanded]);
   const cleared = useTodayProgress(date, snapshot ? allQueueItems : undefined);
   const pulse = useMemo(() => splitPulse(snapshot?.teamPulse ?? [], allQueueItems), [snapshot?.teamPulse, allQueueItems]);
@@ -177,7 +203,37 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     if (index >= 0) lastRowIndex.current = index;
   };
 
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const runBulk = (commands: TodayActionCommand[], title: (count: number) => string) => {
+    if (commands.length === 0) return;
+    if (commands.some((command) => command.confirm)) {
+      setConfirmDraft({ command: commands[0]!, bulk: { commands, title } });
+      return;
+    }
+    void actions.runBulk(commands, title).then(restoreFocus);
+  };
+
   const runCommand = (command: TodayActionCommand, preset?: SnoozePreset) => {
+    // A group row's primary ("Ask all") fans out to each member.
+    // A group row's primary ("Ask all", "Done all") fans out to each member.
+    const group = groupByCommand.get(command);
+    if (group?.bulk) {
+      runBulk(group.bulk.commands, group.bulk.toast);
+      return;
+    }
+    if (group && group.kind === 'people') {
+      openTarget({ type: 'view', view: 'team', date: snapshot?.date });
+      return;
+    }
+
     if (command.kind === 'add_check_in') {
       setCheckInDraft({
         command,
@@ -226,7 +282,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const triage = useTodayKeyboardTriage({
     items: queueView.ordered,
     enabled: Boolean(snapshot) && !dialogOpen && !shortcutsOpen,
-    onOpen: (item) => openTarget(item.target),
+    onOpen: (item) => (queueGroups.has(item.id) ? toggleGroup(item.id) : openTarget(item.target)),
     onRunCommand: runCommand,
     onUndo: actions.undoLast,
   });
@@ -243,9 +299,6 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [snapshot, dialogOpen]);
 
-  const activeItem = queueView.ordered.find((item) => item.id === triage.activeId);
-  const captureContext = captureContextFor(snapshot, activeItem);
-
   const closeDialog = (close: () => void) => {
     close();
     restoreFocus();
@@ -256,34 +309,85 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     queueHeadingRef.current?.focus({ preventScroll: true });
   };
 
-  const renderSection = (section: TodaySectionId) => {
+  const queuedPeople = useMemo(() => new Set(pulse.queued.map((person) => person.accountId)), [pulse.queued]);
+  const quietPeople = focus && 'midday' in focus
+    ? focus.midday.silentSinceStandup
+      .filter((person) => !queuedPeople.has(person.accountId))
+      .map((person) => pulsePersonFromFocus(person, snapshot?.teamPulse.find((entry) => entry.accountId === person.accountId)))
+    : [];
+  const otherPeople = pulse.rows
+    .filter((person) => !quietPeople.some((quiet) => quiet.accountId === person.accountId))
+    .map(pulsePersonFromItem);
+
+  const renderPanelSection = (section: TodayPanelSectionId) => {
     if (!snapshot) return null;
     switch (section) {
       case 'delta':
         return <TodaySinceStrip key="delta" delta={snapshot.delta} date={snapshot.date} onOpenTarget={openTarget} />;
       case 'standup':
-        return <TodayStandupStatus key="standup" standup={standupFocus(focus)} onOpenTarget={openTarget} />;
+        return (
+          <TodayStandupCard
+            key="standup"
+            standup={standupFocus(focus)}
+            row={panelRows.standup}
+            completedOnly={stage === 'midday_check'}
+            onOpenTarget={openTarget}
+          />
+        );
+      case 'oneOnOnes':
+        return <TodayPanelList key="oneOnOnes" title="1:1s" icon="calendar" items={panelRows.oneOnOnes} today={snapshot.date} onRunCommand={runCommand} />;
+      case 'carry': {
+        const carryCommands = panelRows.carry.map((item) => item.primaryAction).filter((command) => command.kind === 'carry_forward');
+        return (
+          <TodayPanelList
+            key="carry"
+            title="Carry from earlier"
+            icon="desk"
+            items={panelRows.carry}
+            today={snapshot.date}
+            bulk={carryCommands.length > 1
+              ? { label: `Carry all ${carryCommands.length}`, onRun: () => runBulk(carryCommands, (count) => `Carried ${count} into today`) }
+              : undefined}
+            onRunCommand={runCommand}
+          />
+        );
+      }
       case 'wrapUp':
-        return focus && 'wrapUp' in focus
-          ? <TodayWrapUp key="wrapUp" wrapUp={focus.wrapUp} onRunCommand={runCommand} onOpenTarget={openTarget} />
-          : null;
+        return focus && 'wrapUp' in focus ? (
+          <TodayWrapUp
+            key="wrapUp"
+            wrapUp={focus.wrapUp}
+            today={snapshot.date}
+            queuedPeople={queuedPeople}
+            onRunCommand={runCommand}
+            onBulk={runBulk}
+            onOpenTarget={openTarget}
+          />
+        ) : null;
       case 'dueSoon':
         return focus && 'midday' in focus
           ? <TodayDueSoon key="dueSoon" items={focus.midday.dueSoon} onRunCommand={runCommand} />
           : null;
-      case 'queue':
+      case 'quiet':
         return (
-          <TodayActionQueue
-            key="queue"
-            ref={queueHeadingRef}
-            view={queueView}
-            expanded={queueExpanded}
-            onToggleExpanded={() => setQueueExpanded((current) => !current)}
-            activeItemId={triage.activeId}
-            pendingTargetKey={pendingTargetKey}
-            cleared={cleared}
-            nextUp={nextUp}
+          <TodayPeoplePulse
+            key="quiet"
+            title="Quiet since standup"
+            people={quietPeople}
             onRunCommand={runCommand}
+            onViewAll={() => openTarget({ type: 'view', view: 'team', date: snapshot.date })}
+          />
+        );
+      case 'promises':
+        return <TodayPromisesList key="promises" items={rail} onRunCommand={runCommand} />;
+      case 'people':
+        return (
+          <TodayPeoplePulse
+            key="people"
+            title="People"
+            people={otherPeople}
+            onRunCommand={runCommand}
+            onViewAll={() => openTarget({ type: 'view', view: 'team', date: snapshot.date })}
           />
         );
       default:
@@ -291,11 +395,25 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     }
   };
 
-  const middayPeople = focus && 'midday' in focus
-    ? focus.midday.silentSinceStandup
-      .filter((person) => !pulse.queued.some((queued) => queued.accountId === person.accountId))
-      .map((person) => pulsePersonFromFocus(person, snapshot?.teamPulse.find((entry) => entry.accountId === person.accountId)))
-    : undefined;
+  // Only sections with data render — the column never shows as an empty slab,
+  // and without any the queue takes the full width.
+  const standup = standupFocus(focus);
+  const hasSection = (section: TodayPanelSectionId): boolean => {
+    if (!snapshot) return false;
+    switch (section) {
+      case 'wrapUp': return Boolean(focus && 'wrapUp' in focus);
+      case 'standup': return Boolean(standup && (standup.status === 'completed' || stage !== 'midday_check'));
+      case 'delta': return deltaChips(snapshot.delta, snapshot.date).length > 0;
+      case 'dueSoon': return Boolean(focus && 'midday' in focus && focus.midday.dueSoon.length > 0);
+      case 'quiet': return quietPeople.length > 0;
+      case 'oneOnOnes': return panelRows.oneOnOnes.length > 0;
+      case 'carry': return panelRows.carry.length > 0;
+      case 'promises': return rail.length > 0;
+      case 'people': return otherPeople.length > 0;
+      default: return false;
+    }
+  };
+  const panelSections = snapshot ? todayPanelOrder(stage).filter(hasSection).map(renderPanelSection) : [];
 
   return (
     <main className="today-page">
@@ -318,25 +436,37 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
               onRetry={() => void today.refetch()}
             />
           ) : null}
-          <div ref={scrollRef} className="today-scroll" onFocus={trackRowFocus}>
-            <div className="today-layout" data-stage={stage}>
-              <div className="today-main">
-                {todaySectionOrder(stage).map(renderSection)}
-              </div>
-              <aside className="today-aside" aria-label="People and promises">
-                <TodayPeoplePulse
-                  title={middayPeople ? 'Quiet since standup' : 'People'}
-                  people={middayPeople ?? pulse.rows.map(pulsePersonFromItem)}
-                  queued={pulse.queued}
-                  emptyLabel={middayPeople ? 'Everyone has updated since standup.' : 'No one else needs you right now.'}
-                  onRunCommand={runCommand}
-                  onViewAll={() => openTarget({ type: 'view', view: 'team', date: snapshot.date })}
-                />
-                <TodayPromisesList items={rail} onRunCommand={runCommand} />
-              </aside>
+          {/* Queue left, stage panel right; each scrolls on desktop, one scroll on phones. */}
+          <div
+            ref={scrollRef}
+            className="today-body"
+            data-stage={stage}
+            data-panel={panelSections.length > 0 ? 'true' : 'false'}
+            onFocus={trackRowFocus}
+          >
+            <div className="today-main-col">
+              <TodayActionQueue
+                ref={queueHeadingRef}
+                view={queueView}
+                expanded={queueExpanded}
+                onToggleExpanded={() => setQueueExpanded((current) => !current)}
+                groups={queueGroups}
+                expandedGroups={expandedGroups}
+                onToggleGroup={toggleGroup}
+                today={snapshot.date}
+                activeItemId={triage.activeId}
+                pendingTargetKey={pendingTargetKey}
+                cleared={cleared}
+                nextUp={nextUp}
+                onRunCommand={runCommand}
+              />
             </div>
+            {panelSections.length > 0 ? (
+              <aside className="today-panel-col" aria-label={`${snapshot.rhythm.label} panel`}>
+                {panelSections}
+              </aside>
+            ) : null}
           </div>
-          <TodayCommandFooter date={date} captureContext={captureContext} onOpenShortcuts={() => setShortcutsOpen(true)} />
         </>
       ) : (
         <TodayLoadingState isError={today.isError} onRetry={() => void today.refetch()} />
@@ -394,11 +524,23 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       ) : null}
       {confirmDraft ? (
         <TodayConfirmDialog
-          {...getConfirmationCopy(confirmDraft.command)}
+          {...(confirmDraft.bulk
+            ? {
+                title: `Carry ${confirmDraft.bulk.commands.length} items?`,
+                description: 'Moves each item forward. This can’t be undone from here.',
+                confirmLabel: `Carry ${confirmDraft.bulk.commands.length}`,
+              }
+            : getConfirmationCopy(confirmDraft.command))}
           isSaving={actions.isPending && actions.pendingKind === confirmDraft.command.kind}
           errorMessage={confirmDraft.error}
           onClose={() => closeDialog(() => setConfirmDraft(null))}
           onConfirm={() => {
+            if (confirmDraft.bulk) {
+              const { commands, title } = confirmDraft.bulk;
+              closeDialog(() => setConfirmDraft(null));
+              void actions.runBulk(commands, title);
+              return;
+            }
             void actions
               .runActionAsync(confirmDraft.command, { preset: confirmDraft.preset })
               .then(() => closeDialog(() => setConfirmDraft(null)))
@@ -471,10 +613,11 @@ function TodayPageSkeleton() {
           <span className="today-skeleton h-4 w-20" />
           {[0, 1, 2, 3].map((item) => <span key={item} className="today-skeleton h-4 w-16" />)}
         </div>
-        <div className="today-layout">
-          <div className="today-main">
-            <span className="today-skeleton h-4 w-24" />
-            <div className="today-list">
+        <div className="today-body">
+          <div className="today-main-col">
+            <div>
+            <span className="today-skeleton block h-4 w-24" />
+            <div className="today-list mt-3">
               {[0, 1, 2, 3, 4, 5].map((row) => (
                 <div key={row} className="grid grid-cols-[22px_minmax(0,1fr)_72px] items-center gap-3 px-2 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
                   <span className="today-skeleton h-4 w-4" />
@@ -486,8 +629,9 @@ function TodayPageSkeleton() {
                 </div>
               ))}
             </div>
+            </div>
           </div>
-          <div className="today-aside">
+          <div className="today-panel-col gap-3 p-4">
             <span className="today-skeleton h-4 w-20" />
             {[0, 1, 2].map((row) => <span key={row} className="today-skeleton h-10 w-full" />)}
           </div>
@@ -501,16 +645,6 @@ function meetingTitle(snapshot: TodayResponse | undefined, target: TodayActionTa
   if (!snapshot || !target.managerDeskItemId) return undefined;
   const match = [...snapshot.actionItems, ...snapshot.meetingPrompts].find((item) => item.target.managerDeskItemId === target.managerDeskItemId);
   return match?.title;
-}
-
-function captureContextFor(snapshot: TodayResponse | undefined, item: TodayActionItem | undefined): GlobalCaptureContext | undefined {
-  if (!item) return undefined;
-  const accountId = item.target.developerAccountId;
-  const issueKey = item.target.issueKey ?? item.target.context?.issueKey;
-  if (accountId) {
-    return { developer: { accountId, displayName: developerNameFor(snapshot, accountId) } };
-  }
-  return issueKey ? { issue: { jiraKey: issueKey } } : undefined;
 }
 
 function errorMessage(error: unknown): string {

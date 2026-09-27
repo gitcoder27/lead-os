@@ -48,55 +48,33 @@ export function pulsePersonFromFocus(person: TodayFocusPerson, pulse?: TodayTeam
 interface TodayPeoplePulseProps {
   title: string;
   people: TodayPulsePerson[];
-  /** docs/53 U1: people already in the queue, as an avatar strip. */
-  queued: Array<Pick<TodayTeamPulseItem, 'accountId' | 'displayName' | 'tone' | 'target'>>;
-  emptyLabel: string;
   onRunCommand: TodayRunCommand;
   onViewAll: () => void;
 }
 
-export function TodayPeoplePulse({ title, people, queued, emptyLabel, onRunCommand, onViewAll }: TodayPeoplePulseProps) {
+/**
+ * docs/53 U1: only people the queue doesn't already cover. Renders nothing
+ * when that's nobody — the panel never holds an empty section.
+ */
+export function TodayPeoplePulse({ title, people, onRunCommand, onViewAll }: TodayPeoplePulseProps) {
+  if (people.length === 0) return null;
   const visible = people.slice(0, 6);
   const hidden = people.length - visible.length;
 
   return (
-    <section aria-labelledby="today-people-heading">
-      <div className="today-section-head">
-        <h2 id="today-people-heading" className="today-section-title">{title}</h2>
-        {people.length > 0 ? <span className="today-section-count">{people.length}</span> : null}
+    <section className="today-panel" aria-label={title}>
+      <div className="today-panel-head">
+        <h2 className="today-section-title">{title}</h2>
+        <span className="today-section-count">{people.length}</span>
         <span className="today-section-actions">
           <button type="button" className="today-link" onClick={onViewAll}>Team</button>
         </span>
       </div>
-      <div className="today-list">
-        {visible.map((person) => (
-          <PulseRow key={person.accountId} person={person} onRunCommand={onRunCommand} />
-        ))}
-        {visible.length === 0 ? (
-          <p className="px-3 py-3 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>{emptyLabel}</p>
-        ) : null}
-        {hidden > 0 ? (
-          <button type="button" className="today-more" onClick={onViewAll}>+{hidden} more</button>
-        ) : null}
-      </div>
-      {queued.length > 0 ? (
-        <div className="today-avatar-strip">
-          <span className="today-avatar-stack">
-            {queued.slice(0, 6).map((person) => (
-              <button
-                key={person.accountId}
-                type="button"
-                className={`today-avatar today-tone-${person.tone}`}
-                title={person.displayName}
-                aria-label={`Open ${person.displayName}`}
-                onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: person.target })}
-              >
-                {initials(person.displayName)}
-              </button>
-            ))}
-          </span>
-          <span>{queued.length} in the queue</span>
-        </div>
+      {visible.map((person) => (
+        <PulseRow key={person.accountId} person={person} onRunCommand={onRunCommand} />
+      ))}
+      {hidden > 0 ? (
+        <button type="button" className="today-panel-more" onClick={onViewAll}>+{hidden} more</button>
       ) : null}
     </section>
   );

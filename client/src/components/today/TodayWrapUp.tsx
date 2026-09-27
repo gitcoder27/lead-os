@@ -1,28 +1,43 @@
+import { useState } from 'react';
 import { CheckCircle2, NotebookPen } from 'lucide-react';
-import { firstName, formatClock } from '@/lib/today-layout';
+import { firstName, formatClock, rowContext } from '@/lib/today-layout';
 import { TodayCompactRow } from './TodayCompactRow';
 import type { TodayRunCommand } from './TodayActionRow';
-import type { TodayActionTarget, TodayFocusPerson, TodayWrapUpFocus } from '@/types';
+import type { TodayActionCommand, TodayActionTarget, TodayFocusPerson, TodayWrapUpFocus } from '@/types';
+
+export type TodayBulkRun = (commands: TodayActionCommand[], title: (count: number) => string) => void;
 
 interface TodayWrapUpProps {
   wrapUp: TodayWrapUpFocus;
+  today: string;
+  /** People the queue already covers (its group row asks them). */
+  queuedPeople: Set<string>;
   onRunCommand: TodayRunCommand;
+  onBulk: TodayBulkRun;
   onOpenTarget: (target: TodayActionTarget) => void;
 }
 
+const PREVIEW = 3;
+
 /**
- * docs/53 §5 wrap-up: close loops in one pass — ask the people who went
- * quiet, clear or push promises, carry what's left to tomorrow, then write
- * the EOD note (shared ritual with Notes, docs/52 §5).
+ * docs/53 §5 wrap-up, as the stage panel: promises to clear or push, what
+ * carries to tomorrow (in one move), anyone quiet the queue doesn't already
+ * show, then the EOD note. Long lists preview three rows.
  */
-export function TodayWrapUp({ wrapUp, onRunCommand, onOpenTarget }: TodayWrapUpProps) {
-  const { missingCheckIns, openPromises, carryCandidates } = wrapUp;
-  const askable = missingCheckIns.filter((person) => person.primaryAction && !person.askedAt);
-  const allClosed = missingCheckIns.length === 0 && openPromises.length === 0 && carryCandidates.length === 0;
+export function TodayWrapUp({ wrapUp, today, queuedPeople, onRunCommand, onBulk, onOpenTarget }: TodayWrapUpProps) {
+  const [showAllCarry, setShowAllCarry] = useState(false);
+  const [showAllPromises, setShowAllPromises] = useState(false);
+  const { openPromises, carryCandidates } = wrapUp;
+  const missing = wrapUp.missingCheckIns.filter((person) => !queuedPeople.has(person.accountId));
+  const askable = missing.map((person) => (!person.askedAt ? person.primaryAction : undefined)).filter((command): command is TodayActionCommand => Boolean(command));
+  const carryCommands = carryCandidates.map((item) => item.primaryAction).filter((command) => command.kind === 'carry_forward');
+  const allClosed = missing.length === 0 && openPromises.length === 0 && carryCandidates.length === 0;
+  const promises = showAllPromises ? openPromises : openPromises.slice(0, PREVIEW);
+  const carries = showAllCarry ? carryCandidates : carryCandidates.slice(0, PREVIEW);
 
   return (
-    <section className="today-wrap" aria-labelledby="today-wrap-heading">
-      <div className="today-section-head">
+    <section className="today-panel" aria-labelledby="today-wrap-heading">
+      <div className="today-panel-head">
         <h2 id="today-wrap-heading" className="today-section-title">Wrap-up</h2>
         <span className="today-section-actions">
           <button type="button" className="today-ghost" onClick={() => onOpenTarget(wrapUp.eodNoteTarget)}>
@@ -33,38 +48,16 @@ export function TodayWrapUp({ wrapUp, onRunCommand, onOpenTarget }: TodayWrapUpP
       </div>
 
       {allClosed ? (
-        <p className="flex items-center gap-2 px-3 pb-3 text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+        <p className="today-panel-empty">
           <CheckCircle2 size={14} style={{ color: 'var(--success)' }} aria-hidden="true" />
           Loops closed for today.
         </p>
       ) : null}
 
-      {missingCheckIns.length > 0 ? (
-        <div role="group" aria-label={`No check-in today (${missingCheckIns.length})`}>
-          <h3 className="today-subhead flex items-center gap-2">
-            No check-in today · {missingCheckIns.length}
-            {askable.length > 1 ? (
-              <button
-                type="button"
-                className="today-link ml-auto normal-case tracking-normal"
-                onClick={() => askable.forEach((person) => onRunCommand(person.primaryAction!))}
-              >
-                Ask all {askable.length}
-              </button>
-            ) : null}
-          </h3>
-          <div className="today-people-row">
-            {missingCheckIns.map((person) => (
-              <PersonAsk key={person.accountId} person={person} onRunCommand={onRunCommand} onOpenTarget={onOpenTarget} />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {openPromises.length > 0 ? (
         <div role="group" aria-label={`Open promises (${openPromises.length})`}>
           <h3 className="today-subhead">Open promises · {openPromises.length}</h3>
-          {openPromises.map((promise) => {
+          {promises.map((promise) => {
             const snooze = promise.secondaryActions.find((action) => action.kind === 'snooze');
             return (
               <TodayCompactRow
@@ -79,19 +72,31 @@ export function TodayWrapUp({ wrapUp, onRunCommand, onOpenTarget }: TodayWrapUpP
               />
             );
           })}
+          <MoreToggle total={openPromises.length} open={showAllPromises} onToggle={() => setShowAllPromises((value) => !value)} />
         </div>
       ) : null}
 
       {carryCandidates.length > 0 ? (
         <div role="group" aria-label={`Carry to tomorrow (${carryCandidates.length})`}>
-          <h3 className="today-subhead">Carry to tomorrow · {carryCandidates.length}</h3>
-          {carryCandidates.map((item) => {
+          <h3 className="today-subhead today-subhead-action">
+            <span>Carry to tomorrow · {carryCandidates.length}</span>
+            {carryCommands.length > 1 ? (
+              <button
+                type="button"
+                className="today-primary today-primary-sm"
+                onClick={() => onBulk(carryCommands, (count) => `Carried ${count} to tomorrow`)}
+              >
+                Carry all {carryCommands.length}
+              </button>
+            ) : null}
+          </h3>
+          {carries.map((item) => {
             const done = item.secondaryActions.find((action) => action.kind === 'mark_done');
             return (
               <TodayCompactRow
                 key={item.id}
                 title={item.title}
-                detail={item.context}
+                detail={rowContext(item, today)}
                 severity={item.severity}
                 target={item.target}
                 primary={{ ...item.primaryAction, label: 'Carry' }}
@@ -100,9 +105,41 @@ export function TodayWrapUp({ wrapUp, onRunCommand, onOpenTarget }: TodayWrapUpP
               />
             );
           })}
+          <MoreToggle total={carryCandidates.length} open={showAllCarry} onToggle={() => setShowAllCarry((value) => !value)} />
+        </div>
+      ) : null}
+
+      {missing.length > 0 ? (
+        <div role="group" aria-label={`No check-in today (${missing.length})`}>
+          <h3 className="today-subhead today-subhead-action">
+            <span>No check-in today · {missing.length}</span>
+            {askable.length > 1 ? (
+              <button
+                type="button"
+                className="today-primary today-primary-sm"
+                onClick={() => onBulk(askable, (count) => `Asked ${count} for an update`)}
+              >
+                Ask all {askable.length}
+              </button>
+            ) : null}
+          </h3>
+          <div className="today-people-row">
+            {missing.map((person) => (
+              <PersonAsk key={person.accountId} person={person} onRunCommand={onRunCommand} onOpenTarget={onOpenTarget} />
+            ))}
+          </div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function MoreToggle({ total, open, onToggle }: { total: number; open: boolean; onToggle: () => void }) {
+  if (total <= PREVIEW) return null;
+  return (
+    <button type="button" className="today-panel-more" aria-expanded={open} onClick={onToggle}>
+      {open ? 'Show fewer' : `+${total - PREVIEW} more`}
+    </button>
   );
 }
 

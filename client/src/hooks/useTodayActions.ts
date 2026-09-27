@@ -41,7 +41,8 @@ function isNavigationCommand(command: TodayActionCommand): boolean {
   return NAVIGATION_KINDS.has(command.kind);
 }
 
-type PendingUndo = { undo: ManagerActionUndo; title: string; expiresAt: number };
+/** One Undo can reverse a whole bulk write (Carry all, Ask all). */
+type PendingUndo = { undos: ManagerActionUndo[]; title: string; expiresAt: number };
 
 export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) {
   const qc = useQueryClient();
@@ -266,7 +267,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       const title = actionToastTitle(variables.command.kind);
       const undo = (result as ManagerActionCommandResponse).undo;
       if (undo) {
-        offerUndo(undo, title);
+        offerUndo([undo], title);
         return;
       }
       addToast(title, 'success');
@@ -281,10 +282,13 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     undoStack.current = undoStack.current.filter((candidate) => candidate !== entry);
     await qc.cancelQueries({ queryKey: ['today', date] });
     try {
-      await api.post<ManagerActionCommandResponse>('/manager-actions/commands', {
-        tz: getLocalTimeZone(),
-        ...entry.undo.request,
-      });
+      // Reverse order, so a bulk write unwinds last-in first-out.
+      for (const undo of [...entry.undos].reverse()) {
+        await api.post<ManagerActionCommandResponse>('/manager-actions/commands', {
+          tz: getLocalTimeZone(),
+          ...undo.request,
+        });
+      }
       addToast('Undone', 'success');
     } catch (error) {
       addToast({ type: 'error', title: 'Could not undo', message: error instanceof Error ? error.message : undefined });
@@ -293,16 +297,53 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     }
   }, [addToast, date, qc]);
 
-  function offerUndo(undo: ManagerActionUndo, title: string) {
-    const entry: PendingUndo = { undo, title, expiresAt: Date.now() + TODAY_UNDO_WINDOW_MS };
+  function offerUndo(undos: ManagerActionUndo[], title: string) {
+    if (undos.length === 0) {
+      addToast(title, 'success');
+      return;
+    }
+    const entry: PendingUndo = { undos, title, expiresAt: Date.now() + TODAY_UNDO_WINDOW_MS };
     undoStack.current = [...pruneExpired(undoStack.current), entry];
     addToast({
       type: 'success',
       title,
       duration: TODAY_UNDO_WINDOW_MS,
-      action: { label: undo.label || 'Undo', onClick: () => void runUndo(entry) },
+      action: { label: 'Undo', onClick: () => void runUndo(entry) },
     });
   }
+
+  /**
+   * Bulk writes ("Carry all", "Ask all"): optimistic for every row, posted
+   * one by one, then a single toast whose Undo reverses them all. Stops at
+   * the first failure and reports how many landed.
+   */
+  const runBulk = async (commands: TodayActionCommand[], title: (count: number) => string) => {
+    if (commands.length === 0) return;
+    await qc.cancelQueries({ queryKey: ['today', date] });
+    for (const command of commands) {
+      if (command.kind === 'ask_check_in') markAskedOptimistically(command.target);
+      else removeTargetOptimistically(command.target);
+    }
+    const undos: ManagerActionUndo[] = [];
+    let done = 0;
+    try {
+      for (const command of commands) {
+        const response = await postCommand({ command });
+        if (response.undo) undos.push(response.undo);
+        done += 1;
+      }
+      offerUndo(undos, title(done));
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: done > 0 ? `${title(done)} — then stopped` : 'Could not complete',
+        message: error instanceof Error ? error.message : undefined,
+      });
+      if (undos.length) offerUndo(undos, title(done));
+    } finally {
+      invalidateToday();
+    }
+  };
 
   /** docs/53 U4 `z`: undo the latest write still inside its window. */
   const undoLast = useCallback((): boolean => {
@@ -336,6 +377,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
   return {
     runAction,
     runActionAsync,
+    runBulk,
     undoLast,
     isPending: mutation.isPending,
     pendingKind: mutation.variables?.command.kind,

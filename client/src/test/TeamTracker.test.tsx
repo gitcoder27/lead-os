@@ -834,7 +834,13 @@ describe('TeamTrackerPage', () => {
     const bob = rosterView.getByText('Bob Jones');
     const alice = rosterView.getByText('Alice Smith');
     expect(bob.compareDocumentPosition(alice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(rosterView.getByText(/blocked · stale with risk/i)).toBeInTheDocument();
+    // Each fact is said once: "Blocked" lives in the status mark, the
+    // attention cell leads with the most severe remaining flag.
+    const bobRow = bob.closest('[role="button"]') as HTMLElement;
+    expect(bobRow).toHaveAttribute('data-attention', 'danger');
+    expect(within(bobRow).getByText('Overdue Jira')).toBeInTheDocument();
+    expect(within(bobRow).getByText('Stale with risk')).toBeInTheDocument();
+    expect(within(bobRow).getAllByText('Blocked')).toHaveLength(1);
     expect(rosterView.getByText('Fix login bug')).toBeInTheDocument();
     expect(rosterView.getByText('No current item')).toBeInTheDocument();
     expect(rosterView.queryByText('Active work is set')).not.toBeInTheDocument();

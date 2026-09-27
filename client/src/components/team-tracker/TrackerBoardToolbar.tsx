@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { CalendarDays, Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { CalendarDays, Check, Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import type { TeamTrackerBoardSort, TeamTrackerBoardGroupBy, TeamTrackerSavedView } from '@/types';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import type { SavedViewsMenuProps } from './SavedViewsMenu';
@@ -77,7 +78,7 @@ export function TrackerBoardToolbar({
   const isGroupActive = groupBy !== 'none';
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex flex-wrap items-center gap-1.5">
       <SearchInput
         ref={inputRef}
         value={localSearch}
@@ -85,50 +86,29 @@ export function TrackerBoardToolbar({
         onClear={clearSearch}
       />
 
-      <div className="flex items-center gap-1.5 ml-auto">
-        {isFiltered && (
-          <span
-            className="h-8 rounded-lg px-2 text-[12px] font-mono font-medium inline-flex items-center"
-            style={{ color: 'var(--text-secondary)', background: 'transparent', border: '1px solid var(--border)' }}
-          >
-            {visibleCount}/{totalCount}
-          </span>
-        )}
+      {isFiltered && (
+        <span className="px-1 text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+          {visibleCount} of {totalCount}
+        </span>
+      )}
 
+      <div className="ml-auto flex items-center gap-1">
         {onOpenOneOnOnes && (
-          <button
-            type="button"
-            onClick={onOpenOneOnOnes}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-            }}
-            aria-label="Open 1:1s"
-            title="1:1s"
-          >
-            <CalendarDays size={12} />
+          <ToolbarButton onClick={onOpenOneOnOnes} ariaLabel="Open 1:1s" title="1:1s">
+            <CalendarDays size={13} />
             1:1s
-          </button>
+          </ToolbarButton>
         )}
 
         {onStartStandup && (
-          <button
-            type="button"
-            onClick={onStartStandup}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-            style={{
-              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-              color: 'var(--accent)',
-            }}
-            aria-label="Start standup"
-            title="Start standup"
-          >
-            <Presentation size={12} />
+          <ToolbarButton onClick={onStartStandup} ariaLabel="Start standup" title="Start standup" accent>
+            <Presentation size={13} />
             Standup
-          </button>
+          </ToolbarButton>
+        )}
+
+        {(onOpenOneOnOnes || onStartStandup) && (
+          <span aria-hidden="true" className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
         )}
 
         <ViewOptionsMenu
@@ -148,6 +128,49 @@ export function TrackerBoardToolbar({
   );
 }
 
+function ToolbarButton({
+  onClick,
+  ariaLabel,
+  title,
+  accent = false,
+  active = false,
+  expanded,
+  children,
+}: {
+  onClick: () => void;
+  ariaLabel?: string;
+  title?: string;
+  accent?: boolean;
+  active?: boolean;
+  expanded?: boolean;
+  children: ReactNode;
+}) {
+  const tinted = accent || active;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={expanded}
+      title={title}
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors ${
+        tinted ? 'hover:brightness-110' : 'hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
+      } ${FOCUS_RING}`}
+      style={{
+        color: tinted ? 'var(--accent)' : 'var(--text-secondary)',
+        background: accent
+          ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+          : active || expanded
+            ? 'var(--bg-tertiary)'
+            : 'transparent',
+        boxShadow: accent ? 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)' : 'none',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 import { forwardRef } from 'react';
 
 const SearchInput = forwardRef<HTMLInputElement, {
@@ -155,35 +178,43 @@ const SearchInput = forwardRef<HTMLInputElement, {
   onChange: (v: string) => void;
   onClear: () => void;
 }>(({ value, onChange, onClear }, ref) => (
-  <div
-    className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 flex-1 min-w-[220px] max-w-[420px]"
+  <label
+    className="flex h-8 min-w-[200px] max-w-[340px] flex-1 cursor-text items-center gap-2 rounded-lg border px-2.5 transition-colors focus-within:!border-[color:var(--border-active)]"
     style={{
-      background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)',
-      border: `1px solid ${value ? 'var(--accent)' : 'var(--border)'}`,
+      background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)',
+      borderColor: value ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
     }}
   >
-    <Search size={13} className="shrink-0" style={{ color: value ? 'var(--accent)' : 'var(--text-muted)' }} />
+    <Search size={13} className="shrink-0" style={{ color: value ? 'var(--accent)' : 'var(--text-muted)' }} aria-hidden="true" />
     <input
       ref={ref}
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Search developers, tasks, Jira keys…"
+      placeholder="Search people, tasks, Jira keys…"
+      aria-label="Search team"
       maxLength={200}
-      className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-placeholder"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && value) {
+          event.preventDefault();
+          onClear();
+        }
+      }}
+      className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-placeholder)]"
       style={{ color: 'var(--text-primary)' }}
     />
     {value && (
       <button
+        type="button"
         onClick={onClear}
-        className="shrink-0 rounded-md p-0.5 transition-colors hover:brightness-125"
+        className={`shrink-0 rounded-md p-0.5 transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
         aria-label="Clear search"
       >
         <X size={12} />
       </button>
     )}
-  </div>
+  </label>
 ));
 SearchInput.displayName = 'SearchInput';
 
@@ -209,46 +240,50 @@ function ViewOptionsMenu({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const isActive = sortActive || groupActive;
+  const activeLabel = [sortActive ? currentSortLabel : null, groupActive ? currentGroupLabel : null].filter(Boolean).join(' · ');
 
   useEffect(() => {
     if (!open) return;
     const handleClick = (event: MouseEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
     };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [open]);
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
+      <ToolbarButton
         onClick={() => setOpen((current) => !current)}
-        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-        style={{
-          background: isActive ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-          border: `1px solid ${isActive ? 'color-mix(in srgb, var(--accent) 30%, transparent)' : 'var(--border)'}`,
-          color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-        }}
+        active={isActive}
+        expanded={open}
+        title={`Sort: ${currentSortLabel} · Group: ${currentGroupLabel}`}
       >
-        <SlidersHorizontal size={12} />
-        View options
-      </button>
+        <SlidersHorizontal size={13} />
+        {isActive ? activeLabel : 'Display'}
+      </ToolbarButton>
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-1 w-[260px] overflow-hidden rounded-xl border p-2"
+          className="absolute right-0 top-full z-50 mt-1.5 w-[240px] overflow-hidden rounded-xl border p-1.5"
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', boxShadow: 'var(--soft-shadow)' }}
         >
           <OptionGroup
-            label={`Sort · ${currentSortLabel}`}
+            label="Sort by"
             activeValue={sortBy}
             options={sortOptions}
             onSelect={(value) => onSortChange(value as TeamTrackerBoardSort)}
           />
-          <div className="my-2 h-px" style={{ background: 'var(--border)' }} />
+          <div className="mx-1 my-1.5 h-px" style={{ background: 'var(--border)' }} />
           <OptionGroup
-            label={`Group · ${currentGroupLabel}`}
+            label="Group"
             activeValue={groupBy}
             options={groupOptions}
             onSelect={(value) => onGroupChange(value as TeamTrackerBoardGroupBy)}
@@ -272,25 +307,27 @@ function OptionGroup({
 }) {
   return (
     <div>
-      <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+      <div className="px-2 pb-1 pt-1 text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
         {label}
       </div>
-      <div className="grid gap-1">
+      <div className="grid gap-px" role="radiogroup" aria-label={label}>
         {options.map((option) => {
           const active = option.value === activeValue;
           return (
             <button
               key={option.value}
               type="button"
+              role="radio"
+              aria-checked={active}
               onClick={() => onSelect(option.value)}
-              className="flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-[13px] font-medium transition-colors"
+              className={`flex h-8 items-center justify-between rounded-lg px-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
               style={{
                 color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: active ? 'var(--bg-tertiary)' : 'transparent',
+                fontWeight: active ? 600 : 400,
               }}
             >
               {option.label}
-              {active && <span className="h-1.5 w-1.5 rounded-sm" style={{ background: 'var(--accent)' }} />}
+              {active && <Check size={13} style={{ color: 'var(--accent)' }} aria-hidden="true" />}
             </button>
           );
         })}

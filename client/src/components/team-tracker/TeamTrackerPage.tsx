@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { Calendar, ChevronLeft, ChevronRight, History, RefreshCw } from 'lucide-react';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useTaskResolution } from '@/hooks/useTasks';
@@ -20,7 +21,8 @@ import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { TrackerSummaryStrip } from './TrackerSummaryStrip';
 import { TrackerBoardToolbar } from './TrackerBoardToolbar';
 import { InactiveDeveloperTray } from './InactiveDeveloperTray';
-import { ROSTER_GRID, TrackerRosterBoard } from './TrackerRosterBoard';
+import { ROSTER_GRID, RosterSurface, TrackerRosterBoard } from './TrackerRosterBoard';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import { TeamTrackerViewSwitcher, type TeamTrackerLens } from './TeamTrackerViewSwitcher';
 import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
 import { AvailabilityDialog } from './AvailabilityDialog';
@@ -450,152 +452,93 @@ export function TeamTrackerPage({
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <motion.div
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="shrink-0 border-b px-4 py-2"
+      <motion.header
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.18 }}
+        className="shrink-0 border-b px-4 pb-3 pt-3.5 md:px-6"
         style={{ borderColor: 'var(--border)' }}
       >
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex min-w-0 items-center gap-2">
-            <div
-              className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--accent)', border: '1px solid var(--border)' }}
-            >
-              <Calendar size={14} />
-            </div>
-            <div className="flex min-w-0 items-baseline gap-2">
-              <h1 className="shrink-0 text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Team
-              </h1>
-              <div className="hidden truncate text-[12px] md:block" style={{ color: 'var(--text-muted)' }}>
-                Full roster, current work, and blockers.
-              </div>
+        <div className="mx-auto max-w-[1600px]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-[19px] font-bold tracking-[-0.015em]" style={{ color: 'var(--text-primary)' }}>
+              Team
+            </h1>
+
+            {board && (
+              <TeamTrackerViewSwitcher
+                activeLens={activeLens}
+                onLensChange={setActiveLens}
+                teamCount={board.visibleSummary.total}
+                inactiveCount={board.inactiveDevelopers.length}
+              />
+            )}
+
+            <TeamTrackerModeBanner date={date} viewMode={viewMode} />
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={workflow.handleRefresh}
+                disabled={isRefreshing}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-default ${FOCUS_RING}`}
+                style={{ color: 'var(--text-muted)' }}
+                aria-label="Refresh team tracker"
+                title={isRefreshing ? 'Refreshing…' : 'Refresh team tracker'}
+              >
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+              </button>
+              <BoardDateNav date={date} isToday={isToday} onChange={setDate} />
             </div>
           </div>
 
           {board && (
-            <TeamTrackerViewSwitcher
-              activeLens={activeLens}
-              onLensChange={setActiveLens}
-              teamCount={board.visibleSummary.total}
-              inactiveCount={board.inactiveDevelopers.length}
-            />
-          )}
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2">
+              <TrackerSummaryStrip
+                summary={board.summary}
+                activeFilter={resolvedSummaryFilter}
+                onFilterChange={qs.handleSummaryFilterChange}
+              />
 
-          <div className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={workflow.handleRefresh}
-              disabled={isRefreshing}
-              className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-              style={{
-                background: 'transparent',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border)',
-              }}
-              aria-label="Refresh team tracker"
-              title="Refresh team tracker"
-            >
-              <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            <div
-              className="flex h-8 items-center gap-0.5 rounded-lg px-1"
-              style={{ background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)', border: '1px solid var(--border)' }}
-            >
-              <button
-                onClick={() => setDate(shiftLocalIsoDate(date, -1))}
-                className="h-6 w-6 rounded-md flex items-center justify-center transition-colors hover:brightness-125"
-                style={{ color: 'var(--text-secondary)' }}
-                aria-label="Previous day"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <div className="flex items-center gap-1.5 px-1.5">
-                <Calendar size={12} style={{ color: 'var(--text-muted)' }} />
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-[116px] bg-transparent text-[12px] font-mono outline-none"
-                  style={{ color: 'var(--text-primary)' }}
+              <div className="min-w-[280px] flex-1">
+                <TrackerBoardToolbar
+                  searchQuery={resolvedSearch}
+                  onSearchChange={qs.handleSearchChange}
+                  sortBy={resolvedSortBy}
+                  onSortChange={qs.handleSortChange}
+                  groupBy={resolvedGroupBy}
+                  onGroupChange={qs.handleGroupChange}
+                  visibleCount={board.visibleSummary.total}
+                  totalCount={board.summary.total}
+                  views={qs.savedViews}
+                  describe={describeTeamTrackerView}
+                  activeViewId={qs.activeViewId}
+                  isDirty={qs.isDirtyFrom(resolvedQuery)}
+                  isViewsLoading={qs.isViewsLoading}
+                  onApplyView={qs.handleApplyView}
+                  onClearView={qs.handleClearView}
+                  onSaveNew={qs.handleSaveNewView}
+                  onUpdateView={qs.handleUpdateView}
+                  onDeleteView={qs.handleDeleteView}
+                  isSaving={qs.isSaving}
+                  onStartStandup={
+                    tasksPhase3 && isToday && !readOnly
+                      ? () => onStandupModeChange?.(true)
+                      : undefined
+                  }
+                  onOpenOneOnOnes={
+                    oneOnOneEnabled && !readOnly
+                      ? () => onOneOnOnePanelChange?.('one-on-ones')
+                      : undefined
+                  }
                 />
               </div>
-              <button
-                onClick={() => setDate(shiftLocalIsoDate(date, 1))}
-                disabled={isToday}
-                className="h-6 w-6 rounded-md flex items-center justify-center transition-colors hover:brightness-125 disabled:opacity-30"
-                style={{ color: 'var(--text-secondary)' }}
-                aria-label="Next day"
-              >
-                <ChevronRight size={14} />
-              </button>
             </div>
-            {!isToday && (
-              <button
-                onClick={() => setDate(getLocalIsoDate())}
-                className="h-8 rounded-lg px-2.5 text-[12px] font-medium"
-                style={{
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                Today
-              </button>
-            )}
-          </div>
+          )}
         </div>
+      </motion.header>
 
-        {board && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <TrackerSummaryStrip
-              summary={board.summary}
-              activeFilter={resolvedSummaryFilter}
-              onFilterChange={qs.handleSummaryFilterChange}
-            />
-
-            <div className="min-w-[280px] flex-1">
-              <TrackerBoardToolbar
-                searchQuery={resolvedSearch}
-                onSearchChange={qs.handleSearchChange}
-                sortBy={resolvedSortBy}
-                onSortChange={qs.handleSortChange}
-                groupBy={resolvedGroupBy}
-                onGroupChange={qs.handleGroupChange}
-                visibleCount={board.visibleSummary.total}
-                totalCount={board.summary.total}
-                views={qs.savedViews}
-                describe={describeTeamTrackerView}
-                activeViewId={qs.activeViewId}
-                isDirty={qs.isDirtyFrom(resolvedQuery)}
-                isViewsLoading={qs.isViewsLoading}
-                onApplyView={qs.handleApplyView}
-                onClearView={qs.handleClearView}
-                onSaveNew={qs.handleSaveNewView}
-                onUpdateView={qs.handleUpdateView}
-                onDeleteView={qs.handleDeleteView}
-                isSaving={qs.isSaving}
-                onStartStandup={
-                  tasksPhase3 && isToday && !readOnly
-                    ? () => onStandupModeChange?.(true)
-                    : undefined
-                }
-                onOpenOneOnOnes={
-                  oneOnOneEnabled && !readOnly
-                    ? () => onOneOnOnePanelChange?.('one-on-ones')
-                    : undefined
-                }
-              />
-            </div>
-
-            <TeamTrackerModeBanner date={date} viewMode={viewMode} />
-          </div>
-        )}
-      </motion.div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 pt-4 md:px-6">
         {/* docs/48: 1:1 panels take over the board area while their URL
             params are set; the flag gate keeps flag-off URLs inert. */}
         {oneOnOneEnabled && oneOnOnePanel === 'one-on-ones' ? (
@@ -824,43 +767,168 @@ function TeamTrackerModeBanner({
   }
 
   return (
-    <div className="rounded-lg border px-2.5 py-1.5" style={{ borderColor: 'var(--border)', background: 'transparent' }}>
-      <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-        <History size={13} style={{ color: 'var(--accent)' }} />
-        {date} is a read-only historical snapshot.
+    <span
+      role="status"
+      className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
+      style={{
+        color: 'var(--warning)',
+        background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
+        boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--warning) 24%, transparent)',
+      }}
+    >
+      <History size={12} aria-hidden="true" />
+      {date} is a read-only historical snapshot.
+    </span>
+  );
+}
+
+function formatBoardDate(date: string, today: string) {
+  const parsed = parseISO(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  const now = parseISO(today);
+  const diff = differenceInCalendarDays(parsed, now);
+  const sameYear = parsed.getFullYear() === now.getFullYear();
+  if (diff === 0) return `Today · ${format(parsed, 'MMM d')}`;
+  if (diff === -1) return `Yesterday · ${format(parsed, 'MMM d')}`;
+  return format(parsed, sameYear ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
+}
+
+/**
+ * ‹ Today · Sep 28 › — the label opens the native picker; the input stays in
+ * the DOM as the source of truth for the value.
+ */
+function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: boolean; onChange: (date: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const label = formatBoardDate(date, getLocalIsoDate());
+
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // showPicker throws without a user gesture or in unsupported contexts.
+    }
+    input.focus();
+  };
+
+  const stepClass = `flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-30 ${FOCUS_RING}`;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {!isToday && (
+        <button
+          type="button"
+          onClick={() => onChange(getLocalIsoDate())}
+          className={`h-8 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          style={{ color: 'var(--accent)' }}
+        >
+          Today
+        </button>
+      )}
+      <div
+        className="flex h-8 items-center gap-0.5 rounded-lg p-0.5"
+        style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)' }}
+      >
+        <button
+          type="button"
+          onClick={() => onChange(shiftLocalIsoDate(date, -1))}
+          className={stepClass}
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label="Previous day"
+          title="Previous day"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={openPicker}
+            className={`flex h-7 min-w-[112px] items-center justify-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium tabular-nums transition-colors hover:bg-[var(--bg-elevated)] ${FOCUS_RING}`}
+            style={{ color: 'var(--text-primary)' }}
+            aria-label={`Choose date, ${label}`}
+            title="Choose date"
+          >
+            <Calendar size={12} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+            {label}
+          </button>
+          <input
+            ref={inputRef}
+            type="date"
+            value={date}
+            onChange={(e) => {
+              if (e.target.value) onChange(e.target.value);
+            }}
+            tabIndex={-1}
+            aria-label="Board date"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(shiftLocalIsoDate(date, 1))}
+          disabled={isToday}
+          className={stepClass}
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label="Next day"
+          title="Next day"
+        >
+          <ChevronRight size={14} />
+        </button>
       </div>
     </div>
   );
 }
 
+function Bone({ className }: { className: string }) {
+  return <span className={`block animate-pulse rounded ${className}`} style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' }} />;
+}
+
 function TeamTrackerSkeleton() {
   return (
-    <div className="mx-auto max-w-[1600px] overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className={`grid gap-3 border-b px-3 py-3 ${ROSTER_GRID}`} style={{ borderColor: 'var(--border)' }}>
-          {Array.from({ length: 7 }).map((__, cellIndex) => (
-            <div
-              key={cellIndex}
-              className="h-8 animate-pulse rounded-lg"
-              style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 74%, transparent)' }}
-            />
-          ))}
-        </div>
-      ))}
+    <div className="mx-auto max-w-[1600px]" aria-busy="true" aria-label="Loading team">
+      <RosterSurface>
+        <div className="hidden h-[34px] md:block" style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }} />
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className={`grid items-center gap-3 border-t px-4 py-2.5 md:min-h-[60px] ${ROSTER_GRID}`}
+            style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
+          >
+            <div className="flex items-center gap-3">
+              <Bone className="h-[30px] w-[30px] shrink-0 !rounded-full" />
+              <div className="space-y-1.5">
+                <Bone className="h-3 w-28" />
+                <Bone className="h-2.5 w-14" />
+              </div>
+            </div>
+            <div className="space-y-1.5 max-md:col-span-2">
+              <Bone className="h-3 w-3/4" />
+              <Bone className="h-2.5 w-1/3" />
+            </div>
+            <Bone className="h-3 w-2/3 max-md:hidden" />
+            <Bone className="h-3 w-10 max-md:hidden" />
+            <Bone className="h-3 w-12 max-md:hidden" />
+            <Bone className="h-3 w-20 max-md:hidden" />
+            <span />
+          </div>
+        ))}
+      </RosterSurface>
     </div>
   );
 }
 
 function EmptyLensState({ title, message }: { title: string; message: string }) {
   return (
-    <div className="flex min-h-[220px] items-center justify-center rounded-xl border px-4 py-10 text-center" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
-      <div>
-        <div className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {title}
-        </div>
-        <div className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-          {message}
-        </div>
+    <div className="flex min-h-[220px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-10 text-center" style={{ borderColor: 'var(--border)' }}>
+      <div className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        {title}
+      </div>
+      <div className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+        {message}
       </div>
     </div>
   );

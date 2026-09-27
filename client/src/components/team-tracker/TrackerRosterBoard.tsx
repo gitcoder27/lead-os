@@ -1,9 +1,19 @@
-import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle2, CircleOff, Clock, MessageSquarePlus, Zap } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { CircleDashed, Lock, MessageSquarePlus, TriangleAlert, Users } from 'lucide-react';
 import type { Issue, TrackerAttentionItem, TrackerDeveloperDay, TrackerDeveloperGroup, TrackerWorkItem } from '@/types';
-import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
-import { TrackerStatusPill } from './TrackerStatusPill';
+import { formatAbsoluteDateTime } from '@/lib/utils';
+import { Avatar, FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { TrackerStatusMark } from './TrackerStatusPill';
 import { RelatedIssueChips } from './RelatedIssueChips';
+import { describeLatestEvent, formatCompactRelative } from './trackerItemFormat';
+import {
+  ROSTER_TONE_COLOR,
+  getRosterAttention,
+  getRosterCheckIn,
+  getRosterLoad,
+  type RosterAttention,
+} from './rosterSignals';
 
 interface TrackerRosterBoardProps {
   date: string;
@@ -22,144 +32,115 @@ interface TrackerRosterBoardProps {
   readOnly?: boolean;
 }
 
+/**
+ * One template for the header, rows and loading skeleton. Below md a row is a
+ * compact card: person + action on top, then work, then load/check-in.
+ */
 export const ROSTER_GRID =
-  'md:grid-cols-[minmax(160px,0.95fr)_minmax(300px,2fr)_minmax(130px,0.7fr)_52px_minmax(96px,0.55fr)_minmax(140px,0.75fr)_44px]';
+  'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(180px,1fr)_minmax(220px,1.6fr)_minmax(150px,1fr)_64px_minmax(92px,0.55fr)_minmax(150px,0.9fr)_32px]';
+
+/** Cells that span the full card width below md. */
+const MOBILE_SPAN = 'max-md:col-span-2';
 
 const statusGroupColors: Record<string, string> = {
   blocked: 'var(--danger)',
   at_risk: 'var(--warning)',
   waiting: 'var(--info)',
   on_track: 'var(--success)',
-  done_for_today: 'var(--success)',
+  done_for_today: 'var(--accent)',
   needs_attention: 'var(--warning)',
-  stable: 'var(--accent)',
-  all: 'var(--accent)',
+  stable: 'var(--text-muted)',
+  all: 'var(--text-muted)',
 };
 
-const getInitials = (name: string) =>
-  name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-const getAssignedCount = (day: TrackerDeveloperDay) => (day.currentItem ? 1 : 0) + day.plannedItems.length;
-
-const getLoadLabel = (day: TrackerDeveloperDay) => `${getAssignedCount(day)}`;
-
-const getFreshnessLabel = (day: TrackerDeveloperDay) => {
-  if (day.lastCheckInAt) {
-    return formatRelativeTime(day.lastCheckInAt);
-  }
-
-  return 'No check-in';
-};
-
-const getRiskLabel = (day: TrackerDeveloperDay) => {
-  if (day.status === 'blocked') return 'Blocked';
-  if (day.signals.risk.overdueLinkedWork) {
-    return day.signals.risk.overdueLinkedCount === 1
-      ? '1 overdue'
-      : `${day.signals.risk.overdueLinkedCount} overdue`;
-  }
-  if (day.signals.freshness.staleWithOpenRisk) return 'Stale risk';
-  if (day.signals.freshness.staleWithoutCurrentWork) return 'Needs current';
-  if (day.signals.freshness.statusChangeWithoutFollowUp) return 'Needs follow-up';
-  if (day.status === 'done_for_today') return 'Done';
-
-  return 'Clear';
-};
-
-const getRiskTone = (day: TrackerDeveloperDay) => {
-  if (day.status === 'blocked' || day.signals.risk.overdueLinkedWork) return 'var(--danger)';
-  if (day.signals.freshness.staleByTime || day.signals.freshness.staleWithoutCurrentWork) return 'var(--warning)';
-  if (day.status === 'done_for_today') return 'var(--success)';
-  return 'var(--text-muted)';
-};
-
-type AttentionMeta = {
-  rank: number;
-  reason: string;
-  tone: 'danger' | 'warning' | 'neutral';
-};
-
-const attentionReasonTone = (item: TrackerAttentionItem): AttentionMeta['tone'] => {
-  const firstCode = item.reasons[0]?.code;
-  if (firstCode === 'blocked' || firstCode === 'overdue_linked_work') {
-    return 'danger';
-  }
-  if (firstCode) {
-    return 'warning';
-  }
-  return 'neutral';
-};
-
-const attentionToneColor: Record<AttentionMeta['tone'], string> = {
-  danger: 'var(--danger)',
-  warning: 'var(--warning)',
-  neutral: 'var(--text-muted)',
-};
-
-const getReasonLine = (item: TrackerAttentionItem) => {
-  const reasons = item.reasons.map((reason) => reason.label);
-  if (reasons.length <= 2) return reasons.join(' · ');
-  return `${reasons.slice(0, 2).join(' · ')} · +${reasons.length - 2} more`;
-};
-
-const buildAttentionMeta = (items: TrackerAttentionItem[] = []) =>
-  new Map(
-    items.map((item, index) => [
-      item.developer.accountId,
-      {
-        rank: index + 1,
-        reason: getReasonLine(item),
-        tone: attentionReasonTone(item),
-      },
-    ])
-  );
-
-const sortByAttention = (developers: TrackerDeveloperDay[], attentionMeta: Map<string, AttentionMeta>) =>
+const sortByAttention = (developers: TrackerDeveloperDay[], ranks: Map<string, number>) =>
   [...developers].sort((left, right) => {
-    const leftRank = attentionMeta.get(left.developer.accountId)?.rank ?? Number.MAX_SAFE_INTEGER;
-    const rightRank = attentionMeta.get(right.developer.accountId)?.rank ?? Number.MAX_SAFE_INTEGER;
+    const leftRank = ranks.get(left.developer.accountId) ?? Number.MAX_SAFE_INTEGER;
+    const rightRank = ranks.get(right.developer.accountId) ?? Number.MAX_SAFE_INTEGER;
     if (leftRank !== rightRank) return leftRank - rightRank;
     return left.developer.displayName.localeCompare(right.developer.displayName);
   });
 
-function WorkSummary({
+function MobileLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="mr-1.5 text-[11.5px] md:hidden" style={{ color: 'var(--text-muted)' }}>
+      {children}
+    </span>
+  );
+}
+
+function MetaSeparator() {
+  return <span aria-hidden="true" className="opacity-50">·</span>;
+}
+
+// ── Cells ───────────────────────────────────────────────────────────
+
+function CurrentWork({
   item,
-  fallback,
+  done,
   onOpenTaskDetail,
 }: {
   item?: TrackerWorkItem;
-  fallback: string;
+  done: boolean;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
 }) {
   if (!item) {
     return (
-      <span className="truncate text-[13px] font-semibold" style={{ color: 'var(--warning)' }}>
-        {fallback}
+      <span className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+        <CircleDashed size={13} className="shrink-0 opacity-70" aria-hidden="true" />
+        <span className="truncate">{done ? 'Done for the day' : 'No current item'}</span>
       </span>
+    );
+  }
+
+  const latest = item.latestEvent ? describeLatestEvent(item.latestEvent) : null;
+  const meta: ReactNode[] = [];
+  if (item.taskKey) {
+    meta.push(
+      <span key="task" className="shrink-0 font-mono text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-disabled)' }}>
+        {item.taskKey}
+      </span>,
+    );
+  }
+  if (item.jiraKey) {
+    meta.push(
+      <span key="jira" className="shrink-0 font-mono text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>
+        {item.jiraKey}
+      </span>,
+    );
+  }
+  if (item.relatedIssueKeys?.length) {
+    meta.push(<RelatedIssueChips key="related" issueKeys={item.relatedIssueKeys} compact link={false} />);
+  }
+  if (latest && item.latestEvent) {
+    meta.push(
+      <span key="latest" className="flex min-w-0 items-center gap-1">
+        {item.latestEvent.visibility === 'private' && <Lock size={10} className="shrink-0" aria-label="Private" />}
+        <span className="truncate" style={{ color: latest.tone === 'danger' ? 'var(--danger)' : undefined }}>
+          {latest.text}
+        </span>
+        <span className="shrink-0 tabular-nums" title={formatAbsoluteDateTime(item.latestEvent.occurredAt)}>
+          {formatCompactRelative(item.latestEvent.occurredAt)}
+        </span>
+      </span>,
     );
   }
 
   const content = (
     <>
-      <span className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+      <span className="block truncate text-[13px] font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
         {item.title}
       </span>
-      {item.jiraKey && (
-        <span className="font-mono text-[12px]" style={{ color: 'var(--accent)' }}>
-          {item.jiraKey}
+      {meta.length > 0 && (
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[11.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+          {meta.flatMap((node, index) => (index === 0 ? [node] : [<MetaSeparator key={`sep-${index}`} />, node]))}
         </span>
       )}
-      <RelatedIssueChips issueKeys={item.relatedIssueKeys} compact link={false} />
     </>
   );
 
   if (!onOpenTaskDetail) {
-    return <div className="flex min-w-0 flex-col gap-0.5">{content}</div>;
+    return <div className="min-w-0">{content}</div>;
   }
 
   return (
@@ -169,203 +150,282 @@ function WorkSummary({
         event.stopPropagation();
         onOpenTaskDetail(item.id, item.managerDeskItemId);
       }}
-      className="flex min-w-0 flex-col gap-0.5 text-left focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-      title={item.title}
+      onKeyDown={(event) => event.stopPropagation()}
+      className={`-mx-1.5 block min-w-0 max-w-full rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      title={`Open ${item.title}`}
     >
       {content}
     </button>
   );
 }
 
+function UpNext({ items }: { items: TrackerWorkItem[] }) {
+  const [first, ...rest] = items;
+  if (!first) {
+    return (
+      <span className="truncate text-[13px]" style={{ color: 'var(--text-placeholder)' }}>
+        <MobileLabel>Next</MobileLabel>
+        Nothing planned
+      </span>
+    );
+  }
+  return (
+    <div className="min-w-0" title={items.map((item) => item.title).join('\n')}>
+      <div className="truncate text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+        <MobileLabel>Next</MobileLabel>
+        {first.title}
+      </div>
+      {rest.length > 0 && (
+        <div className="mt-0.5 text-[11.5px] leading-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          +{rest.length} more planned
+        </div>
+      )}
+    </div>
+  );
+}
+
+const LOAD_PIPS = 5;
+
+function Load({ day }: { day: TrackerDeveloperDay }) {
+  const load = getRosterLoad(day);
+  const detail = `${day.currentItem ? '1 current' : 'No current'} · ${day.plannedItems.length} planned`;
+  return (
+    <div className="flex items-center gap-2" title={`Load ${load} — ${detail}`}>
+      <MobileLabel>Load</MobileLabel>
+      <span className="w-4 text-[13px] font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+        {load}
+      </span>
+      <span aria-hidden="true" className="flex items-center gap-[2px]">
+        {Array.from({ length: LOAD_PIPS }, (_, index) => (
+          <span
+            key={index}
+            className="h-2.5 w-[3px] rounded-full"
+            style={{
+              background: index < load
+                ? 'color-mix(in srgb, var(--text-secondary) 72%, transparent)'
+                : 'color-mix(in srgb, var(--border) 80%, transparent)',
+            }}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
+function CheckIn({ day }: { day: TrackerDeveloperDay }) {
+  const checkIn = getRosterCheckIn(day);
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
+      <MobileLabel>Check-in</MobileLabel>
+      {checkIn.stale && (
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--warning)' }} title={checkIn.title} aria-hidden="true" />
+      )}
+      <span
+        className="truncate tabular-nums"
+        style={{ color: checkIn.stale ? 'var(--warning)' : 'var(--text-secondary)' }}
+        title={day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : checkIn.title}
+      >
+        {checkIn.label}
+      </span>
+      {checkIn.stale && <span className="sr-only">{checkIn.title}</span>}
+    </div>
+  );
+}
+
+function AttentionFlags({ attention }: { attention: RosterAttention }) {
+  const [lead, ...rest] = attention.flags;
+  if (!lead) {
+    return (
+      <span className="text-[12.5px] max-md:hidden" style={{ color: 'var(--text-disabled)' }} title={attention.summary || 'Nothing needs you here'}>
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">No attention flags</span>
+      </span>
+    );
+  }
+  const leadColor = ROSTER_TONE_COLOR[lead.tone];
+  return (
+    <div className="min-w-0" title={attention.summary}>
+      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium leading-5">
+        <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: leadColor }} />
+        <span className="truncate" style={{ color: lead.tone === 'danger' ? leadColor : 'var(--text-primary)' }}>
+          {lead.label}
+        </span>
+      </div>
+      {rest.length > 0 && (
+        <div className="truncate pl-3 text-[11.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+          {rest.map((flag) => flag.label).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Row ─────────────────────────────────────────────────────────────
+
 function RosterRow({
   day,
   index,
+  attentionItem,
   onOpenDrawer,
   onOpenTaskDetail,
   onCaptureFollowUp,
   onAcceptSuggestion,
   readOnly,
-  attentionMeta,
 }: {
   day: TrackerDeveloperDay;
   index: number;
+  attentionItem?: TrackerAttentionItem;
   onOpenDrawer: (accountId: string) => void;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
   onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   readOnly?: boolean;
-  attentionMeta?: AttentionMeta;
 }) {
-  const assignedCount = getAssignedCount(day);
-  const firstPlanned = day.plannedItems[0];
-  const freshnessTitle = day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : undefined;
-  const freshnessIsStale = day.signals.freshness.staleByTime || !day.lastCheckInAt;
-  const riskLabel = getRiskLabel(day);
-  const riskTone = getRiskTone(day);
-  const attentionColor = attentionMeta ? attentionToneColor[attentionMeta.tone] : 'transparent';
+  const reduceMotion = useReducedMotion();
+  const attention = getRosterAttention(day, attentionItem);
+  const done = day.status === 'done_for_today';
+  const name = day.developer.displayName;
+  const railColor = attention.rail ? ROSTER_TONE_COLOR[attention.rail] : null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, delay: Math.min(index * 0.025, 0.16) }}
+      initial={reduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.12) }}
       role="button"
       tabIndex={0}
+      data-attention={attention.rail ?? undefined}
       onClick={() => onOpenDrawer(day.developer.accountId)}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           onOpenDrawer(day.developer.accountId);
         }
       }}
-      className={`relative grid cursor-pointer gap-3 border-b px-3 py-3 text-left transition-colors hover:bg-[var(--bg-tertiary)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--border-active)] ${ROSTER_GRID} md:items-center`}
-      style={{ borderColor: 'var(--border)' }}
+      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)] md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${ROSTER_GRID}`}
+      style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
-      {attentionMeta && (
+      {railColor && (
         <span
-          className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-sm"
-          style={{ background: attentionColor }}
-          title={attentionMeta.reason}
+          aria-hidden="true"
+          className="absolute bottom-2.5 left-0 top-2.5 w-[2px] rounded-r-full"
+          style={{ background: railColor }}
         />
       )}
-      <div className="flex min-w-0 items-center gap-3">
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold"
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--accent)', border: '1px solid var(--border)' }}
-        >
-          {getInitials(day.developer.displayName)}
-        </span>
+
+      <div className={`flex min-w-0 items-center gap-3 max-md:col-start-1 max-md:row-start-1 ${done ? 'opacity-70' : ''}`}>
+        <Avatar name={name} seed={day.developer.accountId} size={30} muted={done} />
         <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {day.developer.displayName}
+          <div className="truncate text-[13.5px] font-semibold leading-5 tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }} title={name}>
+            {name}
           </div>
-          <div className="mt-1 flex items-center gap-1.5">
-            <TrackerStatusPill status={day.status} />
-            {day.statusSuggestion && (
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+            <TrackerStatusMark status={day.status} />
+            {day.statusSuggestion && onAcceptSuggestion && (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onAcceptSuggestion?.(day);
+                  onAcceptSuggestion(day);
                 }}
-                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-                style={{
-                  background: 'color-mix(in srgb, var(--warning) 12%, transparent)',
-                  color: 'var(--warning)',
-                  border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)',
-                }}
+                onKeyDown={(event) => event.stopPropagation()}
+                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-[11px] font-medium leading-[18px] transition-colors hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] ${FOCUS_RING}`}
+                style={{ color: 'var(--warning)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent)' }}
                 title={`${day.statusSuggestion.reasonTaskKey} is blocked — set status to blocked`}
-                aria-label={`Accept suggested blocked status for ${day.developer.displayName}`}
+                aria-label={`Accept suggested blocked status for ${name}`}
                 data-testid={`suggestion-${day.developer.accountId}`}
               >
-                <AlertTriangle size={9} />
-                Suggested
+                <TriangleAlert size={10} aria-hidden="true" />
+                Set blocked?
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <WorkSummary item={day.currentItem} fallback="No current work" onOpenTaskDetail={onOpenTaskDetail} />
-
-      <div className="min-w-0">
-        <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Next
-        </div>
-        <div className="truncate text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-          {day.plannedItems.length > 0
-            ? `${day.plannedItems.length} planned${firstPlanned ? ` · ${firstPlanned.title}` : ''}`
-            : 'Nothing planned'}
-        </div>
+      <div className={`min-w-0 ${MOBILE_SPAN}`}>
+        <CurrentWork item={day.currentItem} done={done} onOpenTaskDetail={onOpenTaskDetail} />
       </div>
 
-      <div className="flex items-center gap-1.5 text-[13px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-        <Zap size={13} />
-        {getLoadLabel(day)}
+      <div className={`min-w-0 ${MOBILE_SPAN}`}>
+        <UpNext items={day.plannedItems} />
       </div>
 
-      <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: freshnessIsStale ? 'var(--warning)' : 'var(--text-secondary)' }} title={freshnessTitle}>
-        <Clock size={13} />
-        <span className="truncate">{getFreshnessLabel(day)}</span>
+      <Load day={day} />
+
+      <CheckIn day={day} />
+
+      <div className={`min-w-0 ${MOBILE_SPAN}`}>
+        <AttentionFlags attention={attention} />
       </div>
 
-      <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: riskTone }}>
-        {riskLabel === 'Clear' ? <CheckCircle2 size={13} /> : riskLabel === 'Needs current' ? <CircleOff size={13} /> : <AlertTriangle size={13} />}
-        <span className="truncate" title={attentionMeta?.reason}>{attentionMeta?.reason ?? riskLabel}</span>
-      </div>
-
-      <div className="flex justify-start md:justify-end">
-        {!readOnly ? (
+      <div className="flex justify-end max-md:col-start-2 max-md:row-start-1">
+        {!readOnly && (
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
               onCaptureFollowUp(day);
             }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-            style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-            aria-label={`Capture follow-up for ${day.developer.displayName}`}
-            title={`Capture follow-up for ${day.developer.displayName}`}
+            onKeyDown={(event) => event.stopPropagation()}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-[opacity,background-color] hover:bg-[var(--bg-elevated)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${FOCUS_RING}`}
+            style={{ color: 'var(--text-secondary)' }}
+            aria-label={`Capture follow-up for ${name}`}
+            title={`Capture follow-up for ${name}`}
           >
-            <MessageSquarePlus size={13} />
+            <MessageSquarePlus size={14} />
           </button>
-        ) : (
-          <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            -
-          </span>
         )}
       </div>
     </motion.div>
   );
 }
 
-function RosterSection({
-  developers,
-  indexOffset,
-  onOpenDrawer,
-  onOpenTaskDetail,
-  onCaptureFollowUp,
-  onAcceptSuggestion,
-  readOnly,
-  attentionMeta,
-  attentionSorted,
-}: {
-  developers: TrackerDeveloperDay[];
-  indexOffset: number;
-  onOpenDrawer: (accountId: string) => void;
-  onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
-  onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
-  onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
-  readOnly?: boolean;
-  attentionMeta: Map<string, AttentionMeta>;
-  attentionSorted: boolean;
-}) {
-  const visibleDevelopers = attentionSorted ? sortByAttention(developers, attentionMeta) : developers;
+// ── Board ───────────────────────────────────────────────────────────
 
+function ColumnHeader() {
   return (
-    <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
-      <div className={`hidden gap-3 border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] md:grid ${ROSTER_GRID}`} style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-        <span>Developer</span>
-        <span>Current work</span>
-        <span>Next</span>
-        <span>Load</span>
-        <span>Check-in</span>
-        <span>Risk</span>
-        <span className="text-right">Action</span>
-      </div>
-      {visibleDevelopers.map((day, index) => (
-        <RosterRow
-          key={day.developer.accountId}
-          day={day}
-          index={indexOffset + index}
-          onOpenDrawer={onOpenDrawer}
-          onOpenTaskDetail={onOpenTaskDetail}
-          onCaptureFollowUp={onCaptureFollowUp}
-          onAcceptSuggestion={onAcceptSuggestion}
-          readOnly={readOnly}
-          attentionMeta={attentionMeta.get(day.developer.accountId)}
-        />
-      ))}
+    <div
+      className={`hidden gap-3 px-4 py-2 text-[11.5px] font-medium md:grid ${ROSTER_GRID}`}
+      style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
+    >
+      <span>Developer</span>
+      <span>Current work</span>
+      <span>Up next</span>
+      <span>Load</span>
+      <span>Check-in</span>
+      <span>Attention</span>
+      <span className="sr-only">Actions</span>
+    </div>
+  );
+}
+
+function GroupHeader({ group }: { group: TrackerDeveloperGroup }) {
+  const color = statusGroupColors[group.key] ?? 'var(--text-muted)';
+  return (
+    <div
+      className="flex items-center gap-2 border-t px-4 pb-2 pt-3.5"
+      style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
+    >
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      <h3 className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        {group.label}
+      </h3>
+      <span className="rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[18px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
+        {group.count}
+      </span>
+    </div>
+  );
+}
+
+export function RosterSurface({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="overflow-hidden rounded-xl border"
+      style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 64%, transparent)' }}
+    >
+      {children}
     </div>
   );
 }
@@ -383,76 +443,58 @@ export function TrackerRosterBoard({
   attentionSorted = false,
   readOnly = false,
 }: TrackerRosterBoardProps) {
-  const attentionMeta = buildAttentionMeta(attentionItems);
-  const visibleCount = isGrouped
-    ? groups.reduce((sum, group) => sum + group.developers.length, 0)
-    : developers.length;
+  const attentionByDeveloper = new Map(attentionItems.map((item) => [item.developer.accountId, item]));
+  const ranks = new Map(attentionItems.map((item, index) => [item.developer.accountId, index]));
+  const sections: Array<{ group?: TrackerDeveloperGroup; developers: TrackerDeveloperDay[] }> = isGrouped
+    ? groups.filter((group) => group.developers.length > 0).map((group) => ({ group, developers: group.developers }))
+    : [{ developers }];
+  const visibleCount = sections.reduce((sum, section) => sum + section.developers.length, 0);
 
   if (visibleCount === 0) {
     return (
-      <div className="flex min-h-[220px] items-center justify-center rounded-xl border px-4 py-10 text-center" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
-        <div>
-          <div className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {searchActive ? 'No developers match this search.' : 'No developers match this view.'}
-          </div>
-          <div className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-            {searchActive ? 'Try a different name, task, or Jira key.' : 'Change the filters or add team members from settings.'}
-          </div>
+      <div
+        className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        <Users size={18} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
+        <div className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {searchActive ? 'No developers match this search.' : 'No developers match this view.'}
+        </div>
+        <div className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+          {searchActive ? 'Try a different name, task, or Jira key.' : 'Change the filters or add team members from settings.'}
         </div>
       </div>
-    );
-  }
-
-  if (!isGrouped) {
-    return (
-      <RosterSection
-        developers={developers}
-        indexOffset={0}
-        onOpenDrawer={onOpenDrawer}
-        onOpenTaskDetail={onOpenTaskDetail}
-        onCaptureFollowUp={onCaptureFollowUp}
-        onAcceptSuggestion={onAcceptSuggestion}
-        readOnly={readOnly}
-        attentionMeta={attentionMeta}
-        attentionSorted={attentionSorted}
-      />
     );
   }
 
   let offset = 0;
 
   return (
-    <div className="space-y-4">
-      {groups.map((group) => {
-        const color = statusGroupColors[group.key] ?? 'var(--accent)';
-        const currentOffset = offset;
-        offset += group.developers.length;
-
+    <RosterSurface>
+      <ColumnHeader />
+      {sections.map((section) => {
+        const rows = attentionSorted ? sortByAttention(section.developers, ranks) : section.developers;
+        const startIndex = offset;
+        offset += rows.length;
         return (
-          <section key={group.key}>
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {group.label}
-              </span>
-              <span className="tabular-nums text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                {group.count}
-              </span>
-            </div>
-            <RosterSection
-              developers={group.developers}
-              indexOffset={currentOffset}
-              onOpenDrawer={onOpenDrawer}
-              onOpenTaskDetail={onOpenTaskDetail}
-              onCaptureFollowUp={onCaptureFollowUp}
-              onAcceptSuggestion={onAcceptSuggestion}
-              readOnly={readOnly}
-              attentionMeta={attentionMeta}
-              attentionSorted={attentionSorted}
-            />
+          <section key={section.group?.key ?? 'all'} aria-label={section.group?.label}>
+            {section.group && <GroupHeader group={section.group} />}
+            {rows.map((day, index) => (
+              <RosterRow
+                key={day.developer.accountId}
+                day={day}
+                index={startIndex + index}
+                attentionItem={attentionByDeveloper.get(day.developer.accountId)}
+                onOpenDrawer={onOpenDrawer}
+                onOpenTaskDetail={onOpenTaskDetail}
+                onCaptureFollowUp={onCaptureFollowUp}
+                onAcceptSuggestion={onAcceptSuggestion}
+                readOnly={readOnly}
+              />
+            ))}
           </section>
         );
       })}
-    </div>
+    </RosterSurface>
   );
 }

@@ -26,6 +26,7 @@ import { describeMoment, describePlanDate, toneColor } from '@/components/tasks/
 import { TrackerItemRow } from './TrackerItemRow';
 import { getSignalBadges, type SignalTone } from './TrackerSignalBadges';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
+import { STATUS_META, StatusDot } from './TrackerStatusPill';
 import { formatCompactRelative } from './trackerItemFormat';
 
 /**
@@ -38,14 +39,6 @@ import { formatCompactRelative } from './trackerItemFormat';
 
 const STATUS_ORDER: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];
 
-export const STATUS_META: Record<TrackerDeveloperStatus, { label: string; color: string; key: string }> = {
-  on_track: { label: 'On track', color: 'var(--success)', key: 'o' },
-  at_risk: { label: 'At risk', color: 'var(--warning)', key: 'r' },
-  blocked: { label: 'Blocked', color: 'var(--danger)', key: 'b' },
-  waiting: { label: 'Waiting', color: 'var(--info)', key: 'w' },
-  done_for_today: { label: 'Done', color: 'var(--accent)', key: 'd' },
-};
-
 /** Statuses that must explain themselves — they open the rationale dialog. */
 const RATIONALE_STATUSES: TrackerDeveloperStatus[] = ['at_risk', 'blocked', 'waiting'];
 
@@ -56,16 +49,6 @@ function statusTint(status: TrackerDeveloperStatus) {
     background: `color-mix(in srgb, ${color} 12%, transparent)`,
     border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
   };
-}
-
-function StatusDot({ status, size = 7 }: { status: TrackerDeveloperStatus; size?: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-block shrink-0 rounded-full"
-      style={{ width: size, height: size, background: STATUS_META[status].color }}
-    />
-  );
 }
 
 // ── Layout primitives ───────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { Users, UserMinus } from 'lucide-react';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 
 export type TeamTrackerLens = 'team' | 'inactive';
 
@@ -31,8 +32,8 @@ export function TeamTrackerViewSwitcher({
 
   return (
     <div
-      className="inline-flex min-w-0 items-center gap-0.5 rounded-lg border p-0.5"
-      style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}
+      className="inline-flex min-w-0 items-center gap-0.5 rounded-lg p-0.5"
+      style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)' }}
       aria-label="Team tracker view"
       role="tablist"
     >
@@ -47,22 +48,16 @@ export function TeamTrackerViewSwitcher({
             role="tab"
             aria-selected={isActive}
             onClick={() => onLensChange(lens.key)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-[var(--border-active)] sm:px-2.5"
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors ${isActive ? '' : 'hover:text-[var(--text-primary)]'} ${FOCUS_RING}`}
             style={{
-              color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
               background: isActive ? 'var(--bg-elevated)' : 'transparent',
-              boxShadow: isActive ? '0 1px 0 rgba(255,255,255,0.04)' : 'none',
+              boxShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.16), inset 0 0 0 1px var(--border)' : 'none',
             }}
           >
-            <Icon size={13} />
+            <Icon size={13} aria-hidden="true" />
             <span>{lens.label}</span>
-            <span
-              className="tabular-nums rounded-md px-1.5 py-0.5 text-[11px] font-semibold"
-              style={{
-                color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                background: isActive ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
-              }}
-            >
+            <span className="tabular-nums text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
               {counts[lens.key]}
             </span>
           </button>

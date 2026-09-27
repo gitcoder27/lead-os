@@ -131,7 +131,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const selectionAnchor = useRef<string | undefined>(undefined);
   const goChordArmed = useRef(false);
-  const goChordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const goChordTimer = useRef<number | null>(null);
   const [lingering, setLingering] = useState<Map<string, LingerEntry>>(() => new Map());
   const [menu, setMenu] = useState<OpenMenuState | null>(null);
   const [addingGroup, setAddingGroup] = useState<string | null>(null);

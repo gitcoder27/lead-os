@@ -18,6 +18,8 @@ export function useModalFocus<T extends HTMLElement>(active = true): RefObject<T
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
+      // Portaled popovers (menus, date pickers) own Tab while they are focused.
+      if (event.target instanceof Element && event.target.closest('[data-popover-layer]')) return;
       const root = ref.current;
       if (!root) return;
       const focusables = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
@@ -30,6 +32,12 @@ export function useModalFocus<T extends HTMLElement>(active = true): RefObject<T
       const first = focusables[0]!;
       const last = focusables[focusables.length - 1]!;
       const current = document.activeElement as HTMLElement | null;
+      if (current === root) {
+        // Focus parked on the container (e.g. on open): enter at either end.
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
       const inside = current !== null && root.contains(current);
       if (event.shiftKey) {
         if (!inside || current === first) {

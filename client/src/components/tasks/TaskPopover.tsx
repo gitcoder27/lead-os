@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type 
 import { createPortal } from 'react-dom';
 import { Check, Minus } from 'lucide-react';
 
+const POPOVER_FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
 /**
  * docs/49 §6/§12: a small anchored popover rendered in a portal (so rows near
  * the bottom of the scrolling list are never clipped). Arrow keys move
@@ -76,11 +78,16 @@ export function TaskPopover({
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const items = [...(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])') ?? [])];
     const index = items.indexOf(document.activeElement as HTMLElement);
-    const inInput = (event.target as HTMLElement).tagName === 'INPUT';
+    const target = event.target as HTMLElement;
+    const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+    // Native date/time inputs use the arrow keys to step their segments.
+    const steppingInput = target instanceof HTMLInputElement && /^(date|datetime-local|time|number)$/.test(target.type);
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
       close();
+    } else if (steppingInput && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      // Leave the arrow to the input.
     } else if (event.key === 'ArrowDown') {
       event.preventDefault();
       items[(index + 1) % items.length]?.focus();
@@ -88,7 +95,16 @@ export function TaskPopover({
       event.preventDefault();
       items[(index - 1 + items.length) % items.length]?.focus();
     } else if (event.key === 'Tab') {
-      close();
+      if (role === 'menu') {
+        close();
+      } else {
+        // Dialog popovers (date pickers) keep Tab inside themselves.
+        const focusables = [...(ref.current?.querySelectorAll<HTMLElement>(POPOVER_FOCUSABLE) ?? [])];
+        const at = focusables.indexOf(document.activeElement as HTMLElement);
+        event.preventDefault();
+        const next = event.shiftKey ? (at <= 0 ? focusables.length - 1 : at - 1) : (at + 1) % focusables.length;
+        focusables[next]?.focus();
+      }
     } else if (!inInput && !event.metaKey && !event.ctrlKey && !event.altKey && onAccelerator?.(event.key)) {
       event.preventDefault();
     }
@@ -101,6 +117,7 @@ export function TaskPopover({
       ref={ref}
       role={role}
       aria-label={label}
+      data-popover-layer=""
       onKeyDown={handleKeyDown}
       className="fixed z-[9000] max-h-[360px] overflow-y-auto rounded-xl p-1 shadow-xl"
       style={{

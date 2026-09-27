@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { TaskDetailResponse } from '@/types';
 
 const mockUseTaskDetail = vi.fn();
 const mockMutate = vi.fn();
+const mockDelete = vi.fn();
 const mockUser = vi.fn();
 
 vi.mock('@/context/AuthContext', () => ({
@@ -18,7 +19,7 @@ vi.mock('@/context/ToastContext', () => ({
 vi.mock('@/hooks/useTaskDetail', () => ({
   useTaskDetail: (...args: unknown[]) => mockUseTaskDetail(...args),
   useUpdateTaskDetail: () => ({ mutate: mockMutate, isPending: false }),
-  useDeleteTaskDetail: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteTaskDetail: () => ({ mutate: mockDelete, isPending: false }),
   useAddTaskDetailLink: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveTaskDetailLink: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateChildTask: () => ({ mutate: vi.fn(), isPending: false }),
@@ -48,6 +49,7 @@ vi.mock('@/components/JiraIssueLink', () => ({
 }));
 
 import { TaskDetailBody, TaskDrawer } from '@/components/tasks/TaskDrawer';
+import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 
 function managerTask(overrides: Partial<TaskDetailResponse> = {}): TaskDetailResponse {
   return {
@@ -91,18 +93,21 @@ function queryFor(task: TaskDetailResponse) {
 
 beforeEach(() => {
   mockMutate.mockReset();
+  mockDelete.mockReset();
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
 });
 
 describe('TaskDrawer body (P3-D2)', () => {
   it('renders all sections for a manager task', () => {
     mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
-    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    const { container } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
     expect(screen.getByDisplayValue('Manager task')).toBeTruthy();
-    expect(screen.getByText('Owner & tracking')).toBeTruthy();
-    expect(screen.getByText('Schedule')).toBeTruthy();
-    expect(screen.getByText('Links')).toBeTruthy();
-    expect(screen.getByText('Properties')).toBeTruthy();
+    const terms = within(container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent);
+    expect(terms).toEqual(['Owner', 'Tracked by', 'Scheduled', 'Follow-up', 'Priority', 'Labels']);
+    expect(screen.getByRole('heading', { name: 'Links' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Activity' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Owner: You' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Task status: Active' })).toBeTruthy();
     expect(screen.getByText('follow up')).toBeTruthy(); // prefix stripped
     expect(screen.getByTestId('timeline')).toBeTruthy();
     expect(screen.getByTestId('composer')).toBeTruthy();
@@ -122,9 +127,8 @@ describe('TaskDrawer body (P3-D2)', () => {
     delete (task as Record<string, unknown>).followUpAt;
     delete (task as Record<string, unknown>).later;
     mockUseTaskDetail.mockReturnValue(queryFor(task));
-    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
-    expect(screen.queryByText('Owner & tracking')).toBeNull();
-    expect(screen.queryByText('Labels')).toBeNull();
+    const { container } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(within(container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent)).toEqual(['Scheduled']);
     expect(screen.queryByText('Priority')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
     expect(screen.getByTestId('timeline')).toBeTruthy();
@@ -151,9 +155,11 @@ describe('TaskDrawer body (P3-D2)', () => {
     render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
     expect(screen.getByText(/was deleted/)).toBeTruthy();
     expect(screen.queryByTestId('composer')).toBeNull();
-    expect(screen.queryByLabelText('Delete task')).toBeNull();
-    // G7: the status control is a read-only pill on tombstones — no live select.
-    expect(screen.queryByRole('combobox', { name: 'Task status' })).toBeNull();
+    // G7: the status control is a read-only pill on tombstones — no live control.
+    expect(screen.queryByRole('button', { name: /task status/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mark done' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(screen.queryByRole('menuitem', { name: /delete task/i })).toBeNull();
   });
 
   it('renders the restricted former-owner view (P3-D15)', () => {
@@ -171,11 +177,141 @@ describe('TaskDrawer body (P3-D2)', () => {
     // Restricted projection: own timeline only — no editing or other sections.
     expect(screen.getByTestId('timeline')).toBeTruthy();
     expect(screen.queryByTestId('composer')).toBeNull();
-    expect(screen.queryByText('Owner & tracking')).toBeNull();
+    expect(screen.queryByText('Owner')).toBeNull();
     expect(screen.queryByText('Links')).toBeNull();
     expect(screen.queryByText('Action items')).toBeNull();
-    expect(screen.queryByText('Properties')).toBeNull();
+    expect(screen.queryByText('Labels')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
+  });
+});
+
+describe('TaskDrawer interactions', () => {
+  it('marks done in one click and reopens closed work', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    const { unmount } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }));
+    expect(mockMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
+    unmount();
+
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ status: 'done', closedAt: '2026-09-25T10:00:00Z' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(mockMutate).toHaveBeenCalledWith({ status: 'open' }, expect.anything());
+  });
+
+  it('sets any status from the status menu', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Task status: Active' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /blocked/i }));
+    expect(mockMutate).toHaveBeenCalledWith({ status: 'blocked' }, expect.anything());
+  });
+
+  it('schedules from presets, parks in Later, and clears the date', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    const scheduleButton = () => screen.getByRole('button', { name: /^Scheduled:/ });
+
+    fireEvent.click(scheduleButton());
+    fireEvent.click(screen.getByRole('menuitem', { name: /tomorrow/i }));
+    expect(mockMutate).toHaveBeenLastCalledWith({ scheduledOn: shiftLocalIsoDate(getLocalIsoDate(), 1), later: false }, expect.anything());
+
+    fireEvent.click(scheduleButton());
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /later/i }));
+    expect(mockMutate).toHaveBeenLastCalledWith({ later: true }, expect.anything());
+
+    fireEvent.click(scheduleButton());
+    fireEvent.click(screen.getByRole('menuitem', { name: /clear date/i }));
+    expect(mockMutate).toHaveBeenLastCalledWith({ scheduledOn: null }, expect.anything());
+  });
+
+  it('commits an exact date only on Set, never mid-typing', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Scheduled:/ }));
+    fireEvent.change(screen.getByLabelText('Pick a date'), { target: { value: '2026-10-02' } });
+    expect(mockMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply schedule' }));
+    expect(mockMutate).toHaveBeenCalledWith({ scheduledOn: '2026-10-02', later: false }, expect.anything());
+  });
+
+  it('shows Later as the schedule value and unparks from the picker', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ later: true, scheduledOn: null } as Partial<TaskDetailResponse>)));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Scheduled: Later' }));
+    const later = screen.getByRole('menuitemcheckbox', { name: /later/i });
+    expect(later.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(later);
+    expect(mockMutate).toHaveBeenCalledWith({ later: false }, expect.anything());
+  });
+
+  it('reassigns from the owner picker', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Owner: You' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Dev One' }));
+    expect(mockMutate).toHaveBeenCalledWith({ ownerType: 'developer', ownerId: 'dev-1' }, expect.anything());
+  });
+
+  it('confirms before deleting', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete task/i }));
+    expect(mockDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete task' }));
+    expect(mockDelete).toHaveBeenCalled();
+  });
+
+  it('commits title edits on Enter and reverts on Escape', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    const title = screen.getByLabelText('Task title');
+    title.focus();
+    fireEvent.change(title, { target: { value: 'Discarded title' } });
+    fireEvent.keyDown(title, { key: 'Escape' });
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Manager task')).toBeTruthy();
+
+    title.focus();
+    fireEvent.change(title, { target: { value: 'Renamed task' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(mockMutate).toHaveBeenCalledWith({ title: 'Renamed task' }, expect.anything());
+  });
+
+  it('runs single-key shortcuts outside of text fields only', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    const title = screen.getByLabelText('Task title');
+    title.focus();
+    fireEvent.keyDown(title, { key: 'e' });
+    expect(mockMutate).not.toHaveBeenCalled();
+    title.blur();
+    fireEvent.keyDown(document.body, { key: 'e' });
+    expect(mockMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
+    fireEvent.keyDown(document.body, { key: 's' });
+    expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeTruthy();
+  });
+
+  it('renders the two-column page layout with a back affordance', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    const onBack = vi.fn();
+    render(<TaskDetailBody taskKey="T-7" fullPage onBack={onBack} onNavigateTask={() => {}} />);
+    expect(screen.getByRole('complementary', { name: 'Task details' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Open full page' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('shows the parent crumb and navigates to it', () => {
+    const onNavigate = vi.fn();
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({
+      parent: { id: 2, taskKey: 'T-2', title: 'Parent meeting', kind: 'meeting', status: 'open', ownerType: null, ownerId: null },
+    })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={onNavigate} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open parent task T-2' }));
+    expect(onNavigate).toHaveBeenCalledWith('T-2');
   });
 });
 

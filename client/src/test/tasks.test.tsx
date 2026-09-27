@@ -353,6 +353,18 @@ describe('TaskTimeline', () => {
     expect(screen.queryByText('Earlier shared update')).not.toBeInTheDocument();
   });
 
+  it('resolves account ids to names and labels own manager events as You', () => {
+    mockManagerEvents = { pages: [{ events: [
+      makeEvent({ id: 1, type: 'created', body: null, meta: { title: 'Ship it', ownerId: 'dev-1' }, author: { type: 'system', id: 'mgr-1' } }),
+      makeEvent({ id: 2, type: 'assign', body: null, meta: { fromId: 'dev-1', toId: 'dev-2' }, author: { type: 'manager', id: 'mgr-1' } }),
+    ], nextCursor: null }] };
+    const names: Record<string, string> = { 'dev-1': 'Alice', 'dev-2': 'Bob' };
+    render(<TaskTimeline taskKey="T-5" mode="manager" resolveName={(id) => names[id]} />, { wrapper: Wrapper });
+    expect(screen.getByText('Created Ship it for Alice')).toBeInTheDocument();
+    expect(screen.getByText('Alice → Bob')).toBeInTheDocument();
+    expect(screen.getByText('You')).toBeInTheDocument();
+  });
+
   it('shows the empty label when there are no events', () => {
     mockManagerEvents = { pages: [{ events: [], nextCursor: null }] };
 

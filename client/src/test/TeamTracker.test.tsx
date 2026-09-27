@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { TestWrapper } from '@/test/wrapper';
 import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse, TaskResolution } from '@/types';
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
@@ -608,9 +608,11 @@ describe('TeamTrackerPage', () => {
 
     clickDeveloperRow('Bob Jones');
 
-    fireEvent.click(screen.getByRole('button', { name: 'T-10' }));
     const input = screen.getByPlaceholderText(/add a check-in note/i);
+    // The task picker stays out of the way until the composer is engaged.
+    expect(screen.queryByRole('button', { name: 'T-10' })).not.toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'Progress on the fix' } });
+    fireEvent.click(screen.getByRole('button', { name: 'T-10' }));
     fireEvent.click(within(input.parentElement as HTMLElement).getByRole('button', { name: 'Save' }));
 
     expect(mockAddCheckInMutate).toHaveBeenCalledWith(
@@ -650,8 +652,8 @@ describe('TeamTrackerPage', () => {
 
     clickDeveloperRow('Alice Smith');
 
-    const select = screen.getByLabelText('Change developer status');
-    fireEvent.change(select, { target: { value: 'done_for_today' } });
+    fireEvent.click(screen.getByRole('button', { name: /change developer status/i }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Done/ }));
 
     expect(mockStatusUpdateMutate).toHaveBeenCalledWith(
       { accountId: 'dev-1', status: 'done_for_today' },
@@ -669,8 +671,8 @@ describe('TeamTrackerPage', () => {
 
     clickDeveloperRow('Alice Smith');
 
-    const select = screen.getByLabelText('Change developer status');
-    fireEvent.change(select, { target: { value: 'blocked' } });
+    fireEvent.click(screen.getByRole('button', { name: /change developer status/i }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Blocked/ }));
 
     const dialog = screen.getByRole('dialog', { name: /Alice Smith → Blocked/ });
     const submit = within(dialog).getByRole('button', { name: 'Set status' });
@@ -704,8 +706,8 @@ describe('TeamTrackerPage', () => {
 
     clickDeveloperRow('Bob Jones');
 
-    const select = screen.getByLabelText('Change developer status');
-    fireEvent.change(select, { target: { value: 'waiting' } });
+    fireEvent.click(screen.getByRole('button', { name: /change developer status/i }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Waiting/ }));
 
     const dialog = screen.getByRole('dialog', { name: /Bob Jones → Waiting/ });
     fireEvent.click(within(dialog).getByRole('button', { name: 'T-13' }));
@@ -1548,6 +1550,129 @@ describe('TeamTrackerPage', () => {
 
     expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
   });
+
+  it('closes the developer drawer on Escape, leaving a focused text field first', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    const input = screen.getByPlaceholderText(/add a check-in note/i);
+    act(() => input.focus());
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(input).not.toHaveFocus();
+    expect(screen.getByRole('dialog', { name: /bob jones developer details/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /bob jones developer details/i })).not.toBeInTheDocument();
+  });
+
+  it('lets Escape close only the rationale dialog stacked above the drawer', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Alice Smith');
+    fireEvent.click(screen.getByRole('button', { name: /change developer status/i }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Blocked/ }));
+    expect(screen.getByRole('dialog', { name: /Alice Smith → Blocked/ })).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: /Alice Smith → Blocked/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /alice smith developer details/i })).toBeInTheDocument();
+  });
+
+  it('reorders a planned task with Alt+Arrow keys from the developer drawer', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    const row = screen.getAllByText('Code review').at(-1)?.closest('[role="button"]') as HTMLElement;
+    fireEvent.keyDown(row, { key: 'ArrowDown', altKey: true });
+
+    expect(mockUpdateTrackerItemMutate).toHaveBeenCalledWith({ itemId: 11, position: 2 });
+    expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
+  });
+
+  it('does not open task detail when Enter is pressed on a row action', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    fireEvent.keyDown(screen.getByRole('button', { name: /start code review/i }), { key: 'Enter' });
+
+    expect(screen.queryByRole('dialog', { name: /team tracker task detail/i })).not.toBeInTheDocument();
+  });
+
+  it('saves manager notes inline from the developer drawer', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    const notes = screen.getByRole('textbox', { name: /notes about bob jones/i });
+    fireEvent.change(notes, { target: { value: 'Pair with QA on Thursday' } });
+    fireEvent.blur(notes);
+
+    expect(mockUpdateDayMutate).toHaveBeenCalledWith({ accountId: 'dev-2', managerNotes: 'Pair with QA on Thursday' });
+  });
+
+  it('explains a blocked status with the latest rationale in the attention note', () => {
+    mockBoard.developers[1] = mockDay({
+      ...mockBoard.developers[1],
+      status: 'blocked',
+      checkIns: [
+        {
+          id: 301,
+          dayId: 2,
+          summary: 'Status set to blocked',
+          rationale: 'Waiting on the staging credentials',
+          status: 'blocked',
+          createdAt: '2026-03-07T11:00:00Z',
+          authorType: 'manager',
+          taskKeys: [],
+        },
+      ],
+    });
+
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    const note = screen.getByRole('note', { name: 'Attention' });
+    expect(within(note).getByText(/Waiting on the staging credentials/)).toBeInTheDocument();
+  });
+
+  it('marks a developer inactive from the drawer actions menu', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+
+    clickDeveloperRow('Bob Jones');
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark bob inactive/i }));
+
+    expect(screen.getByRole('dialog', { name: /mark bob jones inactive/i })).toBeInTheDocument();
+  });
 });
 
 describe('TrackerStatusPill', () => {
@@ -1998,7 +2123,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     const titleInput = screen.getByPlaceholderText('Describe the work in one line');
     fireEvent.change(titleInput, {
       target: { value: 'Prep release notes' },
@@ -2035,7 +2160,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.change(screen.getByPlaceholderText('Describe the work in one line'), {
       target: { value: 'Fix alert rendering regression' },
     });
@@ -2047,7 +2172,7 @@ describe('AddTrackerItemForm', () => {
     fireEvent.change(screen.getByPlaceholderText('Optional context or handoff detail'), {
       target: { value: 'Needs pairing with QA' },
     });
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
 
     expect(onAdd).toHaveBeenCalledWith({
       jiraKey: 'AM-789',
@@ -2076,7 +2201,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.click(screen.getByText('Attach Jira'));
     fireEvent.change(screen.getByPlaceholderText('Search Jira issues'), {
       target: { value: 'AM-789' },
@@ -2120,7 +2245,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.click(screen.getByText('Attach Jira'));
     fireEvent.change(screen.getByPlaceholderText('Search Jira issues'), {
       target: { value: 'AM-789' },
@@ -2162,7 +2287,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.click(screen.getByText('Attach Jira'));
     fireEvent.change(screen.getByPlaceholderText('Search Jira issues'), {
       target: { value: 'AM-789' },
@@ -2207,7 +2332,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.change(screen.getByPlaceholderText('Describe the work in one line'), {
       target: { value: 'Patch the regression anyway' },
     });
@@ -2257,7 +2382,7 @@ describe('AddTrackerItemForm', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Add Task'));
+    fireEvent.click(screen.getByText('Add task'));
     fireEvent.click(screen.getByText('Attach Jira'));
     fireEvent.change(screen.getByPlaceholderText('Search Jira issues'), {
       target: { value: 'AM-789' },
@@ -2267,5 +2392,17 @@ describe('AddTrackerItemForm', () => {
 
     expect(onOpenExistingAssignment).toHaveBeenCalledWith(91);
     expect(screen.queryByText('AM-789 is already assigned in Team Tracker today.')).not.toBeInTheDocument();
+  });
+});
+
+describe('describeLatestEvent', () => {
+  it('labels system events instead of leaking their raw type', async () => {
+    const { describeLatestEvent } = await import('@/components/team-tracker/trackerItemFormat');
+    const base = { id: 1, authorType: 'system' as const, occurredAt: '2026-03-07T10:00:00Z', approximateTime: false, visibility: 'shared' as const };
+
+    expect(describeLatestEvent({ ...base, type: 'focus', excerpt: 'focus' }).text).toBe('Focus changed');
+    expect(describeLatestEvent({ ...base, type: 'title', excerpt: 'title' }).text).toBe('Renamed');
+    expect(describeLatestEvent({ ...base, type: 'update', excerpt: 'Patch is in review' }).text).toBe('Patch is in review');
+    expect(describeLatestEvent({ ...base, type: 'blocker', excerpt: 'API down' })).toEqual({ text: 'Blocker: API down', tone: 'danger' });
   });
 });

@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 import type { TrackerDeveloperDay } from '@/types';
 
-type SignalTone = 'danger' | 'warning' | 'info' | 'accent';
+export type SignalTone = 'danger' | 'warning' | 'info' | 'accent';
 
-interface SignalBadge {
+export interface SignalBadge {
   key: string;
   label: string;
   tone: SignalTone;
@@ -32,7 +32,7 @@ const toneStyles: Record<SignalTone, CSSProperties> = {
   },
 };
 
-function getSignalBadges(day: TrackerDeveloperDay): SignalBadge[] {
+export function getSignalBadges(day: TrackerDeveloperDay): SignalBadge[] {
   const badges: SignalBadge[] = [];
 
   if (day.signals.freshness.staleWithOpenRisk) {

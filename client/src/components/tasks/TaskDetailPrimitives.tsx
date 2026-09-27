@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { CalendarX, ChevronDown, CornerDownLeft } from 'lucide-react';
 import { MenuDivider, MenuItem, TaskPopover } from './TaskPopover';
 import { avatarHue, initials, toneColor, type DateDisplay } from './task-detail-format';
@@ -11,10 +11,12 @@ import { avatarHue, initials, toneColor, type DateDisplay } from './task-detail-
 
 export const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]';
 
-export function SectionHeader({ icon, title, count, action, id }: {
+export function SectionHeader({ icon, title, count, hint, action, id }: {
   icon?: ReactNode;
   title: string;
   count?: ReactNode;
+  /** Quiet qualifier after the count, e.g. "Private". */
+  hint?: ReactNode;
   action?: ReactNode;
   id?: string;
 }) {
@@ -32,6 +34,7 @@ export function SectionHeader({ icon, title, count, action, id }: {
           {count}
         </span>
       )}
+      {hint && <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
       {action && <div className="ml-auto flex items-center gap-1">{action}</div>}
     </div>
   );
@@ -307,4 +310,99 @@ export function InlineTextField({ value, placeholder, onCommit, ariaLabel, multi
       }}
     />
   );
+}
+
+/** Square ghost icon control for drawer toolbars. */
+export function IconButton({ label, hint, onClick, children, expanded, tone, popup }: {
+  label: string;
+  hint?: string;
+  onClick: (anchor: HTMLButtonElement) => void;
+  children: ReactNode;
+  expanded?: boolean;
+  tone?: 'danger';
+  popup?: 'menu' | 'dialog';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => onClick(event.currentTarget)}
+      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      style={{ color: tone === 'danger' ? 'var(--danger)' : 'var(--text-secondary)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
+      title={hint ? `${label} (${hint})` : label}
+      aria-label={label}
+      aria-haspopup={popup}
+      aria-expanded={expanded}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function ShortcutLegend({ hints, className = '' }: { hints: [string, string][]; className?: string }) {
+  return (
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] ${className}`} style={{ color: 'var(--text-muted)' }} aria-hidden="true">
+      {hints.map(([key, label]) => (
+        <span key={key} className="inline-flex items-center gap-1">
+          <kbd className="rounded px-1 font-mono text-[10px] leading-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>
+            {key}
+          </kbd>
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Keyboard ────────────────────────────────────────────────────────
+
+export function isEditable(el: Element): boolean {
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
+}
+
+/**
+ * Single-key shortcuts scoped to a detail surface. A key maps to the element
+ * marked `data-task-shortcut="<key>"` inside `rootRef` (clicked, or its input
+ * focused) unless `custom` handles it. Inactive while typing, with modifiers,
+ * or when another modal layer sits above this one.
+ */
+export function useTaskShortcuts(rootRef: RefObject<HTMLElement>, enabled: boolean, custom: Record<string, () => void>) {
+  const customRef = useRef(custom);
+  customRef.current = custom;
+
+  useEffect(() => {
+    if (!enabled) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1) return;
+      const root = rootRef.current;
+      if (!root) return;
+      const active = document.activeElement;
+      if (active && isEditable(active)) return;
+      if (!(active && root.contains(active))) {
+        const ownDialog = root.closest('[role="dialog"]');
+        if (ownDialog) {
+          // Drawer: live while focus is anywhere in this dialog (incl. its container).
+          if (active !== ownDialog) return;
+        } else if ((active && active !== document.body) || document.querySelector('[aria-modal="true"]')) {
+          // Page: live from the page body, never under a modal layer.
+          return;
+        }
+      }
+      const key = event.key.toLowerCase();
+      const handler = customRef.current[key];
+      const target = handler ? null : root.querySelector<HTMLElement>(`[data-task-shortcut="${key}"]`);
+      if (!handler && !target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (handler) {
+        handler();
+        return;
+      }
+      const field = target && (isEditable(target) ? target : target.querySelector<HTMLElement>('input, textarea'));
+      if (field) field.focus();
+      else target?.click();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [enabled, rootRef]);
 }

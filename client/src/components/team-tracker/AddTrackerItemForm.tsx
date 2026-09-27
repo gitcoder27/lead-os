@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, Plus, Search, X } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import { TrackerIssueAssignmentConflictPanel } from './TrackerIssueAssignmentConflictPanel';
 
 interface AddTrackerItemFormProps {
@@ -82,25 +83,30 @@ export function AddTrackerItemForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] transition-colors"
-        style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
+        data-task-shortcut="a"
+        title="Add a planned task (A)"
+        className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
+        style={{ color: 'var(--text-muted)' }}
       >
-        <Plus size={10} />
-        Add Task
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+          <Plus size={14} />
+        </span>
+        Add task
       </button>
     );
   }
 
   return (
     <div
-      className="rounded-xl p-3 space-y-2"
-      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-active)' }}
+      className="space-y-3 rounded-xl p-3"
+      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', boxShadow: 'var(--soft-shadow)' }}
     >
       <div>
-        <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+        <label htmlFor={`tracker-add-title-${targetAccountId}`} className="mb-1 block text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
           Task
-        </div>
+        </label>
         <input
+          id={`tracker-add-title-${targetAccountId}`}
           type="text"
           autoFocus
           value={title}
@@ -111,29 +117,31 @@ export function AddTrackerItemForm({
               handleSubmit();
             }
             if (event.key === 'Escape') {
+              event.stopPropagation();
               resetForm();
             }
           }}
           placeholder="Describe the work in one line"
-          className="w-full rounded-lg px-2.5 py-2 text-[13px] outline-none"
+          className={`w-full rounded-lg px-2.5 py-2 text-[13px] ${FOCUS_RING}`}
           style={{
-            background: 'var(--bg-tertiary)',
+            background: 'var(--bg-primary)',
             color: 'var(--text-primary)',
-            border: '1px solid var(--border-active)',
+            border: '1px solid var(--border)',
           }}
         />
       </div>
 
       <div>
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-semibold uppercase" style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+          <div className="text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
             Linked Jira
           </div>
           <button
             type="button"
             onClick={() => setJiraPickerOpen((current) => !current)}
-            className="text-[11px] px-2 py-1 rounded-md"
-            style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}
+            className={`rounded-md px-2 py-0.5 text-[12px] font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+            style={{ color: 'var(--accent)' }}
+            aria-expanded={jiraPickerOpen}
           >
             {selectedIssue ? 'Change Jira' : 'Attach Jira'}
           </button>
@@ -143,7 +151,7 @@ export function AddTrackerItemForm({
           <div className="mt-1.5 space-y-1.5">
             <div
               className="flex items-start justify-between gap-2 rounded-lg px-2.5 py-2"
-              style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
+              style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)' }}
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -191,9 +199,9 @@ export function AddTrackerItemForm({
                 value={jiraSearch}
                 onChange={(event) => setJiraSearch(event.target.value)}
                 placeholder="Search Jira issues"
-                className="w-full rounded-lg pl-8 pr-3 py-2 text-[13px] outline-none"
+                className={`w-full rounded-lg py-2 pl-8 pr-3 text-[13px] ${FOCUS_RING}`}
                 style={{
-                  background: 'var(--bg-tertiary)',
+                  background: 'var(--bg-primary)',
                   color: 'var(--text-primary)',
                   border: '1px solid var(--border)',
                 }}
@@ -208,7 +216,7 @@ export function AddTrackerItemForm({
                 {filteredIssues.map((issue) => (
                   <div
                     key={issue.jiraKey}
-                    className="px-2.5 py-2 transition-colors hover:bg-white/5"
+                    className="px-2.5 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
                     style={{ borderBottom: '1px solid var(--border)' }}
                   >
                     <div className="flex items-center gap-2">
@@ -241,41 +249,42 @@ export function AddTrackerItemForm({
       </div>
 
       <div>
-        <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
-          Notes
-        </div>
+        <label htmlFor={`tracker-add-note-${targetAccountId}`} className="mb-1 block text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          Note
+        </label>
         <textarea
+          id={`tracker-add-note-${targetAccountId}`}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           rows={2}
           placeholder="Optional context or handoff detail"
-          className="w-full rounded-lg px-2.5 py-2 text-[12px] outline-none resize-none"
+          className={`w-full resize-none rounded-lg px-2.5 py-2 text-[12.5px] ${FOCUS_RING}`}
           style={{
-            background: 'var(--bg-tertiary)',
+            background: 'var(--bg-primary)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border)',
           }}
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={resetForm}
+          className={`h-7 rounded-lg px-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          Cancel
+        </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={!title.trim() || isPending}
-          className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium disabled:opacity-40"
+          className={`flex h-7 items-center gap-1 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
           style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
         >
-          <Plus size={10} />
-          Add Task
-        </button>
-        <button
-          type="button"
-          onClick={resetForm}
-          className="text-[12px] px-1"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Cancel
+          <Plus size={12} />
+          Add task
         </button>
       </div>
     </div>

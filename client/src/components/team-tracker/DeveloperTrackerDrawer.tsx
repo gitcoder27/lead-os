@@ -1,17 +1,37 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { MessageSquare, Save } from 'lucide-react';
-import type { TrackerDeveloperDay, TrackerDeveloperStatus, Issue } from '@/types';
-import type { TrackerWorkItem } from '@/types';
+import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
+import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
+import {
+  ArrowUpRight,
+  Briefcase,
+  CalendarClock,
+  CornerDownLeft,
+  Crosshair,
+  ListTodo,
+  MessagesSquare,
+  NotebookPen,
+  UserMinus,
+  Users,
+} from 'lucide-react';
+import type { Issue, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
-import { formatAbsoluteDateTime, formatDate, formatRelativeTime } from '@/lib/utils';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
 import { useManagerDesk, useUpdateManagerDeskItem } from '@/hooks/useManagerDesk';
-import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
-import { TaskPicker, taskKeysForSubmit, tasksFromItems } from '@/components/tasks/TaskPicker';
+import { TaskPicker, taskKeysForSubmit, tasksFromItems, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
-import { DrawerHeader, DrawerSection, HistorySection, StatusSummary } from './DeveloperDrawerSections';
+import { FOCUS_RING, InlineTextField, ShortcutLegend, isEditable, useTaskShortcuts } from '@/components/tasks/TaskDetailPrimitives';
+import { describePlanDate } from '@/components/tasks/task-detail-format';
+import { getLocalIsoDate } from '@/lib/utils';
+import {
+  CheckInTimeline,
+  DeveloperHero,
+  Divider,
+  DrawerSection,
+  DrawerToolbar,
+  EmptyLine,
+  HistorySection,
+  type DrawerMenuAction,
+} from './DeveloperDrawerSections';
 import { ManagerFollowUpRow } from './ManagerFollowUpsSection';
 import { useCreateOneOnOneSeries, useOneOnOneEnabled, useOneOnOneSeriesForDeveloper } from '@/hooks/useOneOnOne';
 import { useToast } from '@/context/ToastContext';
@@ -45,86 +65,6 @@ interface DeveloperTrackerDrawerProps {
   readOnly?: boolean;
 }
 
-function getCheckInAuthorBadge(authorType?: TrackerDeveloperDay['checkIns'][number]['authorType']) {
-  if (authorType === 'developer') {
-    return {
-      label: 'Developer',
-      color: 'var(--accent)',
-      background: 'rgba(6, 182, 212, 0.1)',
-      border: 'rgba(6, 182, 212, 0.2)',
-    };
-  }
-
-  if (authorType === 'manager') {
-    return {
-      label: 'Manager',
-      color: 'var(--warning)',
-      background: 'rgba(245, 158, 11, 0.1)',
-      border: 'rgba(245, 158, 11, 0.2)',
-    };
-  }
-
-  return {
-    label: 'Update',
-    color: 'var(--text-secondary)',
-    background: 'var(--bg-secondary)',
-    border: 'var(--border)',
-  };
-}
-
-function CheckInRow({
-  checkIn,
-  showDate = false,
-}: {
-  checkIn: TrackerDeveloperDay['checkIns'][number];
-  showDate?: boolean;
-}) {
-  const badge = getCheckInAuthorBadge(checkIn.authorType);
-  const absoluteCreatedAt = formatAbsoluteDateTime(checkIn.createdAt);
-
-  return (
-    <div className="flex gap-3 px-1 py-3">
-      <div className="flex w-4 shrink-0 justify-center pt-1">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ background: badge.color, boxShadow: `0 0 0 4px ${badge.background}` }}
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>{checkIn.summary}</div>
-        {(checkIn.taskKeys ?? []).length > 0 && (
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            {(checkIn.taskKeys ?? []).map((key) => (
-              <TaskKeyChip key={key} taskKey={key} />
-            ))}
-          </div>
-        )}
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          <span
-            className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
-            style={{
-              color: badge.color,
-              background: badge.background,
-            }}
-          >
-            {badge.label}
-          </span>
-          {showDate && checkIn.date && (
-            <span
-              className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
-              style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
-            >
-              {formatDate(checkIn.date)}
-            </span>
-          )}
-          <span title={absoluteCreatedAt}>{formatRelativeTime(checkIn.createdAt)}</span>
-          <span>{absoluteCreatedAt}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DeveloperTrackerDrawer({
   date,
   day,
@@ -146,10 +86,13 @@ export function DeveloperTrackerDrawer({
   isAddItemPending,
   readOnly = false,
 }: DeveloperTrackerDrawerProps) {
-  const [checkInText, setCheckInText] = useState('');
-  const [checkInTaskKeys, setCheckInTaskKeys] = useState<string[]>([]);
-  const [notesText, setNotesText] = useState('');
-  const [notesEditing, setNotesEditing] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const titleId = useId();
+  const visible = open && Boolean(day);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const checkInInputRef = useRef<HTMLInputElement>(null);
+  const [condensed, setCondensed] = useState(false);
   const [localPlannedItems, setLocalPlannedItems] = useState<TrackerWorkItem[]>([]);
   const [deskCaptureOpen, setDeskCaptureOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -157,14 +100,16 @@ export function DeveloperTrackerDrawer({
   const localPlannedItemsRef = useRef<TrackerWorkItem[]>([]);
   const isDraggingRef = useRef(false);
   const draggedItemIdRef = useRef<number | null>(null);
+  const refocusItemIdRef = useRef<number | null>(null);
   const composerApisRef = useRef(new Map<number, { expand: () => void; focus: () => void }>());
   const assignedTodayCount = (day?.currentItem ? 1 : 0) + (day?.plannedItems.length ?? 0);
-  const loadLabel = `${assignedTodayCount}`;
   const managerDesk = useManagerDesk(date, open && Boolean(day) && !readOnly);
   const updateManagerDeskItem = useUpdateManagerDeskItem(date);
   const managerFollowUps = day
     ? getDeveloperManagerFollowUps(managerDesk.data?.items ?? [], day.developer.accountId)
     : [];
+
+  useDrawerLayer(panelRef, visible, onClose);
 
   // Sync local planned items from server data when not actively dragging
   useEffect(() => {
@@ -180,6 +125,20 @@ export function DeveloperTrackerDrawer({
       setDroppedOpen(false);
     }
   }, [day?.id]);
+
+  // A different developer starts at the top of the panel.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setCondensed(false);
+  }, [day?.developer.accountId]);
+
+  // Keyboard reordering moves DOM nodes; keep focus on the row that moved.
+  useLayoutEffect(() => {
+    const itemId = refocusItemIdRef.current;
+    if (itemId === null) return;
+    refocusItemIdRef.current = null;
+    panelRef.current?.querySelector<HTMLElement>(`[data-planned-item="${itemId}"] [tabindex="0"]`)?.focus();
+  }, [localPlannedItems]);
 
   const handleDragReorder = useCallback(
     (newOrder: TrackerWorkItem[]) => {
@@ -212,6 +171,25 @@ export function DeveloperTrackerDrawer({
     const targetPosition = day.plannedItems[targetIndex]?.position ?? targetIndex;
     onReorderPlannedItem({ itemId: movedItemId, position: targetPosition });
   }, [day, onReorderPlannedItem]);
+
+  /** Alt+↑/↓ on a focused planned row — the keyboard path for drag reordering. */
+  const movePlannedItem = useCallback(
+    (itemId: number, direction: 'up' | 'down') => {
+      if (!day) return;
+      const current = localPlannedItemsRef.current;
+      const index = current.findIndex((item) => item.id === itemId);
+      const targetIndex = index + (direction === 'up' ? -1 : 1);
+      if (index === -1 || targetIndex < 0 || targetIndex >= current.length) return;
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIndex, 0, moved!);
+      localPlannedItemsRef.current = next;
+      refocusItemIdRef.current = itemId;
+      setLocalPlannedItems(next);
+      onReorderPlannedItem({ itemId, position: day.plannedItems[targetIndex]?.position ?? targetIndex });
+    },
+    [day, onReorderPlannedItem],
+  );
 
   // Canonical transport carries `day.tasks`; the legacy item arrays are the
   // pre-canonical fallback (and stay populated under Phase 2 transport).
@@ -259,24 +237,29 @@ export function DeveloperTrackerDrawer({
         mode="manager"
         via="standup"
         collapsed
+        quiet
         registerComposer={registerComposer(item.id)}
         onArrowNav={(direction) => focusAdjacentComposer(item.id, direction)}
       />
     ) : undefined;
 
-  const handleSaveNotes = () => {
-    if (!day) return;
-    onUpdateDay({ accountId: day.developer.accountId, managerNotes: notesText });
-    setNotesEditing(false);
-  };
+  const currentComposerId = day?.currentItem?.taskKey ? day.currentItem.id : undefined;
+  useTaskShortcuts(panelRef, visible && !readOnly, {
+    u: () => {
+      if (currentComposerId !== undefined) composerApisRef.current.get(currentComposerId)?.expand();
+    },
+  });
 
-  const handleCheckIn = () => {
-    if (!day || !checkInText.trim()) return;
-    const taskKeys = taskKeysForSubmit(checkInTaskKeys, checkInText, checkInTasks);
-    onAddCheckIn({ accountId: day.developer.accountId, summary: checkInText.trim(), taskKeys });
-    setCheckInText('');
-    setCheckInTaskKeys([]);
-  };
+  const shortcutHints: [string, string][] = readOnly
+    ? [['Esc', 'Close']]
+    : [
+        ['S', 'Status'],
+        ['A', 'Add task'],
+        ...(currentComposerId !== undefined ? [['U', 'Update'] as [string, string]] : []),
+        ['C', 'Check-in'],
+        ...(localPlannedItems.length > 1 ? [['Alt ↑↓', 'Reorder'] as [string, string]] : []),
+        ['Esc', 'Close'],
+      ];
 
   const issueList = issues?.map((i) => ({
     jiraKey: i.jiraKey,
@@ -286,58 +269,84 @@ export function DeveloperTrackerDrawer({
     developmentDueDate: i.developmentDueDate,
   })) ?? [];
 
+  const menuActions: DrawerMenuAction[] = [];
+  if (day && !readOnly) {
+    menuActions.push({ key: 'capture', label: 'Capture follow-up', icon: <Briefcase size={13} />, onSelect: () => setDeskCaptureOpen(true) });
+  }
+  if (day && onOpenOneOnOne) {
+    menuActions.push({ key: 'one-on-one', label: 'Open 1:1 workspace', icon: <Users size={13} />, onSelect: () => onOpenOneOnOne(day.developer.accountId) });
+  }
+  if (day && !readOnly && onMarkInactive) {
+    menuActions.push({
+      key: 'inactive',
+      label: `Mark ${day.developer.displayName.split(' ')[0]} inactive…`,
+      icon: <UserMinus size={13} />,
+      onSelect: () => onMarkInactive(day),
+      separated: true,
+    });
+  }
+
   return (
     <AnimatePresence>
       {open && day && (
         <>
           <motion.div
+            key="developer-drawer-scrim"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-[60]"
-            style={{ background: 'rgba(0, 0, 0, 0.34)', backdropFilter: 'blur(3px)' }}
+            style={{ background: 'rgba(2, 6, 23, 0.42)', backdropFilter: 'blur(2px)' }}
             onClick={onClose}
           />
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-            className="workspace-shell-drawer fixed right-0 z-[61] flex w-full max-w-[660px] flex-col overflow-hidden"
+            key="developer-drawer-panel"
+            ref={panelRef}
+            tabIndex={-1}
+            initial={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
+            transition={{ type: 'spring', damping: 34, stiffness: 340 }}
+            className="workspace-shell-drawer fixed right-0 z-[61] flex w-full max-w-[680px] flex-col overflow-hidden outline-none"
             style={{
-              background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-elevated) 8%) 0%, var(--bg-primary) 100%)',
-              borderLeft: '1px solid color-mix(in srgb, var(--border-strong) 58%, transparent)',
-              boxShadow: '-28px 0 70px rgba(0, 0, 0, 0.28)',
+              background: 'var(--bg-primary)',
+              borderLeft: '1px solid var(--border)',
+              boxShadow: '-24px 0 64px rgba(15, 23, 42, 0.24)',
             }}
             role="dialog"
             aria-modal="true"
             aria-label={`${day.developer.displayName} developer details`}
           >
-            <DrawerHeader
+            <DrawerToolbar
               day={day}
               date={date}
-              tasks={checkInTasks}
-              loadLabel={loadLabel}
               readOnly={readOnly}
+              condensed={condensed}
+              actions={menuActions}
               onClose={onClose}
-              onMarkInactive={onMarkInactive}
             />
 
-            <StatusSummary day={day} />
+            <div
+              ref={scrollRef}
+              className="min-h-0 flex-1 overflow-y-auto"
+              onScroll={(event) => setCondensed(event.currentTarget.scrollTop > 64)}
+            >
+              <div className="space-y-7 px-6 pb-10 pt-5">
+                <DeveloperHero
+                  day={day}
+                  date={date}
+                  tasks={checkInTasks}
+                  load={assignedTodayCount}
+                  readOnly={readOnly}
+                  titleId={titleId}
+                />
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <DrawerSection title="Current work">
-                {day.currentItem ? (
-                  <div
-                    className="rounded-2xl p-2"
-                    style={{
-                      background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 13%, transparent), color-mix(in srgb, var(--bg-tertiary) 45%, transparent))',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
-                    }}
-                  >
+                <DrawerSection icon={<Crosshair size={14} />} title="Current work">
+                  {day.currentItem ? (
                     <TrackerItemRow
                       item={day.currentItem}
+                      variant="drawer-current"
                       actionPreset="hover-done"
                       viewDate={date}
                       onOpen={readOnly ? undefined : onOpenTaskDetail}
@@ -345,28 +354,79 @@ export function DeveloperTrackerDrawer({
                       onSetCurrent={readOnly ? undefined : onSetCurrent}
                       onMarkDone={readOnly ? undefined : onMarkDone}
                       onDrop={readOnly ? undefined : onDropItem}
+                      readOnly={readOnly}
                       composer={composerFor(day.currentItem)}
                     />
-                  </div>
-                ) : (
-                  <div
-                    className="rounded-2xl px-4 py-3 text-[13px] leading-5"
-                    style={{
-                      color: 'var(--text-muted)',
-                      background: 'color-mix(in srgb, var(--bg-tertiary) 38%, transparent)',
-                    }}
-                  >
-                    {readOnly ? 'No active item in this historical snapshot.' : 'No active item. Set one from the planned list.'}
-                  </div>
-                )}
-              </DrawerSection>
+                  ) : (
+                    <div
+                      className="rounded-xl px-3.5 py-3 text-[12.5px] leading-5"
+                      style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
+                    >
+                      {readOnly
+                        ? 'No active item in this historical snapshot.'
+                        : localPlannedItems.length > 0
+                          ? 'Nothing in progress. Start a planned task to make it current work.'
+                          : 'Nothing in progress and nothing planned yet.'}
+                    </div>
+                  )}
+                </DrawerSection>
 
-              <DrawerSection
-                title="Planned"
-                count={day.plannedItems.length}
-              >
-                {!readOnly && (
-                  <div className="mb-3">
+                <DrawerSection
+                  icon={<ListTodo size={14} />}
+                  title="Planned"
+                  count={day.plannedItems.length}
+                >
+                  {localPlannedItems.length > 0 ? (
+                    readOnly ? (
+                      <div className="space-y-0.5">
+                        {localPlannedItems.map((item, index) => (
+                          <TrackerItemRow
+                            key={item.id}
+                            item={item}
+                            index={index}
+                            variant="drawer-planned"
+                            hideActions
+                            viewDate={date}
+                            onOpen={undefined}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <Reorder.Group
+                        axis="y"
+                        values={localPlannedItems}
+                        onReorder={handleDragReorder}
+                        className="space-y-0.5"
+                        as="div"
+                      >
+                        {localPlannedItems.map((item, index) => (
+                          <PlannedReorderItem
+                            key={item.id}
+                            item={item}
+                            index={index}
+                            date={date}
+                            onDragStart={() => {
+                              isDraggingRef.current = true;
+                              draggedItemIdRef.current = item.id;
+                            }}
+                            onDragEnd={handleDragEnd}
+                            onOpenTaskDetail={onOpenTaskDetail}
+                            onUpdateItemTitle={onUpdateItemTitle}
+                            onSetCurrent={onSetCurrent}
+                            onMarkDone={onMarkDone}
+                            onDropItem={onDropItem}
+                            onMove={movePlannedItem}
+                            canMoveUp={index > 0}
+                            canMoveDown={index < localPlannedItems.length - 1}
+                            composer={composerFor(item)}
+                          />
+                        ))}
+                      </Reorder.Group>
+                    )
+                  ) : (
+                    readOnly && <EmptyLine>Nothing planned.</EmptyLine>
+                  )}
+                  {!readOnly && (
                     <AddTrackerItemForm
                       onAdd={(params) => onAddItem({ accountId: day.developer.accountId, ...params })}
                       date={date}
@@ -375,249 +435,90 @@ export function DeveloperTrackerDrawer({
                       issues={issueList}
                       isPending={isAddItemPending}
                     />
-                  </div>
-                )}
-                {localPlannedItems.length > 0 ? (
-                  readOnly ? (
-                    <div
-                      className="overflow-hidden rounded-2xl"
-                      style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 30%, transparent)' }}
-                    >
-                      {localPlannedItems.map((item) => (
-                        <TrackerItemRow
-                          key={item.id}
-                          item={item}
-                          variant="drawer-planned"
-                          hideActions
-                          viewDate={date}
-                          onOpen={undefined}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                  <Reorder.Group
-                    axis="y"
-                    values={localPlannedItems}
-                    onReorder={handleDragReorder}
-                    className="space-y-1"
-                    as="div"
-                  >
-                    {localPlannedItems.map((item) => (
-                      <Reorder.Item
-                        key={item.id}
-                        value={item}
-                        onDragStart={() => {
-                          isDraggingRef.current = true;
-                          draggedItemIdRef.current = item.id;
-                        }}
-                        onDragEnd={handleDragEnd}
-                        as="div"
-                        whileDrag={{
-                          scale: 1.02,
-                          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.26)',
-                          borderRadius: '14px',
-                          background: 'color-mix(in srgb, var(--bg-secondary) 96%, var(--bg-elevated) 4%)',
-                          zIndex: 50,
-                        }}
-                        style={{ position: 'relative', cursor: 'grab' }}
-                      >
-                        <TrackerItemRow
-                          item={item}
-                          draggable
-                          variant="drawer-planned"
-                          actionPreset="hover-start"
-                          viewDate={date}
-                          onOpen={onOpenTaskDetail}
-                          onUpdateTitle={(itemId, title) => onUpdateItemTitle({ itemId, title })}
-                          onSetCurrent={onSetCurrent}
-                          onMarkDone={onMarkDone}
-                          onDrop={onDropItem}
-                          composer={composerFor(item)}
-                        />
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
-                  )
-                ) : (
-                  <div
-                    className="rounded-2xl px-4 py-3 text-[13px] leading-5"
-                    style={{
-                      color: 'var(--text-muted)',
-                      background: 'color-mix(in srgb, var(--bg-tertiary) 34%, transparent)',
-                    }}
-                  >
-                    Nothing planned.
-                  </div>
-                )}
-              </DrawerSection>
+                  )}
+                </DrawerSection>
 
-              {!readOnly && (
-                <ManagerFollowUpRow
-                  day={day}
-                  items={managerFollowUps}
-                  isLoading={managerDesk.isLoading}
-                  onComplete={(itemId) => updateManagerDeskItem.mutate({ itemId, status: 'done' })}
-                  onCapture={() => setDeskCaptureOpen(true)}
-                />
-              )}
-
-              <DrawerSection
-                title="Notes"
-                action={
-                  !readOnly && !notesEditing ? (
-                    <button
-                      onClick={() => { setNotesText(day.managerNotes ?? ''); setNotesEditing(true); }}
-                      className="text-[12px]"
-                      style={{ color: 'var(--accent)' }}
-                    >
-                      Edit
-                    </button>
-                  ) : undefined
-                }
-              >
-                {notesEditing && !readOnly ? (
-                  <div className="space-y-1">
-                    <textarea
-                      value={notesText}
-                      onChange={(e) => setNotesText(e.target.value)}
-                      rows={3}
-                      className="w-full resize-none rounded-xl px-3 py-2 text-[13px] leading-5 outline-none"
-                      style={{
-                        background: 'color-mix(in srgb, var(--bg-tertiary) 58%, transparent)',
-                        color: 'var(--text-primary)',
-                        border: '1px solid color-mix(in srgb, var(--border-active) 72%, transparent)',
-                      }}
+                {(day.completedItems.length > 0 || day.droppedItems.length > 0) && (
+                  <div className="-mt-3 space-y-0.5">
+                    <HistorySection
+                      title="Completed"
+                      items={day.completedItems}
+                      open={completedOpen}
+                      onToggle={() => setCompletedOpen((current) => !current)}
                     />
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={handleSaveNotes}
-                        className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[13px] font-medium"
-                        style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)' }}
-                      >
-                        <Save size={11} /> Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNotesEditing(false)}
-                        className="text-[13px] px-1"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    className="rounded-2xl px-4 py-3 text-[13px] leading-5"
-                    style={{
-                      color: day.managerNotes ? 'var(--text-secondary)' : 'var(--text-muted)',
-                      background: day.managerNotes ? 'color-mix(in srgb, var(--bg-tertiary) 24%, transparent)' : 'transparent',
-                    }}
-                  >
-                    {day.managerNotes || 'No notes yet.'}
-                  </div>
-                )}
-              </DrawerSection>
-
-              <OneOnOneSection accountId={day.developer.accountId} onOpenWorkspace={onOpenOneOnOne} />
-
-              <HistorySection
-                title="Completed"
-                items={day.completedItems}
-                open={completedOpen}
-                onToggle={() => setCompletedOpen((current) => !current)}
-              />
-              <HistorySection
-                title="Dropped"
-                items={day.droppedItems}
-                open={droppedOpen}
-                onToggle={() => setDroppedOpen((current) => !current)}
-              />
-
-              <DrawerSection title="Check-ins" count={day.checkIns.length + day.recentCheckIns.length}>
-                <div className="space-y-0">
-                  {day.checkIns.length === 0 && (
-                    <div className="rounded-2xl px-4 py-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                      {readOnly ? 'No check-ins recorded for this date.' : 'No check-ins today.'}
-                    </div>
-                  )}
-                  {[...day.checkIns].reverse().map((ci) => (
-                    <CheckInRow key={ci.id} checkIn={ci} />
-                  ))}
-                  {day.recentCheckIns.length > 0 && (
-                    <>
-                      <div
-                        className="mt-1 px-1 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.14em]"
-                        style={{ color: 'var(--text-muted)', borderTop: '1px solid color-mix(in srgb, var(--border) 45%, transparent)' }}
-                      >
-                        Earlier this week
-                      </div>
-                      {day.recentCheckIns.map((ci) => (
-                        <CheckInRow key={`recent-${ci.id}`} checkIn={ci} showDate />
-                      ))}
-                    </>
-                  )}
-                </div>
-              </DrawerSection>
-            </div>
-            {!readOnly && (
-              <div
-                className="shrink-0 px-6 py-4"
-                style={{
-                  background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 12%, transparent), var(--bg-primary))',
-                  borderTop: '1px solid color-mix(in srgb, var(--border) 45%, transparent)',
-                }}
-              >
-                <div
-                  className="rounded-2xl px-3 py-2"
-                  style={{
-                    background: 'color-mix(in srgb, var(--bg-tertiary) 48%, transparent)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-                  }}
-                >
-                  <div className="mb-1.5">
-                    <TaskPicker
-                      tasks={checkInTasks}
-                      text={checkInText}
-                      selected={checkInTaskKeys}
-                      onChange={setCheckInTaskKeys}
+                    <HistorySection
+                      title="Dropped"
+                      items={day.droppedItems}
+                      open={droppedOpen}
+                      onToggle={() => setDroppedOpen((current) => !current)}
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                  <MessageSquare size={14} className="shrink-0" style={{ color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    value={checkInText}
-                    onChange={(e) => setCheckInText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCheckIn();
-                    }}
-                    placeholder="Add a check-in note..."
-                    className="min-w-0 flex-1 rounded-xl px-2 py-1.5 text-[13px] outline-none"
-                    style={{
-                      background: 'transparent',
-                      color: 'var(--text-primary)',
-                    }}
+                )}
+
+                <Divider />
+
+                {!readOnly && (
+                  <ManagerFollowUpRow
+                    day={day}
+                    items={managerFollowUps}
+                    isLoading={managerDesk.isLoading}
+                    onComplete={(itemId) => updateManagerDeskItem.mutate({ itemId, status: 'done' })}
+                    onCapture={() => setDeskCaptureOpen(true)}
                   />
-                  <button
-                    type="button"
-                    onClick={handleCheckIn}
-                    disabled={!checkInText.trim()}
-                    className="h-8 shrink-0 rounded-xl px-3 text-[13px] font-medium transition-colors disabled:opacity-40"
-                    style={{ background: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--accent)' }}
-                  >
-                    Save
-                  </button>
+                )}
+
+                <DrawerSection icon={<NotebookPen size={14} />} title="Notes" hint={readOnly ? undefined : 'Private to you'}>
+                  <div className="-mx-2">
+                    <InlineTextField
+                      value={day.managerNotes ?? ''}
+                      placeholder="Add a private note about today…"
+                      ariaLabel={`Notes about ${day.developer.displayName}`}
+                      multiline
+                      disabled={readOnly}
+                      onCommit={(managerNotes) => onUpdateDay({ accountId: day.developer.accountId, managerNotes })}
+                    />
                   </div>
-                </div>
+                </DrawerSection>
+
+                <OneOnOneSection accountId={day.developer.accountId} onOpenWorkspace={onOpenOneOnOne} />
+
+                <Divider />
+
+                <DrawerSection
+                  icon={<MessagesSquare size={14} />}
+                  title="Check-ins"
+                  count={day.checkIns.length + day.recentCheckIns.length}
+                >
+                  <div className="pt-1">
+                    <CheckInTimeline checkIns={day.checkIns} recentCheckIns={day.recentCheckIns} readOnly={readOnly} />
+                  </div>
+                </DrawerSection>
               </div>
+            </div>
+
+            {readOnly ? (
+              <div
+                className="hidden shrink-0 border-t px-6 py-2 sm:block"
+                style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}
+              >
+                <ShortcutLegend hints={shortcutHints} />
+              </div>
+            ) : (
+              <CheckInComposer
+                key={day.developer.accountId}
+                developerName={day.developer.displayName}
+                tasks={checkInTasks}
+                inputRef={checkInInputRef}
+                shortcutHints={shortcutHints}
+                onSubmit={(summary, taskKeys) => onAddCheckIn({ accountId: day.developer.accountId, summary, taskKeys })}
+              />
             )}
           </motion.div>
         </>
       )}
       {!readOnly && deskCaptureOpen && day && (
         <ManagerDeskCaptureDialog
+          key="developer-drawer-capture"
           date={date}
           onClose={() => setDeskCaptureOpen(false)}
           onOpenManagerDesk={onOpenManagerDesk}
@@ -639,6 +540,263 @@ export function DeveloperTrackerDrawer({
     </AnimatePresence>
   );
 }
+
+// ── Planned row (handle-only drag) ──────────────────────────────────
+
+function PlannedReorderItem({
+  item,
+  index,
+  date,
+  onDragStart,
+  onDragEnd,
+  onOpenTaskDetail,
+  onUpdateItemTitle,
+  onSetCurrent,
+  onMarkDone,
+  onDropItem,
+  onMove,
+  canMoveUp,
+  canMoveDown,
+  composer,
+}: {
+  item: TrackerWorkItem;
+  index: number;
+  date: string;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onOpenTaskDetail: (itemId: number, managerDeskItemId?: number) => void;
+  onUpdateItemTitle: (params: { itemId: number; title: string }) => void;
+  onSetCurrent: (itemId: number) => void;
+  onMarkDone: (itemId: number) => void;
+  onDropItem: (itemId: number) => void;
+  onMove: (itemId: number, direction: 'up' | 'down') => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  composer?: ReactNode;
+}) {
+  // Only the handle starts a drag, so clicking into the update composer or
+  // selecting text never picks the row up.
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={controls}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      as="div"
+      data-planned-item={item.id}
+      whileDrag={{
+        scale: 1.015,
+        boxShadow: 'var(--panel-shadow)',
+        borderRadius: '10px',
+        background: 'var(--bg-elevated)',
+        zIndex: 50,
+      }}
+      style={{ position: 'relative' }}
+    >
+      <TrackerItemRow
+        item={item}
+        index={index}
+        draggable
+        onDragHandlePointerDown={(event: PointerEvent<HTMLDivElement>) => controls.start(event)}
+        variant="drawer-planned"
+        actionPreset="hover-start"
+        viewDate={date}
+        onOpen={onOpenTaskDetail}
+        onUpdateTitle={(itemId, title) => onUpdateItemTitle({ itemId, title })}
+        onSetCurrent={onSetCurrent}
+        onMarkDone={onMarkDone}
+        onDrop={onDropItem}
+        onMoveUp={canMoveUp ? (itemId) => onMove(itemId, 'up') : undefined}
+        onMoveDown={canMoveDown ? (itemId) => onMove(itemId, 'down') : undefined}
+        composer={composer}
+      />
+    </Reorder.Item>
+  );
+}
+
+// ── Check-in composer ───────────────────────────────────────────────
+
+/**
+ * Pinned footer composer. At rest it is a single line plus the drawer's
+ * shortcut legend; once engaged, the legend gives way to the task picker so
+ * the note can be linked to specific tasks.
+ */
+function CheckInComposer({
+  developerName,
+  tasks,
+  inputRef,
+  shortcutHints,
+  onSubmit,
+}: {
+  developerName: string;
+  tasks: TaskPickerTask[];
+  inputRef: RefObject<HTMLInputElement>;
+  shortcutHints: [string, string][];
+  onSubmit: (summary: string, taskKeys: string[]) => void;
+}) {
+  const [text, setText] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [focused, setFocused] = useState(false);
+  const inputId = useId();
+  const engaged = focused || Boolean(text.trim()) || selectedKeys.length > 0;
+  const canSubmit = Boolean(text.trim());
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit(text.trim(), taskKeysForSubmit(selectedKeys, text, tasks));
+    setText('');
+    setSelectedKeys([]);
+  };
+
+  return (
+    <div
+      className="shrink-0 border-t px-5 pb-3 pt-3"
+      style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
+      <div
+        className="rounded-xl transition-[border-color,box-shadow] duration-150"
+        style={{
+          background: 'var(--bg-primary)',
+          border: `1px solid ${engaged ? 'var(--border-active)' : 'var(--border)'}`,
+          boxShadow: engaged ? '0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent)' : undefined,
+        }}
+      >
+        <div className="flex items-center gap-2 py-1.5 pl-3 pr-1.5">
+          <label htmlFor={inputId} className="sr-only">
+            Check-in note for {developerName}
+          </label>
+          <input
+            id={inputId}
+            ref={inputRef}
+            type="text"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            data-task-shortcut="c"
+            placeholder="Add a check-in note…"
+            className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSubmit}
+            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
+            style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+            title="Save check-in (Enter)"
+          >
+            <CornerDownLeft size={12} aria-hidden="true" />
+            Save
+          </button>
+        </div>
+        {engaged && tasks.length > 0 && (
+          // Keep focus in the input while chips are clicked (Safari does not focus buttons on click).
+          <div
+            className="border-t px-3 py-2"
+            style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <TaskPicker tasks={tasks} text={text} selected={selectedKeys} onChange={setSelectedKeys} />
+          </div>
+        )}
+      </div>
+      {!engaged && <ShortcutLegend hints={shortcutHints} className="mt-2 hidden px-1 sm:flex" />}
+    </div>
+  );
+}
+
+// ── Layer behavior ──────────────────────────────────────────────────
+
+/**
+ * Modal behavior for the drawer, aware of what stacks above it: while any
+ * later modal layer is mounted (task detail, rationale dialog, capture
+ * dialog, command palette), Esc and Tab belong to that layer. On its own,
+ * the first Esc leaves a text field (keeping the draft) and the next closes;
+ * Tab cycles inside the panel; focus returns to the opener on close.
+ */
+function useDrawerLayer(panelRef: RefObject<HTMLElement>, active: boolean, onClose: () => void) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!active) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus({ preventScroll: true });
+
+    const covered = () => {
+      const panel = panelRef.current;
+      if (!panel) return true;
+      return Array.from(document.querySelectorAll('[aria-modal="true"]')).some(
+        (layer) => layer !== panel && Boolean(panel.compareDocumentPosition(layer) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+    };
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || covered()) return;
+      const panel = panelRef.current;
+      const focused = document.activeElement;
+      if (panel && focused instanceof HTMLElement && panel.contains(focused) && isEditable(focused)) {
+        focused.blur();
+        panel.focus({ preventScroll: true });
+        return;
+      }
+      onCloseRef.current();
+    };
+
+    const onTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      if (event.target instanceof Element && event.target.closest('[data-popover-layer]')) return;
+      const root = panelRef.current;
+      if (!root || covered()) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      ).filter((el) => el.offsetParent !== null && !el.closest('[aria-hidden="true"]'));
+      if (!focusables.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const current = document.activeElement as HTMLElement | null;
+      if (current === root) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
+      const inside = current !== null && root.contains(current);
+      if (event.shiftKey) {
+        if (!inside || current === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || current === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onEscape);
+    document.addEventListener('keydown', onTab, true);
+    return () => {
+      document.removeEventListener('keydown', onEscape);
+      document.removeEventListener('keydown', onTab, true);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [active, panelRef]);
+}
+
+// ── Manager follow-ups selection ────────────────────────────────────
 
 const managerFollowUpStatusRank: Record<ManagerDeskItem['status'], number> = {
   in_progress: 0,
@@ -671,6 +829,8 @@ function getDeveloperManagerFollowUps(items: ManagerDeskItem[], developerAccount
     });
 }
 
+// ── 1:1 ─────────────────────────────────────────────────────────────
+
 /** docs/48 §4.3: the drawer "1:1" section — next session, agenda count, and
  * a link into the workspace. Hidden entirely while the flag is off. */
 function OneOnOneSection({
@@ -699,59 +859,77 @@ function OneOnOneSectionBody({
   const createSeries = useCreateOneOnOneSeries();
 
   const overdue = (series?.nextSessionOverdueDays ?? 0) > 0;
+  const next = series?.nextSessionDate ? describePlanDate(series.nextSessionDate, 'open', getLocalIsoDate()) : null;
 
   return (
-    <DrawerSection title="1:1">
+    <DrawerSection
+      icon={<CalendarClock size={14} />}
+      title="1:1"
+      action={
+        series && onOpenWorkspace ? (
+          <button
+            type="button"
+            onClick={() => onOpenWorkspace(accountId)}
+            className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+            style={{ color: 'var(--accent)' }}
+            data-testid="one-on-one-open-workspace"
+          >
+            Open workspace
+            <ArrowUpRight size={13} />
+          </button>
+        ) : undefined
+      }
+    >
       {isLoading ? (
-        <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          Loading…
-        </div>
+        <EmptyLine>Loading…</EmptyLine>
       ) : series ? (
-        <div className="flex items-center gap-2 text-[13px]">
-          <div className="min-w-0 flex-1">
-            <div style={{ color: 'var(--text-secondary)' }}>
-              {series.nextSessionDate ? `Next: ${series.nextSessionDate}` : 'No session scheduled'}
-              {overdue && (
-                <span className="ml-1.5 text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
-                  overdue {series.nextSessionOverdueDays}d
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 text-[13px]">
+          <span style={{ color: 'var(--text-secondary)' }}>
+            {series.nextSessionDate ? (
+              <>
+                Next{' '}
+                <span className="font-medium" style={{ color: 'var(--text-primary)' }} title={series.nextSessionDate}>
+                  {next?.label ?? series.nextSessionDate}
                 </span>
-              )}
-            </div>
-            <div className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              {series.openAgendaCount} on agenda{series.active ? '' : ' · paused'}
-            </div>
-          </div>
-          {onOpenWorkspace && (
-            <button
-              type="button"
-              onClick={() => onOpenWorkspace(accountId)}
-              className="text-[12px] font-medium"
-              style={{ color: 'var(--accent)' }}
-              data-testid="one-on-one-open-workspace"
-            >
-              Open workspace
-            </button>
+              </>
+            ) : (
+              'No session scheduled'
+            )}
+          </span>
+          {overdue && (
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--danger)' }}>
+              overdue {series.nextSessionOverdueDays}d
+            </span>
           )}
+          <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>·</span>
+          <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+            {series.openAgendaCount} on agenda{series.active ? '' : ' · paused'}
+          </span>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() =>
-            createSeries.mutate(
-              { developerAccountId: accountId, cadence: 'weekly' },
-              {
-                onSuccess: () => onOpenWorkspace?.(accountId),
-                onError: (error) =>
-                  addToast(error instanceof Error ? error.message : 'Could not create the 1:1 series', 'error'),
-              },
-            )
-          }
-          disabled={createSeries.isPending}
-          className="rounded-lg px-3 py-1.5 text-[13px] font-medium disabled:opacity-50"
-          style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)' }}
-        >
-          {createSeries.isPending ? 'Starting…' : 'Start a 1:1 series'}
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
+          <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+            No recurring 1:1 yet.
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              createSeries.mutate(
+                { developerAccountId: accountId, cadence: 'weekly' },
+                {
+                  onSuccess: () => onOpenWorkspace?.(accountId),
+                  onError: (error) =>
+                    addToast(error instanceof Error ? error.message : 'Could not create the 1:1 series', 'error'),
+                },
+              )
+            }
+            disabled={createSeries.isPending}
+            className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-50 ${FOCUS_RING}`}
+            style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+          >
+            {createSeries.isPending ? 'Starting…' : 'Start a 1:1 series'}
+          </button>
+        </div>
       )}
     </DrawerSection>
   );

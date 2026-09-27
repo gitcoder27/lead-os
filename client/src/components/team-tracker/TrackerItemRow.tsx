@@ -7,8 +7,10 @@ import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { TrackerItemRowActions, type TrackerItemActionPreset } from './TrackerItemRowActions';
 import { TrackerItemRowDetails } from './TrackerItemRowDetails';
 import { RelatedIssueChips } from './RelatedIssueChips';
+import { TrackerDrawerItemRow, type TrackerDrawerItemRowProps, type TrackerDrawerItemVariant } from './TrackerDrawerItemRow';
+import { continuedDays } from './trackerItemFormat';
 
-type TrackerItemRowVariant = 'default' | 'drawer-planned';
+type TrackerItemRowVariant = 'default' | TrackerDrawerItemVariant;
 
 interface TrackerItemRowProps {
   item: TrackerWorkItem;
@@ -31,6 +33,9 @@ interface TrackerItemRowProps {
   readOnly?: boolean;
   /** Inline task-event composer (e.g. standup updates), rendered under the row. */
   composer?: ReactNode;
+  /** Drawer variants: zero-based queue position and a handle-only drag starter. */
+  index?: number;
+  onDragHandlePointerDown?: TrackerDrawerItemRowProps['onDragHandlePointerDown'];
 }
 
 const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }> = {
@@ -40,24 +45,16 @@ const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }>
   dropped: { icon: XCircle, color: 'var(--text-muted)' },
 };
 
-function localDayMs(isoDate: string): number | null {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  if (!year || !month || !day) {
-    return null;
+/** Developer-drawer variants render the drawer row grammar; everything else keeps the classic row. */
+export function TrackerItemRow(props: TrackerItemRowProps) {
+  const { variant = 'default' } = props;
+  if (variant !== 'default') {
+    return <TrackerDrawerItemRow {...props} variant={variant} />;
   }
-  return new Date(year, month - 1, day).getTime();
+  return <ClassicTrackerItemRow {...props} />;
 }
 
-function continuedDays(originDate: string, viewDate: string): number {
-  const origin = localDayMs(originDate);
-  const view = localDayMs(viewDate);
-  if (origin === null || view === null) {
-    return 0;
-  }
-  return Math.max(0, Math.round((view - origin) / 86_400_000));
-}
-
-export function TrackerItemRow({
+function ClassicTrackerItemRow({
   item,
   onOpen,
   onSetCurrent,
@@ -71,7 +68,6 @@ export function TrackerItemRow({
   canMoveDown = false,
   compact,
   draggable,
-  variant = 'default',
   showDetailsToggle = false,
   actionPreset = 'default',
   hideActions = false,
@@ -93,7 +89,6 @@ export function TrackerItemRow({
   const isActive = item.state === 'in_progress';
   const isDone = item.state === 'done' || item.state === 'dropped';
   const isLinked = !item.canonicalTask && Boolean(item.managerDeskItemId);
-  const isDrawerPlanned = variant === 'drawer-planned';
   const canOpen = Boolean(onOpen) && !titleEditing;
   const isTitleEditable = !readOnly && !compact && Boolean(onUpdateTitle) && !isDone && !isLinked && item.canRename !== false;
   const hasExplicitTitleEditAction = isTitleEditable && Boolean(onOpen);
@@ -118,15 +113,9 @@ export function TrackerItemRow({
   return (
     <div
       data-task-key={item.taskKey ?? undefined}
-      className={`group relative flex items-center gap-2.5 rounded-xl transition-colors ${canOpen ? 'cursor-pointer' : ''} ${
-        isDrawerPlanned ? 'px-3 py-2.5' : 'px-2 py-1.5'
-      }`}
+      className={`group relative flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors ${canOpen ? 'cursor-pointer' : ''}`}
       style={{
-        background: isActive
-          ? 'rgba(6, 182, 212, 0.08)'
-          : isDrawerPlanned
-            ? 'color-mix(in srgb, var(--bg-tertiary) 36%, transparent)'
-            : 'transparent',
+        background: isActive ? 'rgba(6, 182, 212, 0.08)' : 'transparent',
         borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
       }}
       onClick={canOpen ? (event) => {
@@ -204,7 +193,7 @@ export function TrackerItemRow({
                 title={item.title}
               >
                 <span
-                  className={`block truncate text-[13px] hover:underline ${isDrawerPlanned ? 'font-medium' : ''}`}
+                  className="block truncate text-[13px] hover:underline"
                   style={{ color: 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}
                 >
                   {item.title}
@@ -212,7 +201,7 @@ export function TrackerItemRow({
               </button>
             ) : (
               <span
-                className={`block truncate text-[13px] ${isDrawerPlanned ? 'font-medium' : ''}`}
+                className="block truncate text-[13px]"
                 style={{ color: isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}
                 title={item.title}
               >
@@ -244,43 +233,29 @@ export function TrackerItemRow({
         </div>
 
         {item.jiraKey && (
-          isDrawerPlanned ? (
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
-              <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-[12px] truncate" style={{ color: 'var(--accent)' }}>
-                {item.jiraKey}
-              </JiraIssueLink>
-              <RelatedIssueChips issueKeys={item.relatedIssueKeys} compact />
-            </div>
-          ) : (
-            <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-              <span className="text-[12px] font-semibold uppercase shrink-0" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
-                Jira
-              </span>
-              <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-[12px] truncate" style={{ color: 'var(--accent)' }}>
-                {jiraLabel}
-              </JiraIssueLink>
-            </div>
-          )
+          <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
+            <span className="text-[12px] font-semibold uppercase shrink-0" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+              Jira
+            </span>
+            <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-[12px] truncate" style={{ color: 'var(--accent)' }}>
+              {jiraLabel}
+            </JiraIssueLink>
+          </div>
         )}
-        {!isDrawerPlanned && (
-          <RelatedIssueChips
-            issueKeys={item.relatedIssueKeys}
-            muted={isDone}
-            compact={compact}
-            className="mt-1"
-          />
-        )}
-        {isDrawerPlanned && !item.jiraKey && (
-          <RelatedIssueChips issueKeys={item.relatedIssueKeys} compact className="mt-0.5" />
-        )}
-        {jiraMeta && !isDrawerPlanned && (
+        <RelatedIssueChips
+          issueKeys={item.relatedIssueKeys}
+          muted={isDone}
+          compact={compact}
+          className="mt-1"
+        />
+        {jiraMeta && (
           <div className="mt-0.5">
             <span className="text-[12px]" style={{ color: item.jiraPriorityName ? priorityColor(item.jiraPriorityName) : 'var(--text-muted)' }}>
               {jiraMeta}
             </span>
           </div>
         )}
-        {isLinked && !compact && !isDrawerPlanned && (
+        {isLinked && !compact && (
           <div className="mt-0.5">
             <span
               className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
@@ -326,7 +301,7 @@ export function TrackerItemRow({
           <div className="mt-1 flex items-start gap-1.5">
             <StickyNote size={12} className="shrink-0 mt-[2px]" style={{ color: 'var(--text-muted)' }} />
             <span
-              className={`text-[13px] leading-5 ${isDrawerPlanned ? 'line-clamp-2' : ''}`}
+              className="text-[13px] leading-5"
               style={{ color: 'var(--text-secondary)' }}
             >
               {item.note}

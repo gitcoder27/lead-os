@@ -1,4 +1,6 @@
-import { CheckCircle2, GripVertical, PencilLine, Play, XCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Check, CheckCircle2, GripVertical, PencilLine, Play, XCircle } from 'lucide-react';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import type { TrackerItemState } from '@/types';
 
 export type TrackerItemActionPreset = 'default' | 'none' | 'hover-start' | 'hover-done';
@@ -42,24 +44,39 @@ export function TrackerItemRowActions({
   const hoverDone = actionPreset === 'hover-done';
   const hoverPrimaryOnly = hoverStart || hoverDone;
 
+  if (hoverPrimaryOnly) {
+    // Drawer rows: a floating mini-toolbar that surfaces on hover/focus (and
+    // stays put on touch screens), so the list reads as text until needed.
+    return (
+      <div
+        className="pointer-events-none absolute right-1.5 top-1.5 z-[2] flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--soft-shadow)' }}
+      >
+        {onToggleTitleEditor && (
+          <ToolbarButton
+            label={`Edit title: ${itemTitle}`}
+            onClick={onToggleTitleEditor}
+          >
+            <PencilLine size={13} style={{ color: 'var(--text-secondary)' }} />
+          </ToolbarButton>
+        )}
+        {hoverStart && itemState !== 'in_progress' && onSetCurrent && (
+          <ToolbarButton label={`Start ${itemTitle}`} title="Start — make this current work" onClick={() => onSetCurrent(itemId)}>
+            <Play size={13} style={{ color: 'var(--accent)' }} />
+          </ToolbarButton>
+        )}
+        {hoverDone && onMarkDone && (
+          <ToolbarButton label={`Mark ${itemTitle} done`} title="Mark done" onClick={() => onMarkDone(itemId)}>
+            <Check size={14} style={{ color: 'var(--success)' }} />
+          </ToolbarButton>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={
-        hoverPrimaryOnly
-          ? 'pointer-events-none absolute right-1.5 top-1/2 z-[1] flex -translate-y-1/2 translate-x-2 items-center gap-1.5 opacity-0 transition-all group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100'
-          : 'flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100'
-      }
-      style={
-        hoverPrimaryOnly
-          ? {
-              background:
-                'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--bg-secondary) 24%, transparent) 24%, var(--bg-secondary) 100%)',
-              padding: '0.25rem 0.25rem 0.25rem 1.25rem',
-            }
-          : undefined
-      }
-    >
-      {!hoverPrimaryOnly && !draggable && itemState === 'planned' && onMoveUp && (
+    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+      {!draggable && itemState === 'planned' && onMoveUp && (
         <button
           onClick={(event) => {
             event.stopPropagation();
@@ -73,7 +90,7 @@ export function TrackerItemRowActions({
           <GripVertical size={10} style={{ color: 'var(--text-secondary)' }} />
         </button>
       )}
-      {!hoverPrimaryOnly && !draggable && itemState === 'planned' && onMoveDown && (
+      {!draggable && itemState === 'planned' && onMoveDown && (
         <button
           onClick={(event) => {
             event.stopPropagation();
@@ -93,71 +110,28 @@ export function TrackerItemRowActions({
             event.stopPropagation();
             onToggleTitleEditor();
           }}
-          className={
-            hoverPrimaryOnly
-              ? 'flex h-8 w-8 items-center justify-center rounded-lg border transition-all hover:scale-[1.04] active:scale-[0.97]'
-              : 'h-6 w-6 rounded-md flex items-center justify-center transition-colors'
-          }
-          style={
-            hoverPrimaryOnly
-              ? {
-                  background: 'color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-tertiary) 10%)',
-                  borderColor: 'color-mix(in srgb, var(--border-strong) 70%, transparent)',
-                  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.12)',
-                }
-              : { background: 'var(--bg-tertiary)' }
-          }
+          className="h-6 w-6 rounded-md flex items-center justify-center transition-colors"
+          style={{ background: 'var(--bg-tertiary)' }}
           title={`Edit title: ${itemTitle}`}
           aria-label={`Edit title: ${itemTitle}`}
         >
-          <PencilLine size={12} style={{ color: hoverPrimaryOnly ? 'var(--text-primary)' : 'var(--text-secondary)' }} />
+          <PencilLine size={12} style={{ color: 'var(--text-secondary)' }} />
         </button>
       )}
-      {itemState !== 'in_progress' && onSetCurrent && !hoverDone && (
+      {itemState !== 'in_progress' && onSetCurrent && (
         <button
           onClick={(event) => {
             event.stopPropagation();
             onSetCurrent(itemId);
           }}
-          className={
-            hoverStart
-              ? 'flex h-8 w-8 items-center justify-center rounded-lg border transition-all hover:scale-[1.04] active:scale-[0.97]'
-              : 'h-6 w-6 rounded-md flex items-center justify-center transition-colors'
-          }
-          style={
-            hoverStart
-              ? {
-                  background: 'color-mix(in srgb, var(--accent-glow) 82%, var(--bg-secondary) 18%)',
-                  borderColor: 'color-mix(in srgb, var(--accent) 24%, transparent)',
-                  boxShadow: '0 8px 18px rgba(6, 182, 212, 0.18)',
-                }
-              : { background: 'var(--bg-tertiary)' }
-          }
-          title={hoverStart ? `Start ${itemTitle}` : 'Set as current'}
-          aria-label={hoverStart ? `Start ${itemTitle}` : undefined}
+          className="h-6 w-6 rounded-md flex items-center justify-center transition-colors"
+          style={{ background: 'var(--bg-tertiary)' }}
+          title="Set as current"
         >
           <Play size={12} style={{ color: 'var(--accent)' }} />
         </button>
       )}
-      {hoverDone && onMarkDone && (
-        <button
-          onClick={(event) => {
-            event.stopPropagation();
-            onMarkDone(itemId);
-          }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all hover:scale-[1.04] active:scale-[0.97]"
-          style={{
-            background: 'color-mix(in srgb, rgba(16,185,129,0.2) 82%, var(--bg-secondary) 18%)',
-            borderColor: 'rgba(16, 185, 129, 0.28)',
-            boxShadow: '0 8px 18px rgba(16, 185, 129, 0.16)',
-          }}
-          title={`Mark ${itemTitle} done`}
-          aria-label={`Mark ${itemTitle} done`}
-        >
-          <CheckCircle2 size={13} style={{ color: 'var(--success)' }} />
-        </button>
-      )}
-      {!hoverPrimaryOnly && onMarkDone && (
+      {onMarkDone && (
         <button
           onClick={(event) => {
             event.stopPropagation();
@@ -170,7 +144,7 @@ export function TrackerItemRowActions({
           <CheckCircle2 size={10} style={{ color: 'var(--success)' }} />
         </button>
       )}
-      {!hoverPrimaryOnly && onDrop && (
+      {onDrop && (
         <button
           onClick={(event) => {
             event.stopPropagation();
@@ -184,5 +158,22 @@ export function TrackerItemRowActions({
         </button>
       )}
     </div>
+  );
+}
+
+function ToolbarButton({ label, title, onClick, children }: { label: string; title?: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      title={title ?? label}
+      aria-label={label}
+    >
+      {children}
+    </button>
   );
 }

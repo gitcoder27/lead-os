@@ -1,8 +1,9 @@
-import { Briefcase, Check, Loader2 } from 'lucide-react';
+import { Briefcase, Check, Plus } from 'lucide-react';
 import type { TrackerDeveloperDay } from '@/types';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { DrawerSection } from './DeveloperDrawerSections';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { DrawerSection, EmptyLine } from './DeveloperDrawerSections';
 
 interface ManagerFollowUpRowProps {
   day: TrackerDeveloperDay;
@@ -22,14 +23,14 @@ const managerDeskStatusLabels: Record<ManagerDeskItem['status'], string> = {
   cancelled: 'Cancelled',
 };
 
-const managerDeskStatusStyles: Record<ManagerDeskItem['status'], { color: string; background: string; border: string }> = {
-  inbox: { color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', border: 'var(--border)' },
-  planned: { color: 'var(--md-accent)', background: 'rgba(217,169,78,0.10)', border: 'rgba(217,169,78,0.18)' },
-  in_progress: { color: 'var(--accent)', background: 'var(--accent-glow)', border: 'color-mix(in srgb, var(--accent) 20%, transparent)' },
-  waiting: { color: 'var(--info)', background: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.20)' },
-  backlog: { color: 'var(--text-secondary)', background: 'var(--bg-tertiary)', border: 'var(--border)' },
-  done: { color: 'var(--success)', background: 'rgba(16,185,129,0.10)', border: 'rgba(16,185,129,0.20)' },
-  cancelled: { color: 'var(--text-muted)', background: 'var(--bg-tertiary)', border: 'var(--border)' },
+const managerDeskStatusColors: Record<ManagerDeskItem['status'], string> = {
+  inbox: 'var(--text-muted)',
+  planned: 'var(--md-accent)',
+  in_progress: 'var(--accent)',
+  waiting: 'var(--info)',
+  backlog: 'var(--text-muted)',
+  done: 'var(--success)',
+  cancelled: 'var(--text-muted)',
 };
 
 function getManagerFollowUpMeta(item: ManagerDeskItem) {
@@ -40,125 +41,119 @@ function getManagerFollowUpMeta(item: ManagerDeskItem) {
   };
 }
 
-function EmptyManagerFollowUp({ day }: { day: TrackerDeveloperDay }) {
-  return (
-    <div
-      className="flex items-center gap-3 rounded-2xl px-4 py-3"
-      style={{
-        background: 'color-mix(in srgb, var(--md-accent) 8%, transparent)',
-      }}
-    >
-      <Briefcase size={15} className="shrink-0" style={{ color: 'var(--md-accent)' }} />
-      <div className="min-w-0 text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
-        <span>Private follow-up linked to {day.developer.displayName}</span>
-        {day.currentItem?.jiraKey && (
-          <>
-            <span> · Current: </span>
-            <JiraIssueLink issueKey={day.currentItem.jiraKey} style={{ color: 'var(--text-primary)' }}>
-              {day.currentItem.jiraKey}
-            </JiraIssueLink>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function ManagerFollowUpItem({ item, onComplete }: { item: ManagerDeskItem; onComplete: (itemId: number) => void }) {
-  const statusStyle = managerDeskStatusStyles[item.status];
   const meta = getManagerFollowUpMeta(item);
   const isDone = item.status === 'done';
 
   return (
-    <div
-      className="group flex items-start gap-3 rounded-2xl px-4 py-3 transition-colors"
-      style={{
-        background: isDone
-          ? 'color-mix(in srgb, var(--bg-tertiary) 28%, transparent)'
-          : 'color-mix(in srgb, var(--md-accent) 8%, transparent)',
-      }}
-    >
-      <Briefcase size={15} className="mt-0.5 shrink-0" style={{ color: isDone ? 'var(--success)' : 'var(--md-accent)' }} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
+    <li className="group flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)]">
+      {isDone ? (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full" style={{ background: 'var(--success)', color: 'var(--bg-primary)' }}>
+            <Check size={11} strokeWidth={3} />
+          </span>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onComplete(item.id)}
+          className={`group/check flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${FOCUS_RING}`}
+          aria-label={`Mark ${item.title} complete`}
+          title="Mark complete"
+        >
           <span
-            className="truncate text-[13px] font-semibold"
+            className="flex h-4 w-4 items-center justify-center rounded-full transition-colors group-hover/check:border-[var(--success)] group-hover/check:text-[var(--success)]"
+            style={{ border: '1.5px solid var(--border-strong)', color: 'transparent' }}
+          >
+            <Check size={10} strokeWidth={3} />
+          </span>
+        </button>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span
+            className="truncate text-[13.5px] font-medium leading-5"
             style={{
-              color: isDone ? 'var(--text-secondary)' : 'var(--text-primary)',
+              color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
               textDecoration: isDone ? 'line-through' : undefined,
             }}
+            title={item.title}
           >
             {item.title}
           </span>
-          <span
-            className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase"
-            style={{
-              color: statusStyle.color,
-              background: statusStyle.background,
-              letterSpacing: '0.04em',
-            }}
-          >
+          <span className="shrink-0 text-[11.5px] font-medium" style={{ color: managerDeskStatusColors[item.status] }}>
             {managerDeskStatusLabels[item.status]}
           </span>
         </div>
         {(meta.issueKey || meta.subtitle) && (
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] leading-[18px]" style={{ color: 'var(--text-muted)' }}>
             {meta.issueKey && (
-              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0" style={{ color: 'var(--accent)' }}>
+              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0 font-mono text-[11.5px] font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
                 {meta.issueKey}
               </JiraIssueLink>
             )}
-            {meta.issueKey && meta.subtitle && <span>·</span>}
-            {meta.subtitle && <span className="truncate">{meta.subtitle}</span>}
+            {meta.issueKey && meta.subtitle && <span aria-hidden="true" className="opacity-60">·</span>}
+            {meta.subtitle && <span className="truncate" title={meta.subtitle}>{meta.subtitle}</span>}
           </div>
         )}
       </div>
-      {!isDone && (
-        <button
-          type="button"
-          onClick={() => onComplete(item.id)}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl opacity-80 transition-all hover:opacity-100"
-          style={{ color: 'var(--success)', background: 'rgba(16,185,129,0.10)' }}
-          aria-label={`Mark ${item.title} complete`}
-          title="Mark complete"
-        >
-          <Check size={13} />
-        </button>
-      )}
-    </div>
+    </li>
   );
 }
 
 export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCapture }: ManagerFollowUpRowProps) {
+  const openCount = items.filter((item) => item.status !== 'done').length;
+  const firstName = day.developer.displayName.split(' ')[0] ?? day.developer.displayName;
+
   return (
     <DrawerSection
-      title="Manager follow-up"
-      count={items.length}
+      icon={<Briefcase size={14} style={{ color: 'var(--md-accent)' }} />}
+      title="Follow-ups"
+      count={items.length > 0 ? openCount : undefined}
+      hint="Private"
       action={
         <button
           type="button"
           onClick={onCapture}
-          className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors"
-          style={{ color: 'var(--md-accent)', background: 'rgba(217,169,78,0.10)' }}
+          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--md-accent-glow)] ${FOCUS_RING}`}
+          style={{ color: 'var(--md-accent)' }}
+          title={`Capture a private follow-up linked to ${day.developer.displayName}`}
         >
+          <Plus size={13} />
           Capture
         </button>
       }
     >
-      <div className="space-y-2">
-        {isLoading && (
-          <div className="flex items-center gap-2 rounded-2xl px-4 py-3 text-[13px]" style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 36%, transparent)' }}>
-            <Loader2 size={13} className="animate-spin" />
-            Loading follow-ups
-          </div>
-        )}
-
-        {!isLoading && items.length === 0 && <EmptyManagerFollowUp day={day} />}
-
-        {items.map((item) => (
-          <ManagerFollowUpItem key={item.id} item={item} onComplete={onComplete} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="space-y-2 px-2 py-1.5" aria-busy="true">
+          {[0, 1].map((index) => (
+            <div key={index} className="flex items-center gap-2.5">
+              <span className="h-4 w-4 animate-pulse rounded-full" style={{ background: 'var(--bg-tertiary)' }} />
+              <span className="h-2.5 animate-pulse rounded" style={{ width: `${55 - index * 15}%`, background: 'var(--bg-tertiary)' }} />
+            </div>
+          ))}
+          <span className="sr-only">Loading follow-ups</span>
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyLine>
+          Nothing open for {firstName}. Captures here stay linked to them on your Desk
+          {day.currentItem?.jiraKey && (
+            <>
+              {' '}with{' '}
+              <JiraIssueLink issueKey={day.currentItem.jiraKey} className="font-mono hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                {day.currentItem.jiraKey}
+              </JiraIssueLink>
+            </>
+          )}
+          .
+        </EmptyLine>
+      ) : (
+        <ul className="space-y-0.5">
+          {items.map((item) => (
+            <ManagerFollowUpItem key={item.id} item={item} onComplete={onComplete} />
+          ))}
+        </ul>
+      )}
     </DrawerSection>
   );
 }

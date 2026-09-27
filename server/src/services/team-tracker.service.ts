@@ -31,6 +31,10 @@ import type {
   MyDayViewMode,
   StandupFeedEntry,
   StandupFeedResponse,
+  StandupSessionRecord,
+  StandupSessionLogEntry,
+  RecordStandupSessionResponse,
+  LatestStandupSessionResponse,
 } from "shared/types";
 import { db } from "../db/connection";
 import {
@@ -44,6 +48,7 @@ import {
   checkinTaskRefs,
   developerNotes,
   dayFocus,
+  standupSessions,
 } from "../db/schema";
 import { getEffectiveDueDate } from "./issue-rules";
 import { HttpError } from "../middleware/errorHandler";
@@ -206,6 +211,26 @@ function resolveTrackerIssueKeys(params: {
     jiraKey,
     relatedIssueKeys,
     allIssueKeys: jiraKey ? [jiraKey, ...relatedIssueKeys] : relatedIssueKeys,
+  };
+}
+
+/** docs/50 S6: lift the status transition / blocker action out of event meta for the standup feed. */
+function standupFeedMetaFields(type: string, metaJson: string | null): Partial<StandupFeedEntry> {
+  if (!metaJson || (type !== "status" && type !== "blocker")) return {};
+  let meta: Record<string, unknown>;
+  try {
+    meta = JSON.parse(metaJson) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+  if (type === "blocker") {
+    return meta.action === "raised" || meta.action === "cleared" ? { blockerAction: meta.action } : {};
+  }
+  if (meta.domain !== "task_status" || typeof meta.to !== "string") return {};
+  return {
+    statusFrom: typeof meta.from === "string" ? meta.from : null,
+    statusTo: meta.to,
+    ...(typeof meta.reason === "string" && { statusReason: meta.reason }),
   };
 }
 
@@ -1288,17 +1313,140 @@ export class TeamTrackerService {
   }
 
   /**
-   * Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed for one developer —
-   * shared task events on their owned tasks plus check-ins on their days.
-   * Window: last 24h, or 72h when today is Monday (covers the weekend).
+   * docs/50 v2: seal one standup round — one durable row anchoring the next
+   * feed window, plus a real follow-up task per flagged person (session flags
+   * become durable work instead of dying with the tab). Idempotent on
+   * requestId: a retry after a lost response returns the sealed session
+   * without duplicating tasks.
    */
-  async getStandupFeed(developerAccountId: string, workspaceId?: string): Promise<StandupFeedResponse> {
+  async recordStandupSession(
+    managerAccountId: string,
+    input: {
+      date: string;
+      startedAt: string;
+      reviewed: string[];
+      flagged: string[];
+      log: { accountId: string; kind: string; taskKey?: string; detail?: string; at: string }[];
+      summary: string;
+      requestId: string;
+    },
+    workspaceId?: string,
+  ): Promise<RecordStandupSessionResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    await this.taskKeys.assertPhase3Enabled(scope);
+    const existing = (await db.select().from(standupSessions).where(and(
+      eq(standupSessions.workspaceId, scope),
+      eq(standupSessions.managerAccountId, managerAccountId),
+      eq(standupSessions.requestId, input.requestId),
+    )).limit(1))[0];
+    if (existing) return { session: this.toSessionRecord(existing), followUps: [] };
+    const now = new Date().toISOString();
+    const principal: TaskPrincipal = { type: "manager", accountId: managerAccountId, workspaceId: scope };
+    return runInTransaction(async () => {
+      const row = (await db.insert(standupSessions).values({
+        workspaceId: scope,
+        managerAccountId,
+        date: input.date,
+        startedAt: input.startedAt,
+        endedAt: now,
+        reviewedJson: JSON.stringify(input.reviewed),
+        flaggedJson: JSON.stringify(input.flagged),
+        logJson: JSON.stringify(input.log),
+        summary: input.summary,
+        requestId: input.requestId,
+        createdAt: now,
+      }).returning())[0]!;
+      const followUps: RecordStandupSessionResponse["followUps"] = [];
+      for (const accountId of input.flagged) {
+        // A stale/unknown flagged id must not block sealing the round.
+        try {
+          const dev = await this.getDeveloperByAccountId(accountId, scope);
+          const task = await this.tasks.create(
+            { title: `Standup follow-up: ${dev.displayName}`, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"] },
+            principal,
+          );
+          followUps.push({ accountId, taskKey: task.taskKey });
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 404) continue;
+          throw error;
+        }
+      }
+      return { session: this.toSessionRecord(row), followUps };
+    });
+  }
+
+  /**
+   * docs/50 v2: the manager's most recent sealed standup — powers the
+   * "previous round" recall view inside standup mode.
+   */
+  async latestStandupSession(managerAccountId: string, workspaceId?: string): Promise<LatestStandupSessionResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    await this.taskKeys.assertPhase3Enabled(scope);
+    const row = (await db
+      .select()
+      .from(standupSessions)
+      .where(and(eq(standupSessions.workspaceId, scope), eq(standupSessions.managerAccountId, managerAccountId)))
+      .orderBy(desc(standupSessions.endedAt), desc(standupSessions.id))
+      .limit(1))[0];
+    if (!row) return { session: null };
+    let log: StandupSessionLogEntry[] = [];
+    try {
+      const parsed = JSON.parse(row.logJson) as unknown;
+      if (Array.isArray(parsed)) log = parsed as StandupSessionLogEntry[];
+    } catch { /* tolerate corrupt JSON — the record still reads */ }
+    return { session: { ...this.toSessionRecord(row), log } };
+  }
+
+  private toSessionRecord(row: typeof standupSessions.$inferSelect): StandupSessionRecord {
+    const parseIds = (raw: string): string[] => {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+      } catch {
+        return [];
+      }
+    };
+    return {
+      id: row.id,
+      date: row.date,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      reviewed: parseIds(row.reviewedJson),
+      flagged: parseIds(row.flaggedJson),
+      summary: row.summary,
+      createdAt: row.createdAt,
+    };
+  }
+
+  /** Latest sealed standup for this manager — anchors the feed window (docs/50 v2). */
+  private async latestEndedStandupSessionAt(managerAccountId: string, scope: string): Promise<string | null> {
+    const row = (await db
+      .select({ endedAt: standupSessions.endedAt })
+      .from(standupSessions)
+      .where(and(eq(standupSessions.workspaceId, scope), eq(standupSessions.managerAccountId, managerAccountId)))
+      .orderBy(desc(standupSessions.endedAt), desc(standupSessions.id))
+      .limit(1))[0];
+    return row?.endedAt ?? null;
+  }
+
+  /**
+   * Phase 3 (P3-D5/D6, §6.1) + docs/50 v2: standup feed for one developer —
+   * shared task events on their owned tasks plus check-ins on their days.
+   * Window: the manager's last sealed standup when one exists; otherwise a
+   * rolling 24h fallback (72h when today is Monday, covering the weekend).
+   */
+  async getStandupFeed(developerAccountId: string, managerAccountId: string, workspaceId?: string): Promise<StandupFeedResponse> {
     const scope = normalizeWorkspaceId(workspaceId);
     await this.taskKeys.assertPhase3Enabled(scope);
     await this.getDeveloperByAccountId(developerAccountId, scope);
+    const lastEnd = await this.latestEndedStandupSessionAt(managerAccountId, scope);
+    const anchored = lastEnd && !Number.isNaN(Date.parse(lastEnd)) ? new Date(lastEnd) : null;
     const isMonday = new Date(`${todayIsoDate()}T12:00:00`).getDay() === 1;
-    const windowHours = isMonday ? 72 : 24;
-    const windowStart = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const fallbackStart = new Date(Date.now() - (isMonday ? 72 : 24) * 60 * 60 * 1000);
+    // A future-dated seal (clock skew) falls back rather than emptying the feed.
+    const start = anchored && anchored.getTime() <= Date.now() ? anchored : fallbackStart;
+    const windowStart = start.toISOString();
+    const windowHours = Math.max(1, Math.round((Date.now() - start.getTime()) / (60 * 60 * 1000)));
     const [eventRows, checkInRows] = await Promise.all([
       this.eventsService.feedForOwner(developerAccountId, windowStart, scope),
       db.select({ checkIn: teamTrackerCheckIns })
@@ -1321,6 +1469,7 @@ export class TeamTrackerService {
         type: row.type as StandupFeedEntry["type"],
         body: row.body,
         authorType: row.authorType as StandupFeedEntry["authorType"],
+        ...standupFeedMetaFields(row.type, row.metaJson),
       })),
       ...checkInRows.map((row): StandupFeedEntry => ({
         id: `checkin:${row.checkIn.id}`,
@@ -1329,7 +1478,7 @@ export class TeamTrackerService {
         summary: row.checkIn.summary,
       })),
     ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
-    return { entries, windowStart, windowHours };
+    return { entries, windowStart, windowHours, anchoredToSession: Boolean(anchored) };
   }
 
   async updateAvailability(

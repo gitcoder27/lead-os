@@ -1166,13 +1166,84 @@ export interface StandupFeedEntry {
   authorType?: TaskEvent["author"]["type"];
   /** Check-in summary text (kind === "checkin"). */
   summary?: string;
+  /** docs/50 S6: task-status transition for `status` events. */
+  statusFrom?: string | null;
+  statusTo?: string;
+  statusReason?: string;
+  /** docs/50 S6: `blocker` events — raised or cleared. */
+  blockerAction?: "raised" | "cleared";
 }
 
 export interface StandupFeedResponse {
   entries: StandupFeedEntry[];
-  /** ISO timestamp the feed starts at (rolling 24h; 72h on Mondays). */
+  /** ISO timestamp the feed starts at — the manager's last ended standup
+   *  session when one exists, else a rolling 24h window (72h on Mondays). */
   windowStart: string;
   windowHours: number;
+  /** True when windowStart is a real sealed standup, not the rolling fallback. */
+  anchoredToSession?: boolean;
+}
+
+// ── Sealed standup sessions (docs/50 v2) ──────────────────────────────────
+
+export type StandupLogKind =
+  | "update"
+  | "checkin"
+  | "status"
+  | "current"
+  | "done"
+  | "blocked"
+  | "reassign"
+  | "added";
+
+/** One entry in the client session log, sent on seal. */
+export interface StandupSessionLogEntry {
+  accountId: string;
+  kind: StandupLogKind;
+  taskKey?: string;
+  detail?: string;
+  at: string;
+}
+
+/** `POST /api/team-tracker/standup/session` — seals one standup round. */
+export interface RecordStandupSessionRequest {
+  /** Local YYYY-MM-DD of the standup day (client-resolved). */
+  date: string;
+  /** ISO timestamp of the first session action (≈ session start). */
+  startedAt: string;
+  reviewed: string[];
+  flagged: string[];
+  log: StandupSessionLogEntry[];
+  /** Pre-rendered markdown summary shown in the wrap-up. */
+  summary: string;
+  /** Idempotency key — retries return the already-sealed session. */
+  requestId: string;
+}
+
+export interface StandupSessionRecord {
+  id: number;
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  reviewed: string[];
+  flagged: string[];
+  summary: string;
+  createdAt: string;
+}
+
+export interface RecordStandupSessionResponse {
+  session: StandupSessionRecord;
+  /** Follow-up tasks created for flagged people: accountId → taskKey. */
+  followUps: { accountId: string; taskKey: string }[];
+}
+
+/** A sealed session with its parsed log — `GET /standup/session/latest`. */
+export interface StandupSessionDetail extends StandupSessionRecord {
+  log: StandupSessionLogEntry[];
+}
+
+export interface LatestStandupSessionResponse {
+  session: StandupSessionDetail | null;
 }
 
 export interface MyDayResponse {

@@ -35,6 +35,8 @@ interface TaskUpdateComposerProps {
   /** Registers expand/focus/privacy handles so a parent can drive this composer. */
   registerComposer?: (api: { expand: () => void; focus: () => void; togglePrivate: () => void } | null) => void;
   autoFocus?: boolean;
+  /** Fires after an event posts successfully (standup session log, docs/50). */
+  onPosted?: (event: { type: ManagerEventType | DeveloperEventType; private: boolean }) => void;
 }
 
 export function TaskUpdateComposer({
@@ -48,6 +50,7 @@ export function TaskUpdateComposer({
   onArrowNav,
   registerComposer,
   autoFocus,
+  onPosted,
 }: TaskUpdateComposerProps) {
   const { addToast } = useToast();
   const [draft, setDraft] = useState('');
@@ -90,7 +93,9 @@ export function TaskUpdateComposer({
     }
     const requestId = requestIdRef.current;
     const onError = (err: Error) => addToast(err.message, 'error');
+    const posted = { type, private: isPrivate };
     const onSuccess = () => {
+      onPosted?.(posted);
       setDraft('');
       setType('update');
       setBlockerAction('raised');

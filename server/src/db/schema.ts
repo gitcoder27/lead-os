@@ -222,6 +222,29 @@ export const teamTrackerSavedViews = sqliteTable("team_tracker_saved_views", {
   uniqueIndex("idx_tracker_saved_views_workspace_manager_name").on(table.workspaceId, table.managerAccountId, table.name),
 ]);
 
+/**
+ * docs/50 v2: one sealed row per completed standup round. The ended_at of the
+ * latest row anchors the "since last standup" feed window; reviewed/flagged/log
+ * are JSON snapshots of the client session at seal time.
+ */
+export const standupSessions = sqliteTable("standup_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  date: text("date").notNull(),
+  startedAt: text("started_at").notNull(),
+  endedAt: text("ended_at").notNull(),
+  reviewedJson: text("reviewed_json").notNull().default("[]"),
+  flaggedJson: text("flagged_json").notNull().default("[]"),
+  logJson: text("log_json").notNull().default("[]"),
+  summary: text("summary").notNull().default(""),
+  requestId: text("request_id"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_standup_sessions_manager_end").on(table.workspaceId, table.managerAccountId, table.endedAt),
+  uniqueIndex("idx_standup_sessions_request").on(table.workspaceId, table.managerAccountId, table.requestId),
+]);
+
 export const workSavedViews = sqliteTable("work_saved_views", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id").notNull().default("default"),

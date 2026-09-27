@@ -9,6 +9,7 @@ import type {
   TrackerCarryForwardContextResponse,
   TrackerCarryForwardPreviewResponse,
   StandupFeedResponse,
+  LatestStandupSessionResponse,
 } from '@/types';
 
 interface TrackerIssueAssignmentsResponse {
@@ -62,6 +63,16 @@ export function useStandupFeed(accountId: string | undefined, enabled = true) {
     queryKey: ['team-tracker', 'standup-feed', accountId, authScopeKey],
     queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?accountId=${encodeURIComponent(accountId!)}`),
     enabled: enabled && Boolean(accountId),
+  });
+}
+
+/** docs/50 v2: the manager's most recent sealed standup — "previous round" recall. */
+export function useLatestStandupSession(enabled = true) {
+  const authScopeKey = useAuthScopeKey();
+  return useQuery<LatestStandupSessionResponse>({
+    queryKey: ['team-tracker', 'standup-session', 'latest', authScopeKey],
+    queryFn: () => api.get<LatestStandupSessionResponse>('/team-tracker/standup/session/latest'),
+    enabled,
   });
 }
 

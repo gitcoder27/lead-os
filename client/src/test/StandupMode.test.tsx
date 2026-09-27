@@ -18,6 +18,16 @@ const mockAddTaskEventMutate = vi.fn();
 const mockAddToast = vi.fn();
 const mockOnClose = vi.fn();
 const mockOnOpenTask = vi.fn();
+const mockApiPost = vi.fn((_url: string, _body?: unknown) =>
+  Promise.resolve({ session: { id: 1 }, followUps: [] }),
+);
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    post: (url: string, body?: unknown) => mockApiPost(url, body),
+    get: () => Promise.resolve({}),
+  },
+}));
 
 let mockFeed: StandupFeedResponse = {
   entries: [
@@ -42,8 +52,11 @@ let mockFeed: StandupFeedResponse = {
   windowHours: 24,
 };
 
+let mockLastSession: import('@/types').StandupSessionDetail | null = null;
+
 vi.mock('@/hooks/useTeamTracker', () => ({
   useStandupFeed: () => ({ data: mockFeed, isLoading: false, isError: false }),
+  useLatestStandupSession: () => ({ data: { session: mockLastSession }, isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 
 vi.mock('@/hooks/useTeamTrackerMutations', () => ({
@@ -213,6 +226,7 @@ function taskRows() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
 });
 
 describe('StandupMode', () => {
@@ -220,8 +234,9 @@ describe('StandupMode', () => {
     renderStandup();
     expect(screen.getByTestId('standup-mode')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Standup' })).toBeInTheDocument();
-    expect(screen.getByText('Ship migration')).toBeInTheDocument();
-    expect(screen.getByText('Stuck migration')).toBeInTheDocument();
+    const tasks = screen.getByRole('listbox', { name: "Alice Smith's tasks" });
+    expect(within(tasks).getByText('Ship migration')).toBeInTheDocument();
+    expect(within(tasks).getByText('Stuck migration')).toBeInTheDocument();
     // Feed mixes events and check-ins.
     expect(screen.getByText('Wrapped the retry path')).toBeInTheDocument();
     expect(screen.getByText('Yesterday: migration, today: reviews')).toBeInTheDocument();
@@ -265,6 +280,38 @@ describe('StandupMode', () => {
     fireEvent.keyDown(document.body, { key: 'n' });
     fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('clicking a task row opens the task drawer', () => {
+    renderStandup();
+    fireEvent.click(taskRows()[1]!);
+    expect(mockOnOpenTask).toHaveBeenCalledWith('T-2');
+    expect(taskRows()[1]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('the Last round button opens the previous sealed standup', () => {
+    mockLastSession = {
+      id: 7,
+      date: '2026-03-07',
+      startedAt: '2026-03-07T08:30:00Z',
+      endedAt: '2026-03-07T08:45:00Z',
+      reviewed: ['dev-1', 'dev-2'],
+      flagged: ['dev-1'],
+      summary: 'Standup 2026-03-07 — 2/2 reviewed',
+      createdAt: '2026-03-07T08:45:00Z',
+      log: [{ accountId: 'dev-1', kind: 'done', taskKey: 'T-1', at: '2026-03-07T08:40:00Z' }],
+    };
+    try {
+      renderStandup();
+      fireEvent.click(screen.getByRole('button', { name: 'Previous standup round' }));
+      const history = screen.getByTestId('standup-history');
+      expect(within(history).getByText(/Ended .*· 2 reviewed · 1 flagged/)).toBeInTheDocument();
+      expect(within(history).getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(2); // flagged chip + log group
+      expect(within(history).getByText('Closed T-1')).toBeInTheDocument();
+      expect(within(history).getByText(/2\/2 reviewed/)).toBeInTheDocument();
+    } finally {
+      mockLastSession = null;
+    }
   });
 
   it('moves between tasks with j/k', () => {
@@ -362,6 +409,177 @@ describe('StandupMode', () => {
     expect(mockOnClose).not.toHaveBeenCalled();
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('session & wrap-up (docs/50)', () => {
+    function rail() {
+      return within(screen.getByRole('listbox', { name: 'Standup order' })).getAllByRole('option');
+    }
+
+    it('shows the day strip for the focused developer', () => {
+      renderStandup();
+      const strip = screen.getByTestId('standup-day-strip');
+      expect(within(strip).getByText('T-1')).toBeInTheDocument();
+      expect(within(strip).getByText('Blocked').nextSibling).toHaveTextContent('1');
+      expect(within(strip).getByText('None today')).toBeInTheDocument();
+    });
+
+    it('marks a developer reviewed on moving past them and tracks progress', () => {
+      renderStandup();
+      expect(screen.getByTestId('standup-progress')).toHaveTextContent('0 of 2 reviewed');
+      fireEvent.keyDown(document.body, { key: 'n' });
+      expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 2 reviewed');
+      expect(rail()[0]).toHaveAccessibleName('Alice Smith, reviewed');
+      expect(rail()[1]).toHaveAccessibleName('Bob Jones');
+    });
+
+    it('does not mark skipped people when jumping from the rail', () => {
+      const board = buildBoard();
+      board.developers.push(day({
+        id: 3,
+        developer: { accountId: 'dev-3', displayName: 'Cara Diaz', isActive: true },
+        tasks: [surfaceTask({ id: 5, taskKey: 'T-5', title: 'Cara task', ownerId: 'dev-3' })],
+      }));
+      render(
+        <TestWrapper>
+          <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
+        </TestWrapper>,
+      );
+      fireEvent.click(rail()[2]!);
+      // Alice was left → reviewed; Bob was skipped; Cara is current.
+      expect(rail()[0]).toHaveAccessibleName('Alice Smith, reviewed');
+      expect(rail()[1]).toHaveAccessibleName('Bob Jones');
+      expect(rail()[2]).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 3 reviewed');
+    });
+
+    it('opens the wrap-up past the last developer; ← returns and Enter ends', async () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'n' });
+      fireEvent.keyDown(document.body, { key: 'n' });
+      const wrapUp = screen.getByTestId('standup-wrapup');
+      expect(within(wrapUp).getByRole('heading', { name: 'Standup complete' })).toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+      expect(screen.queryByTestId('standup-wrapup')).not.toBeInTheDocument();
+      expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'w' });
+      fireEvent.keyDown(document.body, { key: 'Enter' });
+      await waitFor(() => expect(mockOnClose).toHaveBeenCalledTimes(1));
+      // docs/50 v2: Enter sealed the round — session record + summary note append.
+      const urls = mockApiPost.mock.calls.map(([url]) => String(url));
+      expect(urls).toContain('/team-tracker/standup/session');
+      expect(urls.some((url) => url === '/notes/2026-03-07/append')).toBe(true);
+      // Session cleared — the next standup starts fresh.
+      expect(window.sessionStorage.length).toBe(0);
+    });
+
+    it('End standup seals the round with reviewed ids and clears the session', async () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'f' });        // flag Alice
+      fireEvent.keyDown(document.body, { key: 'n' });        // review Alice → Bob
+      fireEvent.keyDown(document.body, { key: 'w' });        // wrap-up (Bob auto-reviewed on entry)
+      fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
+      await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+      const call = mockApiPost.mock.calls.find(([url]) => String(url) === '/team-tracker/standup/session');
+      expect(call).toBeTruthy();
+      const body = call![1] as { reviewed: string[]; flagged: string[]; requestId: string; summary: string };
+      expect(body.reviewed).toEqual(['dev-1', 'dev-2']);
+      expect(body.flagged).toEqual(['dev-1']);
+      expect(body.summary).toContain('Standup 2026-03-07');
+      expect(body.requestId).toBeTruthy();
+      expect(window.sessionStorage.length).toBe(0);
+      // The failed-note path did not run — success toast mentions follow-ups.
+      expect(mockAddToast).toHaveBeenCalledWith(expect.stringContaining('Standup recorded'), 'success');
+    });
+
+    it('keeps the wrap-up open and reports the error when sealing fails', async () => {
+      mockApiPost.mockRejectedValueOnce(new Error('offline'));
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'w' });  // reviews Alice via wrap-up entry → non-empty session
+      fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('offline', 'error'));
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(screen.getByTestId('standup-wrapup')).toBeInTheDocument();
+    });
+
+    it('Esc exits without sealing — the session stays resumable', () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'n' });  // review Alice
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockApiPost.mock.calls.some(([url]) => String(url) === '/team-tracker/standup/session')).toBe(false);
+      // Progress persisted for resume.
+      expect(window.sessionStorage.length).toBeGreaterThan(0);
+    });
+
+    it('f flags for follow-up and logged actions appear in the wrap-up', () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'f' });
+      expect(screen.getByText('Follow up')).toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'd' });
+      fireEvent.keyDown(document.body, { key: 'w' });
+      const wrapUp = screen.getByTestId('standup-wrapup');
+      expect(within(wrapUp).getByRole('heading', { name: '1 not reviewed yet' })).toBeInTheDocument();
+      const aliceFollowUp = within(wrapUp).getAllByRole('button', { name: 'Go to Alice Smith' })[0]!;
+      expect(aliceFollowUp).toHaveTextContent('Flagged');
+      expect(within(wrapUp).getByText('Closed T-1')).toBeInTheDocument();
+      // Jumping from "Not reviewed" lands on Bob.
+      fireEvent.click(within(wrapUp).getByRole('button', { name: 'Go to Bob Jones' }));
+      expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    });
+
+    it('resumes at the first unreviewed developer after reopening', () => {
+      const first = renderStandup();
+      fireEvent.keyDown(document.body, { key: 'n' });
+      first.unmount();
+      renderStandup();
+      expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 2 reviewed');
+      expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    });
+
+    it('feed group headers focus the matching task row', () => {
+      const previous = mockFeed;
+      mockFeed = {
+        ...previous,
+        entries: [
+          { id: 'event:20', kind: 'event', occurredAt: '2026-03-07T10:00:00Z', taskKey: 'T-3', taskTitle: 'Review queue', type: 'blocker', blockerAction: 'raised', body: 'Need access' },
+          ...previous.entries,
+        ],
+      };
+      try {
+        renderStandup();
+        expect(screen.getByText('Blocker raised')).toBeInTheDocument();
+        fireEvent.click(screen.getByTitle('Focus T-3'));
+        expect(taskRows()[2]).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Open T-3' }));
+        expect(mockOnOpenTask).toHaveBeenCalledWith('T-3');
+      } finally {
+        mockFeed = previous;
+      }
+    });
+
+    it('action bar chips run the same handlers as keys', () => {
+      renderStandup();
+      const bar = screen.getByTestId('standup-action-bar');
+      fireEvent.click(within(bar).getByRole('button', { name: /Done/ }));
+      expect(mockUpdateTaskMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
+      fireEvent.click(within(bar).getByRole('button', { name: /Check-in/ }));
+      expect(screen.getByPlaceholderText(/General remark/)).toBeInTheDocument();
+    });
+
+    it('shows an add-task empty state for a developer with no open tasks', () => {
+      const board = buildBoard();
+      board.developers[1]!.tasks = [];
+      render(
+        <TestWrapper>
+          <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
+        </TestWrapper>,
+      );
+      fireEvent.keyDown(document.body, { key: 'n' });
+      const empty = screen.getByText('No open tasks').parentElement!;
+      fireEvent.click(within(empty).getByRole('button', { name: /Add task/ }));
+      expect(screen.getByTestId('capture-box')).toHaveAttribute('data-prefill', '@dev-2 ');
+    });
   });
 
   it('ignores plain keys while a text field holds focus', () => {

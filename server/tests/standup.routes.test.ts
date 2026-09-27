@@ -6,8 +6,9 @@ import { TaskService } from "../src/services/task.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
+import { eq } from "drizzle-orm";
 import { resetDatabase, db } from "./helpers/db";
-import { configTable, developers, teamTrackerCheckIns, teamTrackerDays } from "../src/db/schema";
+import { configTable, developers, standupSessions, tasks, teamTrackerCheckIns, teamTrackerDays } from "../src/db/schema";
 import { todayIsoDate } from "../src/utils/date";
 import type { TaskStatus } from "shared/types";
 
@@ -144,6 +145,157 @@ describe("GET /api/team-tracker/standup/feed (P3-D5/D6)", () => {
     expect(ids.some((id: string) => id.startsWith("checkin:"))).toBe(true);
     const occurred = feed.entries.map((entry: { occurredAt: string }) => entry.occurredAt);
     expect([...occurred].sort().reverse()).toEqual(occurred);
+  });
+
+  it("lifts status transitions and blocker actions out of event meta (docs/50 S6)", async () => {
+    await enablePhase3();
+    const task = await createDevTask("active", "Migration");
+    await eventsService.append(
+      { workspaceId: "default", taskKey: task.taskKey, type: "blocker", meta: { action: "raised" }, body: "Waiting on DBA" },
+      { type: "developer", accountId: "dev-1" },
+    );
+
+    const response = await invoke("GET", "/api/team-tracker/standup/feed?accountId=dev-1");
+    expect(response.status).toBe(200);
+    const entries = response.body.entries as Array<Record<string, unknown>>;
+    const status = entries.find((entry) => entry.type === "status");
+    expect(status).toMatchObject({ statusFrom: "open", statusTo: "active", statusReason: "user" });
+    const blocker = entries.find((entry) => entry.type === "blocker");
+    expect(blocker).toMatchObject({ blockerAction: "raised", body: "Waiting on DBA" });
+    const created = entries.find((entry) => entry.type === "created");
+    expect(created).not.toHaveProperty("statusTo");
+  });
+});
+
+describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
+  function sessionPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      date: todayIsoDate(),
+      startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      reviewed: ["dev-1", "dev-2"],
+      flagged: ["dev-2"],
+      log: [{ accountId: "dev-1", kind: "done", taskKey: "T-1", at: new Date().toISOString() }],
+      summary: "Standup — 2/2 reviewed",
+      requestId: crypto.randomUUID(),
+      ...overrides,
+    };
+  }
+
+  it("seals the session and creates a real follow-up task per flagged person", async () => {
+    await enablePhase3();
+    const payload = sessionPayload();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", payload);
+    expect(response.status).toBe(201);
+    expect(response.body.session).toMatchObject({
+      date: payload.date,
+      startedAt: payload.startedAt,
+      reviewed: ["dev-1", "dev-2"],
+      flagged: ["dev-2"],
+      summary: payload.summary,
+    });
+    expect(response.body.followUps).toEqual([
+      { accountId: "dev-2", taskKey: expect.stringMatching(/^T-\d+$/) },
+    ]);
+    const [row] = await db.select().from(tasks).where(eq(tasks.taskKey, response.body.followUps[0].taskKey));
+    expect(row!.title).toBe("Standup follow-up: Bob Jones");
+    expect(row!.ownerType).toBe("manager");
+    expect(row!.ownerId).toBe("manager-1");
+    expect(row!.followUpAt).toBeTruthy();
+    expect(row!.labelsJson).toContain("category:follow_up");
+  });
+
+  it("is idempotent on requestId — no duplicate session or tasks", async () => {
+    await enablePhase3();
+    const payload = sessionPayload();
+    const first = await invoke("POST", "/api/team-tracker/standup/session", payload);
+    const second = await invoke("POST", "/api/team-tracker/standup/session", payload);
+    expect(second.status).toBe(201);
+    expect(second.body.session.id).toBe(first.body.session.id);
+    expect(second.body.followUps).toEqual([]);
+    const sessions = await db.select().from(standupSessions);
+    expect(sessions).toHaveLength(1);
+  });
+
+  it("anchors the next standup feed to the sealed session end", async () => {
+    await enablePhase3();
+    const task = await createDevTask("active", "Migration");
+    await eventsService.append(
+      { workspaceId: "default", taskKey: task.taskKey, type: "update", meta: null, body: "before seal", occurredAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+      { type: "developer", accountId: "dev-1" },
+    );
+    const seal = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: [] }));
+    expect(seal.status).toBe(201);
+    await eventsService.append(
+      { workspaceId: "default", taskKey: task.taskKey, type: "update", meta: null, body: "after seal" },
+      { type: "developer", accountId: "dev-1" },
+    );
+
+    const response = await invoke("GET", "/api/team-tracker/standup/feed?accountId=dev-1");
+    expect(response.status).toBe(200);
+    const feed = response.body;
+    expect(feed.anchoredToSession).toBe(true);
+    expect(feed.windowStart).toBe(seal.body.session.endedAt);
+    const bodies = feed.entries.map((entry: { body?: string | null }) => entry.body);
+    expect(bodies).toContain("after seal");
+    expect(bodies).not.toContain("before seal");
+  });
+
+  it("does not anchor another manager's feed window", async () => {
+    await enablePhase3();
+    await invoke("POST", "/api/team-tracker/standup/session", sessionPayload());
+    // manager-1's session must not leak into a different manager's anchor; the
+    // service is keyed by manager_account_id.
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-2", "default");
+    expect(feed.anchoredToSession).toBe(false);
+  });
+
+  it("404s while the Phase 3 flag is off", async () => {
+    await enableCanonical();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload());
+    expect(response.status).toBe(404);
+  });
+
+  it("400s on an invalid body", async () => {
+    await enablePhase3();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ requestId: "nope" }));
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("GET /api/team-tracker/standup/session/latest (docs/50 v2)", () => {
+  function sessionPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      date: todayIsoDate(),
+      startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      reviewed: ["dev-1"],
+      flagged: ["dev-2"],
+      log: [{ accountId: "dev-1", kind: "done", taskKey: "T-1", at: new Date().toISOString() }],
+      summary: "Standup — 1/2 reviewed",
+      requestId: crypto.randomUUID(),
+      ...overrides,
+    };
+  }
+
+  it("returns null before any session is sealed", async () => {
+    await enablePhase3();
+    const response = await invoke("GET", "/api/team-tracker/standup/session/latest");
+    expect(response.status).toBe(200);
+    expect(response.body.session).toBeNull();
+  });
+
+  it("returns the latest sealed session with its parsed log", async () => {
+    await enablePhase3();
+    const payload = sessionPayload();
+    await invoke("POST", "/api/team-tracker/standup/session", payload);
+    await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ summary: "newer round" }));
+
+    const response = await invoke("GET", "/api/team-tracker/standup/session/latest");
+    expect(response.status).toBe(200);
+    expect(response.body.session.summary).toBe("newer round");
+    expect(response.body.session.log).toEqual([
+      expect.objectContaining({ accountId: "dev-1", kind: "done", taskKey: "T-1" }),
+    ]);
+    expect(response.body.session.flagged).toEqual(["dev-2"]);
   });
 });
 

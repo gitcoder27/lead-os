@@ -49,6 +49,8 @@ interface CaptureBoxProps {
   /** Initial text, e.g. "@dev-1 " from a developer context or "/note ". */
   prefill?: string;
   onClose: () => void;
+  /** Fires after a successful capture, before close (standup session log, docs/50). */
+  onCaptured?: (result: { intent: string; taskKey?: string }) => void;
 }
 
 function Chip({ icon, children, tone }: { icon?: React.ReactNode; children: React.ReactNode; tone?: 'error' | 'warning' }) {
@@ -116,7 +118,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
  * preview + structured summary; the server re-parses authoritatively on
  * submit. Errors block the submit; warnings may need a confirm press.
  */
-export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
+export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProps) {
   const { addToast } = useToast();
   const capture = useCapture();
   const developers = useDevelopers();
@@ -233,6 +235,7 @@ export function CaptureBox({ prefill = '', onClose }: CaptureBoxProps) {
             return;
           }
           const key = res.task?.taskKey ?? res.event?.taskKey;
+          onCaptured?.({ intent: res.intent, taskKey: key });
           addToast({
             type: 'success',
             title: res.intent === 'note' ? 'Saved to today\u2019s note' : res.intent === 'update' ? `Logged update on ${key}` : `Captured ${key}`,

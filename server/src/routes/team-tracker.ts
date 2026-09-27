@@ -322,8 +322,8 @@ export function createTeamTrackerRouter(
     }
   });
 
-  // Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed per developer.
-  // 404 while the Phase 3 flag is off so the endpoint can't leak early.
+  // Phase 3 (P3-D5/D6, §6.1) + docs/50 v2: standup feed per developer, anchored
+  // to the manager's last sealed session when one exists.
   router.get(
     "/standup/feed",
     validate(z.object({ query: z.object({ accountId: z.string().min(1) }) })),
@@ -331,6 +331,7 @@ export function createTeamTrackerRouter(
       try {
         const feed = await trackerService.getStandupFeed(
           req.query.accountId as string,
+          req.auth!.user.accountId,
           req.auth!.user.workspaceId
         );
         res.json(feed);
@@ -339,6 +340,48 @@ export function createTeamTrackerRouter(
       }
     }
   );
+
+  // docs/50 v2: seal a standup round — durable session row + one follow-up
+  // task per flagged person. Idempotent on requestId.
+  router.post(
+    "/standup/session",
+    validate(z.object({
+      params: z.any().optional(),
+      query: z.any().optional(),
+      body: z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+        startedAt: isoDateTimeSchema,
+        reviewed: z.array(z.string().trim().min(1)).max(500),
+        flagged: z.array(z.string().trim().min(1)).max(500),
+        log: z.array(z.object({
+          accountId: z.string().min(1),
+          kind: z.enum(["update", "checkin", "status", "current", "done", "blocked", "reassign", "added"]),
+          taskKey: z.string().trim().min(1).optional(),
+          detail: z.string().max(500).optional(),
+          at: isoDateTimeSchema,
+        }).strict()).max(2000),
+        summary: z.string().max(20000),
+        requestId: z.string().uuid(),
+      }).strict(),
+    })),
+    async (req, res, next) => {
+      try {
+        res.status(201).json(await trackerService.recordStandupSession(req.auth!.user.accountId, req.body, req.auth!.user.workspaceId));
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // docs/50 v2: the manager's most recent sealed standup — powers the
+  // "previous round" recall view inside standup mode.
+  router.get("/standup/session/latest", async (req, res, next) => {
+    try {
+      res.json(await trackerService.latestStandupSession(req.auth!.user.accountId, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/views", async (req, res, next) => {
     try {

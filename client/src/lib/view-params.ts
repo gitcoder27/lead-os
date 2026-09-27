@@ -1,4 +1,4 @@
-import type { TeamTrackerBoardGroupBy, TeamTrackerBoardQuery, TeamTrackerBoardSort, TrackerBoardSummaryFilter } from '@/types';
+import type { DailyNoteKind, TeamTrackerBoardGroupBy, TeamTrackerBoardQuery, TeamTrackerBoardSort, TrackerBoardSummaryFilter } from '@/types';
 import { DEFAULT_DASHBOARD_FILTER_STATE, type DashboardFilterState } from '@/components/layout/dashboard-state';
 
 // URL serialization for view-scoped filter state. Params only appear when they
@@ -180,6 +180,14 @@ export function deskDateToSearch(date: string | undefined): string {
 
 export function notesDateFromParams(params: URLSearchParams): string | undefined {
   return dateParam(params, 'date');
+}
+
+const NOTE_KINDS: readonly string[] = ['scratchpad', 'standup'];
+
+/** `/notes?kind=standup` selects the standup facet; anything else is scratchpad. */
+export function notesKindFromParams(params: URLSearchParams): DailyNoteKind | undefined {
+  const kind = firstParam(params, 'kind');
+  return kind && NOTE_KINDS.includes(kind) ? (kind as DailyNoteKind) : undefined;
 }
 
 const TASK_KEY_PARAM_PATTERN = /^[Tt]-\d{1,9}$/;

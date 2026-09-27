@@ -492,6 +492,35 @@ describe('StandupMode', () => {
       expect(mockAddToast).toHaveBeenCalledWith(expect.stringContaining('Standup recorded'), 'success');
     });
 
+    it('files the summary as a standup note — checked by default', async () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'w' });  // wrap-up (auto-reviews Alice → non-empty session)
+      const wrapUp = screen.getByTestId('standup-wrapup');
+      const checkbox = within(wrapUp).getByRole('checkbox', { name: /Save summary to notes/ });
+      expect(checkbox).toBeChecked();
+
+      fireEvent.click(within(wrapUp).getByRole('button', { name: /End standup/ }));
+      await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+      const appendCall = mockApiPost.mock.calls.find(([url]) => String(url) === '/notes/2026-03-07/append');
+      expect(appendCall).toBeTruthy();
+      expect((appendCall![1] as { kind?: string }).kind).toBe('standup');
+      expect((appendCall![1] as { requestId?: string }).requestId).toBeTruthy();
+    });
+
+    it('seals without appending when "Save summary to notes" is unchecked', async () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'w' });
+      const wrapUp = screen.getByTestId('standup-wrapup');
+      fireEvent.click(within(wrapUp).getByRole('checkbox', { name: /Save summary to notes/ }));
+
+      fireEvent.click(within(wrapUp).getByRole('button', { name: /End standup/ }));
+      await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+      const urls = mockApiPost.mock.calls.map(([url]) => String(url));
+      expect(urls).toContain('/team-tracker/standup/session');
+      expect(urls.some((url) => url === '/notes/2026-03-07/append')).toBe(false);
+      expect(mockAddToast).toHaveBeenCalledWith(expect.stringContaining('Standup recorded'), 'success');
+    });
+
     it('keeps the wrap-up open and reports the error when sealing fails', async () => {
       mockApiPost.mockRejectedValueOnce(new Error('offline'));
       renderStandup();

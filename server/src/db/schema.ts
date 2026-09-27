@@ -325,12 +325,13 @@ export const dailyNotes = sqliteTable("daily_notes", {
   workspaceId: text("workspace_id").notNull(),
   managerAccountId: text("manager_account_id").notNull(),
   date: text("date").notNull(),
+  kind: text("kind").notNull().default("scratchpad"),
   body: text("body").notNull(),
   revision: integer("revision").notNull().default(1),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [
-  uniqueIndex("idx_daily_notes_owner_date").on(table.workspaceId, table.managerAccountId, table.date),
+  uniqueIndex("idx_daily_notes_owner_date").on(table.workspaceId, table.managerAccountId, table.date, table.kind),
 ]);
 
 export const dailyNoteCaptures = sqliteTable("daily_note_captures", {

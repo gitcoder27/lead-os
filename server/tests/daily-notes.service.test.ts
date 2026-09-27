@@ -209,6 +209,83 @@ describe("DailyNotesService.getDay/save", () => {
   });
 });
 
+describe("DailyNotesService note kinds", () => {
+  it("lets a scratchpad and a standup note coexist for the same day", async () => {
+    const scratchpad = await service.save(MANAGER, DATE, { body: "private scratchpad", revision: 0 }, WS);
+    const standup = await service.save(
+      MANAGER,
+      DATE,
+      { body: "Standup 2026-03-08", revision: 0 },
+      WS,
+      "standup"
+    );
+
+    expect(scratchpad.note?.kind).toBe("scratchpad");
+    expect(standup.note?.kind).toBe("standup");
+    expect(standup.note?.id).not.toBe(scratchpad.note?.id);
+    expect(await noteRows()).toHaveLength(2);
+
+    expect((await service.getDay(MANAGER, DATE, WS)).note?.body).toBe("private scratchpad");
+    expect((await service.getDay(MANAGER, DATE, WS, "standup")).note?.body).toBe("Standup 2026-03-08");
+  });
+
+  it("honors the payload's kind and keeps revision chains per kind", async () => {
+    const standup = await service.save(MANAGER, DATE, { body: "v1", revision: 0, kind: "standup" }, WS);
+    expect(standup.note?.kind).toBe("standup");
+
+    // Each kind has its own revision chain — a scratchpad write starts at 0.
+    const scratchpad = await service.save(MANAGER, DATE, { body: "pad", revision: 0 }, WS);
+    expect(scratchpad.note?.kind).toBe("scratchpad");
+
+    // A stale scratchpad revision must not collide with the standup note.
+    await expect(
+      service.save(MANAGER, DATE, { body: "stale", revision: 5 }, WS)
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await service.getDay(MANAGER, DATE, WS, "standup")).note?.body).toBe("v1");
+  });
+
+  it("appends to the requested kind only and keeps requestId idempotency", async () => {
+    await saveNote("scratchpad body");
+    const requestId = randomUUID();
+
+    const appended = await service.append(
+      MANAGER,
+      DATE,
+      { text: "standup recap", requestId },
+      WS,
+      "standup"
+    );
+    expect(appended.note?.kind).toBe("standup");
+
+    const replayed = await service.append(
+      MANAGER,
+      DATE,
+      { text: "standup recap", requestId },
+      WS,
+      "standup"
+    );
+    expect(replayed.note?.id).toBe(appended.note?.id);
+    expect(replayed.note?.body).toBe("standup recap");
+
+    expect((await service.getDay(MANAGER, DATE, WS)).note?.body).toBe("scratchpad body");
+    expect((await service.getDay(MANAGER, DATE, WS, "standup")).note?.body).toBe("standup recap");
+  });
+
+  it("filters list results by kind and defaults to scratchpad", async () => {
+    await saveNote("scratchpad body");
+    await service.save(MANAGER, DATE, { body: "standup body", revision: 0 }, WS, "standup");
+    await service.save(MANAGER, "2026-03-07", { body: "earlier standup", revision: 0 }, WS, "standup");
+
+    const defaults = await service.list(MANAGER, {}, WS);
+    expect(defaults.notes).toHaveLength(1);
+    expect(defaults.notes[0]?.kind).toBe("scratchpad");
+
+    const standups = await service.list(MANAGER, { kind: "standup" }, WS);
+    expect(standups.notes.map((note) => note.date)).toEqual(["2026-03-08", "2026-03-07"]);
+    expect(standups.notes.every((note) => note.kind === "standup")).toBe(true);
+  });
+});
+
 describe("DailyNotesService.list", () => {
   it("lists notes in descending date order with derived title and excerpt", async () => {
     await saveNote("older body", { date: "2026-03-01" });
@@ -472,7 +549,7 @@ describe("DailyNotesService.createFollowUp/getSources", () => {
 
     const sources = await service.getSources(MANAGER, [followUp.itemId], WS);
     expect(sources.sources).toEqual([
-      { itemId: followUp.itemId, noteId: day.note!.id, date: NOTE_DATE },
+      { itemId: followUp.itemId, noteId: day.note!.id, date: NOTE_DATE, kind: "scratchpad" },
     ]);
   });
 

@@ -103,6 +103,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const [checkInText, setCheckInText] = useState('');
   const [announcement, setAnnouncement] = useState('');
   const [sealing, setSealing] = useState(false);
+  // docs/50 v2: whether "End standup" also files the summary under
+  // Notes → Standups. Sealing the session itself is unconditional.
+  const [saveToNote, setSaveToNote] = useState(true);
   const queryClient = useQueryClient();
 
   const composerApi = useRef<{ expand: () => void; focus: () => void; togglePrivate: () => void } | null>(null);
@@ -287,9 +290,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   /**
    * docs/50 v2: "End standup" seals the round — one durable session record
    * (which also anchors the next "since last standup" feed), a follow-up task
-   * per flagged person created server-side, and the summary appended to
-   * today's private note. The client session is cleared so the next standup
-   * starts fresh; Esc/Exit still leaves without sealing.
+   * per flagged person created server-side, and — when the wrap-up option is
+   * on — the summary appended to the day's standup note (Notes → Standups),
+   * kept apart from the personal scratchpad. The client session is cleared so
+   * the next standup starts fresh; Esc/Exit still leaves without sealing.
    */
   const endStandup = useCallback(async () => {
     if (sealing) return;
@@ -311,10 +315,16 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         summary,
         requestId: crypto.randomUUID(),
       });
-      try {
-        await api.post(`/notes/${encodeURIComponent(date)}/append`, { text: summary, requestId: crypto.randomUUID() });
-      } catch {
-        addToast('Standup recorded, but the summary could not be saved to notes.', 'error');
+      if (saveToNote) {
+        try {
+          await api.post(`/notes/${encodeURIComponent(date)}/append`, {
+            text: summary,
+            requestId: crypto.randomUUID(),
+            kind: 'standup',
+          });
+        } catch {
+          addToast('Standup recorded, but the summary could not be saved to notes.', 'error');
+        }
       }
       // Clear storage synchronously before unmounting — a dispatch alone races
       // with onClose(): the save effect may never run for the empty session,
@@ -335,7 +345,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     } finally {
       setSealing(false);
     }
-  }, [sealing, date, ordered, session, storageKey, queryClient, addToast, onClose]);
+  }, [sealing, saveToNote, date, ordered, session, storageKey, queryClient, addToast, onClose]);
 
   // ── Actions: shared by the keymap and the action bar (S7) ──────────────
   const actions = {
@@ -643,6 +653,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                 days={ordered}
                 session={session}
                 sealing={sealing}
+                saveToNote={saveToNote}
+                onSaveToNoteChange={setSaveToNote}
                 onJump={goToDeveloper}
                 onBack={() => moveDeveloper(-1)}
                 onEnd={() => void endStandup()}

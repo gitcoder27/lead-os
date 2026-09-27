@@ -17,6 +17,7 @@ import {
   deskDateFromParams,
   isValidIsoDate,
   notesDateFromParams,
+  notesKindFromParams,
   taskKeyFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
@@ -34,7 +35,7 @@ import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
-import type { TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
+import type { DailyNoteKind, TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
 export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'notes' | 'my-day' | 'settings';
 export type LegacyAppView = 'dashboard' | 'team-tracker' | 'manager-desk';
@@ -475,6 +476,11 @@ function AppContent() {
       ? notesDateFromParams(new URLSearchParams(window.location.search)) ?? getLocalIsoDate()
       : getLocalIsoDate(),
   );
+  const [notesKind, setNotesKind] = useState<DailyNoteKind>(() =>
+    pathToView(window.location.pathname) === 'notes'
+      ? notesKindFromParams(new URLSearchParams(window.location.search)) ?? 'scratchpad'
+      : 'scratchpad',
+  );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
   const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; taskKey?: string; nonce: number }>(() => {
     if (pathToView(window.location.pathname) !== 'team') {
@@ -528,6 +534,7 @@ function AppContent() {
     }
     if (nextView === 'notes') {
       setNotesDate(getLocalIsoDate());
+      setNotesKind('scratchpad');
     }
     preloadView(nextView);
     setActiveView(nextView);
@@ -557,13 +564,15 @@ function AppContent() {
     navigateToView('work', { params: dashboardFilterStateToParams(nextFilterState) });
   }, [clearTodayTargets]);
 
-  const handleOpenNotes = useCallback((date?: string) => {
+  const handleOpenNotes = useCallback((date?: string, kind?: DailyNoteKind) => {
     const next = date && isValidIsoDate(date) ? date : getLocalIsoDate();
+    const nextKind = kind ?? 'scratchpad';
     clearTodayTargets();
     setNotesDate(next);
+    setNotesKind(nextKind);
     preloadView('notes');
     setActiveView('notes');
-    navigateToView('notes', { params: { date: next } });
+    navigateToView('notes', { params: { date: next, kind: nextKind === 'scratchpad' ? undefined : nextKind } });
   }, [clearTodayTargets]);
 
   const handleNotesDateChange = useCallback((date: string) => {
@@ -571,8 +580,15 @@ function AppContent() {
       return;
     }
     setNotesDate(date);
-    navigateToView('notes', { params: { date } });
-  }, []);
+    navigateToView('notes', { params: { date, kind: notesKind === 'scratchpad' ? undefined : notesKind } });
+  }, [notesKind]);
+
+  const handleNotesKindChange = useCallback((kind: DailyNoteKind) => {
+    setNotesKind(kind);
+    navigateToView('notes', {
+      params: { date: notesDate, kind: kind === 'scratchpad' ? undefined : kind },
+    });
+  }, [notesDate]);
 
   const handleOpenTodayTarget = useCallback((target: TodayActionTarget) => {
     if (target.view === 'work') {
@@ -592,7 +608,7 @@ function AppContent() {
     }
 
     if (target.view === 'notes') {
-      handleOpenNotes(target.date);
+      handleOpenNotes(target.date, target.kind);
       return;
     }
 
@@ -773,6 +789,7 @@ function AppContent() {
       }
       if (nextView === 'notes') {
         setNotesDate(notesDateFromParams(params) ?? getLocalIsoDate());
+        setNotesKind(notesKindFromParams(params) ?? 'scratchpad');
       }
       replaceLegacyPathIfNeeded();
     };
@@ -1124,7 +1141,9 @@ function AppContent() {
         <Suspense fallback={<PanelLoading />}>
           <NotesPage
             date={notesDate}
+            kind={notesKind}
             onDateChange={handleNotesDateChange}
+            onKindChange={handleNotesKindChange}
             onOpenTarget={handleOpenTodayTarget}
           />
         </Suspense>

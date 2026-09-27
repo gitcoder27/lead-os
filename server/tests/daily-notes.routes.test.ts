@@ -150,7 +150,7 @@ describe("notes routes happy path", () => {
     });
     expect(sources.status).toBe(200);
     expect(sources.body.sources).toEqual([
-      { itemId: followUp.body.itemId, noteId: saved.body.note.id, date: DATE },
+      { itemId: followUp.body.itemId, noteId: saved.body.note.id, date: DATE, kind: "scratchpad" },
     ]);
 
     // refs[] carries the created_from relation for the follow-up (docs/52 F9)
@@ -169,6 +169,188 @@ describe("notes routes happy path", () => {
         }),
       ]),
     );
+  });
+
+  it("keeps standup notes separate from the scratchpad for the same day", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    const scratchpad = await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "private scratchpad", revision: 0 },
+      headers: { cookie },
+    });
+    expect(scratchpad.status).toBe(200);
+    expect(scratchpad.body.note.kind).toBe("scratchpad");
+
+    const standup = await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}?kind=standup`,
+      body: { body: "Standup 2026-03-08", revision: 0 },
+      headers: { cookie },
+    });
+    expect(standup.status).toBe(200);
+    expect(standup.body.note).toMatchObject({ kind: "standup", body: "Standup 2026-03-08" });
+
+    // Same date, two documents — each kind reads its own body.
+    const scratchDay = await invoke(app, { method: "GET", url: `/api/notes/${DATE}`, headers: { cookie } });
+    expect(scratchDay.body.note).toMatchObject({ kind: "scratchpad", body: "private scratchpad" });
+    const standupDay = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}?kind=standup`,
+      headers: { cookie },
+    });
+    expect(standupDay.body.note).toMatchObject({ kind: "standup", body: "Standup 2026-03-08" });
+  });
+
+  it("appends to the standup kind without touching the scratchpad", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "scratchpad stays", revision: 0 },
+      headers: { cookie },
+    });
+
+    const appended = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/append`,
+      body: { text: "Standup 2026-03-08\n- reviewed Alice", requestId: randomUUID(), kind: "standup" },
+      headers: { cookie },
+    });
+    expect(appended.status).toBe(200);
+    expect(appended.body.note.kind).toBe("standup");
+
+    const scratchDay = await invoke(app, { method: "GET", url: `/api/notes/${DATE}`, headers: { cookie } });
+    expect(scratchDay.body.note.body).toBe("scratchpad stays");
+    const standupDay = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}?kind=standup`,
+      headers: { cookie },
+    });
+    expect(standupDay.body.note.body).toBe("Standup 2026-03-08\n- reviewed Alice");
+  });
+
+  it("filters the note list by kind and defaults to scratchpad", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "scratchpad body", revision: 0 },
+      headers: { cookie },
+    });
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "standup body", revision: 0, kind: "standup" },
+      headers: { cookie },
+    });
+
+    const all = await invoke(app, { method: "GET", url: "/api/notes", headers: { cookie } });
+    expect(all.body.notes).toHaveLength(1);
+    expect(all.body.notes[0]).toMatchObject({ date: DATE, kind: "scratchpad" });
+
+    const standups = await invoke(app, { method: "GET", url: "/api/notes?kind=standup", headers: { cookie } });
+    expect(standups.body.notes).toHaveLength(1);
+    expect(standups.body.notes[0]).toMatchObject({ date: DATE, kind: "standup" });
+  });
+
+  it("searches only within the requested kind", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "the penguin incident", revision: 0 },
+      headers: { cookie },
+    });
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "penguin standup recap", revision: 0, kind: "standup" },
+      headers: { cookie },
+    });
+
+    const scratchSearch = await invoke(app, { method: "GET", url: "/api/notes?q=penguin", headers: { cookie } });
+    expect(scratchSearch.body.notes).toHaveLength(1);
+    expect(scratchSearch.body.notes[0].kind).toBe("scratchpad");
+
+    const standupSearch = await invoke(app, {
+      method: "GET",
+      url: "/api/notes?q=penguin&kind=standup",
+      headers: { cookie },
+    });
+    expect(standupSearch.body.notes).toHaveLength(1);
+    expect(standupSearch.body.notes[0].kind).toBe("standup");
+  });
+
+  it("rejects an unknown kind", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    const res = await invoke(app, { method: "GET", url: "/api/notes?kind=bogus", headers: { cookie } });
+    expect(res.status).toBe(400);
+
+    const day = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}?kind=bogus`,
+      headers: { cookie },
+    });
+    expect(day.status).toBe(400);
+  });
+
+  it("links follow-ups created under a standup note to that kind", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    const standup = await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "standup recap", revision: 0, kind: "standup" },
+      headers: { cookie },
+    });
+    const noteId = standup.body.note.id;
+
+    const followUp = await invoke(app, {
+      method: "POST",
+      url: `/api/notes/${DATE}/follow-ups`,
+      body: {
+        date: DATE,
+        title: "Standup follow-up",
+        followUpAt: "2026-03-10T09:00:00.000Z",
+        requestId: randomUUID(),
+        kind: "standup",
+      },
+      headers: { cookie },
+    });
+    expect(followUp.status).toBe(200);
+
+    const sources = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/sources?itemIds=${followUp.body.itemId}`,
+      headers: { cookie },
+    });
+    expect(sources.body.sources).toEqual([
+      { itemId: followUp.body.itemId, noteId, date: DATE, kind: "standup" },
+    ]);
+
+    // The standup day doc surfaces the ref; the scratchpad sibling stays clean.
+    const standupDay = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}?kind=standup`,
+      headers: { cookie },
+    });
+    expect(standupDay.body.refs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ itemId: followUp.body.itemId })]),
+    );
+    const scratchDay = await invoke(app, { method: "GET", url: `/api/notes/${DATE}`, headers: { cookie } });
+    expect(scratchDay.body.refs).toEqual([]);
   });
 
   it("GET /api/notes/:date/context returns the assembled day context", async () => {

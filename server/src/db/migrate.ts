@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS daily_notes (
   workspace_id       TEXT NOT NULL,
   manager_account_id TEXT NOT NULL,
   date               TEXT NOT NULL,
+  kind               TEXT NOT NULL DEFAULT 'scratchpad',
   body               TEXT NOT NULL,
   revision           INTEGER NOT NULL DEFAULT 1,
   created_at         TEXT NOT NULL,
@@ -481,7 +482,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_work_saved_views_workspace_manager_name ON
 CREATE INDEX IF NOT EXISTS idx_manager_desk_days_workspace_manager_date ON manager_desk_days(workspace_id, manager_account_id, date);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_item_recorded ON manager_desk_item_history(workspace_id, item_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_manager_desk_item_history_workspace_manager_recorded ON manager_desk_item_history(workspace_id, manager_account_id, recorded_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date, kind);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_captures_owner_request ON daily_note_captures(workspace_id, manager_account_id, request_id);
 CREATE INDEX IF NOT EXISTS idx_daily_note_captures_note ON daily_note_captures(note_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_note_follow_ups_item ON daily_note_follow_ups(item_id);
@@ -729,6 +730,11 @@ const alterStatements = [
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_sessions_request ON standup_sessions(workspace_id, manager_account_id, request_id)",
   // docs/51 F7: per-day manual ordering for schedule-grouped task views.
   "ALTER TABLE tasks ADD COLUMN schedule_position INTEGER",
+  // Standup summaries become their own note kind (docs/50 v2): one scratchpad
+  // AND one standup note per (workspace, manager, date) — the unique key widens.
+  "ALTER TABLE daily_notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'scratchpad'",
+  "DROP INDEX IF EXISTS idx_daily_notes_owner_date",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date, kind)",
 ];
 
 const constraintRepairStatements = [

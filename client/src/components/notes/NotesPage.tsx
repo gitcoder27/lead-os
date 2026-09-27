@@ -6,14 +6,16 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getLocalIsoDate } from '@/lib/utils';
 import { searchTerms } from '@/lib/note-markdown';
 import { isValidIsoDate } from '@/lib/view-params';
-import type { TodayActionTarget } from '@/types';
+import type { DailyNoteKind, TodayActionTarget } from '@/types';
 import { NoteDocument } from './NoteDocument';
 import { NotesSidebar } from './NotesSidebar';
 import './notes.css';
 
 export interface NotesPageProps {
   date: string;
+  kind: DailyNoteKind;
   onDateChange: (date: string) => void;
+  onKindChange: (kind: DailyNoteKind) => void;
   onOpenTarget: (target: TodayActionTarget) => void;
 }
 
@@ -22,7 +24,7 @@ function modalLayerOpen(): boolean {
   return Boolean(document.querySelector('[aria-modal="true"], [role="dialog"][data-state="open"], [data-popover-layer]'));
 }
 
-export function NotesPage({ date, onDateChange, onOpenTarget }: NotesPageProps) {
+export function NotesPage({ date, kind, onDateChange, onKindChange, onOpenTarget }: NotesPageProps) {
   const scope = useAuthScopeKey();
   const { addToast } = useToast();
   const isNarrow = useMediaQuery('(max-width: 767px)');
@@ -62,6 +64,21 @@ export function NotesPage({ date, onDateChange, onOpenTarget }: NotesPageProps) 
       onDateChange(next);
     },
     [addToast, date, onDateChange],
+  );
+
+  const requestKindChange = useCallback(
+    async (next: DailyNoteKind) => {
+      if (next === kind) {
+        return;
+      }
+      const ok = flushRef.current ? await flushRef.current() : true;
+      if (!ok) {
+        addToast('Could not save this note. Your draft is still here — fix the issue before switching views.', 'error');
+        return;
+      }
+      onKindChange(next);
+    },
+    [addToast, kind, onKindChange],
   );
 
   // F14: page keys. ⌥↑/⌥↓ step days, ⌥T jumps to today, ⌘⇧F searches notes.
@@ -113,6 +130,8 @@ export function NotesPage({ date, onDateChange, onOpenTarget }: NotesPageProps) 
         <NotesSidebar
           selectedDate={date}
           today={today}
+          kind={kind}
+          onKindChange={(next) => void requestKindChange(next)}
           onSelectDate={(next, query) => void requestDateChange(next, query)}
           mobile={isNarrow}
           onBack={isNarrow ? () => setHistoryOpen(false) : undefined}
@@ -120,9 +139,10 @@ export function NotesPage({ date, onDateChange, onOpenTarget }: NotesPageProps) 
         />
       ) : null}
       <NoteDocument
-        key={`${scope}:${date}`}
+        key={`${scope}:${kind}:${date}`}
         date={date}
         today={today}
+        kind={kind}
         hidden={isNarrow && historyOpen}
         mobile={isNarrow}
         onNavigateDate={(next) => void requestDateChange(next)}

@@ -9,6 +9,7 @@ import type {
   DailyNote,
   DailyNoteDayContext,
   DailyNoteFollowUp,
+  DailyNoteKind,
   DailyNoteResponse,
   DailyNoteSource,
   DailyNoteSourcesResponse,
@@ -46,12 +47,24 @@ export function invalidateDailyNoteListViews(qc: ReturnType<typeof useQueryClien
   qc.invalidateQueries({ queryKey: ['global-search'] });
 }
 
-/** Patch (or remove, when `note` is null) a saved note inside every cached list page. */
+/** Day-document URL — `?kind=` is omitted for the default scratchpad. */
+export function dailyNoteDayPath(date: string, kind: DailyNoteKind = 'scratchpad'): string {
+  const base = `/notes/${encodeURIComponent(date)}`;
+  return kind === 'scratchpad' ? base : `${base}?kind=${kind}`;
+}
+
+/** React Query key for one day document — kind keeps scratchpad and standup caches apart. */
+export function dailyNoteDayKey(scope: string, date: string, kind: DailyNoteKind = 'scratchpad') {
+  return ['daily-notes', scope, 'day', date, kind] as const;
+}
+
+/** Patch (or remove, when `note` is null) a saved note inside every cached list page of its kind. */
 export function patchDailyNoteInLists(
   qc: ReturnType<typeof useQueryClient>,
   scope: string,
   date: string,
   note: DailyNote | null,
+  kind: DailyNoteKind = 'scratchpad',
 ) {
   const matches = qc.getQueriesData<InfiniteData<DailyNotesResponse>>({
     queryKey: ['daily-notes', scope, 'list'],
@@ -65,7 +78,7 @@ export function patchDailyNoteInLists(
       pages: data.pages.map((page) => ({
         ...page,
         notes: page.notes.flatMap((row) =>
-          row.date === date
+          row.date === date && (row.kind ?? 'scratchpad') === kind
             ? note
               ? [{ ...row, title: note.title, excerpt: note.excerpt, updatedAt: note.updatedAt }]
               : []
@@ -76,13 +89,14 @@ export function patchDailyNoteInLists(
   }
 }
 
-export function useDailyNote(date: string, options?: { pollPaused?: boolean }) {
+export function useDailyNote(date: string, options?: { pollPaused?: boolean; kind?: DailyNoteKind }) {
   const authScopeKey = useAuthScopeKey();
   const isManager = useIsManager();
+  const kind = options?.kind ?? 'scratchpad';
 
   return useQuery<DailyNoteResponse>({
-    queryKey: ['daily-notes', authScopeKey, 'day', date],
-    queryFn: () => api.get<DailyNoteResponse>(`/notes/${encodeURIComponent(date)}`),
+    queryKey: dailyNoteDayKey(authScopeKey, date, kind),
+    queryFn: () => api.get<DailyNoteResponse>(dailyNoteDayPath(date, kind)),
     enabled: isManager,
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -103,7 +117,7 @@ export function useDailyNoteContext(date: string) {
   });
 }
 
-export function useDailyNotes(query: string) {
+export function useDailyNotes(query: string, kind: DailyNoteKind = 'scratchpad') {
   const authScopeKey = useAuthScopeKey();
   const isManager = useIsManager();
   const trimmed = query.trim();
@@ -116,9 +130,12 @@ export function useDailyNotes(query: string) {
   }, [trimmed]);
 
   return useInfiniteQuery<DailyNotesResponse>({
-    queryKey: ['daily-notes', authScopeKey, 'list', debouncedQuery],
+    queryKey: ['daily-notes', authScopeKey, 'list', kind, debouncedQuery],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({ limit: String(LIST_PAGE_SIZE) });
+      if (kind !== 'scratchpad') {
+        params.set('kind', kind);
+      }
       if (debouncedQuery) {
         params.set('q', debouncedQuery);
       }
@@ -161,13 +178,14 @@ export function useAppendDailyNote() {
       return api.post<DailyNoteResponse>(`/notes/${encodeURIComponent(variables.date)}/append`, {
         text: variables.text,
         requestId: variables.requestId,
+        kind: variables.kind,
       });
     },
     onSuccess: (data, variables) => {
       if (!stillCurrent(scopeAtSendRef.current)) {
         return;
       }
-      qc.setQueryData(['daily-notes', authScopeKey, 'day', variables.date], data);
+      qc.setQueryData(dailyNoteDayKey(authScopeKey, variables.date, variables.kind ?? 'scratchpad'), data);
       invalidateDailyNoteListViews(qc);
     },
   });
@@ -208,6 +226,7 @@ export function useAddDailyNoteTaskUpdate(noteDate: string) {
       type?: 'update' | 'instruction' | 'decision';
       visibility?: 'shared' | 'private';
       requestId: string;
+      kind?: DailyNoteKind;
     }) => {
       scopeAtSendRef.current = authScopeKey;
       return api.post<TaskEvent>(`/notes/${encodeURIComponent(noteDate)}/task-updates`, payload);
@@ -238,6 +257,7 @@ export function useCreateDailyNoteTask(noteDate: string) {
       jiraKey?: string;
       context?: string;
       requestId: string;
+      kind?: DailyNoteKind;
     }) => {
       scopeAtSendRef.current = authScopeKey;
       return api.post<TaskResolution>(`/notes/${encodeURIComponent(noteDate)}/tasks`, payload);

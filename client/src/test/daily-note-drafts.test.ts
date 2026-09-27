@@ -57,6 +57,18 @@ describe('daily-note drafts', () => {
     expect(readDailyNoteDraft(SCOPE, DATE)).toBeNull();
   });
 
+  it('keeps standup drafts separate from scratchpad drafts for the same date', () => {
+    writeDailyNoteDraft(SCOPE, DATE, { body: 'scratchpad draft', baseBody: '', revision: 0 });
+    writeDailyNoteDraft(SCOPE, DATE, { body: 'standup draft', baseBody: '', revision: 0 }, 'standup');
+
+    expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('scratchpad draft');
+    expect(readDailyNoteDraft(SCOPE, DATE, 'standup')?.body).toBe('standup draft');
+
+    clearDailyNoteDraft(SCOPE, DATE, 'standup');
+    expect(readDailyNoteDraft(SCOPE, DATE, 'standup')).toBeNull();
+    expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('scratchpad draft');
+  });
+
   it('clears all drafts and the capture draft for a scope only', () => {
     writeDailyNoteDraft(SCOPE, DATE, { body: 'a', baseBody: '', revision: 0 });
     writeDailyNoteDraft(SCOPE, '2026-04-29', { body: 'b', baseBody: '', revision: 0 });

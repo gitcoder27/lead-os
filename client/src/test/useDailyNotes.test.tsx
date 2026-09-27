@@ -41,6 +41,7 @@ const RESPONSE: DailyNoteResponse = {
   note: {
     id: 1,
     date: DATE,
+    kind: 'scratchpad',
     title: 'note',
     excerpt: '',
     body: 'appended',
@@ -73,7 +74,28 @@ describe('daily note mutations', () => {
       result.current.mutate({ date: DATE, text: 'appended', requestId: 'r1' });
     });
 
-    expect(client.getQueryData<DailyNoteResponse>(['daily-notes', scope, 'day', DATE])?.note?.body).toBe('appended');
+    expect(client.getQueryData<DailyNoteResponse>(['daily-notes', scope, 'day', DATE, 'scratchpad'])?.note?.body).toBe('appended');
+  });
+
+  it('appends to a standup note under its own cache key', async () => {
+    const client = new QueryClient();
+    apiMocks.post.mockResolvedValue({
+      ...RESPONSE,
+      note: { ...RESPONSE.note!, kind: 'standup' as const },
+    });
+    const { result } = renderHook(() => useAppendDailyNote(), { wrapper: createWrapper(client) });
+
+    await act(async () => {
+      result.current.mutate({ date: DATE, text: 'standup summary', requestId: 'r3', kind: 'standup' });
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith(`/notes/${DATE}/append`, {
+      text: 'standup summary',
+      requestId: 'r3',
+      kind: 'standup',
+    });
+    expect(client.getQueryData<DailyNoteResponse>(['daily-notes', scope, 'day', DATE, 'standup'])?.note?.kind).toBe('standup');
+    expect(client.getQueryData(['daily-notes', scope, 'day', DATE, 'scratchpad'])).toBeUndefined();
   });
 
   it('does not repopulate the cache when a deferred append resolves after unmount', async () => {
@@ -93,7 +115,7 @@ describe('daily note mutations', () => {
       release(RESPONSE);
     });
 
-    expect(client.getQueryData(['daily-notes', scope, 'day', DATE])).toBeUndefined();
+    expect(client.getQueryData(['daily-notes', scope, 'day', DATE, 'scratchpad'])).toBeUndefined();
   });
 
   it('does not repopulate the cache when the auth scope changes mid-flight', async () => {
@@ -114,8 +136,8 @@ describe('daily note mutations', () => {
       release(RESPONSE);
     });
 
-    expect(client.getQueryData(['daily-notes', 'ws-1:manager-a:manager:', 'day', DATE])).toBeUndefined();
-    expect(client.getQueryData(['daily-notes', 'ws-1:manager-b:manager:', 'day', DATE])).toBeUndefined();
+    expect(client.getQueryData(['daily-notes', 'ws-1:manager-a:manager:', 'day', DATE, 'scratchpad'])).toBeUndefined();
+    expect(client.getQueryData(['daily-notes', 'ws-1:manager-b:manager:', 'day', DATE, 'scratchpad'])).toBeUndefined();
   });
 
   it('does not run follow-up invalidations after the auth scope changes mid-flight', async () => {

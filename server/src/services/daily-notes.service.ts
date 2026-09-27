@@ -4,6 +4,7 @@ import type {
   DailyNote,
   DailyNoteDayContext,
   DailyNoteFollowUp,
+  DailyNoteKind,
   DailyNoteRef,
   DailyNoteRefRelation,
   DailyNoteResponse,
@@ -184,6 +185,7 @@ function toSummary(row: DailyNoteRow, query?: string, snippet?: string): DailyNo
   return {
     id: row.id,
     date: row.date,
+    kind: row.kind as DailyNoteKind,
     title: deriveTitle(row.body),
     excerpt: buildExcerpt(row.body, query),
     updatedAt: row.updatedAt,
@@ -655,6 +657,7 @@ export class DailyNotesService {
     managerAccountId: string,
     workspaceId: string,
     query: string,
+    kind: DailyNoteKind,
     before: string | undefined,
     limit: number
   ): Array<DailyNoteRow & { snippet?: string }> | undefined {
@@ -666,20 +669,21 @@ export class DailyNotesService {
       .map((term) => (term.length >= 3 ? `${term}*` : `"${term.replace(/"/g, '""')}"`))
       .join(" ");
     try {
-      const params: unknown[] = [match, workspaceId, managerAccountId];
+      const params: unknown[] = [match, workspaceId, managerAccountId, kind];
       if (before) {
         params.push(before);
       }
       params.push(limit);
       const rows = rawDb
         .prepare(
-          `SELECT n.id, n.workspace_id, n.manager_account_id, n.date, n.body, n.revision, n.created_at, n.updated_at,
+          `SELECT n.id, n.workspace_id, n.manager_account_id, n.date, n.kind, n.body, n.revision, n.created_at, n.updated_at,
                   snippet(daily_notes_fts, 1, '${SNIPPET_OPEN}', '${SNIPPET_CLOSE}', '…', ${SNIPPET_TOKENS}) AS snippet
            FROM daily_notes_fts
            JOIN daily_notes n ON n.id = daily_notes_fts.rowid
            WHERE daily_notes_fts MATCH ?
              AND n.workspace_id = ?
              AND n.manager_account_id = ?
+             AND n.kind = ?
              AND length(trim(n.body)) > 0
              ${before ? "AND n.date < ?" : ""}
            ORDER BY n.date DESC
@@ -691,6 +695,7 @@ export class DailyNotesService {
         workspaceId: row.workspace_id as string,
         managerAccountId: row.manager_account_id as string,
         date: row.date as string,
+        kind: row.kind as DailyNoteKind,
         body: row.body as string,
         revision: row.revision as number,
         createdAt: row.created_at as string,
@@ -704,22 +709,24 @@ export class DailyNotesService {
 
   async list(
     managerAccountId: string,
-    query: { q?: string; before?: string; limit?: number },
+    query: { q?: string; before?: string; limit?: number; kind?: DailyNoteKind },
     workspaceId: string
   ): Promise<DailyNotesResponse> {
     assertScope(managerAccountId, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const kind = query.kind ?? "scratchpad";
     const limit = Math.min(Math.max(Math.trunc(query.limit ?? DEFAULT_LIST_LIMIT), 1), MAX_LIST_LIMIT);
     const trimmedQuery = query.q?.trim();
 
     let rows: Array<DailyNoteRow & { snippet?: string }> | undefined = trimmedQuery
-      ? this.searchNoteBodies(managerAccountId, normalizedWorkspaceId, trimmedQuery, query.before, limit + 1)
+      ? this.searchNoteBodies(managerAccountId, normalizedWorkspaceId, trimmedQuery, kind, query.before, limit + 1)
       : undefined;
 
     if (!rows) {
       const conditions = [
         eq(dailyNotes.workspaceId, normalizedWorkspaceId),
         eq(dailyNotes.managerAccountId, managerAccountId),
+        eq(dailyNotes.kind, kind),
         sql`length(trim(${dailyNotes.body})) > 0`,
       ];
       if (query.before) {
@@ -789,10 +796,10 @@ export class DailyNotesService {
     return counts;
   }
 
-  async getDay(managerAccountId: string, date: string, workspaceId: string): Promise<DailyNoteResponse> {
+  async getDay(managerAccountId: string, date: string, workspaceId: string, kind: DailyNoteKind = "scratchpad"): Promise<DailyNoteResponse> {
     assertScope(managerAccountId, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId);
+    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId, kind);
     if (!note) {
       return { note: null, followUps: [], refs: [] };
     }
@@ -942,7 +949,8 @@ export class DailyNotesService {
     managerAccountId: string,
     date: string,
     input: SaveDailyNotePayload,
-    workspaceId: string
+    workspaceId: string,
+    kind: DailyNoteKind = input.kind ?? "scratchpad"
   ): Promise<DailyNoteResponse> {
     assertScope(managerAccountId, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
@@ -963,7 +971,8 @@ export class DailyNotesService {
           and(
             eq(dailyNotes.workspaceId, normalizedWorkspaceId),
             eq(dailyNotes.managerAccountId, managerAccountId),
-            eq(dailyNotes.date, date)
+            eq(dailyNotes.date, date),
+            eq(dailyNotes.kind, kind)
           )
         )
         .get();
@@ -982,6 +991,7 @@ export class DailyNotesService {
             workspaceId: normalizedWorkspaceId,
             managerAccountId,
             date,
+            kind,
             body: input.body,
             revision: 1,
             createdAt: now,
@@ -1030,9 +1040,9 @@ export class DailyNotesService {
         throw new HttpError(409, NOTE_CONFLICT_MESSAGE);
       }
     })();
-    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId);
+    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId, kind);
     if (note) await this.scanMentions(note, previousBody);
-    return this.getDay(managerAccountId, date, normalizedWorkspaceId);
+    return this.getDay(managerAccountId, date, normalizedWorkspaceId, kind);
     });
   }
 
@@ -1040,7 +1050,8 @@ export class DailyNotesService {
     managerAccountId: string,
     date: string,
     input: AppendDailyNotePayload,
-    workspaceId: string
+    workspaceId: string,
+    kind: DailyNoteKind = input.kind ?? "scratchpad"
   ): Promise<DailyNoteResponse> {
     assertScope(managerAccountId, workspaceId);
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
@@ -1051,7 +1062,7 @@ export class DailyNotesService {
     if (text.length > MAX_BODY_LENGTH) {
       throw new HttpError(400, `Note body must be ${MAX_BODY_LENGTH} characters or fewer`);
     }
-    const payloadHash = hashPayload({ route: "append", date, text });
+    const payloadHash = hashPayload({ route: "append", date, text, kind });
 
     return runInTransaction(async () => {
     let previousBody = "";
@@ -1082,7 +1093,8 @@ export class DailyNotesService {
           and(
             eq(dailyNotes.workspaceId, normalizedWorkspaceId),
             eq(dailyNotes.managerAccountId, managerAccountId),
-            eq(dailyNotes.date, date)
+            eq(dailyNotes.date, date),
+            eq(dailyNotes.kind, kind)
           )
         )
         .get();
@@ -1107,6 +1119,7 @@ export class DailyNotesService {
             workspaceId: normalizedWorkspaceId,
             managerAccountId,
             date,
+            kind,
             body: text,
             revision: 1,
             createdAt: now,
@@ -1131,16 +1144,17 @@ export class DailyNotesService {
         })
         .run();
     })();
-    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId);
+    const note = await this.findNote(managerAccountId, date, normalizedWorkspaceId, kind);
     if (note) await this.scanMentions(note, previousBody);
-    return this.getDay(managerAccountId, date, normalizedWorkspaceId);
+    return this.getDay(managerAccountId, date, normalizedWorkspaceId, kind);
     });
   }
 
-  async addTaskUpdate(managerAccountId: string, noteDate: string, input: { taskKey: string; text: string; type?: "update" | "instruction" | "decision"; visibility?: "shared" | "private"; requestId: string }, workspaceId: string) {
+  async addTaskUpdate(managerAccountId: string, noteDate: string, input: { taskKey: string; text: string; type?: "update" | "instruction" | "decision"; visibility?: "shared" | "private"; requestId: string; kind?: DailyNoteKind }, workspaceId: string) {
     await this.taskKeys.assertEnabled(workspaceId);
+    const kind = input.kind ?? "scratchpad";
     return runInTransaction(async () => {
-      const note = await this.findNote(managerAccountId, noteDate, workspaceId);
+      const note = await this.findNote(managerAccountId, noteDate, workspaceId, kind);
       if (!note) throw new HttpError(404, "Note not found");
       const task = await this.taskKeys.resolveTask(workspaceId, input.taskKey);
       if (task.deleted) throw new HttpError(410, "Task was deleted");
@@ -1152,10 +1166,11 @@ export class DailyNotesService {
     });
   }
 
-  async createTask(managerAccountId: string, noteDate: string, input: { title: string; developerAccountId?: string; jiraKey?: string; context?: string; requestId: string }, workspaceId: string) {
+  async createTask(managerAccountId: string, noteDate: string, input: { title: string; developerAccountId?: string; jiraKey?: string; context?: string; requestId: string; kind?: DailyNoteKind }, workspaceId: string) {
     await this.taskKeys.assertEnabled(workspaceId);
+    const kind = input.kind ?? "scratchpad";
     return runInTransaction(async () => {
-      const note = await this.findNote(managerAccountId, noteDate, workspaceId);
+      const note = await this.findNote(managerAccountId, noteDate, workspaceId, kind);
       if (!note) throw new HttpError(404, "Note not found");
       const payloadHash = hashPayload({
         route: "task",
@@ -1194,8 +1209,9 @@ export class DailyNotesService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const key = `${normalizedWorkspaceId}:${managerAccountId}:${input.requestId}`;
     const previous = this.followUpOperations.get(key) ?? Promise.resolve();
+    const kind = input.kind ?? "scratchpad";
     const operation = previous.then(() =>
-      this.createFollowUpInternal(managerAccountId, noteDate, input, normalizedWorkspaceId)
+      this.createFollowUpInternal(managerAccountId, noteDate, input, normalizedWorkspaceId, kind)
     );
     const tracked = operation.then(
       () => undefined,
@@ -1300,7 +1316,7 @@ export class DailyNotesService {
       const noteIds = [...new Set(hits.map((hit) => hit.noteId))];
       const noteRows = noteIds.length
         ? await db
-            .select({ id: dailyNotes.id, date: dailyNotes.date })
+            .select({ id: dailyNotes.id, date: dailyNotes.date, kind: dailyNotes.kind })
             .from(dailyNotes)
             .where(
               and(
@@ -1310,16 +1326,16 @@ export class DailyNotesService {
               )
             )
         : [];
-      const dateByNoteId = new Map(noteRows.map((row) => [row.id, row.date]));
+      const noteByNoteId = new Map(noteRows.map((row) => [row.id, row]));
 
       const seen = new Set<string>();
       const sources: DailyNoteSourcesResponse["sources"] = [];
       for (const hit of hits) {
-        const date = dateByNoteId.get(hit.noteId);
+        const note = noteByNoteId.get(hit.noteId);
         const key = `${hit.itemId}:${hit.noteId}`;
-        if (date === undefined || seen.has(key)) continue;
+        if (!note || seen.has(key)) continue;
         seen.add(key);
-        sources.push({ itemId: hit.itemId, noteId: hit.noteId, date });
+        sources.push({ itemId: hit.itemId, noteId: hit.noteId, date: note.date, kind: note.kind as DailyNoteKind });
       }
       return { sources };
     }
@@ -1329,6 +1345,7 @@ export class DailyNotesService {
         itemId: dailyNoteFollowUps.itemId,
         noteId: dailyNoteFollowUps.noteId,
         date: dailyNotes.date,
+        kind: dailyNotes.kind,
       })
       .from(dailyNoteFollowUps)
       .innerJoin(dailyNotes, eq(dailyNoteFollowUps.noteId, dailyNotes.id))
@@ -1344,7 +1361,7 @@ export class DailyNotesService {
       .orderBy(dailyNoteFollowUps.itemId);
 
     return {
-      sources: rows.map((row) => ({ itemId: row.itemId, noteId: row.noteId, date: row.date })),
+      sources: rows.map((row) => ({ itemId: row.itemId, noteId: row.noteId, date: row.date, kind: row.kind as DailyNoteKind })),
     };
   }
 
@@ -1352,9 +1369,10 @@ export class DailyNotesService {
     managerAccountId: string,
     noteDate: string,
     input: CreateDailyNoteFollowUpPayload,
-    normalizedWorkspaceId: string
+    normalizedWorkspaceId: string,
+    kind: DailyNoteKind = "scratchpad"
   ): Promise<DailyNoteFollowUp> {
-    const note = await this.findNote(managerAccountId, noteDate, normalizedWorkspaceId);
+    const note = await this.findNote(managerAccountId, noteDate, normalizedWorkspaceId, kind);
     if (!note) {
       throw new HttpError(404, "Note not found");
     }
@@ -1366,6 +1384,7 @@ export class DailyNotesService {
       date: input.date,
       title,
       followUpAt: input.followUpAt,
+      kind,
     });
 
     return runInTransaction(async () => {
@@ -1491,7 +1510,8 @@ export class DailyNotesService {
   private async findNote(
     managerAccountId: string,
     date: string,
-    normalizedWorkspaceId: string
+    normalizedWorkspaceId: string,
+    kind: DailyNoteKind = "scratchpad"
   ): Promise<DailyNoteRow | undefined> {
     const rows = await db
       .select()
@@ -1500,7 +1520,8 @@ export class DailyNotesService {
         and(
           eq(dailyNotes.workspaceId, normalizedWorkspaceId),
           eq(dailyNotes.managerAccountId, managerAccountId),
-          eq(dailyNotes.date, date)
+          eq(dailyNotes.date, date),
+          eq(dailyNotes.kind, kind)
         )
       )
       .limit(1);

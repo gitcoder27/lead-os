@@ -10,17 +10,18 @@ interface NotesSourceLinkProps {
 
 export function NotesSourceLink({ source }: NotesSourceLinkProps) {
   const { openNotes } = useQuickActions();
-  const href = `/notes?date=${encodeURIComponent(source.date)}`;
+  const kind = source.kind ?? 'scratchpad';
+  const href = `/notes?date=${encodeURIComponent(source.date)}${kind === 'standup' ? '&kind=standup' : ''}`;
 
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!openNotes || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return;
     }
     event.preventDefault();
-    openNotes(source.date);
+    openNotes(source.date, kind);
   };
 
-  const label = `Source: ${isValidIsoDate(source.date) ? format(parseISO(source.date), 'MMM d') : source.date} notes`;
+  const label = `Source: ${isValidIsoDate(source.date) ? format(parseISO(source.date), 'MMM d') : source.date} ${kind === 'standup' ? 'standup note' : 'notes'}`;
 
   return (
     <a

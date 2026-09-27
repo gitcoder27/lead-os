@@ -25,6 +25,7 @@ import {
   developers,
   managerDeskDays,
   managerDeskItems,
+  oneOnOneSeries,
   oneOnOneSessions,
   standupSessions,
   taskLegacyMap,
@@ -120,16 +121,33 @@ function assertScope(managerAccountId: string, workspaceId: string): void {
   }
 }
 
+/**
+ * A note line as prose: list/checkbox/heading syntax, `→ T-n` / `→ date`
+ * provenance, `↩ from date` carried markers and emphasis marks removed, so
+ * sidebar titles and excerpts never show raw markdown (docs/52 review #5).
+ */
+export function plainNoteLine(line: string): string {
+  return line
+    .replace(/^\s*#{1,6}\s+/, "")
+    .replace(/^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?/, "")
+    .replace(/→ (?:[Tt]-\d{1,9}|\d{4}-\d{2}-\d{2})(?![\w-])/g, "")
+    .replace(/↩ from \d{4}-\d{2}-\d{2}/g, "")
+    .replace(/~~|\*\*|__/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function plainLines(body: string): string[] {
+  return body.split("\n").map(plainNoteLine).filter((line) => line.length > 0);
+}
+
 function deriveTitle(body: string): string {
-  const line = body
-    .split("\n")
-    .map((value) => value.trim())
-    .find((value) => value.length > 0);
+  const line = plainLines(body)[0];
   return line ? line.slice(0, TITLE_LENGTH) : "Daily note";
 }
 
 function buildExcerpt(body: string, query?: string): string {
-  const collapsed = body.replace(/\s+/g, " ").trim();
+  const collapsed = plainLines(body).join(" ");
   if (collapsed.length <= EXCERPT_LENGTH) {
     return collapsed;
   }
@@ -152,6 +170,16 @@ function buildExcerpt(body: string, query?: string): string {
   return collapsed.slice(0, EXCERPT_LENGTH);
 }
 
+/** FTS snippets keep the body's newlines, so each fragment line is cleaned like the excerpt. */
+function plainSnippet(snippet: string): string {
+  return snippet.split("\n").map(plainNoteLine).filter((line) => line.length > 0).join(" ");
+}
+
+/** Lines this note carried forward (`→ 2026-09-28` markers). */
+function countCarriedOut(body: string): number {
+  return (body.match(/→ \d{4}-\d{2}-\d{2}(?![\w-])/g) ?? []).length;
+}
+
 function toSummary(row: DailyNoteRow, query?: string, snippet?: string): DailyNoteSummary {
   return {
     id: row.id,
@@ -159,7 +187,7 @@ function toSummary(row: DailyNoteRow, query?: string, snippet?: string): DailyNo
     title: deriveTitle(row.body),
     excerpt: buildExcerpt(row.body, query),
     updatedAt: row.updatedAt,
-    ...(snippet ? { snippet } : {}),
+    ...(snippet ? { snippet: plainSnippet(snippet) } : {}),
   };
 }
 
@@ -713,10 +741,52 @@ export class DailyNotesService {
 
     const page = rows.slice(0, limit);
     const hasMore = rows.length > limit;
+    const created = await this.createdCounts(managerAccountId, normalizedWorkspaceId, page.map((row) => row.id));
     return {
-      notes: page.map((row) => toSummary(row, trimmedQuery, row.snippet)),
+      notes: page.map((row) => {
+        const summary = toSummary(row, trimmedQuery, row.snippet);
+        const tasks = created.get(row.id) ?? 0;
+        const carried = countCarriedOut(row.body);
+        return tasks || carried ? { ...summary, produced: { tasks, carried } } : summary;
+      }),
       nextCursor: hasMore && page.length > 0 ? page[page.length - 1]!.date : null,
     };
+  }
+
+  /**
+   * Tasks/follow-ups each note produced, for the sidebar's "2 tasks · 1 carried"
+   * line. Keyed refs count once per task; legacy follow-ups without a key
+   * are counted from their own table.
+   */
+  private async createdCounts(managerAccountId: string, workspaceId: string, noteIds: number[]): Promise<Map<number, number>> {
+    const counts = new Map<number, number>();
+    if (noteIds.length === 0) return counts;
+    const keyed = await db
+      .select({ noteId: dailyNoteTaskRefs.noteId, count: sql<number>`count(distinct ${dailyNoteTaskRefs.taskKey})` })
+      .from(dailyNoteTaskRefs)
+      .where(
+        and(
+          eq(dailyNoteTaskRefs.workspaceId, workspaceId),
+          eq(dailyNoteTaskRefs.managerAccountId, managerAccountId),
+          eq(dailyNoteTaskRefs.relation, "created_from"),
+          inArray(dailyNoteTaskRefs.noteId, noteIds)
+        )
+      )
+      .groupBy(dailyNoteTaskRefs.noteId);
+    for (const row of keyed) counts.set(row.noteId, Number(row.count));
+    const legacy = await db
+      .select({ noteId: dailyNoteFollowUps.noteId, count: sql<number>`count(*)` })
+      .from(dailyNoteFollowUps)
+      .where(
+        and(
+          eq(dailyNoteFollowUps.workspaceId, workspaceId),
+          eq(dailyNoteFollowUps.managerAccountId, managerAccountId),
+          inArray(dailyNoteFollowUps.noteId, noteIds)
+        )
+      )
+      .groupBy(dailyNoteFollowUps.noteId);
+    for (const row of legacy) counts.set(row.noteId, Math.max(counts.get(row.noteId) ?? 0, Number(row.count)));
+    return counts;
   }
 
   async getDay(managerAccountId: string, date: string, workspaceId: string): Promise<DailyNoteResponse> {
@@ -764,10 +834,10 @@ export class DailyNotesService {
         .limit(1)
     )[0];
 
-    const [note, followUpsDue, oneOnOnes] = await Promise.all([
+    const [note, followUpsDue, oneOnOneWith] = await Promise.all([
       this.findNote(managerAccountId, date, normalizedWorkspaceId),
       this.countDueFollowUps(managerAccountId, date, normalizedWorkspaceId),
-      this.countOneOnOnes(date, normalizedWorkspaceId),
+      this.oneOnOnesOn(date, normalizedWorkspaceId),
     ]);
 
     return {
@@ -780,7 +850,8 @@ export class DailyNotesService {
         : null,
       carriedFrom: note ? countCarriedLines(note.body) : 0,
       followUpsDue,
-      oneOnOnes,
+      oneOnOnes: oneOnOneWith.length,
+      oneOnOneWith,
     };
   }
 
@@ -833,7 +904,8 @@ export class DailyNotesService {
     ).length;
   }
 
-  private async countOneOnOnes(date: string, workspaceId: string): Promise<number> {
+  /** People with a live (scheduled/done) 1:1 on `date`, when the 1:1 workspace is enabled. */
+  private async oneOnOnesOn(date: string, workspaceId: string): Promise<Array<{ accountId: string; name: string }>> {
     const flag = (
       await db
         .select({ value: configTable.value })
@@ -842,21 +914,28 @@ export class DailyNotesService {
         .limit(1)
     )[0];
     if (flag?.value !== "true") {
-      return 0;
+      return [];
     }
-    const row = (
-      await db
-        .select({ count: sql<number>`count(*)` })
-        .from(oneOnOneSessions)
-        .where(
-          and(
-            eq(oneOnOneSessions.workspaceId, workspaceId),
-            eq(oneOnOneSessions.scheduledFor, date),
-            inArray(oneOnOneSessions.status, LIVE_ONE_ON_ONE_STATUSES)
-          )
+    const rows = await db
+      .select({ accountId: oneOnOneSeries.developerAccountId, name: developers.displayName })
+      .from(oneOnOneSessions)
+      .innerJoin(oneOnOneSeries, eq(oneOnOneSessions.seriesId, oneOnOneSeries.id))
+      .leftJoin(
+        developers,
+        and(eq(developers.accountId, oneOnOneSeries.developerAccountId), eq(developers.workspaceId, workspaceId))
+      )
+      .where(
+        and(
+          eq(oneOnOneSessions.workspaceId, workspaceId),
+          eq(oneOnOneSessions.scheduledFor, date),
+          inArray(oneOnOneSessions.status, LIVE_ONE_ON_ONE_STATUSES)
         )
-    )[0];
-    return row?.count ?? 0;
+      );
+    const seen = new Map<string, string>();
+    for (const row of rows) {
+      if (!seen.has(row.accountId)) seen.set(row.accountId, row.name ?? row.accountId);
+    }
+    return [...seen].map(([accountId, name]) => ({ accountId, name }));
   }
 
   async save(
@@ -1308,7 +1387,7 @@ export class DailyNotesService {
         const task = await this.tasks.create({ title, scheduledOn: input.date, followUpAt: input.followUpAt, labels: ["category:follow_up"] }, { type: "manager", accountId: managerAccountId, workspaceId: normalizedWorkspaceId });
         await db.insert(dailyNoteTaskRefs).values({ workspaceId: normalizedWorkspaceId, managerAccountId, noteId: note.id, taskId: task.id, taskKey: task.taskKey, relation: "created_from", requestId: input.requestId, payloadHash, createdAt: nowIso() });
         await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: task.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
-        return { itemId: task.id, title: task.title, date: input.date, status: "planned" as const, followUpAt: task.followUpAt ?? undefined };
+        return { itemId: task.id, title: task.title, date: input.date, status: "planned" as const, followUpAt: task.followUpAt ?? undefined, taskKey: task.taskKey };
       }
       const receiptRows = await db
         .select()
@@ -1366,6 +1445,7 @@ export class DailyNotesService {
         title: item.title,
         status: item.status,
         followUpAt: item.followUpAt,
+        taskKey: item.taskKey ?? undefined,
       };
     });
   }

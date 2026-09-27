@@ -118,7 +118,7 @@ describe('My Day quick update', () => {
       onAddCheckIn.mock.calls[0]![3].onSuccess();
     });
     expect(input).toHaveValue('');
-    expect(screen.getByText(/on your lead’s board/)).toBeInTheDocument();
+    expect(screen.getByText('Sent to your lead')).toBeInTheDocument();
   });
 
   it('stays closed on read-only days', () => {
@@ -190,6 +190,27 @@ describe('My Day queue and finished work', () => {
 
     fireEvent.keyDown(firstHandle, { key: 'ArrowDown' });
     expect(onReorder).toHaveBeenCalledWith(1, 3);
+  });
+
+  it('opens a row’s update composer only on demand and closes it with Escape', () => {
+    render(
+      <PlannedQueue
+        viewDate="2026-03-10"
+        items={[createItem({ id: 1, title: 'Keyed', taskKey: 'T-9', position: 1 })]}
+        onSetCurrent={vi.fn()}
+        onMarkDone={vi.fn()}
+        onDrop={vi.fn()}
+        onReorder={vi.fn()}
+        onUpdateTitle={vi.fn()}
+      />,
+      { wrapper: TestWrapper }
+    );
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add an update to T-9' }));
+    const composer = screen.getByRole('textbox', { name: 'Add an update to T-9' });
+    fireEvent.keyDown(composer, { key: 'Escape' });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('moves finished work back to Up next', () => {

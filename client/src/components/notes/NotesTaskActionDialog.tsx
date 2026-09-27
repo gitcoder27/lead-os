@@ -1,22 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { format, parseISO } from 'date-fns';
-import { ListPlus, SquarePlus, X } from 'lucide-react';
+import { ListPlus, SquarePlus } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAddDailyNoteTaskUpdate, useCreateDailyNoteTask } from '@/hooks/useDailyNotes';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { DeveloperPicker } from '@/components/capture/DeveloperPicker';
 import { TaskPicker, parseTaskKeys, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
+import { lineContent, prettyNoteDate, splitTitleAndContext } from '@/lib/note-markdown';
 import type { ManagerDeskDeveloperLookupItem } from '@/types/manager-desk';
+import {
+  NOTES_INPUT_CLASS,
+  NOTES_INPUT_STYLE,
+  NotesDialogShell,
+  NotesField,
+  NotesFormError,
+  NotesSubmitButton,
+  noteSourceLabel,
+} from './NotesDialogPrimitives';
 
 export type NotesTaskActionMode = 'update' | 'create';
+
+export interface NotesTaskActionInference {
+  taskKey?: string | null;
+  developer?: ManagerDeskDeveloperLookupItem | null;
+  jiraKey?: string | null;
+}
 
 interface NotesTaskActionDialogProps {
   open: boolean;
   mode: NotesTaskActionMode;
   noteDate: string;
   selectedText: string;
+  /** F8: targets pre-picked from what the line says. */
+  inference?: NotesTaskActionInference;
   onClose: () => void;
+  /** Called with the task the text landed on, so the note can mark the line (F7). */
+  onDone?: (result: { taskKey: string }) => void;
 }
 
 const TITLE_MAX = 500;
@@ -28,11 +46,17 @@ const EVENT_TYPES = [
   { value: 'decision', label: 'Decision' },
 ] as const;
 
-function firstLine(text: string, max: number): string {
-  return (text.trim().split('\n')[0] ?? '').slice(0, max);
+/** Update body: every line's content, markers and list syntax stripped. */
+function updateText(text: string): string {
+  return text
+    .split('\n')
+    .map(lineContent)
+    .filter((line) => line.length > 0)
+    .join('\n')
+    .slice(0, TEXT_MAX);
 }
 
-export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onClose }: NotesTaskActionDialogProps) {
+export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, inference, onClose, onDone }: NotesTaskActionDialogProps) {
   const { addToast } = useToast();
   const addUpdate = useAddDailyNoteTaskUpdate(noteDate);
   const createTask = useCreateDailyNoteTask(noteDate);
@@ -50,8 +74,13 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
 
   const search = useGlobalSearch(taskQuery, { enabled: open && mode === 'update' });
 
+  const inferredKey = inference?.taskKey ?? null;
+
   const taskCandidates = useMemo<TaskPickerTask[]>(() => {
     const seen = new Map<string, TaskPickerTask>();
+    if (inferredKey) {
+      seen.set(inferredKey, { taskKey: inferredKey, title: 'Mentioned in this line' });
+    }
     for (const task of search.data?.tasks ?? []) {
       if (task.taskKey && !seen.has(task.taskKey)) {
         seen.set(task.taskKey, { taskKey: task.taskKey, title: task.title });
@@ -65,38 +94,26 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
       }
     }
     return [...seen.values()];
-  }, [search.data, taskQuery, text]);
-
-  const sourceLabel = useMemo(() => {
-    try {
-      return format(parseISO(noteDate), 'EEE, MMM d');
-    } catch {
-      return noteDate;
-    }
-  }, [noteDate]);
+  }, [inferredKey, search.data, taskQuery, text]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    const trimmed = selectedText.trim();
-    setText(trimmed.slice(0, TEXT_MAX));
+    const { title: head, context } = splitTitleAndContext(selectedText, TITLE_MAX);
+    setText(mode === 'update' ? updateText(selectedText) : context.slice(0, TEXT_MAX));
+    setTitle(head);
     setTaskQuery('');
-    setSelectedKeys([]);
+    setSelectedKeys(inference?.taskKey ? [inference.taskKey] : []);
     setEventType('update');
     setVisibility('private');
-    setTitle(firstLine(trimmed, TITLE_MAX));
-    setDeveloper(null);
-    setJiraKey('');
+    setDeveloper(inference?.developer ?? null);
+    setJiraKey(inference?.jiraKey ?? '');
     setFormError(null);
     requestKeyRef.current = null;
-  }, [open, selectedText, mode]);
+  }, [open, selectedText, mode, inference]);
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      onClose();
-    }
-  };
+  const sourceLabel = noteSourceLabel(prettyNoteDate(noteDate, 'EEE, MMM d'));
 
   const handleSubmitUpdate = () => {
     const trimmed = text.trim();
@@ -117,10 +134,11 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
     if (!requestKeyRef.current || requestKeyRef.current.key !== key) {
       requestKeyRef.current = { key, id: crypto.randomUUID() };
     }
+    const taskKey = keys[0]!;
 
     addUpdate.mutate(
       {
-        taskKey: keys[0]!,
+        taskKey,
         text: trimmed,
         type: eventType,
         visibility,
@@ -128,8 +146,9 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
       },
       {
         onSuccess: () => {
-          addToast(`Update added to ${keys[0]}`, 'success');
+          addToast(`Update added to ${taskKey}`, 'success');
           requestKeyRef.current = null;
+          onDone?.({ taskKey });
           onClose();
         },
         onError: (error) => setFormError(error.message),
@@ -163,11 +182,9 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
       },
       {
         onSuccess: (task) => {
-          addToast(
-            task.taskKey ? `Task ${task.taskKey} created` : 'Task created',
-            'success',
-          );
+          addToast(task.taskKey ? `Task ${task.taskKey} created` : 'Task created', 'success');
           requestKeyRef.current = null;
+          if (task.taskKey) onDone?.({ taskKey: task.taskKey });
           onClose();
         },
         onError: (error) => setFormError(error.message),
@@ -178,224 +195,126 @@ export function NotesTaskActionDialog({ open, mode, noteDate, selectedText, onCl
   const isPending = addUpdate.isPending || createTask.isPending;
 
   return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay
-          className="fixed inset-0 z-[90]"
-          style={{ background: 'rgba(4, 8, 14, 0.5)', backdropFilter: 'blur(4px)' }}
-        />
-        <Dialog.Content className="notes-dialog fixed z-[91] rounded-2xl border p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Dialog.Title className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {mode === 'update' ? 'Add as task update' : 'Create task'}
-              </Dialog.Title>
-              <Dialog.Description className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                {mode === 'update'
-                  ? `Adds a timeline update sourced from your ${sourceLabel} note.`
-                  : `Creates a task sourced from your ${sourceLabel} note.`}
-              </Dialog.Description>
-            </div>
-            <Dialog.Close asChild>
-              <button
-                type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ color: 'var(--text-muted)' }}
-                aria-label="Close task dialog"
-              >
-                <X size={14} />
-              </button>
-            </Dialog.Close>
-          </div>
-
-          {mode === 'update' ? (
-            <div className="mt-4 space-y-3">
-              <div>
-                <label htmlFor="note-task-update-text" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Update text
-                </label>
-                <textarea
-                  id="note-task-update-text"
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  maxLength={TEXT_MAX}
-                  rows={4}
-                  placeholder="What should land on the task timeline?"
-                  className="w-full resize-none rounded-lg px-3 py-2 text-[13px] leading-5 outline-none"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                />
-              </div>
-              <div>
-                <label htmlFor="note-task-update-search" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Task
-                </label>
-                <input
-                  id="note-task-update-search"
-                  type="text"
-                  value={taskQuery}
-                  onChange={(event) => setTaskQuery(event.target.value)}
-                  placeholder="Search tasks or type a key like T-12"
-                  className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                />
-                <div className="mt-2">
-                  <TaskPicker
-                    tasks={taskCandidates}
-                    text={`${taskQuery} ${text}`}
-                    selected={selectedKeys}
-                    onChange={setSelectedKeys}
-                  />
-                  {taskCandidates.length === 0 && taskQuery.trim().length >= 2 ? (
-                    <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      {search.isLoading ? 'Searching…' : 'No tasks matched — type a task key like T-12.'}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div>
-                  <label htmlFor="note-task-update-type" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                    Type
-                  </label>
-                  <select
-                    id="note-task-update-type"
-                    value={eventType}
-                    onChange={(event) => setEventType(event.target.value as typeof eventType)}
-                    className="rounded-lg px-2.5 py-1.5 text-[13px] outline-none"
-                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                  >
-                    {EVENT_TYPES.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <fieldset className="min-w-0">
-                  <legend className="mb-1 text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                    Visibility
-                  </legend>
-                  <div className="flex items-center gap-3 text-[13px]" style={{ color: 'var(--text-primary)' }}>
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="radio"
-                        name="note-task-update-visibility"
-                        checked={visibility === 'private'}
-                        onChange={() => setVisibility('private')}
-                      />
-                      Only me
-                    </label>
-                    <label className="flex items-center gap-1.5">
-                      <input
-                        type="radio"
-                        name="note-task-update-visibility"
-                        checked={visibility === 'shared'}
-                        onChange={() => setVisibility('shared')}
-                      />
-                      Shared with developer
-                    </label>
-                  </div>
-                </fieldset>
-              </div>
-              {formError ? (
-                <p className="text-[12px]" style={{ color: 'var(--danger)' }} role="alert">
-                  {formError}
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
-              <div>
-                <label htmlFor="note-task-title" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Title
-                </label>
-                <input
-                  id="note-task-title"
-                  type="text"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  maxLength={TITLE_MAX}
-                  placeholder="What needs to happen?"
-                  className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                />
-              </div>
-              <div>
-                <span className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Assign to
-                </span>
-                <DeveloperPicker
-                  date={noteDate}
-                  selected={developer}
-                  onSelect={setDeveloper}
-                  onClear={() => setDeveloper(null)}
-                />
+    <NotesDialogShell
+      open={open}
+      onClose={onClose}
+      title={mode === 'update' ? 'Add as task update' : 'Create task'}
+      sourceLabel={sourceLabel}
+      footer={
+        <NotesSubmitButton onClick={mode === 'update' ? handleSubmitUpdate : handleSubmitCreate} disabled={isPending}>
+          {mode === 'update' ? <ListPlus size={12} /> : <SquarePlus size={12} />}
+          {isPending ? (mode === 'update' ? 'Adding…' : 'Creating…') : mode === 'update' ? 'Add update' : 'Create task'}
+        </NotesSubmitButton>
+      }
+    >
+      {mode === 'update' ? (
+        <>
+          <NotesField label="Update text" htmlFor="note-task-update-text">
+            <textarea
+              id="note-task-update-text"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              maxLength={TEXT_MAX}
+              rows={4}
+              placeholder="What should land on the task timeline?"
+              className={`${NOTES_INPUT_CLASS} resize-none`}
+              style={NOTES_INPUT_STYLE}
+            />
+          </NotesField>
+          <NotesField label="Task" htmlFor="note-task-update-search">
+            <input
+              id="note-task-update-search"
+              type="text"
+              value={taskQuery}
+              onChange={(event) => setTaskQuery(event.target.value)}
+              placeholder="Search tasks or type a key like T-12"
+              className={NOTES_INPUT_CLASS}
+              style={NOTES_INPUT_STYLE}
+            />
+            <div className="mt-2">
+              <TaskPicker tasks={taskCandidates} text={`${taskQuery} ${text}`} selected={selectedKeys} onChange={setSelectedKeys} />
+              {taskCandidates.length === 0 && taskQuery.trim().length >= 2 ? (
                 <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  Leave unassigned to send the task to your Manager Desk inbox.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="note-task-jira" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Jira key <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
-                </label>
-                <input
-                  id="note-task-jira"
-                  type="text"
-                  value={jiraKey}
-                  onChange={(event) => setJiraKey(event.target.value)}
-                  placeholder="AM-123"
-                  className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                />
-              </div>
-              <div>
-                <label htmlFor="note-task-context" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Context <span style={{ color: 'var(--text-muted)' }}>(private first update)</span>
-                </label>
-                <textarea
-                  id="note-task-context"
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  maxLength={TEXT_MAX}
-                  rows={3}
-                  placeholder="Context lands on the task timeline as a private update"
-                  className="w-full resize-none rounded-lg px-3 py-2 text-[13px] leading-5 outline-none"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-                />
-              </div>
-              {formError ? (
-                <p className="text-[12px]" style={{ color: 'var(--danger)' }} role="alert">
-                  {formError}
+                  {search.isLoading ? 'Searching…' : 'No tasks matched — type a task key like T-12.'}
                 </p>
               ) : null}
             </div>
-          )}
-
-          <div className="mt-5 flex items-center justify-end gap-2">
-            <Dialog.Close asChild>
-              <button type="button" className="notes-button secondary">
-                Cancel
-              </button>
-            </Dialog.Close>
-            <button
-              type="button"
-              onClick={mode === 'update' ? handleSubmitUpdate : handleSubmitCreate}
-              disabled={isPending}
-              className="notes-button"
-              style={{ background: 'var(--accent)', color: '#fff', border: '1px solid transparent' }}
+          </NotesField>
+          {/* F8: type + visibility collapse into one quiet row. */}
+          <div className="notes-quiet-row">
+            <label className="sr-only" htmlFor="note-task-update-type">
+              Type
+            </label>
+            <select
+              id="note-task-update-type"
+              value={eventType}
+              onChange={(event) => setEventType(event.target.value as typeof eventType)}
+              className="notes-quiet-select"
             >
-              {mode === 'update' ? <ListPlus size={12} /> : <SquarePlus size={12} />}
-              {isPending
-                ? mode === 'update'
-                  ? 'Adding…'
-                  : 'Creating…'
-                : mode === 'update'
-                  ? 'Add update'
-                  : 'Create task'}
-            </button>
+              {EVENT_TYPES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span aria-hidden="true">·</span>
+            <label className="sr-only" htmlFor="note-task-update-visibility">
+              Visibility
+            </label>
+            <select
+              id="note-task-update-visibility"
+              value={visibility}
+              onChange={(event) => setVisibility(event.target.value as typeof visibility)}
+              className="notes-quiet-select"
+            >
+              <option value="private">Only me</option>
+              <option value="shared">Shared with developer</option>
+            </select>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </>
+      ) : (
+        <>
+          <NotesField label="Title" htmlFor="note-task-title">
+            <input
+              id="note-task-title"
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={TITLE_MAX}
+              placeholder="What needs to happen?"
+              className={NOTES_INPUT_CLASS}
+              style={NOTES_INPUT_STYLE}
+            />
+          </NotesField>
+          <NotesField label="Assign to" hint="Leave unassigned to send the task to your Manager Desk inbox.">
+            <DeveloperPicker date={noteDate} selected={developer} onSelect={setDeveloper} onClear={() => setDeveloper(null)} />
+          </NotesField>
+          <NotesField label="Jira key" htmlFor="note-task-jira" optional="optional">
+            <input
+              id="note-task-jira"
+              type="text"
+              value={jiraKey}
+              onChange={(event) => setJiraKey(event.target.value)}
+              placeholder="AM-123"
+              className={NOTES_INPUT_CLASS}
+              style={NOTES_INPUT_STYLE}
+            />
+          </NotesField>
+          <NotesField label="Context" htmlFor="note-task-context" optional="private first update">
+            <textarea
+              id="note-task-context"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              maxLength={TEXT_MAX}
+              rows={3}
+              placeholder="Context lands on the task timeline as a private update"
+              className={`${NOTES_INPUT_CLASS} resize-none`}
+              style={NOTES_INPUT_STYLE}
+            />
+          </NotesField>
+        </>
+      )}
+      <NotesFormError message={formError} />
+    </NotesDialogShell>
   );
 }

@@ -458,6 +458,8 @@ describe("DailyNotesService.createFollowUp/getSources", () => {
       contextNote: null,
     });
     expect(itemRows[0]?.contextNote ?? "").not.toContain("confidential");
+    // docs/52 F7: a fresh follow-up returns its key so the note can write `→ T-n`.
+    expect(followUp.taskKey ?? null).toBe(itemRows[0]?.taskKey ?? null);
 
     const dayRows = await db.select().from(managerDeskDays);
     expect(dayRows).toHaveLength(1);
@@ -693,6 +695,8 @@ describe("DailyNotesService refs[] + day context", () => {
       followUpAt: "2026-03-10T12:00:00.000Z",
       requestId: randomUUID(),
     }, WS);
+    // docs/52 F7: the new follow-up's key comes back for the `→ T-n` marker.
+    expect(followUp.taskKey).toMatch(/^T-\d+$/);
     await service.addTaskUpdate(MANAGER, DATE, {
       taskKey: item.taskKey!,
       text: "nudge",
@@ -808,12 +812,31 @@ describe("DailyNotesService refs[] + day context", () => {
       carriedFrom: 2,
       followUpsDue: 1,
       oneOnOnes: 1,
+      oneOnOneWith: [{ accountId: "dev-1", name: expect.any(String) }],
     });
   });
 
   it("getDayContext returns empty context for a blank day", async () => {
     const ctx = await service.getDayContext(MANAGER, DATE, WS);
-    expect(ctx).toEqual({ standup: null, carriedFrom: 0, followUpsDue: 0, oneOnOnes: 0 });
+    expect(ctx).toEqual({ standup: null, carriedFrom: 0, followUpsDue: 0, oneOnOnes: 0, oneOnOneWith: [] });
+  });
+
+  it("lists notes as plain text with what each day produced", async () => {
+    await enableTaskKeys();
+    await saveNote("- [ ] **Chase** vendor → T-9\n## Risks\n- hiring loop → 2026-03-09\n1. third ↩ from 2026-03-07");
+    await service.createFollowUp(MANAGER, DATE, {
+      date: DATE,
+      title: "Follow up",
+      followUpAt: "2026-03-10T12:00:00.000Z",
+      requestId: randomUUID(),
+    }, WS);
+
+    const list = await service.list(MANAGER, {}, WS);
+    expect(list.notes[0]).toMatchObject({
+      title: "Chase vendor",
+      excerpt: "Chase vendor Risks hiring loop third",
+      produced: { tasks: 1, carried: 1 },
+    });
   });
 });
 

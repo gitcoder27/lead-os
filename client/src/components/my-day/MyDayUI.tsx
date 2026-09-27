@@ -52,6 +52,7 @@ export function MyDaySection({
   const headingId = `my-day-${id}-heading`;
   return (
     <motion.section
+      id={`my-day-${id}`}
       variants={sectionVariants}
       aria-labelledby={headingId}
       aria-disabled={readOnly || undefined}

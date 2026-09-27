@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeNoteBodies } from '@/lib/daily-note-merge';
+import { conflictHunks, mergeNoteBodies } from '@/lib/daily-note-merge';
 
 describe('mergeNoteBodies', () => {
   it('returns the local body unchanged when remote equals base', () => {
@@ -73,5 +73,15 @@ describe('mergeNoteBodies', () => {
     );
     expect(outcome.clean).toBe(false);
     expect(outcome.merged).toBe('head\nmiddle remote\n\nmiddle local\nfoot\nremote tail\n\nlocal tail');
+  });
+});
+
+describe('conflictHunks', () => {
+  it('returns only the overlapping passages, not the shared text', () => {
+    expect(conflictHunks('a\nshared\nz', 'a\nmine\nz', 'a\ntheirs\nz')).toEqual([{ mine: ['mine'], theirs: ['theirs'] }]);
+  });
+
+  it('is empty when the edits touch different lines', () => {
+    expect(conflictHunks('a\nb\nc', 'A\nb\nc', 'a\nb\nC')).toEqual([]);
   });
 });

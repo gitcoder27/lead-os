@@ -1,57 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { addDays, format, parseISO } from 'date-fns';
-import { CalendarClock, X } from 'lucide-react';
+import { format } from 'date-fns';
+import { CalendarClock } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useCreateDailyNoteFollowUp } from '@/hooks/useDailyNotes';
+import { followUpPresets, toLocalDateTimeInputValue } from '@/components/tasks/task-detail-format';
 import { getLocalIsoDate } from '@/lib/utils';
+import { prettyNoteDate, splitTitleAndContext } from '@/lib/note-markdown';
 import type { CreateDailyNoteFollowUpPayload } from '@/types';
+import {
+  NOTES_INPUT_CLASS,
+  NOTES_INPUT_STYLE,
+  NotesDialogShell,
+  NotesField,
+  NotesFormError,
+  NotesSubmitButton,
+  noteSourceLabel,
+} from './NotesDialogPrimitives';
 
 interface NotesFollowUpDialogProps {
   open: boolean;
   noteDate: string;
   selectedText: string;
   onClose: () => void;
+  /** Called with the created follow-up's key so the note can mark the line (F7). */
+  onDone?: (result: { taskKey?: string }) => void;
 }
 
 const TITLE_MAX = 500;
 
-function defaultFollowUpValue(): string {
-  const tomorrow = addDays(new Date(), 1);
-  return format(tomorrow, "yyyy-MM-dd'T'09:00");
-}
-
-export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose }: NotesFollowUpDialogProps) {
+export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose, onDone }: NotesFollowUpDialogProps) {
   const { addToast } = useToast();
   const createFollowUp = useCreateDailyNoteFollowUp(noteDate);
   const [title, setTitle] = useState('');
+  const [context, setContext] = useState('');
   const [followUpAt, setFollowUpAt] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const requestKeyRef = useRef<{ key: string; id: string; date: string } | null>(null);
 
-  const sourceLabel = useMemo(() => {
-    try {
-      return format(parseISO(noteDate), 'EEE, MMM d');
-    } catch {
-      return noteDate;
-    }
-  }, [noteDate]);
+  const presets = useMemo(() => (open ? followUpPresets() : []), [open]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    setTitle(selectedText.trim().slice(0, TITLE_MAX));
-    setFollowUpAt(defaultFollowUpValue());
+    const split = splitTitleAndContext(selectedText, TITLE_MAX);
+    setTitle(split.title);
+    setContext(split.context);
+    setFollowUpAt(toLocalDateTimeInputValue(presets[0]?.value ?? null));
     setFormError(null);
     requestKeyRef.current = null;
-  }, [open, selectedText]);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      onClose();
-    }
-  };
+  }, [open, selectedText, presets]);
 
   const handleSubmit = () => {
     const trimmedTitle = title.trim();
@@ -86,9 +84,10 @@ export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose }: N
     };
 
     createFollowUp.mutate(payload, {
-      onSuccess: () => {
-        addToast('Follow-up created', 'success');
+      onSuccess: (created) => {
+        addToast(created?.taskKey ? `Follow-up ${created.taskKey} created` : 'Follow-up created', 'success');
         requestKeyRef.current = null;
+        onDone?.({ taskKey: created?.taskKey });
         onClose();
       },
       onError: (error) => {
@@ -97,91 +96,71 @@ export function NotesFollowUpDialog({ open, noteDate, selectedText, onClose }: N
     });
   };
 
+  const followUpDate = followUpAt ? new Date(followUpAt) : null;
+
   return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay
-          className="fixed inset-0 z-[90]"
-          style={{ background: 'rgba(4, 8, 14, 0.5)', backdropFilter: 'blur(4px)' }}
+    <NotesDialogShell
+      open={open}
+      onClose={onClose}
+      title="Create follow-up"
+      sourceLabel={noteSourceLabel(prettyNoteDate(noteDate, 'EEE, MMM d'))}
+      footer={
+        <NotesSubmitButton onClick={handleSubmit} disabled={createFollowUp.isPending}>
+          <CalendarClock size={12} />
+          {createFollowUp.isPending ? 'Creating…' : 'Create follow-up'}
+        </NotesSubmitButton>
+      }
+    >
+      <NotesField
+        label="Title"
+        htmlFor="note-followup-title"
+        hint={context ? 'Only the first line becomes the title — the rest stays in your note.' : undefined}
+      >
+        <input
+          id="note-followup-title"
+          type="text"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          maxLength={TITLE_MAX}
+          placeholder="What should you come back to?"
+          className={NOTES_INPUT_CLASS}
+          style={NOTES_INPUT_STYLE}
         />
-        <Dialog.Content className="notes-dialog fixed z-[91] rounded-2xl border p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <Dialog.Title className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Create follow-up
-              </Dialog.Title>
-              <Dialog.Description className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                Adds a Manager Desk follow-up sourced from your {sourceLabel} note.
-              </Dialog.Description>
-            </div>
-            <Dialog.Close asChild>
+      </NotesField>
+      <NotesField label="Follow up on" htmlFor="note-followup-at">
+        <div className="mb-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Follow-up presets">
+          {presets.map((preset) => {
+            const value = toLocalDateTimeInputValue(preset.value);
+            return (
               <button
+                key={preset.key}
                 type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-lg"
-                style={{ color: 'var(--text-muted)' }}
-                aria-label="Close follow-up dialog"
+                className={`notes-preset${value === followUpAt ? ' active' : ''}`}
+                aria-pressed={value === followUpAt}
+                onClick={() => setFollowUpAt(value)}
               >
-                <X size={14} />
+                {preset.label}
+                <span>{preset.hint}</span>
               </button>
-            </Dialog.Close>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <div>
-              <label htmlFor="note-followup-title" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Title
-              </label>
-              <input
-                id="note-followup-title"
-                type="text"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                maxLength={TITLE_MAX}
-                placeholder="What should you come back to?"
-                className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-              />
-            </div>
-            <div>
-              <label htmlFor="note-followup-at" className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Follow up on
-              </label>
-              <input
-                id="note-followup-at"
-                type="datetime-local"
-                required
-                value={followUpAt}
-                onChange={(event) => setFollowUpAt(event.target.value)}
-                className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-              />
-            </div>
-            {formError ? (
-              <p className="text-[12px]" style={{ color: 'var(--danger)' }} role="alert">
-                {formError}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="mt-5 flex items-center justify-end gap-2">
-            <Dialog.Close asChild>
-              <button type="button" className="notes-button secondary">
-                Cancel
-              </button>
-            </Dialog.Close>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={createFollowUp.isPending}
-              className="notes-button"
-              style={{ background: 'var(--accent)', color: '#fff', border: '1px solid transparent' }}
-            >
-              <CalendarClock size={12} />
-              {createFollowUp.isPending ? 'Creating…' : 'Create follow-up'}
-            </button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+            );
+          })}
+        </div>
+        <input
+          id="note-followup-at"
+          type="datetime-local"
+          required
+          value={followUpAt}
+          onChange={(event) => setFollowUpAt(event.target.value)}
+          className={NOTES_INPUT_CLASS}
+          style={NOTES_INPUT_STYLE}
+        />
+        {followUpDate && !Number.isNaN(followUpDate.getTime()) ? (
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {format(followUpDate, "EEEE, MMM d 'at' h:mm a")}
+          </p>
+        ) : null}
+      </NotesField>
+      <NotesFormError message={formError} />
+    </NotesDialogShell>
   );
 }

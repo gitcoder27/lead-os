@@ -1,7 +1,9 @@
-import { LogOut, RefreshCw, Sun, Moon } from 'lucide-react';
+import { ChevronRight, LogOut, RefreshCw, Sun, Moon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AuthUser, MyDayResponse } from '@/types';
 import { getLocalIsoDate } from '@/lib/utils';
+import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { getStatusInfo } from './status-config';
 import { MyDayDateControl, relativeDayLabel } from './MyDayDateControl';
 import { HAIRLINE, IconAction } from './MyDayUI';
 
@@ -15,6 +17,8 @@ interface MyDayHeaderProps {
   onRefresh: () => void;
   onToggleTheme: () => void;
   onLogout: () => void;
+  /** Narrow screens stack the check-in below the tasks; the status chip jumps there. */
+  onJumpToCheckIn?: () => void;
 }
 
 function greeting(now = new Date()): string {
@@ -35,6 +39,7 @@ export function MyDayHeader({
   onRefresh,
   onToggleTheme,
   onLogout,
+  onJumpToCheckIn,
 }: MyDayHeaderProps) {
   const isToday = date === getLocalIsoDate();
   const firstName = user?.displayName?.trim().split(/\s+/)[0];
@@ -56,12 +61,14 @@ export function MyDayHeader({
           {title}
         </h1>
         {day && (
-          <DayProgress
-            className="mt-3"
-            done={day.completedItems.length}
-            current={day.currentItem ? 1 : 0}
-            planned={day.plannedItems.length}
-          />
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <DayProgress
+              done={day.completedItems.length}
+              current={day.currentItem ? 1 : 0}
+              planned={day.plannedItems.length}
+            />
+            {onJumpToCheckIn && <StatusChip status={getStatusInfo(day.status)} onClick={onJumpToCheckIn} />}
+          </div>
         )}
       </div>
 
@@ -83,6 +90,26 @@ export function MyDayHeader({
         </IconAction>
       </div>
     </header>
+  );
+}
+
+function StatusChip({ status, onClick }: { status: ReturnType<typeof getStatusInfo>; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-6 items-center gap-1.5 rounded-full pl-2 pr-1.5 text-[12px] font-medium lg:hidden ${FOCUS_RING}`}
+      style={{
+        color: status.color,
+        background: `color-mix(in srgb, ${status.color} 10%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${status.color} 26%, transparent)`,
+      }}
+      aria-label={`Status: ${status.label}. Go to check in`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} aria-hidden="true" />
+      {status.label}
+      <ChevronRight size={12} className="opacity-70" aria-hidden="true" />
+    </button>
   );
 }
 

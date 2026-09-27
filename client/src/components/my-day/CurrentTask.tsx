@@ -67,7 +67,7 @@ export function CurrentTask({
                 ? 'No task was in progress.'
                 : nextItem
                   ? 'Pick up the next thing in your queue.'
-                  : 'Add what you’re working on so your lead can see it.'}
+                  : 'Add what you’re working on to get started.'}
             </p>
           </div>
           {!readOnly && nextItem && onSetCurrent && (

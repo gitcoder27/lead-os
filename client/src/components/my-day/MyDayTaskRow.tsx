@@ -6,7 +6,7 @@ import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { IconAction } from './MyDayUI';
-import { ActivityPanel, EditableTitle, TaskFooter, TaskMeta, TaskNote, canRenameItem } from './MyDayTaskParts';
+import { ActivityPanel, EditableTitle, InlineTaskActions, RowComposer, TaskMeta, TaskNote, canRenameItem } from './MyDayTaskParts';
 
 export type MyDayTaskRowVariant = 'planned' | 'done' | 'dropped';
 
@@ -51,6 +51,7 @@ export function MyDayTaskRow({
   onDragHandlePointerDown,
 }: MyDayTaskRowProps) {
   const [activityOpen, setActivityOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const closed = variant !== 'planned';
   const reorderable = variant === 'planned' && !readOnly && Boolean(onDragHandlePointerDown || onMove);
 
@@ -90,24 +91,28 @@ export function MyDayTaskRow({
           />
         </div>
 
-        <TaskMeta
-          item={item}
-          viewDate={viewDate}
-          closed={closed}
-          trailing={variant === 'dropped' ? 'Dropped' : completedTime}
-          className="mt-1"
-        />
-        <TaskNote note={item.note} className="mt-1.5" />
-
-        {variant === 'planned' && (
-          <TaskFooter
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <TaskMeta
             item={item}
             viewDate={viewDate}
-            readOnly={readOnly}
-            reveal="intent"
-            activityOpen={activityOpen}
-            onToggleActivity={() => setActivityOpen((open) => !open)}
+            closed={closed}
+            trailing={variant === 'dropped' ? 'Dropped' : completedTime}
           />
+          {variant === 'planned' && item.taskKey && (
+            <InlineTaskActions
+              taskKey={item.taskKey}
+              readOnly={readOnly}
+              composerOpen={composerOpen}
+              onOpenComposer={() => setComposerOpen(true)}
+              activityOpen={activityOpen}
+              onToggleActivity={() => setActivityOpen((open) => !open)}
+            />
+          )}
+        </div>
+        <TaskNote note={item.note} className="mt-1.5" />
+
+        {composerOpen && item.taskKey && !readOnly && (
+          <RowComposer taskKey={item.taskKey} viewDate={viewDate} onClose={() => setComposerOpen(false)} />
         )}
         {activityOpen && item.taskKey && <ActivityPanel taskKey={item.taskKey} />}
       </div>

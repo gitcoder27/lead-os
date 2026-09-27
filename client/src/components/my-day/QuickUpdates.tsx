@@ -67,7 +67,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
   };
 
   return (
-    <div className="px-3.5 pb-3 pt-3">
+    <div className="px-3 pb-2.5 pt-2.5">
       <textarea
         ref={setRefs}
         value={draft}
@@ -87,7 +87,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
         aria-label="Quick update"
         disabled={disabled}
         rows={1}
-        className="block w-full resize-none bg-transparent text-[14.5px] leading-6 outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed"
+        className="block w-full resize-none bg-transparent text-[13.5px] leading-[22px] outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed"
         style={{ color: 'var(--text-primary)', maxHeight: MAX_HEIGHT }}
       />
 
@@ -105,24 +105,18 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
         )}
       </AnimatePresence>
 
-      <div className="mt-2.5 flex items-center justify-between gap-3 pt-2.5" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
+      <div className="mt-2 flex items-center justify-between gap-3 pt-2" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
         <div className="min-w-0 text-[11.5px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
           {justSent ? (
             <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: 'var(--success)' }}>
               <Check size={13} aria-hidden="true" />
-              Sent — it’s on your lead’s board
+              Sent to your lead
             </span>
           ) : disabled ? null : (
             <span className="hidden items-center gap-1.5 sm:inline-flex">
               <Kbd>↵</Kbd> send
               <span className="opacity-50">·</span>
               <Kbd>⇧↵</Kbd> new line
-              {!engaged && (
-                <>
-                  <span className="opacity-50">·</span>
-                  <Kbd>U</Kbd> to jump here
-                </>
-              )}
             </span>
           )}
         </div>
@@ -130,14 +124,14 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
           type="button"
           onClick={handleSubmit}
           disabled={!canSend}
-          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed ${FOCUS_RING}`}
+          className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-all disabled:cursor-not-allowed ${FOCUS_RING}`}
           style={
             canSend
               ? { background: 'var(--accent)', color: 'var(--bg-primary)', boxShadow: '0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent)' }
               : { background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)', color: 'var(--text-disabled)' }
           }
         >
-          <ArrowUp size={14} aria-hidden="true" />
+          <ArrowUp size={13} aria-hidden="true" />
           {isPending ? 'Sending…' : 'Send'}
         </button>
       </div>
@@ -184,7 +178,7 @@ function MentionChips({
             }
             aria-pressed={active}
             title={`${task.taskKey} · ${task.title}${mentioned ? ' — mentioned in text' : ''}`}
-            className={`inline-flex max-w-[200px] items-center gap-1.5 rounded-full py-0.5 pl-1.5 pr-2 text-[11.5px] transition-colors ${FOCUS_RING}`}
+            className={`inline-flex max-w-[168px] items-center gap-1.5 rounded-full py-0.5 pl-1.5 pr-2 text-[11.5px] transition-colors ${FOCUS_RING}`}
             style={{
               background: active ? 'color-mix(in srgb, var(--accent) 13%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)',
               color: active ? 'var(--accent)' : 'var(--text-secondary)',

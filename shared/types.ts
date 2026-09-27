@@ -1678,6 +1678,8 @@ export interface DailyNoteSummary {
   updatedAt: string;
   /** FTS5 snippet() output with ⟦…⟧ match markers; present only on FTS hits. */
   snippet?: string;
+  /** What this day's note turned into — list rows only, omitted when nothing. */
+  produced?: { tasks: number; carried: number };
 }
 
 export interface DailyNote extends DailyNoteSummary {
@@ -1692,6 +1694,8 @@ export interface DailyNoteFollowUp {
   title: string;
   status: ManagerDeskStatus;
   followUpAt?: string;
+  /** Present on a freshly created follow-up so the note can write `→ T-n` (docs/52 F7). */
+  taskKey?: string;
 }
 
 export type DailyNoteRefRelation = "created_from" | "update_from" | "mentioned";
@@ -1719,6 +1723,8 @@ export interface DailyNoteDayContext {
   carriedFrom: number;
   followUpsDue: number;
   oneOnOnes: number;
+  /** Who the day's 1:1s are with, so the strip can name them and deep-link. */
+  oneOnOneWith: Array<{ accountId: string; name: string }>;
 }
 
 export interface DailyNotesResponse {

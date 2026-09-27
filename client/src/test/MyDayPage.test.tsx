@@ -319,7 +319,7 @@ describe('MyDayPage', () => {
     const upNextSection = screen.getByText('Up next').closest('section');
     expect(upNextSection).toBeTruthy();
 
-    fireEvent.click(within(upNextSection as HTMLElement).getByText('Add an update…'));
+    fireEvent.click(within(upNextSection as HTMLElement).getByRole('button', { name: 'Add an update to T-3' }));
     fireEvent.change(within(upNextSection as HTMLElement).getByRole('textbox'), {
       target: { value: 'Updated handoff note' },
     });

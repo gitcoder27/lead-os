@@ -58,3 +58,28 @@ export function mergeNoteBodies(base: string, local: string, remote: string): No
   }
   return { merged: lines.join('\n'), clean, remoteWasAppend: false };
 }
+
+export interface NoteConflictHunk {
+  /** Lines only in the editor draft. */
+  mine: string[];
+  /** Lines only in the saved (server) version. */
+  theirs: string[];
+}
+
+/**
+ * docs/52 U5: the overlapping hunks between the draft and the saved version,
+ * so the conflict panel can show what actually differs instead of two full
+ * documents. Empty when the bodies merge cleanly.
+ */
+export function conflictHunks(base: string, local: string, remote: string): NoteConflictHunk[] {
+  const regions = diff3Merge<string>(local.split('\n'), base.split('\n'), remote.split('\n'), {
+    excludeFalseConflicts: true,
+  });
+  const hunks: NoteConflictHunk[] = [];
+  for (const region of regions) {
+    if (!region.ok && region.conflict) {
+      hunks.push({ mine: region.conflict.a, theirs: region.conflict.b });
+    }
+  }
+  return hunks;
+}

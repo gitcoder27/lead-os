@@ -1,12 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
-import { CalendarClock, ChevronLeft, ChevronRight, History, ListPlus, Lock, SquarePlus } from 'lucide-react';
-import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor } from '@/hooks/useDailyNoteEditor';
+import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, History, Lock, Sun } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
+import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor, type DailyNoteEditor } from '@/hooks/useDailyNoteEditor';
+import { useManagerDeskDeveloperLookup } from '@/hooks/useManagerDesk';
+import { useNoteEntityLookups } from '@/hooks/useNoteEntityLookups';
+import { DatePickerPopover, isEditable } from '@/components/tasks/TaskDetailPrimitives';
+import { TaskDrawer } from '@/components/tasks/TaskDrawer';
+import { CARRIED_PATTERN, inferFromText, prettyNoteDate, wrapUpCandidates, type WrapUpCandidate } from '@/lib/note-markdown';
 import { isValidIsoDate } from '@/lib/view-params';
-import type { TodayActionTarget } from '@/types';
+import type { DailyNoteRef, TodayActionTarget } from '@/types';
+import { NoteEditor, type NoteActionSource, type NoteEditorHandle, type NoteLineEdit } from './editor/NoteEditor';
+import type { NoteEditorHandlers, NoteEntityContext, NoteLineAction } from './editor/note-editor-extensions';
 import { NotesConflictPanel } from './NotesConflictPanel';
+import { NotesDayContext } from './NotesDayContext';
+import { NotesDocFooter } from './NotesDocFooter';
 import { NotesFollowUpDialog } from './NotesFollowUpDialog';
-import { NotesTaskActionDialog, type NotesTaskActionMode } from './NotesTaskActionDialog';
+import { NotesFromThisNote } from './NotesFromThisNote';
+import { NotesTaskActionDialog, type NotesTaskActionInference } from './NotesTaskActionDialog';
+import { NotesWrapUpDialog } from './NotesWrapUpDialog';
 
 interface NoteDocumentProps {
   date: string;
@@ -17,9 +29,23 @@ interface NoteDocumentProps {
   onOpenTarget: (target: TodayActionTarget) => void;
   registerFlush: (flush: (() => Promise<boolean>) | null) => void;
   onOpenHistory?: () => void;
+  /** Search terms to land on when this note was opened from a search result (F12). */
+  jumpTerms?: string[];
 }
 
 const CHAR_COUNT_THRESHOLD = DAILY_NOTE_MAX_LENGTH - 5000;
+/** After this local hour the wrap-up button is nudged on today's note. */
+const WRAP_UP_NUDGE_HOUR = 17;
+
+interface ActionDialogState {
+  kind: NoteLineAction;
+  text: string;
+  inference: NotesTaskActionInference;
+}
+
+function hasOpenLayer(): boolean {
+  return Boolean(document.querySelector('[aria-modal="true"], [role="dialog"][data-state="open"], [data-popover-layer]'));
+}
 
 export function NoteDocument({
   date,
@@ -30,14 +56,19 @@ export function NoteDocument({
   onOpenTarget,
   registerFlush,
   onOpenHistory,
+  jumpTerms,
 }: NoteDocumentProps) {
   const editor = useDailyNoteEditor(date);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
-  const [followUpOpen, setFollowUpOpen] = useState(false);
-  const [taskActionOpen, setTaskActionOpen] = useState(false);
-  const [taskActionMode, setTaskActionMode] = useState<NotesTaskActionMode>('update');
-  const [selectedText, setSelectedText] = useState('');
+  const { addToast } = useToast();
+  const lookups = useNoteEntityLookups();
+  const rosterQuery = useManagerDeskDeveloperLookup('', date);
+  const editorRef = useRef<NoteEditorHandle>(null);
+  const actionSourceRef = useRef<NoteActionSource | null>(null);
+  const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
+  const [wrapUp, setWrapUp] = useState<WrapUpCandidate[] | null>(null);
+  const [drawerTaskKey, setDrawerTaskKey] = useState<string | null>(null);
+  const [dateAnchor, setDateAnchor] = useState<HTMLButtonElement | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const { flush } = editor;
 
@@ -46,155 +77,214 @@ export function NoteDocument({
     return () => registerFlush(null);
   }, [flush, registerFlush]);
 
-  const captureSelection = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) {
-      return;
-    }
-    selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
-  }, []);
-
-  // A2: Radix returns focus to the trigger on close; move it back into the
-  // editor with the caret/selection the user had when the dialog opened.
-  const restoreEditorFocus = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) {
-      return;
-    }
-    const { start, end } = selectionRef.current;
-    requestAnimationFrame(() => {
-      el.focus();
-      try {
-        el.setSelectionRange(start, end);
-      } catch {
-        // textarea may be unmounted (date switch) — nothing to restore
-      }
-    });
-  }, []);
-
-  const closeFollowUpDialog = useCallback(() => {
-    setFollowUpOpen(false);
-    restoreEditorFocus();
-  }, [restoreEditorFocus]);
-
-  const closeTaskActionDialog = useCallback(() => {
-    setTaskActionOpen(false);
-    restoreEditorFocus();
-  }, [restoreEditorFocus]);
-
-  const shiftDate = useCallback(
-    (days: number) => {
-      if (!isValidIsoDate(date)) {
-        return;
-      }
-      onNavigateDate(format(addDays(parseISO(date), days), 'yyyy-MM-dd'));
-    },
-    [date, onNavigateDate],
+  const developers = useMemo(
+    () => (rosterQuery.data ?? []).filter((dev) => dev.availability?.state !== 'inactive'),
+    [rosterQuery.data],
   );
 
-  const handlePickerChange = (value: string) => {
-    if (value && isValidIsoDate(value) && value !== date) {
-      onNavigateDate(value);
+  const entityContext = useMemo<NoteEntityContext>(() => {
+    const refs = new Map<string, { status: DailyNoteRef['status']; title: string }>();
+    for (const ref of editor.refs) {
+      if (ref.taskKey) refs.set(ref.taskKey.toUpperCase(), { status: ref.status, title: ref.title });
     }
-  };
+    return { developers, refs };
+  }, [developers, editor.refs]);
 
-  const handleOpenFollowUp = async () => {
-    captureSelection();
-    const { start, end } = selectionRef.current;
-    setSelectedText(end > start ? editor.body.slice(start, end) : '');
+  const conflicted = editor.saveState === 'conflict';
+  const actionsDisabledReason = actionsBlockedReason(editor, conflicted);
+
+  // ── Line actions (F8) ──────────────────────────────────────────────
+
+  const startAction = useCallback(
+    async (kind: NoteLineAction) => {
+      if (actionsDisabledReason) {
+        addToast(actionsDisabledReason, 'info');
+        return;
+      }
+      const source = editorRef.current?.captureActionSource() ?? null;
+      const text = source?.text ?? '';
+      actionSourceRef.current = source;
+      const inferred = inferFromText(text, developers);
+      const ok = await flush();
+      if (!ok) {
+        return;
+      }
+      setActionDialog({
+        kind,
+        text,
+        inference: {
+          taskKey: inferred.taskKey,
+          developer: developers.find((dev) => dev.accountId === inferred.developer?.accountId) ?? null,
+          jiraKey: inferred.jiraKey,
+        },
+      });
+    },
+    [actionsDisabledReason, addToast, developers, flush],
+  );
+
+  const closeActionDialog = useCallback(() => {
+    setActionDialog(null);
+    editorRef.current?.restoreSelection(actionSourceRef.current);
+  }, []);
+
+  const markSourceLine = useCallback((taskKey: string | undefined) => {
+    const source = actionSourceRef.current;
+    if (source && taskKey) editorRef.current?.appendMarker(source, taskKey);
+  }, []);
+
+  // ── Wrap-up (§5) ────────────────────────────────────────────────────
+
+  const openWrapUp = useCallback(async () => {
+    if (actionsDisabledReason) {
+      addToast(actionsDisabledReason, 'info');
+      return;
+    }
     const ok = await flush();
-    if (ok) {
-      setFollowUpOpen(true);
-    }
+    if (!ok) return;
+    setWrapUp(wrapUpCandidates(editor.body, developers));
+  }, [actionsDisabledReason, addToast, developers, editor.body, flush]);
+
+  const applyWrapUpEdits = useCallback((edits: NoteLineEdit[]) => {
+    editorRef.current?.applyLineEdits(edits);
+  }, []);
+
+  const openItems = useMemo(() => wrapUpCandidates(editor.body, developers), [developers, editor.body]);
+  const openCheckboxes = openItems.filter((item) => item.kind === 'checkbox').length;
+
+  // ── Editor handlers (read through a ref inside CodeMirror) ──────────
+
+  const handlers: NoteEditorHandlers = {
+    openTask: (taskKey) => setDrawerTaskKey(taskKey),
+    openIssue: (issueKey) => onOpenTarget({ type: 'issue', view: 'work', issueKey }),
+    openDeveloper: (developerAccountId) => onOpenTarget({ type: 'developer', view: 'team', developerAccountId }),
+    openNoteDate: (next) => onNavigateDate(next),
+    previewTask: lookups.previewTask,
+    previewIssue: lookups.previewIssue,
+    searchTasks: lookups.searchTasks,
+    searchIssues: lookups.searchIssues,
+    onAction: (kind) => void startAction(kind),
+    onWrapUp: () => void openWrapUp(),
+    onSave: () => void flush(),
   };
 
-  const handleOpenTaskAction = async (mode: NotesTaskActionMode) => {
-    captureSelection();
-    const { start, end } = selectionRef.current;
-    setSelectedText(end > start ? editor.body.slice(start, end) : '');
-    const ok = await flush();
-    if (ok) {
-      setTaskActionMode(mode);
-      setTaskActionOpen(true);
-    }
+  // F12: land at the match when opened (or re-opened) from a search result.
+  const jumpedRef = useRef<string[] | undefined>(undefined);
+  useEffect(() => {
+    if (jumpedRef.current === jumpTerms || editor.loading || !jumpTerms?.length) return;
+    jumpedRef.current = jumpTerms;
+    requestAnimationFrame(() => editorRef.current?.highlightTerms(jumpTerms));
+  }, [editor.loading, jumpTerms]);
+
+  // `?` opens the shortcut legend from anywhere on the page that isn't a text field.
+  useEffect(() => {
+    if (hidden) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      const active = document.activeElement;
+      if (active && isEditable(active)) return;
+      if (event.target instanceof Element && isEditable(event.target)) return;
+      if (hasOpenLayer()) return;
+      event.preventDefault();
+      setShortcutsOpen(true);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [hidden]);
+
+  // ── Header ──────────────────────────────────────────────────────────
+
+  const shiftDate = (days: number) => {
+    if (isValidIsoDate(date)) onNavigateDate(format(addDays(parseISO(date), days), 'yyyy-MM-dd'));
   };
 
-  const heading = safeFormat(date, 'EEEE, MMMM d');
-  const subline = safeFormat(date, 'yyyy');
   const isToday = date === today;
+  const heading = headingLabel(date, today);
+  const headingDate = safeFormat(date, 'EEEE, MMMM d, yyyy');
+
+  const save = saveStatus(editor, today);
   const showCharCount = editor.body.length > CHAR_COUNT_THRESHOLD;
   const overLimit = editor.body.length > DAILY_NOTE_MAX_LENGTH;
-  const conflicted = editor.saveState === 'conflict';
-  const selectionActionsDisabled =
-    editor.loading || conflicted || (!editor.latest && editor.body.trim().length === 0);
+  // Only nag about real open checkboxes, and only once the day is winding down.
+  const wrapUpNudge = isToday && openCheckboxes > 0 && new Date().getHours() >= WRAP_UP_NUDGE_HOUR;
 
-  const saveStatus = statusLabel(editor.saveState, editor.offline);
+  const openRef = (ref: DailyNoteRef) => {
+    if (ref.taskKey) {
+      setDrawerTaskKey(ref.taskKey);
+    } else if (ref.itemId) {
+      onOpenTarget({ type: 'manager_desk_item', view: 'desk', managerDeskItemId: ref.itemId });
+    }
+  };
 
   return (
-    <section className="notes-document" aria-label={`Note for ${date}`} hidden={hidden}>
+    <section className="notes-document" aria-label={`Note for ${headingDate}`} hidden={hidden}>
       <div className="notes-document-inner">
-        <div className="notes-doc-toolbar">
-          <div className="min-w-0">
+        <header className="notes-doc-toolbar">
+          <div className="min-w-0 flex-1">
             {mobile ? (
               <p className="notes-doc-mobile-label">
                 <Lock size={10} aria-hidden="true" />
                 Notes · Only you
               </p>
             ) : null}
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               {onOpenHistory ? (
-                <button
-                  type="button"
-                  onClick={onOpenHistory}
-                  className="notes-nav-button"
-                  aria-label="Open note history"
-                >
+                <button type="button" onClick={onOpenHistory} className="notes-nav-button" aria-label="Open note history">
                   <History size={13} />
                   History
                 </button>
               ) : null}
-              <h2 className="notes-doc-heading">{heading}</h2>
-            </div>
-            <div className="notes-doc-subline">
-              <span>{subline}</span>
-              {isToday ? <span>· Today</span> : null}
+              <h2 className="notes-doc-heading">
+                {heading}
+                {isToday ? <span className="notes-today-pill">Today</span> : null}
+              </h2>
             </div>
           </div>
 
-          <div className="notes-doc-nav">
-            <button
-              type="button"
-              className="notes-nav-button"
-              onClick={() => shiftDate(-1)}
-              aria-label="Previous day"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              type="button"
-              className="notes-nav-button"
-              onClick={() => shiftDate(1)}
-              aria-label="Next day"
-            >
-              <ChevronRight size={14} />
-            </button>
-            <label className="sr-only" htmlFor="notes-date-picker">
-              Pick a date
-            </label>
-            <input
-              id="notes-date-picker"
-              type="date"
-              value={date}
-              onChange={(event) => handlePickerChange(event.target.value)}
-              className="notes-date-input"
-            />
+          <nav className="notes-doc-nav" aria-label="Change day">
+            <div className="notes-nav-group">
+              <button
+                type="button"
+                className="notes-nav-button"
+                onClick={() => shiftDate(-1)}
+                aria-label="Previous day"
+                title="Previous day (⌥↑)"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                className="notes-nav-button"
+                onClick={() => shiftDate(1)}
+                aria-label="Next day"
+                title="Next day (⌥↓)"
+              >
+                <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                className="notes-nav-button"
+                aria-label="Pick a date"
+                aria-haspopup="dialog"
+                aria-expanded={Boolean(dateAnchor)}
+                onClick={(event) => setDateAnchor(dateAnchor ? null : event.currentTarget)}
+              >
+                <CalendarDays size={13} />
+              </button>
+            </div>
             {!isToday ? (
-              <button type="button" className="notes-nav-button" onClick={() => onNavigateDate(today)}>
+              <button type="button" className="notes-nav-button" onClick={() => onNavigateDate(today)} title="Today (⌥T)">
                 Today
               </button>
             ) : null}
-          </div>
-        </div>
+          </nav>
+        </header>
+
+        <NotesDayContext
+          date={date}
+          isToday={isToday}
+          onOpenTarget={onOpenTarget}
+          onRevealCarried={() => editorRef.current?.revealLine((text) => new RegExp(CARRIED_PATTERN.source).test(text))}
+        />
 
         {editor.loadError ? (
           <div className="notes-doc-error" role="alert">
@@ -207,174 +297,164 @@ export function NoteDocument({
             </button>
           </div>
         ) : editor.loading ? (
-          <div aria-hidden="true" className="mt-6 space-y-3">
+          <div aria-hidden="true" className="notes-doc-skeleton">
             {[0, 1, 2, 3].map((item) => (
-              <div
-                key={item}
-                className="notes-skeleton"
-                style={{ height: 14, width: `${88 - item * 14}%` }}
-              />
+              <div key={item} className="notes-skeleton" style={{ height: 14, width: `${88 - item * 14}%` }} />
             ))}
           </div>
         ) : (
           <>
-            <label className="sr-only" htmlFor="notes-editor">
-              {`Notes for ${heading}`}
-            </label>
-            <textarea
-              id="notes-editor"
-              ref={textareaRef}
-              value={editor.body}
-              onChange={(event) => editor.changeBody(event.target.value)}
-              onSelect={captureSelection}
-              onKeyUp={captureSelection}
-              onMouseUp={captureSelection}
-              onBlur={() => void editor.flush()}
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-                  event.preventDefault();
-                  void editor.flush();
-                }
-              }}
-              placeholder="Thoughts, observations, things to come back to…"
-              className="notes-textarea"
-              disabled={editor.loading}
-            />
-            {editor.body.trim().length === 0 && !conflicted ? (
-              <p className="mt-1 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-                Start anywhere. Your notes save as you write.
-              </p>
-            ) : null}
-
             {conflicted ? (
               <NotesConflictPanel
                 remote={editor.conflict}
+                base={editor.baseBody}
+                local={editor.body}
                 error={editor.error}
                 onKeepBoth={editor.keepBoth}
                 onUseSavedVersion={editor.useSavedVersion}
               />
             ) : editor.error ? (
               <p className="notes-doc-inline-error" role={editor.offline ? 'status' : 'alert'}>
-                {editor.offline
-                  ? 'Your draft is saved on this device and will sync when you reconnect.'
-                  : editor.error}
+                {editor.offline ? 'Your draft is saved on this device and will sync when you reconnect.' : editor.error}
               </p>
             ) : null}
 
-            {/* A1: routine save states stay silent; only merge/error reach AT. */}
+            <NoteEditor
+              ref={editorRef}
+              value={editor.body}
+              onChange={editor.changeBody}
+              onBlur={() => void editor.flush()}
+              handlers={handlers}
+              entityContext={entityContext}
+              placeholder={isToday ? 'What’s on your mind today?' : 'Thoughts, observations, things to come back to…'}
+              ariaLabel={`Notes for ${headingDate}`}
+              actionsDisabled={actionsDisabledReason !== null}
+              mobile={mobile}
+            />
+
+            {editor.body.trim().length === 0 && !conflicted ? (
+              <p className="notes-teach">
+                Type <kbd>@</kbd> for people, <kbd>T-</kbd> for tasks, <kbd>#</kbd> for Jira, <kbd>/</kbd> for commands.
+                Put the caret on a line and press <kbd>⌘⇧E</kbd> to turn it into a task.
+              </p>
+            ) : null}
+
+            {/* A1: routine save states stay silent; merge notices reach assistive tech. */}
             <span className="sr-only" role="status">
               {editor.mergeNotice ?? ''}
             </span>
 
-            <div className="notes-doc-meta">
-              {editor.mergeNotice ? (
-                <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
-                  {editor.mergeNotice}
-                </span>
-              ) : null}
-              <span className={`notes-save-state${editor.saveState === 'error' ? ' error' : ''}`}>
-                {saveStatus}
-                {editor.saveState === 'error' ? (
-                  <button
-                    type="button"
-                    className="notes-followup-open"
-                    onClick={editor.retrySave}
-                  >
-                    Retry
-                  </button>
-                ) : null}
-              </span>
-              {editor.recoveryUnavailable ? (
-                <span style={{ color: 'var(--warning)' }}>
-                  Draft recovery unavailable in this browser. Keep this page open until saved.
-                </span>
-              ) : null}
-              <span className="notes-meta-spacer" />
-              {showCharCount || overLimit ? (
-                <span className={`notes-char-count${overLimit ? ' danger' : ''}`}>
-                  {editor.body.length.toLocaleString()}/{DAILY_NOTE_MAX_LENGTH.toLocaleString()}
-                </span>
-              ) : null}
-              <button
-                type="button"
-                className="notes-followup-button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleOpenTaskAction('update')}
-                disabled={selectionActionsDisabled}
-              >
-                <ListPlus size={12} />
-                Add as update to…
-              </button>
-              <button
-                type="button"
-                className="notes-followup-button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleOpenTaskAction('create')}
-                disabled={selectionActionsDisabled}
-              >
-                <SquarePlus size={12} />
-                Create task…
-              </button>
-              <button
-                type="button"
-                className="notes-followup-button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleOpenFollowUp()}
-                disabled={selectionActionsDisabled}
-              >
-                <CalendarClock size={12} />
-                Create follow-up
-              </button>
-            </div>
-
-            {editor.followUps.length > 0 ? (
-              <div className="notes-followups">
-                <h3 className="notes-followups-title">Follow-ups from this note</h3>
-                {editor.followUps.map((followUp) => (
-                  <div key={followUp.itemId} className="notes-followup-row">
-                    <span className="notes-followup-row-title">{followUp.title}</span>
-                    <span className="notes-followup-row-meta">
-                      {followUp.followUpAt ? safeFormat(followUp.followUpAt, 'MMM d, h:mm a') : 'Unscheduled'}
-                      {' · '}
-                      {followUp.status.replace(/_/g, ' ')}
-                    </span>
-                    <button
-                      type="button"
-                      className="notes-followup-open"
-                      onClick={() =>
-                        onOpenTarget({
-                          type: 'manager_desk_item',
-                          view: 'desk',
-                          managerDeskItemId: followUp.itemId,
-                          date: followUp.date,
-                        })
-                      }
-                    >
-                      Open follow-up
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
+            <NotesFromThisNote refs={editor.refs} onOpen={openRef} />
           </>
         )}
       </div>
 
+      {!editor.loading && !editor.loadError ? (
+        <NotesDocFooter
+          saveLabel={save.label}
+          saveTone={save.tone}
+          onRetrySave={editor.saveState === 'error' ? editor.retrySave : undefined}
+          mergeNotice={editor.mergeNotice}
+          charCount={showCharCount || overLimit ? { value: editor.body.length, max: DAILY_NOTE_MAX_LENGTH, over: overLimit } : null}
+          recoveryUnavailable={editor.recoveryUnavailable}
+          actionsDisabledReason={actionsDisabledReason}
+          onAction={(kind) => void startAction(kind)}
+          wrapUpCount={openItems.length}
+          wrapUpNudge={wrapUpNudge}
+          onWrapUp={() => void openWrapUp()}
+          shortcutsOpen={shortcutsOpen}
+          onShortcutsOpenChange={setShortcutsOpen}
+        />
+      ) : null}
+
+      {dateAnchor ? (
+        <DatePickerPopover
+          anchor={dateAnchor}
+          label="Go to day"
+          kind="date"
+          value={date}
+          clearLabel={null}
+          presets={[
+            { key: 'today', label: 'Today', hint: prettyNoteDate(today, 'EEE, MMM d'), icon: <Sun size={13} />, onSelect: () => goTo(today) },
+            {
+              key: 'yesterday',
+              label: 'Yesterday',
+              hint: prettyNoteDate(shiftIso(today, -1), 'EEE, MMM d'),
+              icon: <ChevronLeft size={13} />,
+              onSelect: () => goTo(shiftIso(today, -1)),
+            },
+            {
+              key: 'tomorrow',
+              label: 'Tomorrow',
+              hint: prettyNoteDate(shiftIso(today, 1), 'EEE, MMM d'),
+              icon: <CalendarPlus size={13} />,
+              onSelect: () => goTo(shiftIso(today, 1)),
+            },
+          ]}
+          onCommit={(value) => {
+            if (value && isValidIsoDate(value)) goTo(value);
+          }}
+          onClose={() => setDateAnchor(null)}
+        />
+      ) : null}
+
       <NotesFollowUpDialog
-        open={followUpOpen}
+        open={actionDialog?.kind === 'follow-up'}
         noteDate={date}
-        selectedText={selectedText}
-        onClose={closeFollowUpDialog}
+        selectedText={actionDialog?.kind === 'follow-up' ? actionDialog.text : ''}
+        onClose={closeActionDialog}
+        onDone={({ taskKey }) => markSourceLine(taskKey)}
       />
       <NotesTaskActionDialog
-        open={taskActionOpen}
-        mode={taskActionMode}
+        open={actionDialog?.kind === 'task' || actionDialog?.kind === 'update'}
+        mode={actionDialog?.kind === 'update' ? 'update' : 'create'}
         noteDate={date}
-        selectedText={selectedText}
-        onClose={closeTaskActionDialog}
+        selectedText={actionDialog && actionDialog.kind !== 'follow-up' ? actionDialog.text : ''}
+        inference={actionDialog?.inference}
+        onClose={closeActionDialog}
+        onDone={({ taskKey }) => markSourceLine(taskKey)}
       />
+      <NotesWrapUpDialog
+        open={wrapUp !== null}
+        noteDate={date}
+        today={today}
+        candidates={wrapUp ?? []}
+        developers={developers}
+        onClose={() => {
+          setWrapUp(null);
+          editorRef.current?.focus();
+        }}
+        onApplyEdits={applyWrapUpEdits}
+      />
+      <TaskDrawer taskKey={drawerTaskKey} onClose={() => setDrawerTaskKey(null)} onNavigateTask={setDrawerTaskKey} />
     </section>
   );
+
+  function goTo(next: string) {
+    setDateAnchor(null);
+    if (next !== date) onNavigateDate(next);
+  }
+}
+
+function actionsBlockedReason(editor: DailyNoteEditor, conflicted: boolean): string | null {
+  if (editor.loading) return 'Loading this note…';
+  if (conflicted) return 'Resolve the version conflict first';
+  if (!editor.latest && editor.body.trim().length === 0) return 'Write something first';
+  return null;
+}
+
+function headingLabel(date: string, today: string): string {
+  try {
+    const parsed = parseISO(date);
+    const sameYear = parsed.getFullYear() === parseISO(today).getFullYear();
+    return format(parsed, sameYear ? 'EEEE, MMMM d' : 'EEEE, MMMM d, yyyy');
+  } catch {
+    return date;
+  }
+}
+
+function shiftIso(date: string, days: number): string {
+  return format(addDays(parseISO(date), days), 'yyyy-MM-dd');
 }
 
 function safeFormat(value: string, pattern: string): string {
@@ -385,21 +465,20 @@ function safeFormat(value: string, pattern: string): string {
   }
 }
 
-function statusLabel(state: string, offline: boolean): string {
-  switch (state) {
-    case 'loading':
-      return 'Loading…';
-    case 'dirty':
-      return 'Unsaved changes';
-    case 'saving':
-      return 'Saving…';
-    case 'saved':
-      return 'Saved';
-    case 'error':
-      return offline ? 'Offline — saved on this device' : 'Could not save.';
-    case 'conflict':
-      return 'Needs your review';
-    default:
-      return '';
+/** U3: a steady "Saved · time"; only errors, offline, and conflicts change the line. */
+function saveStatus(editor: DailyNoteEditor, today: string): { label: string; tone: 'default' | 'error' | 'warning' } {
+  if (editor.saveState === 'conflict') return { label: 'Needs your review', tone: 'warning' };
+  if (editor.saveState === 'error') {
+    return editor.offline
+      ? { label: 'Offline — saved on this device', tone: 'warning' }
+      : { label: 'Could not save.', tone: 'error' };
   }
+  const updatedAt = editor.latest?.updatedAt;
+  if (!updatedAt) {
+    return { label: editor.body.trim().length > 0 ? 'Saving…' : '', tone: 'default' };
+  }
+  const at = new Date(updatedAt);
+  if (Number.isNaN(at.getTime())) return { label: 'Saved', tone: 'default' };
+  const sameDay = format(at, 'yyyy-MM-dd') === today;
+  return { label: `Saved · ${format(at, sameDay ? 'h:mm a' : 'MMM d, h:mm a')}`, tone: 'default' };
 }

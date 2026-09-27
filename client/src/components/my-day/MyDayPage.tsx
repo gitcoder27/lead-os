@@ -200,6 +200,10 @@ export function MyDayPage() {
             onRefresh={handleRefresh}
             onToggleTheme={toggleTheme}
             onLogout={logout}
+            onJumpToCheckIn={() => {
+              document.getElementById('my-day-check-in')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              if (!isReadOnly) window.setTimeout(() => quickUpdateRef.current?.focus({ preventScroll: true }), 350);
+            }}
           />
 
           <motion.div
@@ -209,6 +213,7 @@ export function MyDayPage() {
             animate="visible"
             className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_344px]"
           >
+            {/* Main column: the developer's to-do list for the day. */}
             <div className="flex min-w-0 flex-col gap-8">
               {(isInactive || readOnlyReason === 'history' || readOnlyReason === 'future') && (
                 <motion.div variants={sectionVariants} className="flex flex-col gap-2">
@@ -216,51 +221,6 @@ export function MyDayPage() {
                   {!isInactive && <MyDayReadOnlyBanner reason={readOnlyReason} onToday={goToday} />}
                 </motion.div>
               )}
-
-              <MyDaySection
-                id="check-in"
-                icon={<Radio size={14} />}
-                title="Check in"
-                hint={
-                  nudge ? (
-                    <span style={{ color: 'var(--warning)' }}>Your lead hasn’t heard from you in a while</span>
-                  ) : (
-                    <span className="hidden sm:inline">Shared with your lead</span>
-                  )
-                }
-                action={
-                  day?.lastCheckInAt ? (
-                    <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                      Last check-in {formatCompactRelative(day.lastCheckInAt)}
-                    </span>
-                  ) : undefined
-                }
-                readOnly={isReadOnly}
-              >
-                <div
-                  className="overflow-hidden rounded-2xl shadow-[var(--soft-shadow)] ring-0 ring-[var(--border-active)] transition-shadow focus-within:ring-1"
-                  style={surfaceStyle}
-                >
-                  <div className="p-1.5">
-                    <StatusSelector
-                      current={day?.status ?? 'on_track'}
-                      onUpdate={handleStatusUpdate}
-                      isPending={updateStatusPending}
-                      disabled={isReadOnly}
-                    />
-                  </div>
-                  <div style={{ borderTop: `1px solid ${HAIRLINE}` }}>
-                    <QuickUpdates
-                      onAddCheckIn={handleAddCheckIn}
-                      tasks={tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, plannedItems)}
-                      status={day?.status}
-                      isPending={addCheckInPending}
-                      disabled={isReadOnly}
-                      inputRef={quickUpdateRef}
-                    />
-                  </div>
-                </div>
-              </MyDaySection>
 
               <MyDaySection id="now" icon={<Target size={14} />} title="Now" readOnly={isReadOnly}>
                 <CurrentTask
@@ -329,7 +289,56 @@ export function MyDayPage() {
               )}
             </div>
 
-            <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
+            {/* Side column: an optional line to the lead, and the day's log. */}
+            <aside className="flex min-w-0 flex-col gap-7 lg:sticky lg:top-6 lg:-mx-1 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto lg:px-1 lg:pb-4">
+              <MyDaySection
+                id="check-in"
+                icon={<Radio size={14} />}
+                title="Check in"
+                hint={
+                  nudge ? (
+                    <span className="inline-flex items-center gap-1.5" style={{ color: 'var(--warning)' }}>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warning)' }} aria-hidden="true" />
+                      Due for an update
+                    </span>
+                  ) : (
+                    'Optional'
+                  )
+                }
+                action={
+                  day?.lastCheckInAt ? (
+                    <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }} title="Last check-in">
+                      {formatCompactRelative(day.lastCheckInAt)}
+                    </span>
+                  ) : undefined
+                }
+                readOnly={isReadOnly}
+              >
+                <div
+                  className="overflow-hidden rounded-2xl ring-0 ring-[var(--border-active)] transition-shadow focus-within:ring-1"
+                  style={surfaceStyle}
+                >
+                  <div className="p-1.5">
+                    <StatusSelector
+                      current={day?.status ?? 'on_track'}
+                      onUpdate={handleStatusUpdate}
+                      isPending={updateStatusPending}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div style={{ borderTop: `1px solid ${HAIRLINE}` }}>
+                    <QuickUpdates
+                      onAddCheckIn={handleAddCheckIn}
+                      tasks={tasksFromItems(day?.currentItem ? [day.currentItem] : undefined, plannedItems)}
+                      status={day?.status}
+                      isPending={addCheckInPending}
+                      disabled={isReadOnly}
+                      inputRef={quickUpdateRef}
+                    />
+                  </div>
+                </div>
+              </MyDaySection>
+
               <MyDaySection
                 id="log"
                 icon={<ScrollText size={14} />}
@@ -337,16 +346,15 @@ export function MyDayPage() {
                 count={checkIns.length > 0 ? checkIns.length : undefined}
               >
                 <div className="overflow-hidden rounded-2xl" style={surfaceStyle}>
-                  <div className="lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">
-                    <RecentActivity checkIns={checkIns} isToday={isToday} />
-                  </div>
+                  <RecentActivity checkIns={checkIns} isToday={isToday} />
                 </div>
               </MyDaySection>
+
               <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[11.5px] md:flex" style={{ color: 'var(--text-muted)' }}>
                 {!isReadOnly && (
                   <>
-                    <span className="inline-flex items-center gap-1.5"><Kbd>U</Kbd> update</span>
                     <span className="inline-flex items-center gap-1.5"><Kbd>N</Kbd> new task</span>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>U</Kbd> check in</span>
                   </>
                 )}
                 <span className="inline-flex items-center gap-1.5"><Kbd>[</Kbd><Kbd>]</Kbd> change day</span>
@@ -375,11 +383,13 @@ function MyDaySkeleton() {
         </div>
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_344px]">
           <div className="flex flex-col gap-8">
-            <div className={`${block} h-[150px]`} style={fill} />
             <div className={`${block} h-[168px]`} style={fill} />
-            <div className={`${block} h-[132px]`} style={fill} />
+            <div className={`${block} h-[180px]`} style={fill} />
           </div>
-          <div className={`${block} h-[220px]`} style={fill} />
+          <div className="flex flex-col gap-7">
+            <div className={`${block} h-[150px]`} style={fill} />
+            <div className={`${block} h-[120px]`} style={fill} />
+          </div>
         </div>
       </div>
     </div>

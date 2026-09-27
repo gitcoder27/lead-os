@@ -13,9 +13,9 @@ interface StatusSelectorProps {
 }
 
 /**
- * Five-way segmented control. The active pill slides between segments and
- * takes the status tone; everything else stays neutral so the one colour on
- * the control is the answer to "how's it going?".
+ * Five-way segmented control, icon over label so it fits the side rail. The
+ * active pill slides between segments and takes the status tone; everything
+ * else stays neutral.
  */
 export function StatusSelector({ current, onUpdate, isPending, disabled }: StatusSelectorProps) {
   return (
@@ -39,8 +39,9 @@ export function StatusSelector({ current, onUpdate, isPending, disabled }: Statu
             }}
             disabled={disabled}
             aria-pressed={isActive}
+            aria-label={cfg.label}
             title={cfg.label}
-            className={`relative flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-[9px] px-1.5 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed ${
+            className={`relative flex h-[50px] min-w-0 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed ${
               isActive ? '' : 'hover:text-[var(--text-primary)]'
             } ${FOCUS_RING}`}
             style={{ color: isActive ? cfg.color : 'var(--text-muted)' }}
@@ -53,16 +54,13 @@ export function StatusSelector({ current, onUpdate, isPending, disabled }: Statu
                 style={{
                   background: `color-mix(in srgb, ${cfg.color} 13%, var(--bg-elevated))`,
                   border: `1px solid color-mix(in srgb, ${cfg.color} 34%, transparent)`,
-                  boxShadow: `0 1px 2px rgba(0,0,0,0.12), 0 0 18px color-mix(in srgb, ${cfg.color} 14%, transparent)`,
+                  boxShadow: `0 1px 2px rgba(0,0,0,0.12), 0 0 16px color-mix(in srgb, ${cfg.color} 12%, transparent)`,
                 }}
                 transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
               />
             )}
-            <Icon size={14} className="relative hidden shrink-0 sm:block" aria-hidden="true" />
-            <span className="relative truncate">
-              <span className="hidden md:inline">{cfg.label}</span>
-              <span className="md:hidden">{cfg.shortLabel}</span>
-            </span>
+            <Icon size={15} className="relative shrink-0" aria-hidden="true" />
+            <span className="relative max-w-full truncate leading-none">{cfg.shortLabel}</span>
           </button>
         );
       })}

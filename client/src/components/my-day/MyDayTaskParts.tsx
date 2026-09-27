@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, History, Link2, StickyNote, X } from 'lucide-react';
+import { Check, History, Link2, MessageSquarePlus, StickyNote, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { formatAbsoluteDateTime, formatDate, isOverdue, priorityColor } from '@/lib/utils';
@@ -286,35 +286,25 @@ export function ActivityPanel({ taskKey }: { taskKey: string }) {
 }
 
 /**
- * Per-task update composer + activity toggle. Only keyed tasks carry a
- * timeline; read-only days keep the history but lose the composer.
+ * The focus card's update composer + activity toggle. Only keyed tasks carry
+ * a timeline; read-only days keep the history but lose the composer.
  */
 export function TaskFooter({
   item,
   viewDate,
   readOnly,
-  reveal = 'always',
   activityOpen,
   onToggleActivity,
 }: {
   item: TrackerWorkItem;
   viewDate: string;
   readOnly?: boolean;
-  /** 'intent' keeps the footer out of the way until the row is hovered or focused. */
-  reveal?: 'always' | 'intent';
   activityOpen: boolean;
   onToggleActivity: () => void;
 }) {
   if (!item.taskKey) return null;
-  const quiet = reveal === 'intent' && !activityOpen;
   return (
-    <div
-      className={`mt-1.5 flex min-w-0 items-start gap-1 ${
-        quiet
-          ? 'transition-opacity has-[textarea]:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0'
-          : ''
-      }`}
-    >
+    <div className="mt-1.5 flex min-w-0 items-start gap-1">
       {/* pr-2 absorbs the quiet composer's hover bleed so it never overlaps the toggle. */}
       <div className="min-w-0 flex-1 pr-2">
         {!readOnly && (
@@ -322,6 +312,98 @@ export function TaskFooter({
         )}
       </div>
       <ActivityButton taskKey={item.taskKey} expanded={activityOpen} onToggle={onToggleActivity} />
+    </div>
+  );
+}
+
+/**
+ * Update + activity as quiet text actions at the end of a row's meta line —
+ * no reserved space until they're used. Stays visible while either is open.
+ */
+export function InlineTaskActions({
+  taskKey,
+  readOnly,
+  composerOpen,
+  onOpenComposer,
+  activityOpen,
+  onToggleActivity,
+}: {
+  taskKey: string;
+  readOnly?: boolean;
+  composerOpen: boolean;
+  onOpenComposer: () => void;
+  activityOpen: boolean;
+  onToggleActivity: () => void;
+}) {
+  const pinned = composerOpen || activityOpen;
+  const link = `inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 ${
+        pinned ? '' : 'transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0'
+      }`}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenComposer();
+          }}
+          aria-label={`Add an update to ${taskKey}`}
+          aria-expanded={composerOpen}
+          className={link}
+          style={{ color: composerOpen ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+        >
+          <MessageSquarePlus size={12} aria-hidden="true" />
+          Update
+        </button>
+      )}
+      <button
+        type="button"
+        aria-expanded={activityOpen}
+        aria-label={`Activity for ${taskKey}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleActivity();
+        }}
+        className={link}
+        style={{ color: activityOpen ? 'var(--text-secondary)' : 'var(--text-muted)', background: activityOpen ? 'var(--bg-tertiary)' : undefined }}
+      >
+        <History size={12} aria-hidden="true" />
+        Activity
+      </button>
+    </span>
+  );
+}
+
+/** Expanded per-task composer for list rows; closes after posting or on Escape. */
+export function RowComposer({ taskKey, viewDate, onClose }: { taskKey: string; viewDate: string; onClose: () => void }) {
+  return (
+    <div
+      className="mt-1.5 flex items-start gap-1"
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <TaskUpdateComposer taskKey={taskKey} mode="developer" date={viewDate} autoFocus onPosted={onClose} />
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close update"
+        title="Close (Esc)"
+        className={`mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <X size={13} />
+      </button>
     </div>
   );
 }

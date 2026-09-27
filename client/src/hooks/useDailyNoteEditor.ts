@@ -39,6 +39,8 @@ export interface DailyNoteEditor {
   offline: boolean;
   latest: DailyNote | null;
   conflict: DailyNote | null;
+  /** Last server-acknowledged body — the common ancestor for conflict hunks (U5). */
+  baseBody: string;
   followUps: DailyNoteFollowUp[];
   refs: DailyNoteRef[];
   loading: boolean;
@@ -580,6 +582,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     offline,
     latest,
     conflict,
+    baseBody: baseBodyRef.current,
     followUps: dayQuery.data?.followUps ?? [],
     refs: dayQuery.data?.refs ?? [],
     loading: !initializedRef.current && dayQuery.isLoading,

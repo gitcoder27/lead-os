@@ -193,6 +193,7 @@ describe("notes routes happy path", () => {
       carriedFrom: 2,
       followUpsDue: 0,
       oneOnOnes: 0,
+      oneOnOneWith: [],
     });
   });
 

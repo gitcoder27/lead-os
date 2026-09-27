@@ -1,25 +1,53 @@
-import { useMemo, useState } from 'react';
-import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Lock, Search } from 'lucide-react';
+import { useMemo, useState, type RefObject } from 'react';
+import { differenceInCalendarWeeks, format, parseISO } from 'date-fns';
+import { ArrowLeft, Lock, PenLine, Search } from 'lucide-react';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
+import { snippetSegments } from '@/lib/note-markdown';
 import type { DailyNoteSummary } from '@/types';
 
 interface NotesSidebarProps {
   selectedDate: string;
   today: string;
-  onSelectDate: (date: string) => void;
+  /** `query` is set when the row came from a search, so the note can land at the match (F12). */
+  onSelectDate: (date: string, query?: string) => void;
   mobile?: boolean;
   onBack?: () => void;
+  searchInputRef?: RefObject<HTMLInputElement>;
 }
 
-function rowLabel(date: string): string {
+function rowLabel(date: string, today: string): string {
   try {
     const parsed = parseISO(date);
-    const sameYear = parsed.getFullYear() === new Date().getFullYear();
-    return format(parsed, sameYear ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
+    const sameYear = parsed.getFullYear() === parseISO(today).getFullYear();
+    const label = format(parsed, sameYear ? 'EEE, MMM d' : 'EEE, MMM d, yyyy');
+    return date === today ? `Today · ${label}` : label;
   } catch {
     return date;
   }
+}
+
+/** Sidebar section for a note date: This week · Last week · month. */
+export function historyGroup(date: string, today: string): string {
+  try {
+    const parsed = parseISO(date);
+    const now = parseISO(today);
+    const weeks = differenceInCalendarWeeks(now, parsed, { weekStartsOn: 1 });
+    if (weeks <= 0) return 'This week';
+    if (weeks === 1) return 'Last week';
+    return format(parsed, parsed.getFullYear() === now.getFullYear() ? 'MMMM' : 'MMMM yyyy');
+  } catch {
+    return '';
+  }
+}
+
+function producedLabel(note: DailyNoteSummary): string | null {
+  const produced = note.produced;
+  if (!produced) return null;
+  const parts = [
+    produced.tasks ? `${produced.tasks} ${produced.tasks === 1 ? 'task' : 'tasks'}` : null,
+    produced.carried ? `${produced.carried} carried` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 function rowExcerpt(note: DailyNoteSummary): string {
@@ -34,7 +62,7 @@ function rowExcerpt(note: DailyNoteSummary): string {
   return excerpt;
 }
 
-export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false, onBack }: NotesSidebarProps) {
+export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false, onBack, searchInputRef }: NotesSidebarProps) {
   const [query, setQuery] = useState('');
   const listQuery = useDailyNotes(query);
 
@@ -45,65 +73,71 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
 
   const trimmedQuery = query.trim();
   const searching = trimmedQuery.length > 0;
+  const hasToday = notes.some((note) => note.date === today);
 
   return (
     <aside className="notes-sidebar" aria-label="Note history">
       <div className="notes-sidebar-header">
         <div className="notes-sidebar-title-row">
-          <div className="flex items-center gap-2">
-            {mobile && onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                className="notes-nav-button"
-                aria-label="Back to note"
-              >
-                <ArrowLeft size={13} />
-                Back
-              </button>
-            ) : null}
-            <h1 className="notes-sidebar-title">Notes</h1>
-          </div>
-          <span className="notes-sidebar-private">
-            <Lock size={10} aria-hidden="true" />
-            Only you
+          {mobile && onBack ? (
+            <button type="button" onClick={onBack} className="notes-nav-button" aria-label="Back to note">
+              <ArrowLeft size={13} />
+              Back
+            </button>
+          ) : null}
+          <h1 className="notes-sidebar-title">Notes</h1>
+          <span
+            className="notes-sidebar-private"
+            title="Private — only you can see your notes"
+            aria-label="Private — only you can see your notes"
+            role="img"
+          >
+            <Lock size={11} aria-hidden="true" />
           </span>
         </div>
-        <p className="notes-sidebar-subtitle">A little space to clear your head.</p>
-      </div>
-
-      <div className="notes-sidebar-search">
-        <label className="notes-search-wrap">
+        <label className="notes-search-wrap mt-2.5">
           <Search size={12} className="notes-search-icon" aria-hidden="true" />
           <span className="sr-only">Search all notes</span>
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && query) {
+                event.stopPropagation();
+                setQuery('');
+              }
+            }}
             placeholder="Search all notes"
             aria-label="Search all notes"
+            aria-keyshortcuts="Meta+Shift+F Control+Shift+F"
             maxLength={200}
             className="notes-search-input"
           />
+          <kbd className="notes-search-kbd" aria-hidden="true">
+            ⌘⇧F
+          </kbd>
         </label>
       </div>
 
-      <div className="px-3 pt-2 pb-1">
-        <button
-          type="button"
-          onClick={() => onSelectDate(today)}
-          className="notes-day-row"
-          style={{ color: 'var(--accent)' }}
-          aria-label="Go to today's note"
-        >
-          <span className="text-[12px] font-semibold">Today</span>
-          <span className="ml-2 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
-            {rowLabel(today)}
-          </span>
-        </button>
-      </div>
-
-      <div className="notes-sidebar-list" role="list" aria-label="Recent notes">
+      <div className="notes-sidebar-list" role="list" aria-label={searching ? 'Search results' : 'Recent notes'}>
+        {!searching && !hasToday && !listQuery.isLoading ? (
+          <div role="listitem">
+            <button
+              type="button"
+              onClick={() => onSelectDate(today)}
+              aria-current={selectedDate === today ? 'date' : undefined}
+              className={`notes-day-row ghost${selectedDate === today ? ' selected' : ''}`}
+            >
+              <span className="notes-day-row-date">{rowLabel(today, today)}</span>
+              <span className="notes-day-row-title flex items-center gap-1.5">
+                <PenLine size={11} aria-hidden="true" />
+                Start writing
+              </span>
+            </button>
+          </div>
+        ) : null}
         {listQuery.isLoading ? (
           <div aria-hidden="true" className="space-y-1.5 px-1 pt-1">
             {[0, 1, 2, 3, 4].map((item) => (
@@ -117,29 +151,30 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
         ) : listQuery.isError ? (
           <div className="notes-sidebar-empty">
             <p>Could not load your notes.</p>
-            <button
-              type="button"
-              onClick={() => void listQuery.refetch()}
-              className="notes-button secondary mt-3"
-            >
+            <button type="button" onClick={() => void listQuery.refetch()} className="notes-button secondary mt-3">
               Retry
             </button>
           </div>
         ) : notes.length === 0 ? (
-          <div className="notes-sidebar-empty">
-            {searching ? 'No notes match that search.' : 'Nothing here yet. Today is a good place to start.'}
-          </div>
+          searching ? <div className="notes-sidebar-empty">No notes match that search.</div> : null
         ) : (
           <>
-            {notes.map((note) => (
-              <div key={note.id} role="listitem">
-                <NoteRow
-                  note={note}
-                  selected={note.date === selectedDate}
-                  onSelect={onSelectDate}
-                />
-              </div>
-            ))}
+            {notes.map((note, index) => {
+              // Search results are a flat list; history reads by week/month.
+              const group = searching ? '' : historyGroup(note.date, today);
+              const showGroup = group && (index === 0 || historyGroup(notes[index - 1]!.date, today) !== group);
+              return (
+                <div key={note.id} role="listitem">
+                  {showGroup ? <p className="notes-history-group">{group}</p> : null}
+                  <NoteRow
+                    note={note}
+                    today={today}
+                    selected={note.date === selectedDate}
+                    onSelect={(date) => onSelectDate(date, searching ? trimmedQuery : undefined)}
+                  />
+                </div>
+              );
+            })}
             {listQuery.hasNextPage ? (
               <button
                 type="button"
@@ -148,9 +183,7 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
                 className="notes-day-row mt-1"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <span className="text-[12px]">
-                  {listQuery.isFetchingNextPage ? 'Loading…' : 'Load earlier notes'}
-                </span>
+                <span className="text-[12px]">{listQuery.isFetchingNextPage ? 'Loading…' : 'Load earlier notes'}</span>
               </button>
             ) : null}
           </>
@@ -162,13 +195,17 @@ export function NotesSidebar({ selectedDate, today, onSelectDate, mobile = false
 
 function NoteRow({
   note,
+  today,
   selected,
   onSelect,
 }: {
   note: DailyNoteSummary;
+  today: string;
   selected: boolean;
   onSelect: (date: string) => void;
 }) {
+  const excerpt = rowExcerpt(note);
+  const produced = producedLabel(note);
   return (
     <button
       type="button"
@@ -176,9 +213,20 @@ function NoteRow({
       aria-current={selected ? 'date' : undefined}
       className={`notes-day-row${selected ? ' selected' : ''}`}
     >
-      <span className="notes-day-row-date">{rowLabel(note.date)}</span>
+      <span className="notes-day-row-head">
+        <span className="notes-day-row-date">{rowLabel(note.date, today)}</span>
+        {produced ? <span className="notes-day-row-produced">{produced}</span> : null}
+      </span>
       <span className="notes-day-row-title block">{note.title || 'Daily note'}</span>
-      {rowExcerpt(note) ? <span className="notes-day-row-excerpt block">{rowExcerpt(note)}</span> : null}
+      {note.snippet ? (
+        <span className="notes-day-row-excerpt snippet block">
+          {snippetSegments(note.snippet).map((segment, index) =>
+            segment.match ? <mark key={index}>{segment.text}</mark> : <span key={index}>{segment.text}</span>,
+          )}
+        </span>
+      ) : excerpt ? (
+        <span className="notes-day-row-excerpt block">{excerpt}</span>
+      ) : null}
     </button>
   );
 }

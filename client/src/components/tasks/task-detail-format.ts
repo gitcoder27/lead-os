@@ -36,7 +36,8 @@ export function describePlanDate(value: string | null, status: TaskStatus, today
   const open = isOpenStatus(status);
   if (!open) return { label: dayName(date, now), tone: 'muted' };
   if (diff === 0) return { label: 'Today', tone: 'accent' };
-  if (diff < 0) return { label: dayName(date, now), hint: `${-diff}d ago`, tone: -diff > 2 ? 'danger' : 'warning' };
+  // docs/51 D1: a slipped plan date is amber at any age — red is reserved for missed `dueAt` deadlines.
+  if (diff < 0) return { label: dayName(date, now), hint: `${-diff}d ago`, tone: 'warning' };
   return { label: dayName(date, now), tone: 'default' };
 }
 

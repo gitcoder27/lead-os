@@ -1,36 +1,144 @@
-import { useEffect } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { AlertTriangle, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { useModalFocus } from '@/hooks/useModalFocus';
+import { TASK_LIST_CONTAINER } from './TaskList';
 
-/** docs/49 §11: skeleton rows — first load only (R5). */
-export function TaskListSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading tasks" className="divide-y" style={{ borderColor: 'var(--border)' }}>
-      {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="flex h-[38px] items-center gap-3 px-3" style={{ borderColor: 'var(--border)' }}>
-          <span className="h-4 w-4 animate-pulse rounded-full" style={{ background: 'var(--bg-tertiary)' }} />
-          <span className="h-3 w-10 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)' }} />
-          <span className="h-3 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)', width: `${40 - index * 4}%` }} />
-          <span className="flex-1" />
-          <span className="h-3 w-14 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)' }} />
+const SKELETON_TITLE_WIDTHS = ['46%', '32%', '54%', '38%', '28%', '44%'];
+
+function Bone({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <span className={`block animate-pulse rounded motion-reduce:animate-none ${className}`} style={{ background: 'var(--bg-tertiary)', ...style }} />;
+}
+
+/**
+ * docs/49 §11 (R5) + docs/51 U5: first-load skeleton drawn on the real
+ * geometry — same column, same 38px rows and hairlines, glyph / key / title /
+ * date in the same x positions, plus section labels when the view groups —
+ * so data lands without the page jumping.
+ */
+export function TaskListSkeleton({ grouped = false }: { grouped?: boolean }) {
+  const rule = 'color-mix(in srgb, var(--border) 55%, transparent)';
+  const row = (index: number) => (
+    <div key={index} className="flex h-[38px] items-center gap-2 px-2">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center"><Bone className="h-[15px] w-[15px] rounded-full" /></span>
+      <span className="flex w-5 shrink-0 md:w-12"><Bone className="hidden h-2.5 w-9 md:block" /></span>
+      <Bone className="h-3" style={{ width: SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length] }} />
+      <span className="flex-1" />
+      <span className="flex w-[84px] shrink-0 justify-end pr-1.5"><Bone className="h-2.5 w-12" /></span>
+    </div>
+  );
+  const section = (rows: number[], first: boolean) => (
+    <div className={first ? '' : 'mt-5'}>
+      {grouped && (
+        <div className="flex h-9 items-center gap-2 border-b px-2" style={{ borderColor: rule }}>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center"><Bone className="h-1.5 w-1.5 rounded-full" /></span>
+          <Bone className="h-2.5 w-16" />
         </div>
-      ))}
+      )}
+      <div className="divide-y" style={{ borderColor: rule }}>{rows.map(row)}</div>
+    </div>
+  );
+  return (
+    <div aria-busy="true" aria-label="Loading tasks" className={`${TASK_LIST_CONTAINER} pt-2`}>
+      {grouped ? (
+        <>
+          {section([0, 1], true)}
+          {section([2, 3, 4, 5], false)}
+        </>
+      ) : section([0, 1, 2, 3, 4, 5], true)}
+    </div>
+  );
+}
+
+const KEY_HINT_STORAGE = 'leados.tasks.keyHintDismissed';
+
+function readHintDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(KEY_HINT_STORAGE) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function Key({ children }: { children: ReactNode }) {
+  return (
+    <kbd
+      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded px-1 font-mono text-[10.5px] leading-none"
+      style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+/**
+ * docs/51 U3: one quiet, dismissible line under the list that teaches the
+ * five keys that matter and points at `?` for the rest. Dismissal is a
+ * per-browser convenience (localStorage); the toolbar keyboard button and `?`
+ * remain. Pointer-only devices never see it.
+ */
+export function TaskKeyboardHint({ onShowAll }: { onShowAll: () => void }) {
+  const [dismissed, setDismissed] = useState(readHintDismissed);
+  if (dismissed) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(KEY_HINT_STORAGE, '1');
+    } catch {
+      // Storage unavailable — the hint just returns next visit.
+    }
+  };
+  const item = (keys: ReactNode, label: string) => (
+    <span className="flex items-center gap-1">
+      {keys}
+      <span>{label}</span>
+    </span>
+  );
+  return (
+    <div
+      className="mt-4 hidden flex-wrap items-center gap-x-3.5 gap-y-1.5 px-2 text-[11.5px] md:flex [@media(hover:none)]:hidden"
+      style={{ color: 'var(--text-muted)' }}
+      aria-label="Keyboard shortcuts hint"
+      role="note"
+    >
+      {item(<><Key>j</Key><Key>k</Key></>, 'move')}
+      {item(<Key>x</Key>, 'select')}
+      {item(<Key>e</Key>, 'done')}
+      {item(<Key>s</Key>, 'schedule')}
+      {item(<Key>a</Key>, 'assign')}
+      <button
+        type="button"
+        onClick={onShowAll}
+        className="flex items-center gap-1 rounded-md px-1 transition-colors hover:text-[var(--text-primary)]"
+      >
+        <Key>?</Key> all shortcuts
+      </button>
+      <button
+        type="button"
+        onClick={dismiss}
+        className="flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+        aria-label="Dismiss keyboard hint"
+        title="Dismiss"
+      >
+        <X size={12} />
+      </button>
     </div>
   );
 }
 
 export function TaskListError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div
-      role="alert"
-      className="mx-3 my-3 flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px]"
-      style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
-    >
-      <AlertTriangle size={14} />
-      <span className="min-w-0 flex-1">{message}</span>
-      <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ border: '1px solid currentColor' }}>
-        <RefreshCw size={12} /> Retry
-      </button>
+    <div className={`${TASK_LIST_CONTAINER} pt-3`}>
+      <div
+        role="alert"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px]"
+        style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
+      >
+        <AlertTriangle size={14} />
+        <span className="min-w-0 flex-1">{message}</span>
+        <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ border: '1px solid currentColor' }}>
+          <RefreshCw size={12} /> Retry
+        </button>
+      </div>
     </div>
   );
 }

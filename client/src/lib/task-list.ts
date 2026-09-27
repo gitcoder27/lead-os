@@ -37,11 +37,30 @@ function daysBetween(from: string, to: string): number {
 
 export type RelativeDateTone = 'default' | 'muted' | 'warning' | 'danger';
 
+/**
+ * docs/51 D1: how loud an overdue date reads. 1 = a nudge (tinted text),
+ * 2 = a tinted pill, 3 = an outlined pill. Scheduled slips climb 1 → 3 with
+ * age (3d, 7d); a missed deadline starts at 2 — it is never just a nudge.
+ */
+export type OverdueLevel = 1 | 2 | 3;
+
+export function overdueLevel(days: number, source: 'due' | 'scheduled' | null): OverdueLevel {
+  const byAge: OverdueLevel = days >= 7 ? 3 : days >= 3 ? 2 : 1;
+  return source === 'due' && byAge === 1 ? 2 : byAge;
+}
+
+/** docs/51 D1: red only for a missed deadline (`dueAt`); a slipped plan date is amber. */
+export function overdueTone(source: 'due' | 'scheduled' | null): 'danger' | 'warning' {
+  return source === 'due' ? 'danger' : 'warning';
+}
+
 export interface RelativeTaskDate {
   label: string;
   tone: RelativeDateTone;
   /** Full date for the tooltip. */
   title: string;
+  /** Set only for overdue open work (docs/51 D1 escalation). */
+  level?: OverdueLevel;
 }
 
 /** docs/49 §5.1: the row's relative date label. */
@@ -55,7 +74,7 @@ export function relativeTaskDate(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'
   const title = `${plan.source === 'due' ? 'Due' : 'Scheduled'} ${format(parseISO(plan.date), 'EEE, MMM d, yyyy')}`;
   const diff = daysBetween(today, plan.date);
   if (diff < 0) {
-    return { label: `${-diff}d overdue`, tone: plan.source === 'due' ? 'danger' : 'warning', title };
+    return { label: `${-diff}d overdue`, tone: overdueTone(plan.source), title, level: overdueLevel(-diff, plan.source) };
   }
   if (diff === 0) return { label: plan.source === 'due' ? 'Due today' : 'Today', tone: 'default', title };
   if (diff === 1) return { label: 'Tomorrow', tone: 'default', title };
@@ -90,6 +109,36 @@ export function impliedMeta(
   const tone = relativeTaskDate(task, today)?.tone;
   const showDate = !(singleDay && tone !== 'danger' && tone !== 'warning' && isOpenStatus(task.status));
   return { showOwner, showDate };
+}
+
+/**
+ * docs/51 D3: a group reserves the fixed date column only when at least one
+ * of its rows shows a date — single-day buckets collapse it instead of
+ * leaving signal icons orphaned in front of an empty column.
+ */
+export function groupShowsDate(
+  definition: TaskViewDefinition | undefined,
+  context: TaskGroupContext,
+  tasks: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status' | 'closedAt'>[],
+  today: string,
+): boolean {
+  return tasks.some((task) => impliedMeta(definition, context, task, today).showDate && relativeTaskDate(task, today) !== null);
+}
+
+/**
+ * docs/51 D1: the loudest overdue tone among open rows — the group header
+ * and the rail badge use it so they never out-shout the rows they summarize.
+ */
+export function worstOverdueTone(tasks: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status'>[], today: string): 'danger' | 'warning' | null {
+  let worst: 'danger' | 'warning' | null = null;
+  for (const task of tasks) {
+    if (!isOpenStatus(task.status)) continue;
+    const plan = taskPlanDate(task);
+    if (!plan.date || plan.date >= today) continue;
+    if (plan.source === 'due') return 'danger';
+    worst = 'warning';
+  }
+  return worst;
 }
 
 /** docs/49 D7: transient search over the loaded view. */

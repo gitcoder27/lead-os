@@ -58,6 +58,14 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       {children}
       {/* docs/51 R2: icon-only below sm — the title/aria-label carry the name. */}
       <span className="hidden sm:inline">{label}</span>
+      {/* docs/51 U3: the key is shown where there is room, not only in a tooltip. */}
+      <kbd
+        className="hidden rounded px-1 font-mono text-[10px] leading-4 lg:inline"
+        style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+        aria-hidden="true"
+      >
+        {hint}
+      </kbd>
     </button>
   );
 }

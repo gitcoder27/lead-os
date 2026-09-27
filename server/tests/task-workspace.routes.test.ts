@@ -253,6 +253,8 @@ describe("GET /api/tasks/view-counts (docs/49 §10)", () => {
     ]);
     await createTask(headers, { title: "Overdue", scheduledOn: shift(-2) });
     await createTask(headers, { title: "Now" });
+    // docs/51 D1: a missed deadline is the only overdue case counted as `missed`.
+    await createTask(headers, { title: "Missed", scheduledOn: shift(2), dueAt: `${shift(-1)}T12:00:00.000Z` });
     await createTask(headers, { title: "Soon", scheduledOn: shift(4) });
     await createTask(headers, { title: "Inbox", ownerType: null, ownerId: null });
     await createTask(headers, { title: "Delegated", ownerType: "developer", ownerId: "dev-2" });
@@ -276,9 +278,10 @@ describe("GET /api/tasks/view-counts (docs/49 §10)", () => {
       const rows = await runView(headers, view.id);
       expect({ id: view.id, count: response.body.counts[view.id].count }).toEqual({ id: view.id, count: rows.length });
       expect(response.body.counts[view.id].overdue).toBe(rows.filter((row) => row.signals.overdue).length);
+      expect(response.body.counts[view.id].missed).toBe(rows.filter((row) => row.signals.overdue && row.signals.overdueSource === "due").length);
     }
-    expect(response.body.counts.today).toEqual({ count: 2, overdue: 1 });
-    expect(response.body.counts.attention.count).toBe(3);
+    expect(response.body.counts.today).toEqual({ count: 3, overdue: 2, missed: 1 });
+    expect(response.body.counts.attention.count).toBe(4);
   });
 
   it("defaults today, validates it, and is flag-gated", async () => {

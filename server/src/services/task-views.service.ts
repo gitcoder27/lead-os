@@ -371,7 +371,11 @@ export class TaskViewsService {
       const matched = closed && !closed.from
         ? await this.evaluate(principal, view.definition, today)
         : this.matching(principal, universe, view.definition, facts, today);
-      counts[view.id] = { count: matched.length, overdue: matched.filter((entry) => entry.signals.overdue).length };
+      counts[view.id] = {
+        count: matched.length,
+        overdue: matched.filter((entry) => entry.signals.overdue).length,
+        missed: matched.filter((entry) => entry.signals.overdue && entry.signals.overdueSource === "due").length,
+      };
     }
     return counts;
   }

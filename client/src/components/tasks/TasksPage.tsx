@@ -45,9 +45,9 @@ import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
 import type { ManagerTask, TaskStatus, TaskViewDefinition, TaskViewMeta, UpdateTaskRequest } from '@/types';
 import { TaskDrawer, navigateToTaskPage } from './TaskDrawer';
 import { TaskBulkBar } from './TaskBulkBar';
-import { InlineAddRow, TaskList } from './TaskList';
+import { InlineAddRow, TASK_LIST_CONTAINER, TaskList } from './TaskList';
 import type { TaskRowHandlers } from './TaskListRow';
-import { TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
+import { TaskKeyboardHint, TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
 import { AssignMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
 import { TaskToolbar } from './TaskToolbar';
 import { TaskViewRail } from './TaskViewRail';
@@ -90,6 +90,14 @@ const GO_CHORD_TIMEOUT_MS = 1200;
 
 /** docs/51 F14: pseudo-group key for the standalone add row on empty views. */
 const EMPTY_ADD_KEY = 'empty-view';
+
+/**
+ * docs/51 U6: rows pinned by a *mouse* action stay long enough to read their
+ * new state, then release as soon as the pointer is not over them — lingering
+ * exists so rows never vanish under the cursor, not to pile up ghosts for a
+ * mouse user who never moves keyboard focus. Keyboard pins keep R2 semantics.
+ */
+const POINTER_LINGER_DWELL_MS = 1500;
 
 function isEditable(element: HTMLElement): boolean {
   return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
@@ -143,6 +151,11 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [doneTodayOpen, setDoneTodayOpen] = useState(false);
+  // docs/51 U6: which input drove the last action, and the mouse-pinned rows.
+  const lastInput = useRef<'pointer' | 'keyboard'>('keyboard');
+  const hoveredRow = useRef<string | null>(null);
+  const pointerPins = useRef<{ keys: Set<string>; since: number } | null>(null);
+  const pointerPinTimer = useRef<number | null>(null);
 
   // External URL changes (popstate, palette deep links) replace local state.
   useEffect(() => {
@@ -169,6 +182,19 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   // docs/51 B5: an armed `g` chord must not outlive the page.
   useEffect(() => () => {
     if (goChordTimer.current) window.clearTimeout(goChordTimer.current);
+    if (pointerPinTimer.current) window.clearTimeout(pointerPinTimer.current);
+  }, []);
+
+  // docs/51 U6: remember whether the latest interaction was pointer or keys.
+  useEffect(() => {
+    const onPointer = () => { lastInput.current = 'pointer'; };
+    const onKey = () => { lastInput.current = 'keyboard'; };
+    document.addEventListener('pointerdown', onPointer, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
   }, []);
 
   // ── View + data ──────────────────────────────────────────────────────────
@@ -245,7 +271,26 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const rowByKey = useMemo(() => new Map(flatRows.map((row) => [row.taskKey, row])), [flatRows]);
 
   // ── Lingering / selection / focus housekeeping ───────────────────────────
-  const clearLingering = useCallback(() => setLingering((current) => (current.size ? new Map() : current)), []);
+  const clearLingering = useCallback(() => {
+    pointerPins.current = null;
+    setLingering((current) => (current.size ? new Map() : current));
+  }, []);
+
+  /** docs/51 U6: drop mouse-pinned rows the pointer isn't over, once they've been seen. */
+  const releasePointerPins = useCallback(() => {
+    const pins = pointerPins.current;
+    if (!pins || Date.now() - pins.since < POINTER_LINGER_DWELL_MS - 50) return;
+    const release = [...pins.keys].filter((key) => key !== hoveredRow.current);
+    if (!release.length) return;
+    for (const key of release) pins.keys.delete(key);
+    if (!pins.keys.size) pointerPins.current = null;
+    setLingering((current) => {
+      if (!release.some((key) => current.has(key))) return current;
+      const next = new Map(current);
+      for (const key of release) next.delete(key);
+      return next;
+    });
+  }, []);
 
   const viewSignature = `${selectedView?.id}|${JSON.stringify(state.overrides)}|${state.q ?? ''}`;
   useEffect(() => {
@@ -351,12 +396,22 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       }
       return next;
     });
+    if (entries.size && lastInput.current === 'pointer') {
+      const pins = pointerPins.current ?? { keys: new Set<string>(), since: 0 };
+      for (const key of entries.keys()) pins.keys.add(key);
+      pins.since = Date.now();
+      pointerPins.current = pins;
+      if (pointerPinTimer.current) window.clearTimeout(pointerPinTimer.current);
+      pointerPinTimer.current = window.setTimeout(releasePointerPins, POINTER_LINGER_DWELL_MS);
+    } else if (pointerPins.current) {
+      for (const key of entries.keys()) pointerPins.current.keys.delete(key);
+    }
     await mutations.apply(items, {
       label: `${label(items.length)}${skipped ? ` · skipped ${skipped}` : ''}`,
       undoable: options.undoable,
       onUndo: clearLingering,
     });
-  }, [clearLingering, groups, mutations, today, ownerName, doneTodayKeys]);
+  }, [clearLingering, releasePointerPins, groups, mutations, today, ownerName, doneTodayKeys]);
 
   const toggleDone = useCallback((targets: ManagerTask[]) => {
     const reopen = targets.every((task) => !isOpenStatus(task.status));
@@ -729,6 +784,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           ref={searchRef}
           title={selectedView?.name ?? 'Tasks'}
           count={visibleCount}
+          narrowed={overridesActive || Boolean(state.q)}
           updating={updating}
           views={allViews}
           counts={countData}
@@ -749,7 +805,18 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onShowShortcuts={() => setShowShortcuts(true)}
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto"
+          // docs/51 U6: track the row under the pointer so mouse pins release once it moves on.
+          onPointerMove={(event) => {
+            hoveredRow.current = (event.target as Element).closest?.('[data-task-row]')?.getAttribute('data-task-row') ?? null;
+            if (pointerPins.current) releasePointerPins();
+          }}
+          onPointerLeave={() => {
+            hoveredRow.current = null;
+            if (pointerPins.current) releasePointerPins();
+          }}
+        >
           {tasks.isError && (
             <TaskListError
               message={tasks.error instanceof Error ? tasks.error.message : 'Could not load tasks'}
@@ -757,7 +824,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             />
           )}
           {firstLoad ? (
-            <TaskListSkeleton />
+            <TaskListSkeleton grouped={Boolean(definition?.group)} />
           ) : !tasks.data ? null : flatRows.length === 0 && !doneTodayRows.length ? (
             <>
               <TaskListEmpty
@@ -770,7 +837,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               />
               {/* docs/51 F14: a real add row, not a fake second task list — `n` opens it. */}
               {canAddToEmptyView && (
-                <div className="mx-auto w-full max-w-[1180px] px-4">
+                <div className={TASK_LIST_CONTAINER}>
                   <InlineAddRow
                     active={addingGroup === EMPTY_ADD_KEY}
                     onStart={() => setAddingGroup(EMPTY_ADD_KEY)}
@@ -798,6 +865,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               onSubmitAdd={handleInlineAdd}
               onMoveOverdueToToday={(rows) => schedule(rows, 'today')}
               onToggleGroup={(key) => { if (key === 'done-today') setDoneTodayOpen((open) => !open); }}
+              footer={<TaskKeyboardHint onShowAll={() => setShowShortcuts(true)} />}
             />
           )}
         </div>

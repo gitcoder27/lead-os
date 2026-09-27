@@ -4,6 +4,7 @@ import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type Ta
 import { OWNER_TOKENS, type TaskViewGroupOverride, type TaskViewOverrides } from '@/lib/task-views';
 import { labelChipStyle } from './label-colors';
 import { FilterMenu, TASK_STATUS_META } from './TaskMenus';
+import { TASK_LIST_CONTAINER } from './TaskList';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from './TaskPopover';
 
 const STATUSES: TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
@@ -34,6 +35,12 @@ type OpenMenu = 'owner' | 'status' | 'label' | 'signal' | 'display' | 'filters' 
 interface TaskToolbarProps {
   title: string;
   count: number | undefined;
+  /**
+   * docs/51 D2: filters or search narrow the list below the rail's count, so
+   * the toolbar states the match count. Otherwise the rail already says it —
+   * the toolbar count only shows where the rail is hidden (below md).
+   */
+  narrowed?: boolean;
   updating: boolean;
   views: TaskViewMeta[];
   /** docs/51 R1: the mobile view picker shows per-view counts. */
@@ -58,7 +65,7 @@ interface TaskToolbarProps {
 /** docs/49 §9: search · filter chips · Display popover · view actions. */
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
-    title, count, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
+    title, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
     effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
@@ -91,131 +98,138 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
     + (overrides.sort || overrides.group ? 1 : 0);
 
   return (
-    <header className="shrink-0 px-5 pb-3 pt-4" style={{ borderBottom: '1px solid var(--border)' }}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <select
-          value={viewId}
-          onChange={(event) => onSelectView(event.target.value)}
-          className="rounded-lg px-2 py-1 text-[12px] md:hidden"
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-          aria-label="Task view"
-        >
-          {views.map((view) => {
-            const count = counts?.[view.id]?.count;
-            return (
-              <option key={view.id} value={view.id}>
-                {count ? `${view.name} (${count})` : view.name}
-              </option>
-            );
-          })}
-        </select>
-        <h1 className="flex items-center gap-2 text-[19px] font-bold" style={{ color: 'var(--text-primary)' }}>
-          {title}
-          {isSavedView && hasOverrides && (
-            <span className="h-2 w-2 rounded-full" style={{ background: 'var(--warning)' }} title="Unsaved filter changes" aria-label="Unsaved filter changes" />
-          )}
-        </h1>
-        <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-          {count === undefined ? '' : `${count} task${count === 1 ? '' : 's'}`}
-        </span>
-        {updating && (
-          <span className="flex items-center gap-1 text-[11.5px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
-            <Loader2 size={11} className="animate-spin" /> Updating…
-          </span>
-        )}
-        <span className="flex-1" />
-        {hasOverrides && isSavedView && (
-          <>
-            <ToolbarButton onClick={onUpdateView} accent>Update view</ToolbarButton>
-            <ToolbarButton onClick={onRevert}>Revert</ToolbarButton>
-          </>
-        )}
-        {hasOverrides && !isSavedView && <ToolbarButton onClick={onRevert}>Reset</ToolbarButton>}
-        <button
-          type="button"
-          onClick={onShowShortcuts}
-          className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
-          style={{ color: 'var(--text-muted)' }}
-          aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
-        >
-          <Keyboard size={14} />
-        </button>
-      </div>
+    <header className="shrink-0 pb-3 pt-4" style={{ borderBottom: '1px solid var(--border)' }}>
+      {/* docs/51 D5: same centered column as the list; px-2 puts the title on the rows' glyph edge. */}
+      <div className={TASK_LIST_CONTAINER}>
+        <div className="px-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <select
+              value={viewId}
+              onChange={(event) => onSelectView(event.target.value)}
+              className="rounded-lg px-2 py-1 text-[12px] md:hidden"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              aria-label="Task view"
+            >
+              {views.map((view) => {
+                const count = counts?.[view.id]?.count;
+                return (
+                  <option key={view.id} value={view.id}>
+                    {count ? `${view.name} (${count})` : view.name}
+                  </option>
+                );
+              })}
+            </select>
+            <h1 className="flex items-center gap-2 text-[19px] font-bold" style={{ color: 'var(--text-primary)' }}>
+              {title}
+              {isSavedView && hasOverrides && (
+                <span className="h-2 w-2 rounded-full" style={{ background: 'var(--warning)' }} title="Unsaved filter changes" aria-label="Unsaved filter changes" />
+              )}
+            </h1>
+            {count !== undefined && (
+              <span className={`text-[12px] tabular-nums ${narrowed ? '' : 'md:hidden'}`} style={{ color: 'var(--text-muted)' }}>
+                {narrowed ? `${count} matching` : `${count} task${count === 1 ? '' : 's'}`}
+              </span>
+            )}
+            {updating && (
+              <span className="flex items-center gap-1 text-[11.5px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+                <Loader2 size={11} className="animate-spin" /> Updating…
+              </span>
+            )}
+            <span className="flex-1" />
+            {hasOverrides && isSavedView && (
+              <>
+                <ToolbarButton onClick={onUpdateView} accent>Update view</ToolbarButton>
+                <ToolbarButton onClick={onRevert}>Revert</ToolbarButton>
+              </>
+            )}
+            {hasOverrides && !isSavedView && <ToolbarButton onClick={onRevert}>Reset</ToolbarButton>}
+            <button
+              type="button"
+              onClick={onShowShortcuts}
+              className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
+              style={{ color: 'var(--text-muted)' }}
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard size={14} />
+            </button>
+          </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <label className="flex h-7 min-w-[180px] flex-1 items-center gap-1.5 rounded-lg px-2 sm:max-w-[260px]" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-          <Search size={12} style={{ color: 'var(--text-muted)' }} />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                onQuery('');
-                event.currentTarget.blur();
-              }
-            }}
-            placeholder="Search this view"
-            aria-label="Search tasks"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
-            style={{ color: 'var(--text-primary)' }}
-          />
-          {query ? (
-            <button type="button" onClick={() => onQuery('')} aria-label="Clear search" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
-          ) : (
-            <kbd className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>/</kbd>
-          )}
-        </label>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <label className="flex h-7 min-w-[180px] flex-1 items-center gap-1.5 rounded-lg px-2 sm:max-w-[260px]" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+              <Search size={12} style={{ color: 'var(--text-muted)' }} />
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(event) => onQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    onQuery('');
+                    event.currentTarget.blur();
+                  }
+                }}
+                placeholder="Search this view"
+                aria-label="Search tasks"
+                className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
+                style={{ color: 'var(--text-primary)' }}
+              />
+              {query ? (
+                <button type="button" onClick={() => onQuery('')} aria-label="Clear search" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
+              ) : (
+                <kbd className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>/</kbd>
+              )}
+            </label>
 
-        {/* docs/51 R3: below sm, every filter control folds into one Filter button. */}
-        <button
-          type="button"
-          onClick={open('filters')}
-          aria-haspopup="menu"
-          className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] sm:hidden"
-          style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
-        >
-          <Filter size={12} /> Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}
-        </button>
-        <div className="hidden items-center gap-1.5 sm:flex sm:flex-wrap">
-          <FilterChip
-            label="Owner"
-            values={ownerValues.map(ownerLabel)}
-            onOpen={open('owner')}
-            onClear={() => onOverrides({ owner: undefined })}
-          />
-          <FilterChip
-            label="Status"
-            values={(overrides.status ?? []).map((status) => TASK_STATUS_META[status].label)}
-            onOpen={open('status')}
-            onClear={() => onOverrides({ status: undefined })}
-          />
-          <FilterChip
-            label="Label"
-            values={(overrides.label ?? []).map(taskLabelDisplayName)}
-            onOpen={open('label')}
-            onClear={() => onOverrides({ label: undefined })}
-          />
-          {viewId === 'attention' && (
-            <FilterChip
-              label="Signal"
-              values={(overrides.signal ?? []).map((signal) => SIGNALS.find((entry) => entry.value === signal)?.label ?? signal)}
-              onOpen={open('signal')}
-              onClear={() => onOverrides({ signal: undefined })}
-            />
-          )}
-          <span className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
-          <button
-            type="button"
-            onClick={open('display')}
-            aria-haspopup="menu"
-            className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
-            style={{ color: overrides.sort || overrides.group ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
-          >
-            <SlidersHorizontal size={12} /> Display
-          </button>
+            {/* docs/51 R3: below sm, every filter control folds into one Filter button. */}
+            <button
+              type="button"
+              onClick={open('filters')}
+              aria-haspopup="menu"
+              className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] sm:hidden"
+              style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              <Filter size={12} /> Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </button>
+            <div className="hidden items-center gap-1.5 sm:flex sm:flex-wrap">
+              <FilterChip
+                label="Owner"
+                values={ownerValues.map(ownerLabel)}
+                onOpen={open('owner')}
+                onClear={() => onOverrides({ owner: undefined })}
+              />
+              <FilterChip
+                label="Status"
+                values={(overrides.status ?? []).map((status) => TASK_STATUS_META[status].label)}
+                onOpen={open('status')}
+                onClear={() => onOverrides({ status: undefined })}
+              />
+              <FilterChip
+                label="Label"
+                values={(overrides.label ?? []).map(taskLabelDisplayName)}
+                onOpen={open('label')}
+                onClear={() => onOverrides({ label: undefined })}
+              />
+              {viewId === 'attention' && (
+                <FilterChip
+                  label="Signal"
+                  values={(overrides.signal ?? []).map((signal) => SIGNALS.find((entry) => entry.value === signal)?.label ?? signal)}
+                  onOpen={open('signal')}
+                  onClear={() => onOverrides({ signal: undefined })}
+                />
+              )}
+              <span className="mx-1 h-4 w-px" style={{ background: 'var(--border)' }} />
+              <button
+                type="button"
+                onClick={open('display')}
+                aria-haspopup="menu"
+                className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+                style={{ color: overrides.sort || overrides.group ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              >
+                <SlidersHorizontal size={12} /> Display
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

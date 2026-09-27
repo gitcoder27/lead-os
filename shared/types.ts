@@ -771,6 +771,8 @@ export interface TaskViewTasksResponse {
 export interface TaskViewCount {
   count: number;
   overdue: number;
+  /** docs/51 D1: overdue rows whose plan date is a missed `dueAt` deadline (the only red case). */
+  missed?: number;
 }
 
 /** `GET /api/tasks/view-counts` (docs/49 §10). Keyed by view id. */

@@ -3,13 +3,25 @@ import { BookmarkPlus, Check, Pencil, Trash2, X } from 'lucide-react';
 import type { TaskViewCount, TaskViewMeta } from '@/types';
 import { FOCUS_RING } from './TaskDetailPrimitives';
 
-/** docs/49 §4: colored badges only on actionable views. */
+/**
+ * docs/49 §4: colored badges only on actionable views. docs/51 D1: a badge
+ * takes the loudest tone of the rows it counts — red only when one of them
+ * missed a `dueAt` deadline, amber for slipped plan dates — so the rail, the
+ * group header, and the row always agree.
+ */
+function severityTone(count: TaskViewCount, fallback: string): string {
+  if ((count.missed ?? 0) > 0) return 'var(--danger)';
+  if (count.overdue > 0) return 'var(--warning)';
+  return fallback;
+}
+
 function badgeStyle(viewId: string, count: TaskViewCount | undefined): { tone: string | null; value: number } {
   if (!count) return { tone: null, value: 0 };
+  if (count.count === 0) return { tone: null, value: 0 };
   switch (viewId) {
-    case 'inbox': return { tone: count.count > 0 ? 'var(--accent)' : null, value: count.count };
-    case 'today': return { tone: count.count > 0 ? (count.overdue > 0 ? 'var(--danger)' : 'var(--accent)') : null, value: count.count };
-    case 'attention': return { tone: count.count > 0 ? 'var(--warning)' : null, value: count.count };
+    case 'inbox': return { tone: 'var(--accent)', value: count.count };
+    case 'today': return { tone: severityTone(count, 'var(--accent)'), value: count.count };
+    case 'attention': return { tone: severityTone(count, 'var(--warning)'), value: count.count };
     default: return { tone: null, value: count.count };
   }
 }

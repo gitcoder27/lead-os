@@ -712,3 +712,113 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeTruthy();
   });
 });
+
+describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
+  const styleOf = (element: Element | null) => element?.getAttribute('style') ?? '';
+
+  it('rail badge, Overdue label and row agree: a slipped plan date is amber, not red (D1)', () => {
+    render(<TasksPage />);
+    const rail = within(screen.getByRole('navigation', { name: 'Task views' }));
+    const badge = within(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).getByText('2');
+    expect(styleOf(badge)).toContain('var(--warning)');
+    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--warning)');
+    expect(styleOf(screen.getByText('3d overdue'))).toContain('var(--warning)');
+    expect(styleOf(screen.getByText('3d overdue'))).not.toContain('var(--danger)');
+  });
+
+  it('a missed deadline turns the badge, label and row red together (D1)', () => {
+    mockUseTaskViewCounts.mockReturnValue({ data: { today: TODAY, counts: { today: { count: 2, overdue: 1, missed: 1 } } } });
+    const missed = tasksResult([
+      task(),
+      task({ id: 2, taskKey: 'T-2', title: 'Board deck', scheduledOn: null, dueAt: '2026-09-24', signals: { ...NO_SIGNALS, overdue: true, overdueDays: 2, overdueSource: 'due' } }),
+    ]);
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : missed,
+    );
+    render(<TasksPage />);
+    const rail = within(screen.getByRole('navigation', { name: 'Task views' }));
+    expect(styleOf(within(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).getByText('2'))).toContain('var(--danger)');
+    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--danger)');
+    expect(styleOf(screen.getByText('2d overdue'))).toContain('var(--danger)');
+  });
+
+  it('a follow-up shows the bell only — no duplicate label chip (D4)', () => {
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ labels: ['category:follow_up'] })]));
+    render(<TasksPage />);
+    expect(within(row('T-1')).getByRole('img', { name: 'Follow-up' })).toBeTruthy();
+    expect(within(row('T-1')).queryByText('follow up')).toBeNull();
+  });
+
+  it('the toolbar states a count only when it differs from the rail (D2)', () => {
+    render(<TasksPage />);
+    // Unfiltered: present for narrow screens only (the rail carries it at md+).
+    expect(screen.getByText('2 tasks').className).toContain('md:hidden');
+    fireEvent.change(screen.getByLabelText('Search tasks'), { target: { value: 'priya' } });
+    expect(screen.getByText('1 matching').className).not.toContain('md:hidden');
+  });
+
+  it('the focused row keeps its date visible — hover actions are hover-only (U2)', () => {
+    render(<TasksPage />);
+    press('j');
+    expect(row('T-2')).toHaveAttribute('tabindex', '0');
+    expect(within(row('T-2')).getByText('3d overdue')).toBeTruthy();
+    const actions = within(row('T-2')).getByRole('button', { name: 'Mark done (space)' }).parentElement!;
+    expect(actions.className).toContain('opacity-0');
+    expect(actions.className).toContain('right-full');
+  });
+
+  it('the key slot turns into the selection box for the focused row (U4)', () => {
+    render(<TasksPage />);
+    const select = within(row('T-2')).getByRole('button', { name: 'Select T-2' });
+    expect(select.className).toContain('group-hover:opacity-100');
+    press('j');
+    expect(within(row('T-2')).getByRole('button', { name: 'Select T-2' }).className).toContain('opacity-100');
+  });
+
+  it('keyboard hint teaches the core keys and stays dismissed (U3)', () => {
+    window.localStorage.removeItem('leados.tasks.keyHintDismissed');
+    const { unmount } = render(<TasksPage />);
+    const hint = screen.getByRole('note', { name: 'Keyboard shortcuts hint' });
+    fireEvent.click(within(hint).getByRole('button', { name: /all shortcuts/ }));
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close shortcuts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss keyboard hint' }));
+    expect(screen.queryByRole('note', { name: 'Keyboard shortcuts hint' })).toBeNull();
+    unmount();
+    render(<TasksPage />);
+    expect(screen.queryByRole('note', { name: 'Keyboard shortcuts hint' })).toBeNull();
+    window.localStorage.removeItem('leados.tasks.keyHintDismissed');
+  });
+
+  it('skeleton draws section labels for grouped views (U5)', () => {
+    mockUseTaskViewTasks.mockReturnValue({ data: undefined, isLoading: true, isError: false, isFetching: true, isPlaceholderData: false, error: null, refetch: vi.fn() });
+    render(<TasksPage />);
+    const skeleton = screen.getByLabelText('Loading tasks');
+    expect(skeleton.querySelectorAll('.h-\\[38px\\]').length).toBe(6);
+    expect(skeleton.querySelectorAll('.h-9').length).toBe(2);
+  });
+
+  it('a mouse-pinned row releases once the pointer moves to another row (U6)', async () => {
+    const { rerender } = render(<TasksPage />);
+    const done = within(row('T-2')).getByRole('button', { name: 'Mark done (space)' });
+    fireEvent.pointerDown(done);
+    await act(async () => { fireEvent.click(done); });
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult([task()]),
+    );
+    rerender(<TasksPage />);
+    expect(row('T-2')).toBeTruthy();
+    const later = Date.now() + 5_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(later);
+    try {
+      // Still under the pointer: stays put.
+      fireEvent.pointerMove(row('T-2'));
+      expect(row('T-2')).toBeTruthy();
+      // Pointer moves on: released.
+      act(() => { fireEvent.pointerMove(row('T-1')); });
+      await waitFor(() => expect(row('T-2')).toBeNull());
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});

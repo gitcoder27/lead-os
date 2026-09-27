@@ -270,7 +270,7 @@ export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
-      {canLater && <MenuItem icon={<Moon size={13} />} label="Move to Later" onSelect={onLater} />}
+      {canLater && <MenuItem icon={<Moon size={13} />} label="Move to Later" hint="s l" onSelect={onLater} />}
       <MenuItem icon={<Link2 size={13} />} label="Copy link" onSelect={onCopyLink} />
       <MenuDivider />
       <MenuItem icon={<Ban size={13} />} label="Drop" hint="#" tone="danger" onSelect={onDrop} />

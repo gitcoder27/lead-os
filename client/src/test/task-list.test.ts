@@ -2,17 +2,21 @@ import { describe, expect, it } from 'vitest';
 import type { ManagerTask } from '@/types';
 import {
   applyLingering,
+  groupShowsDate,
   impliedMeta,
   inlineAddDefaults,
   lingerEntriesFor,
   nextMonday,
   optimisticTask,
+  overdueLevel,
+  overdueTone,
   relativeTaskDate,
   scheduleChanges,
   searchTasks,
   taskPlanDate,
   toggledDoneStatus,
   undoChanges,
+  worstOverdueTone,
   type RenderGroup,
 } from '@/lib/task-list';
 import {
@@ -274,5 +278,43 @@ describe('search (docs/49 D7)', () => {
     expect(searchTasks(rows, 'app-9').map((row) => row.taskKey)).toEqual(['T-4']);
     expect(searchTasks(rows, 't-2').map((row) => row.taskKey)).toEqual(['T-2']);
     expect(searchTasks(rows, '  ')).toBe(rows);
+  });
+});
+
+describe('overdue severity (docs/51 D1)', () => {
+  it('red only for missed deadlines; slipped plan dates are amber at any age', () => {
+    expect(overdueTone('due')).toBe('danger');
+    expect(overdueTone('scheduled')).toBe('warning');
+    expect(relativeTaskDate(task({ scheduledOn: '2026-09-10' }), TODAY)).toMatchObject({ label: '16d overdue', tone: 'warning' });
+  });
+
+  it('escalates with age so 15 days late never reads like 1 day late', () => {
+    expect(overdueLevel(1, 'scheduled')).toBe(1);
+    expect(overdueLevel(2, 'scheduled')).toBe(1);
+    expect(overdueLevel(3, 'scheduled')).toBe(2);
+    expect(overdueLevel(7, 'scheduled')).toBe(3);
+    expect(overdueLevel(15, 'scheduled')).toBe(3);
+    // A missed deadline is never just a nudge.
+    expect(overdueLevel(1, 'due')).toBe(2);
+    expect(overdueLevel(9, 'due')).toBe(3);
+    expect(relativeTaskDate(task({ scheduledOn: '2026-09-25' }), TODAY)?.level).toBe(1);
+    expect(relativeTaskDate(task({ scheduledOn: '2026-09-11' }), TODAY)?.level).toBe(3);
+    expect(relativeTaskDate(task({ scheduledOn: TODAY }), TODAY)?.level).toBeUndefined();
+  });
+
+  it('a group takes the loudest tone among its open rows', () => {
+    expect(worstOverdueTone([task({ scheduledOn: '2026-09-20' })], TODAY)).toBe('warning');
+    expect(worstOverdueTone([task({ scheduledOn: '2026-09-20' }), task({ dueAt: '2026-09-25' })], TODAY)).toBe('danger');
+    expect(worstOverdueTone([task({ dueAt: '2026-09-25', status: 'done' }), task({ scheduledOn: TODAY })], TODAY)).toBeNull();
+  });
+});
+
+describe('date column reservation (docs/51 D3)', () => {
+  it('collapses in single-day buckets and reserves it when any row shows a date', () => {
+    const todayBucket = { mode: 'scheduled', bucket: 'Today' } as const;
+    expect(groupShowsDate(undefined, todayBucket, [task({ scheduledOn: TODAY })], TODAY)).toBe(false);
+    expect(groupShowsDate(undefined, { mode: 'scheduled', bucket: 'Next 7 days' }, [task({ scheduledOn: '2026-10-01' })], TODAY)).toBe(true);
+    expect(groupShowsDate(undefined, { mode: 'none' }, [task(), task({ scheduledOn: '2026-10-01' })], TODAY)).toBe(true);
+    expect(groupShowsDate(undefined, { mode: 'none' }, [task()], TODAY)).toBe(false);
   });
 });

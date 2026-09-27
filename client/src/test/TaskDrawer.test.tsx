@@ -56,6 +56,7 @@ function managerTask(overrides: Partial<TaskDetailResponse> = {}): TaskDetailRes
     id: 1,
     taskKey: 'T-7',
     title: 'Manager task',
+    details: null,
     kind: 'task',
     status: 'active',
     ownerType: 'manager',
@@ -335,6 +336,87 @@ describe('TaskDrawer interactions', () => {
     render(<TaskDetailBody taskKey="T-7" onNavigateTask={onNavigate} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open parent task T-2' }));
     expect(onNavigate).toHaveBeenCalledWith('T-2');
+  });
+});
+
+describe('TaskDrawer details (shared description)', () => {
+  it('adds details from the empty state and saves with Cmd/Ctrl+Enter', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByRole('heading', { name: 'Details' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Add details/ }));
+    const editor = screen.getByLabelText('Task details');
+    fireEvent.change(editor, { target: { value: '  Why: finance close.\nDone: CSV opens.  ' } });
+    fireEvent.keyDown(editor, { key: 'Enter', metaKey: true });
+    expect(mockMutate).toHaveBeenCalledWith({ details: 'Why: finance close.\nDone: CSV opens.' }, expect.anything());
+    expect(screen.queryByLabelText('Task details')).toBeNull();
+  });
+
+  it('discards on Escape without closing anything, and commits on blur', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ details: 'Original context' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }));
+    let editor = screen.getByLabelText('Task details');
+    fireEvent.change(editor, { target: { value: 'Throwaway' } });
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(screen.getByText('Original context')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Original context'));
+    editor = screen.getByLabelText('Task details');
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.blur(editor);
+    // Clearing the text clears the field.
+    expect(mockMutate).toHaveBeenCalledWith({ details: null }, expect.anything());
+  });
+
+  it('folds long details, links URLs, and names who it is shared with', () => {
+    const long = `${'Context line\n'.repeat(14)}See https://example.com/spec for the spec.`;
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ details: long, ownerType: 'developer', ownerId: 'dev-1' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByText('Shared with Dev One')).toBeTruthy();
+    const more = screen.getByRole('button', { name: 'Show more' });
+    fireEvent.click(more);
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'https://example.com/spec' }).getAttribute('href')).toBe('https://example.com/spec');
+  });
+
+  it('opens the editor with the D shortcut', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    fireEvent.keyDown(document.body, { key: 'd' });
+    expect(screen.getByLabelText('Task details')).toBeTruthy();
+  });
+
+  it('lets the owning developer edit details and status, with nothing manager-private', () => {
+    mockUser.mockReturnValue({ accountId: 'u-dev', role: 'developer', developerAccountId: 'dev-1' });
+    const task = { ...managerTask({ details: 'Lead wrote this' }), ownerType: 'developer' as const, ownerId: 'dev-1' } as TaskDetailResponse;
+    for (const field of ['trackedByManagerId', 'labels', 'nextAction', 'followUpAt', 'later']) delete (task as Record<string, unknown>)[field];
+    mockUseTaskDetail.mockReturnValue(queryFor(task));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByText('Shared with your lead')).toBeTruthy();
+    // Manager-created: the title is locked, status and details are not.
+    expect(screen.queryByLabelText('Task title')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Task status: Active' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }));
+    const editor = screen.getByLabelText('Task details');
+    fireEvent.change(editor, { target: { value: 'Lead wrote this. Dev added repro steps.' } });
+    fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+    expect(mockMutate).toHaveBeenCalledWith({ details: 'Lead wrote this. Dev added repro steps.' }, expect.anything());
+    expect(screen.queryByText('Tracked by')).toBeNull();
+    expect(screen.queryByText('Follow-up')).toBeNull();
+    expect(screen.queryByText('Labels')).toBeNull();
+  });
+
+  it('is read-only on deleted tasks and hidden when empty', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ deletedAt: '2026-09-25T10:00:00Z', details: 'Kept for the record' })));
+    const { unmount } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByText('Kept for the record')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Edit/ })).toBeNull();
+    unmount();
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ deletedAt: '2026-09-25T10:00:00Z' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.queryByRole('heading', { name: 'Details' })).toBeNull();
   });
 });
 

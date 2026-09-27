@@ -67,7 +67,8 @@ export function useAddMyDayItem(date: string) {
       jiraKey?: string;
       relatedIssueKeys?: string[];
       title: string;
-      note?: string;
+      /** Shared task description; legacy (pre-canonical) days store it as the note. */
+      details?: string;
     }) =>
       api.post<TrackerWorkItem>('/my-day/items', { date, ...params }),
     onSuccess: () => {

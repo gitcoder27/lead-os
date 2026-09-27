@@ -7,7 +7,7 @@ import { AuthService } from "../services/auth.service";
 import { IssueService } from "../services/issue.service";
 import { MyDayService } from "../services/my-day.service";
 import { TaskKeysService } from "../services/task-keys.service";
-import { taskCreateSchema, taskUpdateSchema, TaskService, type TaskPrincipal } from "../services/task.service";
+import { TASK_DETAILS_MAX, taskCreateSchema, taskUpdateSchema, TaskService, type TaskPrincipal } from "../services/task.service";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
 
@@ -37,6 +37,7 @@ const addItemSchema = z.object({
     relatedIssueKeys: z.array(z.string().trim().min(1)).max(20).optional(),
     title: z.string().trim().min(1).max(500),
     note: z.string().trim().max(2000).optional(),
+    details: z.string().max(TASK_DETAILS_MAX).optional(),
   }),
   query: z.any().optional(),
   params: z.any().optional(),

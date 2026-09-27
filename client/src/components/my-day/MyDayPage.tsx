@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { CheckCircle2, ListTodo, LogOut, Radio, ScrollText, Target, XCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -6,9 +6,10 @@ import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
 import { useMyDay } from '@/hooks/useMyDay';
 import { useTaskResolution } from '@/hooks/useTasks';
+import { usePrefetchTaskDetail } from '@/hooks/useTaskDetail';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
-import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
+import { TaskDrawer, navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
 import type { MyDayReadOnlyReason, MyDayResponse } from '@/types';
@@ -24,6 +25,7 @@ import { AddTaskForm } from './AddTaskForm';
 import { FinishedWork } from './FinishedWork';
 import { RecentActivity } from './RecentActivity';
 import { HAIRLINE, Kbd, MyDaySection, pageVariants, sectionVariants, surfaceStyle } from './MyDayUI';
+import { MyDayTaskDetailContext, type MyDayTaskDetailActions } from './MyDayTaskDetailContext';
 
 function readOnlyReasonFor(day: MyDayResponse | undefined): MyDayReadOnlyReason | undefined {
   if (!day) return undefined;
@@ -45,6 +47,22 @@ export function MyDayPage() {
   const [date, setDate] = useState(() => getLocalIsoDate());
   const [deepLinkTaskKey] = useState(() => taskKeyFromParams(new URLSearchParams(window.location.search)));
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  // The shared task drawer (developer mode): title, status, details, links and
+  // the full timeline. Mirrored to `?task=` so a refresh reopens it.
+  const [openTaskKey, setOpenTaskKey] = useState<string | null>(null);
+  const prefetchTaskDetail = usePrefetchTaskDetail();
+  const openTask = useCallback((taskKey: string) => {
+    setOpenTaskKey(taskKey);
+    writeTaskParam(taskKey);
+  }, []);
+  const closeTask = useCallback(() => {
+    setOpenTaskKey(null);
+    writeTaskParam(undefined);
+  }, []);
+  const taskDetailActions = useMemo<MyDayTaskDetailActions>(
+    () => ({ openTask, prefetchTask: prefetchTaskDetail }),
+    [openTask, prefetchTaskDetail],
+  );
   // Background polling refetches every 30s; only a manual refresh spins the icon.
   const [refreshing, setRefreshing] = useState(false);
   const quickUpdateRef = useRef<HTMLTextAreaElement | null>(null);
@@ -121,7 +139,8 @@ export function MyDayPage() {
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
     row.classList.add('task-row-deep-link');
     window.setTimeout(() => row.classList.remove('task-row-deep-link'), 2400);
-  }, [taskResolution.data, taskResolution.isError, day, date, addToast]);
+    openTask(resolution.taskKey);
+  }, [taskResolution.data, taskResolution.isError, day, date, addToast, openTask]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -185,9 +204,14 @@ export function MyDayPage() {
   const readOnlyReason = readOnlyReasonFor(day);
   const isInactive = day?.availability.state === 'inactive';
   const nudge = Boolean(day?.isStale) && !isReadOnly;
+  // J/K in the drawer steps through the page in reading order.
+  const orderedTaskKeys = [day?.currentItem, ...plannedItems, ...completedItems, ...droppedItems]
+    .map((item) => item?.taskKey)
+    .filter((key): key is string => Boolean(key));
 
   return (
     <MotionConfig reducedMotion="user">
+      <MyDayTaskDetailContext.Provider value={taskDetailActions}>
       <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
         <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
           <MyDayHeader
@@ -364,6 +388,14 @@ export function MyDayPage() {
           </motion.div>
         </div>
       </div>
+      <TaskDrawer
+        taskKey={openTaskKey}
+        onClose={closeTask}
+        onNavigateTask={openTask}
+        orderedKeys={orderedTaskKeys}
+        onStepTask={openTask}
+      />
+      </MyDayTaskDetailContext.Provider>
     </MotionConfig>
   );
 }

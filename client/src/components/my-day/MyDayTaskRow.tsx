@@ -6,7 +6,8 @@ import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { IconAction } from './MyDayUI';
-import { ActivityPanel, EditableTitle, InlineTaskActions, RowComposer, TaskMeta, TaskNote, canRenameItem } from './MyDayTaskParts';
+import { InlineTaskActions, RowComposer, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
+import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
 
 export type MyDayTaskRowVariant = 'planned' | 'done' | 'dropped';
 
@@ -32,7 +33,8 @@ export interface MyDayTaskRowProps {
 /**
  * Up next / Done rows. Text first: a leading glyph (queue number that turns
  * into a drag handle), key + title, one meta line, the note. Actions float
- * in on hover or focus and stay visible on touch screens.
+ * in on hover or focus and stay visible on touch screens. Clicking a keyed
+ * row (or its title) opens the shared task drawer.
  */
 export function MyDayTaskRow({
   item,
@@ -50,8 +52,9 @@ export function MyDayTaskRow({
   canMoveDown = false,
   onDragHandlePointerDown,
 }: MyDayTaskRowProps) {
-  const [activityOpen, setActivityOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const { openTask } = useMyDayTaskDetail();
+  const prefetch = usePrefetchHandlers(item.taskKey);
   const closed = variant !== 'planned';
   const reorderable = variant === 'planned' && !readOnly && Boolean(onDragHandlePointerDown || onMove);
 
@@ -64,7 +67,17 @@ export function MyDayTaskRow({
   return (
     <div
       data-task-key={item.taskKey ?? undefined}
-      className={`group relative flex items-start gap-3 px-3 transition-colors sm:px-4 ${closed ? 'py-2.5' : 'py-3'} hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)] focus-within:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)]`}
+      onPointerEnter={prefetch.onPointerEnter}
+      onClick={(event) => {
+        // The whole row is a click target for the drawer; its own controls
+        // (title, chip, actions, composer) keep their behaviour. Keyboard
+        // users open it from the title button.
+        if (!item.taskKey || composerOpen) return;
+        if ((event.target as HTMLElement).closest('button, a, input, textarea, [role="menu"], [role="dialog"]')) return;
+        if (window.getSelection()?.toString()) return;
+        openTask(item.taskKey);
+      }}
+      className={`group relative flex items-start gap-3 px-3 transition-colors sm:px-4 ${closed ? 'py-2.5' : 'py-3'} ${item.taskKey ? 'cursor-pointer' : ''} hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)] focus-within:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)]`}
     >
       <LeadingGlyph
         item={item}
@@ -81,7 +94,7 @@ export function MyDayTaskRow({
       <div className={`min-w-0 flex-1 ${readOnly ? '' : closed ? '[@media(hover:none)]:pr-9' : '[@media(hover:none)]:pr-[92px]'}`}>
         <div className="flex min-w-0 items-start gap-2">
           {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-[1px]" />}
-          <EditableTitle
+          <TaskTitle
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
             onCommit={onUpdateTitle}
@@ -104,8 +117,6 @@ export function MyDayTaskRow({
               readOnly={readOnly}
               composerOpen={composerOpen}
               onOpenComposer={() => setComposerOpen(true)}
-              activityOpen={activityOpen}
-              onToggleActivity={() => setActivityOpen((open) => !open)}
             />
           )}
         </div>
@@ -114,7 +125,6 @@ export function MyDayTaskRow({
         {composerOpen && item.taskKey && !readOnly && (
           <RowComposer taskKey={item.taskKey} viewDate={viewDate} onClose={() => setComposerOpen(false)} />
         )}
-        {activityOpen && item.taskKey && <ActivityPanel taskKey={item.taskKey} />}
       </div>
 
       {!readOnly && <RowActions item={item} variant={variant} onSetCurrent={onSetCurrent} onMarkDone={onMarkDone} onDrop={onDrop} onReopen={onReopen} />}

@@ -75,6 +75,8 @@ export function useAddTrackerItem(date: string) {
       relatedIssueKeys?: string[];
       title: string;
       note?: string;
+      /** Shared task description (canonical tasks); legacy days keep it as the note. */
+      details?: string;
     }) =>
       api.post<TrackerWorkItem>(`/team-tracker/${params.accountId}/items`, {
         date,
@@ -82,6 +84,7 @@ export function useAddTrackerItem(date: string) {
         relatedIssueKeys: params.relatedIssueKeys,
         title: params.title,
         note: params.note,
+        details: params.details,
       }),
     onSuccess: (_data, params) => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });

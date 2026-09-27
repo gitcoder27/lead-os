@@ -92,7 +92,7 @@ export function useMyDayHandlers(date: string, readOnly = false, day?: MyDayResp
     updateItem.mutate({ itemId, title }, { onError });
   };
 
-  const handleAddItem = (params: { title: string; jiraKey?: string; note?: string }) => {
+  const handleAddItem = (params: { title: string; jiraKey?: string; details?: string }) => {
     if (guardReadOnly()) return;
     addItem.mutate(params, { onError });
   };

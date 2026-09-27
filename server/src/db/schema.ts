@@ -462,6 +462,9 @@ export const tasks = sqliteTable("tasks", {
   workspaceId: text("workspace_id").notNull().default("default"),
   taskKey: text("task_key").notNull(),
   title: text("title").notNull(),
+  // Shared description: anyone who can see the task can read and edit it.
+  // Static context — the running thread lives in task_events.
+  details: text("details"),
   kind: text("kind").notNull().default("task"),
   status: text("status").notNull().default("open"),
   later: integer("later").notNull().default(0),

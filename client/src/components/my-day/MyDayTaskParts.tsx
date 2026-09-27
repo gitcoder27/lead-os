@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, History, Link2, MessageSquarePlus, StickyNote, X } from 'lucide-react';
+import { AlignLeft, Check, Link2, MessageSquarePlus, PanelRight, StickyNote, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { formatAbsoluteDateTime, formatDate, isOverdue, priorityColor } from '@/lib/utils';
 import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
-import { TaskTimeline } from '@/components/tasks/TaskTimeline';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { RelatedIssueChips } from '@/components/team-tracker/RelatedIssueChips';
 import { continuedDays, describeLatestEvent, formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
+import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
 
 /** Days carried before the provenance turns amber — matches the manager's drawer. */
 const AGING_DAYS = 3;
@@ -128,6 +128,62 @@ export function EditableTitle({
   );
 }
 
+/** Hover/focus handlers that warm a task's drawer data before the click lands. */
+export function usePrefetchHandlers(taskKey: string | null | undefined) {
+  const { prefetchTask } = useMyDayTaskDetail();
+  if (!taskKey) return {};
+  const warm = () => prefetchTask(taskKey);
+  return { onPointerEnter: warm, onFocus: warm };
+}
+
+/**
+ * Keyed tasks open the shared task drawer from their title — renaming,
+ * details and the full timeline live there. Unkeyed legacy rows keep the
+ * in-place rename.
+ */
+export function TaskTitle({
+  item,
+  editable,
+  onCommit,
+  className,
+  color = 'var(--text-primary)',
+  strike = false,
+}: {
+  item: TrackerWorkItem;
+  editable: boolean;
+  onCommit?: (id: number, title: string) => void;
+  className: string;
+  color?: string;
+  strike?: boolean;
+}) {
+  const { openTask } = useMyDayTaskDetail();
+  const prefetch = usePrefetchHandlers(item.taskKey);
+  if (!item.taskKey) {
+    return <EditableTitle item={item} editable={editable} onCommit={onCommit} className={className} color={color} strike={strike} />;
+  }
+  const taskKey = item.taskKey;
+  return (
+    <button
+      type="button"
+      {...prefetch}
+      onClick={(event) => {
+        event.stopPropagation();
+        openTask(taskKey);
+      }}
+      className={`block min-w-0 flex-1 rounded-md text-left ${FOCUS_RING}`}
+      aria-label={`Open ${taskKey}: ${item.title}`}
+      aria-haspopup="dialog"
+    >
+      <span
+        className={`line-clamp-2 break-words decoration-[var(--border-strong)] decoration-1 underline-offset-4 hover:underline ${className}`}
+        style={{ color, textDecoration: strike ? 'line-through' : undefined }}
+      >
+        {item.title}
+      </span>
+    </button>
+  );
+}
+
 /**
  * One quiet line of context: Jira, related issues, delegation, how long it
  * has been carried, and the latest word on it.
@@ -137,6 +193,7 @@ export function TaskMeta({
   viewDate,
   closed = false,
   hideContinued = false,
+  hideDetailsHint = false,
   trailing,
   className,
 }: {
@@ -144,6 +201,8 @@ export function TaskMeta({
   viewDate?: string;
   closed?: boolean;
   hideContinued?: boolean;
+  /** The focus card shows the details excerpt itself. */
+  hideDetailsHint?: boolean;
   trailing?: ReactNode;
   className?: string;
 }) {
@@ -176,6 +235,14 @@ export function TaskMeta({
     meta.push(
       <span key="due" style={{ color: isOverdue(item.jiraDueDate) ? 'var(--danger)' : undefined }}>
         Due {formatDate(item.jiraDueDate)}
+      </span>
+    );
+  }
+  if (item.details && !hideDetailsHint) {
+    meta.push(
+      <span key="details" className="inline-flex items-center gap-1" title={item.details.length > 280 ? `${item.details.slice(0, 280)}…` : item.details}>
+        <AlignLeft size={11} aria-hidden="true" />
+        Details
       </span>
     );
   }
@@ -253,54 +320,42 @@ export function TaskNote({ note, className, clamp = true }: { note?: string; cla
   );
 }
 
-export function ActivityButton({ taskKey, expanded, onToggle }: { taskKey: string; expanded: boolean; onToggle: () => void }) {
+/** Explicit "open the task" affordance — the drawer holds details and the full timeline. */
+export function OpenTaskButton({ taskKey, label = 'Details', className = '' }: { taskKey: string; label?: string; className?: string }) {
+  const { openTask } = useMyDayTaskDetail();
+  const prefetch = usePrefetchHandlers(taskKey);
   return (
     <button
       type="button"
-      aria-expanded={expanded}
-      aria-label={`Activity for ${taskKey}`}
+      {...prefetch}
+      aria-label={`Open ${taskKey} details and activity`}
+      aria-haspopup="dialog"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
-        onToggle();
+        openTask(taskKey);
       }}
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
-      style={{ color: expanded ? 'var(--text-secondary)' : 'var(--text-muted)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING} ${className}`}
+      style={{ color: 'var(--text-muted)' }}
     >
-      <History size={12} aria-hidden="true" />
-      {expanded ? 'Hide activity' : 'Activity'}
+      <PanelRight size={12} aria-hidden="true" />
+      {label}
     </button>
   );
 }
 
-export function ActivityPanel({ taskKey }: { taskKey: string }) {
-  return (
-    <div
-      className="mt-2 rounded-xl px-3 py-1"
-      style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 32%, transparent)', border: '1px solid color-mix(in srgb, var(--border) 50%, transparent)' }}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <TaskTimeline taskKey={taskKey} mode="developer" emptyLabel="No activity yet — updates you post land here." />
-    </div>
-  );
-}
-
 /**
- * The focus card's update composer + activity toggle. Only keyed tasks carry
- * a timeline; read-only days keep the history but lose the composer.
+ * The focus card's update composer + the way into the task drawer. Only keyed
+ * tasks carry a timeline; read-only days keep the history but lose the composer.
  */
 export function TaskFooter({
   item,
   viewDate,
   readOnly,
-  activityOpen,
-  onToggleActivity,
 }: {
   item: TrackerWorkItem;
   viewDate: string;
   readOnly?: boolean;
-  activityOpen: boolean;
-  onToggleActivity: () => void;
 }) {
   if (!item.taskKey) return null;
   return (
@@ -311,68 +366,48 @@ export function TaskFooter({
           <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed quiet placeholder="Add an update…" />
         )}
       </div>
-      <ActivityButton taskKey={item.taskKey} expanded={activityOpen} onToggle={onToggleActivity} />
+      <OpenTaskButton taskKey={item.taskKey} label="Details & activity" />
     </div>
   );
 }
 
 /**
- * Update + activity as quiet text actions at the end of a row's meta line —
- * no reserved space until they're used. Stays visible while either is open.
+ * Update as a quiet text action at the end of a row's meta line — no
+ * reserved space until it's used. Stays visible while the composer is open.
+ * Activity lives in the task drawer (row title / Details).
  */
 export function InlineTaskActions({
   taskKey,
   readOnly,
   composerOpen,
   onOpenComposer,
-  activityOpen,
-  onToggleActivity,
 }: {
   taskKey: string;
   readOnly?: boolean;
   composerOpen: boolean;
   onOpenComposer: () => void;
-  activityOpen: boolean;
-  onToggleActivity: () => void;
 }) {
-  const pinned = composerOpen || activityOpen;
-  const link = `inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`;
+  if (readOnly) return null;
   return (
     <span
       className={`inline-flex items-center gap-0.5 ${
-        pinned ? '' : 'transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0'
+        composerOpen ? '' : 'transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0'
       }`}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      {!readOnly && (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenComposer();
-          }}
-          aria-label={`Add an update to ${taskKey}`}
-          aria-expanded={composerOpen}
-          className={link}
-          style={{ color: composerOpen ? 'var(--text-secondary)' : 'var(--text-muted)' }}
-        >
-          <MessageSquarePlus size={12} aria-hidden="true" />
-          Update
-        </button>
-      )}
       <button
         type="button"
-        aria-expanded={activityOpen}
-        aria-label={`Activity for ${taskKey}`}
         onClick={(event) => {
           event.stopPropagation();
-          onToggleActivity();
+          onOpenComposer();
         }}
-        className={link}
-        style={{ color: activityOpen ? 'var(--text-secondary)' : 'var(--text-muted)', background: activityOpen ? 'var(--bg-tertiary)' : undefined }}
+        aria-label={`Add an update to ${taskKey}`}
+        aria-expanded={composerOpen}
+        className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
+        style={{ color: composerOpen ? 'var(--text-secondary)' : 'var(--text-muted)' }}
       >
-        <History size={12} aria-hidden="true" />
-        Activity
+        <MessageSquarePlus size={12} aria-hidden="true" />
+        Update
       </button>
     </span>
   );

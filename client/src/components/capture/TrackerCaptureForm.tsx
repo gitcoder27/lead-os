@@ -71,7 +71,7 @@ export function TrackerCaptureForm({
         accountId: developer.accountId,
         title: trimmed,
         jiraKey: selectedIssue?.jiraKey,
-        note: note.trim() || undefined,
+        details: note.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -188,7 +188,7 @@ export function TrackerCaptureForm({
                 border: '1px solid var(--border)',
               }}
             >
-              + Add note
+              + Add details
             </button>
           </div>
         )}
@@ -370,7 +370,7 @@ export function TrackerCaptureForm({
               style={{ color: 'var(--text-muted)' }}
               htmlFor="tracker-capture-note"
             >
-              Note{' '}
+              Details{' '}
               <span
                 style={{
                   fontWeight: 400,
@@ -385,8 +385,8 @@ export function TrackerCaptureForm({
               id="tracker-capture-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Context, handoff detail, or priority reason…"
+              rows={3}
+              placeholder="Context, links, what done looks like — shared with the developer"
               className="w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none"
               style={{
                 background: 'var(--bg-elevated)',

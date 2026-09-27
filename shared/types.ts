@@ -761,6 +761,8 @@ export interface DeveloperTask {
   id: number;
   taskKey: string;
   title: string;
+  /** Shared description — visible and editable by anyone who can see the task. */
+  details: string | null;
   kind: "task" | "meeting";
   status: TaskStatus;
   ownerType: TaskOwnerType | null;
@@ -1068,6 +1070,7 @@ export interface UpdateTaskViewRequest {
 
 export interface CreateTaskRequest {
   title: string;
+  details?: string | null;
   kind?: "task" | "meeting";
   status?: TaskStatus;
   ownerType?: TaskOwnerType | null;
@@ -1170,6 +1173,8 @@ export interface TrackerWorkItem {
   state: TrackerItemState;
   position: number;
   note?: string;
+  /** Canonical task description (client-side mapping of the surface task). */
+  details?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;

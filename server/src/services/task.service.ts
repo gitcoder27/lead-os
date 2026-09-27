@@ -24,8 +24,16 @@ export interface TaskPrincipal {
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, "Invalid date");
 const timestamp = z.string().datetime({ offset: true });
+export const TASK_DETAILS_MAX = 20000;
+/** Blank details clear the field; surrounding whitespace is not content. */
+function normalizeDetails(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 export const taskCreateSchema = z.object({
   title: z.string().trim().min(1).max(500),
+  details: z.string().max(TASK_DETAILS_MAX).nullable().optional(),
   kind: z.enum(["task", "meeting"]).optional(), status: z.enum(["open", "active", "blocked", "done", "dropped"]).optional(),
   ownerType: z.enum(["manager", "developer"]).nullable().optional(), ownerId: z.string().trim().min(1).nullable().optional(),
   later: z.boolean().optional(), priority: z.enum(["normal", "high"]).optional(),
@@ -122,7 +130,7 @@ export class TaskService {
 
   private rowToDto(row: TaskRow, links: TaskLinkRow[], legacyDeskItemId: number | undefined, principal: TaskPrincipal): DeveloperTask | ManagerTask {
     const shared: DeveloperTask = {
-      id: row.id, taskKey: row.taskKey, title: row.title, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
+      id: row.id, taskKey: row.taskKey, title: row.title, details: row.details ?? null, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
       ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId, priority: row.priority as DeveloperTask["priority"],
       scheduledOn: row.scheduledOn, dueAt: row.dueAt, startsAt: row.startsAt, endsAt: row.endsAt, participants: row.participants, outcome: row.outcome,
       createdByType: row.createdByType, createdById: row.createdById, createdAt: row.createdAt, updatedAt: row.updatedAt, closedAt: row.closedAt, deletedAt: row.deletedAt,
@@ -239,7 +247,7 @@ export class TaskService {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);
-      if (principal.type === "developer" && Object.keys(data).some((field) => !["title", "status", "scheduledOn"].includes(field))) throw new HttpError(403, "Developer creation fields are restricted");
+      if (principal.type === "developer" && Object.keys(data).some((field) => !["title", "details", "status", "scheduledOn"].includes(field))) throw new HttpError(403, "Developer creation fields are restricted");
       // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
       if (data.labels?.length && await this.keys.phase3Enabled(scope)) {
         await new TaskLabelsService().ensureRegistered(scope, data.labels);
@@ -247,7 +255,7 @@ export class TaskService {
       const now = new Date().toISOString();
       const ownerType = principal.type === "developer" ? "developer" : data.ownerType === undefined ? "manager" : data.ownerType;
       const ownerId = principal.type === "developer" ? principal.accountId : data.ownerId === undefined && ownerType === "manager" ? principal.accountId : data.ownerId ?? null;
-      const values = { ...data, labels: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
+      const values = { ...data, details: normalizeDetails(data.details) ?? null, labels: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
         startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null,
         scheduledOn: data.scheduledOn === undefined ? (data.later ? null : todayIsoDate()) : data.scheduledOn,
         taskKey: this.keys.allocate(scope), trackedByManagerId: principal.type === "developer" ? null : principal.accountId,
@@ -271,10 +279,12 @@ export class TaskService {
       const before = await this.requireTask(key, principal);
       if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
       if (principal.type === "developer") {
-        if (Object.keys(data).some((field) => !["title", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
+        // `details` is shared by design: the owning developer edits it like the manager does.
+        if (Object.keys(data).some((field) => !["title", "details", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
       }
       const { labels, later, ...fields } = data;
+      if (fields.details !== undefined) fields.details = normalizeDetails(fields.details);
       // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
       if (labels && labels.length && await this.keys.phase3Enabled(before.workspaceId)) {
         await new TaskLabelsService().ensureRegistered(before.workspaceId, labels);
@@ -621,7 +631,7 @@ export class TaskService {
       };
       const links = (linksByTask.get(row.id) ?? []).map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] }));
       const shared: DeveloperTask = {
-        id: row.id, taskKey: row.taskKey, title: row.title, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
+        id: row.id, taskKey: row.taskKey, title: row.title, details: row.details ?? null, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
         ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId, priority: row.priority as DeveloperTask["priority"],
         scheduledOn: row.scheduledOn, dueAt: row.dueAt, startsAt: row.startsAt, endsAt: row.endsAt, participants: row.participants, outcome: row.outcome,
         createdByType: row.createdByType, createdById: row.createdById, createdAt: row.createdAt, updatedAt: row.updatedAt, closedAt: row.closedAt, deletedAt: row.deletedAt, links,

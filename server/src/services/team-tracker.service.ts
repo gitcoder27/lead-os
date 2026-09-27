@@ -1666,6 +1666,8 @@ export class TeamTrackerService {
       relatedIssueKeys?: string[];
       title: string;
       note?: string;
+      /** Canonical task description; legacy (pre-canonical) rows keep it as the note. */
+      details?: string;
       managerDeskItemId?: number;
       actor?: TaskEventActor;
       source?: "tracker" | "my_day" | "note" | "copilot" | "today";
@@ -1679,7 +1681,8 @@ export class TeamTrackerService {
     if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) {
       const actor = this.tasks.principal(normalizedWorkspaceId, params.actor);
       if (params.note !== undefined) await this.taskKeys.assertLegacyFieldsAllowed(normalizedWorkspaceId);
-      const task = await this.tasks.create(actor.type === "developer" ? { title: params.title, scheduledOn: date } : { title: params.title, ownerType: "developer", ownerId: accountId, scheduledOn: date }, actor);
+      const details = params.details?.trim() ? params.details : undefined;
+      const task = await this.tasks.create(actor.type === "developer" ? { title: params.title, details, scheduledOn: date } : { title: params.title, details, ownerType: "developer", ownerId: accountId, scheduledOn: date }, actor);
       const issueKeys = normalizeJiraIssueKeys([params.jiraKey ?? "", ...(params.relatedIssueKeys ?? [])]);
       for (const [index, ref] of issueKeys.entries()) {
         await this.tasks.addLink(task.taskKey, { kind: "jira", ref, role: index === 0 ? "primary" : "related" }, { ...actor, type: "manager" });
@@ -1723,14 +1726,14 @@ export class TeamTrackerService {
         title: params.title,
         state: "planned",
         position: maxPosition + 1,
-        note: params.note ?? null,
+        note: params.note ?? params.details ?? null,
         createdAt: now,
         updatedAt: now,
       })
       .returning();
 
     await this.emit(inserted[0]!, { type: "created", body: null, meta: { source: params.source ?? "tracker", ownerType: "developer", ownerId: accountId, title: params.title, ...(allIssueKeys.length && { jiraKeys: allIssueKeys }) } }, { type: "system", accountId: actor.accountId });
-    if (params.note?.trim()) await this.emit(inserted[0]!, { type: "update", body: params.note, meta: { via: "note_field" } }, actor);
+    if ((params.note ?? params.details)?.trim()) await this.emit(inserted[0]!, { type: "update", body: (params.note ?? params.details)!, meta: { via: "note_field" } }, actor);
     return this.getItemById(inserted[0]!.id, normalizedWorkspaceId);
     });
   }

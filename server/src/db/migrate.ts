@@ -354,6 +354,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   workspace_id          TEXT NOT NULL DEFAULT 'default',
   task_key              TEXT NOT NULL,
   title                 TEXT NOT NULL,
+  details               TEXT,
   kind                  TEXT NOT NULL DEFAULT 'task',
   status                TEXT NOT NULL DEFAULT 'open',
   later                 INTEGER NOT NULL DEFAULT 0,
@@ -735,6 +736,13 @@ const alterStatements = [
   "ALTER TABLE daily_notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'scratchpad'",
   "DROP INDEX IF EXISTS idx_daily_notes_owner_date",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_notes_owner_date ON daily_notes(workspace_id, manager_account_id, date, kind)",
+  // docs/53 §8.5-7: per-manager Today visit anchor (since-last-visit delta)
+  // and "Ask for update" records shown on the pulse row.
+  "CREATE TABLE IF NOT EXISTS today_visits (workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, visit_started_at TEXT NOT NULL, last_active_at TEXT NOT NULL, baseline_at TEXT, PRIMARY KEY (workspace_id, manager_account_id))",
+  "CREATE TABLE IF NOT EXISTS today_check_in_asks (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, developer_account_id TEXT NOT NULL, date TEXT NOT NULL, asked_at TEXT NOT NULL, title TEXT NOT NULL, tracker_item_id INTEGER, task_key TEXT, cancelled_at TEXT)",
+  "CREATE INDEX IF NOT EXISTS idx_today_check_in_asks_manager_date ON today_check_in_asks(workspace_id, manager_account_id, date)",
+  // Shared task description (manager drawer + developer My Day detail).
+  "ALTER TABLE tasks ADD COLUMN details TEXT",
 ];
 
 const constraintRepairStatements = [

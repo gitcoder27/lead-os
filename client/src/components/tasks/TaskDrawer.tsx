@@ -34,6 +34,7 @@ import {
   MeetingOutcome,
   StatusControl,
   StatusPill,
+  TaskDetailsSection,
   TaskMetaList,
   TaskProperties,
   useTaskPeople,
@@ -286,7 +287,11 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   const deleted = Boolean(task.deletedAt);
   const canEditTitle =
     !deleted && (mode === 'manager' || (task.createdByType === 'developer' && task.createdById === user?.developerAccountId));
-  const canEditStatus = !deleted && (canEditTitle || mode === 'manager');
+  // Developer detail is owner-only (former owners get the restricted view), and
+  // owners already move status from My Day — the drawer matches that.
+  const canEditStatus = !deleted;
+  // Details is shared by design: whoever can open the task can edit it.
+  const canEditDetails = !deleted;
   const managerEditable = mode === 'manager' && !deleted;
 
   // docs/51 F19: j/k step to the previous/next row of the list the drawer was
@@ -310,6 +315,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   if (canStep) hints.push(['J / K', 'Prev / next task']);
   if (canEditStatus) hints.push(['E', isOpenish(task) ? 'Done' : 'Reopen']);
   if (managerEditable) hints.push(['S', 'Schedule'], ['A', 'Assign'], ['P', 'Priority'], ['L', 'Labels']);
+  if (canEditDetails) hints.push(['D', 'Details']);
   if (!deleted) hints.push(['U', 'Update']);
 
   const toolbar = (
@@ -376,6 +382,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   );
 
   const properties = <TaskProperties task={task} mode={mode} readOnly={deleted} onPatch={onPatch} people={people} />;
+  const details = <TaskDetailsSection task={task} mode={mode} editable={canEditDetails} onPatch={onPatch} people={people} />;
   const outcome = task.kind === 'meeting' && <MeetingOutcome task={task} editable={managerEditable} onPatch={onPatch} />;
   const relations = (
     <>
@@ -423,6 +430,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
               </div>
             </aside>
             <div className="min-w-0 space-y-9 lg:col-start-1">
+              {details}
               {outcome}
               {relations}
               {activity}
@@ -443,6 +451,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
         <div className="space-y-7 px-6 pb-10 pt-5">
           {titleBlock}
           <div className="-mx-2">{properties}</div>
+          {details}
           {outcome}
           <Divider />
           {relations}

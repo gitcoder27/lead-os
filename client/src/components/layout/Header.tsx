@@ -188,8 +188,9 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
             )}
 
             <div className="flex items-center gap-1.5">
-              {user?.role === 'manager' && onViewChange ? (
-                <ManagerActionInbox deriveFromToday={activeView === 'today'} onOpenTarget={openActionTarget} onViewChange={onViewChange} />
+              {/* docs/53 U1/P2: on `/` the page itself is the inbox. */}
+              {user?.role === 'manager' && onViewChange && activeView !== 'today' ? (
+                <ManagerActionInbox onOpenTarget={openActionTarget} onViewChange={onViewChange} />
               ) : null}
 
               {canQuickCapture && (

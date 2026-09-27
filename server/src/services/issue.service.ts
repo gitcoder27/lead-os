@@ -42,6 +42,7 @@ export type TodayIssue = Pick<
   | "dueDate"
   | "developmentDueDate"
   | "updatedAt"
+  | "createdAt"
 >;
 
 export interface TodayIssueSnapshot {
@@ -133,6 +134,7 @@ export class IssueService {
         dueDate: issues.dueDate,
         developmentDueDate: issues.developmentDueDate,
         updatedAt: issues.updatedAt,
+        createdAt: issues.createdAt,
       })
       .from(issues)
       .where(and(...visibilityConditions));
@@ -148,6 +150,7 @@ export class IssueService {
       dueDate: row.dueDate ?? undefined,
       developmentDueDate: row.developmentDueDate ?? undefined,
       updatedAt: row.updatedAt,
+      createdAt: row.createdAt,
     }));
 
     return {

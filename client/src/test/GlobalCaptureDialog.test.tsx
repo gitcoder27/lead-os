@@ -354,10 +354,10 @@ describe('GlobalCaptureDialog', () => {
     fireEvent.click(screen.getByText('Alice Smith'));
 
     expect(screen.getByText('+ Attach Jira')).toBeInTheDocument();
-    expect(screen.getByText('+ Add note')).toBeInTheDocument();
+    expect(screen.getByText('+ Add details')).toBeInTheDocument();
   });
 
-  it('expands note field when add note is clicked', async () => {
+  it('expands the details field when add details is clicked', async () => {
     renderDialog();
     fireEvent.click(screen.getByText('Team'));
 
@@ -366,8 +366,8 @@ describe('GlobalCaptureDialog', () => {
     });
     fireEvent.click(screen.getByText('Alice Smith'));
 
-    fireEvent.click(screen.getByText('+ Add note'));
-    expect(screen.getByPlaceholderText('Context, handoff detail, or priority reason…')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('+ Add details'));
+    expect(screen.getByPlaceholderText('Context, links, what done looks like — shared with the developer')).toBeInTheDocument();
   });
 
   it('switches to the Notes target and appends via the notes mutation', async () => {

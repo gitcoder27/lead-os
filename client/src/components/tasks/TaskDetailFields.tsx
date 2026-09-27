@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  AlignLeft,
   BellRing,
   CalendarArrowUp,
   CalendarClock,
@@ -10,6 +11,7 @@ import {
   Eye,
   Flag,
   Moon,
+  Pencil,
   RotateCcw,
   Tag,
   UserRound,
@@ -32,6 +34,7 @@ import {
   Placeholder,
   PropertyButton,
   PropertyRow,
+  SectionHeader,
   type DatePreset,
 } from './TaskDetailPrimitives';
 import {
@@ -196,7 +199,11 @@ export function TaskProperties({ task, mode, readOnly, onPatch, people }: TaskPr
           onCommit={(v) => onPatch({ followUpAt: v })}
         />
       )}
-      {manager && <PriorityRow task={task} editable={editable} onPatch={onPatch} />}
+      {!isMeeting && task.dueAt && (
+        <MomentRow label="Due" icon={<CalendarClock size={14} />} value={task.dueAt} status={task.status} editable={false} onCommit={() => undefined} />
+      )}
+      {/* Priority is shared data; only managers change it. */}
+      {(manager || task.priority === 'high') && <PriorityRow task={task} editable={editable} onPatch={onPatch} />}
       {manager ? (
         <PropertyRow icon={<Tag size={14} />} label="Labels" align="start">
           <div data-task-shortcut="l" className="min-h-[32px] rounded-lg px-1.5 py-[5px] transition-colors hover:bg-[var(--bg-tertiary)] focus-within:bg-[var(--bg-tertiary)]">
@@ -474,6 +481,239 @@ function DeveloperLabels({ task }: { task: TaskDetailResponse }) {
         {labels.map((name) => <TaskLabelChip key={name} name={name} />)}
       </div>
     </PropertyRow>
+  );
+}
+
+// ── Details (shared description) ────────────────────────────────────
+
+/** Long enough that the read view folds behind "Show more". */
+const DETAILS_FOLD_CHARS = 640;
+const DETAILS_FOLD_LINES = 10;
+export const TASK_DETAILS_MAX = 20000;
+
+const URL_PATTERN = /(https?:\/\/[^\s<>]+[^\s<>().,;:!?'")\]])/g;
+
+/** Plain text with bare URLs made clickable — details is not markdown. */
+function LinkifiedText({ text }: { text: string }) {
+  const parts = text.split(URL_PATTERN);
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={(event) => event.stopPropagation()}
+            className="break-all underline decoration-[color-mix(in_srgb,var(--accent)_45%,transparent)] underline-offset-2 hover:decoration-[var(--accent)]"
+            style={{ color: 'var(--accent)' }}
+          >
+            {part}
+          </a>
+        ) : (
+          <Fragment key={index}>{part}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/**
+ * The task's static description — what it is, why it matters, what done
+ * looks like. Shared by design: the manager and the owning developer both
+ * read and edit it. The running thread stays in Activity.
+ */
+export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
+  task: TaskDetailResponse;
+  mode: TaskDetailMode;
+  editable: boolean;
+  onPatch: Patch;
+  people: TaskPeople;
+}) {
+  const value = task.details ?? '';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [expanded, setExpanded] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const skipBlurCommit = useRef(false);
+
+  // Never clobber a draft in progress with a background refetch.
+  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+  useEffect(() => { setEditing(false); setExpanded(false); }, [task.taskKey]);
+
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight) el.style.height = `${el.scrollHeight}px`;
+  }, [draft, editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editing]);
+
+  if (!editable && !value) return null;
+
+  const startEditing = () => {
+    if (!editable) return;
+    skipBlurCommit.current = false;
+    setDraft(value);
+    setEditing(true);
+  };
+  const commit = () => {
+    const next = draft.trim();
+    if (next !== value.trim()) onPatch({ details: next || null });
+    setEditing(false);
+  };
+  const discard = () => {
+    setDraft(value);
+    setEditing(false);
+  };
+
+  const ownerName = task.ownerType === 'developer' && task.ownerId ? people.nameFor(task.ownerId) : undefined;
+  const hint = mode === 'developer' ? 'Shared with your lead' : ownerName && ownerName !== 'You' ? `Shared with ${ownerName}` : undefined;
+  const long = value.length > DETAILS_FOLD_CHARS || value.split('\n').length > DETAILS_FOLD_LINES;
+  const folded = long && !expanded;
+
+  let body: ReactNode;
+  if (editing) {
+    body = (
+      <div
+        className="rounded-xl px-1 pb-1.5 pt-1"
+        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-active)' }}
+      >
+        <textarea
+          ref={inputRef}
+          value={draft}
+          maxLength={TASK_DETAILS_MAX}
+          rows={4}
+          aria-label="Task details"
+          placeholder="Context, links, acceptance criteria — anything the next person needs."
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => {
+            if (skipBlurCommit.current) {
+              skipBlurCommit.current = false;
+              return;
+            }
+            commit();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              skipBlurCommit.current = true;
+              commit();
+            }
+            if (event.key === 'Escape') {
+              // Keep the drawer open: Esc leaves the editor, the next one closes.
+              event.stopPropagation();
+              skipBlurCommit.current = true;
+              discard();
+            }
+          }}
+          className="block max-h-[60vh] min-h-[96px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-[13.5px] leading-[21px] outline-none placeholder:text-[var(--text-placeholder)]"
+          style={{ color: 'var(--text-primary)' }}
+        />
+        <div className="flex items-center gap-2 px-2 pt-1">
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {draft.length > TASK_DETAILS_MAX * 0.9 ? `${draft.length.toLocaleString()} / ${TASK_DETAILS_MAX.toLocaleString()}` : '⌘/Ctrl ↵ to save · Esc to discard'}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={discard}
+              className={`h-7 rounded-lg px-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={commit}
+              className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold transition-[filter] hover:brightness-110 ${FOCUS_RING}`}
+              style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (value) {
+    body = (
+      <div className="relative">
+        <div
+          onClick={(event) => {
+            // Selecting text to copy shouldn't flip into the editor.
+            if (window.getSelection()?.toString()) return;
+            if ((event.target as HTMLElement).closest('a')) return;
+            startEditing();
+          }}
+          className={`-mx-2 whitespace-pre-wrap break-words rounded-lg px-2 py-1.5 text-[13.5px] leading-[21px] transition-colors ${editable ? 'cursor-text hover:bg-[var(--bg-secondary)]' : ''} ${folded ? 'max-h-[210px] overflow-hidden' : ''}`}
+          style={{
+            color: 'var(--text-primary)',
+            ...(folded ? { maskImage: 'linear-gradient(180deg, #000 70%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 70%, transparent)' } : {}),
+          }}
+        >
+          <LinkifiedText text={value} />
+        </div>
+        {long && (
+          <button
+            type="button"
+            onClick={() => setExpanded((open) => !open)}
+            aria-expanded={expanded}
+            className={`-ml-1 mt-0.5 inline-flex h-6 items-center rounded-md px-1 text-[12px] font-medium transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {expanded ? 'Show less' : 'Show more'}
+          </button>
+        )}
+      </div>
+    );
+  } else {
+    body = (
+      <button
+        type="button"
+        onClick={startEditing}
+        data-task-shortcut="d"
+        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[12.5px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
+      >
+        <AlignLeft size={13} />
+        Add details — context, links, what done looks like
+      </button>
+    );
+  }
+
+  return (
+    <section aria-labelledby={`details-${task.taskKey}`} className="space-y-2">
+      <SectionHeader
+        id={`details-${task.taskKey}`}
+        icon={<AlignLeft size={14} />}
+        title="Details"
+        hint={hint}
+        action={editable && value && !editing && (
+          <button
+            type="button"
+            onClick={startEditing}
+            data-task-shortcut="d"
+            title="Edit details (D)"
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <Pencil size={12} />
+            Edit
+          </button>
+        )}
+      />
+      {body}
+    </section>
   );
 }
 

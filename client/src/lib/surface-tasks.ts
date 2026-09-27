@@ -90,6 +90,7 @@ export function surfaceTaskToWorkItem(task: SurfaceTask, developerAccountId?: st
     jiraPriorityName: task.jiraPriorityName,
     jiraDueDate: task.jiraDueDate,
     title: task.title,
+    details: task.details ?? undefined,
     state: taskStatusToTrackerState(task.status),
     position: task.position,
     completedAt: task.closedAt ?? undefined,

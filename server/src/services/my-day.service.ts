@@ -20,6 +20,7 @@ interface AddMyDayItemParams {
   relatedIssueKeys?: string[];
   title: string;
   note?: string;
+  details?: string;
 }
 
 interface UpdateMyDayItemParams {
@@ -143,6 +144,7 @@ export class MyDayService {
       relatedIssueKeys: params.relatedIssueKeys,
       title: params.title,
       note: params.note,
+      details: params.details,
       source: "my_day",
       actor: { type: "developer", accountId },
     }, workspaceId);

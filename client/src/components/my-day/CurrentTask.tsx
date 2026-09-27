@@ -1,11 +1,11 @@
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Play, Plus, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 import { EASE_OUT, IconAction, Kbd, surfaceStyle } from './MyDayUI';
-import { ActivityPanel, EditableTitle, TaskFooter, TaskMeta, TaskNote, canRenameItem } from './MyDayTaskParts';
+import { TaskFooter, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
 
 interface CurrentTaskProps {
   viewDate: string;
@@ -124,8 +124,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
   { item, viewDate, onMarkDone, onDrop, onUpdateTitle, readOnly },
   ref,
 ) {
-  const [activityOpen, setActivityOpen] = useState(false);
-  useEffect(() => setActivityOpen(false), [item.id]);
+  const prefetch = usePrefetchHandlers(item.taskKey);
 
   return (
     <motion.article
@@ -137,6 +136,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
       transition={{ duration: 0.32, ease: EASE_OUT }}
       data-task-key={item.taskKey ?? undefined}
       aria-label={`Now: ${item.title}`}
+      onPointerEnter={prefetch.onPointerEnter}
       className="group relative overflow-hidden rounded-2xl"
       style={{
         background:
@@ -189,7 +189,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
         </div>
 
         <div className="mt-3 flex min-w-0">
-          <EditableTitle
+          <TaskTitle
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
             onCommit={onUpdateTitle}
@@ -197,21 +197,28 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
           />
         </div>
 
-        <TaskMeta item={item} viewDate={viewDate} className="mt-2" />
+        <TaskMeta item={item} viewDate={viewDate} className="mt-2" hideDetailsHint />
         <TaskNote note={item.note} className="mt-2.5" clamp={false} />
+        <DetailsExcerpt details={item.details} />
 
-        <TaskFooter
-          item={item}
-          viewDate={viewDate}
-          readOnly={readOnly}
-          activityOpen={activityOpen}
-          onToggleActivity={() => setActivityOpen((open) => !open)}
-        />
-        {activityOpen && item.taskKey && <ActivityPanel taskKey={item.taskKey} />}
+        <TaskFooter item={item} viewDate={viewDate} readOnly={readOnly} />
       </div>
     </motion.article>
   );
 });
+
+/** The focus task's context, a glance deep — the drawer shows it in full. */
+function DetailsExcerpt({ details }: { details?: string }) {
+  if (!details) return null;
+  return (
+    <p
+      className="mt-2.5 line-clamp-3 whitespace-pre-line break-words border-l-2 pl-3 text-[13px] leading-[19px]"
+      style={{ color: 'var(--text-secondary)', borderColor: 'color-mix(in srgb, var(--accent) 30%, var(--border))' }}
+    >
+      {details}
+    </p>
+  );
+}
 
 function LiveDot({ active }: { active: boolean }) {
   return (

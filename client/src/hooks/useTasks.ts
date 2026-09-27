@@ -41,19 +41,30 @@ export function useTaskEvents(key: string | undefined, options?: { enabled?: boo
   });
 }
 
-export function useMyDayTaskEvents(key: string | undefined, options?: { enabled?: boolean }) {
-  const authScopeKey = useAuthScopeKey();
-
-  return useInfiniteQuery<TaskEventsPage>({
+function myDayTaskEventsQuery(authScopeKey: string, key: string | undefined) {
+  return {
     queryKey: ['task-events', authScopeKey, 'my-day', key],
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam }: { pageParam: unknown }) =>
       api.get<TaskEventsPage>(
         `/my-day/tasks/${encodeURIComponent(key!)}/events?limit=${EVENTS_PAGE_SIZE}${pageParam ? `&cursor=${encodeURIComponent(String(pageParam))}` : ''}`,
       ),
     initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.nextCursor,
+    getNextPageParam: (last: TaskEventsPage) => last.nextCursor,
+  };
+}
+
+export function useMyDayTaskEvents(key: string | undefined, options?: { enabled?: boolean }) {
+  const authScopeKey = useAuthScopeKey();
+
+  return useInfiniteQuery<TaskEventsPage>({
+    ...myDayTaskEventsQuery(authScopeKey, key),
     enabled: Boolean(key) && (options?.enabled ?? true),
   });
+}
+
+/** Warm the developer timeline's first page (row hover/focus on My Day). */
+export function prefetchMyDayTaskEvents(qc: ReturnType<typeof useQueryClient>, authScopeKey: string, key: string) {
+  return qc.prefetchInfiniteQuery({ ...myDayTaskEventsQuery(authScopeKey, key), staleTime: 10_000 });
 }
 
 function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {

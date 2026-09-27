@@ -245,6 +245,36 @@ export const standupSessions = sqliteTable("standup_sessions", {
   uniqueIndex("idx_standup_sessions_request").on(table.workspaceId, table.managerAccountId, table.requestId),
 ]);
 
+/**
+ * docs/53: one row per manager — `baseline_at` is the last activity before the
+ * current visit and anchors the Today since-last-visit delta.
+ */
+export const todayVisits = sqliteTable("today_visits", {
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  visitStartedAt: text("visit_started_at").notNull(),
+  lastActiveAt: text("last_active_at").notNull(),
+  baselineAt: text("baseline_at"),
+}, (table) => [
+  primaryKey({ name: "pk_today_visits", columns: [table.workspaceId, table.managerAccountId] }),
+]);
+
+/** docs/53 F15: "Ask for update" nudges — the task lands on the dev's My Day. */
+export const todayCheckInAsks = sqliteTable("today_check_in_asks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  developerAccountId: text("developer_account_id").notNull(),
+  date: text("date").notNull(),
+  askedAt: text("asked_at").notNull(),
+  title: text("title").notNull(),
+  trackerItemId: integer("tracker_item_id"),
+  taskKey: text("task_key"),
+  cancelledAt: text("cancelled_at"),
+}, (table) => [
+  index("idx_today_check_in_asks_manager_date").on(table.workspaceId, table.managerAccountId, table.date),
+]);
+
 export const workSavedViews = sqliteTable("work_saved_views", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id").notNull().default("default"),
@@ -433,6 +463,9 @@ export const tasks = sqliteTable("tasks", {
   workspaceId: text("workspace_id").notNull().default("default"),
   taskKey: text("task_key").notNull(),
   title: text("title").notNull(),
+  // Shared description: anyone who can see the task can read and edit it.
+  // Static context — the running thread lives in task_events.
+  details: text("details"),
   kind: text("kind").notNull().default("task"),
   status: text("status").notNull().default("open"),
   later: integer("later").notNull().default(0),

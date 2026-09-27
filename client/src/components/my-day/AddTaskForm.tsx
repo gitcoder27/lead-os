@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link2, Plus, Search, StickyNote, X } from 'lucide-react';
+import { AlignLeft, Link2, Plus, Search, X } from 'lucide-react';
 import { useMyDayIssues } from '@/hooks/useIssues';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
@@ -8,7 +8,8 @@ import { formatDate } from '@/lib/utils';
 import { HAIRLINE, Kbd } from './MyDayUI';
 
 interface AddTaskFormProps {
-  onAdd: (params: { title: string; jiraKey?: string; note?: string }) => void;
+  /** `details` becomes the task's shared description (not a timeline entry). */
+  onAdd: (params: { title: string; jiraKey?: string; details?: string }) => void;
   isPending?: boolean;
   disabled?: boolean;
   /** Controlled open state (the page opens it from the N shortcut and empty states). */
@@ -26,8 +27,8 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
     onOpenChange?.(next);
   };
   const [title, setTitle] = useState('');
-  const [note, setNote] = useState('');
-  const [noteOpen, setNoteOpen] = useState(false);
+  const [details, setDetails] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [jiraSearch, setJiraSearch] = useState('');
   const [jiraPickerOpen, setJiraPickerOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<{ jiraKey: string; summary: string } | null>(null);
@@ -49,8 +50,8 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
   const resetForm = () => {
     setOpen(false);
     setTitle('');
-    setNote('');
-    setNoteOpen(false);
+    setDetails('');
+    setDetailsOpen(false);
     setJiraSearch('');
     setJiraPickerOpen(false);
     setSelectedIssue(null);
@@ -73,7 +74,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
     onAdd({
       title: trimmedTitle,
       jiraKey: selectedIssue?.jiraKey,
-      note: note.trim() || undefined,
+      details: details.trim() || undefined,
     });
     resetForm();
   };
@@ -239,17 +240,17 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
             </div>
           )}
 
-          {noteOpen && (
+          {detailsOpen && (
             <div className="mt-2">
-              <label htmlFor="my-day-task-notes" className="sr-only">Notes</label>
+              <label htmlFor="my-day-task-details" className="sr-only">Details</label>
               <textarea
-                id="my-day-task-notes"
+                id="my-day-task-details"
                 autoFocus
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
+                value={details}
+                onChange={(event) => setDetails(event.target.value)}
                 disabled={disabled}
-                rows={2}
-                placeholder="Context or handoff detail (optional)"
+                rows={3}
+                placeholder="Context, links, what done looks like (optional)"
                 className="w-full resize-none rounded-lg px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--border-active)]"
                 style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
               />
@@ -268,10 +269,10 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
               <Link2 size={13} aria-hidden="true" />
               {selectedIssue ? 'Change Jira' : 'Attach Jira'}
             </button>
-            {!noteOpen && (
-              <button type="button" onClick={() => setNoteOpen(true)} disabled={disabled} className={ghostButton} style={{ color: 'var(--text-muted)' }}>
-                <StickyNote size={13} aria-hidden="true" />
-                Add note
+            {!detailsOpen && (
+              <button type="button" onClick={() => setDetailsOpen(true)} disabled={disabled} className={ghostButton} style={{ color: 'var(--text-muted)' }}>
+                <AlignLeft size={13} aria-hidden="true" />
+                Add details
               </button>
             )}
             <div className="ml-auto flex items-center gap-1.5">

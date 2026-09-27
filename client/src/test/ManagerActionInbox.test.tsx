@@ -89,14 +89,13 @@ function openInbox() {
   fireEvent.click(screen.getByRole('button', { name: 'Manager actions' }));
 }
 
-function renderInbox(props: { onOpenTarget?: (target: import('@/types').ManagerActionTarget) => void; onViewChange?: (view: import('@/App').AppView) => void; deriveFromToday?: boolean } = {}) {
+function renderInbox(props: { onOpenTarget?: (target: import('@/types').ManagerActionTarget) => void; onViewChange?: (view: import('@/App').AppView) => void } = {}) {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <ManagerActionInbox
         onOpenTarget={props.onOpenTarget ?? vi.fn()}
         onViewChange={props.onViewChange ?? vi.fn()}
-        deriveFromToday={props.deriveFromToday}
       />
     </QueryClientProvider>,
   );
@@ -222,41 +221,5 @@ describe('ManagerActionInbox', () => {
 
     expect(screen.queryByText('No manager actions right now.')).not.toBeInTheDocument();
     expect(screen.getByText('Issue AM-2 is blocked.')).toBeInTheDocument();
-  });
-
-  it('derives the inbox from the shared today cache on / and disables the manager-actions poll (docs/53 P2)', async () => {
-    const { getLocalIsoDate } = await import('@/lib/utils');
-    const todayData = {
-      date: getLocalIsoDate(),
-      generatedAt: '2026-03-08T08:30:00.000Z',
-      rhythm: { stage: 'morning_plan', label: 'Morning plan', detail: '' },
-      summary: [],
-      currentPriority: null,
-      actionItems: [makeAction(), makeAction({ id: 'action-2', title: 'Second action', severity: 'info', group: 'next' })],
-      teamPulse: [],
-      promises: [],
-      standupPrompts: [],
-      meetingPrompts: [],
-      isPartial: false,
-      sourceStatus: { issues: 'ready', team: 'ready', desk: 'ready' },
-    };
-
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData(['today', getLocalIsoDate(), 'anonymous'], todayData);
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} deriveFromToday />
-      </QueryClientProvider>,
-    );
-
-    // Badge reads the cached snapshot (1 urgent of 2), not the hook payload.
-    expect(screen.getByText('1')).toBeInTheDocument();
-    openInbox();
-    expect(screen.getByText('AM-1 is overdue')).toBeInTheDocument();
-    expect(screen.getByText('Second action')).toBeInTheDocument();
-    expect(useManagerActionsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ enabled: false }),
-    );
   });
 });

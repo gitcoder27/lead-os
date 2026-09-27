@@ -84,6 +84,23 @@ vi.mock('@/hooks/useTasks', () => ({
   useUpdateTaskEventVisibility: () => ({ mutate: vi.fn() }),
 }));
 
+const mockPrefetchTaskDetail = vi.fn();
+vi.mock('@/hooks/useTaskDetail', () => ({
+  usePrefetchTaskDetail: () => mockPrefetchTaskDetail,
+}));
+
+// The shared drawer has its own suite (TaskDrawer.test); here we only care
+// which task My Day asks it to show.
+vi.mock('@/components/tasks/TaskDrawer', () => ({
+  TaskDrawer: ({ taskKey, onClose }: { taskKey: string | null; onClose: () => void }) =>
+    taskKey ? (
+      <div role="dialog" aria-label={`Task ${taskKey}`}>
+        <button type="button" onClick={onClose}>Close drawer</button>
+      </div>
+    ) : null,
+  navigateToTaskPage: vi.fn(),
+}));
+
 vi.mock('@/components/my-day/AddTaskForm', () => ({
   AddTaskForm: () => <div>Add Task Form</div>,
 }));
@@ -234,16 +251,51 @@ describe('MyDayPage', () => {
     };
   });
 
-  it('opens shared activity from current and planned tasks without manager controls', () => {
+  it('opens the task drawer from keyed rows, the focus card, and finished work', () => {
     mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Current keyed task', state: 'in_progress' });
     mockDay.plannedItems = [createItem({ id: 102, taskKey: 'T-2', title: 'Planned keyed task' })];
+    mockDay.completedItems = [createItem({ id: 103, taskKey: 'T-3', title: 'Shipped keyed task', state: 'done' })];
+    mockDay.droppedItems = [];
+    window.history.replaceState(null, '', '/my-day');
     render(<MyDayPage />, { wrapper: TestWrapper });
-    expect(screen.queryByText('Earlier shared progress')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-1' }));
-    expect(screen.getByText('Earlier shared progress')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Redact event' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Activity for T-2' }));
-    expect(screen.getAllByText('Earlier shared progress')).toHaveLength(2);
+
+    // Activity is folded into the drawer — no competing inline timeline.
+    expect(screen.queryByRole('button', { name: /^Activity for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const plannedTitle = screen.getByRole('button', { name: 'Open T-2: Planned keyed task' });
+    fireEvent.pointerEnter(plannedTitle);
+    expect(mockPrefetchTaskDetail).toHaveBeenCalledWith('T-2');
+    fireEvent.click(plannedTitle);
+    expect(screen.getByRole('dialog', { name: 'Task T-2' })).toBeInTheDocument();
+    expect(window.location.search).toBe('?task=T-2');
+    fireEvent.click(screen.getByRole('button', { name: 'Close drawer' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open T-1 details and activity' }));
+    expect(screen.getByRole('dialog', { name: 'Task T-1' })).toBeInTheDocument();
+
+    // Clicking the row body (not a control) opens it too.
+    fireEvent.click(screen.getByText('Shipped keyed task').closest('[data-task-key]')!);
+    expect(screen.getByRole('dialog', { name: 'Task T-3' })).toBeInTheDocument();
+  });
+
+  it('keeps row controls from opening the drawer', () => {
+    mockDay.currentItem = undefined;
+    mockDay.plannedItems = [createItem({ id: 102, taskKey: 'T-2', title: 'Planned keyed task' })];
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    fireEvent.click(screen.getByRole('button', { name: 'Add an update to T-2' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows a details excerpt on the focus card and a hint on queued rows', () => {
+    mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Current keyed task', state: 'in_progress', details: 'Acceptance: CSV opens in Excel' });
+    mockDay.plannedItems = [createItem({ id: 102, taskKey: 'T-2', title: 'Planned keyed task', details: 'Background for the queue' })];
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.getByText('Acceptance: CSV opens in Excel')).toBeInTheDocument();
+    expect(screen.queryByText('Background for the queue')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Background for the queue')).toHaveTextContent('Details');
   });
 
   it('shows synced task notes across current, planned, completed, and dropped work', () => {

@@ -1,77 +1,119 @@
-import { MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import {
+  ArrowUpRight,
+  BellRing,
+  CalendarClock,
+  Check,
+  Ellipsis,
+  MessageSquare,
+  MessageSquarePlus,
+  Rows3,
+  Send,
+  UserRoundCheck,
+  type LucideIcon,
+} from 'lucide-react';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/tasks/TaskPopover';
 import { isLaterTodayAvailable } from '@/lib/utils';
 import type { TodayActionCommand } from '@/types';
 
+type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
+
 interface TodayActionMenuProps {
+  /** Accessible name of the row this menu belongs to. */
+  label: string;
   actions: TodayActionCommand[];
-  onRunAction: (command: TodayActionCommand, preset?: 'later_today' | 'tomorrow' | 'next_week') => void;
+  /** docs/53 R1: the row's primary action, repeated as the first item. */
+  primary?: TodayActionCommand;
+  /** The row's open command (Enter). */
+  open?: TodayActionCommand;
+  onRunAction: (command: TodayActionCommand, preset?: SnoozePreset) => void;
 }
 
-export function TodayActionMenu({ actions, onRunAction }: TodayActionMenuProps) {
-  if (actions.length === 0) {
+const iconByKind: Partial<Record<TodayActionCommand['kind'], LucideIcon>> = {
+  mark_done: Check,
+  add_check_in: MessageSquare,
+  ask_check_in: Send,
+  capture_follow_up: MessageSquarePlus,
+  carry_forward: Rows3,
+  capture_meeting_outcome: CalendarClock,
+  set_current_work: UserRoundCheck,
+  open: ArrowUpRight,
+  assign_owner: ArrowUpRight,
+  snooze: BellRing,
+};
+
+/** docs/53 U4: menu items show the triage key that runs them. */
+const hintByKind: Partial<Record<TodayActionCommand['kind'], string>> = {
+  capture_follow_up: 'f',
+  add_check_in: 'c',
+};
+
+/**
+ * docs/53 A1: a real menu (role="menu", arrow-key focus, Esc/outside-click
+ * close, focus restored) instead of a `<details>` element.
+ */
+export function TodayActionMenu({ label, actions, primary, open, onRunAction }: TodayActionMenuProps) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const snooze = actions.find((action) => action.kind === 'snooze');
+  const rest = actions.filter((action) =>
+    action.kind !== 'snooze' &&
+    !(action.kind === 'open' && open) &&
+    !(primary && action.kind === primary.kind),
+  );
+  if (!primary && !open && actions.length === 0) {
     return null;
   }
 
+  const run = (command: TodayActionCommand, preset?: SnoozePreset) => {
+    setAnchor(null);
+    onRunAction(command, preset);
+  };
+
   return (
-    <details className="relative" onClick={(event) => event.stopPropagation()}>
-      <summary
-        className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] [&::-webkit-details-marker]:hidden"
-        aria-label="More actions"
+    <>
+      <button
+        type="button"
+        className="today-icon-btn"
+        aria-label={`More actions for ${label}`}
+        aria-haspopup="menu"
+        aria-expanded={Boolean(anchor)}
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
       >
-        <MoreHorizontal size={15} />
-      </summary>
-      <div
-        className="absolute right-0 top-9 z-20 min-w-[150px] overflow-hidden rounded-lg border py-1"
-        style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-strong)', boxShadow: 'var(--shadow-lg)' }}
-      >
-        {actions.map((action) => (
-          action.kind === 'snooze' ? (
-            <SnoozeGroup key={`${action.kind}-${action.label}`} action={action} onRunAction={onRunAction} />
-          ) : (
-            <button
-              key={`${action.kind}-${action.label}`}
-              type="button"
-              onClick={() => onRunAction(action)}
-              className="block w-full px-3 py-2 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {action.label}
-            </button>
-          )
-        ))}
-      </div>
-    </details>
+        <Ellipsis size={15} />
+      </button>
+      {anchor ? (
+        <TaskPopover anchor={anchor} label={`Actions for ${label}`} onClose={() => setAnchor(null)} width={208}>
+          {primary ? <CommandItem command={primary} hint="e" onSelect={() => run(primary)} /> : null}
+          {open && open.kind !== primary?.kind ? <CommandItem command={open} hint="↵" onSelect={() => run(open)} /> : null}
+          {rest.length > 0 && (primary || open) ? <MenuDivider /> : null}
+          {rest.map((action) => (
+            <CommandItem key={`${action.kind}-${action.label}`} command={action} onSelect={() => run(action)} />
+          ))}
+          {snooze ? (
+            <>
+              <MenuDivider />
+              <MenuHeading>Snooze</MenuHeading>
+              {snoozePresets().map(([preset, presetLabel]) => (
+                <MenuItem
+                  key={preset}
+                  icon={<BellRing size={13} />}
+                  label={presetLabel}
+                  hint={preset === 'tomorrow' ? 's' : undefined}
+                  onSelect={() => run(snooze, preset)}
+                />
+              ))}
+            </>
+          ) : null}
+        </TaskPopover>
+      ) : null}
+    </>
   );
 }
 
-function SnoozeGroup({
-  action,
-  onRunAction,
-}: {
-  action: TodayActionCommand;
-  onRunAction: TodayActionMenuProps['onRunAction'];
-}) {
-  return (
-    <div className="border-y py-1" style={{ borderColor: 'var(--border)' }}>
-      <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
-        Snooze
-      </p>
-      {snoozePresets().map(([preset, label]) => (
-        <button
-          key={preset}
-          type="button"
-          onClick={() => onRunAction(action, preset)}
-          className="block w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+function CommandItem({ command, hint, onSelect }: { command: TodayActionCommand; hint?: string; onSelect: () => void }) {
+  const Icon = iconByKind[command.kind] ?? ArrowUpRight;
+  return <MenuItem icon={<Icon size={13} />} label={command.label} hint={hint ?? hintByKind[command.kind]} onSelect={onSelect} />;
 }
-
-type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
 
 /**
  * docs/53 F1: "Later today" is hidden past ~18:00 — snoozing to now+3h would

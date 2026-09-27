@@ -112,16 +112,17 @@ export function TaskViewRail({
             >
               <span className="truncate">{view.name}</span>
               <span className="flex-1" />
-              {value > 0 && (tone ? (
+              {value > 0 && (
                 <span
-                  className="min-w-[20px] rounded-full px-1.5 text-center text-[10.5px] font-bold tabular-nums"
-                  style={{ color: tone, background: `color-mix(in srgb, ${tone} 16%, transparent)` }}
+                  className={`min-w-[20px] rounded-full px-1.5 text-center text-[10.5px] tabular-nums ${tone ? 'font-bold' : 'font-medium'}`}
+                  style={{
+                    color: tone ?? 'var(--text-muted)',
+                    background: tone ? `color-mix(in srgb, ${tone} 16%, transparent)` : 'transparent',
+                  }}
                 >
                   {value}
                 </span>
-              ) : (
-                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{value}</span>
-              ))}
+              )}
             </button>
             {!view.builtin && (
               <span className="hidden shrink-0 items-center pr-1 group-hover:flex group-focus-within:flex">

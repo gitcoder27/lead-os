@@ -5,7 +5,7 @@ import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 import { ManagerDeskService } from "../services/manager-desk.service";
 import { OneOnOneService } from "../services/one-on-one.service";
-import { TaskService } from "../services/task.service";
+import { TASK_DETAILS_MAX, TaskService } from "../services/task.service";
 import { TeamTrackerService } from "../services/team-tracker.service";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
@@ -129,6 +129,7 @@ const addItemSchema = z.object({
     relatedIssueKeys: z.array(z.string().trim().min(1)).max(20).optional(),
     title: z.string().trim().min(1).max(500),
     note: z.string().trim().max(2000).optional(),
+    details: z.string().max(TASK_DETAILS_MAX).optional(),
   }),
   query: z.any().optional(),
 });
@@ -489,12 +490,13 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, jiraKey, relatedIssueKeys, title, note } = req.body;
+        const { date, jiraKey, relatedIssueKeys, title, note, details } = req.body;
         const item = await trackerService.addItem(accountId, date, {
           jiraKey,
           relatedIssueKeys,
           title,
           note,
+          details,
           actor: { type: "manager", accountId: req.auth!.user.accountId },
         }, req.auth!.user.workspaceId);
         res.status(201).json(item);

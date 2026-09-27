@@ -28,6 +28,8 @@ import type {
   TrackerDeveloperGroup,
   TeamTrackerSavedView,
   TeamTrackerViewMode,
+  TeamTrackerAttentionSnapshot,
+  InactiveDeveloperListItem,
   MyDayViewMode,
   StandupFeedEntry,
   StandupFeedResponse,
@@ -1004,14 +1006,21 @@ export class TeamTrackerService {
     }
   }
 
-  async getBoard(
+  private async loadBoardDays(
     date: string,
     options?: {
       workspaceId?: string;
       managerAccountId?: string;
       query?: TeamTrackerBoardQuery;
     }
-  ): Promise<TeamTrackerBoardResponse> {
+  ): Promise<{
+    workspaceId: string;
+    query: TeamTrackerBoardResolvedQuery;
+    viewMode: TeamTrackerViewMode;
+    devDays: TrackerDeveloperDay[];
+    inactiveDevelopers: InactiveDeveloperListItem[];
+    canonical: boolean;
+  }> {
     const workspaceId = normalizeWorkspaceId(options?.workspaceId);
     const query = await this.resolveBoardQuery(
       options?.managerAccountId,
@@ -1054,11 +1063,16 @@ export class TeamTrackerService {
           )
         )
       : await this.buildLiveDeveloperDays(date, activeDevelopers, signalConfig, workspaceId, viewer);
-    await this.decorateDayEvents(devDays, { kind: "manager", accountId: options?.managerAccountId ?? "", workspaceId });
 
-    const summary = this.computeSummary(devDays);
+    return { workspaceId, query, viewMode, devDays, inactiveDevelopers, canonical };
+  }
+
+  private filterVisibleDeveloperDays(
+    devDays: TrackerDeveloperDay[],
+    query: TeamTrackerBoardResolvedQuery
+  ): TrackerDeveloperDay[] {
     const normalizedQuery = query.q.toLowerCase();
-    const visibleDevelopers = sortDeveloperDays(
+    return sortDeveloperDays(
       devDays.filter(
         (day) =>
           matchesSummaryFilter(day, query.summaryFilter) &&
@@ -1066,10 +1080,26 @@ export class TeamTrackerService {
       ),
       query.sortBy
     );
+  }
+
+  async getBoard(
+    date: string,
+    options?: {
+      workspaceId?: string;
+      managerAccountId?: string;
+      query?: TeamTrackerBoardQuery;
+    }
+  ): Promise<TeamTrackerBoardResponse> {
+    const { workspaceId, query, viewMode, devDays, inactiveDevelopers, canonical } =
+      await this.loadBoardDays(date, options);
+    await this.decorateDayEvents(devDays, { kind: "manager", accountId: options?.managerAccountId ?? "", workspaceId });
+
+    const summary = this.computeSummary(devDays);
+    const visibleDevelopers = this.filterVisibleDeveloperDays(devDays, query);
     const visibleSummary = this.computeSummary(visibleDevelopers);
     const groups = buildDeveloperGroups(visibleDevelopers, query.groupBy);
     const filteredInactiveDevelopers = inactiveDevelopers.filter((item) =>
-      matchesInactiveDeveloperSearch(item, normalizedQuery)
+      matchesInactiveDeveloperSearch(item, query.q.toLowerCase())
     );
     const attentionQueue =
       viewMode === "history" ? [] : this.computeAttentionQueue(visibleDevelopers);
@@ -1085,6 +1115,30 @@ export class TeamTrackerService {
       groups,
       query,
       attentionQueue,
+    };
+  }
+
+  /**
+   * docs/53 §8.3: the lean slice Today consumes — developer days, the
+   * attention queue, and the board summary — skipping event decoration,
+   * groups, and the visible/inactive presentation fields.
+   */
+  async getAttentionSnapshot(
+    date: string,
+    options?: {
+      workspaceId?: string;
+      managerAccountId?: string;
+      query?: TeamTrackerBoardQuery;
+    }
+  ): Promise<TeamTrackerAttentionSnapshot> {
+    const { query, viewMode, devDays } = await this.loadBoardDays(date, options);
+    const visibleDevelopers = this.filterVisibleDeveloperDays(devDays, query);
+    return {
+      date,
+      viewMode,
+      developers: visibleDevelopers,
+      summary: this.computeSummary(devDays),
+      attentionQueue: viewMode === "history" ? [] : this.computeAttentionQueue(visibleDevelopers),
     };
   }
 

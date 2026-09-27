@@ -19,6 +19,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   overdue_issue: AlertTriangle,
   due_issue: CalendarClock,
   unassigned_issue: Users,
+  high_priority_issue: AlertTriangle,
   stale_check_in: MessageSquare,
   follow_up_due: Bell,
   meeting_outcome: CalendarClock,

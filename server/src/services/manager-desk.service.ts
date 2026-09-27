@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import type {
   ManagerDeskAssignee,
   ManagerDeskCategory,
@@ -431,45 +431,134 @@ export class ManagerDeskService {
   }
 
   async getTodayItems(managerAccountId: string, date: string, workspaceId?: string): Promise<ManagerDeskItem[]> {
-    if (await this.taskKeys.canonicalEnabled(workspaceId)) {
-      const projected = await this.tasks.projectTodayItems(managerAccountId, date, workspaceId);
-      return Promise.all(projected.map(async (item) => this.canonicalItem((await this.tasks.getByKey(item.taskKey, workspaceId))!, managerAccountId)));
-    }
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const days = await db
-      .select()
-      .from(managerDeskDays)
-      .where(
-        and(
-          eq(managerDeskDays.workspaceId, normalizedWorkspaceId),
-          eq(managerDeskDays.managerAccountId, managerAccountId)
-        )
-      );
-    if (days.length === 0) {
-      return [];
+    if (await this.taskKeys.canonicalEnabled(normalizedWorkspaceId)) {
+      // docs/53 P1: one batched surface pass instead of a getByKey +
+      // canonicalItem round-trip per row.
+      const rows = await this.tasks.projectTodayRows(managerAccountId, date, normalizedWorkspaceId);
+      if (!rows.length) {
+        return [];
+      }
+      const surfaces = await this.tasks.surfaceDtos(rows, {
+        date,
+        principal: { type: "manager", accountId: managerAccountId, workspaceId: normalizedWorkspaceId },
+      });
+      return this.deskItemsFromSurfaces(surfaces, normalizedWorkspaceId);
     }
 
-    const dayById = new Map(days.map((day) => [day.id, day]));
-    const itemRows = await db
-      .select()
+    // docs/53 P1: the candidate predicate runs in SQL (a superset of the JS
+    // filter below — `substr` covers raw-string dates, `date(…,'localtime')`
+    // covers offset timestamps), then each candidate's full lineage is fetched
+    // so dedupe still picks the same canonical row the unfiltered scan did.
+    const dayPartBefore = (column: typeof managerDeskItems.plannedStartAt | typeof managerDeskItems.plannedEndAt) =>
+      or(
+        lt(sql`substr(${column}, 1, 10)`, date),
+        lt(sql`date(${column}, 'localtime')`, date)
+      );
+    const candidateRows = await db
+      .select({ item: managerDeskItems, dayDate: managerDeskDays.date })
       .from(managerDeskItems)
+      .innerJoin(managerDeskDays, eq(managerDeskItems.dayId, managerDeskDays.id))
       .where(
         and(
           eq(managerDeskItems.workspaceId, normalizedWorkspaceId),
-          inArray(managerDeskItems.dayId, days.map((day) => day.id))
+          eq(managerDeskDays.managerAccountId, managerAccountId),
+          sql`${managerDeskItems.status} NOT IN ('done','cancelled')`,
+          or(
+            or(eq(managerDeskItems.category, "follow_up"), isNotNull(managerDeskItems.followUpAt)),
+            and(
+              eq(managerDeskItems.kind, "meeting"),
+              or(isNull(managerDeskItems.outcome), sql`trim(${managerDeskItems.outcome}) = ''`),
+              lte(managerDeskDays.date, date)
+            ),
+            and(
+              ne(managerDeskItems.status, "backlog"),
+              ne(managerDeskItems.kind, "meeting"),
+              or(
+                lt(managerDeskDays.date, date),
+                and(isNotNull(managerDeskItems.plannedStartAt), dayPartBefore(managerDeskItems.plannedStartAt)),
+                and(isNotNull(managerDeskItems.plannedEndAt), dayPartBefore(managerDeskItems.plannedEndAt))
+              )
+            )
+          )
         )
       );
-    const candidateRows = this.dedupeCurrentLineageRows(itemRows).filter((item) => {
+
+    if (candidateRows.length === 0) {
+      return [];
+    }
+
+    const dayById = new Map<number, string>();
+    const rowsById = new Map<number, ManagerDeskItemRow>();
+    const collect = (row: { item: ManagerDeskItemRow; dayDate: string }) => {
+      rowsById.set(row.item.id, row.item);
+      dayById.set(row.item.dayId, row.dayDate);
+    };
+    for (const row of candidateRows) {
+      collect(row);
+    }
+
+    // Lineage closure: ancestors (id = sourceItemId chains) and descendants
+    // (sourceItemId = any known member) of every candidate, any status.
+    let missingAncestors = new Set<number>();
+    let descendantFrontier = new Set<number>();
+    for (const row of candidateRows) {
+      descendantFrontier.add(row.item.id);
+      if (row.item.sourceItemId !== null) {
+        missingAncestors.add(row.item.sourceItemId);
+      }
+    }
+
+    for (let depth = 0; depth < 64 && (missingAncestors.size > 0 || descendantFrontier.size > 0); depth += 1) {
+      const ancestorIds = [...missingAncestors].filter((id) => !rowsById.has(id));
+      const parentIds = [...descendantFrontier];
+      missingAncestors = new Set<number>();
+      descendantFrontier = new Set<number>();
+      if (ancestorIds.length === 0 && parentIds.length === 0) {
+        break;
+      }
+
+      const lineageRows = await db
+        .select({ item: managerDeskItems, dayDate: managerDeskDays.date })
+        .from(managerDeskItems)
+        .innerJoin(managerDeskDays, eq(managerDeskItems.dayId, managerDeskDays.id))
+        .where(
+          and(
+            eq(managerDeskItems.workspaceId, normalizedWorkspaceId),
+            eq(managerDeskDays.managerAccountId, managerAccountId),
+            or(
+              ...(ancestorIds.length ? [inArray(managerDeskItems.id, ancestorIds)] : []),
+              ...(parentIds.length ? [inArray(managerDeskItems.sourceItemId, parentIds)] : [])
+            )
+          )
+        );
+
+      for (const row of lineageRows) {
+        if (rowsById.has(row.item.id)) {
+          continue;
+        }
+        collect(row);
+        descendantFrontier.add(row.item.id);
+        if (row.item.sourceItemId !== null) {
+          missingAncestors.add(row.item.sourceItemId);
+        }
+      }
+    }
+
+    const nowMs = Date.now();
+    const filteredRows = this.dedupeCurrentLineageRows([...rowsById.values()]).filter((item) => {
       const status = item.status as ManagerDeskStatus;
       if (status === "done" || status === "cancelled") {
         return false;
       }
 
-      const originDate = dayById.get(item.dayId)?.date ?? date;
+      const originDate = dayById.get(item.dayId) ?? date;
       const plannedStartDate = isoDatePart(item.plannedStartAt ?? undefined);
       const plannedEndDate = isoDatePart(item.plannedEndAt ?? undefined);
       const isFollowUp = item.category === "follow_up" || Boolean(item.followUpAt);
-      const isDueFollowUp = isFollowUp && (!item.followUpAt || isoDatePart(item.followUpAt)! <= date);
+      // docs/53 F1: follow-ups are due by timestamp, not by day — a same-day
+      // future followUpAt (e.g. a "Later today" snooze) is not due yet.
+      const isDueFollowUp = isFollowUp && (!item.followUpAt || Date.parse(item.followUpAt) <= nowMs);
       const isMeeting = item.kind === "meeting" && !item.outcome?.trim() && originDate <= date;
       const isCarryForward = status !== "backlog" && !isFollowUp && item.kind !== "meeting" && (
         originDate < date ||
@@ -479,11 +568,11 @@ export class ManagerDeskService {
       return isDueFollowUp || isMeeting || isCarryForward;
     });
     const linksByItemId = await this.getLinksByItemIds(
-      candidateRows.map((item) => item.id),
+      filteredRows.map((item) => item.id),
       normalizedWorkspaceId
     );
 
-    return candidateRows
+    return filteredRows
       .sort(compareItemRows)
       .map((item) =>
         this.mapItem(
@@ -491,7 +580,7 @@ export class ManagerDeskService {
           linksByItemId.get(item.id) ?? [],
           undefined,
           undefined,
-          dayById.get(item.dayId)?.date ?? date
+          dayById.get(item.dayId) ?? date
         )
       );
   }

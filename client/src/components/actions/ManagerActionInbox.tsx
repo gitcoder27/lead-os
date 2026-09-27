@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as Popover from '@radix-ui/react-popover';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Ban,
@@ -25,24 +26,31 @@ import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useAlerts, useDismissAlerts } from '@/hooks/useAlerts';
 import { useToast } from '@/context/ToastContext';
+import { useAuthScopeKey } from '@/context/AuthContext';
+import { api } from '@/lib/api';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { getLocalIsoDate } from '@/lib/utils';
+import { snoozePresets } from '@/components/today/TodayActionMenu';
 import type {
   Alert,
   FilterType,
   ManagerActionCommand,
   ManagerActionItem,
+  ManagerActionResponse,
   ManagerActionTarget,
   TodayActionItemType,
+  TodayResponse,
 } from '@/types';
 import type { AppView } from '@/App';
 import { TodayCheckInDialog } from '@/components/today/TodayCheckInDialog';
 import { TodayConfirmDialog } from '@/components/today/TodayConfirmDialog';
-import { TodayTextCaptureDialog } from '@/components/today/TodayTextCaptureDialog';
+import { TodayTextCaptureDialog, type TodayCapturePreset } from '@/components/today/TodayTextCaptureDialog';
 
 interface ManagerActionInboxProps {
   date?: string;
   enabled?: boolean;
+  /** docs/53 P2: on `/` derive the inbox from the shared Today query cache. */
+  deriveFromToday?: boolean;
   onOpenTarget: (target: ManagerActionTarget) => void;
   onViewChange: (view: AppView) => void;
 }
@@ -54,6 +62,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   overdue_issue: AlertTriangle,
   due_issue: CalendarClock,
   unassigned_issue: Users,
+  high_priority_issue: AlertTriangle,
   stale_check_in: MessageSquare,
   follow_up_due: BellRing,
   meeting_outcome: CalendarClock,
@@ -68,6 +77,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
 export function ManagerActionInbox({
   date = getLocalIsoDate(),
   enabled = true,
+  deriveFromToday = false,
   onOpenTarget,
   onViewChange,
 }: ManagerActionInboxProps) {
@@ -76,6 +86,7 @@ export function ManagerActionInbox({
     command: ManagerActionCommand;
     developerName: string;
     defaultSummary: string;
+    error?: string;
   } | null>(null);
   const [textDraft, setTextDraft] = useState<{
     command: ManagerActionCommand;
@@ -85,15 +96,31 @@ export function ManagerActionInbox({
     defaultValue: string;
     saveLabel: string;
     multiline?: boolean;
+    preset?: TodayCapturePreset;
+    error?: string;
   } | null>(null);
   const [confirmDraft, setConfirmDraft] = useState<{
     command: ManagerActionCommand;
     preset?: SnoozePreset;
+    error?: string;
   } | null>(null);
-  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled });
-  const actions = managerActions.data?.actions ?? [];
-  const urgentCount = managerActions.data?.urgentCount ?? 0;
-  const actionRunner = useTodayActions({ date, onOpenTarget, onViewChange });
+  const authScopeKey = useAuthScopeKey();
+  // docs/53 P2: on `/` the header inbox reads the shared ['today'] cache
+  // instead of polling /manager-actions in parallel.
+  const todaySnapshot = useQuery<TodayResponse>({
+    queryKey: ['today', date, authScopeKey],
+    queryFn: ({ signal }) => api.get<TodayResponse>(`/today?date=${encodeURIComponent(date)}`, { signal }),
+    enabled: false,
+    staleTime: Infinity,
+  });
+  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled: enabled && !deriveFromToday });
+  const actionsData = deriveFromToday ? buildHeaderResponse(todaySnapshot.data) : managerActions.data;
+  const actionsLoading = deriveFromToday ? !todaySnapshot.data : managerActions.isLoading;
+  const actionsFetching = deriveFromToday ? todaySnapshot.isFetching : managerActions.isFetching;
+  const actionsError = deriveFromToday ? false : managerActions.isError;
+  const actions = actionsData?.actions ?? [];
+  const urgentCount = actionsData?.urgentCount ?? 0;
+  const actionRunner = useTodayActions({ date, onOpenTarget });
   const { addToast } = useToast();
   // Board fetch is only needed while the check-in dialog is open — it supplies
   // the developer's current/planned tasks for the task picker.
@@ -143,6 +170,7 @@ export function ManagerActionInbox({
         label: 'Follow-up title',
         defaultValue: defaultFollowUpTitle(command.target),
         saveLabel: 'Save follow-up',
+        preset: 'tomorrow',
       });
       return;
     }
@@ -204,11 +232,19 @@ export function ManagerActionInbox({
             developerName={checkInDraft.developerName}
             defaultSummary={checkInDraft.defaultSummary}
             tasks={checkInTasks}
+            initialTaskKeys={checkInDraft.command.target.context?.taskKey ? [checkInDraft.command.target.context.taskKey] : undefined}
             isSaving={actionRunner.isPending && actionRunner.pendingKind === 'add_check_in'}
+            errorMessage={checkInDraft.error}
             onClose={() => setCheckInDraft(null)}
             onSave={(summary, taskKeys) => {
-              actionRunner.runAction(checkInDraft.command, { summary, taskKeys });
-              setCheckInDraft(null);
+              void actionRunner
+                .runActionAsync(checkInDraft.command, { summary, taskKeys })
+                .then(() => setCheckInDraft(null))
+                .catch((error: unknown) => {
+                  setCheckInDraft((current) =>
+                    current ? { ...current, error: errorMessage(error) } : current,
+                  );
+                });
             }}
           />
         ) : null}
@@ -220,14 +256,25 @@ export function ManagerActionInbox({
             defaultValue={textDraft.defaultValue}
             saveLabel={textDraft.saveLabel}
             multiline={textDraft.multiline}
+            presets={textDraft.command.kind === 'capture_follow_up' ? snoozePresets().map(([id, label]) => ({ id, label })) : undefined}
+            preset={textDraft.preset}
+            onPresetChange={(preset) => setTextDraft((current) => (current ? { ...current, preset } : current))}
             isSaving={actionRunner.isPending && actionRunner.pendingKind === textDraft.command.kind}
+            errorMessage={textDraft.error}
             onClose={() => setTextDraft(null)}
             onSave={(value) => {
-              actionRunner.runAction(textDraft.command, {
-                title: textDraft.command.kind === 'capture_follow_up' ? value : undefined,
-                outcome: textDraft.command.kind === 'capture_meeting_outcome' ? value : undefined,
-              });
-              setTextDraft(null);
+              void actionRunner
+                .runActionAsync(textDraft.command, {
+                  title: textDraft.command.kind === 'capture_follow_up' ? value : undefined,
+                  outcome: textDraft.command.kind === 'capture_meeting_outcome' ? value : undefined,
+                  preset: textDraft.command.kind === 'capture_follow_up' ? textDraft.preset : undefined,
+                })
+                .then(() => setTextDraft(null))
+                .catch((error: unknown) => {
+                  setTextDraft((current) =>
+                    current ? { ...current, error: errorMessage(error) } : current,
+                  );
+                });
             }}
           />
         ) : null}
@@ -235,10 +282,17 @@ export function ManagerActionInbox({
           <TodayConfirmDialog
             {...getConfirmationCopy(confirmDraft.command)}
             isSaving={actionRunner.isPending && actionRunner.pendingKind === confirmDraft.command.kind}
+            errorMessage={confirmDraft.error}
             onClose={() => setConfirmDraft(null)}
             onConfirm={() => {
-              actionRunner.runAction(confirmDraft.command, { preset: confirmDraft.preset });
-              setConfirmDraft(null);
+              void actionRunner
+                .runActionAsync(confirmDraft.command, { preset: confirmDraft.preset })
+                .then(() => setConfirmDraft(null))
+                .catch((error: unknown) => {
+                  setConfirmDraft((current) =>
+                    current ? { ...current, error: errorMessage(error) } : current,
+                  );
+                });
             }}
           />
         ) : null}
@@ -260,7 +314,7 @@ export function ManagerActionInbox({
             title={attentionCount > 0 ? `${attentionCount} need attention` : 'Manager actions'}
             aria-label="Manager actions"
           >
-            {managerActions.isFetching ? (
+            {actionsFetching ? (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
             ) : (
               <Sparkles size={16} style={{ color: attentionCount > 0 ? 'var(--accent)' : 'var(--text-secondary)' }} />
@@ -298,7 +352,7 @@ export function ManagerActionInbox({
                     Action inbox
                   </p>
                   <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {managerActions.isLoading ? 'Syncing queue' : `${managerActions.data?.totalCount ?? 0} open`}
+                    {actionsLoading ? 'Syncing queue' : `${actionsData?.totalCount ?? 0} open`}
                   </p>
                 </div>
                 <button
@@ -317,11 +371,11 @@ export function ManagerActionInbox({
             </div>
 
             <div className="max-h-[min(64vh,520px)] overflow-auto py-1.5">
-              {managerActions.isLoading ? (
+              {actionsLoading ? (
                 <InboxSkeleton />
               ) : (
                 <>
-                  {managerActions.isError ? (
+                  {actionsError ? (
                     <InboxEmpty title="Queue unavailable" detail="Retry from Today." />
                   ) : actions.length === 0 && signals.length === 0 ? (
                     <InboxEmpty title="Clear" detail="No manager actions right now." />
@@ -484,15 +538,11 @@ function SnoozeActions({
 }) {
   return (
     <div className="border-y py-1" style={{ borderColor: 'var(--border)' }}>
-      {[
-        ['later_today', 'Later today'],
-        ['tomorrow', 'Tomorrow'],
-        ['next_week', 'Next week'],
-      ].map(([preset, label]) => (
+      {snoozePresets().map(([preset, label]) => (
         <button
           key={preset}
           type="button"
-          onClick={() => onRunCommand(action, preset as SnoozePreset)}
+          onClick={() => onRunCommand(action, preset)}
           className="block w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--text-secondary)' }}
         >
@@ -655,6 +705,27 @@ function buildDefaultCheckInSummary(actions: ManagerActionItem[], target: Manage
   }
 
   return `Manager check-in: ${actionMatch.signal}`;
+}
+
+/** docs/53 P2: derive the header inbox payload from the shared Today cache. */
+function buildHeaderResponse(today: TodayResponse | undefined): ManagerActionResponse | undefined {
+  if (!today) {
+    return undefined;
+  }
+
+  const actionable = today.actionItems.filter((item) => item.type !== 'calm');
+  return {
+    date: today.date,
+    generatedAt: today.generatedAt,
+    surface: 'header',
+    actions: actionable.slice(0, 8),
+    urgentCount: actionable.filter((item) => item.severity === 'critical' || item.severity === 'warning').length,
+    totalCount: actionable.length,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : 'Something went wrong. Try again.';
 }
 
 function defaultFollowUpTitle(target: ManagerActionTarget): string {

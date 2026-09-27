@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, History, RefreshCw } from 'lucide-react';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useTaskResolution } from '@/hooks/useTasks';
-import { writeTaskParam } from '@/lib/view-params';
+import { writeDevParam, writeTaskParam } from '@/lib/view-params';
 import {
   useUpdateDay,
   useUpdateAvailability,
@@ -438,6 +438,15 @@ export function TeamTrackerPage({
   useEffect(() => {
     writeTaskParam(workflow.selectedTask?.taskKey);
   }, [workflow.selectedTask]);
+
+  // docs/53 F2: mirror the open developer drawer into ?dev= so Today deep
+  // links (`/team?dev=<id>`) stay restorable on reload/back. The 1:1 panel
+  // owns `dev` while it's open — the drawer mirror stays out of the way.
+  useEffect(() => {
+    if (!oneOnOnePanel) {
+      writeDevParam(workflow.drawerAccountId);
+    }
+  }, [workflow.drawerAccountId, oneOnOnePanel]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

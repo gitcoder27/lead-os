@@ -41,12 +41,14 @@ export type TodayIssue = Pick<
   | "assigneeName"
   | "dueDate"
   | "developmentDueDate"
+  | "updatedAt"
 >;
 
 export interface TodayIssueSnapshot {
   issues: TodayIssue[];
   activeDefects: number;
   dueToday: number;
+  staleThresholdHours: number;
 }
 
 type JiraMutationClient = Pick<JiraClient, "updateIssue" | "addComment">;
@@ -104,7 +106,10 @@ export class IssueService {
 
   async getTodaySnapshot(date: string, workspaceId?: string): Promise<TodayIssueSnapshot> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const jiraSyncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
+    const [jiraSyncScopeMode, staleThresholdHours] = await Promise.all([
+      this.settings.getJiraSyncScopeMode(normalizedWorkspaceId),
+      this.settings.getStaleThresholdHours(normalizedWorkspaceId),
+    ]);
     const visibilityConditions = [
       eq(issues.workspaceId, normalizedWorkspaceId),
       ne(issues.statusCategory, "done"),
@@ -127,6 +132,7 @@ export class IssueService {
         assigneeName: issues.assigneeName,
         dueDate: issues.dueDate,
         developmentDueDate: issues.developmentDueDate,
+        updatedAt: issues.updatedAt,
       })
       .from(issues)
       .where(and(...visibilityConditions));
@@ -141,12 +147,14 @@ export class IssueService {
       assigneeName: row.assigneeName ?? undefined,
       dueDate: row.dueDate ?? undefined,
       developmentDueDate: row.developmentDueDate ?? undefined,
+      updatedAt: row.updatedAt,
     }));
 
     return {
       issues: todayIssues,
       activeDefects: todayIssues.length,
       dueToday: todayIssues.filter((issue) => getEffectiveDueDate(issue) === date).length,
+      staleThresholdHours,
     };
   }
 

@@ -35,6 +35,7 @@ export function useUpdateDay(date: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
     },
   });
 }
@@ -115,6 +116,7 @@ export function useUpdateTrackerItem(date: string) {
       qc.invalidateQueries({ queryKey: ['manager-desk', 'task-detail'] });
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
       invalidateIssueAssignments(qc, date);
       invalidateIssueViews(qc);
     },
@@ -130,6 +132,7 @@ export function useDeleteTrackerItem(date: string) {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['manager-desk', 'task-detail'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
       invalidateIssueAssignments(qc, date);
       invalidateIssueViews(qc);
     },
@@ -147,6 +150,7 @@ export function useSetCurrentItem(date: string) {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
       invalidateIssueAssignments(qc, date);
       invalidateIssueViews(qc);
     },
@@ -193,6 +197,7 @@ export function useAddCheckIn(date: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
     },
   });
 }
@@ -218,6 +223,7 @@ export function useStatusUpdate(date: string) {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
       qc.invalidateQueries({ queryKey: ['manager-desk'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
     },
   });
 }
@@ -231,6 +237,7 @@ export function useCarryForward() {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });
       qc.invalidateQueries({ queryKey: ['team-tracker', 'carry-forward-context'] });
       qc.invalidateQueries({ queryKey: ['workload'] });
+      qc.invalidateQueries({ queryKey: ['today'] });
       invalidateIssueViews(qc);
     },
   });

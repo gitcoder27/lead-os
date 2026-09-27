@@ -7,12 +7,10 @@ import type {
   TodayActionTarget,
   TodayResponse,
 } from '@/types';
-import type { AppView } from '@/App';
 
 interface UseTodayActionsOptions {
   date: string;
   onOpenTarget: (target: TodayActionTarget) => void;
-  onViewChange: (view: AppView) => void;
 }
 
 type TodayActionVariables = {
@@ -24,7 +22,16 @@ type TodayActionVariables = {
   taskKeys?: string[];
 };
 
-export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayActionsOptions) {
+// docs/53 P4: navigation commands never hit the mutation pipeline — they just
+// open the target, so they can't invalidate/cancel the destination page's
+// fetches or flash a "Working" state.
+const NAVIGATION_KINDS = new Set<TodayActionCommand['kind']>(['open', 'assign_owner', 'ask_check_in']);
+
+function isNavigationCommand(command: TodayActionCommand): boolean {
+  return NAVIGATION_KINDS.has(command.kind);
+}
+
+export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) {
   const qc = useQueryClient();
   const { addToast } = useToast();
 
@@ -127,11 +134,6 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
     mutationFn: async ({ command, outcome, preset, summary, title, taskKeys }: TodayActionVariables) => {
       const { target } = command;
 
-      if (command.kind === 'open' || command.kind === 'assign_owner' || command.kind === 'ask_check_in') {
-        onOpenTarget(target);
-        return { label: command.label, skipToast: true };
-      }
-
       if (command.kind === 'mark_done' && target.managerDeskItemId) {
         return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command });
       }
@@ -155,7 +157,7 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
         if (!title?.trim()) {
           return { cancelled: true };
         }
-        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, title: title.trim() });
+        return api.post<ManagerActionCommandResponse>('/manager-actions/commands', { date, command, title: title.trim(), preset });
       }
 
       if (command.kind === 'carry_forward' && target.managerDeskItemId) {
@@ -173,9 +175,9 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
       return { label: command.label, skipToast: true };
     },
     onMutate: async ({ command, summary }) => {
-      if (command.kind === 'add_check_in') {
-        await qc.cancelQueries({ queryKey: ['today', date] });
-      }
+      // docs/53 P5: every mutating kind cancels the in-flight Today poll so a
+      // stale response can't overwrite the optimistic write.
+      await qc.cancelQueries({ queryKey: ['today', date] });
       if (
         command.kind === 'mark_done' ||
         command.kind === 'snooze' ||
@@ -190,28 +192,42 @@ export function useTodayActions({ date, onOpenTarget, onViewChange }: UseTodayAc
       }
     },
     onSuccess: (result, variables) => {
-      invalidateToday();
       if (isActionResult(result, 'cancelled')) {
         return;
       }
+      invalidateToday();
       if (isActionResult(result, 'skipToast')) {
         return;
       }
       addToast(actionToastTitle(variables.command.kind), 'success');
     },
-    onError: (error, variables) => {
+    onError: (error) => {
       invalidateToday();
-      if (variables.command.kind === 'open') {
-        onViewChange(variables.command.target.view as AppView);
-        return;
-      }
       addToast(error.message, 'error');
     },
   });
 
+  const runAction = (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
+    if (isNavigationCommand(command)) {
+      onOpenTarget(command.target);
+      return;
+    }
+    mutation.mutate({ command, ...options });
+  };
+
+  // docs/53 F9: dialogs await the action so they can stay open with an inline
+  // error when the write fails instead of silently discarding input.
+  const runActionAsync = async (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
+    if (isNavigationCommand(command)) {
+      onOpenTarget(command.target);
+      return;
+    }
+    await mutation.mutateAsync({ command, ...options });
+  };
+
   return {
-    runAction: (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) =>
-      mutation.mutate({ command, ...options }),
+    runAction,
+    runActionAsync,
     isPending: mutation.isPending,
     pendingKind: mutation.variables?.command.kind,
     pendingTarget: mutation.variables?.command.target,

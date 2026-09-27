@@ -6,6 +6,8 @@ interface TodayConfirmDialogProps {
   description: string;
   confirmLabel: string;
   isSaving: boolean;
+  /** docs/53 F9: surfaced inline when the mutation fails. */
+  errorMessage?: string;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -15,6 +17,7 @@ export function TodayConfirmDialog({
   description,
   confirmLabel,
   isSaving,
+  errorMessage,
   onClose,
   onConfirm,
 }: TodayConfirmDialogProps) {
@@ -113,6 +116,14 @@ export function TodayConfirmDialog({
             <X size={15} style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
+
+        {errorMessage ? (
+          <div className="border-t px-4 py-2.5" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-[12px] font-medium" style={{ color: 'var(--danger)' }} role="alert">
+              {errorMessage}
+            </p>
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
           <button

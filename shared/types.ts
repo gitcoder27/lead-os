@@ -216,6 +216,7 @@ export type TodayActionItemType =
   | "overdue_issue"
   | "due_issue"
   | "unassigned_issue"
+  | "high_priority_issue"
   | "stale_check_in"
   | "follow_up_due"
   | "meeting_outcome"
@@ -247,6 +248,17 @@ export type TodayActionSeverity =
 
 export type TodayActionGroup = "now" | "next" | "later";
 
+/**
+ * Optional work context attached to a target. Dialogs (check-in, follow-up)
+ * read it for prefill/linking; plain `open` navigation ignores it.
+ */
+export interface TodayActionTargetContext {
+  trackerItemId?: number;
+  taskKey?: string;
+  issueKey?: string;
+  relatedIssueKeys?: string[];
+}
+
 export interface TodayActionTarget {
   type: TodayActionTargetType;
   view: "work" | "team" | "desk" | "tasks" | "follow-ups" | "meetings" | "notes" | "settings";
@@ -262,6 +274,7 @@ export interface TodayActionTarget {
   filter?: FilterType;
   /** Team-page panel to open when view === "team" (e.g. "one-on-one"). */
   panel?: string;
+  context?: TodayActionTargetContext;
 }
 
 export interface TodayActionCommand {
@@ -1160,6 +1173,15 @@ export interface InactiveDeveloperListItem {
   developer: Developer;
   availability: DeveloperAvailability;
 }
+
+/**
+ * docs/53 §8.3: the lean board slice Today consumes — full developer days +
+ * attention queue + summary, without groups/decoration presentation fields.
+ */
+export type TeamTrackerAttentionSnapshot = Pick<
+  TeamTrackerBoardResponse,
+  "date" | "viewMode" | "developers" | "summary" | "attentionQueue"
+>;
 
 /**
  * Phase 3 (P3-D5/D6, §6): the standup rolling-window feed. Task events on

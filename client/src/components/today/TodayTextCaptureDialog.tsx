@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { FileText, X } from 'lucide-react';
 
+export type TodayCapturePreset = 'later_today' | 'tomorrow' | 'next_week';
+
 interface TodayTextCaptureDialogProps {
   title: string;
   description: string;
@@ -9,6 +11,12 @@ interface TodayTextCaptureDialogProps {
   saveLabel: string;
   multiline?: boolean;
   isSaving: boolean;
+  /** docs/53 F3: optional "when" chips (e.g. follow-up due-time presets). */
+  presets?: Array<{ id: TodayCapturePreset; label: string }>;
+  preset?: TodayCapturePreset;
+  onPresetChange?: (preset: TodayCapturePreset) => void;
+  /** docs/53 F9: surfaced inline when the save mutation fails. */
+  errorMessage?: string;
   onClose: () => void;
   onSave: (value: string) => void;
 }
@@ -21,6 +29,10 @@ export function TodayTextCaptureDialog({
   saveLabel,
   multiline = false,
   isSaving,
+  presets,
+  preset,
+  onPresetChange,
+  errorMessage,
   onClose,
   onSave,
 }: TodayTextCaptureDialogProps) {
@@ -160,6 +172,32 @@ export function TodayTextCaptureDialog({
               style={fieldStyle}
             />
           )}
+          {presets && presets.length > 0 ? (
+            <div className="mt-3 flex items-center gap-1.5">
+              <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>When</span>
+              {presets.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onPresetChange?.(option.id)}
+                  className="rounded-md border px-2 py-1 text-[11px] font-medium transition-colors"
+                  style={{
+                    borderColor: preset === option.id ? 'var(--accent)' : 'var(--border)',
+                    background: preset === option.id ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
+                    color: preset === option.id ? 'var(--accent)' : 'var(--text-secondary)',
+                  }}
+                  aria-pressed={preset === option.id}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {errorMessage ? (
+            <p className="mt-3 text-[12px] font-medium" style={{ color: 'var(--danger)' }} role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>

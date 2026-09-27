@@ -3,9 +3,10 @@ import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
+import { useLocalDate } from '@/hooks/useLocalDate';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
-import { getLocalIsoDate } from '@/lib/utils';
-import type { FilterType, TodayActionCommand, TodayActionTarget, TodayResponse } from '@/types';
+import type { FilterType, TodayActionCommand, TodayActionTarget, TodayResponse, TodaySourceName } from '@/types';
+import { snoozePresets } from './TodayActionMenu';
 import { TodayActionQueue } from './TodayActionQueue';
 import { TodayCheckInDialog } from './TodayCheckInDialog';
 import { TodayCommandFooter } from './TodayCommandFooter';
@@ -14,7 +15,7 @@ import { TodayCurrentPriority } from './TodayCurrentPriority';
 import { TodayPeoplePulse } from './TodayPeoplePulse';
 import { TodayRhythmHeader } from './TodayRhythmHeader';
 import { TodayRhythmRail } from './TodayRhythmRail';
-import { TodayTextCaptureDialog } from './TodayTextCaptureDialog';
+import { TodayTextCaptureDialog, type TodayCapturePreset } from './TodayTextCaptureDialog';
 
 interface TodayPageProps {
   onViewChange: (view: AppView) => void;
@@ -23,11 +24,12 @@ interface TodayPageProps {
 }
 
 export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget }: TodayPageProps) {
-  const date = getLocalIsoDate();
+  const date = useLocalDate();
   const [checkInDraft, setCheckInDraft] = useState<{
     command: TodayActionCommand;
     developerName: string;
     defaultSummary: string;
+    error?: string;
   } | null>(null);
   const [textDraft, setTextDraft] = useState<{
     command: TodayActionCommand;
@@ -37,10 +39,13 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     defaultValue: string;
     saveLabel: string;
     multiline?: boolean;
+    preset?: TodayCapturePreset;
+    error?: string;
   } | null>(null);
   const [confirmDraft, setConfirmDraft] = useState<{
     command: TodayActionCommand;
     preset?: 'later_today' | 'tomorrow' | 'next_week';
+    error?: string;
   } | null>(null);
   const today = useToday(date);
   const snapshot = today.data;
@@ -68,7 +73,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     onViewChange(target.view as AppView);
   };
 
-  const actions = useTodayActions({ date, onOpenTarget: openTarget, onViewChange });
+  const actions = useTodayActions({ date, onOpenTarget: openTarget });
   const pendingTargetKey = useMemo(
     () => (actions.isPending ? targetKey(actions.pendingTarget) : undefined),
     [actions.isPending, actions.pendingTarget],
@@ -92,6 +97,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         label: 'Follow-up title',
         defaultValue: defaultFollowUpTitle(command.target),
         saveLabel: 'Save follow-up',
+        preset: 'tomorrow',
       });
       return;
     }
@@ -147,10 +153,10 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           <TodayCurrentPriority
             item={snapshot.currentPriority}
             onRunAction={(item) => runCommand(item.primaryAction)}
+            onOpenTarget={openTarget}
           />
           <section className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
             <TodayActionQueue
-              isLoading={today.isLoading}
               items={snapshot.actionItems}
               pendingTargetKey={pendingTargetKey}
               onRunCommand={runCommand}
@@ -180,11 +186,19 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           developerName={checkInDraft.developerName}
           defaultSummary={checkInDraft.defaultSummary}
           tasks={checkInTasks}
+          initialTaskKeys={checkInDraft.command.target.context?.taskKey ? [checkInDraft.command.target.context.taskKey] : undefined}
           isSaving={actions.isPending && actions.pendingKind === 'add_check_in'}
+          errorMessage={checkInDraft.error}
           onClose={() => setCheckInDraft(null)}
           onSave={(summary, taskKeys) => {
-            actions.runAction(checkInDraft.command, { summary, taskKeys });
-            setCheckInDraft(null);
+            void actions
+              .runActionAsync(checkInDraft.command, { summary, taskKeys })
+              .then(() => setCheckInDraft(null))
+              .catch((error: unknown) => {
+                setCheckInDraft((current) =>
+                  current ? { ...current, error: errorMessage(error) } : current,
+                );
+              });
           }}
         />
       ) : null}
@@ -196,14 +210,25 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           defaultValue={textDraft.defaultValue}
           saveLabel={textDraft.saveLabel}
           multiline={textDraft.multiline}
+          presets={textDraft.command.kind === 'capture_follow_up' ? followUpPresetOptions() : undefined}
+          preset={textDraft.preset}
+          onPresetChange={(preset) => setTextDraft((current) => (current ? { ...current, preset } : current))}
           isSaving={actions.isPending && actions.pendingKind === textDraft.command.kind}
+          errorMessage={textDraft.error}
           onClose={() => setTextDraft(null)}
           onSave={(value) => {
-            actions.runAction(textDraft.command, {
-              title: textDraft.command.kind === 'capture_follow_up' ? value : undefined,
-              outcome: textDraft.command.kind === 'capture_meeting_outcome' ? value : undefined,
-            });
-            setTextDraft(null);
+            void actions
+              .runActionAsync(textDraft.command, {
+                title: textDraft.command.kind === 'capture_follow_up' ? value : undefined,
+                outcome: textDraft.command.kind === 'capture_meeting_outcome' ? value : undefined,
+                preset: textDraft.command.kind === 'capture_follow_up' ? textDraft.preset : undefined,
+              })
+              .then(() => setTextDraft(null))
+              .catch((error: unknown) => {
+                setTextDraft((current) =>
+                  current ? { ...current, error: errorMessage(error) } : current,
+                );
+              });
           }}
         />
       ) : null}
@@ -211,10 +236,17 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         <TodayConfirmDialog
           {...getConfirmationCopy(confirmDraft.command)}
           isSaving={actions.isPending && actions.pendingKind === confirmDraft.command.kind}
+          errorMessage={confirmDraft.error}
           onClose={() => setConfirmDraft(null)}
           onConfirm={() => {
-            actions.runAction(confirmDraft.command, { preset: confirmDraft.preset });
-            setConfirmDraft(null);
+            void actions
+              .runActionAsync(confirmDraft.command, { preset: confirmDraft.preset })
+              .then(() => setConfirmDraft(null))
+              .catch((error: unknown) => {
+                setConfirmDraft((current) =>
+                  current ? { ...current, error: errorMessage(error) } : current,
+                );
+              });
           }}
         />
       ) : null}
@@ -231,9 +263,16 @@ function TodayPartialDataNotice({
   isFetching: boolean;
   onRetry: () => void;
 }) {
-  const labels = { issues: 'Work', team: 'Team', desk: 'Desk', sync: 'Sync', drift: 'Jira drift' } as const;
+  const labels: Record<TodaySourceName, string> = {
+    issues: 'Work',
+    team: 'Team',
+    desk: 'Desk',
+    sync: 'Sync',
+    drift: 'Jira drift',
+    one_on_one: '1:1s',
+  };
   const unavailable = sourceStatus
-    ? (Object.entries(sourceStatus) as Array<[keyof typeof labels, 'ready' | 'unavailable']>)
+    ? (Object.entries(sourceStatus) as Array<[TodaySourceName, 'ready' | 'unavailable']>)
         .filter(([, status]) => status === 'unavailable')
         .map(([source]) => labels[source])
     : [];
@@ -403,6 +442,14 @@ function defaultFollowUpTitle(target: TodayActionTarget): string {
     return 'Follow up with developer';
   }
   return 'Follow up';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : 'Something went wrong. Try again.';
+}
+
+function followUpPresetOptions(): Array<{ id: TodayCapturePreset; label: string }> {
+  return snoozePresets().map(([id, label]) => ({ id, label }));
 }
 
 function getConfirmationCopy(command: TodayActionCommand): {

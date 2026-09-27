@@ -1,4 +1,5 @@
 import express from "express";
+import type { Request, Response, NextFunction } from "express";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import type { SendFileOptions } from "express-serve-static-core";
@@ -125,6 +126,22 @@ export function createApp(services: AppServices) {
   app.use("/api/notes", express.json({ limit: "512kb" }));
   app.use(express.json());
 
+  // docs/53 §8.3: any successful write to a surface Today reads (desk,
+  // tracker, tasks, capture) must drop the cached attention payload so the
+  // next poll rebuilds it — the 25s TTL would otherwise serve stale queues.
+  const clearTodayCacheOnWrite = (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+      next();
+      return;
+    }
+    res.on("finish", () => {
+      if (res.statusCode < 400) {
+        services.todayService.clearTodayCache();
+      }
+    });
+    next();
+  };
+
   const dailyNotesService = services.dailyNotesService ?? new DailyNotesService(services.managerDeskService);
   const navPreferencesService = services.navPreferencesService ?? new NavPreferencesService();
   const taskKeysService = services.taskKeysService ?? new TaskKeysService();
@@ -165,19 +182,21 @@ export function createApp(services: AppServices) {
   app.use(
     "/api/team-tracker",
     requireManager(services.authService),
+    clearTodayCacheOnWrite,
     createTeamTrackerRouter(services.teamTrackerService, services.managerDeskService)
   );
-  app.use("/api/my-day", createMyDayRouter(services.myDayService, services.authService, services.issueService));
+  app.use("/api/my-day", clearTodayCacheOnWrite, createMyDayRouter(services.myDayService, services.authService, services.issueService));
   app.use(
     "/api/manager-desk",
+    clearTodayCacheOnWrite,
     createManagerDeskRouter(services.managerDeskService, services.authService)
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
-  app.use("/api/tasks", requireManager(services.authService), createTasksRouter(taskKeysService, taskEventsService));
+  app.use("/api/tasks", requireManager(services.authService), clearTodayCacheOnWrite, createTasksRouter(taskKeysService, taskEventsService));
   // docs/48: 1:1 workspace API — manager-only mount, flag-gated to 404 inside.
   app.use("/api/one-on-ones", requireManager(services.authService), createOneOnOnesRouter(services.oneOnOneService));
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
-  app.use("/api/capture", requireManager(services.authService), createCaptureRouter(new CaptureService()));
+  app.use("/api/capture", requireManager(services.authService), clearTodayCacheOnWrite, createCaptureRouter(new CaptureService()));
   app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(

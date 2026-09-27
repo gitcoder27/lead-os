@@ -765,8 +765,9 @@ export class TaskService {
    * either a due follow-up, an undecided meeting due by the date, or open work
    * scheduled on/before it (the carry-forward analogue).
    */
-  async projectTodayItems(managerAccountId: string, date: string, workspaceId?: string): Promise<TaskProjection[]> {
+  async projectTodayRows(managerAccountId: string, date: string, workspaceId?: string): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(workspaceId);
+    const nowMs = Date.now();
     const rows = await db.select().from(tasks).where(and(
       eq(tasks.workspaceId, scope),
       eq(tasks.trackedByManagerId, managerAccountId),
@@ -776,7 +777,9 @@ export class TaskService {
     return rows.filter((row) => {
       const scheduledOn = row.scheduledOn ?? date;
       const isFollowUp = Boolean(row.followUpAt) || (row.labelsJson?.includes('"category:follow_up"') ?? false);
-      const isDueFollowUp = isFollowUp && (!row.followUpAt || (isoDatePart(row.followUpAt) ?? date) <= date);
+      // docs/53 F1: follow-ups are due by timestamp — a same-day future
+      // followUpAt (e.g. a "Later today" snooze) is not due yet.
+      const isDueFollowUp = isFollowUp && (!row.followUpAt || Date.parse(row.followUpAt) <= nowMs);
       const isMeeting = row.kind === "meeting" && !row.outcome?.trim() && scheduledOn <= date;
       const isCarryForward = !row.later && !isFollowUp && row.kind !== "meeting" && (
         scheduledOn < date ||
@@ -784,7 +787,11 @@ export class TaskService {
         Boolean(row.endsAt && (isoDatePart(row.endsAt) ?? date) < date)
       );
       return isDueFollowUp || isMeeting || isCarryForward;
-    }).map(toProjection);
+    });
+  }
+
+  async projectTodayItems(managerAccountId: string, date: string, workspaceId?: string): Promise<TaskProjection[]> {
+    return (await this.projectTodayRows(managerAccountId, date, workspaceId)).map(toProjection);
   }
 
   /** Follow-ups predicate (§2.3.3 #7): follow_up_at set or category:follow_up. */

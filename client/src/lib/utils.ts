@@ -59,6 +59,14 @@ export function isStale(updatedAt: string, thresholdHours = 48): boolean {
   return dt.getTime() < Date.now() - thresholdHours * 60 * 60 * 1000;
 }
 
+/**
+ * docs/53 F1: the "Later today" snooze preset is only offered while ~3h of the
+ * day remain — past ~18:00 it is hidden because it would land after hours.
+ */
+export function isLaterTodayAvailable(now: Date = new Date()): boolean {
+  return now.getHours() < 18;
+}
+
 export function formatDate(dateStr?: string): string {
   if (!dateStr) return '—';
   try {

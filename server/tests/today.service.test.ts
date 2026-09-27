@@ -25,18 +25,14 @@ function todayService(syncStatus = { status: "idle" as const }) {
 
 function cachedTodayService() {
   const issueServiceMock = {
-    getTodaySnapshot: vi.fn(async () => ({ issues: [], activeDefects: 0, dueToday: 0 })),
+    getTodaySnapshot: vi.fn(async () => ({ issues: [], activeDefects: 0, dueToday: 0, staleThresholdHours: 24 })),
   };
   const teamTrackerServiceMock = {
-    getBoard: vi.fn(async () => ({
+    getAttentionSnapshot: vi.fn(async () => ({
       date: "2026-03-08",
       viewMode: "live",
       developers: [],
-      inactiveDevelopers: [],
       summary: { total: 0, blocked: 0, atRisk: 0, stale: 0, noCurrent: 0, doneForToday: 0 },
-      visibleSummary: { total: 0, blocked: 0, atRisk: 0, stale: 0, noCurrent: 0, doneForToday: 0 },
-      groups: [],
-      query: { q: "", summaryFilter: "all", sortBy: "attention", groupBy: "attention" },
       attentionQueue: [],
     })),
   };
@@ -180,7 +176,7 @@ describe("TodayService", () => {
     expect(today.generatedAt).toBe(managerActions.generatedAt);
     expect(issueService.getTodaySnapshot).toHaveBeenCalledTimes(1);
     expect(issueService.getTodaySnapshot).toHaveBeenCalledWith("2026-03-08", "workspace-a");
-    expect(teamTrackerService.getBoard).toHaveBeenCalledTimes(1);
+    expect(teamTrackerService.getAttentionSnapshot).toHaveBeenCalledTimes(1);
     expect(managerDeskService.getTodayItems).toHaveBeenCalledTimes(1);
   });
 
@@ -272,7 +268,7 @@ describe("TodayService", () => {
     expect(pulseItem?.actionPreview).toBe("BE modernization");
   });
 
-  it("includes current tracker issue context on developer action targets", async () => {
+  it("keeps developer targets person-only while task context rides in target.context (docs/53 F2)", async () => {
     await seedIssue("AM-1");
     await seedIssue("AM-2", { summary: "Related checkout context" });
     await trackerService.updateDay("dev-1", "2026-03-08", { status: "blocked" });
@@ -287,15 +283,169 @@ describe("TodayService", () => {
     const developerAction = response.actionItems.find((item) => item.target.developerAccountId === "dev-1");
     const pulseItem = response.teamPulse.find((item) => item.accountId === "dev-1");
 
+    // Developer navigation identity lives on the target; task/issue detail
+    // is context for the dialogs, not for `open`.
     expect(developerAction?.target).toMatchObject({
-      trackerItemId: current.id,
-      issueKey: "AM-1",
-      relatedIssueKeys: ["AM-2"],
+      type: "developer",
+      view: "team",
+      developerAccountId: "dev-1",
+      context: {
+        trackerItemId: current.id,
+        issueKey: "AM-1",
+        relatedIssueKeys: ["AM-2"],
+      },
     });
+    expect(developerAction?.target).not.toHaveProperty("trackerItemId");
+    expect(developerAction?.target).not.toHaveProperty("taskKey");
+    expect(developerAction?.target).not.toHaveProperty("issueKey");
     expect(pulseItem?.target).toMatchObject({
-      trackerItemId: current.id,
-      issueKey: "AM-1",
-      relatedIssueKeys: ["AM-2"],
+      type: "developer",
+      developerAccountId: "dev-1",
+      context: {
+        trackerItemId: current.id,
+        issueKey: "AM-1",
+        relatedIssueKeys: ["AM-2"],
+      },
+    });
+  });
+
+  it("snooze 'later_today' writes now+3h and the item stays out of due follow-ups until then (docs/53 F1)", async () => {
+    const item = await managerDeskService.createItem("manager-1", {
+      date: "2026-03-08",
+      title: "Ping QA on the release",
+      kind: "action",
+      category: "follow_up",
+      status: "planned",
+      followUpAt: "2026-03-08T07:00:00.000Z",
+    });
+    const service = todayService();
+
+    const before = await service.getToday("manager-1", "2026-03-08");
+    expect(before.promises.some((promise) => promise.target.managerDeskItemId === item.id)).toBe(true);
+
+    const response = await service.executeCommand(
+      "manager-1",
+      {
+        date: "2026-03-08",
+        preset: "later_today",
+        command: {
+          kind: "snooze",
+          label: "Snooze",
+          target: { type: "follow_up", view: "follow-ups", managerDeskItemId: item.id, date: "2026-03-08" },
+        },
+      },
+      { type: "manager", accountId: "manager-1" },
+    );
+
+    // Fake clock is 2026-03-08T08:30Z → now+3h lands on 11:30Z (already aligned
+    // to the half-hour, so no rounding adjustment expected).
+    expect((response.result as { followUpAt?: string }).followUpAt).toBe("2026-03-08T11:30:00.000Z");
+
+    const after = await service.getToday("manager-1", "2026-03-08");
+    expect(after.promises.some((promise) => promise.target.managerDeskItemId === item.id)).toBe(false);
+    expect(after.actionItems.some((action) => action.target.managerDeskItemId === item.id)).toBe(false);
+
+    vi.setSystemTime(new Date("2026-03-08T11:31:00.000Z"));
+    const due = await service.getToday("manager-1", "2026-03-08");
+    expect(due.promises.some((promise) => promise.target.managerDeskItemId === item.id)).toBe(true);
+  });
+
+  it("captured follow-ups default to tomorrow 09:00 and are not due immediately (docs/53 F3)", async () => {
+    await seedIssue("AM-1");
+    const service = todayService();
+
+    const response = await service.executeCommand(
+      "manager-1",
+      {
+        date: "2026-03-08",
+        title: "Check the checkout fix",
+        command: {
+          kind: "capture_follow_up",
+          label: "Follow up",
+          target: { type: "issue", view: "work", issueKey: "AM-1", date: "2026-03-08" },
+        },
+      },
+      { type: "manager", accountId: "manager-1" },
+    );
+
+    const created = response.result as { id: number; followUpAt?: string };
+    const dueAt = new Date(created.followUpAt!);
+    expect(dueAt.getHours()).toBe(9);
+    expect(dueAt.getMinutes()).toBe(0);
+    expect(dueAt.getDate()).toBe(9);
+
+    const today = await service.getToday("manager-1", "2026-03-08");
+    expect(today.promises.some((promise) => promise.target.managerDeskItemId === created.id)).toBe(false);
+    expect(today.actionItems.some((action) => action.target.managerDeskItemId === created.id)).toBe(false);
+  });
+
+  it("captured follow-ups honor the later_today preset and land outside the queue until then (docs/53 F3)", async () => {
+    const service = todayService();
+
+    const response = await service.executeCommand(
+      "manager-1",
+      {
+        date: "2026-03-08",
+        title: "Ping Deepak this afternoon",
+        preset: "later_today",
+        command: {
+          kind: "capture_follow_up",
+          label: "Follow up",
+          target: { type: "developer", view: "team", developerAccountId: "dev-1", date: "2026-03-08" },
+        },
+      },
+      { type: "manager", accountId: "manager-1" },
+    );
+
+    const created = response.result as { id: number; followUpAt?: string };
+    expect(created.followUpAt).toBe("2026-03-08T11:30:00.000Z");
+
+    const today = await service.getToday("manager-1", "2026-03-08");
+    expect(today.promises.some((promise) => promise.target.managerDeskItemId === created.id)).toBe(false);
+  });
+
+  it("only surfaces high-priority defects that are unassigned, not started, or stale (docs/53 F12)", async () => {
+    await seedIssue("AM-10", { dueDate: null, updatedAt: "2026-03-08T07:30:00.000Z" });
+    await seedIssue("AM-11", {
+      statusCategory: "new",
+      statusName: "To Do",
+      dueDate: null,
+      updatedAt: "2026-03-08T07:30:00.000Z",
+    });
+    await seedIssue("AM-12", { dueDate: null, updatedAt: "2026-03-05T08:00:00.000Z" });
+    await seedIssue("AM-13", { assigneeId: null, assigneeName: null, dueDate: null });
+    await seedIssue("AM-14", { priorityName: "Low", statusCategory: "new", dueDate: null });
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const ids = response.actionItems.map((item) => item.id);
+
+    expect(ids).not.toContain("today-issue-AM-10");
+    expect(ids).not.toContain("today-issue-AM-14");
+    expect(ids).toContain("today-issue-AM-11");
+    expect(ids).toContain("today-issue-AM-12");
+    expect(ids).toContain("today-issue-AM-13");
+    expect(response.actionItems.find((item) => item.id === "today-issue-AM-11")?.type).toBe("high_priority_issue");
+    expect(response.actionItems.find((item) => item.id === "today-issue-AM-12")?.type).toBe("high_priority_issue");
+    expect(response.actionItems.find((item) => item.id === "today-issue-AM-13")?.type).toBe("unassigned_issue");
+  });
+
+  it("caps high-priority rows at three and folds the rest into an aggregate row (docs/53 F12)", async () => {
+    for (const key of ["AM-20", "AM-21", "AM-22", "AM-23", "AM-24"]) {
+      await seedIssue(key, { statusCategory: "new", statusName: "To Do", dueDate: null });
+    }
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const priorityRows = response.actionItems.filter(
+      (item) => item.type === "high_priority_issue" && item.target.issueKey,
+    );
+    const aggregate = response.actionItems.find((item) => item.id === "today-issue-priority-backlog");
+
+    expect(priorityRows).toHaveLength(3);
+    expect(aggregate).toMatchObject({
+      type: "high_priority_issue",
+      title: "5 high-priority defects",
+      target: { type: "view", view: "work", filter: "highPriority" },
+      primaryAction: { kind: "open", label: "Open Work" },
     });
   });
 

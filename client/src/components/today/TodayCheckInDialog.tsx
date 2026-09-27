@@ -7,7 +7,11 @@ interface TodayCheckInDialogProps {
   defaultSummary?: string;
   /** Tasks that can be tagged on this check-in (developer's current + planned work). */
   tasks?: TaskPickerTask[];
+  /** docs/53 F2: task keys pre-selected from the action's target context. */
+  initialTaskKeys?: string[];
   isSaving: boolean;
+  /** docs/53 F9: surfaced inline when the save mutation fails. */
+  errorMessage?: string;
   onClose: () => void;
   onSave: (summary: string, taskKeys: string[]) => void;
 }
@@ -16,12 +20,20 @@ export function TodayCheckInDialog({
   developerName,
   defaultSummary = '',
   tasks = [],
+  initialTaskKeys = [],
   isSaving,
+  errorMessage,
   onClose,
   onSave,
 }: TodayCheckInDialogProps) {
   const [summary, setSummary] = useState(defaultSummary);
-  const [taskKeys, setTaskKeys] = useState<string[]>([]);
+  const [taskKeys, setTaskKeys] = useState<string[]>(initialTaskKeys);
+  // docs/53 F2: pre-selected context tasks may be absent from the day's
+  // candidate list (e.g. the item rolled off the plan) — render them anyway so
+  // the chip survives taskKeysForSubmit's known-key filter.
+  const pickerTasks = initialTaskKeys.length
+    ? [...tasks, ...initialTaskKeys.filter((key) => !tasks.some((task) => task.taskKey === key)).map((taskKey) => ({ taskKey, title: taskKey }))]
+    : tasks;
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -138,11 +150,16 @@ export function TodayCheckInDialog({
               placeholder="Asked for today update, blocker detail, or current status..."
             />
           </label>
-          {tasks.length > 0 && (
+          {pickerTasks.length > 0 && (
             <div className="mt-3">
-              <TaskPicker tasks={tasks} text={summary} selected={taskKeys} onChange={setTaskKeys} />
+              <TaskPicker tasks={pickerTasks} text={summary} selected={taskKeys} onChange={setTaskKeys} />
             </div>
           )}
+          {errorMessage ? (
+            <p className="mt-3 text-[12px] font-medium" style={{ color: 'var(--danger)' }} role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
@@ -156,7 +173,7 @@ export function TodayCheckInDialog({
           </button>
           <button
             type="button"
-            onClick={() => onSave(summary, taskKeysForSubmit(taskKeys, summary, tasks))}
+            onClick={() => onSave(summary, taskKeysForSubmit(taskKeys, summary, pickerTasks))}
             disabled={!canSave}
             className="rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-opacity disabled:opacity-45"
             style={{ background: 'var(--accent)', color: '#fff' }}

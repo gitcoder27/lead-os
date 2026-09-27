@@ -16,6 +16,13 @@ const getActionsSchema = z.object({
   params: z.any().optional(),
 });
 
+const actionTargetContextSchema = z.object({
+  trackerItemId: z.number().int().positive().optional(),
+  taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
+  issueKey: z.string().optional(),
+  relatedIssueKeys: z.array(z.string()).optional(),
+});
+
 const actionTargetSchema = z.object({
   type: z.enum([
     "issue",
@@ -26,7 +33,7 @@ const actionTargetSchema = z.object({
     "meeting",
     "view",
   ]),
-  view: z.enum(["work", "team", "desk", "follow-ups", "meetings", "settings"]),
+  view: z.enum(["work", "team", "desk", "tasks", "follow-ups", "meetings", "notes", "settings"]),
   issueKey: z.string().optional(),
   relatedIssueKeys: z.array(z.string()).optional(),
   developerAccountId: z.string().optional(),
@@ -35,6 +42,8 @@ const actionTargetSchema = z.object({
   taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
   date: z.string().regex(dateRegex, "target date must be YYYY-MM-DD").optional(),
   filter: z.string().optional(),
+  panel: z.string().optional(),
+  context: actionTargetContextSchema.optional(),
 });
 
 const actionCommandSchema = z.object({

@@ -476,13 +476,20 @@ function AppContent() {
       : getLocalIsoDate(),
   );
   const [todayWorkTarget, setTodayWorkTarget] = useState<{ issueKey?: string; nonce: number }>({ nonce: 0 });
-  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; taskKey?: string; nonce: number }>(() => ({
-    taskKey:
-      pathToView(window.location.pathname) === 'team'
-        ? taskKeyFromParams(new URLSearchParams(window.location.search))
-        : undefined,
-    nonce: 0,
-  }));
+  const [todayTeamTarget, setTodayTeamTarget] = useState<{ developerAccountId?: string; trackerItemId?: number; managerDeskItemId?: number; taskKey?: string; nonce: number }>(() => {
+    if (pathToView(window.location.pathname) !== 'team') {
+      return { nonce: 0 };
+    }
+    const params = new URLSearchParams(window.location.search);
+    // `?dev=` means the 1:1 panel when `panel=one-on-one`, the developer
+    // drawer otherwise (docs/53 F2).
+    const panel = teamPanelFromParams(params);
+    return {
+      developerAccountId: panel !== 'one-on-one' ? params.get('dev') ?? undefined : undefined,
+      taskKey: taskKeyFromParams(params),
+      nonce: 0,
+    };
+  });
   const [settingsSectionTarget, setSettingsSectionTarget] = useState<{ section?: string; nonce: number }>({ nonce: 0 });
   const [todayDeskTarget, setTodayDeskTarget] = useState<{ itemId?: number; date?: string; taskKey?: string; nonce: number }>(() => ({
     itemId: undefined,
@@ -623,7 +630,14 @@ function AppContent() {
       }));
       preloadView('team');
       setActiveView('team');
-      navigateToView('team', { params: target.taskKey ? { task: target.taskKey } : undefined });
+      navigateToView('team', {
+        // docs/53 F2: developer targets deep-link by person (`?dev=`) — task
+        // context rides in `target.context` and is read by dialogs, not `open`.
+        params:
+          target.type === 'developer'
+            ? (target.developerAccountId ? { dev: target.developerAccountId } : undefined)
+            : (target.taskKey ? { task: target.taskKey } : undefined),
+      });
       return;
     }
 
@@ -740,8 +754,10 @@ function AppContent() {
         setTeamPanel(panel);
         setTeamPanelDev(panel === 'one-on-one' ? teamPanelDevFromParams(params) : undefined);
         const taskKey = taskKeyFromParams(params);
-        if (taskKey) {
-          setTodayTeamTarget((prev) => ({ taskKey, nonce: prev.nonce + 1 }));
+        const devParam = panel === 'one-on-one' ? undefined : params.get('dev') ?? undefined;
+        if (taskKey || devParam) {
+          // docs/53 F2: ?dev= restores the developer drawer on back/forward.
+          setTodayTeamTarget((prev) => ({ developerAccountId: devParam, taskKey, nonce: prev.nonce + 1 }));
         }
       }
       if (nextView === 'desk') {
@@ -828,14 +844,17 @@ function AppContent() {
     if (activeView !== 'team' || !teamBoardQuery) {
       return;
     }
-    // Keep the deep-linked task param in sync so task drawers stay shareable.
-    const taskKey = taskKeyFromParams(new URLSearchParams(window.location.search));
+    // Keep the deep-linked task + developer params in sync so the drawers
+    // stay shareable (docs/53 F2: `?dev=` may also point at the dev drawer).
+    const currentParams = new URLSearchParams(window.location.search);
+    const taskKey = taskKeyFromParams(currentParams);
+    const drawerDev = currentParams.get('dev') ?? undefined;
     const target = `${window.location.pathname}${buildSearchFromParams({
       ...teamBoardQueryToParams(teamBoardQuery),
       task: taskKey,
       mode: teamMode,
       panel: teamPanel,
-      dev: teamPanel === 'one-on-one' ? teamPanelDev : undefined,
+      dev: teamPanel === 'one-on-one' ? teamPanelDev : drawerDev,
     })}`;
     if (sameLocation(target)) {
       return;

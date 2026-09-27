@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Alert, ManagerActionItem } from '@/types';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
+import { createTestQueryClient } from '@/test/wrapper';
 
 const mockRunAction = vi.fn();
 const mockDismiss = vi.fn();
@@ -12,18 +14,24 @@ let mockActionsData:
   | undefined;
 let mockAlerts: Alert[] = [];
 
+const useManagerActionsSpy = vi.fn();
+
 vi.mock('@/hooks/useManagerActions', () => ({
-  useManagerActions: () => ({
-    data: mockActionsData,
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-  }),
+  useManagerActions: (options: { enabled?: boolean }) => {
+    useManagerActionsSpy(options);
+    return {
+      data: mockActionsData,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+  },
 }));
 
 vi.mock('@/hooks/useTodayActions', () => ({
   useTodayActions: () => ({
     runAction: mockRunAction,
+    runActionAsync: vi.fn(async () => undefined),
     isPending: false,
     pendingTarget: undefined,
     pendingKind: undefined,
@@ -81,6 +89,19 @@ function openInbox() {
   fireEvent.click(screen.getByRole('button', { name: 'Manager actions' }));
 }
 
+function renderInbox(props: { onOpenTarget?: (target: import('@/types').ManagerActionTarget) => void; onViewChange?: (view: import('@/App').AppView) => void; deriveFromToday?: boolean } = {}) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ManagerActionInbox
+        onOpenTarget={props.onOpenTarget ?? vi.fn()}
+        onViewChange={props.onViewChange ?? vi.fn()}
+        deriveFromToday={props.deriveFromToday}
+      />
+    </QueryClientProvider>,
+  );
+}
+
 describe('ManagerActionInbox', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,7 +110,7 @@ describe('ManagerActionInbox', () => {
   });
 
   it('shows the badge with only the urgent action count when there are no signals', () => {
-    render(<ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} />);
+    renderInbox();
 
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manager actions' })).toHaveAttribute('title', '1 need attention');
@@ -110,7 +131,7 @@ describe('ManagerActionInbox', () => {
       }),
     ];
 
-    render(<ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} />);
+    renderInbox();
 
     // 1 urgent action + 2 non-duplicated signals (AM-1 already appears as an action)
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -127,7 +148,7 @@ describe('ManagerActionInbox', () => {
     const onOpenTarget = vi.fn();
     mockAlerts = [makeAlert()];
 
-    render(<ManagerActionInbox onOpenTarget={onOpenTarget} onViewChange={vi.fn()} />);
+    renderInbox({ onOpenTarget });
     openInbox();
     fireEvent.click(screen.getByText('Issue AM-2 is blocked.'));
 
@@ -153,7 +174,7 @@ describe('ManagerActionInbox', () => {
       }),
     ];
 
-    render(<ManagerActionInbox onOpenTarget={onOpenTarget} onViewChange={vi.fn()} />);
+    renderInbox({ onOpenTarget });
     openInbox();
     fireEvent.click(screen.getByText('Priya has no current or planned work today.'));
 
@@ -167,7 +188,7 @@ describe('ManagerActionInbox', () => {
   it('dismisses a single signal', () => {
     mockAlerts = [makeAlert()];
 
-    render(<ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} />);
+    renderInbox();
     openInbox();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Blocked signal' }));
 
@@ -181,7 +202,7 @@ describe('ManagerActionInbox', () => {
       makeAlert({ id: 'stale:AM-3', type: 'stale', severity: 'medium', issueKey: 'AM-3', message: 'Issue AM-3 is stale.' }),
     ];
 
-    render(<ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} />);
+    renderInbox();
     openInbox();
     fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
 
@@ -196,10 +217,46 @@ describe('ManagerActionInbox', () => {
     mockActionsData = { actions: [], urgentCount: 0, totalCount: 0 };
     mockAlerts = [makeAlert()];
 
-    render(<ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} />);
+    renderInbox();
     openInbox();
 
     expect(screen.queryByText('No manager actions right now.')).not.toBeInTheDocument();
     expect(screen.getByText('Issue AM-2 is blocked.')).toBeInTheDocument();
+  });
+
+  it('derives the inbox from the shared today cache on / and disables the manager-actions poll (docs/53 P2)', async () => {
+    const { getLocalIsoDate } = await import('@/lib/utils');
+    const todayData = {
+      date: getLocalIsoDate(),
+      generatedAt: '2026-03-08T08:30:00.000Z',
+      rhythm: { stage: 'morning_plan', label: 'Morning plan', detail: '' },
+      summary: [],
+      currentPriority: null,
+      actionItems: [makeAction(), makeAction({ id: 'action-2', title: 'Second action', severity: 'info', group: 'next' })],
+      teamPulse: [],
+      promises: [],
+      standupPrompts: [],
+      meetingPrompts: [],
+      isPartial: false,
+      sourceStatus: { issues: 'ready', team: 'ready', desk: 'ready' },
+    };
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(['today', getLocalIsoDate(), 'anonymous'], todayData);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ManagerActionInbox onOpenTarget={vi.fn()} onViewChange={vi.fn()} deriveFromToday />
+      </QueryClientProvider>,
+    );
+
+    // Badge reads the cached snapshot (1 urgent of 2), not the hook payload.
+    expect(screen.getByText('1')).toBeInTheDocument();
+    openInbox();
+    expect(screen.getByText('AM-1 is overdue')).toBeInTheDocument();
+    expect(screen.getByText('Second action')).toBeInTheDocument();
+    expect(useManagerActionsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+    );
   });
 });

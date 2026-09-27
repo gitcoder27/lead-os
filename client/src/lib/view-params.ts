@@ -151,6 +151,25 @@ export function teamPanelDevFromParams(params: URLSearchParams): string | undefi
   return firstParam(params, 'dev');
 }
 
+/**
+ * docs/53 F2: writes/removes the `?dev=` param on the current URL without
+ * adding history. Used to mirror the open developer drawer so the link is
+ * restorable on reload/back. Skipped while the 1:1 panel owns `dev`.
+ */
+export function writeDevParam(developerAccountId: string | undefined) {
+  const params = new URLSearchParams(window.location.search);
+  const current = params.get('dev');
+  if (developerAccountId && current !== developerAccountId) {
+    params.set('dev', developerAccountId);
+  } else if (!developerAccountId && current !== null) {
+    params.delete('dev');
+  } else {
+    return;
+  }
+  const search = params.toString();
+  window.history.replaceState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
+}
+
 export function deskDateFromParams(params: URLSearchParams): string | undefined {
   return dateParam(params, 'date');
 }

@@ -13,7 +13,7 @@ import type {
   ManagerActionTarget,
   ManagerDeskItem,
   SyncStatus,
-  TeamTrackerBoardResponse,
+  TeamTrackerAttentionSnapshot,
   TodayActionCommand,
   TodayActionGroup,
   TodayActionItem,
@@ -37,6 +37,7 @@ import type {
 } from "shared/types";
 import { HttpError } from "../middleware/errorHandler";
 import { IssueService, type TodayIssue } from "./issue.service";
+import { isStaleIssue } from "./issue-rules";
 import { ManagerDeskService } from "./manager-desk.service";
 import { TeamTrackerService } from "./team-tracker.service";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -82,7 +83,7 @@ type TodayServiceOptions = {
   oneOnOneService?: OneOnOneService;
 };
 
-const defaultTodayCacheTtlMs = 10_000;
+const defaultTodayCacheTtlMs = 25_000;
 
 const openDeskStatuses = new Set<ManagerDeskItem["status"]>([
   "inbox",
@@ -213,7 +214,7 @@ export class TodayService {
     const buildStartedAt = performance.now();
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
-      measureSource(() => this.teamTrackerService.getBoard(date, { managerAccountId, workspaceId })),
+      measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId })),
       measureSource(() => this.managerDeskService.getTodayItems(managerAccountId, date, workspaceId)),
       measureSource(() => this.getSyncStatus(workspaceId)),
       // §8.1: the Jira drift signal only exists once Phase 3 is enabled — the
@@ -259,7 +260,7 @@ export class TodayService {
 
     const issueSnapshot = issueResult.status === "fulfilled"
       ? issueResult.value
-      : { issues: [], activeDefects: 0, dueToday: 0 };
+      : { issues: [], activeDefects: 0, dueToday: 0, staleThresholdHours: 24 };
     const teamBoard = teamResult.status === "fulfilled" ? teamResult.value : emptyTeamBoard(date);
     const deskItems = deskResult.status === "fulfilled" ? deskResult.value : [];
     const syncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
@@ -267,11 +268,11 @@ export class TodayService {
     const oneOnOneSignals = oneOnOneResult.status === "fulfilled" ? oneOnOneResult.value : [];
     const issues = issueSnapshot.issues;
 
-    const followUps = getDueFollowUps(deskItems, date);
+    const followUps = getDueFollowUps(deskItems);
     const meetings = getMeetingPrompts(deskItems, date);
     const actionItems = rankActionItems([
       ...buildDeveloperActions(teamBoard, date),
-      ...buildIssueActions(issues, date),
+      ...buildIssueActions(issues, date, issueSnapshot.staleThresholdHours),
       ...buildFollowUpActions(followUps, date),
       ...buildMeetingActions(meetings),
       ...buildDeskCarryForwardActions(deskItems, date),
@@ -448,7 +449,7 @@ export class TodayService {
         const title = requireTrimmedText(request.title, "title");
         const result = await this.managerDeskService.createItem(
           managerAccountId,
-          { ...buildFollowUpCreateParams(date, actionTarget, title), source: "today", actor: { type: "manager", accountId: managerAccountId } },
+          { ...buildFollowUpCreateParams(date, actionTarget, title, request.preset), source: "today", actor: { type: "manager", accountId: managerAccountId } },
           workspaceId,
         );
         return commandResponse(command.kind, actionTarget, result);
@@ -547,7 +548,7 @@ function buildSummary(params: {
     : []);
 }
 
-function emptyTeamBoard(date: string): TeamTrackerBoardResponse {
+function emptyTeamBoard(date: string): TeamTrackerAttentionSnapshot {
   const summary = {
     total: 0,
     blocked: 0,
@@ -563,11 +564,7 @@ function emptyTeamBoard(date: string): TeamTrackerBoardResponse {
     date,
     viewMode: "live",
     developers: [],
-    inactiveDevelopers: [],
     summary,
-    visibleSummary: summary,
-    groups: [],
-    query: { q: "", summaryFilter: "all", sortBy: "attention", groupBy: "none" },
     attentionQueue: [],
   };
 }
@@ -583,7 +580,7 @@ function metric(
   return { id, label, value, detail, severity, target: actionTarget };
 }
 
-function buildDeveloperActions(board: TeamTrackerBoardResponse, date: string): TodayActionItem[] {
+function buildDeveloperActions(board: TeamTrackerAttentionSnapshot, date: string): TodayActionItem[] {
   const dayByDeveloper = new Map(board.developers.map((day) => [day.developer.accountId, day]));
 
   return board.attentionQueue.map((item) => {
@@ -630,11 +627,13 @@ function getDeveloperAttentionPrimary(
 } {
   const currentTarget = target("developer", "team", {
     developerAccountId: item.developer.accountId,
-    trackerItemId: item.currentItem?.id,
-    taskKey: item.currentItem?.taskKey ?? undefined,
-    issueKey: item.currentItem?.jiraKey,
-    relatedIssueKeys: item.currentItem?.relatedIssueKeys,
     date,
+    context: {
+      trackerItemId: item.currentItem?.id,
+      taskKey: item.currentItem?.taskKey ?? undefined,
+      issueKey: item.currentItem?.jiraKey,
+      relatedIssueKeys: item.currentItem?.relatedIssueKeys,
+    },
   });
   const setCurrentCandidate = !item.hasCurrentItem ? item.setCurrentCandidates[0] : undefined;
 
@@ -691,11 +690,13 @@ function getDeveloperPulsePrimary(
 } {
   const openTarget = target("developer", "team", {
     developerAccountId: day.developer.accountId,
-    trackerItemId: day.currentItem?.id,
-    taskKey: day.currentItem?.taskKey ?? undefined,
-    issueKey: day.currentItem?.jiraKey,
-    relatedIssueKeys: day.currentItem?.relatedIssueKeys,
     date,
+    context: {
+      trackerItemId: day.currentItem?.id,
+      taskKey: day.currentItem?.taskKey ?? undefined,
+      issueKey: day.currentItem?.jiraKey,
+      relatedIssueKeys: day.currentItem?.relatedIssueKeys,
+    },
   });
   const setCurrentCandidate = attentionItem?.setCurrentCandidates[0] ?? (!day.currentItem ? day.plannedItems[0] : undefined);
 
@@ -739,41 +740,117 @@ function getDeveloperPulsePrimary(
   };
 }
 
-function buildIssueActions(issues: TodayIssue[], date: string): TodayActionItem[] {
-  return issues
-    .filter((issue) => issue.statusCategory.toLowerCase() !== "done")
-    .filter((issue) => isOverdue(issueDueDate(issue), date) || isDueToday(issueDueDate(issue), date) || !issue.assigneeId || isHighPriority(issue))
-    .map((issue) => {
-      const dueDate = issueDueDate(issue);
-      const overdue = isOverdue(dueDate, date);
-      const dueToday = isDueToday(dueDate, date);
-      const unassigned = !issue.assigneeId;
-      const severity: TodayActionSeverity = overdue ? "critical" : dueToday ? "warning" : unassigned ? "info" : "warning";
-      const itemType: TodayActionItemType = overdue ? "overdue_issue" : dueToday ? "due_issue" : unassigned ? "unassigned_issue" : "manual_work";
-      const filter: FilterType = overdue ? "overdue" : dueToday ? "dueToday" : unassigned ? "unassigned" : "highPriority";
-      const actionTarget = target("issue", "work", { issueKey: issue.jiraKey, filter, date });
-      const signals = [
-        overdue ? "Overdue" : undefined,
-        dueToday ? "Due today" : undefined,
-        unassigned ? "Unassigned" : undefined,
-        isHighPriority(issue) ? "High priority" : undefined,
-      ].filter(Boolean).join(" / ");
+const MAX_PRIORITY_ISSUE_ROWS = 3;
 
-      return action({
+/**
+ * docs/53 F12: high-priority issues only surface when they still need a
+ * manager decision — unassigned (handled by the unassigned bucket), not
+ * started, or stale. Beyond a few rows the rest fold into one aggregate row
+ * that deep-links to the filtered Work view.
+ */
+function buildIssueActions(issues: TodayIssue[], date: string, staleThresholdHours: number): TodayActionItem[] {
+  const now = new Date();
+  const rows: TodayActionItem[] = [];
+  const priorityIssues: TodayIssue[] = [];
+
+  for (const issue of issues) {
+    if (issue.statusCategory.toLowerCase() === "done") {
+      continue;
+    }
+
+    const dueDate = issueDueDate(issue);
+    const overdue = isOverdue(dueDate, date);
+    const dueToday = isDueToday(dueDate, date);
+    const unassigned = !issue.assigneeId;
+    const highPriority = isHighPriority(issue);
+
+    if (!(overdue || dueToday || unassigned || highPriority)) {
+      continue;
+    }
+
+    if (!overdue && !dueToday && !unassigned) {
+      // High-priority only counts if it is also not started or has gone stale.
+      const notStarted = issue.statusCategory === "new";
+      const stale = isStaleIssue(issue, staleThresholdHours, now);
+      if (!notStarted && !stale) {
+        continue;
+      }
+      priorityIssues.push(issue);
+      continue;
+    }
+
+    const severity: TodayActionSeverity = overdue ? "critical" : dueToday ? "warning" : "info";
+    const itemType: TodayActionItemType = overdue ? "overdue_issue" : dueToday ? "due_issue" : "unassigned_issue";
+    const filter: FilterType = overdue ? "overdue" : dueToday ? "dueToday" : "unassigned";
+    const actionTarget = target("issue", "work", { issueKey: issue.jiraKey, filter, date });
+    const signals = [
+      overdue ? "Overdue" : undefined,
+      dueToday ? "Due today" : undefined,
+      unassigned ? "Unassigned" : undefined,
+      highPriority ? "High priority" : undefined,
+    ].filter(Boolean).join(" / ");
+
+    rows.push(
+      action({
         id: `today-issue-${issue.jiraKey}`,
         type: itemType,
         title: `${issue.jiraKey} ${issue.summary}`,
         context: issue.assigneeName ? `${issue.assigneeName} / ${issue.statusName}` : issue.statusName,
         signal: signals,
         severity,
-        priority: overdue && !unassigned ? 92 : overdue ? 90 : dueToday ? 72 : unassigned ? 70 : 66,
+        priority: overdue && !unassigned ? 92 : overdue ? 90 : dueToday ? 72 : 70,
         group: overdue || dueToday ? "now" : "next",
         target: actionTarget,
         primaryKind: unassigned ? "assign_owner" : "open",
         primaryLabel: unassigned ? "Assign owner" : "Open issue",
         secondaryKinds: ["capture_follow_up"],
-      });
-    });
+      }),
+    );
+  }
+
+  for (const issue of priorityIssues.slice(0, MAX_PRIORITY_ISSUE_ROWS)) {
+    const stale = isStaleIssue(issue, staleThresholdHours, now);
+    const notStarted = issue.statusCategory === "new";
+    const actionTarget = target("issue", "work", { issueKey: issue.jiraKey, filter: "highPriority", date });
+    rows.push(
+      action({
+        id: `today-issue-${issue.jiraKey}`,
+        type: "high_priority_issue",
+        title: `${issue.jiraKey} ${issue.summary}`,
+        context: issue.assigneeName ? `${issue.assigneeName} / ${issue.statusName}` : issue.statusName,
+        signal: ["High priority", notStarted ? "Not started" : undefined, stale ? "Stale" : undefined].filter(Boolean).join(" / "),
+        severity: "warning",
+        priority: 66,
+        group: "next",
+        target: actionTarget,
+        primaryKind: "open",
+        primaryLabel: "Open issue",
+        secondaryKinds: ["capture_follow_up"],
+      }),
+    );
+  }
+
+  if (priorityIssues.length > MAX_PRIORITY_ISSUE_ROWS) {
+    const aggregateTarget = target("view", "work", { filter: "highPriority", date });
+    rows.push(
+      action({
+        id: "today-issue-priority-backlog",
+        type: "high_priority_issue",
+        title: `${priorityIssues.length} high-priority defects`,
+        context: "Open the high-priority Work filter to triage the rest",
+        signal: "High priority",
+        severity: "info",
+        priority: 64,
+        group: "next",
+        target: aggregateTarget,
+        primaryKind: "open",
+        primaryLabel: "Open Work",
+        secondaryKinds: [],
+      }),
+    );
+  }
+
+  return rows;
 }
 
 function buildFollowUpActions(items: ManagerDeskItem[], date: string): TodayActionItem[] {
@@ -932,7 +1009,7 @@ function buildSyncActions(syncStatus?: SyncStatus): TodayActionItem[] {
   ];
 }
 
-function buildTeamPulse(board: TeamTrackerBoardResponse, date: string): TodayTeamPulseItem[] {
+function buildTeamPulse(board: TeamTrackerAttentionSnapshot, date: string): TodayTeamPulseItem[] {
   const attentionByDeveloper = new Map(board.attentionQueue.map((item) => [item.developer.accountId, item]));
 
   return board.developers
@@ -946,11 +1023,13 @@ function buildTeamPulse(board: TeamTrackerBoardResponse, date: string): TodayTea
       const attentionItem = attentionByDeveloper.get(day.developer.accountId);
       const pulseTarget = target("developer", "team", {
         developerAccountId: day.developer.accountId,
-        trackerItemId: day.currentItem?.id,
-    taskKey: day.currentItem?.taskKey ?? undefined,
-        issueKey: day.currentItem?.jiraKey,
-        relatedIssueKeys: day.currentItem?.relatedIssueKeys,
         date,
+        context: {
+          trackerItemId: day.currentItem?.id,
+          taskKey: day.currentItem?.taskKey ?? undefined,
+          issueKey: day.currentItem?.jiraKey,
+          relatedIssueKeys: day.currentItem?.relatedIssueKeys,
+        },
       });
       const primary = getDeveloperPulsePrimary(day, attentionItem, date);
 
@@ -1010,7 +1089,7 @@ function buildMeetingPrompt(item: ManagerDeskItem): TodayMeetingPrompt {
 }
 
 function buildStandupPrompts(
-  board: TeamTrackerBoardResponse,
+  board: TeamTrackerAttentionSnapshot,
   issues: TodayIssue[],
   followUps: ManagerDeskItem[],
   date: string,
@@ -1067,11 +1146,14 @@ function getMeetingPrompts(items: ManagerDeskItem[], date: string): ManagerDeskI
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 
-function getDueFollowUps(items: ManagerDeskItem[], date: string): ManagerDeskItem[] {
+function getDueFollowUps(items: ManagerDeskItem[]): ManagerDeskItem[] {
+  const nowMs = Date.now();
   return items
     .filter((item) => isOpenDeskItem(item))
     .filter((item) => item.category === "follow_up" || Boolean(item.followUpAt))
-    .filter((item) => !item.followUpAt || !isAfterDay(item.followUpAt, date))
+    // docs/53 F1: follow-ups are due by timestamp, not by day — a same-day
+    // future followUpAt (e.g. a "Later today" snooze) is not due yet.
+    .filter((item) => !item.followUpAt || Date.parse(item.followUpAt) <= nowMs)
     .sort((left, right) => (left.followUpAt ?? left.createdAt).localeCompare(right.followUpAt ?? right.createdAt));
 }
 
@@ -1120,8 +1202,6 @@ function commandLabel(kind: TodayActionCommand["kind"]): string {
   switch (kind) {
     case "add_check_in":
       return "Add check-in";
-    case "ask_check_in":
-      return "Ask check-in";
     case "assign_owner":
       return "Assign owner";
     case "capture_follow_up":
@@ -1378,11 +1458,15 @@ function requireTrimmedText(value: string | undefined, field: string): string {
 }
 
 function buildSnoozeIso(date: string, preset: ManagerActionSnoozePreset): string {
-  const base = new Date(`${date}T09:00:00`);
+  // docs/53 F1: "later today" is relative to now (rounded to the half hour)
+  // rather than a fixed time, so the snooze is meaningful whenever it runs.
   if (preset === "later_today") {
-    base.setHours(17, 0, 0, 0);
-    return base.toISOString();
+    const target = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    target.setTime(Math.round(target.getTime() / 1_800_000) * 1_800_000);
+    return target.toISOString();
   }
+
+  const base = new Date(`${date}T09:00:00`);
   if (preset === "next_week") {
     base.setDate(base.getDate() + 7);
     return base.toISOString();
@@ -1391,7 +1475,7 @@ function buildSnoozeIso(date: string, preset: ManagerActionSnoozePreset): string
   return base.toISOString();
 }
 
-function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarget, title: string) {
+function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarget, title: string, preset?: ManagerActionSnoozePreset) {
   const links: Array<
     | { linkType: "developer"; developerAccountId: string }
     | { linkType: "issue"; issueKey: string }
@@ -1405,6 +1489,7 @@ function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarg
     links.push({ linkType: "issue", issueKey });
   }
 
+  const contextTaskKey = actionTarget.taskKey ?? actionTarget.context?.taskKey;
   return {
     date,
     title,
@@ -1412,13 +1497,21 @@ function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarg
     category: "follow_up" as const,
     status: "planned" as const,
     priority: "medium" as const,
-    contextNote: actionTarget.taskKey ? `Follow-up for ${actionTarget.taskKey}` : undefined,
+    // docs/53 F3: a captured follow-up must never be due immediately — the
+    // default is tomorrow 09:00 local; presets shift it.
+    followUpAt: buildSnoozeIso(date, preset ?? "tomorrow"),
+    contextNote: contextTaskKey ? `Follow-up for ${contextTaskKey}` : undefined,
     links,
   };
 }
 
 function uniqueIssueKeys(actionTarget: ManagerActionTarget): string[] {
-  const issueKeys = [actionTarget.issueKey, ...(actionTarget.relatedIssueKeys ?? [])]
+  const issueKeys = [
+    actionTarget.issueKey,
+    actionTarget.context?.issueKey,
+    ...(actionTarget.relatedIssueKeys ?? []),
+    ...(actionTarget.context?.relatedIssueKeys ?? []),
+  ]
     .map((issueKey) => issueKey?.trim())
     .filter((issueKey): issueKey is string => Boolean(issueKey));
 

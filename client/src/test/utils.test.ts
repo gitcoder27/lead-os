@@ -1,13 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   formatAbsoluteDateTime,
   formatDate,
   getLocalIsoDate,
   isDueToday,
+  isLaterTodayAvailable,
   isOverdue,
   isStale,
   shiftLocalIsoDate,
 } from '@/lib/utils';
+import { snoozePresets } from '@/components/today/TodayActionMenu';
 
 describe('isStale', () => {
   it('returns true for issue updated more than 48 hours ago', () => {
@@ -82,5 +84,32 @@ describe('formatAbsoluteDateTime', () => {
   it('returns dash for undefined or invalid values', () => {
     expect(formatAbsoluteDateTime(undefined)).toBe('—');
     expect(formatAbsoluteDateTime('not-a-date')).toBe('—');
+  });
+});
+
+describe('docs/53 F1: snooze preset availability', () => {
+  it('offers Later today before 18:00 local', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 2, 8, 9, 30));
+      expect(isLaterTodayAvailable()).toBe(true);
+      expect(snoozePresets().map(([id]) => id)).toEqual(['later_today', 'tomorrow', 'next_week']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hides Later today at 18:00 and later', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 2, 8, 18, 0));
+      expect(isLaterTodayAvailable()).toBe(false);
+      expect(snoozePresets().map(([id]) => id)).toEqual(['tomorrow', 'next_week']);
+
+      vi.setSystemTime(new Date(2026, 2, 8, 22, 15));
+      expect(isLaterTodayAvailable()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,4 +1,5 @@
 import { MoreHorizontal } from 'lucide-react';
+import { isLaterTodayAvailable } from '@/lib/utils';
 import type { TodayActionCommand } from '@/types';
 
 interface TodayActionMenuProps {
@@ -55,15 +56,11 @@ function SnoozeGroup({
       <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
         Snooze
       </p>
-      {[
-        ['later_today', 'Later today'],
-        ['tomorrow', 'Tomorrow'],
-        ['next_week', 'Next week'],
-      ].map(([preset, label]) => (
+      {snoozePresets().map(([preset, label]) => (
         <button
           key={preset}
           type="button"
-          onClick={() => onRunAction(action, preset as 'later_today' | 'tomorrow' | 'next_week')}
+          onClick={() => onRunAction(action, preset)}
           className="block w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--text-secondary)' }}
         >
@@ -72,4 +69,21 @@ function SnoozeGroup({
       ))}
     </div>
   );
+}
+
+type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
+
+/**
+ * docs/53 F1: "Later today" is hidden past ~18:00 — snoozing to now+3h would
+ * silently roll into the evening.
+ */
+export function snoozePresets(): Array<readonly [SnoozePreset, string]> {
+  const presets: Array<readonly [SnoozePreset, string]> = [
+    ['tomorrow', 'Tomorrow'],
+    ['next_week', 'Next week'],
+  ];
+  if (isLaterTodayAvailable()) {
+    presets.unshift(['later_today', 'Later today']);
+  }
+  return presets;
 }

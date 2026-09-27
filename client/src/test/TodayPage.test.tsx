@@ -156,7 +156,8 @@ describe('TodayPage V2', () => {
     const onOpenTodayTarget = vi.fn();
     renderToday(todayResponse(), onOpenTodayTarget);
 
-    fireEvent.click(await screen.findByRole('button', { name: /open am-1/i }));
+    // The Start band and the queue row both expose "Open AM-1 Issue 1" (F10).
+    fireEvent.click((await screen.findAllByRole('button', { name: /open am-1/i }))[0]!);
 
     await waitFor(() => {
       expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-1', view: 'work' }));
@@ -562,5 +563,88 @@ describe('TodayPage V2', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /^Working$/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('Start band body opens the target; only its action button runs the command (docs/53 F10)', async () => {
+    const priorityTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
+    const priority = actionItem(99, {
+      id: 'priority-1',
+      type: 'follow_up_due',
+      title: 'Priority pick',
+      target: priorityTarget,
+      primaryAction: command('mark_done', 'Mark done now', priorityTarget),
+      secondaryActions: [],
+    });
+    const fetchMock = mockFetch(todayResponse({ currentPriority: priority }));
+    const onOpenTodayTarget = vi.fn();
+    renderToday(todayResponse({ currentPriority: priority }), onOpenTodayTarget);
+
+    // Body click navigates — no mutation, no confirm dialog.
+    fireEvent.click(await screen.findByRole('button', { name: /open priority pick/i }));
+    expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ managerDeskItemId: 44 }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input, init]) =>
+        String(input) === '/api/manager-actions/commands' && (init as RequestInit | undefined)?.method === 'POST',
+      ),
+    ).toBe(false);
+
+    // The right-side action button is the write path.
+    fireEvent.click(screen.getByRole('button', { name: /^mark done now$/i }));
+    expect(await screen.findByRole('dialog', { name: /mark done\?/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Mark done$/i }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"kind":"mark_done"'),
+      }));
+    });
+  });
+
+  it('keeps the follow-up dialog open with an inline error when the command fails (docs/53 F9)', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/today')) {
+        return new Response(JSON.stringify(todayResponse()), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url === '/api/manager-actions/commands') {
+        return new Response(JSON.stringify({ error: 'Desk unavailable' }), { status: 500, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderToday();
+
+    fireEvent.click((await screen.findAllByLabelText('More actions'))[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /^follow up$/i })[0]!);
+    expect(await screen.findByRole('dialog', { name: /capture follow-up/i })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Follow-up title'), { target: { value: 'Check API rollout' } });
+    fireEvent.click(screen.getByRole('button', { name: /save follow-up/i }));
+
+    expect(await screen.findByText('Desk unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /capture follow-up/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Follow-up title')).toHaveValue('Check API rollout');
+  });
+
+  it('keeps the check-in dialog open with an inline error when the command fails (docs/53 F9)', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/today')) {
+        return new Response(JSON.stringify(todayResponse()), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url === '/api/manager-actions/commands') {
+        return new Response(JSON.stringify({ error: 'Tracker write failed' }), { status: 500, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderToday();
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Check-in$/i }));
+    fireEvent.change(screen.getByLabelText('Check-in note'), { target: { value: 'Still working?' } });
+    fireEvent.click(screen.getByRole('button', { name: /save check-in/i }));
+
+    expect(await screen.findByText('Tracker write failed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Check-in note')).toHaveValue('Still working?');
   });
 });

@@ -65,17 +65,29 @@ vi.mock('@/components/layout/Header', () => ({
   ),
 }));
 
+const todayPagePropsSpy = vi.fn();
+const teamTrackerPropsSpy = vi.fn();
+
 vi.mock('@/components/today/TodayPage', () => ({
-  TodayPage: ({ onViewChange }: { onViewChange: (view: 'work') => void }) => (
-    <div>
-      <div>Today loaded</div>
-      <button onClick={() => onViewChange('work')}>Open Work from Today</button>
-    </div>
-  ),
+  TodayPage: (props: {
+    onViewChange: (view: 'work') => void;
+    onOpenTodayTarget?: (target: import('@/types').TodayActionTarget) => void;
+  }) => {
+    todayPagePropsSpy(props);
+    return (
+      <div>
+        <div>Today loaded</div>
+        <button onClick={() => props.onViewChange('work')}>Open Work from Today</button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/components/team-tracker/TeamTrackerPage', () => ({
-  TeamTrackerPage: () => <div>Team loaded</div>,
+  TeamTrackerPage: (props: { initialDeveloperAccountId?: string; initialTaskKey?: string }) => {
+    teamTrackerPropsSpy(props);
+    return <div>Team loaded</div>;
+  },
 }));
 
 vi.mock('@/components/setup/SetupWizard', () => ({
@@ -447,6 +459,63 @@ describe('App', () => {
       expect(window.location.search).toContain('task=T-5');
     });
     expect(await screen.findByText('Team loaded')).toBeInTheDocument();
+  });
+
+  it('opens developer targets with ?dev= (not ?task=) while task context stays off the URL (docs/53 F2)', async () => {
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+    expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+
+    const onOpenTodayTarget = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as
+      | ((target: import('@/types').TodayActionTarget) => void)
+      | undefined;
+    expect(onOpenTodayTarget).toBeDefined();
+
+    act(() => {
+      onOpenTodayTarget!({
+        type: 'developer',
+        view: 'team',
+        developerAccountId: 'dev-1',
+        context: { taskKey: 'T-5', trackerItemId: 10, issueKey: 'AM-1' },
+      });
+    });
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/team');
+      expect(window.location.search).toContain('dev=dev-1');
+    });
+    expect(window.location.search).not.toContain('task=');
+    expect(await screen.findByText('Team loaded')).toBeInTheDocument();
+    expect(teamTrackerPropsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDeveloperAccountId: 'dev-1', initialTaskKey: undefined }),
+    );
+  });
+
+  it('restores the developer drawer target from /team?dev= on cold load (docs/53 F2)', async () => {
+    window.history.pushState(null, '', '/team?dev=dev-7');
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Team loaded')).toBeInTheDocument();
+    expect(teamTrackerPropsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDeveloperAccountId: 'dev-7' }),
+    );
   });
 
   it('redirects /t/:key to the desk with date and task params for desk-only tasks', async () => {

@@ -12,6 +12,9 @@ import {
   developers,
   managerDeskDays,
   managerDeskItems,
+  oneOnOneSeries,
+  oneOnOneSessions,
+  standupSessions,
 } from "../src/db/schema";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -56,7 +59,7 @@ describe("DailyNotesService.getDay/save", () => {
   it("returns null for a blank day without inserting a row", async () => {
     const result = await service.getDay(MANAGER, DATE, WS);
 
-    expect(result).toEqual({ note: null, followUps: [] });
+    expect(result).toEqual({ note: null, followUps: [], refs: [] });
     expect(await noteRows()).toHaveLength(0);
   });
 
@@ -94,19 +97,51 @@ describe("DailyNotesService.getDay/save", () => {
     expect(await db.select().from(managerDeskItems)).toHaveLength(0);
   });
 
-  it("updates and clears an existing note with the expected revision", async () => {
+  it("updates and clears an existing note — clearing deletes the row (F13)", async () => {
     await saveNote("v1");
     const updated = await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
     expect(updated.note?.body).toBe("v2");
     expect(updated.note?.revision).toBe(2);
 
     const cleared = await service.save(MANAGER, DATE, { body: "", revision: 2 }, WS);
-    expect(cleared.note?.body).toBe("");
-    expect(cleared.note?.revision).toBe(3);
+    expect(cleared.note).toBeNull();
+    expect(cleared.refs).toEqual([]);
+    expect(await noteRows()).toHaveLength(0);
 
     const list = await service.list(MANAGER, {}, WS);
-    expect(list.notes.map((note) => note.date)).toEqual([DATE]);
-    expect(list.notes[0]?.title).toBe("Daily note");
+    expect(list.notes).toEqual([]);
+
+    const day = await service.getDay(MANAGER, DATE, WS);
+    expect(day.note).toBeNull();
+  });
+
+  it("deleting a cleared note cleans up its follow-up and ref rows", async () => {
+    await enableTaskKeys();
+    await saveNote("cleanup source", { date: "2026-03-01" });
+    await service.createFollowUp(MANAGER, "2026-03-01", {
+      date: DATE,
+      title: "cleanup target",
+      followUpAt: "2026-03-10T09:00:00.000Z",
+      requestId: randomUUID(),
+    }, WS);
+    const before = await service.getDay(MANAGER, "2026-03-01", WS);
+    expect(before.followUps).toHaveLength(1);
+
+    const cleared = await service.save(MANAGER, "2026-03-01", { body: "", revision: before.note!.revision }, WS);
+    expect(cleared.note).toBeNull();
+    expect(await db.select().from(dailyNoteFollowUps)).toHaveLength(0);
+    expect(await db.select().from(dailyNoteTaskRefs)).toHaveLength(0);
+    expect(await noteRows()).toHaveLength(0);
+  });
+
+  it("clears with a stale revision still conflict rather than deleting", async () => {
+    await saveNote("v1");
+    await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+
+    await expect(
+      service.save(MANAGER, DATE, { body: "", revision: 1 }, WS)
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await service.getDay(MANAGER, DATE, WS)).note?.body).toBe("v2");
   });
 
   it("rejects a stale update without overwriting newer content", async () => {
@@ -260,12 +295,46 @@ describe("DailyNotesService.list", () => {
     expect(result.notes.map((note) => note.date)).toEqual(["2026-03-01"]);
   });
 
-  it("ranks FTS results by relevance ahead of recency", async () => {
+  it("orders FTS results by date so the cursor paginates correctly (F11)", async () => {
     await saveNote("vendor pricing vendor pricing vendor pricing deep dive", { date: "2026-03-01" });
     await saveNote("vendor mentioned once", { date: "2026-03-05" });
 
     const result = await service.list(MANAGER, { q: "vendor" }, WS);
-    expect(result.notes[0]?.date).toBe("2026-03-01");
+    expect(result.notes.map((note) => note.date)).toEqual(["2026-03-05", "2026-03-01"]);
+  });
+
+  it("paginates search results over more than one page without duplicates or gaps", async () => {
+    // 35 notes, all containing the search term — exercises the >1-page path (F11)
+    for (let day = 1; day <= 35; day += 1) {
+      const date = `2026-02-${String(day).padStart(2, "0")}`;
+      await saveNote(`needle mention ${day}`, { date });
+    }
+    await saveNote("no match", { date: "2026-03-01" });
+
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const page = await service.list(MANAGER, { q: "needle", before: cursor ?? undefined }, WS);
+      pages += 1;
+      for (const note of page.notes) {
+        expect(seen.has(note.date)).toBe(false);
+        seen.add(note.date);
+      }
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+
+    expect(seen.size).toBe(35);
+    expect(pages).toBe(2);
+  });
+
+  it("returns FTS snippets with match markers on search hits", async () => {
+    await saveNote("deploy window moved to Friday after the vendor review", { date: "2026-03-01" });
+
+    const result = await service.list(MANAGER, { q: "vendor" }, WS);
+    expect(result.notes).toHaveLength(1);
+    expect(result.notes[0]?.snippet).toBeDefined();
+    expect(result.notes[0]?.snippet).toContain("⟦vendor⟧");
   });
 
   it("keeps the FTS index in sync across edits", async () => {
@@ -601,6 +670,150 @@ describe("DailyNotesService task actions", () => {
     await expect(
       service.createTask(MANAGER, DATE, { title: "x", requestId: randomUUID() }, WS)
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("DailyNotesService refs[] + day context", () => {
+  beforeEach(async () => {
+    await db.insert(developers).values({
+      accountId: "dev-1",
+      displayName: "Dev One",
+      isActive: 1,
+    });
+  });
+
+  it("returns refs with relation metadata alongside the legacy followUps field", async () => {
+    await enableTaskKeys();
+    const item = await tracker.addItem("dev-1", DATE, { title: "Queue review" });
+    await saveNote(`Check on ${item.taskKey} this afternoon`);
+
+    const followUp = await service.createFollowUp(MANAGER, DATE, {
+      date: DATE,
+      title: "Follow up on the note",
+      followUpAt: "2026-03-10T12:00:00.000Z",
+      requestId: randomUUID(),
+    }, WS);
+    await service.addTaskUpdate(MANAGER, DATE, {
+      taskKey: item.taskKey!,
+      text: "nudge",
+      requestId: randomUUID(),
+    }, WS);
+
+    const day = await service.getDay(MANAGER, DATE, WS);
+    expect(day.followUps).toHaveLength(1);
+    expect(day.refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          taskKey: item.taskKey,
+          relation: "mentioned",
+          title: "Queue review",
+          status: "planned",
+          owner: "Dev One",
+        }),
+        expect.objectContaining({ taskKey: item.taskKey, relation: "update_from" }),
+        expect.objectContaining({
+          itemId: followUp.itemId,
+          relation: "created_from",
+          title: "Follow up on the note",
+          status: "planned",
+        }),
+      ])
+    );
+  });
+
+  it("does not double-register a mention already present before the edit", async () => {
+    await enableTaskKeys();
+    const item = await tracker.addItem("dev-1", DATE, { title: "Queue review" });
+    await saveNote(`watching ${item.taskKey}`);
+    const saved = await service.getDay(MANAGER, DATE, WS);
+    await service.save(MANAGER, DATE, { body: `watching ${item.taskKey} plus more`, revision: saved.note!.revision }, WS);
+
+    const mentioned = (await db.select().from(dailyNoteTaskRefs)).filter((row) => row.relation === "mentioned");
+    expect(mentioned).toHaveLength(1);
+  });
+
+  it("getDayContext assembles standup, carried lines, due follow-ups, and 1:1s", async () => {
+    await db.insert(standupSessions).values({
+      workspaceId: WS,
+      managerAccountId: MANAGER,
+      date: DATE,
+      startedAt: "2026-03-08T09:00:00.000Z",
+      endedAt: "2026-03-08T09:20:00.000Z",
+      reviewedJson: JSON.stringify(["a", "b", "c"]),
+      flaggedJson: JSON.stringify(["d"]),
+      logJson: "[]",
+      summary: "",
+      createdAt: "2026-03-08T09:20:00.000Z",
+    });
+    await saveNote("scratch\n↩ carried task\n↩ carried again", { date: DATE });
+
+    // one due + one future follow-up
+    await service.createFollowUp(MANAGER, DATE, {
+      date: DATE,
+      title: "due follow-up",
+      followUpAt: "2026-03-07T12:00:00.000Z",
+      requestId: randomUUID(),
+    }, WS);
+    await service.createFollowUp(MANAGER, DATE, {
+      date: DATE,
+      title: "future follow-up",
+      followUpAt: "2026-03-20T12:00:00.000Z",
+      requestId: randomUUID(),
+    }, WS);
+
+    // 1:1 flag + one session on the date + one elsewhere
+    await db.insert(configTable).values({ workspaceId: WS, key: "one_on_one_enabled", value: "true" });
+    const series = (
+      await db
+        .insert(oneOnOneSeries)
+        .values({
+          workspaceId: WS,
+          developerAccountId: "dev-1",
+          cadence: "weekly",
+          preferredWeekday: 2,
+          active: 1,
+          createdAt: "2026-03-01T00:00:00.000Z",
+        })
+        .returning()
+    )[0]!;
+    await db.insert(oneOnOneSessions).values({
+      workspaceId: WS,
+      seriesId: series.id,
+      scheduledFor: DATE,
+      status: "scheduled",
+      notes: "",
+      createdAt: "2026-03-01T00:00:00.000Z",
+    });
+    await db.insert(oneOnOneSessions).values({
+      workspaceId: WS,
+      seriesId: series.id,
+      scheduledFor: "2026-03-15",
+      status: "scheduled",
+      notes: "",
+      createdAt: "2026-03-01T00:00:00.000Z",
+    });
+    // cancelled session should not count
+    await db.insert(oneOnOneSessions).values({
+      workspaceId: WS,
+      seriesId: series.id,
+      scheduledFor: DATE,
+      status: "skipped",
+      notes: "",
+      createdAt: "2026-03-01T00:00:00.000Z",
+    });
+
+    const ctx = await service.getDayContext(MANAGER, DATE, WS);
+    expect(ctx).toEqual({
+      standup: { endedAt: "2026-03-08T09:20:00.000Z", reviewed: 3, flagged: 1 },
+      carriedFrom: 2,
+      followUpsDue: 1,
+      oneOnOnes: 1,
+    });
+  });
+
+  it("getDayContext returns empty context for a blank day", async () => {
+    const ctx = await service.getDayContext(MANAGER, DATE, WS);
+    expect(ctx).toEqual({ standup: null, carriedFrom: 0, followUpsDue: 0, oneOnOnes: 0 });
   });
 });
 

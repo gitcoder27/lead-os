@@ -56,7 +56,7 @@ function note(overrides: Partial<DailyNote> = {}): DailyNote {
 }
 
 function dayResponse(value: DailyNote | null): DailyNoteResponse {
-  return { note: value, followUps: [] };
+  return { note: value, followUps: [], refs: [] };
 }
 
 function createQueryClient() {
@@ -92,6 +92,7 @@ async function until(cond: () => boolean) {
 describe('useDailyNoteEditor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    window.localStorage.clear();
     window.sessionStorage.clear();
     scopeRef.current = SCOPE;
     apiMocks.get.mockReset();
@@ -156,6 +157,113 @@ describe('useDailyNoteEditor', () => {
 
     await advance(2000);
     expect(apiMocks.put).not.toHaveBeenCalled();
+  });
+
+  it('merges keep-both against the shared base without duplicating it (F2)', async () => {
+    // Draft base has three shared lines; remote edited line 3, draft edited line 1
+    // — non-adjacent hunks merge cleanly and each shared line appears once.
+    apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'shared one\nshared two\nremote three', revision: 4 })));
+    writeDailyNoteDraft(SCOPE, DATE, {
+      body: 'local one\nshared two\nshared three',
+      baseBody: 'shared one\nshared two\nshared three',
+      revision: 2,
+    });
+
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'conflict');
+
+    act(() => result.current.keepBoth());
+    expect(result.current.body).toBe('local one\nshared two\nremote three');
+    expect(result.current.saveState).toBe('dirty');
+
+    await advance(700);
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, {
+      body: 'local one\nshared two\nremote three',
+      revision: 4,
+    });
+  });
+
+  it('keep-both preserves both sides of a genuinely overlapping edit', async () => {
+    apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'shared\nremote middle', revision: 4 })));
+    writeDailyNoteDraft(SCOPE, DATE, { body: 'shared\nlocal middle', baseBody: 'shared\nbase middle', revision: 2 });
+
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'conflict');
+
+    act(() => result.current.keepBoth());
+    expect(result.current.body).toBe('shared\nremote middle\n\nlocal middle');
+  });
+
+  it('rebases a dirty draft silently when the remote change is a pure append (F3)', async () => {
+    const queryClient = createQueryClient();
+    apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'morning notes', revision: 1 })));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper(queryClient) });
+    await until(() => result.current.saveState === 'idle');
+
+    act(() => result.current.changeBody('morning notes\n\nlocal typing'));
+
+    // Server appends a standup summary while the draft is dirty.
+    act(() => {
+      queryClient.setQueryData(
+        ['daily-notes', SCOPE, 'day', DATE],
+        dayResponse(note({ body: 'morning notes\n\nstandup summary', revision: 2 })),
+      );
+    });
+
+    await until(() => result.current.body === 'morning notes\n\nlocal typing\n\nstandup summary');
+    expect(result.current.saveState).toBe('dirty');
+    expect(result.current.conflict).toBeNull();
+    expect(result.current.mergeNotice).toBe('New saved text was added below.');
+
+    // The rebased draft persists immediately rather than waiting for a keystroke.
+    await advance(1);
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, {
+      body: 'morning notes\n\nlocal typing\n\nstandup summary',
+      revision: 2,
+    });
+  });
+
+  it('rebases cleanly after a 409 when the remote change was a pure append', async () => {
+    apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'base note', revision: 1 })));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'idle');
+
+    apiMocks.put.mockRejectedValueOnce(new ApiRequestError('conflict', 409));
+    apiMocks.get.mockResolvedValueOnce(dayResponse(note({ body: 'base note\n\nremote appended', revision: 2 })));
+
+    act(() => result.current.changeBody('base note\n\nlocal'));
+    await advance(700);
+
+    for (let i = 0; i < 50 && apiMocks.put.mock.calls.length < 2; i += 1) {
+      await advance(1);
+    }
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, {
+      body: 'base note\n\nlocal\n\nremote appended',
+      revision: 2,
+    });
+    expect(result.current.conflict).toBeNull();
+    await until(() => result.current.saveState === 'saved');
+  });
+
+  it('auto-retries a failed save with backoff and recovers', async () => {
+    apiMocks.get.mockResolvedValue(dayResponse(note()));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'idle');
+
+    apiMocks.put.mockRejectedValueOnce(new ApiRequestError('down', 0));
+    act(() => result.current.changeBody('typed while offline-ish'));
+    await advance(700);
+    await until(() => result.current.saveState === 'error');
+    expect(apiMocks.put).toHaveBeenCalledTimes(1);
+
+    // backoff retry fires ~2s later without user action
+    await advance(2000);
+    await until(() => apiMocks.put.mock.calls.length === 2);
+    await until(() => result.current.saveState === 'saved');
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, {
+      body: 'typed while offline-ish',
+      revision: 1,
+    });
   });
 
   it('keeps both versions on conflict resolution', async () => {

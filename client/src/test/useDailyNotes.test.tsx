@@ -49,6 +49,7 @@ const RESPONSE: DailyNoteResponse = {
     updatedAt: '2026-04-28T09:00:00.000Z',
   },
   followUps: [],
+  refs: [],
 };
 
 function createWrapper(client: QueryClient) {

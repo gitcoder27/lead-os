@@ -48,6 +48,7 @@ describe('NoteCaptureForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     appendPending = false;
+    window.localStorage.clear();
     window.sessionStorage.clear();
   });
 

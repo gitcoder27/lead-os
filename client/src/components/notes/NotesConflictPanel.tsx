@@ -14,7 +14,7 @@ export function NotesConflictPanel({ remote, error, onKeepBoth, onUseSavedVersio
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   return (
-    <div className="notes-conflict" role="alert">
+    <div className="notes-conflict" role="status">
       <p className="notes-conflict-title">This note changed elsewhere</p>
       <p className="notes-conflict-detail">
         Your draft is still in the editor. Review the saved version and choose how to continue.

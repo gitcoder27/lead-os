@@ -60,6 +60,7 @@ describe("notes routes auth", () => {
     { method: "GET", url: "/api/notes" },
     { method: "GET", url: "/api/notes/sources?itemIds=1" },
     { method: "GET", url: `/api/notes/${DATE}` },
+    { method: "GET", url: `/api/notes/${DATE}/context` },
     { method: "PUT", url: `/api/notes/${DATE}`, body: { body: "x", revision: 0 } },
     { method: "POST", url: `/api/notes/${DATE}/append`, body: { text: "x", requestId: randomUUID() } },
     {
@@ -103,7 +104,7 @@ describe("notes routes happy path", () => {
       headers: { cookie },
     });
     expect(blank.status).toBe(200);
-    expect(blank.body).toEqual({ note: null, followUps: [] });
+    expect(blank.body).toEqual({ note: null, followUps: [], refs: [] });
 
     const saved = await invoke(app, {
       method: "PUT",
@@ -151,6 +152,59 @@ describe("notes routes happy path", () => {
     expect(sources.body.sources).toEqual([
       { itemId: followUp.body.itemId, noteId: saved.body.note.id, date: DATE },
     ]);
+
+    // refs[] carries the created_from relation for the follow-up (docs/52 F9)
+    const day = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}`,
+      headers: { cookie },
+    });
+    expect(day.body.refs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: followUp.body.itemId,
+          relation: "created_from",
+          title: "Follow up",
+          status: "planned",
+        }),
+      ]),
+    );
+  });
+
+  it("GET /api/notes/:date/context returns the assembled day context", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    await invoke(app, {
+      method: "PUT",
+      url: `/api/notes/${DATE}`,
+      body: { body: "morning notes\n↩ carried over\n↩ carried twice", revision: 0 },
+      headers: { cookie },
+    });
+
+    const res = await invoke(app, {
+      method: "GET",
+      url: `/api/notes/${DATE}/context`,
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      standup: null,
+      carriedFrom: 2,
+      followUpsDue: 0,
+      oneOnOnes: 0,
+    });
+  });
+
+  it("GET /api/notes/:date/context rejects an invalid date", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+    const res = await invoke(app, {
+      method: "GET",
+      url: "/api/notes/2026-02-30/context",
+      headers: { cookie },
+    });
+    expect(res.status).toBe(400);
   });
 
   it("accepts a 50000 non-ASCII character body and echoes it exactly", async () => {

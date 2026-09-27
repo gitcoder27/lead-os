@@ -17,6 +17,7 @@ const REQUEST_ID_2 = '22222222-2222-4222-8222-222222222222';
 
 describe('daily-note drafts', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     window.sessionStorage.clear();
   });
 
@@ -88,6 +89,80 @@ describe('daily-note drafts', () => {
     window.sessionStorage.setItem(key, JSON.stringify({ date: DATE, text: 'x', requestId: 'r-1' }));
     expect(readDailyNoteCaptureDraft(SCOPE)).toBeNull();
     expect(window.sessionStorage.getItem(key)).toBeNull();
+  });
+
+  it('expires drafts older than 14 days', () => {
+    const key = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:${DATE}`;
+    const stale = {
+      body: 'old draft',
+      baseBody: 'base',
+      revision: 2,
+      savedAt: Date.now() - 15 * 24 * 60 * 60 * 1000,
+    };
+    window.localStorage.setItem(key, JSON.stringify(stale));
+    expect(readDailyNoteDraft(SCOPE, DATE)).toBeNull();
+    expect(window.localStorage.getItem(key)).toBeNull();
+  });
+
+  it('keeps fresh drafts and updates their timestamp on write', () => {
+    const key = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:${DATE}`;
+    const recent = {
+      body: 'fresh draft',
+      baseBody: 'base',
+      revision: 2,
+      savedAt: Date.now() - 13 * 24 * 60 * 60 * 1000,
+    };
+    window.localStorage.setItem(key, JSON.stringify(recent));
+    expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('fresh draft');
+  });
+
+  it('caps stored daily-note drafts per scope, evicting oldest first', () => {
+    const prefix = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:`;
+    const now = Date.now();
+    for (let i = 0; i < 55; i += 1) {
+      window.localStorage.setItem(
+        `${prefix}2026-03-${String(i + 1).padStart(2, '0')}`,
+        // fresh entries, oldest first by a minute
+        JSON.stringify({ body: `d${i}`, baseBody: '', revision: 0, savedAt: now - (55 - i) * 60_000 }),
+      );
+    }
+    expect(writeDailyNoteDraft(SCOPE, DATE, { body: 'newest', baseBody: '', revision: 0 })).toBe(true);
+
+    let surviving = 0;
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(prefix) && !key.endsWith('quick-capture')) {
+        surviving += 1;
+      }
+    }
+    expect(surviving).toBe(50);
+    // oldest entries evicted; the freshly written draft survives
+    expect(readDailyNoteDraft(SCOPE, '2026-03-01')).toBeNull();
+    expect(readDailyNoteDraft(SCOPE, '2026-03-02')).toBeNull();
+    expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('newest');
+    expect(readDailyNoteDraft(SCOPE, '2026-03-55')?.body).toBe('d54');
+  });
+
+  it('migrates a legacy sessionStorage draft into localStorage', () => {
+    const key = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:${DATE}`;
+    const legacy = { body: 'session draft', baseBody: 'base', revision: 4 };
+    window.sessionStorage.setItem(key, JSON.stringify(legacy));
+
+    expect(readDailyNoteDraft(SCOPE, DATE)).toEqual(legacy);
+    expect(window.sessionStorage.getItem(key)).toBeNull();
+    const migrated = JSON.parse(window.localStorage.getItem(key)!);
+    expect(migrated.body).toBe('session draft');
+    expect(typeof migrated.savedAt).toBe('number');
+  });
+
+  it('migrates a legacy sessionStorage capture draft', () => {
+    const key = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:quick-capture`;
+    const legacy = { date: DATE, text: 'remember', requestId: REQUEST_ID };
+    window.sessionStorage.setItem(key, JSON.stringify(legacy));
+
+    expect(readDailyNoteCaptureDraft(SCOPE)).toEqual(legacy);
+    expect(window.sessionStorage.getItem(key)).toBeNull();
+    expect(JSON.parse(window.localStorage.getItem(key)!).text).toBe('remember');
   });
 
   it('reports failure when storage is unavailable', () => {

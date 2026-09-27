@@ -141,6 +141,19 @@ export function createNotesRouter(service: DailyNotesService): Router {
     }
   });
 
+  router.get("/:date/context", validate(dateParamSchema), async (req, res, next) => {
+    try {
+      const result = await service.getDayContext(
+        req.auth!.user.accountId,
+        req.params.date as string,
+        req.auth!.user.workspaceId
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.put("/:date", validate(saveNoteSchema), async (req, res, next) => {
     try {
       const result = await service.save(

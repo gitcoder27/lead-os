@@ -7,11 +7,17 @@ import {
   readDailyNoteDraft,
   writeDailyNoteDraft,
 } from '@/lib/daily-note-drafts';
-import { invalidateDailyNotesViews, useDailyNote } from './useDailyNotes';
-import type { DailyNote, DailyNoteFollowUp, DailyNoteResponse } from '@/types';
+import { mergeNoteBodies } from '@/lib/daily-note-merge';
+import {
+  invalidateDailyNoteListViews,
+  patchDailyNoteInLists,
+  useDailyNote,
+} from './useDailyNotes';
+import type { DailyNote, DailyNoteFollowUp, DailyNoteRef, DailyNoteResponse } from '@/types';
 
 export const DAILY_NOTE_MAX_LENGTH = 50000;
 const AUTOSAVE_DELAY_MS = 700;
+const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000] as const;
 
 export type DailyNoteSaveState =
   | 'loading'
@@ -27,9 +33,14 @@ export interface DailyNoteEditor {
   changeBody: (next: string) => void;
   saveState: DailyNoteSaveState;
   error: string | null;
+  /** Quiet inline note shown when saved text merged into the draft (docs/52 F3). */
+  mergeNotice: string | null;
+  /** True while the browser reports no connectivity; an error state means the draft is only on this device. */
+  offline: boolean;
   latest: DailyNote | null;
   conflict: DailyNote | null;
   followUps: DailyNoteFollowUp[];
+  refs: DailyNoteRef[];
   loading: boolean;
   loadError: Error | null;
   retryLoad: () => void;
@@ -43,11 +54,14 @@ export interface DailyNoteEditor {
 export function useDailyNoteEditor(date: string): DailyNoteEditor {
   const scope = useAuthScopeKey();
   const queryClient = useQueryClient();
-  const dayQuery = useDailyNote(date);
 
   const [body, setBody] = useState('');
   const [saveState, setSaveState] = useState<DailyNoteSaveState>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [mergeNotice, setMergeNotice] = useState<string | null>(null);
+  const [offline, setOffline] = useState(() =>
+    typeof navigator === 'undefined' ? false : !navigator.onLine,
+  );
   const [latest, setLatest] = useState<DailyNote | null>(null);
   const [conflict, setConflict] = useState<DailyNote | null>(null);
   const [recoveryUnavailable, setRecoveryUnavailable] = useState(false);
@@ -61,9 +75,17 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
   const scopeRef = useRef(scope);
   const inFlightRef = useRef<Promise<void> | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
+  // Set whenever a save commit lands so list/search/context views refresh on
+  // the next commit boundary (blur, date switch) rather than per keystroke.
+  const listViewsStaleRef = useRef(false);
 
   bodyRef.current = body;
   scopeRef.current = scope;
+
+  // P1: pause the 60s day poll while the editor is dirty or a save is in flight.
+  const pollPaused = saveState === 'dirty' || saveState === 'saving';
+  const dayQuery = useDailyNote(date, { pollPaused });
 
   const setStatus = useCallback((next: DailyNoteSaveState) => {
     saveStateRef.current = next;
@@ -94,6 +116,8 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       bodyRef.current = nextBody;
       setConflict(null);
       setError(null);
+      setMergeNotice(null);
+      retryCountRef.current = 0;
     },
     [],
   );
@@ -135,9 +159,15 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     (acknowledgedBody: string, acknowledgedRevision: number, note: DailyNote | null, res: DailyNoteResponse) => {
       baseBodyRef.current = acknowledgedBody;
       baseRevisionRef.current = acknowledgedRevision;
+      retryCountRef.current = 0;
+      listViewsStaleRef.current = true;
       setLatest(note);
       setConflict(null);
+      setOffline(false);
       queryClient.setQueryData(['daily-notes', scopeRef.current, 'day', date], res);
+      // P1: patch the saved row into cached list pages instead of invalidating
+      // the whole ['daily-notes'] prefix on every keystroke-save.
+      patchDailyNoteInLists(queryClient, scopeRef.current, date, note);
       if (bodyRef.current === acknowledgedBody) {
         clearDailyNoteDraft(scopeRef.current, date);
         setStatus('saved');
@@ -146,9 +176,54 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         setStatus('dirty');
         scheduleSave();
       }
-      invalidateDailyNotesViews(queryClient);
     },
     [date, persistDraft, queryClient, scheduleSave, setStatus],
+  );
+
+  /**
+   * Reconcile a newer remote note with the local draft (docs/52 F3): identical
+   * body just bumps the revision, a clean three-way merge (e.g. a pure append)
+   * silently rebases the draft and shows a quiet notice, genuine overlap opens
+   * the conflict panel.
+   */
+  const reconcileRemote = useCallback(
+    (note: DailyNote | null): 'merged' | 'conflict' | 'ignored' => {
+      if (!note) {
+        enterConflict(null);
+        return 'conflict';
+      }
+      if (note.body === baseBodyRef.current) {
+        setLatest(note);
+        baseRevisionRef.current = note.revision;
+        return 'ignored';
+      }
+      if (bodyRef.current === baseBodyRef.current) {
+        adoptServerNote(note);
+        setStatus('idle');
+        return 'ignored';
+      }
+      const outcome = mergeNoteBodies(baseBodyRef.current, bodyRef.current, note.body);
+      if (!outcome.clean) {
+        enterConflict(note);
+        return 'conflict';
+      }
+      baseBodyRef.current = note.body;
+      baseRevisionRef.current = note.revision;
+      setLatest(note);
+      setConflict(null);
+      setBody(outcome.merged);
+      bodyRef.current = outcome.merged;
+      persistDraft(outcome.merged);
+      setStatus('dirty');
+      setMergeNotice(
+        outcome.remoteWasAppend
+          ? 'New saved text was added below.'
+          : 'New saved changes were merged into your draft.',
+      );
+      scheduleSave(0);
+      return 'merged';
+    },
+    [adoptServerNote, enterConflict, persistDraft, scheduleSave, setStatus],
   );
 
   const attemptSave = useCallback(async (): Promise<void> => {
@@ -163,8 +238,10 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       return;
     }
     if (bodyRef.current === baseBodyRef.current) {
-      if (saveStateRef.current === 'dirty') {
+      if (saveStateRef.current === 'dirty' || saveStateRef.current === 'error') {
         setStatus('idle');
+        setError(null);
+        retryCountRef.current = 0;
       }
       return;
     }
@@ -219,7 +296,15 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
             if (!mountedRef.current || scopeRef.current !== scopeAtSend) {
               return;
             }
-            enterConflict(remote);
+            const outcome = reconcileRemote(remote);
+            if (outcome === 'conflict') {
+              return;
+            }
+            // A clean rebase moved the draft onto the new base — persist it
+            // immediately rather than waiting for the next keystroke.
+            if (bodyRef.current !== baseBodyRef.current) {
+              scheduleSave(0);
+            }
             return;
           } catch {
             if (!mountedRef.current || scopeRef.current !== scopeAtSend) {
@@ -227,8 +312,17 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
             }
           }
         }
-        setError(err instanceof Error ? err.message : 'Could not save');
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setOffline(true);
+        }
+        retryCountRef.current += 1;
+        setError(err instanceof Error ? err.message : 'Could not save your note.');
         setStatus('error');
+        // F5: keep retrying with backoff while the draft stays on this device.
+        scheduleSave(
+          RETRY_DELAYS_MS[Math.min(retryCountRef.current - 1, RETRY_DELAYS_MS.length - 1)] ??
+            30_000,
+        );
       }
     })();
 
@@ -238,7 +332,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     } finally {
       inFlightRef.current = null;
     }
-  }, [acknowledge, date, enterConflict, fetchLatest, setStatus]);
+  }, [acknowledge, date, enterConflict, fetchLatest, reconcileRemote, scheduleSave, setStatus]);
 
   useEffect(() => {
     attemptSaveRef.current = attemptSave;
@@ -275,6 +369,9 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         setStatus('dirty');
         scheduleSave(0);
       } else {
+        // The draft's base diverged from the server — restore it behind the
+        // conflict panel so the user decides (keep-both merges against the
+        // draft's real base, not a blind concat).
         baseBodyRef.current = draft.baseBody;
         baseRevisionRef.current = draft.revision;
         setBody(draft.body);
@@ -293,21 +390,64 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
       baseRevisionRef.current = note.revision;
       return;
     }
+    if (saveStateRef.current === 'conflict') {
+      enterConflict(note);
+      return;
+    }
     if (bodyRef.current === baseBodyRef.current) {
       adoptServerNote(note);
       setStatus('idle');
       return;
     }
-    enterConflict(note);
-  }, [adoptServerNote, date, dayQuery.data, dayQuery.isLoading, enterConflict, scheduleSave, scope, setStatus]);
+    reconcileRemote(note);
+  }, [adoptServerNote, date, dayQuery.data, dayQuery.isLoading, enterConflict, reconcileRemote, scheduleSave, scope, setStatus]);
 
   useEffect(() => {
     mountedRef.current = true;
+    const onOnline = () => {
+      setOffline(false);
+      const state = saveStateRef.current;
+      if (state === 'error' || state === 'dirty') {
+        scheduleSave(0);
+      }
+    };
+    const onOffline = () => setOffline(true);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && saveStateRef.current === 'error') {
+        scheduleSave(0);
+      }
+    };
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       mountedRef.current = false;
       cancelPendingTimer();
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+      document.removeEventListener('visibilitychange', onVisible);
+      // F6: best-effort flush for a dirty draft on unmount (route leave, or a
+      // reload that slips past beforeunload). keepalive lets the PUT outlive
+      // the page; a stale-revision duplicate is a harmless no-op.
+      if (
+        initializedRef.current &&
+        saveStateRef.current !== 'conflict' &&
+        bodyRef.current !== baseBodyRef.current &&
+        typeof fetch === 'function'
+      ) {
+        try {
+          void fetch(`/api/notes/${encodeURIComponent(date)}`, {
+            method: 'PUT',
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: bodyRef.current, revision: baseRevisionRef.current }),
+          }).catch(() => undefined);
+        } catch {
+          // best-effort only — the local draft remains as the fallback
+        }
+      }
     };
-  }, [cancelPendingTimer]);
+  }, [cancelPendingTimer, date, scheduleSave]);
 
   useEffect(() => {
     if (!['dirty', 'saving', 'error', 'conflict'].includes(saveState)) {
@@ -325,6 +465,7 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     (next: string) => {
       setBody(next);
       bodyRef.current = next;
+      setMergeNotice(null);
       persistDraft(next);
       if (saveStateRef.current === 'conflict') {
         return;
@@ -362,12 +503,19 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
         return false;
       }
       if (bodyRef.current === baseBodyRef.current) {
-        return true;
+        break;
       }
       await attemptSave();
     }
-    return bodyRef.current === baseBodyRef.current;
-  }, [attemptSave, cancelPendingTimer]);
+    const ok = saveStateRef.current !== 'conflict' && saveStateRef.current !== 'error';
+    // P1: list/search/context refresh happens at commit boundaries (blur,
+    // date switch), not per keystroke-save.
+    if (ok && listViewsStaleRef.current) {
+      listViewsStaleRef.current = false;
+      invalidateDailyNoteListViews(queryClient);
+    }
+    return ok;
+  }, [attemptSave, cancelPendingTimer, queryClient]);
 
   const keepBoth = useCallback(() => {
     if (saveStateRef.current !== 'conflict') {
@@ -376,8 +524,12 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     const remote = conflict;
     const remoteBody = remote?.body ?? '';
     const localBody = bodyRef.current;
-    const combined = remoteBody.length > 0 ? `${remoteBody}\n\n${localBody}` : localBody;
-    if (combined.length > DAILY_NOTE_MAX_LENGTH) {
+    // F2: three-way merge against the shared base — a pure append on one side
+    // splices its tail on; overlapping hunks keep both edits in order.
+    const merged = remoteBody
+      ? mergeNoteBodies(baseBodyRef.current, localBody, remoteBody).merged
+      : localBody;
+    if (merged.length > DAILY_NOTE_MAX_LENGTH) {
       setError('Combining both versions would exceed the 50,000 character limit. Shorten your draft or use the saved version.');
       return;
     }
@@ -386,9 +538,10 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     setLatest(remote);
     setConflict(null);
     setError(null);
-    setBody(combined);
-    bodyRef.current = combined;
-    persistDraft(combined);
+    setMergeNotice(null);
+    setBody(merged);
+    bodyRef.current = merged;
+    persistDraft(merged);
     setStatus('dirty');
     scheduleSave();
   }, [conflict, persistDraft, scheduleSave, setStatus]);
@@ -401,6 +554,8 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     adoptServerNote(remote);
     clearDailyNoteDraft(scope, date);
     setStatus('idle');
+    setMergeNotice(null);
+    retryCountRef.current = 0;
     queryClient.setQueryData(['daily-notes', scope, 'day', date], (existing: DailyNoteResponse | undefined) =>
       existing ? { ...existing, note: remote } : existing,
     );
@@ -421,9 +576,12 @@ export function useDailyNoteEditor(date: string): DailyNoteEditor {
     changeBody,
     saveState,
     error,
+    mergeNotice,
+    offline,
     latest,
     conflict,
     followUps: dayQuery.data?.followUps ?? [],
+    refs: dayQuery.data?.refs ?? [],
     loading: !initializedRef.current && dayQuery.isLoading,
     loadError: !initializedRef.current && dayQuery.error ? (dayQuery.error as Error) : null,
     retryLoad,

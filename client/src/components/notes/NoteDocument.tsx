@@ -54,6 +54,34 @@ export function NoteDocument({
     selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
   }, []);
 
+  // A2: Radix returns focus to the trigger on close; move it back into the
+  // editor with the caret/selection the user had when the dialog opened.
+  const restoreEditorFocus = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) {
+      return;
+    }
+    const { start, end } = selectionRef.current;
+    requestAnimationFrame(() => {
+      el.focus();
+      try {
+        el.setSelectionRange(start, end);
+      } catch {
+        // textarea may be unmounted (date switch) — nothing to restore
+      }
+    });
+  }, []);
+
+  const closeFollowUpDialog = useCallback(() => {
+    setFollowUpOpen(false);
+    restoreEditorFocus();
+  }, [restoreEditorFocus]);
+
+  const closeTaskActionDialog = useCallback(() => {
+    setTaskActionOpen(false);
+    restoreEditorFocus();
+  }, [restoreEditorFocus]);
+
   const shiftDate = useCallback(
     (days: number) => {
       if (!isValidIsoDate(date)) {
@@ -100,7 +128,7 @@ export function NoteDocument({
   const selectionActionsDisabled =
     editor.loading || conflicted || (!editor.latest && editor.body.trim().length === 0);
 
-  const saveStatus = statusLabel(editor.saveState);
+  const saveStatus = statusLabel(editor.saveState, editor.offline);
 
   return (
     <section className="notes-document" aria-label={`Note for ${date}`} hidden={hidden}>
@@ -226,13 +254,25 @@ export function NoteDocument({
                 onUseSavedVersion={editor.useSavedVersion}
               />
             ) : editor.error ? (
-              <p className="notes-doc-inline-error" role="alert">
-                {editor.error}
+              <p className="notes-doc-inline-error" role={editor.offline ? 'status' : 'alert'}>
+                {editor.offline
+                  ? 'Your draft is saved on this device and will sync when you reconnect.'
+                  : editor.error}
               </p>
             ) : null}
 
+            {/* A1: routine save states stay silent; only merge/error reach AT. */}
+            <span className="sr-only" role="status">
+              {editor.mergeNotice ?? ''}
+            </span>
+
             <div className="notes-doc-meta">
-              <span className={`notes-save-state${editor.saveState === 'error' ? ' error' : ''}`} aria-live="polite">
+              {editor.mergeNotice ? (
+                <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                  {editor.mergeNotice}
+                </span>
+              ) : null}
+              <span className={`notes-save-state${editor.saveState === 'error' ? ' error' : ''}`}>
                 {saveStatus}
                 {editor.saveState === 'error' ? (
                   <button
@@ -324,14 +364,14 @@ export function NoteDocument({
         open={followUpOpen}
         noteDate={date}
         selectedText={selectedText}
-        onClose={() => setFollowUpOpen(false)}
+        onClose={closeFollowUpDialog}
       />
       <NotesTaskActionDialog
         open={taskActionOpen}
         mode={taskActionMode}
         noteDate={date}
         selectedText={selectedText}
-        onClose={() => setTaskActionOpen(false)}
+        onClose={closeTaskActionDialog}
       />
     </section>
   );
@@ -345,7 +385,7 @@ function safeFormat(value: string, pattern: string): string {
   }
 }
 
-function statusLabel(state: string): string {
+function statusLabel(state: string, offline: boolean): string {
   switch (state) {
     case 'loading':
       return 'Loading…';
@@ -356,7 +396,7 @@ function statusLabel(state: string): string {
     case 'saved':
       return 'Saved';
     case 'error':
-      return 'Could not save.';
+      return offline ? 'Offline — saved on this device' : 'Could not save.';
     case 'conflict':
       return 'Needs your review';
     default:

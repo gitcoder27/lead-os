@@ -173,7 +173,7 @@ function NoteRow({
     <button
       type="button"
       onClick={() => onSelect(note.date)}
-      aria-current={selected ? 'true' : undefined}
+      aria-current={selected ? 'date' : undefined}
       className={`notes-day-row${selected ? ' selected' : ''}`}
     >
       <span className="notes-day-row-date">{rowLabel(note.date)}</span>

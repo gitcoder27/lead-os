@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowUpRight,
@@ -14,14 +14,16 @@ import {
   CircleSlash,
   CircleX,
   Circle,
+  Flag,
   Link2,
   Moon,
   Tag,
   UserRound,
 } from 'lucide-react';
 import { taskLabelDisplayName, type TaskLabel, type TaskStatus } from '@/types';
-import type { SchedulePreset } from '@/lib/task-list';
+import { nextWeekday, type SchedulePreset } from '@/lib/task-list';
 import { labelChipStyle } from './label-colors';
+import { DatePickerPopover, type DatePreset } from './TaskDetailPrimitives';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from './TaskPopover';
 
 /** docs/49 §5: status glyphs — never a done-checkbox. */
@@ -37,11 +39,16 @@ const STATUS_ORDER: TaskStatus[] = ['open', 'active', 'blocked', 'done', 'droppe
 
 export function TaskStatusGlyph({ status, size = 15 }: { status: TaskStatus; size?: number }) {
   const reduceMotion = useReducedMotion();
+  // docs/51 P3: animate only on a real status change — a fresh mount or a
+  // view switch with the same status must not flash a scale-in.
+  const previous = useRef<TaskStatus | null>(null);
+  const changed = previous.current !== null && previous.current !== status;
+  useEffect(() => { previous.current = status; }, [status]);
   const { Icon, color } = TASK_STATUS_META[status];
   return (
     <motion.span
       key={status}
-      initial={reduceMotion ? false : { scale: 0.6, opacity: 0.4 }}
+      initial={reduceMotion || !changed ? false : { scale: 0.6, opacity: 0.4 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 500, damping: 28 }}
       className="flex items-center justify-center"
@@ -52,7 +59,7 @@ export function TaskStatusGlyph({ status, size = 15 }: { status: TaskStatus; siz
   );
 }
 
-export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'more';
+export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'priority' | 'more';
 
 export function StatusMenu({ anchor, current, onClose, onSelect }: {
   anchor: HTMLElement;
@@ -79,36 +86,79 @@ export function StatusMenu({ anchor, current, onClose, onSelect }: {
   );
 }
 
-const SCHEDULE_OPTIONS: { preset: SchedulePreset; label: string; key: string; Icon: typeof Circle }[] = [
-  { preset: 'today', label: 'Today', key: 't', Icon: CalendarClock },
-  { preset: 'tomorrow', label: 'Tomorrow', key: 'm', Icon: CalendarArrowUp },
-  { preset: 'next-week', label: 'Next week (Mon)', key: 'w', Icon: CalendarDays },
-  { preset: 'later', label: 'Later', key: 'l', Icon: Moon },
-  { preset: 'clear', label: 'Clear date', key: 'c', Icon: CalendarX },
-];
-
-export function ScheduleMenu({ anchor, onClose, onSelect, allowLater = true }: {
+/**
+ * docs/51 F8: the list's schedule menu is the same picker the drawer uses —
+ * presets with their single-key accelerators plus an exact date that only
+ * commits on Set/Enter. Digit accelerators jump to the next weekday (1=Mon …
+ * 7=Sun, strictly after today).
+ */
+export function ScheduleMenu({ anchor, today, current, laterActive, onClose, onSelect, onPickDate, allowLater = true }: {
   anchor: HTMLElement;
+  today: string;
+  /** Single-target scheduledOn for the date field ('' when mixed or unset). */
+  current?: string | null;
+  /** Single/multi-target Later state for the Later checkbox. */
+  laterActive?: boolean;
   onClose: () => void;
   onSelect: (preset: SchedulePreset) => void;
+  onPickDate: (date: string) => void;
   allowLater?: boolean;
 }) {
-  const options = SCHEDULE_OPTIONS.filter((option) => allowLater || option.preset !== 'later');
+  const presets: DatePreset[] = [
+    { key: 't', label: 'Today', hint: 't', icon: <CalendarClock size={13} />, onSelect: () => onSelect('today') },
+    { key: 'm', label: 'Tomorrow', hint: 'm', icon: <CalendarArrowUp size={13} />, onSelect: () => onSelect('tomorrow') },
+    { key: 'w', label: 'Next week (Mon)', hint: 'w', icon: <CalendarDays size={13} />, onSelect: () => onSelect('next-week') },
+    ...(allowLater
+      ? [{ key: 'l', label: 'Later', hint: 'l', icon: <Moon size={13} />, checked: laterActive === true, onSelect: () => onSelect('later' as const) }]
+      : []),
+    { key: 'c', label: 'Clear date', hint: 'c', icon: <CalendarX size={13} />, onSelect: () => onSelect('clear') },
+  ];
   return (
-    <TaskPopover
+    <DatePickerPopover
       anchor={anchor}
-      onClose={onClose}
       label="Schedule"
-      width={200}
+      kind="date"
+      value={current ?? ''}
+      presets={presets}
+      clearLabel={null}
+      onCommit={(date) => { if (date) onPickDate(date); }}
+      onClose={onClose}
       onAccelerator={(key) => {
-        const option = options.find((candidate) => candidate.key === key.toLowerCase());
-        if (!option) return false;
-        onSelect(option.preset);
-        return true;
+        const preset = presets.find((candidate) => candidate.key === key.toLowerCase());
+        if (preset) {
+          preset.onSelect();
+          return true;
+        }
+        const weekday = Number(key);
+        if (Number.isInteger(weekday) && weekday >= 1 && weekday <= 7) {
+          onPickDate(nextWeekday(today, weekday));
+          return true;
+        }
+        return false;
       }}
-    >
-      {options.map(({ preset, label, key, Icon }) => (
-        <MenuItem key={preset} icon={<Icon size={13} />} label={label} hint={key} onSelect={() => onSelect(preset)} />
+    />
+  );
+}
+
+export type TaskPriority = 'normal' | 'high';
+
+export function PriorityMenu({ anchor, current, onClose, onSelect }: {
+  anchor: HTMLElement;
+  current?: TaskPriority;
+  onClose: () => void;
+  onSelect: (priority: TaskPriority) => void;
+}) {
+  return (
+    <TaskPopover anchor={anchor} onClose={onClose} label="Set priority" width={170}>
+      {(['normal', 'high'] as const).map((priority) => (
+        <MenuItem
+          key={priority}
+          role="menuitemradio"
+          checked={priority === current}
+          icon={<Flag size={13} style={{ color: priority === 'high' ? 'var(--danger)' : 'var(--text-muted)' }} />}
+          label={priority === 'high' ? 'High' : 'Normal'}
+          onSelect={() => onSelect(priority)}
+        />
       ))}
     </TaskPopover>
   );
@@ -200,13 +250,14 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   );
 }
 
-export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels, onLater, onDrop, onCopyLink, canLater }: {
+export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels, onPriority, onLater, onDrop, onCopyLink, canLater }: {
   anchor: HTMLElement;
   onClose: () => void;
   onOpen: () => void;
   onStatus: () => void;
   onAssign: () => void;
   onLabels: () => void;
+  onPriority: () => void;
   onLater: () => void;
   onDrop: () => void;
   onCopyLink: () => void;
@@ -217,6 +268,7 @@ export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels
       <MenuItem icon={<ArrowUpRight size={13} />} label="Open" hint="↵" onSelect={onOpen} />
       <MenuItem icon={<CircleDashed size={13} />} label="Status…" onSelect={onStatus} />
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
+      <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
       {canLater && <MenuItem icon={<Moon size={13} />} label="Move to Later" onSelect={onLater} />}
       <MenuItem icon={<Link2 size={13} />} label="Copy link" onSelect={onCopyLink} />

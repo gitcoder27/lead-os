@@ -52,6 +52,9 @@ interface TaskDrawerProps {
   onClose: () => void;
   /** Navigate the drawer to another task (children, parent, linked tasks). */
   onNavigateTask?: (taskKey: string) => void;
+  /** docs/51 F19: list order the drawer was opened from — enables j/k stepping. */
+  orderedKeys?: string[];
+  onStepTask?: (taskKey: string) => void;
   stacked?: boolean;
 }
 
@@ -61,7 +64,7 @@ interface TaskDrawerProps {
  * and developer principals get their own DTOs server-side; private fields and
  * controls are hidden for developers.
  */
-export function TaskDrawer({ taskKey, onClose, onNavigateTask, stacked = false }: TaskDrawerProps) {
+export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onStepTask, stacked = false }: TaskDrawerProps) {
   const open = Boolean(taskKey);
   const reduceMotion = useReducedMotion();
   // §6.2: the drawer traps Tab while open and restores focus to the element
@@ -129,6 +132,8 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, stacked = false }
             onClose={onClose}
             onOpenFullPage={() => navigateToTaskPage(taskKey!)}
             onNavigateTask={onNavigateTask ?? ((key) => navigateToTaskPage(key))}
+            orderedKeys={orderedKeys}
+            onStepTask={onStepTask}
           />
         </motion.aside>
       </>
@@ -145,10 +150,13 @@ interface TaskDetailBodyProps {
   /** Page layout (`/t/:key`): two columns, a back affordance instead of close. */
   fullPage?: boolean;
   onBack?: () => void;
+  /** docs/51 F19: list order the drawer was opened from — enables j/k stepping. */
+  orderedKeys?: string[];
+  onStepTask?: (taskKey: string) => void;
 }
 
 /** The shared task detail content — drawer panel body and `/t/:key` page body. */
-export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTask, fullPage = false, onBack }: TaskDetailBodyProps) {
+export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTask, fullPage = false, onBack, orderedKeys, onStepTask }: TaskDetailBodyProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
   const mode: TaskDetailMode = user?.role === 'developer' ? 'developer' : 'manager';
@@ -245,6 +253,8 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
       onBack={onBack}
       onOpenFullPage={fullPage ? undefined : onOpenFullPage}
       onNavigateTask={onNavigateTask}
+      orderedKeys={orderedKeys}
+      onStepTask={onStepTask}
     />
   );
 }
@@ -262,9 +272,12 @@ interface TaskDetailViewProps {
   onBack?: () => void;
   onOpenFullPage?: () => void;
   onNavigateTask: (taskKey: string) => void;
+  /** docs/51 F19: list order the detail was opened from — enables j/k stepping. */
+  orderedKeys?: string[];
+  onStepTask?: (taskKey: string) => void;
 }
 
-function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClose, onBack, onOpenFullPage, onNavigateTask }: TaskDetailViewProps) {
+function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClose, onBack, onOpenFullPage, onNavigateTask, orderedKeys, onStepTask }: TaskDetailViewProps) {
   const { user } = useAuth();
   const rootRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -276,9 +289,25 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   const canEditStatus = !deleted && (canEditTitle || mode === 'manager');
   const managerEditable = mode === 'manager' && !deleted;
 
-  useTaskShortcuts(rootRef, !deleted, { u: () => composerRef.current?.focus() });
+  // docs/51 F19: j/k step to the previous/next row of the list the drawer was
+  // opened from (dead inside inputs by useTaskShortcuts' usual scoping).
+  const stepTo = useCallback(
+    (delta: number) => {
+      if (!orderedKeys?.length || !onStepTask) return;
+      const index = orderedKeys.indexOf(task.taskKey);
+      const next = index >= 0 ? orderedKeys[index + delta] : undefined;
+      if (next) onStepTask(next);
+    },
+    [orderedKeys, onStepTask, task.taskKey],
+  );
+  const canStep = Boolean(orderedKeys?.includes(task.taskKey) && onStepTask);
+  useTaskShortcuts(rootRef, !deleted, {
+    u: () => composerRef.current?.focus(),
+    ...(canStep ? { j: () => stepTo(1), k: () => stepTo(-1) } : {}),
+  });
 
   const hints: [string, string][] = [];
+  if (canStep) hints.push(['J / K', 'Prev / next task']);
   if (canEditStatus) hints.push(['E', isOpenish(task) ? 'Done' : 'Reopen']);
   if (managerEditable) hints.push(['S', 'Schedule'], ['A', 'Assign'], ['P', 'Priority'], ['L', 'Labels']);
   if (!deleted) hints.push(['U', 'Update']);

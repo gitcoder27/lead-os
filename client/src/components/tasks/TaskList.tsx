@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { CalendarClock, Plus } from 'lucide-react';
+import { CalendarClock, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import type { TaskViewDefinition } from '@/types';
 import type { TaskGroupContext } from '@/lib/task-views';
 import type { RenderGroup } from '@/lib/task-list';
@@ -21,10 +21,13 @@ interface TaskListProps {
   onCancelAdd: () => void;
   onSubmitAdd: (context: TaskGroupContext, title: string) => Promise<boolean>;
   onMoveOverdueToToday: (tasks: RowTask[]) => void;
+  onToggleGroup?: (groupKey: string) => void;
 }
 
 /**
- * docs/49 §5/§6.1: grouped, dense list — `listbox` with roving-tabindex rows,
+ * docs/49 §5/§6.1: grouped, dense list — each section is a labelled
+ * `role="group"` containing a real `listbox` of `option` rows (docs/51 A1:
+ * headers, counts and inline-add live outside the listbox), roving tabindex,
  * a per-group inline add row, and exit-only row motion (no layout animation).
  */
 export function TaskList({
@@ -42,53 +45,71 @@ export function TaskList({
   onCancelAdd,
   onSubmitAdd,
   onMoveOverdueToToday,
+  onToggleGroup,
 }: TaskListProps) {
   const reduceMotion = useReducedMotion();
   const selectionActive = selected.size > 0;
   return (
-    <div role="listbox" aria-label="Tasks" aria-multiselectable="true" className="mx-auto w-full max-w-[1180px] space-y-3 px-4 pb-24 pt-3">
-      {groups.map((group) => (
-        <section
-          key={group.key}
-          aria-label={group.label || 'Tasks'}
-          className="group/section overflow-hidden rounded-xl"
-          style={{ border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)', background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}
-        >
-          {group.label && (
-            <GroupHeader
-              group={group}
-              ownerName={ownerName}
-              onAdd={() => onStartAdd(group.key)}
-              onMoveOverdueToToday={onMoveOverdueToToday}
-            />
-          )}
-          <div className="divide-y" style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)' }}>
-            <AnimatePresence initial={false}>
-              {group.tasks.map((task) => (
-                <motion.div
-                  key={task.taskKey}
-                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.15 }}
-                  style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)', overflow: 'hidden' }}
-                >
-                  <TaskListRow
-                    task={task as RowTask}
-                    context={group.context}
-                    definition={definition}
-                    today={today}
-                    attentionMode={attentionMode}
-                    focused={task.taskKey === focusedKey}
-                    selected={selected.has(task.taskKey)}
-                    selectionActive={selectionActive}
-                    ownerName={ownerName}
-                    labelColor={labelColor}
-                    handlers={handlers}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {/* Labeled groups add from the header "+"; unlabeled lists keep a footer row. */}
-            {(addingGroup === group.key || !group.label) && (
+    <div className="mx-auto w-full max-w-[1180px] space-y-3 px-4 pb-24 pt-3">
+      {groups.map((group) => {
+        const collapsed = group.collapsed === true;
+        return (
+          <section
+            key={group.key}
+            role="group"
+            aria-labelledby={group.label ? `task-group-${group.key}` : undefined}
+            aria-label={group.label ? undefined : 'Tasks'}
+            className="group/section overflow-hidden rounded-xl"
+            style={{ border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)', background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}
+          >
+            {group.label && (
+              <GroupHeader
+                group={group}
+                headerId={`task-group-${group.key}`}
+                collapsed={collapsed}
+                ownerName={ownerName}
+                onAdd={() => onStartAdd(group.key)}
+                onMoveOverdueToToday={onMoveOverdueToToday}
+                onToggle={() => onToggleGroup?.(group.key)}
+              />
+            )}
+            {!collapsed && (
+              <div
+                role="listbox"
+                aria-label={group.label || 'Tasks'}
+                aria-multiselectable="true"
+                className="divide-y"
+                style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)' }}
+              >
+                <AnimatePresence initial={false}>
+                  {group.tasks.map((task) => (
+                    <motion.div
+                      key={task.taskKey}
+                      role="presentation"
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.15 }}
+                      style={{ borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)', overflow: 'hidden' }}
+                    >
+                      <TaskListRow
+                        task={task as RowTask}
+                        context={group.context}
+                        definition={definition}
+                        today={today}
+                        attentionMode={attentionMode}
+                        focused={task.taskKey === focusedKey}
+                        selected={selected.has(task.taskKey)}
+                        selectionActive={selectionActive}
+                        ownerName={ownerName}
+                        labelColor={labelColor}
+                        handlers={handlers}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+            {/* Labeled groups add from the header "+"; unlabeled lists keep a footer row. Collapsed groups keep both hidden. */}
+            {!collapsed && !group.collapsible && (addingGroup === group.key || !group.label) && (
               <InlineAddRow
                 active={addingGroup === group.key}
                 onStart={() => onStartAdd(group.key)}
@@ -97,9 +118,9 @@ export function TaskList({
                 groupLabel={group.label}
               />
             )}
-          </div>
-        </section>
-      ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -115,21 +136,36 @@ const BUCKET_TONES: Record<string, string> = {
  * in normal case; schedule groups get a tone dot. The inline add lives here
  * as a "+" so empty "Add task" rows don't compete with real tasks.
  */
-function GroupHeader({ group, ownerName, onAdd, onMoveOverdueToToday }: {
+function GroupHeader({ group, headerId, collapsed, ownerName, onAdd, onMoveOverdueToToday, onToggle }: {
   group: RenderGroup;
+  headerId: string;
+  collapsed: boolean;
   ownerName: (ownerType: string | null, ownerId: string | null) => string;
   onAdd: () => void;
   onMoveOverdueToToday: (tasks: RowTask[]) => void;
+  onToggle: () => void;
 }) {
   const context = group.context;
   const tone = context.mode === 'scheduled' ? BUCKET_TONES[context.bucket] ?? 'var(--text-muted)' : undefined;
   const movable = group.key === 'Overdue' ? group.tasks.filter((task) => !task.lingering) : [];
+  const count = group.count ?? group.tasks.length;
   return (
     <header
       className="sticky top-0 z-[1] flex h-10 items-center gap-2.5 px-3"
       style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid color-mix(in srgb, var(--border) 60%, transparent)' }}
     >
-      {context.mode === 'owner' ? (
+      {group.collapsible ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.label}`}
+          className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+      ) : context.mode === 'owner' ? (
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
           style={context.ownerType
@@ -142,15 +178,15 @@ function GroupHeader({ group, ownerName, onAdd, onMoveOverdueToToday }: {
       ) : tone ? (
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone }} aria-hidden="true" />
       ) : null}
-      <h2 className="truncate text-[13px] font-semibold" style={{ color: group.key === 'Overdue' ? 'var(--danger)' : 'var(--text-primary)' }}>
+      <h2 id={headerId} className="truncate text-[13px] font-semibold" style={{ color: group.key === 'Overdue' ? 'var(--danger)' : 'var(--text-primary)' }}>
         {group.label}
       </h2>
       <span
         className="rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums"
         style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
-        aria-label={`${group.tasks.length} tasks`}
+        aria-label={`${count} tasks`}
       >
-        {group.tasks.length}
+        {count}
       </span>
       <span className="flex-1" />
       {movable.length > 0 && (
@@ -163,16 +199,18 @@ function GroupHeader({ group, ownerName, onAdd, onMoveOverdueToToday }: {
           <CalendarClock size={11} /> Move all to today
         </button>
       )}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="flex h-6 w-6 items-center justify-center rounded-md opacity-50 transition-opacity hover:bg-[var(--bg-tertiary)] hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100"
-        style={{ color: 'var(--text-secondary)' }}
-        aria-label={`Add task to ${group.label}`}
-        title="Add task (n)"
-      >
-        <Plus size={14} />
-      </button>
+      {!group.collapsible && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex h-6 w-6 items-center justify-center rounded-md opacity-50 transition-opacity hover:bg-[var(--bg-tertiary)] hover:opacity-100 focus-visible:opacity-100 group-hover/section:opacity-100"
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label={`Add task to ${group.label}`}
+          title="Add task (n)"
+        >
+          <Plus size={14} />
+        </button>
+      )}
     </header>
   );
 }
@@ -182,7 +220,8 @@ function ownerInitials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1]![0] : '')).toUpperCase();
 }
 
-function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }: {
+/** docs/51 F14: exported so an empty view can host its own add row. */
+export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }: {
   active: boolean;
   onStart: () => void;
   onCancel: () => void;

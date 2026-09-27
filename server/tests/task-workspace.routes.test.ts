@@ -96,6 +96,38 @@ describe("taskPlanDate (docs/49 D1)", () => {
 });
 
 describe("consolidated built-in views (docs/49 §3)", () => {
+  it("manual order persists inside a plan-date bucket via /tasks/bulk (docs/51 F7)", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const early = await createTask(headers, { title: "Early unpositioned" });
+    const a = await createTask(headers, { title: "Alpha" });
+    const b = await createTask(headers, { title: "Beta" });
+    const c = await createTask(headers, { title: "Gamma" });
+    const later = await createTask(headers, { title: "Future", scheduledOn: shift(4) });
+
+    // Default: creation order inside the today bucket.
+    const before = (await runView(headers, "today")).map((row) => row.taskKey);
+    expect(before).toEqual([early.taskKey, a.taskKey, b.taskKey, c.taskKey]);
+
+    const reorder = await invoke(app, {
+      method: "POST",
+      url: "/api/tasks/bulk",
+      headers,
+      body: { items: [
+        { key: c.taskKey, changes: { schedulePosition: 0 } },
+        { key: a.taskKey, changes: { schedulePosition: 1 } },
+        { key: b.taskKey, changes: { schedulePosition: 2 } },
+      ] },
+    });
+    expect(reorder.status).toBe(200);
+
+    // Positioned rows lead the bucket in position order; the unpositioned row
+    // keeps its natural spot after them; the future bucket still sorts by date.
+    const after = await runView(headers, "my-tasks");
+    expect(after.map((row) => row.taskKey)).toEqual([c.taskKey, a.taskKey, b.taskKey, early.taskKey, later.taskKey]);
+    const gama = after.find((row) => row.taskKey === c.taskKey) as Record<string, unknown>;
+    expect(gama.schedulePosition).toBe(0);
+  });
+
   it("Today is plan date <= today, excluding Later and closed; Upcoming is retired (docs/51 F4)", async () => {
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Overdue", scheduledOn: shift(-3) });

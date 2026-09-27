@@ -30,7 +30,7 @@ export const taskCreateSchema = z.object({
   ownerType: z.enum(["manager", "developer"]).nullable().optional(), ownerId: z.string().trim().min(1).nullable().optional(),
   later: z.boolean().optional(), priority: z.enum(["normal", "high"]).optional(),
   labels: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
-  scheduledOn: dateOnly.nullable().optional(), dueAt: timestamp.nullable().optional(), followUpAt: timestamp.nullable().optional(),
+  scheduledOn: dateOnly.nullable().optional(), schedulePosition: z.number().int().min(0).nullable().optional(), dueAt: timestamp.nullable().optional(), followUpAt: timestamp.nullable().optional(),
   startsAt: timestamp.nullable().optional(), endsAt: timestamp.nullable().optional(),
   participants: z.string().max(4000).nullable().optional(), nextAction: z.string().max(4000).nullable().optional(), outcome: z.string().max(4000).nullable().optional(),
   parentId: z.number().int().positive().nullable().optional(),
@@ -130,7 +130,7 @@ export class TaskService {
     };
     if (principal.type === "developer") return shared;
     const ownsPrivate = row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
-    return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: ownsPrivate && row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
+    return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: ownsPrivate && row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null, schedulePosition: row.schedulePosition,
       labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
   }
 
@@ -628,7 +628,7 @@ export class TaskService {
       };
       if (options.principal.type === "developer") return { ...shared, ...extras } satisfies DeveloperSurfaceTask;
       const ownsPrivate = row.trackedByManagerId === options.principal.accountId || (row.ownerType === "manager" && row.ownerId === options.principal.accountId);
-      const managerDto: ManagerTask = { ...shared, legacyDeskItemId: mappedByTaskSource.get(`manager_desk_items:${row.id}`) ?? row.id, later: row.later === 1, parentId: row.parentId,
+      const managerDto: ManagerTask = { ...shared, legacyDeskItemId: mappedByTaskSource.get(`manager_desk_items:${row.id}`) ?? row.id, later: row.later === 1, parentId: row.parentId, schedulePosition: row.schedulePosition,
         trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
         labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
       return { ...managerDto, ...extras } satisfies ManagerSurfaceTask;

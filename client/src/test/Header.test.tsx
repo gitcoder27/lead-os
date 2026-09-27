@@ -186,6 +186,11 @@ describe('Header', () => {
     rerender(<Header activeView="team" onViewChange={vi.fn()} />);
 
     expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
+
+    // docs/53 U1: on `/` the Today page is the inbox — no duplicate trigger.
+    rerender(<Header activeView="today" onViewChange={vi.fn()} />);
+
+    expect(screen.queryByTestId('manager-action-inbox')).not.toBeInTheDocument();
   });
 
   it('shows the capture button on all manager views including desk', () => {

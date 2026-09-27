@@ -1,7 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/context/ToastContext';
+import { QuickActionsProvider } from '@/context/QuickActionsContext';
 import { TodayPage } from '@/components/today/TodayPage';
 import { createTestQueryClient } from '@/test/wrapper';
 import type { TodayActionItem, TodayResponse } from '@/types';
@@ -115,16 +116,18 @@ function mockFetch(response: TodayResponse) {
   return fetchMock;
 }
 
-function renderToday(response = todayResponse(), onOpenTodayTarget = vi.fn()) {
+function renderToday(response = todayResponse(), onOpenTodayTarget = vi.fn(), openCapture = vi.fn()) {
   const queryClient = createTestQueryClient();
   render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <TodayPage onViewChange={vi.fn()} onOpenTodayTarget={onOpenTodayTarget} />
-      </ToastProvider>
+      <QuickActionsProvider value={{ openCapture, openCommandPalette: vi.fn() }}>
+        <ToastProvider>
+          <TodayPage onViewChange={vi.fn()} onOpenTodayTarget={onOpenTodayTarget} />
+        </ToastProvider>
+      </QuickActionsProvider>
     </QueryClientProvider>,
   );
-  return { onOpenTodayTarget };
+  return { onOpenTodayTarget, openCapture };
 }
 
 describe('TodayPage V2', () => {
@@ -146,9 +149,172 @@ describe('TodayPage V2', () => {
     mockFetch(todayResponse());
     renderToday();
 
-    expect(await screen.findByText('Action queue')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Queue' })).toBeInTheDocument();
     expect(screen.getAllByTestId('today-action-row')).toHaveLength(8);
-    expect(screen.getByText('+3 more in the source workflows')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+3 more' })).toBeInTheDocument();
+  });
+
+  it('expands "+N more" in place, grouped Now / Next / Later, with the server total (docs/53 F13)', async () => {
+    const response = todayResponse();
+    const overflow = [
+      actionItem(20, { id: 'overflow-next', group: 'next', title: 'AM-20 Next row' }),
+      actionItem(21, { id: 'overflow-later', group: 'later', title: 'AM-21 Later row' }),
+    ];
+    mockFetch({ ...response, overflowActionItems: overflow, totalCount: 15 });
+    renderToday();
+
+    fireEvent.click(await screen.findByRole('button', { name: '+7 more' }));
+
+    expect(screen.getAllByTestId('today-action-row')).toHaveLength(13);
+    expect(screen.getByRole('group', { name: 'Now (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Next (1)' })).toHaveTextContent('AM-20 Next row');
+    expect(screen.getByRole('group', { name: 'Later (1)' })).toHaveTextContent('AM-21 Later row');
+    // Two rows are still past the shipped overflow cap.
+    expect(screen.getByRole('button', { name: /Show less · 2 more/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('sends the browser time zone with the Today read (docs/53 F5)', async () => {
+    const fetchMock = mockFetch(todayResponse());
+    renderToday();
+    await screen.findByRole('heading', { name: 'Queue' });
+    const todayCall = fetchMock.mock.calls.find(([input]) => String(input).includes('/api/today'));
+    expect(String(todayCall?.[0])).toMatch(/[?&]tz=/);
+  });
+
+  it('keyboard triage: j/k move the cursor, e runs the primary action, Enter opens (docs/53 U4)', async () => {
+    const { onOpenTodayTarget } = renderToday(todayResponse(), vi.fn());
+    mockFetch(todayResponse());
+    await screen.findByRole('heading', { name: 'Queue' });
+
+    fireEvent.keyDown(window, { key: 'j' });
+    expect(screen.getAllByTestId('today-action-row')[0]).toHaveAttribute('data-keyboard-active', 'true');
+    fireEvent.keyDown(window, { key: 'j' });
+    fireEvent.keyDown(window, { key: 'k' });
+    fireEvent.keyDown(window, { key: 'j' });
+    expect(screen.getAllByTestId('today-action-row')[1]).toHaveAttribute('aria-current', 'true');
+
+    // Row 2 is the follow-up whose fixture primary is confirm-gated (old server shape).
+    fireEvent.keyDown(window, { key: 'e' });
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+
+    fireEvent.keyDown(window, { key: 'k' });
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-1' }));
+  });
+
+  it('runs undoable writes without confirm, offers a 6s Undo, and z posts the restore (docs/53 F11)', async () => {
+    const followUpTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
+    const undoRequest = {
+      date: '2026-03-08',
+      command: { kind: 'restore', label: 'Undo', target: followUpTarget },
+      restore: { type: 'desk_item', managerDeskItemId: 44, patch: { status: 'planned' } },
+    };
+    const response = todayResponse();
+    response.actionItems[1] = {
+      ...response.actionItems[1]!,
+      primaryAction: { kind: 'mark_done', label: 'Done', target: followUpTarget, confirm: false, undoable: true },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/today')) {
+        return new Response(JSON.stringify(response), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      const body = JSON.parse(String(init?.body ?? '{}')) as { command?: { kind?: string } };
+      const payload = body.command?.kind === 'mark_done'
+        ? { success: true, command: 'mark_done', target: followUpTarget, undo: { label: 'Undo', request: undoRequest } }
+        : { success: true, command: 'restore', target: followUpTarget };
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderToday(response);
+
+    await screen.findByRole('heading', { name: 'Queue' });
+    fireEvent.click(within(screen.getAllByTestId('today-action-row')[1]!).getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    const commandCall = fetchMock.mock.calls.find(([input, init]) =>
+      String(input).includes('/api/manager-actions/commands') && String(init?.body).includes('"kind":"mark_done"'));
+    expect(String(commandCall?.[1]?.body)).toContain('"tz":');
+
+    fireEvent.keyDown(window, { key: 'z' });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/manager-actions/commands'),
+        expect.objectContaining({ body: expect.stringContaining('"kind":"restore"') }),
+      );
+    });
+    expect(await screen.findByText('Undone')).toBeInTheDocument();
+  });
+
+  it('Ask for update posts a write and stamps askedAt optimistically (docs/53 F15)', async () => {
+    const devTarget = target({ type: 'developer', view: 'team', developerAccountId: 'dev-1', date: '2026-03-08' });
+    const response = todayResponse({
+      actionItems: [actionItem(1, {
+        id: 'today-dev-dev-1-stale',
+        type: 'stale_check_in',
+        title: 'Alice Smith',
+        target: devTarget,
+        primaryAction: { kind: 'add_check_in', label: 'Add check-in', target: devTarget },
+        secondaryActions: [{ kind: 'ask_check_in', label: 'Ask for update', target: devTarget, confirm: false, undoable: true }],
+      })],
+    });
+    const fetchMock = mockFetch(response);
+    const { onOpenTodayTarget } = renderToday(response);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions for Alice Smith' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Ask for update' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/manager-actions/commands'),
+        expect.objectContaining({ body: expect.stringContaining('"kind":"ask_check_in"') }),
+      );
+    });
+    expect(onOpenTodayTarget).not.toHaveBeenCalled();
+  });
+
+  it('meeting outcome dialog sends an optional next action with its owner (docs/53 F14)', async () => {
+    const meetingTarget = target({ type: 'meeting', view: 'meetings', managerDeskItemId: 70, date: '2026-03-08' });
+    const response = todayResponse({
+      actionItems: [actionItem(1, {
+        id: 'meeting-70',
+        type: 'meeting_outcome',
+        title: 'Migration review',
+        target: meetingTarget,
+        primaryAction: { kind: 'capture_meeting_outcome', label: 'Capture outcome', target: meetingTarget },
+        secondaryActions: [],
+      })],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/today')) {
+        return new Response(JSON.stringify(response), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url.includes('/api/team-tracker')) {
+        return new Response(JSON.stringify({
+          date: '2026-03-08',
+          developers: [{ developer: { accountId: 'dev-1', displayName: 'Alice Smith' }, plannedItems: [], checkIns: [] }],
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderToday(response);
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Capture outcome' }))[0]!);
+    fireEvent.change(await screen.findByLabelText('Meeting outcome'), { target: { value: 'Go Friday' } });
+    fireEvent.change(screen.getByLabelText('Next action (optional)'), { target: { value: 'Draft rollback plan' } });
+    await screen.findByRole('option', { name: 'Alice Smith' });
+    fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'dev-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save outcome' }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([input, init]) =>
+        String(input).includes('/api/manager-actions/commands') && String((init as RequestInit | undefined)?.body).includes('capture_meeting_outcome'));
+      expect(String((call?.[1] as RequestInit | undefined)?.body)).toContain('"nextAction":"Draft rollback plan"');
+      expect(String((call?.[1] as RequestInit | undefined)?.body)).toContain('"nextActionOwnerAccountId":"dev-1"');
+    });
   });
 
   it('opens the exact issue target from a row', async () => {
@@ -156,8 +322,8 @@ describe('TodayPage V2', () => {
     const onOpenTodayTarget = vi.fn();
     renderToday(todayResponse(), onOpenTodayTarget);
 
-    // The Start band and the queue row both expose "Open AM-1 Issue 1" (F10).
-    fireEvent.click((await screen.findAllByRole('button', { name: /open am-1/i }))[0]!);
+    // docs/53 A2: the row's one link opens the target.
+    fireEvent.click(await screen.findByRole('button', { name: /^(start here: )?am-1 issue 1/i }));
 
     await waitFor(() => {
       expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-1', view: 'work' }));
@@ -198,7 +364,9 @@ describe('TodayPage V2', () => {
       ],
     }), onOpenTodayTarget);
 
-    fireEvent.click(await screen.findByRole('button', { name: /open task/i }));
+    // An open-only row has no separate primary button — the row link is it.
+    expect(screen.queryByRole('button', { name: /^open task$/i })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /^(start here: )?t-7 checkout follow-up/i }));
 
     await waitFor(() => {
       expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ view: 'tasks', taskKey: 'T-7' }));
@@ -219,7 +387,7 @@ describe('TodayPage V2', () => {
     const doneButtons = await screen.findAllByRole('button', { name: /^Done$/i });
     fireEvent.click(doneButtons[0]!);
 
-    expect(await screen.findByRole('dialog', { name: /mark done/i })).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog', { name: /mark done/i })).toBeInTheDocument();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(
       fetchMock.mock.calls.some(([input, init]) =>
@@ -241,10 +409,11 @@ describe('TodayPage V2', () => {
     const fetchMock = mockFetch(todayResponse());
     renderToday();
 
-    const moreActions = await screen.findAllByLabelText('More actions');
-    const tomorrowButtons = screen.getAllByText('Tomorrow');
-    fireEvent.click(moreActions[1]!);
-    fireEvent.click(tomorrowButtons[0]!);
+    // docs/53 A1: a real menu — items only exist while it's open.
+    expect(screen.queryByRole('menuitem', { name: /tomorrow/i })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions for Follow up with QA' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: /tomorrow/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
@@ -274,9 +443,11 @@ describe('TodayPage V2', () => {
     }));
     renderToday();
 
-    fireEvent.click((await screen.findAllByLabelText('More actions'))[0]!);
-    fireEvent.click(screen.getAllByRole('button', { name: /^follow up$/i })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions for AM-1 Issue 1' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^follow up/i }));
     expect(await screen.findByRole('dialog', { name: /capture follow-up/i })).toBeInTheDocument();
+    // docs/53 F16: the default title uses what Today knows.
+    expect(screen.getByLabelText('Follow-up title')).toHaveValue('Follow up on AM-1');
     fireEvent.change(screen.getByLabelText('Follow-up title'), { target: { value: 'Check API rollout' } });
     fireEvent.click(screen.getByRole('button', { name: /save follow-up/i }));
 
@@ -313,7 +484,8 @@ describe('TodayPage V2', () => {
     }));
     renderToday();
 
-    fireEvent.click(await screen.findByRole('button', { name: /^meetings 1$/i }));
+    // docs/53 U7: one "Promises & meetings" list, no tabs.
+    expect(await screen.findByRole('heading', { name: 'Promises & meetings' })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /capture outcome/i }));
     fireEvent.change(screen.getByLabelText('Meeting outcome'), { target: { value: 'Decision approved' } });
     fireEvent.click(screen.getByRole('button', { name: /save outcome/i }));
@@ -331,7 +503,10 @@ describe('TodayPage V2', () => {
     renderToday();
 
     fireEvent.click(await screen.findByRole('button', { name: /^Check-in$/i }));
-    expect(await screen.findByText('Saves to Team / Alice Smith / Check-ins for today.')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Add check-in' });
+    expect(dialog).toHaveTextContent('Alice Smith');
+    // docs/53 F15: the signal is a placeholder, never a pre-filled value.
+    expect(screen.getByLabelText('Check-in note')).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Check-in note'), { target: { value: 'Asked for update' } });
     fireEvent.click(screen.getByRole('button', { name: /save check-in/i }));
 
@@ -475,8 +650,10 @@ describe('TodayPage V2', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /^Add check-in$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Check-in$/i })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Open developer$/i })).toBeInTheDocument();
     });
+    // The row stays, now open-only; Alice is in the queue so the pulse shows her as an avatar.
+    expect(screen.getByRole('button', { name: /^(start here: )?alice smith/i })).toBeInTheDocument();
+    expect(screen.getByText('1 in the queue')).toBeInTheDocument();
   });
 
   it('sets planned work current when Today chooses Set current for a developer', async () => {
@@ -565,7 +742,7 @@ describe('TodayPage V2', () => {
     });
   });
 
-  it('Start band body opens the target; only its action button runs the command (docs/53 F10)', async () => {
+  it('the first queue row is the priority: its link opens, only its primary button writes (docs/53 U1/F10)', async () => {
     const priorityTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
     const priority = actionItem(99, {
       id: 'priority-1',
@@ -575,12 +752,18 @@ describe('TodayPage V2', () => {
       primaryAction: command('mark_done', 'Mark done now', priorityTarget),
       secondaryActions: [],
     });
-    const fetchMock = mockFetch(todayResponse({ currentPriority: priority }));
+    const response = todayResponse({ currentPriority: priority, actionItems: [priority, actionItem(2)] });
+    const fetchMock = mockFetch(response);
     const onOpenTodayTarget = vi.fn();
-    renderToday(todayResponse({ currentPriority: priority }), onOpenTodayTarget);
+    renderToday(response, onOpenTodayTarget);
 
-    // Body click navigates — no mutation, no confirm dialog.
-    fireEvent.click(await screen.findByRole('button', { name: /open priority pick/i }));
+    const rows = await screen.findAllByTestId('today-action-row');
+    expect(rows[0]).toHaveAttribute('data-featured', 'true');
+    expect(rows[1]).not.toHaveAttribute('data-featured');
+    // No separate "Start" band duplicating the first row.
+    expect(screen.getAllByText('Priority pick')).toHaveLength(1);
+
+    fireEvent.click(within(rows[0]!).getByRole('button', { name: /^start here: priority pick/i }));
     expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ managerDeskItemId: 44 }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
@@ -589,9 +772,8 @@ describe('TodayPage V2', () => {
       ),
     ).toBe(false);
 
-    // The right-side action button is the write path.
-    fireEvent.click(screen.getByRole('button', { name: /^mark done now$/i }));
-    expect(await screen.findByRole('dialog', { name: /mark done\?/i })).toBeInTheDocument();
+    fireEvent.click(within(rows[0]!).getByRole('button', { name: /^mark done now$/i }));
+    expect(await screen.findByRole('alertdialog', { name: /mark done\?/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Mark done$/i }));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
@@ -615,8 +797,8 @@ describe('TodayPage V2', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderToday();
 
-    fireEvent.click((await screen.findAllByLabelText('More actions'))[0]!);
-    fireEvent.click(screen.getAllByRole('button', { name: /^follow up$/i })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions for AM-1 Issue 1' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^follow up/i }));
     expect(await screen.findByRole('dialog', { name: /capture follow-up/i })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Follow-up title'), { target: { value: 'Check API rollout' } });
     fireEvent.click(screen.getByRole('button', { name: /save follow-up/i }));
@@ -646,5 +828,194 @@ describe('TodayPage V2', () => {
 
     expect(await screen.findByText('Tracker write failed')).toBeInTheDocument();
     expect(screen.getByLabelText('Check-in note')).toHaveValue('Still working?');
+  });
+
+  describe('stage-driven layout (docs/53 §2/§3/§5)', () => {
+    const serverSummary: TodayResponse['summary'] = [
+      { id: 'attention', label: 'Attention', value: 11, detail: 'action rows', severity: 'warning' },
+      { id: 'work', label: 'Active defects', value: 5, detail: 'in Work', severity: 'neutral' },
+      { id: 'team', label: 'People', value: 7, detail: 'on team', severity: 'info' },
+      { id: 'stale', label: 'Stale check-ins', value: 2, detail: 'need update', severity: 'warning', target: target({ filter: undefined }) },
+      { id: 'due-work', label: 'Due today', value: 1, detail: 'defects', severity: 'warning', target: target({ view: 'work', filter: 'dueToday' }) },
+      { id: 'promises', label: 'Follow-ups', value: 4, detail: 'due now', severity: 'warning', target: target({ view: 'follow-ups' }) },
+    ];
+
+    it('header band: stage first, four decision metrics, no inventory tiles (D2/U3)', async () => {
+      const response = todayResponse({
+        summary: serverSummary,
+        rhythm: { stage: 'standup_window', label: 'Standup window', detail: 'Clear blockers', nextStage: { stage: 'midday_check', startsAt: new Date(2026, 2, 8, 12, 0).toISOString() } },
+      });
+      mockFetch(response);
+      renderToday(response);
+
+      const band = await screen.findByRole('region', { name: 'Today summary' });
+      expect(band.textContent?.startsWith('Standup window')).toBe(true);
+      expect(within(band).getByText('until 12:00')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Today/);
+      for (const name of ['11 in queue', '2 stale', '1 due', '4 follow-ups']) {
+        expect(within(band).getByRole('button', { name })).toBeInTheDocument();
+      }
+      expect(within(band).queryByText(/active defects|on team/i)).not.toBeInTheDocument();
+    });
+
+    it('wrap-up: the EOD block comes first and owns promises, so the queue does not repeat them', async () => {
+      const followUpTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
+      const base = todayResponse();
+      const response = todayResponse({
+        rhythm: { stage: 'wrap_up', label: 'Wrap-up', detail: 'Close loops' },
+        focus: {
+          stage: 'wrap_up',
+          wrapUp: {
+            missingCheckIns: [{
+              accountId: 'dev-2',
+              displayName: 'Deepak Rao',
+              target: target({ type: 'developer', developerAccountId: 'dev-2' }),
+              primaryAction: { kind: 'ask_check_in', label: 'Ask for update', target: target({ type: 'developer', developerAccountId: 'dev-2' }) },
+            }],
+            openPromises: base.promises,
+            carryCandidates: [],
+            eodNoteTarget: target({ view: 'notes', date: '2026-03-08' }),
+          },
+        },
+      });
+      const fetchMock = mockFetch(response);
+      const { onOpenTodayTarget } = renderToday(response);
+
+      const wrap = await screen.findByRole('heading', { name: 'Wrap-up' });
+      const queue = screen.getByRole('heading', { name: 'Queue' });
+      expect(wrap.compareDocumentPosition(queue) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // Follow-up 44 lives in the wrap-up block only.
+      expect(screen.getAllByText('Follow up with QA')).toHaveLength(1);
+      expect(screen.getAllByTestId('today-action-row').some((row) => row.textContent?.includes('Follow up with QA'))).toBe(false);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ask Deepak Rao for an update' }));
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/api/manager-actions/commands'),
+          expect.objectContaining({ body: expect.stringContaining('"kind":"ask_check_in"') }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /write eod note/i }));
+      expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ view: 'notes' }));
+      void followUpTarget;
+    });
+
+    it('standup: a sealed round shows "Standup ✓ 09:40 · 1 flagged" with the person one tap away (F7)', async () => {
+      const flaggedTarget = target({ type: 'developer', developerAccountId: 'dev-2' });
+      const response = todayResponse({
+        rhythm: { stage: 'standup_window', label: 'Standup window', detail: '' },
+        focus: {
+          stage: 'standup_window',
+          morning: {
+            nowCount: 3,
+            oneOnOnes: [],
+            standup: {
+              status: 'completed',
+              date: '2026-03-08',
+              endedAt: new Date(2026, 2, 8, 9, 40).toISOString(),
+              sessionCount: 1,
+              reviewedCount: 5,
+              flaggedCount: 1,
+              flagged: [{ accountId: 'dev-2', displayName: 'Deepak Rao', target: flaggedTarget }],
+              target: flaggedTarget,
+            },
+          },
+        },
+      });
+      mockFetch(response);
+      const { onOpenTodayTarget } = renderToday(response);
+
+      const line = await screen.findByRole('region', { name: 'Standup' });
+      expect(line).toHaveTextContent('Standup 09:40');
+      expect(line).toHaveTextContent('1 flagged');
+      fireEvent.click(within(line).getByRole('button', { name: 'Deepak' }));
+      expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ developerAccountId: 'dev-2' }));
+    });
+
+    it('since-last-visit strip sits above the queue and deep-links its chips', async () => {
+      const response = todayResponse({
+        delta: {
+          since: new Date(2026, 2, 7, 18, 40).toISOString(),
+          newIssues: { count: 0, items: [] },
+          overdueOvernight: { count: 1, items: [{ jiraKey: 'AM-3', summary: 'x', target: target({ type: 'issue', view: 'work', issueKey: 'AM-3', filter: 'overdue' }) }] },
+          newCheckIns: { count: 0, people: [] },
+          followUpsNewlyDue: { count: 0, items: [] },
+          resolvedCount: 2,
+        },
+      });
+      mockFetch(response);
+      const { onOpenTodayTarget } = renderToday(response);
+
+      const strip = await screen.findByRole('region', { name: 'Since your last visit' });
+      expect(strip.compareDocumentPosition(screen.getByRole('heading', { name: 'Queue' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(strip).getByRole('button', { name: '2 resolved' })).toBeDisabled();
+      fireEvent.click(within(strip).getByRole('button', { name: '1 went overdue' }));
+      expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-3' }));
+    });
+
+    it('an empty queue is a real done state with what comes next (U2)', async () => {
+      const calm = actionItem(1, { id: 'today-calm', type: 'calm', title: 'Team is calm', severity: 'success', primaryAction: command('open', 'Open Team', target()), secondaryActions: [] });
+      const response = todayResponse({
+        actionItems: [calm],
+        promises: [],
+        totalCount: 0,
+        rhythm: { stage: 'midday_check', label: 'Midday check', detail: '', nextStage: { stage: 'wrap_up', startsAt: new Date(2026, 2, 8, 16, 0).toISOString() } },
+      });
+      mockFetch(response);
+      renderToday(response);
+
+      const done = await screen.findByText('Clear for now');
+      expect(done.closest('[role="status"]')).toHaveTextContent('Next: Wrap-up at 16:00');
+      expect(screen.queryAllByTestId('today-action-row')).toHaveLength(0);
+    });
+
+    it('? opens the shortcuts sheet; the footer Capture uses global capture (F17)', async () => {
+      mockFetch(todayResponse());
+      const { openCapture } = renderToday(todayResponse());
+      await screen.findByRole('heading', { name: 'Queue' });
+
+      fireEvent.keyDown(window, { key: '?' });
+      const sheet = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+      expect(sheet).toHaveTextContent('Snooze to tomorrow');
+      fireEvent.keyDown(sheet, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument());
+
+      // The footer is display:none below md (docs/53 R2) — query it regardless.
+      fireEvent.click(screen.getByRole('button', { name: /capture/i, hidden: true }));
+      expect(openCapture).toHaveBeenCalled();
+    });
+
+    it('keeps focus in the queue after an optimistic removal (A5)', async () => {
+      const followUpTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
+      const response = todayResponse();
+      response.actionItems = [
+        { ...response.actionItems[1]!, primaryAction: { kind: 'mark_done', label: 'Done', target: followUpTarget, confirm: false, undoable: true } },
+        response.actionItems[0]!,
+      ];
+      // After the write the server no longer returns the done row.
+      let served = response;
+      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/manager-actions/commands')) {
+          served = { ...response, actionItems: response.actionItems.slice(1) };
+          return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify(served), { status: 200, headers: { 'content-type': 'application/json' } });
+      }));
+      renderToday(response);
+
+      const rows = await screen.findAllByTestId('today-action-row');
+      const doneButton = within(rows[0]!).getByRole('button', { name: 'Done' });
+      within(rows[0]!).getAllByRole('button')[0]!.focus();
+      doneButton.focus();
+      fireEvent.click(doneButton);
+
+      await waitFor(() => {
+        expect(document.activeElement).not.toBe(document.body);
+        expect(document.activeElement?.hasAttribute('data-row-link')).toBe(true);
+      });
+      expect(document.activeElement).toHaveAccessibleName(/am-1 issue 1/i);
+    });
   });
 });

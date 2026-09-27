@@ -1,133 +1,131 @@
+import { memo } from 'react';
 import {
   AlertTriangle,
   Bell,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
+  GitCompareArrows,
+  Loader2,
   MessageSquare,
+  PlayCircle,
+  RefreshCcw,
   Rows3,
   Target,
+  UserRoundX,
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import { formatClock, signalChips } from '@/lib/today-layout';
 import { TodayActionMenu } from './TodayActionMenu';
-import { todayToneStyles } from './today-design';
 import type { TodayActionCommand, TodayActionItem, TodayActionItemType } from '@/types';
 
 const iconByType: Record<TodayActionItemType, LucideIcon> = {
   developer_attention: Users,
   overdue_issue: AlertTriangle,
   due_issue: CalendarClock,
-  unassigned_issue: Users,
+  unassigned_issue: UserRoundX,
   high_priority_issue: AlertTriangle,
   stale_check_in: MessageSquare,
   follow_up_due: Bell,
   meeting_outcome: CalendarClock,
   desk_carry_forward: Rows3,
   manual_work: Target,
-  sync_attention: AlertTriangle,
-  jira_drift: AlertTriangle,
+  sync_attention: RefreshCcw,
+  jira_drift: GitCompareArrows,
   one_on_one: CalendarDays,
+  standup: PlayCircle,
   calm: CheckCircle2,
 };
 
+export type TodayRunCommand = (command: TodayActionCommand, preset?: 'later_today' | 'tomorrow' | 'next_week') => void;
+
 interface TodayActionRowProps {
   item: TodayActionItem;
+  /** docs/53 U1: the first row is "Start here" — the only tinted row. */
   featured?: boolean;
   isPending?: boolean;
-  onRunCommand: (command: TodayActionCommand, preset?: 'later_today' | 'tomorrow' | 'next_week') => void;
+  /** docs/53 U4: the keyboard-triage cursor is on this row. */
+  isActive?: boolean;
+  onRunCommand: TodayRunCommand;
 }
 
-export function TodayActionRow({ item, featured = false, isPending = false, onRunCommand }: TodayActionRowProps) {
+/**
+ * docs/53 D4/A2: two lines (title + reasons, then context), three stops —
+ * one link that opens the target, the compact primary action, the menu.
+ */
+export const TodayActionRow = memo(function TodayActionRow({
+  item,
+  featured = false,
+  isPending = false,
+  isActive = false,
+  onRunCommand,
+}: TodayActionRowProps) {
   const Icon = iconByType[item.type] ?? Target;
-  const style = todayToneStyles[item.severity];
-  const displaySignal = getCompactSignal(item.signal);
+  const chips = signalChips(item.signal);
+  const openCommand: TodayActionCommand = { kind: 'open', label: 'Open', target: item.target };
+  const primaryIsOpen = item.primaryAction.kind === 'open';
+  const asked = formatClock(item.askedAt);
+  const meta = [item.context, item.freshness].filter(Boolean).join(' · ');
 
   return (
     <div
-      className="grid w-full grid-cols-[32px_minmax(0,1fr)] gap-4 rounded-lg px-3.5 py-3.5 text-left transition-colors hover:bg-[var(--today-hover)] md:grid-cols-[32px_minmax(0,1.15fr)_minmax(130px,0.65fr)_112px_154px_34px]"
-      style={{
-        background: featured ? `linear-gradient(90deg, color-mix(in srgb, ${style.color} 4%, transparent), transparent)` : 'transparent',
-        boxShadow: featured ? `inset 0 0 0 1px color-mix(in srgb, ${style.color} 12%, var(--today-line))` : 'inset 0 -1px 0 var(--today-line)',
-      }}
+      className={`today-row today-tone-${item.severity}`}
       data-testid="today-action-row"
+      data-row-id={item.id}
+      data-featured={featured ? 'true' : undefined}
+      data-keyboard-active={isActive ? 'true' : undefined}
+      aria-current={isActive ? 'true' : undefined}
     >
-      <button
-        type="button"
-        onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: item.target })}
-        className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
-        style={{ color: style.color }}
-        aria-label={`Open ${item.title}`}
-      >
-        <Icon size={16} />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: item.target })}
-        className="min-w-0 text-left"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-[14px] font-medium" style={{ color: 'var(--text-primary)' }}>{item.title}</span>
-          <span
-            className="rounded-md border px-1.5 py-0.5 text-[11px] font-medium md:hidden"
-            style={{ background: style.bg, borderColor: style.border, color: style.color }}
-            title={item.signal}
-          >
-            {displaySignal}
-          </span>
-        </span>
-        <span className="mt-1 block truncate text-[12px] leading-5 md:hidden" style={{ color: 'var(--text-secondary)' }}>{item.context}</span>
-        {item.actionPreview ? (
-          <span className="block truncate text-[12px] leading-5 md:hidden" style={{ color: 'var(--text-muted)' }} title={`Will set: ${item.actionPreview}`}>
-            <span style={{ color: 'var(--accent)' }}>Will set:</span> {item.actionPreview}
-          </span>
-        ) : null}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: item.target })}
-        className="hidden min-w-0 text-left md:block"
-      >
-        <span className="block truncate text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>{item.context}</span>
-        {item.actionPreview ? (
-          <span className="mt-0.5 block truncate text-[12px] leading-5" style={{ color: 'var(--text-muted)' }} title={`Will set: ${item.actionPreview}`}>
-            <span style={{ color: 'var(--accent)' }}>Will set:</span> {item.actionPreview}
-          </span>
-        ) : null}
-      </button>
-
-      <span className="hidden md:block">
-        <span
-          className="inline-flex max-w-full items-center truncate rounded-md border px-2 py-1 text-[11px] font-medium"
-          style={{ background: style.bg, borderColor: style.border, color: style.color }}
-          title={item.signal}
-        >
-          {displaySignal}
-        </span>
+      <span className="today-row-icon" aria-hidden="true">
+        <Icon size={15} />
       </span>
 
       <button
         type="button"
-        onClick={() => onRunCommand(item.primaryAction)}
-        disabled={isPending}
-        className="hidden items-center justify-end gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50 md:flex"
-        style={{ color: 'var(--accent)' }}
+        className="today-row-link"
+        data-row-link=""
+        onClick={() => onRunCommand(openCommand)}
       >
-        {isPending ? 'Working' : item.primaryAction.label}
+        {featured ? <span className="sr-only">Start here: </span> : null}
+        <span className="today-row-title-line">
+          <span className="today-row-title">{item.title}</span>
+          {chips.map((chip, index) => (
+            <span key={chip} className="today-chip" data-quiet={index > 0 ? 'true' : undefined}>
+              {chip}
+            </span>
+          ))}
+        </span>
+        <span className="today-row-meta">
+          {asked ? <span className="today-row-meta-muted">Asked {asked} · </span> : null}
+          {item.actionPreview ? (
+            <>
+              <span className="today-row-preview">Will set</span> {item.actionPreview}
+            </>
+          ) : meta}
+        </span>
       </button>
 
-      <TodayActionMenu actions={item.secondaryActions} onRunAction={onRunCommand} />
+      <span className="today-row-actions">
+        {primaryIsOpen && item.type !== 'standup' ? null : (
+          <button
+            type="button"
+            className="today-primary"
+            onClick={() => onRunCommand(item.primaryAction)}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : null}
+            {item.primaryAction.label}
+          </button>
+        )}
+        <TodayActionMenu
+          label={item.title}
+          actions={item.secondaryActions}
+          primary={primaryIsOpen ? undefined : item.primaryAction}
+          open={primaryIsOpen ? item.primaryAction : openCommand}
+          onRunAction={onRunCommand}
+        />
+      </span>
     </div>
   );
-}
-
-function getCompactSignal(signal: string): string {
-  if (signal.includes('Stale without current work')) {
-    return 'Stale';
-  }
-
-  return signal
-    .split(' / ')[0] ?? signal;
-}
+});

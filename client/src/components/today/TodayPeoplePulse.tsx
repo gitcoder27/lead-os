@@ -1,109 +1,139 @@
-import { CheckCircle2, MessageSquare, Users } from 'lucide-react';
-import { todayToneStyles } from './today-design';
-import type { TodayActionCommand, TodayTeamPulseItem } from '@/types';
+import { formatClock } from '@/lib/today-layout';
+import { TodayActionMenu } from './TodayActionMenu';
+import { initials } from './TodayWrapUp';
+import type { TodayRunCommand } from './TodayActionRow';
+import type { TodayActionCommand, TodayActionSeverity, TodayActionTarget, TodayFocusPerson, TodayTeamPulseItem } from '@/types';
+
+export interface TodayPulsePerson {
+  accountId: string;
+  displayName: string;
+  tone: TodayActionSeverity;
+  status?: string;
+  meta?: string;
+  askedAt?: string;
+  target: TodayActionTarget;
+  primary?: TodayActionCommand;
+  secondary: TodayActionCommand[];
+}
+
+export function pulsePersonFromItem(person: TodayTeamPulseItem): TodayPulsePerson {
+  return {
+    accountId: person.accountId,
+    displayName: person.displayName,
+    tone: person.tone,
+    status: person.status,
+    meta: person.actionPreview ? `Will set ${person.actionPreview}` : [person.currentWork, person.lastUpdate].filter(Boolean).join(' · '),
+    askedAt: person.askedAt,
+    target: person.target,
+    primary: person.primaryAction.kind === 'open' ? undefined : person.primaryAction,
+    secondary: person.secondaryActions,
+  };
+}
+
+export function pulsePersonFromFocus(person: TodayFocusPerson, pulse?: TodayTeamPulseItem): TodayPulsePerson {
+  const base = pulse ? pulsePersonFromItem(pulse) : undefined;
+  return {
+    accountId: person.accountId,
+    displayName: person.displayName,
+    tone: base?.tone ?? 'neutral',
+    status: base?.status,
+    meta: base?.meta ?? 'No update since standup',
+    askedAt: person.askedAt ?? base?.askedAt,
+    target: person.target,
+    primary: person.primaryAction ?? base?.primary,
+    secondary: base?.secondary ?? [],
+  };
+}
 
 interface TodayPeoplePulseProps {
-  people: TodayTeamPulseItem[];
-  onRunCommand: (command: TodayActionCommand) => void;
+  title: string;
+  people: TodayPulsePerson[];
+  /** docs/53 U1: people already in the queue, as an avatar strip. */
+  queued: Array<Pick<TodayTeamPulseItem, 'accountId' | 'displayName' | 'tone' | 'target'>>;
+  emptyLabel: string;
+  onRunCommand: TodayRunCommand;
   onViewAll: () => void;
 }
 
-export function TodayPeoplePulse({ people, onRunCommand, onViewAll }: TodayPeoplePulseProps) {
-  const visiblePeople = people.slice(0, 6);
-  const hiddenCount = Math.max(people.length - visiblePeople.length, 0);
+export function TodayPeoplePulse({ title, people, queued, emptyLabel, onRunCommand, onViewAll }: TodayPeoplePulseProps) {
+  const visible = people.slice(0, 6);
+  const hidden = people.length - visible.length;
 
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users size={16} style={{ color: 'var(--accent)' }} />
-          <h2 className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>People pulse</h2>
-        </div>
-        <button type="button" onClick={onViewAll} className="text-[12px] font-medium" style={{ color: 'var(--accent)' }}>
-          View team
-        </button>
+    <section aria-labelledby="today-people-heading">
+      <div className="today-section-head">
+        <h2 id="today-people-heading" className="today-section-title">{title}</h2>
+        {people.length > 0 ? <span className="today-section-count">{people.length}</span> : null}
+        <span className="today-section-actions">
+          <button type="button" className="today-link" onClick={onViewAll}>Team</button>
+        </span>
       </div>
-
-      <div className="space-y-1">
-        {visiblePeople.length > 0 ? (
-          visiblePeople.map((person) => (
-            <PeoplePulseRow key={person.accountId} person={person} onRunCommand={onRunCommand} />
-          ))
-        ) : (
-          <div className="py-5 text-center">
-            <CheckCircle2 size={18} className="mx-auto" style={{ color: 'var(--success)' }} />
-            <p className="mt-2 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>Team is calm</p>
-          </div>
-        )}
-        {hiddenCount > 0 ? (
-          <button
-            type="button"
-            onClick={onViewAll}
-            className="w-full px-1 py-2.5 text-left text-[13px] font-medium transition-colors hover:bg-[var(--today-hover)]"
-            style={{ color: 'var(--accent)', borderBottom: '1px solid var(--today-line)' }}
-          >
-            +{hiddenCount} more people signals
-          </button>
+      <div className="today-list">
+        {visible.map((person) => (
+          <PulseRow key={person.accountId} person={person} onRunCommand={onRunCommand} />
+        ))}
+        {visible.length === 0 ? (
+          <p className="px-3 py-3 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>{emptyLabel}</p>
+        ) : null}
+        {hidden > 0 ? (
+          <button type="button" className="today-more" onClick={onViewAll}>+{hidden} more</button>
         ) : null}
       </div>
+      {queued.length > 0 ? (
+        <div className="today-avatar-strip">
+          <span className="today-avatar-stack">
+            {queued.slice(0, 6).map((person) => (
+              <button
+                key={person.accountId}
+                type="button"
+                className={`today-avatar today-tone-${person.tone}`}
+                title={person.displayName}
+                aria-label={`Open ${person.displayName}`}
+                onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: person.target })}
+              >
+                {initials(person.displayName)}
+              </button>
+            ))}
+          </span>
+          <span>{queued.length} in the queue</span>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function PeoplePulseRow({
-  person,
-  onRunCommand,
-}: {
-  person: TodayTeamPulseItem;
-  onRunCommand: (command: TodayActionCommand) => void;
-}) {
-  const style = todayToneStyles[person.tone];
-
+function PulseRow({ person, onRunCommand }: { person: TodayPulsePerson; onRunCommand: TodayRunCommand }) {
+  const asked = formatClock(person.askedAt);
+  const open: TodayActionCommand = { kind: 'open', label: 'Open', target: person.target };
   return (
-    <div
-      className="grid w-full grid-cols-[34px_minmax(0,1fr)_86px] gap-3 px-1 py-3 text-left md:grid-cols-[38px_minmax(118px,0.75fr)_82px_minmax(0,1fr)_82px]"
-      style={{ borderBottom: '1px solid var(--today-line)' }}
-    >
-      <button
-        type="button"
-        onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: person.target })}
-        className="relative mt-0.5 flex h-8 w-8 items-center justify-center rounded-md text-[11px] font-medium"
-        style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
-        aria-label={`Open ${person.displayName}`}
-      >
-        {person.initials}
-        <span className="absolute -left-1 top-1.5 h-1.5 w-1.5 rounded-full" style={{ background: style.color }} />
-      </button>
-      <button type="button" onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: person.target })} className="min-w-0 text-left">
-        <span className="block truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{person.displayName}</span>
-        <span className="mt-0.5 block truncate text-[12px] leading-5 md:hidden" style={{ color: 'var(--text-secondary)' }}>{person.currentWork}</span>
-      </button>
-      <span className="justify-self-start rounded-md px-2 py-1 text-[11px] font-medium" style={{ background: style.bg, color: style.color }}>
-        {person.status}
+    <div className={`today-row today-tone-${person.tone}`} data-testid="today-pulse-row">
+      <span className="today-avatar" aria-hidden="true" style={{ width: 22, height: 22, fontSize: 9 }}>
+        {initials(person.displayName)}
       </span>
-      <span className="hidden min-w-0 md:block">
-        <span className="block truncate text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>{person.currentWork}</span>
-        <span
-          className="mt-0.5 block truncate text-[12px] leading-5"
-          style={{ color: 'var(--text-muted)' }}
-          title={person.actionPreview ? `Will set: ${person.actionPreview}` : person.detail}
-        >
-          {person.actionPreview ? (
-            <>
-              <span style={{ color: 'var(--accent)' }}>Will set:</span> {person.actionPreview}
-            </>
-          ) : person.detail}
+      <button type="button" className="today-row-link" onClick={() => onRunCommand(open)}>
+        <span className="today-row-title-line">
+          <span className="today-row-title">{person.displayName}</span>
+          {person.status ? <span className="today-chip">{person.status}</span> : null}
         </span>
-      </span>
-      <button
-        type="button"
-        onClick={() => onRunCommand(person.primaryAction)}
-        className="hidden items-center justify-end gap-1.5 text-[12px] font-medium md:flex"
-        style={{ color: 'var(--accent)' }}
-      >
-        <MessageSquare size={12} />
-        {person.primaryAction.label}
+        <span className="today-row-meta">
+          {asked ? <span className="today-row-meta-muted">Asked {asked} · </span> : null}
+          {person.meta}
+        </span>
       </button>
+      <span className="today-row-actions">
+        {person.primary ? (
+          <button type="button" className="today-primary" onClick={() => onRunCommand(person.primary!)}>
+            {person.primary.label}
+          </button>
+        ) : null}
+        <TodayActionMenu
+          label={person.displayName}
+          actions={person.secondary}
+          primary={person.primary}
+          open={open}
+          onRunAction={onRunCommand}
+        />
+      </span>
     </div>
   );
 }

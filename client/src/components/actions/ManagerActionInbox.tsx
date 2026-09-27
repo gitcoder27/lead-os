@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as Popover from '@radix-ui/react-popover';
-import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Ban,
@@ -26,8 +25,6 @@ import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useAlerts, useDismissAlerts } from '@/hooks/useAlerts';
 import { useToast } from '@/context/ToastContext';
-import { useAuthScopeKey } from '@/context/AuthContext';
-import { api } from '@/lib/api';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { getLocalIsoDate } from '@/lib/utils';
 import { snoozePresets } from '@/components/today/TodayActionMenu';
@@ -36,10 +33,8 @@ import type {
   FilterType,
   ManagerActionCommand,
   ManagerActionItem,
-  ManagerActionResponse,
   ManagerActionTarget,
   TodayActionItemType,
-  TodayResponse,
 } from '@/types';
 import type { AppView } from '@/App';
 import { TodayCheckInDialog } from '@/components/today/TodayCheckInDialog';
@@ -49,8 +44,6 @@ import { TodayTextCaptureDialog, type TodayCapturePreset } from '@/components/to
 interface ManagerActionInboxProps {
   date?: string;
   enabled?: boolean;
-  /** docs/53 P2: on `/` derive the inbox from the shared Today query cache. */
-  deriveFromToday?: boolean;
   onOpenTarget: (target: ManagerActionTarget) => void;
   onViewChange: (view: AppView) => void;
 }
@@ -71,13 +64,13 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   sync_attention: AlertTriangle,
   jira_drift: AlertTriangle,
   one_on_one: CalendarDays,
+  standup: Users,
   calm: CheckCircle2,
 };
 
 export function ManagerActionInbox({
   date = getLocalIsoDate(),
   enabled = true,
-  deriveFromToday = false,
   onOpenTarget,
   onViewChange,
 }: ManagerActionInboxProps) {
@@ -91,7 +84,7 @@ export function ManagerActionInbox({
   const [textDraft, setTextDraft] = useState<{
     command: ManagerActionCommand;
     title: string;
-    description: string;
+    description?: string;
     label: string;
     defaultValue: string;
     saveLabel: string;
@@ -104,20 +97,13 @@ export function ManagerActionInbox({
     preset?: SnoozePreset;
     error?: string;
   } | null>(null);
-  const authScopeKey = useAuthScopeKey();
-  // docs/53 P2: on `/` the header inbox reads the shared ['today'] cache
-  // instead of polling /manager-actions in parallel.
-  const todaySnapshot = useQuery<TodayResponse>({
-    queryKey: ['today', date, authScopeKey],
-    queryFn: ({ signal }) => api.get<TodayResponse>(`/today?date=${encodeURIComponent(date)}`, { signal }),
-    enabled: false,
-    staleTime: Infinity,
-  });
-  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled: enabled && !deriveFromToday });
-  const actionsData = deriveFromToday ? buildHeaderResponse(todaySnapshot.data) : managerActions.data;
-  const actionsLoading = deriveFromToday ? !todaySnapshot.data : managerActions.isLoading;
-  const actionsFetching = deriveFromToday ? todaySnapshot.isFetching : managerActions.isFetching;
-  const actionsError = deriveFromToday ? false : managerActions.isError;
+  // docs/53 U1: the inbox isn't rendered on `/` (Today is the inbox there),
+  // so it only ever reads /manager-actions.
+  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled });
+  const actionsData = managerActions.data;
+  const actionsLoading = managerActions.isLoading;
+  const actionsFetching = managerActions.isFetching;
+  const actionsError = managerActions.isError;
   const actions = actionsData?.actions ?? [];
   const urgentCount = actionsData?.urgentCount ?? 0;
   const actionRunner = useTodayActions({ date, onOpenTarget });
@@ -166,7 +152,6 @@ export function ManagerActionInbox({
       setTextDraft({
         command,
         title: 'Capture follow-up',
-        description: 'Save a linked follow-up.',
         label: 'Follow-up title',
         defaultValue: defaultFollowUpTitle(command.target),
         saveLabel: 'Save follow-up',
@@ -178,8 +163,7 @@ export function ManagerActionInbox({
     if (command.kind === 'capture_meeting_outcome') {
       setTextDraft({
         command,
-        title: 'Capture meeting outcome',
-        description: 'Close the meeting loop.',
+        title: 'Capture outcome',
         label: 'Meeting outcome',
         defaultValue: '',
         saveLabel: 'Save outcome',
@@ -230,7 +214,7 @@ export function ManagerActionInbox({
         {checkInDraft ? (
           <TodayCheckInDialog
             developerName={checkInDraft.developerName}
-            defaultSummary={checkInDraft.defaultSummary}
+            placeholder={checkInDraft.defaultSummary || undefined}
             tasks={checkInTasks}
             initialTaskKeys={checkInDraft.command.target.context?.taskKey ? [checkInDraft.command.target.context.taskKey] : undefined}
             isSaving={actionRunner.isPending && actionRunner.pendingKind === 'add_check_in'}
@@ -704,24 +688,9 @@ function buildDefaultCheckInSummary(actions: ManagerActionItem[], target: Manage
     return '';
   }
 
-  return `Manager check-in: ${actionMatch.signal}`;
-}
-
-/** docs/53 P2: derive the header inbox payload from the shared Today cache. */
-function buildHeaderResponse(today: TodayResponse | undefined): ManagerActionResponse | undefined {
-  if (!today) {
-    return undefined;
-  }
-
-  const actionable = today.actionItems.filter((item) => item.type !== 'calm');
-  return {
-    date: today.date,
-    generatedAt: today.generatedAt,
-    surface: 'header',
-    actions: actionable.slice(0, 8),
-    urgentCount: actionable.filter((item) => item.severity === 'critical' || item.severity === 'warning').length,
-    totalCount: actionable.length,
-  };
+  // docs/53 F15: a placeholder hint, never a pre-filled value.
+  const reason = actionMatch.signal.split(' / ')[0]?.trim();
+  return reason ? `${reason} — what did you hear?` : '';
 }
 
 function errorMessage(error: unknown): string {

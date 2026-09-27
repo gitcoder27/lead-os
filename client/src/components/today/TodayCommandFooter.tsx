@@ -1,58 +1,37 @@
-import { BriefcaseBusiness, Plus, Rows3, Users, Zap, type LucideIcon } from 'lucide-react';
-import type { AppView } from '@/App';
-import type { FilterType } from '@/types';
+import { NotebookPen, Plus } from 'lucide-react';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 
 interface TodayCommandFooterProps {
-  onViewChange: (view: AppView) => void;
-  onSelectWorkFilter?: (filter: FilterType) => void;
+  date: string;
+  /** Prefills capture from the keyboard-active row (developer / issue). */
+  captureContext?: GlobalCaptureContext;
+  onOpenShortcuts: () => void;
 }
 
-export function TodayCommandFooter({ onViewChange, onSelectWorkFilter }: TodayCommandFooterProps) {
+/**
+ * docs/53 F17/R2/§7: the footer keeps one capture affordance (the global
+ * capture dialog, not a jump to Desk) and today's note. Nav duplicates are
+ * gone, and the whole bar is hidden below `md`.
+ */
+export function TodayCommandFooter({ date, captureContext, onOpenShortcuts }: TodayCommandFooterProps) {
+  const { openCapture, openNotes } = useQuickActions();
   return (
-    <footer className="shrink-0 border-t px-5 py-2 xl:px-8" style={{ borderColor: 'var(--today-line)', background: 'color-mix(in srgb, var(--bg-primary) 48%, transparent)' }}>
-      <div className="grid gap-1.5 md:grid-cols-[150px_repeat(4,minmax(0,1fr))_170px]">
-        <div className="hidden items-center gap-2.5 md:flex">
-          <Zap size={16} style={{ color: 'var(--accent)' }} />
-          <div>
-            <p className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>Quick actions</p>
-            <p className="text-[11.5px] leading-5" style={{ color: 'var(--text-muted)' }}>Capture or jump</p>
-          </div>
-        </div>
-        <FooterAction icon={Plus} title="Capture" detail="Note, decision, follow-up" onClick={() => onViewChange('desk')} />
-        <FooterAction icon={Rows3} title="Open Work" detail="Defects and filters" onClick={() => onViewChange('work')} />
-        <FooterAction icon={Users} title="Open Team" detail="Team tracker board" onClick={() => onViewChange('team')} />
-        <FooterAction icon={BriefcaseBusiness} title="Open Desk" detail="Manager daily desk" onClick={() => onViewChange('desk')} />
-        <button
-          type="button"
-          onClick={() => onSelectWorkFilter?.('blocked')}
-          className="hidden items-center justify-end gap-2.5 border-l pl-4 text-left transition-colors hover:bg-[var(--today-hover)] md:flex"
-          style={{ borderColor: 'var(--today-line)' }}
-        >
-          <Zap size={16} style={{ color: 'var(--accent)' }} />
-          <span>
-            <span className="block text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>Standup</span>
-            <span className="block text-[12px] leading-5" style={{ color: 'var(--text-muted)' }}>Blocked work</span>
-          </span>
+    <footer className="today-footer">
+      <button type="button" className="today-ghost" onClick={() => openCapture(captureContext)}>
+        <Plus size={14} aria-hidden="true" />
+        Capture
+        <kbd className="today-kbd">⌘I</kbd>
+      </button>
+      {openNotes ? (
+        <button type="button" className="today-ghost" onClick={() => openNotes(date)}>
+          <NotebookPen size={13} aria-hidden="true" />
+          Today&apos;s note
         </button>
-      </div>
+      ) : null}
+      <button type="button" className="today-ghost ml-auto" onClick={onOpenShortcuts}>
+        Shortcuts <kbd className="today-kbd">?</kbd>
+      </button>
     </footer>
-  );
-}
-
-function FooterAction({ icon: Icon, title, detail, onClick }: { icon: LucideIcon; title: string; detail: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[var(--today-hover)] active:scale-[0.98]"
-    >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)' }}>
-        <Icon size={14} />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{title}</span>
-        <span className="hidden truncate text-[11.5px] leading-5 xl:block" style={{ color: 'var(--text-muted)' }}>{detail}</span>
-      </span>
-    </button>
   );
 }

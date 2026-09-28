@@ -9,6 +9,7 @@ import {
   type ResolvedCapture,
 } from 'shared/capture-grammar';
 import { taskLabelDisplayName } from '@/types';
+import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/context/ToastContext';
 import { useCapture } from '@/hooks/useCapture';
 import { useDevelopers } from '@/hooks/useDevelopers';
@@ -48,6 +49,13 @@ const TOKEN_BG: Record<CaptureTokenKind, string> = {
 interface CaptureBoxProps {
   /** Initial text, e.g. "@dev-1 " from a developer context or "/note ". */
   prefill?: string;
+  /**
+   * The developer this capture is for (standup "New task", dev-scoped quick
+   * capture). Shown as an assignee pill above the input; the `@accountId`
+   * token is injected at submit so a raw account id never appears in the
+   * text. A `@person` typed in the box overrides it.
+   */
+  assignee?: { accountId: string; displayName?: string };
   onClose: () => void;
   /** Fires after a successful capture, before close (standup session log, docs/50). */
   onCaptured?: (result: { intent: string; taskKey?: string }) => void;
@@ -78,14 +86,14 @@ function DiagnosticRow({ diagnostic }: { diagnostic: CaptureDiagnostic }) {
   );
 }
 
-function summarize(resolved: ResolvedCapture, developerNames: Map<string, string>) {
+function summarize(resolved: ResolvedCapture, developerNames: Map<string, string>, omitOwner = false) {
   const chips: React.ReactNode[] = [];
   if (resolved.intent === 'update') {
     chips.push(<Chip key="intent" icon={<ArrowRight size={10} />}>Update {resolved.updateTargetKey}</Chip>);
   } else if (resolved.intent === 'note') {
     chips.push(<Chip key="intent" icon={<NotebookPen size={10} />}>Today's note</Chip>);
   }
-  if (resolved.owner) {
+  if (resolved.owner && !omitOwner) {
     chips.push(<Chip key="owner" icon={<UserRound size={10} />}>{developerNames.get(resolved.owner.accountId) ?? resolved.owner.accountId}</Chip>);
   }
   if (resolved.meeting) chips.push(<Chip key="meeting" icon={<Users size={10} />}>Meeting</Chip>);
@@ -118,7 +126,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
  * preview + structured summary; the server re-parses authoritatively on
  * submit. Errors block the submit; warnings may need a confirm press.
  */
-export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProps) {
+export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: CaptureBoxProps) {
   const { addToast } = useToast();
   const capture = useCapture();
   const developers = useDevelopers();
@@ -219,10 +227,20 @@ export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProp
     setText(text.slice(0, token.start) + `@${accountId}` + text.slice(token.end));
   };
 
+  // Assignee pill: shows the effective owner — the prop, or a `@person` the
+  // user typed themselves. Irrelevant for update/note intents and forbidden
+  // on /later, so it hides there (and no token is injected for them).
+  const ownerPill = resolved?.owner ?? assignee ?? null;
+  const ownerPillName = ownerPill
+    ? developerNames.get(ownerPill.accountId) ?? ownerPill.displayName ?? ownerPill.accountId
+    : '';
+  const showOwnerPill = !!assignee && (!resolved || (resolved.intent === 'create' && !resolved.later));
+
   const submit = (confirm = false) => {
     if (!resolved || blocked || capture.isPending) return;
+    const injectOwner = assignee && resolved.intent === 'create' && !resolved.owner && !resolved.later;
     capture.mutate(
-      { text, clientToday: today, ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
+      { text: injectOwner ? `@${assignee.accountId} ${text}` : text, clientToday: today, ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
       {
         onSuccess: (res) => {
           if (res.blocked) {
@@ -286,10 +304,28 @@ export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProp
     return spans;
   };
 
-  const summaryChips = resolved ? summarize(resolved, developerNames) : [];
+  const summaryChips = resolved ? summarize(resolved, developerNames, !!assignee) : [];
 
   return (
     <div className="px-4 py-3 space-y-2.5">
+      {showOwnerPill && ownerPill && (
+        <div className="flex items-center gap-1.5" data-testid="capture-assignee">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+            Assignee
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-[12.5px] font-medium"
+            style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 26%, transparent)' }}
+          >
+            <Avatar name={ownerPillName} seed={ownerPill.accountId} size={16} />
+            {ownerPillName}
+          </span>
+          <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+            type @name to change
+          </span>
+        </div>
+      )}
+
       {/* Highlight-backed input: the textarea's text is transparent over a
           colored mirror, the caret stays visible. */}
       <div className="relative">

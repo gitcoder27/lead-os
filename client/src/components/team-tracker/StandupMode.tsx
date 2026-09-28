@@ -740,7 +740,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         {layer === 'capture' && (
           <LayerShell onClose={closeLayer} label={`Add a task for ${day.developer.displayName}`}>
             <CaptureBox
-              prefill={`@${day.developer.accountId} `}
+              assignee={{ accountId: day.developer.accountId, displayName: day.developer.displayName }}
               onClose={closeLayer}
               onCaptured={({ intent, taskKey }) => {
                 if (intent === 'note') return;

@@ -38,11 +38,11 @@ vi.mock('@/hooks/useTaskLabels', () => ({
   }),
 }));
 
-function renderBox(prefill = '') {
+function renderBox(prefill = '', assignee?: { accountId: string; displayName?: string }) {
   const onClose = vi.fn();
   const utils = render(
     <TestWrapper>
-      <CaptureBox prefill={prefill} onClose={onClose} />
+      <CaptureBox prefill={prefill} assignee={assignee} onClose={onClose} />
     </TestWrapper>,
   );
   const input = screen.getByLabelText('Capture');
@@ -256,5 +256,37 @@ describe('CaptureBox (P3-D8)', () => {
     expect(value).toBe('@dev-1 #PROJ-221 ');
     // Owner resolves immediately in the preview.
     expect(screen.getByTestId('capture-summary').textContent).toContain('Alice Smith');
+  });
+
+  it('shows the assignee as a pill instead of a raw @token in the input', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    expect((input as HTMLTextAreaElement).value).toBe('');
+    expect(screen.getByTestId('capture-assignee').textContent).toContain('Bob Jones');
+  });
+
+  it('injects the assignee @token into the submitted text', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    fireEvent.change(input, { target: { value: 'Review the deploy' } });
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+    expect(lastBody().text).toBe('@dev-2 Review the deploy');
+  });
+
+  it('lets a typed @person override the assignee pill', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    fireEvent.change(input, { target: { value: '@alice pair on the release' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Alice Smith' }));
+
+    // Pill tracks the typed owner; the text is submitted unchanged.
+    expect(screen.getByTestId('capture-assignee').textContent).toContain('Alice Smith');
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+    expect(lastBody().text).toBe('@dev-1 pair on the release');
+  });
+
+  it('hides the pill and injects nothing for /later captures', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    fireEvent.change(input, { target: { value: '/later Park this thought' } });
+    expect(screen.queryByTestId('capture-assignee')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+    expect(lastBody().text).toBe('/later Park this thought');
   });
 });

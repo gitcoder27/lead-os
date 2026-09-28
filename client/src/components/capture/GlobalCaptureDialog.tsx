@@ -67,10 +67,8 @@ export function GlobalCaptureDialog({
   const phase3Prefill = useMemo(() => {
     if (!phase3) return '';
     if (context?.defaultTarget === 'notes') return '/note ';
-    const parts: string[] = [];
-    if (context?.developer?.accountId) parts.push(`@${context.developer.accountId}`);
-    if (context?.issue?.jiraKey) parts.push(`#${context.issue.jiraKey}`);
-    return parts.length ? `${parts.join(' ')} ` : '';
+    if (context?.issue?.jiraKey) return `#${context.issue.jiraKey} `;
+    return '';
   }, [phase3, context]);
 
   // docs/54 §1.7: Phase 3 capture lands in Tasks (cyan); amber is legacy Desk only.
@@ -124,7 +122,15 @@ export function GlobalCaptureDialog({
       }
     >
       {phase3 ? (
-        <CaptureBox prefill={phase3Prefill} onClose={onClose} />
+        <CaptureBox
+          prefill={phase3Prefill}
+          assignee={
+            context?.developer?.accountId
+              ? { accountId: context.developer.accountId, displayName: context.developer.displayName }
+              : undefined
+          }
+          onClose={onClose}
+        />
       ) : isDesk ? (
         <DeskCaptureForm
           key="desk"

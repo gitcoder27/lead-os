@@ -91,10 +91,13 @@ export function StandupTaskList({
                 onDoubleClick={() => onOpen(task.taskKey)}
                 // docs/54 D3: the list-row idiom from /tasks — focus is a tint plus a
                 // keyboard ring; the left accent bar is reserved for "featured".
+                // j/k moves the focus state without moving DOM focus, so the ring
+                // is rendered from state, not :focus-visible.
                 className="relative block w-full px-3 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)] [&:not(:first-child)]:border-t"
                 style={{
                   borderColor: 'var(--border)',
-                  background: focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined,
+                  background: focused ? 'color-mix(in srgb, var(--bg-tertiary) 85%, transparent)' : undefined,
+                  boxShadow: focused ? 'inset 0 0 0 1.5px var(--border-active)' : undefined,
                 }}
               >
                 <span className="flex min-h-[38px] items-center gap-2.5">

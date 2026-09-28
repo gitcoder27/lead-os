@@ -90,8 +90,8 @@ vi.mock('@/context/ToastContext', () => ({
 }));
 
 vi.mock('@/components/capture/CaptureBox', () => ({
-  CaptureBox: ({ prefill, onClose }: { prefill?: string; onClose: () => void }) => (
-    <div data-testid="capture-box" data-prefill={prefill}>
+  CaptureBox: ({ assignee, onClose }: { assignee?: { accountId: string; displayName?: string }; onClose: () => void }) => (
+    <div data-testid="capture-box" data-assignee={assignee?.accountId}>
       <button type="button" onClick={onClose}>
         Done
       </button>
@@ -362,10 +362,10 @@ describe('StandupMode', () => {
     expect(within(dialog).getByLabelText(/Rationale/)).toBeInTheDocument();
   });
 
-  it('a opens the capture box pre-filled with the developer owner token', async () => {
+  it('a opens the capture box with the developer as assignee', async () => {
     renderStandup();
     fireEvent.keyDown(document.body, { key: 'n' });
-    expect(screen.getByTestId('capture-box')).toHaveAttribute('data-prefill', '@dev-1 ');
+    expect(screen.getByTestId('capture-box')).toHaveAttribute('data-assignee', 'dev-1');
     // Closing marks the developer visited and returns to the board layer.
     fireEvent.click(within(screen.getByTestId('capture-box')).getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(screen.queryByTestId('capture-box')).not.toBeInTheDocument());
@@ -631,7 +631,7 @@ describe('StandupMode', () => {
       fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       const empty = screen.getByText('No open tasks').parentElement!;
       fireEvent.click(within(empty).getByRole('button', { name: /Add task/ }));
-      expect(screen.getByTestId('capture-box')).toHaveAttribute('data-prefill', '@dev-2 ');
+      expect(screen.getByTestId('capture-box')).toHaveAttribute('data-assignee', 'dev-2');
     });
   });
 

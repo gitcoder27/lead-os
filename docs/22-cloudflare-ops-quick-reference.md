@@ -10,7 +10,7 @@ The production deployment no longer uses the Cloudflare Quick Tunnel as the prim
 
 Use `docs/23-hostinger-domain-vps-deployment-runbook.md` for the active VPS deployment and redeploy process.
 
-Keep this document only for rollback or legacy tunnel troubleshooting.
+Keep this document only for rollback or legacy tunnel troubleshooting. If you do fall back to the tunnel, set `TRUST_PROXY=loopback` (see `docs/20`) so the login throttle sees real visitor IPs.
 
 ## Current Services
 

@@ -655,6 +655,35 @@ Relevant file:
 
 - `server/src/services/auth.service.ts`
 
+### Client IP And TRUST_PROXY
+
+The app sits behind `nginx` on the same host, so every request reaches Node from `127.0.0.1`. Without further setup Express reports that address as the client IP, and the login throttle (which keys on `IP:username`) treats every user as one client: five bad passwords from anyone can lock a given account, including the manager, for up to 15 minutes.
+
+Set this in the production `.env` (`/home/ubuntu/apps/lead-os-prod/.env`) and restart the service:
+
+```env
+TRUST_PROXY=loopback
+```
+
+Why `loopback`:
+
+- Node only trusts `X-Forwarded-For` from a peer on the loopback interface, which is `nginx` here. A direct connection from any other address cannot spoof its IP.
+- The `nginx` block above sets `X-Forwarded-For $proxy_add_x_forwarded_for`, which appends the real peer after anything the client sent. Express takes the right-most untrusted entry, so a client-supplied `X-Forwarded-For` prefix cannot change its key.
+- `true` is rejected at startup on purpose: it trusts every hop and lets any client pick its own IP. An invalid value also fails startup rather than being ignored.
+
+Other values:
+
+- a hop count such as `1` also works for exactly one proxy in front of the app
+- if Cloudflare proxying (orange cloud) is ever put in front of `nginx`, `loopback` would report Cloudflare's edge IP instead of the visitor. Use a hop count of `2` only if every request always passes through Cloudflare, or restore the visitor IP in `nginx` with the `real_ip` module first
+
+Verify after a restart:
+
+```bash
+sudo journalctl -u lead-os -n 50 --no-pager | grep "trust proxy"
+```
+
+You should see `Express trust proxy enabled` with `trustProxy: "loopback"`. If `TRUST_PROXY` is unset the app behaves exactly as before.
+
 ### Two Subdomain Caveat
 
 If you use two hostnames, remember:

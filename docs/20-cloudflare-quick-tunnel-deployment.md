@@ -162,6 +162,10 @@ Even with HTTPS, the following still matter:
 - keep the server updated
 - monitor who has manager access
 
+## Client IP And TRUST_PROXY
+
+`cloudflared` connects to the app from the same host, so Node sees every request as coming from `127.0.0.1` and the login throttle (keyed on `IP:username`) treats all visitors as one client. Set `TRUST_PROXY=loopback` in the app's `.env` so Express takes the visitor address from `X-Forwarded-For`, which Cloudflare sets. Node then only trusts that header from the local `cloudflared` process. Do not use `true`: it is rejected on purpose because it lets clients spoof their IP. Leaving `TRUST_PROXY` unset keeps the old behavior. The live deployment now uses `nginx`; see the "Client IP And TRUST_PROXY" section in `docs/23-hostinger-domain-vps-deployment-runbook.md`.
+
 ## Operational Risks
 
 ### Temporary hostname

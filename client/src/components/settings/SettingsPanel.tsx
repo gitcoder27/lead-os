@@ -41,6 +41,7 @@ import {
   useAppUsers,
   useCreateAppUser,
   useDeleteAppUser,
+  useResetAppUserPassword,
   useDiscoverJiraFields,
   useDiscoverTeamMembers,
   useRemoveTeamDeveloper,
@@ -53,6 +54,7 @@ import {
 } from '@/hooks/useSettingsActions';
 import { TagManagementSection } from '@/components/settings/TagManagementSection';
 import { LabelsSection } from '@/components/settings/LabelsSection';
+import { UserPasswordResetAction } from '@/components/settings/UserPasswordResetAction';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
@@ -96,6 +98,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const appUsersQuery = useAppUsers();
   const { mutateAsync: createAppUser } = useCreateAppUser();
   const { mutateAsync: deleteAppUser } = useDeleteAppUser();
+  const { mutateAsync: resetAppUserPassword } = useResetAppUserPassword();
   const { mutateAsync: testJiraConnection } = useTestJiraConnection();
   const { mutateAsync: discoverJiraFields } = useDiscoverJiraFields();
   const { mutateAsync: saveSettingsConfig } = useSaveSettingsConfig();
@@ -272,6 +275,17 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       setTimeout(() => setCopiedLink(false), 2000);
     });
   };
+
+  // Rejections propagate to UserPasswordResetAction, which shows the message inline.
+  // The password is never put in a toast or logged.
+  const handleResetUserPassword = useCallback(async (user: AuthUser, newPassword: string) => {
+    await resetAppUserPassword({ username: user.username, newPassword });
+    addToast({
+      type: 'success',
+      title: 'Password reset',
+      message: `${user.displayName} was signed out and can log in with the new password.`,
+    });
+  }, [addToast, resetAppUserPassword]);
 
   const handleDeleteUser = useCallback(async (user: AuthUser) => {
     setDeletingUsername(user.username);
@@ -1873,7 +1887,13 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 </p>
                               </div>
                             </div>
-                            <div className="sm:ml-auto">
+                            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                              {u.role === 'developer' ? (
+                                <UserPasswordResetAction
+                                  user={u}
+                                  onReset={(newPassword) => handleResetUserPassword(u, newPassword)}
+                                />
+                              ) : null}
                               {u.role === 'developer' ? (
                                 <UserAccountDeleteAction
                                   user={u}

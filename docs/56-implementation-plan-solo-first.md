@@ -109,7 +109,7 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
   - Files: `server/src/routes/team.ts:338-350`, `auth.service.ts:185-196,221-243`, `team-tracker.service.ts:2596-2608`.
   - Accept: after removal, existing sessions fail auth and the user cannot log in. Decide between deleting `app_users`/`app_sessions` and failing auth on an inactive mapped developer. Prefer failing auth in `getUserForSession` too, so it holds even if sessions survive.
   - Test: removed developer's cookie returns 401 on `/api/my-day`.
-- [ ] **P0-S3** Fix the login throttle behind the tunnel and add an admin password reset.
+- [x] **P0-S3** (`task/p0-s3-throttle-and-reset`) Fix the login throttle behind the tunnel and add an admin password reset.
   - Files: `server/src/routes/auth.ts:82-84`, `server/src/app.ts`, `auth.service.ts:300-324`, `docs/42-auth-admin-cli.md`.
   - Accept: `trust proxy` configured from env (default safe for local dev), throttle keys on the real client IP, and a manager can reset a developer's password (Settings action, plus CLI command in `server/src/scripts/`).
 - [x] **P0-S4** (`task/p0-s4-error-boundary`) Add a root error boundary and reload on chunk-load failure.
@@ -385,6 +385,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 | 2026-09-29 | P0-S4 | task/p0-s4-error-boundary | Sonnet | Root error boundary, guarded reload on `vite:preloadError` and lazy-chunk errors (30s sessionStorage guard). |
 | 2026-09-29 | P0-S1 | task/p0-s1-my-day-issues-projection | Sonnet | `DeveloperIssue` allowlist projection for `GET /api/my-day/issues` (`IssueService.getForDeveloper`), route tests incl. exact-key allowlist. Needs Opus review (developer-visible data). |
 | 2026-09-29 | P0-S2 | task/p0-s2-revoke-on-removal | Sonnet | Removal (DELETE and PATCH isActive:false) deletes the developer's sessions and login rows; `getUserForSession` and login reject developer logins with a missing/inactive team member. Needs Opus review (auth/sessions). |
+| 2026-09-29 | P0-S3 | task/p0-s3-throttle-and-reset | Sonnet | `TRUST_PROXY` env (validated; blanket `true` rejected) applied in `createApp`; manager-only developer password reset (route, Settings action, `auth:reset-password` CLI). Needs Opus review (auth). |
 
 ## Findings from verification
 

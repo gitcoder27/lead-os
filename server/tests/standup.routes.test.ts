@@ -88,8 +88,9 @@ describe("GET /api/team-tracker/standup/feed (P3-D5/D6)", () => {
     await enablePhase3();
     const task = await createDevTask("active", "Migration");
     const now = Date.now();
+    const isMonday = new Date(`${todayIsoDate()}T12:00:00`).getDay() === 1;
     const inside = new Date(now - 2 * 60 * 60 * 1000).toISOString();
-    const outside = new Date(now - 30 * 60 * 60 * 1000).toISOString();
+    const outside = new Date(now - (isMonday ? 80 : 30) * 60 * 60 * 1000).toISOString();
 
     await eventsService.append(
       { workspaceId: "default", taskKey: task.taskKey, type: "update", meta: null, body: "inside window", occurredAt: inside },
@@ -128,7 +129,6 @@ describe("GET /api/team-tracker/standup/feed (P3-D5/D6)", () => {
     const response = await invoke("GET", "/api/team-tracker/standup/feed?accountId=dev-1");
     expect(response.status).toBe(200);
     const feed = response.body;
-    const isMonday = new Date(`${today}T12:00:00`).getDay() === 1;
     expect(feed.windowHours).toBe(isMonday ? 72 : 24);
     expect(new Date(feed.windowStart).getTime()).toBeLessThanOrEqual(Date.now() - feed.windowHours * 3600 * 1000 + 1000);
 

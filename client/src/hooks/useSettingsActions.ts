@@ -98,6 +98,13 @@ export function useDeleteAppUser() {
   });
 }
 
+export function useResetAppUserPassword() {
+  return useMutation({
+    mutationFn: ({ username, newPassword }: { username: string; newPassword: string }) =>
+      api.post<{ ok: true }>(`/auth/users/${encodeURIComponent(username)}/reset-password`, { newPassword }),
+  });
+}
+
 export function useDiscoverJiraFields() {
   return useMutation({
     mutationFn: async () => {

@@ -3,9 +3,14 @@ import { promisify } from "node:util";
 import { and, eq } from "drizzle-orm";
 import type { AuthUser, UserRole } from "shared/types";
 import { db } from "../db/connection";
+import { runInTransaction } from "../db/transaction";
 import { appSessions, appUsers, developers } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId, WorkspaceService } from "./workspace.service";
+
+/** Password rules shared by account creation (`/register`), reset and the admin CLI. */
+export const PASSWORD_MIN_LENGTH = 6;
+export const PASSWORD_MAX_LENGTH = 200;
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -321,6 +326,57 @@ export class AuthService {
       .update(appUsers)
       .set({ passwordHash: await hashPassword(newPassword), updatedAt: nowIso() })
       .where(eq(appUsers.id, row.id));
+  }
+
+  /**
+   * Admin password reset: sets a new password without the current one and signs the
+   * user out everywhere. `allowedRoles` is the caller's policy (the Settings route
+   * passes ["developer"]; the host-trusted CLI also allows managers). `workspaceId`
+   * scopes the lookup for callers that are tied to a workspace; the CLI omits it
+   * because usernames are globally unique. Never logs or returns the password.
+   */
+  async resetPassword(
+    username: string,
+    newPassword: string,
+    options: { allowedRoles: UserRole[]; workspaceId?: string }
+  ): Promise<{ username: string; role: UserRole; sessionsRevoked: number }> {
+    const normalizedUsername = normalizeUsername(username);
+    if (!normalizedUsername) {
+      throw new HttpError(400, "username is required");
+    }
+    if (typeof newPassword !== "string" || newPassword.length < PASSWORD_MIN_LENGTH) {
+      throw new HttpError(400, `New password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    }
+    if (newPassword.length > PASSWORD_MAX_LENGTH) {
+      throw new HttpError(400, `New password must be at most ${PASSWORD_MAX_LENGTH} characters`);
+    }
+
+    const rows = await db
+      .select()
+      .from(appUsers)
+      .where(
+        and(
+          eq(appUsers.username, normalizedUsername),
+          eq(appUsers.isActive, 1),
+          options.workspaceId ? eq(appUsers.workspaceId, normalizeWorkspaceId(options.workspaceId)) : undefined
+        )
+      )
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      throw new HttpError(404, "User not found");
+    }
+    const role = row.role as UserRole;
+    if (!options.allowedRoles.includes(role)) {
+      throw new HttpError(403, `Passwords for ${role} accounts cannot be reset here`);
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    return runInTransaction(async () => {
+      await db.update(appUsers).set({ passwordHash, updatedAt: nowIso() }).where(eq(appUsers.id, row.id));
+      const revoked = await db.delete(appSessions).where(eq(appSessions.userId, row.id)).returning({ id: appSessions.id });
+      return { username: row.username, role, sessionsRevoked: revoked.length };
+    });
   }
 
   async deleteUser(username: string, workspaceId?: string): Promise<void> {

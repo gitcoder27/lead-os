@@ -8,6 +8,8 @@ export async function invoke(
     url: string;
     body?: unknown;
     headers?: Record<string, string>;
+    /** Socket peer address, i.e. what `req.ip` falls back to (and what `trust proxy` checks). */
+    remoteAddress?: string;
   }
 ): Promise<{
   status: number;
@@ -26,8 +28,8 @@ export async function invoke(
     method: string;
     headers: Record<string, string>;
     body?: unknown;
-    connection: Record<string, never>;
-    socket: Record<string, never>;
+    connection: { remoteAddress?: string };
+    socket: { remoteAddress?: string };
     httpVersion: string;
     httpVersionMajor: number;
     httpVersionMinor: number;
@@ -40,8 +42,8 @@ export async function invoke(
     ...(options.headers ?? {}),
   };
   req.body = options.body;
-  req.connection = {};
-  req.socket = {};
+  req.connection = { remoteAddress: options.remoteAddress };
+  req.socket = { remoteAddress: options.remoteAddress };
   req.httpVersion = "1.1";
   req.httpVersionMajor = 1;
   req.httpVersionMinor = 1;

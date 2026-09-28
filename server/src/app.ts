@@ -54,6 +54,8 @@ import { TeamTrackerService } from "./services/team-tracker.service";
 import { TodayService } from "./services/today.service";
 import { SyncEngine } from "./sync/engine";
 import { resolveWorkspaceRoot } from "./db/paths";
+import { logger } from "./utils/logger";
+import { parseTrustProxy, type TrustProxySetting } from "./utils/trust-proxy";
 
 // Vite emits content-hashed filenames (e.g. assets/index-CnNbQUcO.js), which are
 // safe to cache forever: any change produces a new URL.
@@ -121,8 +123,21 @@ export interface AppServices {
   oneOnOneService?: OneOnOneService;
 }
 
-export function createApp(services: AppServices) {
+export interface AppOptions {
+  /** Overrides `TRUST_PROXY`; mainly for tests. `false` leaves Express's default (ignore X-Forwarded-*). */
+  trustProxy?: TrustProxySetting;
+}
+
+export function createApp(services: AppServices, options: AppOptions = {}) {
   const app = express();
+  // Behind nginx/cloudflared every request arrives from the proxy's address, so
+  // without this `req.ip` (and the login throttle keyed on it) is one shared value.
+  // Off unless TRUST_PROXY is set; never a blanket `true` (see parseTrustProxy).
+  const trustProxy = options.trustProxy ?? parseTrustProxy(process.env.TRUST_PROXY);
+  if (trustProxy !== false) {
+    app.set("trust proxy", trustProxy);
+    logger.info({ trustProxy }, "Express trust proxy enabled");
+  }
   app.use("/api/notes", express.json({ limit: "512kb" }));
   app.use(express.json());
 

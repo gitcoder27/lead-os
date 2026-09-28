@@ -117,7 +117,7 @@ Run from repo root:
 - Validate/build: `npm run typecheck`, `npm run build:check`, `npm run build`, `npm run start`.
 - Tests: `npm run test`, `npm run test --workspace=client`, `npm run test:coverage`.
 - Ops: `npm run backup:restore -- <path-to-backup-db>`, `npm run manager-desk:cleanup-carry-forward -- <args>`, `npm run tasks:drop-legacy --workspace=server -- --workspace <id> [--apply]` (dry-run default; drops `legacy_*` archives once stage `2d` + `p2_contract` have soaked 30 days), `npm run one-on-one --workspace=server -- --workspace <id> [--status|--enable|--disable]` (`one_on_one_enabled` toggle for the manager-private 1:1 workspace, `/team?dev=<id>&panel=one-on-one`).
-- Users: `npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <manager|developer> [--developer-account-id <id>]`.
+- Users: `npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <manager|developer> [--developer-account-id <id>]`. Reset a password (signs the user out everywhere; prefer stdin): `printf '%s' <password> | npm run auth:reset-password --workspace=server -- --username <name> --password-stdin`. Behind nginx/cloudflared set `TRUST_PROXY=loopback` (see docs/23).
 - Deploy/worktrees: `npm run deploy:prod`, `npm run sync:worktrees`.
 
 Windows users can use `run-node20.ps1` modes: `all`, `install`, `build`, `test`, `dev`, `client-dev`, `client-build`, `client-test`.

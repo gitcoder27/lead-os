@@ -98,6 +98,8 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+If the tunnel is your public path, also add `Environment=TRUST_PROXY=loopback` to the `[Service]` block (or set it in the app's `.env`). Without it the login throttle sees every visitor as `127.0.0.1` and one person's failed attempts lock the account for everyone. See `docs/20-cloudflare-quick-tunnel-deployment.md` ("Client IP And TRUST_PROXY").
+
 ## Tunnel Service
 
 Create:

@@ -3,7 +3,14 @@ import { z } from "zod";
 import type { AuthBootstrapResponse, AuthSessionResponse, AuthUser } from "shared/types";
 import { validate } from "../middleware/validate";
 import { requireAuth, requireManager } from "../middleware/auth";
-import { AuthService, clearSessionCookie, serializeSessionCookie, SESSION_COOKIE_NAME } from "../services/auth.service";
+import {
+  AuthService,
+  clearSessionCookie,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  serializeSessionCookie,
+  SESSION_COOKIE_NAME,
+} from "../services/auth.service";
 import { TaskKeysService } from "../services/task-keys.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { HttpError } from "../middleware/errorHandler";
@@ -20,7 +27,7 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   body: z.object({
     username: z.string().min(1).max(100),
-    password: z.string().min(6).max(200),
+    password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
     displayName: z.string().min(1).max(200),
     role: z.enum(["manager", "developer"]),
     developerAccountId: z.string().optional(),
@@ -47,6 +54,16 @@ const deleteUserSchema = z.object({
   query: z.any().optional(),
 });
 
+const resetPasswordSchema = z.object({
+  body: z.object({
+    newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  }),
+  params: z.object({
+    username: z.string().min(1).max(100),
+  }),
+  query: z.any().optional(),
+});
+
 class AuthAttemptThrottle {
   private readonly attempts = new Map<string, { failures: number; lockedUntil?: number; lastFailureAt: number }>();
 
@@ -64,6 +81,14 @@ class AuthAttemptThrottle {
 
   recordSuccess(key: string): void {
     this.attempts.delete(key);
+  }
+
+  /** Forget every client's failures for one username (used after an admin reset). */
+  clearUsername(username: string): void {
+    const suffix = `:${username.trim().toLowerCase()}`;
+    for (const key of this.attempts.keys()) {
+      if (key.endsWith(suffix)) this.attempts.delete(key);
+    }
   }
 
   recordFailure(key: string): void {
@@ -218,6 +243,29 @@ export function createAuthRouter(authService: AuthService): Router {
       next(error);
     }
   });
+
+  // Manager-only, developer accounts only: managers recover their own password with
+  // /change-password, or an operator runs `npm run auth:reset-password` on the host.
+  // A manager resetting another manager's password would be an account takeover path.
+  router.post(
+    "/users/:username/reset-password",
+    requireManager(authService),
+    validate(resetPasswordSchema),
+    async (req, res, next) => {
+      try {
+        const username = req.params.username as string;
+        await authService.resetPassword(username, req.body.newPassword, {
+          allowedRoles: ["developer"],
+          workspaceId: req.auth!.user.workspaceId,
+        });
+        // The person was likely locked out by failed attempts; let them try the new password.
+        throttle.clearUsername(username);
+        res.json({ ok: true });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
 
   router.get("/me", requireAuth(authService), async (req, res, next) => {
     try {

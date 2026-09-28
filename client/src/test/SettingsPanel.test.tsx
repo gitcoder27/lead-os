@@ -703,6 +703,69 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('resets a developer password from Settings without exposing the password, and offers no reset for managers', async () => {
+    mockPost.mockResolvedValue({ ok: true });
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /developer access/i }));
+    await screen.findByRole('button', { name: /reset password for taylor dev/i });
+    expect(screen.queryByRole('button', { name: /reset password for morgan manager/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /reset password for taylor dev/i }));
+    expect(screen.getByText(/signed out on every device/i)).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalledWith(expect.stringContaining('reset-password'), expect.anything());
+
+    fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'fresh-secret-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/auth/users/taylor.dev/reset-password', { newPassword: 'fresh-secret-1' });
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success', title: 'Password reset' }));
+    });
+    expect(JSON.stringify(mockAddToast.mock.calls)).not.toContain('fresh-secret-1');
+    expect(screen.queryByLabelText(/new password for taylor dev/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the server error inline when a password reset is rejected and keeps the form open', async () => {
+    mockPost.mockRejectedValue(new Error('New password must be at least 6 characters'));
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /developer access/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /reset password for taylor dev/i }));
+    fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'abcdef' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('New password must be at least 6 characters');
+    expect(screen.getByLabelText(/new password for taylor dev/i)).toBeInTheDocument();
+  });
+
+  it('blocks too-short passwords on the client and lets the manager cancel', async () => {
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /developer access/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /reset password for taylor dev/i }));
+    fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least 6 characters/i);
+    expect(mockPost).not.toHaveBeenCalledWith(expect.stringContaining('reset-password'), expect.anything());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByLabelText(/new password for taylor dev/i)).not.toBeInTheDocument();
+  });
+
   it('shows and copies the hosted developer login link', async () => {
     render(
       <TestWrapper>

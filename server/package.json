@@ -20,6 +20,7 @@
     "one-on-one": "tsx src/scripts/one-on-one.ts",
     "auth:create-user": "tsx src/scripts/create-auth-user.ts",
     "auth:delete-user": "tsx src/scripts/delete-auth-user.ts",
+    "auth:reset-password": "tsx src/scripts/reset-auth-password.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"

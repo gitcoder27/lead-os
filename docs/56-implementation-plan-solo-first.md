@@ -105,7 +105,7 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
   - Files: `server/src/routes/my-day.ts:145-153`, `issue.service.ts:546-549`, `shared/types.ts`.
   - Accept: response has only key, summary, priority, status, due dates. No `localTags`, `analysisNotes`, `trackerAssignmentsToday`, `excluded`.
   - Test: route test asserting the field allowlist.
-- [ ] **P0-S2** Removing a team member revokes their login.
+- [x] **P0-S2** (`task/p0-s2-revoke-on-removal`) Removing a team member revokes their login.
   - Files: `server/src/routes/team.ts:338-350`, `auth.service.ts:185-196,221-243`, `team-tracker.service.ts:2596-2608`.
   - Accept: after removal, existing sessions fail auth and the user cannot log in. Decide between deleting `app_users`/`app_sessions` and failing auth on an inactive mapped developer. Prefer failing auth in `getUserForSession` too, so it holds even if sessions survive.
   - Test: removed developer's cookie returns 401 on `/api/my-day`.
@@ -382,6 +382,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
 | 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
+| 2026-09-29 | P0-S2 | task/p0-s2-revoke-on-removal | Sonnet | Removal (DELETE and PATCH isActive:false) deletes the developer's sessions and login rows; `getUserForSession` and login reject developer logins with a missing/inactive team member. Needs Opus review (auth/sessions). |
 
 ## Findings from verification
 

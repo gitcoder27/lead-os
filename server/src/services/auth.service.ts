@@ -1,6 +1,6 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { AuthUser, UserRole } from "shared/types";
 import { db } from "../db/connection";
 import { appSessions, appUsers, developers } from "../db/schema";
@@ -194,6 +194,10 @@ export class AuthService {
     if (!row || !(await verifyPassword(password, row.passwordHash))) {
       throw new HttpError(401, "Invalid username or password");
     }
+    // Same generic error: don't reveal that the account exists but was removed.
+    if (row.role === "developer" && !(await this.isActiveDeveloper(row.workspaceId, row.developerAccountId))) {
+      throw new HttpError(401, "Invalid username or password");
+    }
 
     const now = nowIso();
     const sessionId = randomBytes(32).toString("hex");
@@ -231,14 +235,28 @@ export class AuthService {
         isActive: appUsers.isActive,
         expiresAt: appSessions.expiresAt,
         lastSeenAt: appSessions.lastSeenAt,
+        teamMemberIsActive: developers.isActive,
       })
       .from(appSessions)
       .innerJoin(appUsers, eq(appUsers.id, appSessions.userId))
+      // Same query, no extra round trip: managers have a null developerAccountId so
+      // the join matches nothing; developers pick up their team member's state.
+      .leftJoin(
+        developers,
+        and(eq(developers.workspaceId, appUsers.workspaceId), eq(developers.accountId, appUsers.developerAccountId))
+      )
       .where(eq(appSessions.id, sessionId))
       .limit(1);
 
     const row = rows[0];
     if (!row || row.isActive !== 1) {
+      return undefined;
+    }
+
+    // Defense in depth: a developer login is only valid while its team member is
+    // active, even if removal failed to delete the session or user row.
+    if (row.role === "developer" && row.teamMemberIsActive !== 1) {
+      await this.invalidateSession(sessionId);
       return undefined;
     }
 
@@ -268,6 +286,56 @@ export class AuthService {
 
   async invalidateSession(sessionId: string): Promise<void> {
     await db.delete(appSessions).where(eq(appSessions.id, sessionId));
+  }
+
+  /**
+   * Deletes every session of the developer-role logins mapped to a team member.
+   * Managers are never matched: the role filter is part of the query.
+   */
+  async revokeDeveloperSessions(developerAccountId: string, workspaceId?: string): Promise<number> {
+    const userIds = await this.developerLoginIds(developerAccountId, workspaceId);
+    if (userIds.length === 0) return 0;
+    const deleted = await db.delete(appSessions).where(inArray(appSessions.userId, userIds)).returning({ id: appSessions.id });
+    return deleted.length;
+  }
+
+  /**
+   * Team-member removal: delete the developer's sessions and login rows. Rows are
+   * deleted rather than deactivated because `username` is globally unique, so a
+   * dead row would block re-linking a login (and `listUsers` hides inactive rows,
+   * leaving the manager no way to see or clear it). Mirrors `deleteUser`.
+   * Returns the number of logins removed.
+   */
+  async revokeDeveloperAccess(developerAccountId: string, workspaceId?: string): Promise<number> {
+    const userIds = await this.developerLoginIds(developerAccountId, workspaceId);
+    if (userIds.length === 0) return 0;
+    await db.delete(appSessions).where(inArray(appSessions.userId, userIds));
+    await db.delete(appUsers).where(inArray(appUsers.id, userIds));
+    return userIds.length;
+  }
+
+  private async developerLoginIds(developerAccountId: string, workspaceId?: string): Promise<number[]> {
+    const rows = await db
+      .select({ id: appUsers.id })
+      .from(appUsers)
+      .where(
+        and(
+          eq(appUsers.workspaceId, normalizeWorkspaceId(workspaceId)),
+          eq(appUsers.role, "developer"),
+          eq(appUsers.developerAccountId, developerAccountId)
+        )
+      );
+    return rows.map((row) => row.id);
+  }
+
+  private async isActiveDeveloper(workspaceId: string, developerAccountId: string | null): Promise<boolean> {
+    if (!developerAccountId) return false;
+    const rows = await db
+      .select({ isActive: developers.isActive })
+      .from(developers)
+      .where(and(eq(developers.workspaceId, workspaceId), eq(developers.accountId, developerAccountId)))
+      .limit(1);
+    return rows[0]?.isActive === 1;
   }
 
   async getUserCount(): Promise<number> {

@@ -153,7 +153,7 @@ export function createApp(services: AppServices) {
 
   app.use("/api/issues", requireManager(services.authService), createIssuesRouter(services.issueService));
   app.use("/api/overview", requireManager(services.authService), createOverviewRouter(services.issueService));
-  app.use("/api/team", requireManager(services.authService), createTeamRouter(services.workloadService));
+  app.use("/api/team", requireManager(services.authService), createTeamRouter(services.workloadService, services.authService));
   app.use("/api/alerts", requireManager(services.authService), createAlertsRouter(services.alertService));
   app.use(
     "/api/suggestions",

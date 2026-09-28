@@ -45,6 +45,8 @@ import {
 import type { ManagerDeskStatus } from '@/types';
 
 export type NoteLineAction = 'task' | 'update' | 'follow-up';
+/** Commands a host surface can leave out (the 1:1 notes have no day wrap-up). */
+export type NoteEditorCommand = NoteLineAction | 'wrap-up';
 
 export interface NoteRefStatus {
   status: ManagerDeskStatus;
@@ -663,10 +665,10 @@ function insertAtLineStart(view: EditorView, from: number, prefix: string) {
   });
 }
 
-const SLASH_COMMANDS: SlashCommand[] = [
-  { label: 'Task', detail: NOTE_ACTION_SHORTCUTS.task.label, run: (_v, _f, h) => h.onAction('task') },
-  { label: 'Update', detail: NOTE_ACTION_SHORTCUTS.update.label, run: (_v, _f, h) => h.onAction('update') },
-  { label: 'Follow-up', detail: NOTE_ACTION_SHORTCUTS['follow-up'].label, run: (_v, _f, h) => h.onAction('follow-up') },
+const SLASH_COMMANDS: (SlashCommand & { command?: NoteEditorCommand })[] = [
+  { label: 'Task', command: 'task', detail: NOTE_ACTION_SHORTCUTS.task.label, run: (_v, _f, h) => h.onAction('task') },
+  { label: 'Update', command: 'update', detail: NOTE_ACTION_SHORTCUTS.update.label, run: (_v, _f, h) => h.onAction('update') },
+  { label: 'Follow-up', command: 'follow-up', detail: NOTE_ACTION_SHORTCUTS['follow-up'].label, run: (_v, _f, h) => h.onAction('follow-up') },
   { label: 'Checkbox', detail: '- [ ]', run: (v, f) => insertAtLineStart(v, f, '- [ ] ') },
   { label: 'Heading', detail: '##', run: (v, f) => insertAtLineStart(v, f, '## ') },
   {
@@ -678,10 +680,11 @@ const SLASH_COMMANDS: SlashCommand[] = [
       void f;
     },
   },
-  { label: 'Wrap up day', detail: '⌘⏎', run: (_v, _f, h) => h.onWrapUp() },
+  { label: 'Wrap up day', command: 'wrap-up', detail: '⌘⏎', run: (_v, _f, h) => h.onWrapUp() },
 ];
 
-function slashSource(getHandlers: () => NoteEditorHandlers) {
+function slashSource(getHandlers: () => NoteEditorHandlers, omit: ReadonlySet<NoteEditorCommand>) {
+  const commands = SLASH_COMMANDS.filter((command) => !command.command || !omit.has(command.command));
   return (context: CompletionContext): CompletionResult | null => {
     const line = context.state.doc.lineAt(context.pos);
     const before = line.text.slice(0, context.pos - line.from);
@@ -690,7 +693,7 @@ function slashSource(getHandlers: () => NoteEditorHandlers) {
     return {
       from: slashAt,
       filter: true,
-      options: SLASH_COMMANDS.map<Completion>((command, index) => ({
+      options: commands.map<Completion>((command, index) => ({
         label: `/${command.label}`,
         displayLabel: command.label,
         detail: command.detail,
@@ -800,8 +803,10 @@ function onListLine(state: EditorState): boolean {
   });
 }
 
-function noteKeymap(getHandlers: () => NoteEditorHandlers): Extension {
+function noteKeymap(getHandlers: () => NoteEditorHandlers, omit: ReadonlySet<NoteEditorCommand>): Extension {
+  // An omitted command's shortcut falls through to the default keymap.
   const action = (name: NoteLineAction) => () => {
+    if (omit.has(name)) return false;
     getHandlers().onAction(name);
     return true;
   };
@@ -814,6 +819,7 @@ function noteKeymap(getHandlers: () => NoteEditorHandlers): Extension {
       {
         key: 'Mod-Enter',
         run: () => {
+          if (omit.has('wrap-up')) return false;
           getHandlers().onWrapUp();
           return true;
         },
@@ -839,9 +845,11 @@ export interface NoteEditorConfig {
   getHandlers: () => NoteEditorHandlers;
   placeholder: string;
   ariaLabel: string;
+  omit?: readonly NoteEditorCommand[];
 }
 
-export function noteEditorExtensions({ getHandlers, placeholder, ariaLabel }: NoteEditorConfig): Extension[] {
+export function noteEditorExtensions({ getHandlers, placeholder, ariaLabel, omit = [] }: NoteEditorConfig): Extension[] {
+  const omitted = new Set(omit);
   return [
     entityContextField,
     searchHighlightField,
@@ -856,11 +864,11 @@ export function noteEditorExtensions({ getHandlers, placeholder, ariaLabel }: No
     EditorView.contentAttributes.of({ 'aria-label': ariaLabel, 'aria-multiline': 'true', spellcheck: 'true' }),
     search({ top: true }),
     autocompletion({
-      override: [slashSource(getHandlers), mentionSource, taskSource(getHandlers), jiraSource(getHandlers)],
+      override: [slashSource(getHandlers, omitted), mentionSource, taskSource(getHandlers), jiraSource(getHandlers)],
       icons: false,
       activateOnTypingDelay: 120,
     }),
-    noteKeymap(getHandlers),
+    noteKeymap(getHandlers, omitted),
     checkboxShorthand,
     keymap.of([
       ...withoutReserved(completionKeymap),

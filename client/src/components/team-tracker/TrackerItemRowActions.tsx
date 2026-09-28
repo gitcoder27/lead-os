@@ -19,6 +19,8 @@ interface TrackerItemRowActionsProps {
   onMoveUp?: (id: number) => void;
   onMoveDown?: (id: number) => void;
   onToggleTitleEditor?: () => void;
+  /** Extra hover-toolbar buttons (e.g. "Add to 1:1 agenda"); drawer presets only. */
+  extraActions?: ReactNode;
 }
 
 export function TrackerItemRowActions({
@@ -35,6 +37,7 @@ export function TrackerItemRowActions({
   onMoveUp,
   onMoveDown,
   onToggleTitleEditor,
+  extraActions,
 }: TrackerItemRowActionsProps) {
   if (actionPreset === 'none') {
     return null;
@@ -70,6 +73,7 @@ export function TrackerItemRowActions({
             <Check size={14} style={{ color: 'var(--success)' }} />
           </ToolbarButton>
         )}
+        {extraActions}
       </div>
     );
   }
@@ -161,7 +165,7 @@ export function TrackerItemRowActions({
   );
 }
 
-function ToolbarButton({ label, title, onClick, children }: { label: string; title?: string; onClick: () => void; children: ReactNode }) {
+export function ToolbarButton({ label, title, onClick, disabled, children }: { label: string; title?: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -169,7 +173,8 @@ function ToolbarButton({ label, title, onClick, children }: { label: string; tit
         event.stopPropagation();
         onClick();
       }}
-      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      disabled={disabled}
+      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 ${FOCUS_RING}`}
       title={title ?? label}
       aria-label={label}
     >

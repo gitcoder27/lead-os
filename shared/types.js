@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
@@ -69,6 +69,8 @@ exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
 ];
+exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = 3;
+exports.ONE_ON_ONE_SUGGESTION_LIMIT = 6;
 const oneOnOneIsoDate = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 exports.oneOnOneCadenceSchema = zod_1.z.enum(["weekly", "biweekly", "monthly", "ad_hoc"]);
 exports.oneOnOneSeriesCreateSchema = zod_1.z.object({
@@ -104,6 +106,17 @@ exports.oneOnOneAgendaAttachSchema = zod_1.z.object({
     /** Freeform capture — creates a canonical task and attaches it (48 §4.2). */
     title: zod_1.z.string().trim().min(1).max(500).optional(),
 }).strict();
+/**
+ * Attach an existing task to a developer's 1:1 agenda by developer id —
+ * creates a weekly series first when none exists (one transaction).
+ */
+exports.oneOnOneQuickAttachSchema = zod_1.z.object({
+    developerAccountId: zod_1.z.string().trim().min(1).max(200),
+    taskId: zod_1.z.number().int().positive().optional(),
+    taskKey: zod_1.z.string().trim().min(1).max(32).optional(),
+}).strict().refine((body) => body.taskId !== undefined || body.taskKey !== undefined, {
+    message: "Provide taskId or taskKey",
+});
 exports.oneOnOneAgendaReorderSchema = zod_1.z.object({
     itemIds: zod_1.z.array(zod_1.z.number().int().positive()).min(1).max(1000),
 }).strict();

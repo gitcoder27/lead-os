@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   oneOnOneAgendaAttachSchema,
   oneOnOneAgendaReorderSchema,
+  oneOnOneQuickAttachSchema,
   oneOnOneSeriesCreateSchema,
   oneOnOneSeriesUpdateSchema,
   oneOnOneSessionActionSchema,
@@ -23,6 +24,7 @@ const sessionCreate = z.object({ params: z.object({ id: z.coerce.number().int().
 const sessionUpdate = z.object({ params: z.object({ id: z.coerce.number().int().positive(), sid: z.coerce.number().int().positive() }), body: oneOnOneSessionUpdateSchema, query: z.any().optional() });
 const agendaAttach = z.object({ params: z.object({ id: z.coerce.number().int().positive() }), body: oneOnOneAgendaAttachSchema, query: z.any().optional() });
 const agendaReorder = z.object({ params: z.object({ id: z.coerce.number().int().positive() }), body: oneOnOneAgendaReorderSchema, query: z.any().optional() });
+const quickAttach = z.object({ params: z.any().optional(), body: oneOnOneQuickAttachSchema, query: z.any().optional() });
 const sessionAction = z.object({ params: z.object({ id: z.coerce.number().int().positive(), sid: z.coerce.number().int().positive() }), body: oneOnOneSessionActionSchema, query: z.any().optional() });
 
 /**
@@ -59,6 +61,16 @@ export function createOneOnOnesRouter(service = new OneOnOneService()): Router {
   router.post("/", validate(seriesCreate), async (req, res, next) => {
     try {
       res.status(201).json(await service.createSeries(req.body, workspaceId(req)));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Attach by developer from outside the workspace (drawer rows) — starts the
+  // series on demand. Registered before the `/:id` routes.
+  router.post("/agenda", validate(quickAttach), async (req, res, next) => {
+    try {
+      res.status(201).json(await service.quickAttach(req.body, principal(req), workspaceId(req)));
     } catch (error) {
       next(error);
     }
@@ -101,6 +113,14 @@ export function createOneOnOnesRouter(service = new OneOnOneService()): Router {
   router.get("/:id/agenda", validate(idParams), async (req, res, next) => {
     try {
       res.json({ items: await service.listAgenda(Number(req.params.id), workspaceId(req)) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/:id/suggestions", validate(idParams), async (req, res, next) => {
+    try {
+      res.json(await service.suggestions(Number(req.params.id), workspaceId(req)));
     } catch (error) {
       next(error);
     }

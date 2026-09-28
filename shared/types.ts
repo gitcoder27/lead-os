@@ -2000,6 +2000,11 @@ export interface OneOnOneAgendaTask {
   status: TaskStatus;
   ownerType: TaskOwnerType | null;
   ownerId: string | null;
+  /** Live task state so a topic attached weeks ago reads correctly today. */
+  priority: "normal" | "high";
+  scheduledOn: string | null;
+  dueAt: string | null;
+  closedAt: string | null;
   /** Tombstone marker — deleted tasks never render in the open agenda. */
   deletedAt: string | null;
 }
@@ -2069,6 +2074,45 @@ export interface OneOnOneSeriesDetail {
   agenda: OneOnOneAgendaItem[];
 }
 
+/**
+ * Why a task is worth raising in a 1:1 — the manager's existing prep signals,
+ * strongest first. `carried` is days since the task first entered a day plan.
+ */
+export type OneOnOneSuggestionReason =
+  | { code: "blocked" }
+  | { code: "overdue"; days: number; source: "due" | "scheduled" }
+  | { code: "high_priority" }
+  | { code: "carried"; days: number }
+  | { code: "stale"; days: number };
+
+/** An open task owned by the developer, not yet on the agenda. */
+export interface OneOnOneTaskSuggestion {
+  task: OneOnOneAgendaTask;
+  reasons: OneOnOneSuggestionReason[];
+}
+
+/** `GET /api/one-on-ones/:id/suggestions` — one-tap agenda prep. */
+export interface OneOnOneSuggestionsResponse {
+  tasks: OneOnOneTaskSuggestion[];
+  /**
+   * Present when the developer has had no check-in for
+   * `ONE_ON_ONE_NO_CHECK_IN_DAYS` or more — suggests a freeform topic.
+   */
+  checkIn: { lastCheckInAt: string | null; days: number | null } | null;
+}
+
+export const ONE_ON_ONE_NO_CHECK_IN_DAYS = 3;
+export const ONE_ON_ONE_SUGGESTION_LIMIT = 6;
+
+/** `POST /api/one-on-ones/agenda` — attach from anywhere, series on demand. */
+export interface OneOnOneQuickAttachResponse {
+  item: OneOnOneAgendaItem;
+  seriesId: number;
+  developerName: string;
+  /** True when this call started the developer's series. */
+  seriesCreated: boolean;
+}
+
 /** Manager-only board/Today signal: a scheduled session due today or overdue. */
 export interface OneOnOneDueSignal {
   seriesId: number;
@@ -2128,6 +2172,18 @@ export const oneOnOneAgendaAttachSchema = z.object({
   title: z.string().trim().min(1).max(500).optional(),
 }).strict();
 
+/**
+ * Attach an existing task to a developer's 1:1 agenda by developer id —
+ * creates a weekly series first when none exists (one transaction).
+ */
+export const oneOnOneQuickAttachSchema = z.object({
+  developerAccountId: z.string().trim().min(1).max(200),
+  taskId: z.number().int().positive().optional(),
+  taskKey: z.string().trim().min(1).max(32).optional(),
+}).strict().refine((body) => body.taskId !== undefined || body.taskKey !== undefined, {
+  message: "Provide taskId or taskKey",
+});
+
 export const oneOnOneAgendaReorderSchema = z.object({
   itemIds: z.array(z.number().int().positive()).min(1).max(1000),
 }).strict();
@@ -2146,6 +2202,7 @@ export type OneOnOneSessionCreateRequest = z.infer<typeof oneOnOneSessionCreateS
 export type OneOnOneSessionUpdateRequest = z.infer<typeof oneOnOneSessionUpdateSchema>;
 export type OneOnOneAgendaAttachRequest = z.infer<typeof oneOnOneAgendaAttachSchema>;
 export type OneOnOneAgendaReorderRequest = z.infer<typeof oneOnOneAgendaReorderSchema>;
+export type OneOnOneQuickAttachRequest = z.infer<typeof oneOnOneQuickAttachSchema>;
 export type OneOnOneSessionActionRequest = z.infer<typeof oneOnOneSessionActionSchema>;
 
 // ── Navigation preferences ────────────────────────────

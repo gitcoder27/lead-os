@@ -36,6 +36,8 @@ interface TrackerItemRowProps {
   /** Drawer variants: zero-based queue position and a handle-only drag starter. */
   index?: number;
   onDragHandlePointerDown?: TrackerDrawerItemRowProps['onDragHandlePointerDown'];
+  /** Drawer variants only: extra hover-toolbar buttons. */
+  extraActions?: ReactNode;
 }
 
 const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }> = {

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import type { OneOnOneSeriesDetail, OneOnOneSeriesSummary } from '@/types';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { addDays, format } from 'date-fns';
+import type { OneOnOneAgendaItem, OneOnOneSeriesDetail, OneOnOneSeriesSummary, OneOnOneSuggestionsResponse } from '@/types';
 import { OneOnOneWorkspace } from '@/components/team-tracker/OneOnOneWorkspace';
+import { OneOnOneAgendaButton } from '@/components/team-tracker/OneOnOneAgendaButton';
+import { TrackerItemRowActions } from '@/components/team-tracker/TrackerItemRowActions';
+import { getLocalIsoDate } from '@/lib/utils';
 import { OneOnOneSeriesPanel } from '@/components/team-tracker/OneOnOneSeriesPanel';
 import { TrackerBoardToolbar } from '@/components/team-tracker/TrackerBoardToolbar';
 
@@ -14,17 +18,30 @@ const mockAttach = vi.fn();
 const mockReorder = vi.fn();
 const mockDetach = vi.fn();
 const mockAddToast = vi.fn();
+const mockQuickAttach = vi.fn();
 
 let mockEnabled = true;
 let mockList: { data?: { series: OneOnOneSeriesSummary[] }; isLoading: boolean } = { data: { series: [] }, isLoading: false };
 let mockDetail: { data?: OneOnOneSeriesDetail; isError?: boolean } = { data: undefined };
+let mockSuggestions: { data?: OneOnOneSuggestionsResponse; isLoading: boolean } = { data: undefined, isLoading: false };
 
 vi.mock('@/context/ToastContext', () => ({
   useToast: () => ({ addToast: mockAddToast }),
 }));
 
+vi.mock('@/hooks/useNoteEntityLookups', () => ({
+  useNoteEntityLookups: () => ({
+    previewTask: async () => null,
+    previewIssue: async () => null,
+    searchTasks: async () => [],
+    searchIssues: async () => [],
+  }),
+}));
+
 vi.mock('@/hooks/useOneOnOne', () => ({
   useOneOnOneEnabled: () => mockEnabled,
+  useOneOnOneSuggestions: () => mockSuggestions,
+  useQuickAttachOneOnOneAgenda: () => ({ mutate: mockQuickAttach, isPending: false }),
   useOneOnOneSeriesList: () => mockList,
   useOneOnOneSeries: () => mockDetail,
   useOneOnOneSeriesForDeveloper: (accountId: string | undefined) => ({
@@ -56,6 +73,24 @@ function summary(overrides: Partial<OneOnOneSeriesSummary> = {}): OneOnOneSeries
     createdAt: '2026-03-01T08:00:00Z',
     ...overrides,
   };
+}
+
+function agendaTask(overrides: Partial<OneOnOneAgendaItem['task']> & Pick<OneOnOneAgendaItem['task'], 'taskId' | 'taskKey' | 'title'>): OneOnOneAgendaItem['task'] {
+  return {
+    status: 'open',
+    ownerType: 'developer',
+    ownerId: 'dev-1',
+    priority: 'normal',
+    scheduledOn: null,
+    dueAt: null,
+    closedAt: null,
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+function agendaItem(id: number, task: OneOnOneAgendaItem['task'], overrides: Partial<OneOnOneAgendaItem> = {}): OneOnOneAgendaItem {
+  return { id, seriesId: 5, taskId: task.taskId, position: id, addedAt: '2026-03-05T08:00:00Z', carriedFrom: null, task, ...overrides };
 }
 
 function detail(overrides: Partial<OneOnOneSeriesDetail> = {}): OneOnOneSeriesDetail {
@@ -104,7 +139,7 @@ function detail(overrides: Partial<OneOnOneSeriesDetail> = {}): OneOnOneSeriesDe
         position: 0,
         addedAt: '2026-02-20T08:00:00Z',
         carriedFrom: '2026-03-02',
-        task: { taskId: 1, taskKey: 'T-1', title: 'Review queue', status: 'open', ownerType: 'developer', ownerId: 'dev-1', deletedAt: null },
+        task: agendaTask({ taskId: 1, taskKey: 'T-1', title: 'Review queue' }),
       },
       {
         id: 102,
@@ -113,7 +148,7 @@ function detail(overrides: Partial<OneOnOneSeriesDetail> = {}): OneOnOneSeriesDe
         position: 1,
         addedAt: '2026-03-05T08:00:00Z',
         carriedFrom: null,
-        task: { taskId: 2, taskKey: 'T-2', title: 'Career goals', status: 'open', ownerType: 'developer', ownerId: 'dev-1', deletedAt: null },
+        task: agendaTask({ taskId: 2, taskKey: 'T-2', title: 'Career goals' }),
       },
     ],
     ...overrides,
@@ -146,6 +181,7 @@ beforeEach(() => {
   mockEnabled = true;
   mockList = { data: { series: [summary()] }, isLoading: false };
   mockDetail = { data: detail() };
+  mockSuggestions = { data: { tasks: [], checkIn: null }, isLoading: false };
 });
 
 describe('OneOnOneWorkspace', () => {
@@ -156,15 +192,16 @@ describe('OneOnOneWorkspace', () => {
     expect(screen.getByRole('region', { name: '1:1 agenda' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '1:1 session' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: '1:1 history' })).toBeInTheDocument();
-    expect(screen.getByText('Review queue')).toBeInTheDocument();
-    expect(screen.getByText('Career goals')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('2026-03-09')).toBeInTheDocument();
+    const agenda = screen.getByTestId('one-on-one-agenda');
+    expect(within(agenda).getByText('Review queue')).toBeInTheDocument();
+    expect(within(agenda).getByText('Career goals')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Session date: Mon, Mar 9/ })).toBeInTheDocument();
     expect(screen.getByText('Talked about the migration')).toBeInTheDocument();
   });
 
   it('renders the carried-from marker on carried agenda items', () => {
     render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
-    expect(screen.getByText('carried from 2026-03-02')).toBeInTheDocument();
+    expect(screen.getByText(/carried from Mar 2/)).toBeInTheDocument();
     // The non-carried item renders no marker.
     expect(screen.queryAllByText(/carried from/)).toHaveLength(1);
   });
@@ -259,6 +296,198 @@ describe('OneOnOneWorkspace', () => {
     (document.activeElement as HTMLElement).blur();
     fireEvent.keyDown(document, { key: '?' });
     expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+  });
+});
+
+describe('OneOnOneWorkspace — agenda guidance and suggestions', () => {
+  it('teaches the model when the agenda is empty', () => {
+    mockDetail = { data: detail({ agenda: [] }) };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.getByText(/Topics to raise with Alice/)).toBeInTheDocument();
+    const empty = screen.getByTestId('one-on-one-agenda-empty');
+    expect(within(empty).getByText('Nothing on the agenda yet')).toBeInTheDocument();
+    expect(within(empty).getByText(/Add to 1:1 agenda/)).toBeInTheDocument();
+  });
+
+  it('offers one-tap suggestions with reasons, including a no-check-in topic', () => {
+    mockSuggestions = {
+      isLoading: false,
+      data: {
+        tasks: [
+          { task: agendaTask({ taskId: 7, taskKey: 'T-7', title: 'Flaky deploy', status: 'blocked' }), reasons: [{ code: 'blocked' }, { code: 'stale', days: 6 }] },
+          { task: agendaTask({ taskId: 8, taskKey: 'T-8', title: 'Quarterly report' }), reasons: [{ code: 'overdue', days: 2, source: 'due' }] },
+        ],
+        checkIn: { lastCheckInAt: null, days: null },
+      },
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    const panel = screen.getByTestId('one-on-one-suggestions');
+    expect(within(panel).getByText("Suggested from Alice's work")).toBeInTheDocument();
+    expect(within(panel).getByText('Blocked')).toBeInTheDocument();
+    expect(within(panel).getByText('Quiet 6d')).toBeInTheDocument();
+    expect(within(panel).getByText('Overdue 2d')).toBeInTheDocument();
+    expect(within(panel).getByText('No check-ins yet')).toBeInTheDocument();
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add to agenda: Flaky deploy' }));
+    expect(mockAttach).toHaveBeenCalledWith({ taskId: 7 }, expect.anything());
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add to agenda: Check in — how are things going?' }));
+    expect(mockAttach).toHaveBeenCalledWith({ title: 'Check in — how are things going?' }, expect.anything());
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Dismiss suggestion: Quarterly report' }));
+    expect(within(panel).queryByText('Quarterly report')).not.toBeInTheDocument();
+  });
+
+  it('caps suggestions and reveals the rest on demand', () => {
+    mockSuggestions = {
+      isLoading: false,
+      data: {
+        tasks: [1, 2, 3, 4, 5].map((n) => ({
+          task: agendaTask({ taskId: 20 + n, taskKey: `T-2${n}`, title: `Idle thing ${n}` }),
+          reasons: [{ code: 'stale' as const, days: 5 + n }],
+        })),
+        checkIn: null,
+      },
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.queryByText('Idle thing 4')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show 2 more' }));
+    expect(screen.getByText('Idle thing 5')).toBeInTheDocument();
+  });
+
+  it('agenda rows show live task state and reorder keeps closed links in the permutation', () => {
+    const past = format(addDays(new Date(), -3), 'yyyy-MM-dd');
+    mockDetail = {
+      data: detail({
+        agenda: [
+          agendaItem(101, agendaTask({ taskId: 1, taskKey: 'T-1', title: 'Review queue', status: 'blocked', priority: 'high' })),
+          agendaItem(102, agendaTask({ taskId: 2, taskKey: 'T-2', title: 'Career goals', dueAt: `${past}T12:00:00Z` })),
+          agendaItem(103, agendaTask({ taskId: 3, taskKey: 'T-3', title: 'Shipped the fix', status: 'done', closedAt: '2026-03-04T10:00:00Z' })),
+        ],
+      }),
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    const blocked = screen.getByTestId('agenda-item-101');
+    expect(within(blocked).getByText('Blocked')).toBeInTheDocument();
+    expect(within(blocked).getByLabelText('High priority')).toBeInTheDocument();
+    expect(within(screen.getByTestId('agenda-item-102')).getByText(/3d late/)).toBeInTheDocument();
+    // The closed topic leaves the open list but is a talking point since the last session.
+    expect(screen.queryByTestId('agenda-item-103')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Closed since last 1:1/ }));
+    expect(screen.getByText('Shipped the fix')).toBeInTheDocument();
+
+    fireEvent.keyDown(blocked, { key: 'ArrowDown', altKey: true });
+    expect(mockReorder).toHaveBeenCalledWith({ itemIds: [102, 101, 103] }, expect.anything());
+  });
+});
+
+describe('OneOnOneWorkspace — session and history', () => {
+  it('reschedules through the date popover', () => {
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Session date:/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Tomorrow/ }));
+    const tomorrow = format(addDays(new Date(`${getLocalIsoDate()}T00:00:00`), 1), 'yyyy-MM-dd');
+    expect(mockUpdateSession).toHaveBeenCalledWith({ sessionId: 11, scheduledFor: tomorrow }, expect.anything());
+  });
+
+  it('schedules a session when none is upcoming', () => {
+    mockDetail = { data: detail({ upcoming: null }) };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule for today' }));
+    expect(mockCreateSession).toHaveBeenCalledWith({ scheduledFor: getLocalIsoDate() }, expect.anything());
+  });
+
+  it('pauses and resumes the series from the controls', () => {
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Pause series/ }));
+    expect(mockUpdateSeries).toHaveBeenCalledWith({ active: false }, expect.anything());
+  });
+
+  it('shows the live chip once started and renders session notes in the Notes editor', () => {
+    const base = detail();
+    mockDetail = { data: { ...base, upcoming: { ...base.upcoming!, startedAt: '2026-03-09T09:00:00Z', notes: 'Asked about **on-call**' } } };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.getByText(/Live · since/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Session notes')).toBeInTheDocument();
+    expect(screen.getByTestId('one-on-one-notes')).toHaveTextContent('on-call');
+  });
+
+  it('leads history with the last session: notes and the topics that were on the agenda', () => {
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    const last = screen.getByTestId('one-on-one-last-session');
+    expect(within(last).getByText('Last time')).toBeInTheDocument();
+    expect(within(last).getByText('Talked about the migration')).toBeInTheDocument();
+    // T-1 was attached before the Mar 2 session closed; T-2 came after.
+    expect(within(last).getByText('Review queue')).toBeInTheDocument();
+    expect(within(last).queryByText('Career goals')).not.toBeInTheDocument();
+  });
+
+  it('lists earlier sessions with a one-line preview', () => {
+    const base = detail();
+    mockDetail = {
+      data: {
+        ...base,
+        sessions: [
+          ...base.sessions,
+          {
+            id: 9,
+            seriesId: 5,
+            scheduledFor: '2026-02-23',
+            status: 'skipped',
+            notes: '- [ ] Revisit **hiring** plan',
+            startedAt: null,
+            completedAt: '2026-02-23T10:00:00Z',
+            createdAt: '2026-02-16T08:00:00Z',
+            agendaCount: 0,
+          },
+        ],
+      },
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.getByText('Earlier')).toBeInTheDocument();
+    expect(screen.getByText('Revisit hiring plan')).toBeInTheDocument();
+    expect(screen.getByText('Skipped')).toBeInTheDocument();
+  });
+});
+
+describe('Add to 1:1 agenda (developer drawer rows)', () => {
+  it('attaches by developer and offers to open the workspace', () => {
+    mockQuickAttach.mockImplementation((_body: unknown, options?: { onSuccess?: (result: unknown) => void }) =>
+      options?.onSuccess?.({ item: {}, seriesId: 5, developerName: 'Alice Smith', seriesCreated: true }),
+    );
+    const onOpenOneOnOne = vi.fn();
+    render(<OneOnOneAgendaButton developerAccountId="dev-1" taskKey="T-9" title="Ship it" onOpenOneOnOne={onOpenOneOnOne} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add Ship it to 1:1 agenda' }));
+    expect(mockQuickAttach).toHaveBeenCalledWith({ developerAccountId: 'dev-1', taskKey: 'T-9' }, expect.anything());
+    const toast = mockAddToast.mock.calls[0]![0] as { title: string; message?: string; action?: { onClick: () => void } };
+    expect(toast.title).toBe("Added to Alice's 1:1 agenda");
+    expect(toast.message).toMatch(/Started a weekly 1:1 series/);
+    toast.action!.onClick();
+    expect(onOpenOneOnOne).toHaveBeenCalledWith('dev-1');
+  });
+
+  it('reports a duplicate as info rather than an error', () => {
+    mockQuickAttach.mockImplementation((_body: unknown, options?: { onError?: (error: unknown) => void }) =>
+      options?.onError?.(new Error('Task is already on the agenda')),
+    );
+    render(<OneOnOneAgendaButton developerAccountId="dev-1" taskKey="T-9" title="Ship it" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add Ship it to 1:1 agenda' }));
+    expect(mockAddToast).toHaveBeenCalledWith('Already on the 1:1 agenda', 'info');
+  });
+
+  it('renders in the drawer row hover toolbar', () => {
+    render(
+      <TrackerItemRowActions
+        itemId={1}
+        itemTitle="Ship it"
+        itemState="planned"
+        actionPreset="hover-start"
+        onSetCurrent={vi.fn()}
+        extraActions={<OneOnOneAgendaButton developerAccountId="dev-1" taskKey="T-9" title="Ship it" />}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Start Ship it' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Ship it to 1:1 agenda' })).toBeInTheDocument();
   });
 });
 

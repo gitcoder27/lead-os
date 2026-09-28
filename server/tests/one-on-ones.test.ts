@@ -3,7 +3,7 @@ import express from "express";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers, oneOnOneAgendaItems, tasks, workspaces } from "../src/db/schema";
+import { configTable, developers, oneOnOneAgendaItems, oneOnOneSeries, tasks, teamTrackerDays, workspaces } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { createOneOnOnesRouter } from "../src/routes/one-on-ones";
@@ -94,6 +94,8 @@ describe("one-on-one routes: gating", () => {
     expect((await invoke(app, { method: "PATCH", url: "/api/one-on-ones/1/agenda", headers, body: { itemIds: [1] } })).status).toBe(404);
     expect((await invoke(app, { method: "DELETE", url: "/api/one-on-ones/1/agenda/1", headers })).status).toBe(404);
     expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/1/sessions/1/actions", headers, body: { title: "x" } })).status).toBe(404);
+    expect((await invoke(app, { method: "GET", url: "/api/one-on-ones/1/suggestions", headers })).status).toBe(404);
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-1", taskKey: "T-1" } })).status).toBe(404);
   });
 
   it("403s for developer principals even with the flag on", async () => {
@@ -103,6 +105,8 @@ describe("one-on-one routes: gating", () => {
       (await invoke(app, { method: "POST", url: "/api/one-on-ones", headers, body: { developerAccountId: "dev-1", cadence: "weekly" } })).status,
     ).toBe(403);
     expect((await invoke(app, { method: "GET", url: "/api/one-on-ones/1/agenda", headers })).status).toBe(403);
+    expect((await invoke(app, { method: "GET", url: "/api/one-on-ones/1/suggestions", headers })).status).toBe(403);
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-1", taskKey: "T-1" } })).status).toBe(403);
   });
 
   it("401s without a session", async () => {
@@ -306,6 +310,97 @@ describe("one-on-one routes: agenda", () => {
     const agenda = await invoke(app, { method: "GET", url: `/api/one-on-ones/${seriesId}/agenda`, headers });
     expect(agenda.body.items.map((item: { id: number }) => item.id)).toEqual([ids[2], ids[1]]);
     expect((await invoke(app, { method: "DELETE", url: `/api/one-on-ones/${seriesId}/agenda/${ids[0]}`, headers })).status).toBe(404);
+  });
+});
+
+describe("one-on-one routes: agenda suggestions", () => {
+  it("ranks the developer's blocked, overdue and high-priority tasks and skips agenda items", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const seriesId = (await createSeries()).body.series.id;
+    const yesterday = addDaysIso(todayIsoDate(), -1);
+    const dev = { ownerType: "developer" as const, ownerId: "dev-1" };
+    const plain = await taskService.create({ title: "Fresh work", ...dev }, manager);
+    const high = await taskService.create({ title: "Hot fix", priority: "high", ...dev }, manager);
+    const overdue = await taskService.create({ title: "Late report", dueAt: `${yesterday}T12:00:00.000Z`, scheduledOn: yesterday, ...dev }, manager);
+    const blocked = await taskService.create({ title: "Waiting on infra", status: "blocked", ...dev }, manager);
+    const attached = await taskService.create({ title: "Already raised", status: "blocked", ...dev }, manager);
+    await taskService.create({ title: "Someone else", status: "blocked", ownerType: "developer", ownerId: "dev-2" }, manager);
+    await taskService.create({ title: "Done already", status: "done", priority: "high", ...dev }, manager);
+    await invoke(app, { method: "POST", url: `/api/one-on-ones/${seriesId}/agenda`, headers, body: { taskId: attached.id } });
+
+    const res = await invoke(app, { method: "GET", url: `/api/one-on-ones/${seriesId}/suggestions`, headers });
+    expect(res.status).toBe(200);
+    const keys = res.body.tasks.map((entry: { task: { taskKey: string } }) => entry.task.taskKey);
+    expect(keys).toEqual([blocked.taskKey, overdue.taskKey, high.taskKey]);
+    expect(keys).not.toContain(plain.taskKey);
+    expect(res.body.tasks[0].reasons).toEqual([{ code: "blocked" }]);
+    expect(res.body.tasks[1].reasons).toEqual([{ code: "overdue", days: 1, source: "due" }]);
+    expect(res.body.tasks[1].task.dueAt).toBe(`${yesterday}T12:00:00.000Z`);
+    expect(res.body.tasks[2].reasons).toEqual([{ code: "high_priority" }]);
+    // Never checked in → a no-check-in topic is suggested.
+    expect(res.body.checkIn).toEqual({ lastCheckInAt: null, days: null });
+  });
+
+  it("surfaces carried and idle tasks as time passes, and drops the check-in topic after a recent check-in", async () => {
+    const seriesId = (await createSeries()).body.series.id;
+    const task = await taskService.create({ title: "Long runner", ownerType: "developer", ownerId: "dev-1" }, manager);
+    const later = addDaysIso(todayIsoDate(), 6);
+    const future = await service.suggestions(seriesId, "default", later);
+    expect(future.tasks).toHaveLength(1);
+    expect(future.tasks[0]!.task.taskKey).toBe(task.taskKey);
+    expect(future.tasks[0]!.reasons.map((reason) => reason.code)).toEqual(["overdue", "carried", "stale"]);
+    expect(future.tasks[0]!.reasons).toContainEqual({ code: "carried", days: 6 });
+
+    const now = new Date().toISOString();
+    await db.insert(teamTrackerDays).values({
+      workspaceId: "default",
+      date: todayIsoDate(),
+      developerAccountId: "dev-1",
+      lastCheckInAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    expect((await service.suggestions(seriesId, "default")).checkIn).toBeNull();
+    expect((await service.suggestions(seriesId, "default", later)).checkIn).toEqual({ lastCheckInAt: now, days: 6 });
+  });
+});
+
+describe("one-on-one routes: attach by developer", () => {
+  it("starts the series on demand, then reuses it; duplicates conflict", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const first = await taskService.create({ title: "Perf review", ownerType: "developer", ownerId: "dev-2" }, manager);
+    const second = await taskService.create({ title: "Growth plan", ownerType: "developer", ownerId: "dev-2" }, manager);
+
+    const created = await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-2", taskKey: first.taskKey } });
+    expect(created.status).toBe(201);
+    expect(created.body.seriesCreated).toBe(true);
+    expect(created.body.developerName).toBe("Dev Two");
+    expect(created.body.item.task.taskKey).toBe(first.taskKey);
+    const series = await db.select().from(oneOnOneSeries).where(eq(oneOnOneSeries.developerAccountId, "dev-2"));
+    expect(series).toHaveLength(1);
+    expect(series[0]!.cadence).toBe("weekly");
+    expect(created.body.seriesId).toBe(series[0]!.id);
+
+    const reused = await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-2", taskId: second.id } });
+    expect(reused.status).toBe(201);
+    expect(reused.body.seriesCreated).toBe(false);
+    expect(reused.body.seriesId).toBe(series[0]!.id);
+
+    const detail = await invoke(app, { method: "GET", url: `/api/one-on-ones/${series[0]!.id}`, headers });
+    expect(detail.body.agenda.map((item: { task: { title: string } }) => item.task.title)).toEqual(["Perf review", "Growth plan"]);
+    expect(detail.body.upcoming).not.toBeNull();
+
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-2", taskKey: first.taskKey } })).status).toBe(409);
+  });
+
+  it("validates the developer, the task, and the body; failures create no series", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const task = await taskService.create({ title: "Anything" }, manager);
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "nobody", taskKey: task.taskKey } })).status).toBe(404);
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-3", taskKey: "T-999" } })).status).toBe(404);
+    expect((await invoke(app, { method: "POST", url: "/api/one-on-ones/agenda", headers, body: { developerAccountId: "dev-3" } })).status).toBe(400);
+    // The rolled-back attach left no half-created series behind.
+    expect(await db.select().from(oneOnOneSeries).where(eq(oneOnOneSeries.developerAccountId, "dev-3"))).toHaveLength(0);
   });
 });
 

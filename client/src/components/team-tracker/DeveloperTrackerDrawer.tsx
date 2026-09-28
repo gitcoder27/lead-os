@@ -24,6 +24,7 @@ import {
   type DrawerMenuAction,
 } from './DeveloperDrawerSections';
 import { ManagerFollowUpRow } from './ManagerFollowUpsSection';
+import { OneOnOneAgendaButton } from './OneOnOneAgendaButton';
 import { useCreateOneOnOneSeries, useOneOnOneEnabled, useOneOnOneSeriesForDeveloper } from '@/hooks/useOneOnOne';
 import { useToast } from '@/context/ToastContext';
 import type { ManagerDeskItem } from '@/types/manager-desk';
@@ -235,6 +236,19 @@ export function DeveloperTrackerDrawer({
       />
     ) : undefined;
 
+  // docs/48 §4.3: "Add to 1:1 agenda" rides the row hover toolbar — manager
+  // board only (never the historical read-only snapshot), flag-gated.
+  const oneOnOneEnabled = useOneOnOneEnabled();
+  const agendaActionFor = (item: TrackerWorkItem) =>
+    oneOnOneEnabled && !readOnly && day && item.taskKey ? (
+      <OneOnOneAgendaButton
+        developerAccountId={day.developer.accountId}
+        taskKey={item.taskKey}
+        title={item.title}
+        onOpenOneOnOne={onOpenOneOnOne}
+      />
+    ) : undefined;
+
   const currentComposerId = day?.currentItem?.taskKey ? day.currentItem.id : undefined;
   useTaskShortcuts(panelRef, visible && !readOnly, {
     u: () => {
@@ -349,6 +363,7 @@ export function DeveloperTrackerDrawer({
                       onDrop={readOnly ? undefined : onDropItem}
                       readOnly={readOnly}
                       composer={composerFor(day.currentItem)}
+                      extraActions={agendaActionFor(day.currentItem)}
                     />
                   ) : (
                     <div
@@ -412,6 +427,7 @@ export function DeveloperTrackerDrawer({
                             canMoveUp={index > 0}
                             canMoveDown={index < localPlannedItems.length - 1}
                             composer={composerFor(item)}
+                            extraActions={agendaActionFor(item)}
                           />
                         ))}
                       </Reorder.Group>
@@ -551,6 +567,7 @@ function PlannedReorderItem({
   canMoveUp,
   canMoveDown,
   composer,
+  extraActions,
 }: {
   item: TrackerWorkItem;
   index: number;
@@ -566,6 +583,7 @@ function PlannedReorderItem({
   canMoveUp: boolean;
   canMoveDown: boolean;
   composer?: ReactNode;
+  extraActions?: ReactNode;
 }) {
   // Only the handle starts a drag, so clicking into the update composer or
   // selecting text never picks the row up.
@@ -604,6 +622,7 @@ function PlannedReorderItem({
         onMoveUp={canMoveUp ? (itemId) => onMove(itemId, 'up') : undefined}
         onMoveDown={canMoveDown ? (itemId) => onMove(itemId, 'down') : undefined}
         composer={composer}
+        extraActions={extraActions}
       />
     </Reorder.Item>
   );
@@ -858,7 +877,7 @@ function OneOnOneSectionBody({
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-2 px-2">
           <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-            No recurring 1:1 yet.
+            No recurring 1:1 yet — adding a task to the agenda starts one.
           </span>
           <button
             type="button"

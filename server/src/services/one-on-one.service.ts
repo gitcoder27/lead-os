@@ -1,35 +1,46 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
-import type {
-  OneOnOneAgendaAttachRequest,
-  OneOnOneAgendaItem,
-  OneOnOneAgendaTask,
-  OneOnOneAgendaReorderRequest,
-  OneOnOneCadence,
-  OneOnOneDueSignal,
-  OneOnOneSeriesCreateRequest,
-  OneOnOneSeriesDetail,
-  OneOnOneSeriesSummary,
-  OneOnOneSeriesUpdateRequest,
-  OneOnOneSession,
-  OneOnOneSessionActionRequest,
-  OneOnOneSessionCreateRequest,
-  OneOnOneSessionUpdateRequest,
-  TaskStatus,
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, max, min, sql } from "drizzle-orm";
+import {
+  ONE_ON_ONE_NO_CHECK_IN_DAYS,
+  ONE_ON_ONE_SUGGESTION_LIMIT,
+  type OneOnOneAgendaAttachRequest,
+  type OneOnOneAgendaItem,
+  type OneOnOneAgendaTask,
+  type OneOnOneAgendaReorderRequest,
+  type OneOnOneCadence,
+  type OneOnOneDueSignal,
+  type OneOnOneQuickAttachRequest,
+  type OneOnOneQuickAttachResponse,
+  type OneOnOneSeriesCreateRequest,
+  type OneOnOneSeriesDetail,
+  type OneOnOneSeriesSummary,
+  type OneOnOneSeriesUpdateRequest,
+  type OneOnOneSession,
+  type OneOnOneSessionActionRequest,
+  type OneOnOneSessionCreateRequest,
+  type OneOnOneSessionUpdateRequest,
+  type OneOnOneSuggestionReason,
+  type OneOnOneSuggestionsResponse,
+  type OneOnOneTaskSuggestion,
+  type TaskStatus,
 } from "shared/types";
 import { db } from "../db/connection";
 import { runInTransaction } from "../db/transaction";
 import {
   configTable,
+  dayFocus,
   developers,
   oneOnOneAgendaItems,
   oneOnOneSeries,
   oneOnOneSessions,
   tasks,
+  teamTrackerDays,
 } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { todayIsoDate } from "../utils/date";
+import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService, type TaskPrincipal } from "./task.service";
+import { taskSignals } from "./task-views.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 export const ONE_ON_ONE_FLAG = "one_on_one_enabled";
@@ -42,6 +53,16 @@ type TaskRow = typeof tasks.$inferSelect;
 const OPEN_TASK_STATUSES: TaskStatus[] = ["open", "active", "blocked"];
 const CLOSED_SESSION_STATUSES = ["done", "skipped"] as const;
 const AGENDA_ATTACH_CONFLICT = "Task is already on the agenda";
+/** Days on a day plan before a still-open task reads as carried (drawer AGING_DAYS). */
+const CARRIED_SUGGESTION_DAYS = 3;
+/** Suggestion ranking weights — the strongest reason leads. */
+const REASON_WEIGHT: Record<OneOnOneSuggestionReason["code"], number> = {
+  blocked: 50,
+  overdue: 40,
+  high_priority: 30,
+  carried: 20,
+  stale: 10,
+};
 
 // ── Cadence math (48 §5): all arithmetic on YYYY-MM-DD via UTC ──
 
@@ -124,6 +145,7 @@ export function nextSessionDate(
 export class OneOnOneService {
   private readonly keys = new TaskKeysService();
   private readonly taskService = new TaskService();
+  private readonly events = new TaskEventsService();
 
   /** 48 §0: `one_on_one_enabled` — purely additive, no stage prerequisite. */
   async enabled(workspaceId?: string): Promise<boolean> {
@@ -203,20 +225,7 @@ export class OneOnOneService {
           .limit(1)
       )[0];
       if (existing) throw new HttpError(409, "A 1:1 series already exists for this developer");
-      const row = (
-        await db
-          .insert(oneOnOneSeries)
-          .values({
-            workspaceId: scope,
-            developerAccountId: input.developerAccountId,
-            cadence: input.cadence,
-            preferredWeekday: input.preferredWeekday ?? null,
-            active: 1,
-            createdAt: new Date().toISOString(),
-          })
-          .returning()
-      )[0]!;
-      await this.ensureNextSession(row, scope);
+      const row = await this.insertSeries(scope, input);
       return this.getDetail(row.id, scope);
     });
   }
@@ -400,6 +409,157 @@ export class OneOnOneService {
     });
   }
 
+  /**
+   * Attach from anywhere a manager already is (developer drawer rows): resolve
+   * the developer's series — starting a weekly one when none exists — and
+   * attach the task, all in one transaction.
+   */
+  async quickAttach(
+    input: OneOnOneQuickAttachRequest,
+    principal: TaskPrincipal,
+    workspaceId?: string,
+  ): Promise<OneOnOneQuickAttachResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    return runInTransaction(async () => {
+      const developer = (
+        await db
+          .select({ displayName: developers.displayName })
+          .from(developers)
+          .where(and(eq(developers.workspaceId, scope), eq(developers.accountId, input.developerAccountId)))
+          .limit(1)
+      )[0];
+      if (!developer) throw new HttpError(404, "Developer not found");
+      const existing = (
+        await db
+          .select()
+          .from(oneOnOneSeries)
+          .where(
+            and(
+              eq(oneOnOneSeries.workspaceId, scope),
+              eq(oneOnOneSeries.developerAccountId, input.developerAccountId),
+            ),
+          )
+          .limit(1)
+      )[0];
+      const series =
+        existing ?? (await this.insertSeries(scope, { developerAccountId: input.developerAccountId, cadence: "weekly" }));
+      const task = await this.resolveOrCreateAgendaTask(
+        series,
+        { taskId: input.taskId, taskKey: input.taskKey },
+        principal,
+        scope,
+      );
+      const item = await this.attachTask(series.id, task.id, scope);
+      const boundary = await this.latestClosedSession(series.id, scope);
+      return {
+        item: this.toAgendaItem(item, task, boundary),
+        seriesId: series.id,
+        developerName: developer.displayName,
+        seriesCreated: !existing,
+      };
+    });
+  }
+
+  /**
+   * One-tap agenda prep: the developer's open tasks that are blocked, overdue,
+   * high priority, carried across day plans, or idle — minus what is already
+   * on the agenda — plus a no-check-in topic. Signals reuse the Tasks view
+   * definitions (`taskSignals`), so "overdue" and "stale" mean the same thing
+   * everywhere. Read-only.
+   */
+  async suggestions(
+    seriesId: number,
+    workspaceId?: string,
+    today = todayIsoDate(),
+  ): Promise<OneOnOneSuggestionsResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const series = await this.requireSeries(seriesId, scope);
+    const developerId = series.developerAccountId;
+
+    const linked = new Set(
+      (
+        await db
+          .select({ taskId: oneOnOneAgendaItems.taskId })
+          .from(oneOnOneAgendaItems)
+          .where(and(eq(oneOnOneAgendaItems.workspaceId, scope), eq(oneOnOneAgendaItems.seriesId, series.id)))
+      ).map((row) => row.taskId),
+    );
+    const candidates = (
+      await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, scope),
+            eq(tasks.ownerType, "developer"),
+            eq(tasks.ownerId, developerId),
+            inArray(tasks.status, OPEN_TASK_STATUSES),
+            eq(tasks.kind, "task"),
+            isNull(tasks.deletedAt),
+          ),
+        )
+    ).filter((row) => !linked.has(row.id));
+
+    const ids = candidates.map((row) => row.id);
+    const [lastActivity, origins, checkIn] = await Promise.all([
+      this.events.latestActivityByTask(ids, scope),
+      ids.length
+        ? db
+            .select({ taskId: dayFocus.taskId, origin: min(dayFocus.date) })
+            .from(dayFocus)
+            .where(
+              and(
+                eq(dayFocus.workspaceId, scope),
+                eq(dayFocus.ownerType, "developer"),
+                eq(dayFocus.ownerId, developerId),
+                inArray(dayFocus.taskId, ids),
+              ),
+            )
+            .groupBy(dayFocus.taskId)
+        : Promise.resolve([]),
+      db
+        .select({ last: max(teamTrackerDays.lastCheckInAt) })
+        .from(teamTrackerDays)
+        .where(and(eq(teamTrackerDays.workspaceId, scope), eq(teamTrackerDays.developerAccountId, developerId))),
+    ]);
+    const originByTask = new Map(origins.map((row) => [row.taskId, row.origin]));
+    const facts = { lastActivity, drifted: new Set<number>(), jiraLinked: null };
+
+    const ranked: (OneOnOneTaskSuggestion & { score: number; since: string })[] = [];
+    for (const row of candidates) {
+      const signals = taskSignals(row, facts, today);
+      const reasons: OneOnOneSuggestionReason[] = [];
+      if (row.status === "blocked") reasons.push({ code: "blocked" });
+      if (signals.overdue) {
+        reasons.push({ code: "overdue", days: signals.overdueDays ?? 0, source: signals.overdueSource ?? "scheduled" });
+      }
+      if (row.priority === "high") reasons.push({ code: "high_priority" });
+      const origin = originByTask.get(row.id);
+      const carriedDays = origin ? diffDaysIso(origin, today) : 0;
+      if (carriedDays >= CARRIED_SUGGESTION_DAYS) reasons.push({ code: "carried", days: carriedDays });
+      if (signals.stale) reasons.push({ code: "stale", days: signals.staleDays ?? 0 });
+      if (!reasons.length) continue;
+      ranked.push({
+        task: this.toAgendaTask(row),
+        reasons,
+        score: reasons.reduce((sum, reason) => sum + REASON_WEIGHT[reason.code], 0),
+        since: lastActivity.get(row.id) ?? row.updatedAt,
+      });
+    }
+    // Strongest combined signal first; ties go to the longest-quiet task.
+    ranked.sort((a, b) => b.score - a.score || a.since.localeCompare(b.since) || a.task.taskId - b.task.taskId);
+
+    const lastCheckInAt = checkIn[0]?.last ?? null;
+    const checkInDays = lastCheckInAt ? diffDaysIso(lastCheckInAt.slice(0, 10), today) : null;
+    return {
+      tasks: ranked.slice(0, ONE_ON_ONE_SUGGESTION_LIMIT).map(({ task, reasons }) => ({ task, reasons })),
+      checkIn:
+        checkInDays === null || checkInDays >= ONE_ON_ONE_NO_CHECK_IN_DAYS
+          ? { lastCheckInAt, days: checkInDays }
+          : null,
+    };
+  }
+
   async reorderAgenda(
     seriesId: number,
     input: OneOnOneAgendaReorderRequest,
@@ -545,6 +705,24 @@ export class OneOnOneService {
   }
 
   // ── Internals ──
+
+  private async insertSeries(workspaceId: string, input: OneOnOneSeriesCreateRequest): Promise<OneOnOneSeriesRow> {
+    const row = (
+      await db
+        .insert(oneOnOneSeries)
+        .values({
+          workspaceId,
+          developerAccountId: input.developerAccountId,
+          cadence: input.cadence,
+          preferredWeekday: input.preferredWeekday ?? null,
+          active: 1,
+          createdAt: new Date().toISOString(),
+        })
+        .returning()
+    )[0]!;
+    await this.ensureNextSession(row, workspaceId);
+    return row;
+  }
 
   private async requireSeries(id: number, workspaceId: string): Promise<OneOnOneSeriesRow> {
     const row = (
@@ -871,20 +1049,28 @@ export class OneOnOneService {
     };
   }
 
-  private toAgendaItem(
-    item: OneOnOneAgendaRow,
-    task: TaskRow,
-    boundary: { scheduledFor: string; completedAt: string } | null,
-  ): OneOnOneAgendaItem {
-    const projection: OneOnOneAgendaTask = {
+  private toAgendaTask(task: TaskRow): OneOnOneAgendaTask {
+    return {
       taskId: task.id,
       taskKey: task.taskKey,
       title: task.title,
       status: task.status as TaskStatus,
       ownerType: task.ownerType as OneOnOneAgendaTask["ownerType"],
       ownerId: task.ownerId,
+      priority: task.priority === "high" ? "high" : "normal",
+      scheduledOn: task.scheduledOn,
+      dueAt: task.dueAt,
+      closedAt: task.closedAt,
       deletedAt: task.deletedAt,
     };
+  }
+
+  private toAgendaItem(
+    item: OneOnOneAgendaRow,
+    task: TaskRow,
+    boundary: { scheduledFor: string; completedAt: string } | null,
+  ): OneOnOneAgendaItem {
+    const projection = this.toAgendaTask(task);
     return {
       id: item.id,
       seriesId: item.seriesId,

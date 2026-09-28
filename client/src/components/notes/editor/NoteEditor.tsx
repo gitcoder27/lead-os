@@ -8,6 +8,7 @@ import {
   noteEditorExtensions,
   setEntityContext,
   setSearchHighlight,
+  type NoteEditorCommand,
   type NoteEditorHandlers,
   type NoteEntityContext,
   type NoteLineAction,
@@ -54,6 +55,8 @@ interface NoteEditorProps {
   /** Hide the selection bubble's actions (e.g. while a conflict is unresolved). */
   actionsDisabled?: boolean;
   mobile?: boolean;
+  /** Line actions / commands this surface does not offer (fixed at mount). */
+  omit?: readonly NoteEditorCommand[];
 }
 
 const External = Annotation.define<boolean>();
@@ -80,7 +83,7 @@ const BUBBLE_ACTIONS: Array<{ action: NoteLineAction; label: string; icon: typeo
 ];
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
-  { value, onChange, onBlur, handlers, entityContext, placeholder, ariaLabel, actionsDisabled = false, mobile = false },
+  { value, onChange, onBlur, handlers, entityContext, placeholder, ariaLabel, actionsDisabled = false, mobile = false, omit },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -132,7 +135,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       state: EditorState.create({
         doc: value,
         extensions: [
-          noteEditorExtensions({ getHandlers: () => handlersRef.current, placeholder, ariaLabel }),
+          noteEditorExtensions({ getHandlers: () => handlersRef.current, placeholder, ariaLabel, omit }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               for (const [id, pos] of anchorsRef.current) {
@@ -329,7 +332,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
               aria-label="Turn selection into"
               style={{ top: bubble.top, left: bubble.left }}
             >
-              {BUBBLE_ACTIONS.map(({ action, label, icon: Icon }) => (
+              {BUBBLE_ACTIONS.filter(({ action }) => !omit?.includes(action)).map(({ action, label, icon: Icon }) => (
                 <button
                   key={action}
                   type="button"

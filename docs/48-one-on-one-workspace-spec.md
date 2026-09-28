@@ -157,3 +157,16 @@ scheduled → done     → next session auto-created per cadence
 | `capture-grammar` `/11` token or `+1on1` label | Grammar changes are high-blast-radius; wait for usage. |
 | Talking-point templates / prep suggestions | Wait for usage data. |
 | Copilot proactive prep ("your 1:1 with X is in 2h — here's the agenda") | Needs copilot-v2 proactive signals first. |
+
+---
+
+## 11. Discoverability pass (2026-09-28)
+
+Presentation + affordance work on top of §2–§5; the data model is unchanged.
+
+- **Agenda teaches the model.** An always-on line ("Topics to raise with <name>. Each one stays on the agenda until you discuss it or its task closes.") plus an empty state listing the three ways in. Rows show the linked task's live state (Blocked / In progress, due or slipped plan date, high-priority flag); the carried marker is a quiet `↻ carried from <date>`. Topics whose tasks closed since the last session collect under a collapsed "Closed since last 1:1".
+- **Suggestions** — `GET /api/one-on-ones/:id/suggestions` (read-only, manager-only, flag-gated). Open `kind: task` rows owned by the series developer, minus anything already linked to the series, ranked by blocked > overdue (`taskSignals`) > high priority > carried (≥3 days since first `day_focus` date) > stale (`TASK_STALE_DAYS`, via `taskSignals`); top `ONE_ON_ONE_SUGGESTION_LIMIT` (6). A no-check-in topic is added when `max(team_tracker_days.last_check_in_at)` is ≥ `ONE_ON_ONE_NO_CHECK_IN_DAYS` (3) old or absent. The UI shows three, "Show more", one-tap Add, and per-view dismiss.
+- **Attach from the drawer** — `POST /api/one-on-ones/agenda { developerAccountId, taskKey | taskId }` resolves the developer's series, starting a weekly one when none exists, and attaches in one transaction. Surfaced as a hover-toolbar button on the developer drawer's current and planned rows (not in historical read-only snapshots); the toast links to the workspace.
+- **Session** uses the shared `DatePickerPopover` (Today / Tomorrow / Next <preferred weekday> / In a week / exact date) and the Notes CodeMirror editor at column scale: same live markdown and task chips, `⌘⇧E` turns a line into a developer action item and `⌘⇧L` into a manager follow-up (marked `→ KEY`), with no Update or day wrap-up commands. Notes flush on blur, before status changes and on unmount.
+- **History** leads with a "Last time" card (notes + the topics that were on the agenda — links attached before close, minus topics already resolved before the previous session). Earlier sessions are one line each with a plain-text preview.
+

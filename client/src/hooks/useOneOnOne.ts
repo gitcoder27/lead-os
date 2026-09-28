@@ -5,6 +5,8 @@ import type {
   OneOnOneAgendaAttachRequest,
   OneOnOneAgendaItem,
   OneOnOneAgendaReorderRequest,
+  OneOnOneQuickAttachRequest,
+  OneOnOneQuickAttachResponse,
   OneOnOneSeriesCreateRequest,
   OneOnOneSeriesDetail,
   OneOnOneSeriesListResponse,
@@ -12,6 +14,7 @@ import type {
   OneOnOneSessionActionRequest,
   OneOnOneSessionCreateRequest,
   OneOnOneSessionUpdateRequest,
+  OneOnOneSuggestionsResponse,
 } from '@/types';
 
 /** docs/48: the `one_on_one_enabled` flag, delivered on the manager session. */
@@ -46,6 +49,17 @@ export function useOneOnOneSeries(seriesId: number | undefined) {
   return useQuery<OneOnOneSeriesDetail>({
     queryKey: ['one-on-ones', 'detail', seriesId, authScopeKey],
     queryFn: () => api.get<OneOnOneSeriesDetail>(`/one-on-ones/${seriesId}`),
+    enabled: flagOn && seriesId !== undefined,
+  });
+}
+
+/** One-tap agenda prep: the developer's flagged/blocked/overdue/idle work. */
+export function useOneOnOneSuggestions(seriesId: number | undefined) {
+  const authScopeKey = useAuthScopeKey();
+  const flagOn = useOneOnOneEnabled();
+  return useQuery<OneOnOneSuggestionsResponse>({
+    queryKey: ['one-on-ones', 'suggestions', seriesId, authScopeKey],
+    queryFn: () => api.get<OneOnOneSuggestionsResponse>(`/one-on-ones/${seriesId}/suggestions`),
     enabled: flagOn && seriesId !== undefined,
   });
 }
@@ -110,6 +124,16 @@ export function useAttachOneOnOneAgendaItemToSeries() {
   return useMutation({
     mutationFn: ({ seriesId, ...body }: OneOnOneAgendaAttachRequest & { seriesId: number }) =>
       api.post<{ item: OneOnOneAgendaItem }>(`/one-on-ones/${seriesId}/agenda`, body),
+    onSuccess: invalidate,
+  });
+}
+
+/** Attach by developer (drawer rows) — the server starts the series if needed. */
+export function useQuickAttachOneOnOneAgenda() {
+  const invalidate = useInvalidateOneOnOnes();
+  return useMutation({
+    mutationFn: (body: OneOnOneQuickAttachRequest) =>
+      api.post<OneOnOneQuickAttachResponse>('/one-on-ones/agenda', body),
     onSuccess: invalidate,
   });
 }

@@ -32,6 +32,8 @@ export interface TrackerDrawerItemRowProps {
   hideActions?: boolean;
   readOnly?: boolean;
   composer?: ReactNode;
+  /** Extra hover-toolbar buttons for open rows (e.g. "Add to 1:1 agenda"). */
+  extraActions?: ReactNode;
 }
 
 /** Days carried before the provenance line turns amber. */
@@ -60,6 +62,7 @@ export function TrackerDrawerItemRow({
   hideActions = false,
   readOnly = false,
   composer,
+  extraActions,
 }: TrackerDrawerItemRowProps) {
   const [titleEditing, setTitleEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(item.title);
@@ -328,6 +331,7 @@ export function TrackerDrawerItemRow({
           onMarkDone={onMarkDone}
           onDrop={onDrop}
           onToggleTitleEditor={hasExplicitTitleEditAction ? () => setTitleEditing(true) : undefined}
+          extraActions={extraActions}
         />
       )}
     </div>

@@ -489,6 +489,16 @@ textarea.ui-field { resize: none; }
   .one-on-one-column + .one-on-one-column { border-left: 1px solid var(--border); }
 }
 
+/* 1:1 session notes: the Notes editor at column scale — same live markdown,
+ * smaller type and no page-height minimum. */
+.one-on-one-notes {
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.one-on-one-notes .notes-editor { margin-top: 0; min-height: 180px; }
+.one-on-one-notes .notes-editor .cm-editor { font-size: 13.5px; line-height: 1.55; }
+.one-on-one-notes .notes-editor .cm-scroller { line-height: 1.55; }
+.one-on-one-notes .notes-editor .cm-content { min-height: 170px; padding: 8px 0 16px; }
+
 /* ── Tabs vs segments (docs/54 V11) ───────────────────────────────────
  * `ui-tabs`: switch between views of the same surface (header nav, Team
  * lenses, Notes kinds) — a track with an elevated active pill.

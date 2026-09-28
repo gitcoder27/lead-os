@@ -87,10 +87,8 @@ export function StandupTaskList({
                 aria-selected={focused}
                 tabIndex={focused ? 0 : -1}
                 ref={(el) => registerRow(task.taskKey, el)}
-                onClick={() => {
-                  onFocusIndex(index);
-                  onOpen(task.taskKey);
-                }}
+                onClick={() => onFocusIndex(index)}
+                onDoubleClick={() => onOpen(task.taskKey)}
                 // docs/54 D3: the list-row idiom from /tasks — focus is a tint plus a
                 // keyboard ring; the left accent bar is reserved for "featured".
                 className="relative block w-full px-3 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)] [&:not(:first-child)]:border-t"

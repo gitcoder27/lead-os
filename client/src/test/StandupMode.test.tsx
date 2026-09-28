@@ -281,11 +281,23 @@ describe('StandupMode', () => {
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('clicking a task row opens the task drawer', () => {
+  it('clicking a task row selects it without opening the task drawer', () => {
     renderStandup();
     fireEvent.click(taskRows()[1]!);
-    expect(mockOnOpenTask).toHaveBeenCalledWith('T-2');
+    expect(mockOnOpenTask).not.toHaveBeenCalled();
     expect(taskRows()[1]).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(document.body, { key: 'u' });
+    expect(screen.getByLabelText('Add an update to T-2')).toBeInTheDocument();
+  });
+
+  it('double-clicking a task row opens the selected task drawer once', () => {
+    renderStandup();
+    const row = taskRows()[1]!;
+    fireEvent.click(row);
+    fireEvent.click(row);
+    fireEvent.doubleClick(row);
+    expect(mockOnOpenTask).toHaveBeenCalledExactlyOnceWith('T-2');
+    expect(row).toHaveAttribute('aria-selected', 'true');
   });
 
   it('the Last round button opens the previous sealed standup', () => {
@@ -395,6 +407,19 @@ describe('StandupMode', () => {
     fireEvent.keyDown(document.body, { key: 'j' });
     fireEvent.keyDown(document.body, { key: 'Enter' });
     expect(mockOnOpenTask).toHaveBeenCalledWith('T-2');
+  });
+
+  it('ignores Escape claimed by a higher layer and exits on the next Escape', () => {
+    renderStandup();
+    const claimEscape = (event: KeyboardEvent) => event.preventDefault();
+    document.addEventListener('keydown', claimEscape, { once: true });
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(mockOnClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId('standup-mode')).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it('? opens the key help overlay and Esc closes layers before exiting', async () => {

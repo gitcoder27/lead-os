@@ -406,7 +406,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   useLayoutEffect(() => {
     keyHandlerRef.current = (event: KeyboardEvent) => {
-      if (suspended || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.defaultPrevented || suspended || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
       const inField =
         target instanceof HTMLElement &&

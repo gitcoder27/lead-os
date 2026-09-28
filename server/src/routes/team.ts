@@ -10,6 +10,8 @@ import { and, eq } from "drizzle-orm";
 import { config } from "../config";
 import { getJiraApiToken } from "../runtime-credentials";
 import { getPersistedJiraApiToken } from "../services/jira-credentials.service";
+import { getParticipatingDeveloperIds } from "../services/developer-participation.service";
+import type { Developer } from "shared/types";
 
 const paramsSchema = z.object({
   params: z.object({ accountId: z.string().regex(/^[A-Za-z0-9:-]+$/, "Invalid account id format") }),
@@ -68,7 +70,7 @@ const updateDeveloperSchema = z.object({
 
 type DeveloperUpdateValues = Partial<typeof developersTable.$inferInsert>;
 
-function serializeDeveloper(row: typeof developersTable.$inferSelect) {
+function serializeDeveloper(row: typeof developersTable.$inferSelect, participants: ReadonlySet<string>): Developer {
   return {
     accountId: row.accountId,
     displayName: row.displayName,
@@ -77,6 +79,7 @@ function serializeDeveloper(row: typeof developersTable.$inferSelect) {
     source: row.source as "jira" | "manual",
     jiraAccountId: row.jiraAccountId ?? undefined,
     isActive: row.isActive === 1,
+    participates: participants.has(row.accountId),
   };
 }
 
@@ -305,7 +308,7 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
         throw new Error("Failed to create manual team member");
       }
       res.status(201).json({
-        developer: serializeDeveloper(created),
+        developer: serializeDeveloper(created, await getParticipatingDeveloperIds(workspaceId)),
       });
     } catch (error) {
       next(error);
@@ -329,7 +332,7 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
         return;
       }
 
-      res.json({ developer: serializeDeveloper(updated) });
+      res.json({ developer: serializeDeveloper(updated, await getParticipatingDeveloperIds(req.auth!.user.workspaceId)) });
     } catch (error) {
       next(error);
     }

@@ -126,7 +126,7 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
 
 Critical path. Server changes first, then client relabeling.
 
-- [ ] **P1-01** Add `team_mode` (`solo | collab`) and per-developer `participates`.
+- [x] **P1-01** Add `team_mode` (`solo | collab`) and per-developer `participates`. (`task/p1-01-team-mode`, uncommitted)
   - Pattern to copy: `one_on_one_enabled` (`one-on-one.service.ts:46,150-156`, `routes/auth.ts:90-97`, `shared/types.ts:725-731`, `useOneOnOne.ts:20-22`, `server/src/scripts/one-on-one.ts`).
   - Do:
     - Config key `team_mode` with `getTeamMode()` in `settings.service.ts`.
@@ -368,7 +368,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
-| | | | | |
+| 2026-09-29 | P1-01 | `task/p1-01-team-mode` (uncommitted) | Opus | `SettingsService.getTeamMode()/setTeamMode()` (missing key → `solo`); one-shot `team_mode_v1` backfill in `migrate()` (active developer login → `collab`, else `solo`; explicit values kept; report in `data_migrations`). `participates` from `getParticipatingDeveloperIds()` (`developer-participation.service.ts`) on `Developer`, `TrackerDeveloperDay`, `TodayTeamPulseItem`. `SessionFeatures.teamMode` on every session; manager-only `GET/PUT /api/config/team-mode`; Settings → Team Members toggle; `npm run team-mode -- --workspace <id> [--status\|--set solo\|collab]`; `useTeamMode()`/`useSetTeamMode()`. Migration verified on snapshot copies of dev `dashboard.sandbox.db` and legacy `dashboard.db` (both → `collab`, integrity ok, idempotent). Signals untouched (P1-02/P1-03). Pre-existing failures on `HEAD`, unrelated: `one-on-ones.test.ts` (agenda suggestions), `task-views.routes.test.ts` (closed range). |
 
 ## Findings from verification
 

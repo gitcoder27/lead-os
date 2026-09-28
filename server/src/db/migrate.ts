@@ -1410,6 +1410,47 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   // to legacy_* archives, after which these repair statements are inert.
   runConstraintRepairStatements(sqlite, true);
   migrateSecretConfigValues(sqlite);
+  backfillTeamMode(sqlite);
+}
+
+export const TEAM_MODE_MIGRATION = "team_mode_v1";
+
+/**
+ * docs/56 P1-01, Decisions #1: one-shot backfill of the workspace `team_mode`.
+ * A workspace with at least one active developer `app_users` row becomes
+ * `collab`; every other existing workspace becomes `solo`. Explicit values are
+ * never overwritten, and workspaces created later default to `solo` via
+ * `SettingsService.getTeamMode()` (missing key).
+ */
+export function backfillTeamMode(sqlite: BetterSqlite3.Database): void {
+  if (sqlite.prepare("SELECT 1 FROM data_migrations WHERE name = ?").get(TEAM_MODE_MIGRATION)) {
+    return;
+  }
+  sqlite.transaction(() => {
+    const workspaceRows = sqlite
+      .prepare(
+        `SELECT id AS workspaceId FROM workspaces
+         UNION
+         SELECT DISTINCT workspace_id AS workspaceId FROM app_users`
+      )
+      .all() as Array<{ workspaceId: string }>;
+    const hasDeveloperLogin = sqlite.prepare(
+      "SELECT 1 FROM app_users WHERE workspace_id = ? AND role = 'developer' AND is_active = 1 LIMIT 1"
+    );
+    const insert = sqlite.prepare(
+      "INSERT INTO config (workspace_id, key, value) VALUES (?, 'team_mode', ?) ON CONFLICT(workspace_id, key) DO NOTHING"
+    );
+    const report: Record<string, string> = {};
+    for (const { workspaceId } of workspaceRows) {
+      const mode = hasDeveloperLogin.get(workspaceId) ? "collab" : "solo";
+      if (insert.run(workspaceId, mode).changes > 0) {
+        report[workspaceId] = mode;
+      }
+    }
+    sqlite
+      .prepare("INSERT INTO data_migrations (name, applied_at, report_json) VALUES (?, ?, ?)")
+      .run(TEAM_MODE_MIGRATION, new Date().toISOString(), JSON.stringify(report));
+  })();
 }
 
 function migrateSecretConfigValues(sqlite: BetterSqlite3.Database): void {

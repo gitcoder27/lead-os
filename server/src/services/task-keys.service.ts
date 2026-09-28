@@ -3,6 +3,7 @@ import { TASK_KEY_PATTERN, type TaskResolution, type Developer, type ManagerDesk
 import { db, rawDb } from "../db/connection";
 import { configTable, developers, managerDeskDays, managerDeskItems, taskKeyAliases, taskLegacyMap, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
+import { getParticipatingDeveloperIds } from "./developer-participation.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { todayIsoDate } from "../utils/date";
 
@@ -118,7 +119,7 @@ export class TaskKeysService {
         state: ({ active: "in_progress", done: "done", dropped: "dropped" } as Record<string, TrackerItemState>)[task.status] ?? "planned",
         status: task.status === "active" ? "in_progress" : task.status === "blocked" ? "waiting" : task.status === "done" ? "done" : task.status === "dropped" ? "cancelled" : task.later ? "backlog" : "planned",
         updatedAt: task.updatedAt,
-        developer: developerRow ? { accountId: developerRow.accountId, displayName: developerRow.displayName, isActive: developerRow.isActive === 1, email: developerRow.email ?? undefined, avatarUrl: developerRow.avatarUrl ?? undefined } : undefined,
+        developer: developerRow ? { accountId: developerRow.accountId, displayName: developerRow.displayName, isActive: developerRow.isActive === 1, participates: (await getParticipatingDeveloperIds(scope)).has(developerRow.accountId), email: developerRow.email ?? undefined, avatarUrl: developerRow.avatarUrl ?? undefined } : undefined,
       };
     }
     const desk = await db.select().from(managerDeskItems).where(and(eq(managerDeskItems.workspaceId, scope), eq(managerDeskItems.taskKey, key))).limit(1);
@@ -138,7 +139,7 @@ export class TaskKeysService {
     }
     const deskDay = desk[0] ? (await db.select().from(managerDeskDays).where(eq(managerDeskDays.id, desk[0].dayId)).limit(1))[0] : undefined;
     const developerRow = latest ? (await db.select().from(developers).where(and(eq(developers.workspaceId, scope), eq(developers.accountId, latest.day.developerAccountId))).limit(1))[0] : undefined;
-    const developer: Developer | undefined = developerRow && { accountId: developerRow.accountId, displayName: developerRow.displayName, isActive: developerRow.isActive === 1, email: developerRow.email ?? undefined, avatarUrl: developerRow.avatarUrl ?? undefined };
+    const developer: Developer | undefined = developerRow && { accountId: developerRow.accountId, displayName: developerRow.displayName, isActive: developerRow.isActive === 1, participates: (await getParticipatingDeveloperIds(scope)).has(developerRow.accountId), email: developerRow.email ?? undefined, avatarUrl: developerRow.avatarUrl ?? undefined };
     return {
       taskKey: key, requestedKey: rawKey.trim(), title: desk[0]?.title ?? latest!.item.title,
       kind: desk[0] && latest?.item.managerDeskItemId === desk[0].id ? "delegated" : latest ? "tracker_only" : "desk_only",

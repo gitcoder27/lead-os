@@ -19,6 +19,7 @@ import { logger } from "../utils/logger";
 import { HttpError } from "../middleware/errorHandler";
 import { runInTransaction } from "../db/transaction";
 import { DEFAULT_WORKSPACE_ID } from "../services/workspace.service";
+import { TEAM_MODES, type TeamModeResponse } from "shared/types";
 
 const configSchema = z.object({
   body: z.object({
@@ -162,6 +163,12 @@ const aiConfigUpdateSchema = z.object({
       .optional(),
     removeProviderId: z.string().trim().min(1).optional(),
   }),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
+const teamModeUpdateSchema = z.object({
+  body: z.object({ teamMode: z.enum(TEAM_MODES) }),
   params: z.any().optional(),
   query: z.any().optional(),
 });
@@ -494,6 +501,27 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         }
       }
       res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // docs/56 P1-01: workspace `team_mode` (manager-only via the /api/config mount).
+  router.get("/team-mode", async (req, res, next) => {
+    try {
+      const response: TeamModeResponse = { teamMode: await settings.getTeamMode(req.auth!.user.workspaceId) };
+      res.json(response);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/team-mode", validate(teamModeUpdateSchema), async (req, res, next) => {
+    try {
+      const response: TeamModeResponse = {
+        teamMode: await settings.setTeamMode(req.auth!.user.workspaceId, req.body.teamMode),
+      };
+      res.json(response);
     } catch (error) {
       next(error);
     }

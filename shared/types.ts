@@ -89,6 +89,10 @@ export interface Developer {
   source?: "jira" | "manual";
   jiraAccountId?: string;
   isActive: boolean;
+  /** docs/56 P1-01: true only when an active developer `app_users` row maps to
+   *  this developer. Participation signals apply only when
+   *  `teamMode === "collab" && participates`. Computed server-side. */
+  participates: boolean;
   availability?: DeveloperAvailability;
 }
 
@@ -494,6 +498,8 @@ export interface TodayTeamPulseItem {
   actionPreview?: string;
   /** docs/53 F15: "asked 9:12" — set while an Ask for update is unanswered. */
   askedAt?: string;
+  /** docs/56 P1-01: mirrors `Developer.participates`. */
+  participates: boolean;
 }
 
 export interface TodayPromiseItem {
@@ -722,9 +728,25 @@ export interface AuthUser {
   developerAccountId?: string;
 }
 
+/** docs/56 P1-01: workspace `team_mode`. `solo` is the default; `collab`
+ *  means developers log in and participate (check-ins, My Day). */
+export const TEAM_MODES = ["solo", "collab"] as const;
+export type TeamMode = (typeof TEAM_MODES)[number];
+export const DEFAULT_TEAM_MODE: TeamMode = "solo";
+
+export interface TeamModeResponse {
+  teamMode: TeamMode;
+}
+
+export interface TeamModeUpdateRequest {
+  teamMode: TeamMode;
+}
+
 export interface SessionFeatures {
   /** Phase 3 workspace flag (P3 §0): one flag drives every Phase 3 surface. */
   tasksPhase3: boolean;
+  /** docs/56 P1-01: workspace `team_mode`, delivered to every role. */
+  teamMode: TeamMode;
   /** 48 §0: `one_on_one_enabled`. Only ever true for manager principals —
    *  developer sessions omit the field entirely (OO-D6). */
   oneOnOne?: boolean;
@@ -1221,6 +1243,8 @@ export interface TrackerDeveloperDay {
   checkIns: TrackerCheckIn[];
   recentCheckIns: TrackerCheckIn[];
   isStale: boolean;
+  /** docs/56 P1-01: mirrors `developer.participates`. */
+  participates: boolean;
   signals: TrackerDeveloperSignals;
   statusUpdatedAt?: string;
   createdAt: string;

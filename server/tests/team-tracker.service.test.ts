@@ -1824,6 +1824,7 @@ describe("TeamTrackerService", () => {
             email: undefined,
             avatarUrl: undefined,
             isActive: true,
+            participates: false,
           },
         },
         {
@@ -1838,6 +1839,7 @@ describe("TeamTrackerService", () => {
             email: undefined,
             avatarUrl: undefined,
             isActive: true,
+            participates: false,
           },
         },
       ]);

@@ -3,10 +3,12 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import { validate } from "../middleware/validate";
 import { WorkloadService } from "../services/workload.service";
+import type { AuthService } from "../services/auth.service";
+import { runInTransaction } from "../db/transaction";
 import { JiraClient } from "../jira/client";
 import { db } from "../db/connection";
 import { configTable, developers as developersTable, issues } from "../db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { config } from "../config";
 import { getJiraApiToken } from "../runtime-credentials";
 import { getPersistedJiraApiToken } from "../services/jira-credentials.service";
@@ -147,7 +149,7 @@ function makeManualAccountId(displayName: string): string {
   return `manual:${slug}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
-export function createTeamRouter(workloadService: WorkloadService): Router {
+export function createTeamRouter(workloadService: WorkloadService, authService: AuthService): Router {
   const router = Router();
 
   router.get("/workload", validate(workloadQuerySchema), async (req, res, next) => {
@@ -242,6 +244,24 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
       }>;
       const workspaceId = req.auth!.user.workspaceId;
 
+      // Members who are new or coming back from removal: any session left over from
+      // an earlier stint must not come back to life with them. Members who were
+      // already active keep their sessions (this endpoint upserts the whole roster).
+      const alreadyActive = new Set(
+        (
+          devs.length === 0 ? [] : await db
+            .select({ accountId: developersTable.accountId })
+            .from(developersTable)
+            .where(
+              and(
+                eq(developersTable.workspaceId, workspaceId),
+                eq(developersTable.isActive, 1),
+                inArray(developersTable.accountId, devs.map((dev) => dev.accountId))
+              )
+            )
+        ).map((row) => row.accountId)
+      );
+
       for (const dev of devs) {
         const source = dev.source ?? "jira";
         const jiraAccountId = source === "jira"
@@ -270,6 +290,12 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
               isActive: 1,
             },
           });
+      }
+
+      for (const dev of devs) {
+        if (!alreadyActive.has(dev.accountId)) {
+          await authService.revokeDeveloperSessions(dev.accountId, workspaceId);
+        }
       }
 
       res.json({ success: true, count: devs.length });
@@ -316,14 +342,30 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
     try {
       const accountId = req.params.accountId as string;
       const updates = createDeveloperUpdateValues(req.body);
+      const workspaceId = req.auth!.user.workspaceId;
 
-      const rows = await db
-        .update(developersTable)
-        .set(updates)
-        .where(and(eq(developersTable.workspaceId, req.auth!.user.workspaceId), eq(developersTable.accountId, accountId)))
-        .returning();
-
-      const updated = rows[0];
+      const updated = await runInTransaction(async () => {
+        const before = (
+          await db
+            .select({ isActive: developersTable.isActive })
+            .from(developersTable)
+            .where(and(eq(developersTable.workspaceId, workspaceId), eq(developersTable.accountId, accountId)))
+            .limit(1)
+        )[0];
+        const rows = await db
+          .update(developersTable)
+          .set(updates)
+          .where(and(eq(developersTable.workspaceId, workspaceId), eq(developersTable.accountId, accountId)))
+          .returning();
+        // Deactivating via PATCH is a removal too: revoke logins. Reactivating drops
+        // stale sessions so they cannot resume with the member.
+        if (rows[0] && updates.isActive === 0) {
+          await authService.revokeDeveloperAccess(accountId, workspaceId);
+        } else if (rows[0] && updates.isActive === 1 && before?.isActive !== 1) {
+          await authService.revokeDeveloperSessions(accountId, workspaceId);
+        }
+        return rows[0];
+      });
       if (!updated) {
         res.status(404).json({ error: "Team member not found", status: 404 });
         return;
@@ -339,10 +381,16 @@ export function createTeamRouter(workloadService: WorkloadService): Router {
     try {
       const accountId = req.params.accountId as string;
 
-      await db
-        .update(developersTable)
-        .set({ isActive: 0 })
-        .where(and(eq(developersTable.workspaceId, req.auth!.user.workspaceId), eq(developersTable.accountId, accountId)));
+      const workspaceId = req.auth!.user.workspaceId;
+
+      // Deactivate and revoke together: a removed member must not keep a working login.
+      await runInTransaction(async () => {
+        await db
+          .update(developersTable)
+          .set({ isActive: 0 })
+          .where(and(eq(developersTable.workspaceId, workspaceId), eq(developersTable.accountId, accountId)));
+        await authService.revokeDeveloperAccess(accountId, workspaceId);
+      });
 
       res.json({ success: true, accountId });
     } catch (error) {

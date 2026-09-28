@@ -6,6 +6,7 @@ import {
   dataMigrations,
   developers,
   managerDeskDays,
+  managerDeskItemHistory,
   managerDeskItems,
   managerDeskLinks,
   taskKeySequences,
@@ -193,6 +194,41 @@ describe("Phase 2 parity (§2.5.3)", () => {
     const result = await service.verify("default", { strict: true });
     expect(result.parityDiffs).toEqual([]);
     expect(result.ok).toBe(true);
+  });
+
+  it("reviewed drift: sparse snapshots, exec-truth desk status and demotions classify as explained", async () => {
+    const day = await deskDay(yday);
+    // Covered item: a snapshot activates the legacy history path.
+    const covered = await deskRow(day.id, { taskKey: "T-1", title: "Covered", status: "planned", createdAt: T(yday) });
+    await db.insert(managerDeskItemHistory).values({
+      workspaceId: "default", itemId: covered.id, managerAccountId: "mgr-1", eventType: "upsert",
+      snapshotJson: JSON.stringify({ id: covered.id, taskKey: "T-1", title: "Covered", status: "planned" }),
+      recordedAt: T(yday, "T10:00:00.000Z"),
+    });
+    // Uncovered item: no history rows -> invisible to the snapshot oracle.
+    await deskRow(day.id, { taskKey: "T-2", title: "Never snapshotted", status: "planned", createdAt: T(yday) });
+    // Dual-sourced: desk card stays inbox while the execution row is in progress.
+    const mirrored = await deskRow(day.id, { taskKey: "T-3", title: "Delegated inbox", status: "inbox", assignee: "dev-1", createdAt: T(yday) });
+    const dd = await devDay(yday);
+    await trackerRow(dd.id, { taskKey: "T-3", title: "Delegated inbox", managerDeskItemId: mirrored.id, state: "in_progress", createdAt: T(yday) });
+    // dev-2 stacked actives: the older row is demoted to open by single-active.
+    await db.insert(developers).values({ accountId: "dev-2", displayName: "Dev Two", isActive: 1 });
+    const d2 = await devDay(yday, "dev-2");
+    await trackerRow(d2.id, { taskKey: "T-4", title: "First stacked", state: "in_progress", position: 0, createdAt: T(yday) });
+    await trackerRow(d2.id, { taskKey: "T-5", title: "Second stacked", state: "in_progress", position: 1, createdAt: T(yday, "T10:00:00.000Z"), updatedAt: T(yday, "T10:00:00.000Z") });
+    await backfill();
+
+    const result = await service.verify("default", { strict: true });
+    expect(result.parityDiffs).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.explainedDrift.some((d) => d.key === "T-2" && d.field === "presence" && d.surface === "desk_history")).toBe(true);
+    expect(result.explainedDrift.some((d) => d.key === "T-3")).toBe(true);
+    // Nothing the review pass explains may hide a real violation: a planted
+    // post-backfill title edit still fails strict verify.
+    await db.update(tasks).set({ title: "Edited" }).where(eq(tasks.taskKey, "T-1"));
+    const after = await service.verify("default", { strict: true });
+    expect(after.ok).toBe(false);
+    expect(after.parityDiffs.some((d) => d.field === "title")).toBe(true);
   });
 
   it("strict verify catches a planted canonical-only task (presence diff)", async () => {

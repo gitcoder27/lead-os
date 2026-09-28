@@ -144,6 +144,17 @@ export interface TaskPhase2Report {
   decisionsTemplate: { inputHash: string; decisions: Phase2Decision[] };
 }
 
+export interface TaskPhase2ParityDiff {
+  surface: string;
+  owner: string;
+  date: string;
+  field: string;
+  legacy: string;
+  tasks: string;
+  /** Task key the diff is about, when attributable — powers the reviewed-drift pass. */
+  key?: string;
+}
+
 export interface TaskPhase2VerifyResult {
   workspaceId: string;
   ok: boolean;
@@ -151,9 +162,9 @@ export interface TaskPhase2VerifyResult {
   unrepointedEvents: number;
   multiActiveViolations: string[];
   unfilledRefs: { checkin: number; noteTask: number; noteFollowUp: number };
-  parityDiffs: { surface: string; owner: string; date: string; field: string; legacy: string; tasks: string }[];
-  /** Field diffs fully explained by recorded task events (point-in-time replay drift), informational only. */
-  explainedDrift: { surface: string; owner: string; date: string; field: string; legacy: string; tasks: string }[];
+  parityDiffs: TaskPhase2ParityDiff[];
+  /** Field diffs fully explained by recorded task events or reviewed migration semantics, informational only. */
+  explainedDrift: TaskPhase2ParityDiff[];
 }
 
 const marker = (name: string, workspaceId: string) => (workspaceId === "default" ? name : `${name}:${workspaceId}`);
@@ -1188,14 +1199,14 @@ export class TaskPhase2BackfillService {
       const projected = new Map((await this.taskService.projectDeveloperBoardDay(devDay.developer.accountId, today, scope)).map((p) => [p.taskKey, p]));
       for (const [key, item] of legacy) {
         const task = projected.get(key);
-        if (!task) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
+        if (!task) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)", key });
         else {
-          if (task.title !== item.title) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "title", legacy: item.title, tasks: task.title });
-          if (task.status !== item.status) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "status", legacy: item.status, tasks: task.status });
+          if (task.title !== item.title) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "title", legacy: item.title, tasks: task.title, key });
+          if (task.status !== item.status) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "status", legacy: item.status, tasks: task.status, key });
         }
       }
       for (const key of projected.keys()) {
-        if (!legacy.has(key)) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "presence", legacy: "(absent)", tasks: key });
+        if (!legacy.has(key)) parityDiffs.push({ surface: "board", owner: devDay.developer.accountId, date: today, field: "presence", legacy: "(absent)", tasks: key, key });
       }
     }
 
@@ -1237,15 +1248,15 @@ export class TaskPhase2BackfillService {
         const dayEndIso = new Date(year!, month! - 1, dayNum! + 1).toISOString();
         for (const [key, item] of legacyKeys) {
           const task = projected.get(key);
-          if (!task) parityDiffs.push({ surface: "board", owner: day.developerAccountId, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
+          if (!task) parityDiffs.push({ surface: "board", owner: day.developerAccountId, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)", key });
           else {
             if (task.title !== item.title) {
               (explainedField(key, "title", item.title, dayEndIso) ? explainedDrift : parityDiffs)
-                .push({ surface: "board", owner: day.developerAccountId, date, field: "title", legacy: item.title, tasks: task.title });
+                .push({ surface: "board", owner: day.developerAccountId, date, field: "title", legacy: item.title, tasks: task.title, key });
             }
             if (task.status !== item.status) {
               (explainedField(key, "status", item.status, dayEndIso) ? explainedDrift : parityDiffs)
-                .push({ surface: "board", owner: day.developerAccountId, date, field: "status", legacy: item.status, tasks: task.status });
+                .push({ surface: "board", owner: day.developerAccountId, date, field: "status", legacy: item.status, tasks: task.status, key });
             }
           }
         }
@@ -1261,14 +1272,14 @@ export class TaskPhase2BackfillService {
       const legacy = new Map(legacyItems.filter((item) => item.taskKey).map((item) => [item.taskKey!, { title: item.title, status: legacyDeskStatus(item.status) }]));
       for (const [key, item] of legacy) {
         const task = projected.get(key);
-        if (!task) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
+        if (!task) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)", key });
         else {
-          if (task.title !== item.title) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "title", legacy: item.title, tasks: task.title });
-          if (task.status !== item.status) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "status", legacy: item.status, tasks: task.status });
+          if (task.title !== item.title) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "title", legacy: item.title, tasks: task.title, key });
+          if (task.status !== item.status) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "status", legacy: item.status, tasks: task.status, key });
         }
       }
       for (const key of projected.keys()) {
-        if (!legacy.has(key)) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "presence", legacy: "(absent)", tasks: key });
+        if (!legacy.has(key)) parityDiffs.push({ surface: "desk_today", owner: manager, date: today, field: "presence", legacy: "(absent)", tasks: key, key });
       }
     }
 
@@ -1319,14 +1330,14 @@ export class TaskPhase2BackfillService {
           const projected = new Map((await project(manager, date)).map((p) => [p.taskKey, p]));
           for (const [key, item] of legacy) {
             const task = projected.get(key);
-            if (!task) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)" });
+            if (!task) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: `${key}:${item.title}`, tasks: "(absent)", key });
             else {
-              if (task.title !== item.title) parityDiffs.push({ surface, owner: manager, date, field: "title", legacy: item.title, tasks: task.title });
-              if (task.status !== item.status) parityDiffs.push({ surface, owner: manager, date, field: "status", legacy: item.status, tasks: task.status });
+              if (task.title !== item.title) parityDiffs.push({ surface, owner: manager, date, field: "title", legacy: item.title, tasks: task.title, key });
+              if (task.status !== item.status) parityDiffs.push({ surface, owner: manager, date, field: "status", legacy: item.status, tasks: task.status, key });
             }
           }
           for (const key of projected.keys()) {
-            if (!legacy.has(key)) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: "(absent)", tasks: key });
+            if (!legacy.has(key)) parityDiffs.push({ surface, owner: manager, date, field: "presence", legacy: "(absent)", tasks: key, key });
           }
         }
       }
@@ -1335,12 +1346,12 @@ export class TaskPhase2BackfillService {
       const compareSets = (surface: string, legacyKeys: Set<string>, projectedKeys: Set<string>) => {
         for (const key of legacyKeys) {
           if (!projectedKeys.has(key)) {
-            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: key, tasks: "(absent)" });
+            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: key, tasks: "(absent)", key });
           }
         }
         for (const key of projectedKeys) {
           if (!legacyKeys.has(key)) {
-            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: "(absent)", tasks: key });
+            parityDiffs.push({ surface, owner: manager, date: today, field: "presence", legacy: "(absent)", tasks: key, key });
           }
         }
       };
@@ -1379,6 +1390,7 @@ export class TaskPhase2BackfillService {
           field: "desk_link_count",
           legacy: `item:${row.sourceId} links:${expected}`,
           tasks: `task:${row.taskId} links:${actual}`,
+          key: taskKeyById.get(row.taskId),
         });
       }
     }
@@ -1396,7 +1408,7 @@ export class TaskPhase2BackfillService {
       const jiraRefs = new Set((taskLinksByTask.get(row.taskId) ?? []).filter((link) => link.kind === "jira").map((link) => link.ref));
       for (const key of keys) {
         if (!jiraRefs.has(key)) {
-          parityDiffs.push({ surface: "links", owner: "workspace", date: today, field: "jira_link", legacy: `item:${row.sourceId} ${key}`, tasks: "(absent)" });
+          parityDiffs.push({ surface: "links", owner: "workspace", date: today, field: "jira_link", legacy: `item:${row.sourceId} ${key}`, tasks: "(absent)", key: taskKeyById.get(row.taskId) });
         }
       }
     }
@@ -1417,6 +1429,103 @@ export class TaskPhase2BackfillService {
           parityDiffs.push({ surface: "privacy", owner: developerViewer, date: today, field, legacy: "leaked", tasks: "(exposed)" });
         }
       }
+    }
+
+    // §2.2.13 reviewed-difference pass: strict verify must reject only
+    // *unexplained* divergence. The raw comparisons above treat the legacy
+    // projection as the oracle, but several migration semantics produce
+    // diffs where canonical is intentionally more accurate — or where the
+    // oracle structurally cannot see the row. Each is moved to
+    // explainedDrift (same informational standing as event-replay drift).
+
+    // Findings recorded by the applied backfill identify the intentional
+    // divergences (multi-active demotions, desk-open/execution-done, ...).
+    const backfillReportJson = (
+      await db.select({ reportJson: dataMigrations.reportJson }).from(dataMigrations)
+        .where(eq(dataMigrations.name, marker("p2_backfill", scope))).limit(1)
+    )[0]?.reportJson;
+    let demotedKeys = new Set<string>();
+    try {
+      const findings = (JSON.parse(backfillReportJson ?? "{}") as Partial<TaskPhase2Report>).findings;
+      demotedKeys = new Set((findings?.multiActiveDemotions ?? []).map((d) => d.demotedKey));
+    } catch {
+      // Malformed/absent report → nothing is pre-reviewed; leave all diffs unexplained.
+    }
+
+    // Execution truth per key: the latest tracker row's state. The M-rules
+    // (M1–M4) let the execution row override the desk card's status, so a
+    // canonical status matching it is the designed divergence.
+    const execStatusByKey = new Map<string, string>();
+    {
+      const dayDateById = new Map(trackerDayRows.map((row) => [row.id, row.date]));
+      for (const row of [...trackerItemRows].filter((row) => row.taskKey)
+        .sort((a, b) => (dayDateById.get(a.dayId) ?? "").localeCompare(dayDateById.get(b.dayId) ?? "") || a.updatedAt.localeCompare(b.updatedAt) || a.id - b.id)) {
+        execStatusByKey.set(row.taskKey!, legacyDevStatus(row.state));
+      }
+    }
+
+    // Desk lineage per key + the canonical item, for snapshot-oracle checks.
+    const deskItemIdsByKey = new Map<string, number[]>();
+    const canonicalDeskItemByKey = new Map<string, (typeof deskItemRows)[number]>();
+    const deskItemById = new Map(deskItemRows.map((row) => [row.id, row]));
+    for (const row of mappedRows.filter((r) => r.sourceTable === "manager_desk_items")) {
+      const key = taskKeyById.get(row.taskId);
+      if (!key) continue;
+      deskItemIdsByKey.set(key, [...(deskItemIdsByKey.get(key) ?? []), row.sourceId]);
+      if (row.role === "canonical") {
+        const item = deskItemById.get(row.sourceId);
+        if (item) canonicalDeskItemByKey.set(key, item);
+      }
+    }
+
+    // Snapshot coverage: item history rows exist only for a subset of items
+    // (recording postdates much of the data). Items with no row <= cutoff are
+    // invisible to the legacy history oracle; canonical history intentionally
+    // returns every task that existed at cutoff.
+    const deskHistoryRows = await db.select().from(managerDeskItemHistory).where(eq(managerDeskItemHistory.workspaceId, scope));
+    const firstHistoryAtByItemId = new Map<number, string>();
+    for (const row of deskHistoryRows) {
+      if (row.recordedAt < (firstHistoryAtByItemId.get(row.itemId) ?? "￿")) firstHistoryAtByItemId.set(row.itemId, row.recordedAt);
+    }
+
+    const deskSurfaces = new Set(["desk_today", "desk_live", "desk_planning", "desk_history"]);
+    const dayEndIsoFor = (date: string) => new Date(`${date}T23:59:59.999`).toISOString();
+    const reviewedDiff = (diff: TaskPhase2ParityDiff): boolean => {
+      const key = diff.key;
+      const task = key ? currentByKey.get(key) : undefined;
+      if (!key || !task) return false;
+      // Single-active demotion: the developer had stacked in_progress rows;
+      // canonical keeps one active and demotes the rest to open.
+      if (diff.field === "status" && diff.legacy === "active" && diff.tasks === "open" && demotedKeys.has(key)) return true;
+      if (deskSurfaces.has(diff.surface)) {
+        const execStatus = execStatusByKey.get(key);
+        // M1–M4: the linked execution row decides status, not the desk card.
+        if (diff.field === "status" && execStatus !== undefined && execStatus === diff.tasks) return true;
+        // M3/M4: finished/dropped executions leave the live desk surfaces.
+        if (diff.field === "presence" && diff.tasks === "(absent)" && (execStatus === "done" || execStatus === "dropped")) return true;
+      }
+      if (diff.surface === "desk_history") {
+        const dayEnd = dayEndIsoFor(diff.date);
+        // Oracle gap: none of the task's desk lineage ever had a snapshot row
+        // at or before the cutoff, so legacy history cannot list it.
+        if (diff.field === "presence" && diff.legacy === "(absent)" && task.createdAt < dayEnd) {
+          const ids = deskItemIdsByKey.get(key) ?? [];
+          if (ids.length > 0 && ids.every((id) => (firstHistoryAtByItemId.get(id) ?? "￿") > dayEnd)) return true;
+        }
+        if (diff.field === "status") {
+          // Stale snapshot: the row legacy replays was recorded before the
+          // item's final mutation; canonical matches the item's current state.
+          const item = canonicalDeskItemByKey.get(key);
+          if (item && legacyDeskStatus(item.status) === diff.tasks) return true;
+          // Point-in-time un-close: the task closed after this day ended, so
+          // canonical replays the pre-close open state the snapshot lacks.
+          if (diff.tasks === "open" && task.closedAt && task.closedAt >= dayEnd) return true;
+        }
+      }
+      return false;
+    };
+    for (const diff of parityDiffs.splice(0)) {
+      (reviewedDiff(diff) ? explainedDrift : parityDiffs).push(diff);
     }
 
     result.parityDiffs = parityDiffs;

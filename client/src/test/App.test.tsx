@@ -114,6 +114,14 @@ vi.mock('@/components/notes/NotesPage', () => ({
   NotesPage: ({ date }: { date: string }) => <div>Notes loaded {date}</div>,
 }));
 
+vi.mock('@/components/tasks/TasksPage', () => ({
+  TasksPage: () => <div>Tasks loaded</div>,
+}));
+
+vi.mock('@/components/tasks/TaskPage', () => ({
+  TaskPage: () => <div>Task page loaded</div>,
+}));
+
 const taskDrawerPropsSpy = vi.fn();
 vi.mock('@/components/tasks/TaskDrawer', () => ({
   TaskDrawer: (props: { taskKey: string | null }) => {

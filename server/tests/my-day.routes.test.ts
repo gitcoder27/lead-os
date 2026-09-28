@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { createMyDayRouter } from "../src/routes/my-day";
+import { createIssuesRouter } from "../src/routes/issues";
+import { requireManager } from "../src/middleware/auth";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -12,7 +14,7 @@ import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { todayIsoDate } from "../src/utils/date";
 import { IssueService } from "../src/services/issue.service";
 import { resetDatabase, db } from "./helpers/db";
-import { configTable, developers, issues, teamTrackerDays } from "../src/db/schema";
+import { configTable, developers, issueTags, issues, localTags, teamTrackerDays } from "../src/db/schema";
 import { invoke } from "./helpers/http";
 
 const authService = new AuthService();
@@ -29,7 +31,12 @@ async function seedDevelopers() {
   ]);
 }
 
-async function seedIssue(jiraKey = "AM-123", assigneeId = "dev-1", assigneeName = "Alice Smith") {
+async function seedIssue(
+  jiraKey = "AM-123",
+  assigneeId = "dev-1",
+  assigneeName = "Alice Smith",
+  overrides: Partial<typeof issues.$inferInsert> = {},
+) {
   await db.insert(issues).values({
     jiraKey,
     summary: "Linked Jira task",
@@ -57,6 +64,7 @@ async function seedIssue(jiraKey = "AM-123", assigneeId = "dev-1", assigneeName 
     scopeChangedAt: null,
     analysisNotes: null,
     excluded: 0,
+    ...overrides,
   });
 }
 
@@ -68,6 +76,7 @@ async function loginCookie(username: string, password: string): Promise<string> 
 function createTestApp() {
   const app = express();
   app.use("/api/my-day", createMyDayRouter(myDayService, authService, issueService));
+  app.use("/api/issues", requireManager(authService), createIssuesRouter(issueService));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -563,7 +572,107 @@ describe("my day routes", () => {
     expect(res.body?.issues).toHaveLength(1);
     expect(res.body?.issues[0]).toMatchObject({
       jiraKey: "AM-123",
-      assigneeId: "dev-1",
+      summary: "Linked Jira task",
+    });
+  });
+
+  describe("GET /api/my-day/issues developer-safe projection", () => {
+    // Explicit allowlist: adding a field to DeveloperIssue / getForDeveloper must
+    // be a deliberate change to this list, reviewed as a privacy decision.
+    const DEVELOPER_ISSUE_KEYS = ["developmentDueDate", "dueDate", "jiraKey", "priorityName", "statusName", "summary"];
+
+    async function seedSensitiveIssue() {
+      await seedIssue("AM-123", "dev-1", "Alice Smith", {
+        analysisNotes: "Internal: reporter is unhappy, escalate quietly",
+        description: "Full description",
+        aspenSeverity: "Sev1",
+        component: "billing-core",
+        reporterName: "Rita Reporter",
+        flagged: 1,
+        labels: JSON.stringify(["customer-escalation"]),
+      });
+      const [tag] = await db.insert(localTags).values({ name: "manager-only-tag", color: "#ff0000" }).returning();
+      await db.insert(issueTags).values({ jiraKey: "AM-123", tagId: tag!.id });
+      // Another developer's plan for the same issue feeds trackerAssignmentsToday.
+      await trackerService.addItem("dev-2", "2026-03-07", { jiraKey: "AM-123", title: "Bob works this too" });
+    }
+
+    it("returns exactly the allowlisted keys and none of the manager triage data", async () => {
+      await seedSensitiveIssue();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: "/api/my-day/issues",
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body)).toEqual(["issues"]);
+      expect(res.body.issues).toHaveLength(1);
+      expect(Object.keys(res.body.issues[0]).sort()).toEqual(DEVELOPER_ISSUE_KEYS);
+      expect(res.body.issues[0]).toEqual({
+        jiraKey: "AM-123",
+        summary: "Linked Jira task",
+        priorityName: "High",
+        statusName: "In Progress",
+        dueDate: "2026-03-10",
+        developmentDueDate: "2026-03-08",
+      });
+
+      const raw = JSON.stringify(res.body);
+      for (const secret of ["manager-only-tag", "Internal: reporter", "Bob Jones", "Rita Reporter", "billing-core", "customer-escalation", "Sev1"]) {
+        expect(raw).not.toContain(secret);
+      }
+    });
+
+    it("the manager endpoint still returns the full triage shape for the same issue", async () => {
+      await seedSensitiveIssue();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: "/api/issues",
+        headers: { cookie: await loginCookie("manager", "secret123") },
+      });
+
+      expect(res.status).toBe(200);
+      const issue = res.body.issues.find((entry: { jiraKey: string }) => entry.jiraKey === "AM-123");
+      expect(issue).toBeDefined();
+      // Proves the fixture is sensitive: the same row carries these fields for managers.
+      expect(issue.localTags.map((tag: { name: string }) => tag.name)).toEqual(["manager-only-tag"]);
+      expect(issue.analysisNotes).toBe("Internal: reporter is unhappy, escalate quietly");
+      // Excluded issues are already filtered out of default lists, so the field is always false here.
+      expect(issue.excluded).toBe(false);
+      expect(issue.trackerAssignmentsToday.developerNames).toEqual(["Bob Jones"]);
+      expect(issue.assigneeId).toBe("dev-1");
+    });
+
+    it("developers cannot call the manager issues endpoint, and unauthenticated calls are rejected", async () => {
+      await seedSensitiveIssue();
+      const app = createTestApp();
+
+      const asDeveloper = await invoke(app, {
+        method: "GET",
+        url: "/api/issues",
+        headers: { cookie: await loginCookie("alice", "secret123") },
+      });
+      expect(asDeveloper.status).toBe(403);
+
+      const anonymous = await invoke(app, { method: "GET", url: "/api/my-day/issues" });
+      expect(anonymous.status).toBe(401);
+    });
+
+    it("does not let a manager session read the developer projection", async () => {
+      await seedSensitiveIssue();
+      const app = createTestApp();
+
+      const res = await invoke(app, {
+        method: "GET",
+        url: "/api/my-day/issues",
+        headers: { cookie: await loginCookie("manager", "secret123") },
+      });
+      expect(res.status).toBe(403);
     });
   });
 

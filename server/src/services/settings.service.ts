@@ -9,7 +9,7 @@ import { getPersistedJiraApiToken } from "./jira-credentials.service";
 import path from "node:path";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "./workspace.service";
-import type { JiraSyncScopeMode } from "shared/types";
+import { DEFAULT_TEAM_MODE, type JiraSyncScopeMode, type TeamMode } from "shared/types";
 
 export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
 export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
@@ -25,9 +25,15 @@ export const DEFAULT_BACKUP_MAX_SCHEDULED_SNAPSHOTS = 96;
 export const DEFAULT_BACKUP_ON_STARTUP = true;
 export const DEFAULT_BACKUP_STARTUP_MAX_AGE_HOURS = 12;
 export const DEFAULT_BACKUP_BEFORE_RESET = true;
+/** docs/56 P1-01: workspace `team_mode` config key (`solo` | `collab`). */
+export const TEAM_MODE_KEY = "team_mode";
 
 export function normalizeJiraSyncScopeMode(value: string | null | undefined): JiraSyncScopeMode {
   return value === "base_query" ? "base_query" : DEFAULT_JIRA_SYNC_SCOPE_MODE;
+}
+
+export function normalizeTeamMode(value: string | null | undefined): TeamMode {
+  return value?.trim().toLowerCase() === "collab" ? "collab" : DEFAULT_TEAM_MODE;
 }
 
 export class SettingsService {
@@ -43,6 +49,20 @@ export class SettingsService {
       .where(and(eq(configTable.workspaceId, normalizedWorkspaceId), eq(configTable.key, key)))
       .limit(1);
     return rows[0]?.value;
+  }
+
+  /** docs/56 P1-01: missing or unrecognised values read as `solo`. */
+  async getTeamMode(workspaceId?: string): Promise<TeamMode> {
+    return normalizeTeamMode(await this.getConfigValue(TEAM_MODE_KEY, workspaceId));
+  }
+
+  async setTeamMode(workspaceId: string | undefined, teamMode: TeamMode): Promise<TeamMode> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    await db
+      .insert(configTable)
+      .values({ workspaceId: normalizedWorkspaceId, key: TEAM_MODE_KEY, value: teamMode })
+      .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: teamMode } });
+    return teamMode;
   }
 
   async getJiraBaseUrl(workspaceId?: string): Promise<string | undefined> {

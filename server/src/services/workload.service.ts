@@ -4,6 +4,7 @@ import { db } from "../db/connection";
 import { developers, issues, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { todayIsoDate } from "../utils/date";
 import { getEffectiveDueDate, isActiveTeamIssue } from "./issue-rules";
+import { getParticipatingDeveloperIds } from "./developer-participation.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { TaskKeysService } from "./task-keys.service";
@@ -70,6 +71,7 @@ export class WorkloadService {
       .select()
       .from(developers)
       .where(and(eq(developers.workspaceId, normalizedWorkspaceId), eq(developers.isActive, 1)));
+    const participants = await getParticipatingDeveloperIds(normalizedWorkspaceId);
     const mapped = rows.map((row) => ({
       accountId: row.accountId,
       displayName: row.displayName,
@@ -78,6 +80,7 @@ export class WorkloadService {
       source: row.source as Developer["source"],
       jiraAccountId: row.jiraAccountId ?? undefined,
       isActive: row.isActive === 1,
+      participates: participants.has(row.accountId),
     }));
 
     if (!date) {

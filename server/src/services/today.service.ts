@@ -1435,6 +1435,7 @@ function buildTeamPulse(
         secondaryActions: primary.secondaryKinds.map((kind) => command(kind, commandLabel(kind), pulseTarget)),
         actionPreview: primary.actionPreview,
         ...(ask ? { askedAt: ask.askedAt } : {}),
+        participates: day.participates,
       };
     });
 }

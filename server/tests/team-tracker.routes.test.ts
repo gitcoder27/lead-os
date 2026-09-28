@@ -792,6 +792,7 @@ describe("team tracker routes", () => {
           email: undefined,
           avatarUrl: undefined,
           isActive: true,
+          participates: false,
         },
       },
       {
@@ -806,6 +807,7 @@ describe("team tracker routes", () => {
           email: undefined,
           avatarUrl: undefined,
           isActive: true,
+          participates: false,
         },
       },
     ]);

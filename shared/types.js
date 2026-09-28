@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isNavPageId = isNavPageId;
@@ -12,6 +12,10 @@ exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = {
     middayStart: "12:00",
     wrapUpStart: "16:00",
 };
+/** docs/56 P1-01: workspace `team_mode`. `solo` is the default; `collab`
+ *  means developers log in and participate (check-ins, My Day). */
+exports.TEAM_MODES = ["solo", "collab"];
+exports.DEFAULT_TEAM_MODE = "solo";
 exports.TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
 exports.TASK_LABEL_COLORS = [
     "slate",

@@ -12,6 +12,7 @@ import {
   SESSION_COOKIE_NAME,
 } from "../services/auth.service";
 import { TaskKeysService } from "../services/task-keys.service";
+import { SettingsService } from "../services/settings.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { HttpError } from "../middleware/errorHandler";
 
@@ -113,11 +114,13 @@ export function createAuthRouter(authService: AuthService): Router {
   const throttle = new AuthAttemptThrottle();
   const taskKeys = new TaskKeysService();
   const oneOnOnes = new OneOnOneService();
+  const settings = new SettingsService();
   const sessionResponse = async (user: AuthUser): Promise<AuthSessionResponse> => ({
     user,
     // docs/48: `oneOnOne` is manager-only — developer sessions never receive it.
     features: {
       tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId),
+      teamMode: await settings.getTeamMode(user.workspaceId),
       ...(user.role === "manager" ? { oneOnOne: await oneOnOnes.enabled(user.workspaceId) } : {}),
     },
   });

@@ -57,6 +57,7 @@ import { getEffectiveDueDate } from "./issue-rules";
 import { HttpError } from "../middleware/errorHandler";
 import { SettingsService } from "./settings.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
+import { getParticipatingDeveloperIds } from "./developer-participation.service";
 import { runInTransaction } from "../db/transaction";
 import {
   normalizeBoardSearchQuery,
@@ -511,13 +512,17 @@ function getAttentionQuickActions(day: TrackerDeveloperDay): TrackerAttentionQui
   return actions;
 }
 
-function mapDeveloper(row: typeof developers.$inferSelect): Developer {
+function mapDeveloper(
+  row: typeof developers.$inferSelect,
+  participants: ReadonlySet<string>
+): Developer {
   return {
     accountId: row.accountId,
     displayName: row.displayName,
     email: row.email ?? undefined,
     avatarUrl: row.avatarUrl ?? undefined,
     isActive: row.isActive === 1,
+    participates: participants.has(row.accountId),
   };
 }
 
@@ -1034,7 +1039,8 @@ export class TeamTrackerService {
       .from(developers)
       .where(and(eq(developers.workspaceId, workspaceId), eq(developers.isActive, 1)));
 
-    const devList: Developer[] = devRows.map(mapDeveloper);
+    const participants = await getParticipatingDeveloperIds(workspaceId);
+    const devList: Developer[] = devRows.map((row) => mapDeveloper(row, participants));
     const availabilityByAccountId = await this.availability.getAvailabilityMapForDate(
       devList.map((dev) => dev.accountId),
       date,
@@ -2361,7 +2367,7 @@ export class TeamTrackerService {
 
     return {
       date: row.date,
-      developer: mapDeveloper(row.developer),
+      developer: mapDeveloper(row.developer, await getParticipatingDeveloperIds(normalizedWorkspaceId)),
       trackerItem: mapItem(
         row.item,
         row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined
@@ -2413,7 +2419,7 @@ export class TeamTrackerService {
 
     return {
       date: row.date,
-      developer: mapDeveloper(row.developer),
+      developer: mapDeveloper(row.developer, await getParticipatingDeveloperIds(normalizedWorkspaceId)),
       trackerItem: mapItem(
         row.item,
         row.item.jiraKey ? issueContextMap.get(row.item.jiraKey) : undefined
@@ -2606,7 +2612,7 @@ export class TeamTrackerService {
       throw new HttpError(404, `Developer ${accountId} not found`);
     }
 
-    return mapDeveloper(row);
+    return mapDeveloper(row, await getParticipatingDeveloperIds(normalizedWorkspaceId));
   }
 
   private async buildDeveloperDay(
@@ -2670,6 +2676,7 @@ export class TeamTrackerService {
       checkIns: checkIns.map(mapCheckIn),
       recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
+      participates: developer.participates,
       signals,
       statusUpdatedAt: day.statusUpdatedAt ?? undefined,
       createdAt: day.createdAt,
@@ -2743,6 +2750,7 @@ export class TeamTrackerService {
       checkIns: checkIns.map(mapCheckIn),
       recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
+      participates: developer.participates,
       signals,
       statusUpdatedAt: day?.statusUpdatedAt ?? undefined,
       createdAt: day?.createdAt ?? `${date}T00:00:00.000Z`,
@@ -2834,6 +2842,7 @@ export class TeamTrackerService {
       checkIns: checkIns.map(mapCheckIn),
       recentCheckIns: recentCheckInsByDeveloper.get(developer.accountId) ?? [],
       isStale: signals.freshness.staleByTime,
+      participates: developer.participates,
       signals,
       statusUpdatedAt: effectiveDay?.statusUpdatedAt ?? undefined,
       createdAt: effectiveDay?.createdAt ?? `${date}T00:00:00.000Z`,
@@ -2998,6 +3007,7 @@ export class TeamTrackerService {
         checkIns: checkIns.map(mapCheckIn),
         recentCheckIns,
         isStale: signals.freshness.staleByTime,
+        participates: developer.participates,
         signals,
         statusUpdatedAt: effectiveDay?.statusUpdatedAt ?? undefined,
         createdAt: effectiveDay?.createdAt ?? `${date}T00:00:00.000Z`,
@@ -3034,7 +3044,7 @@ export class TeamTrackerService {
       nextFollowUpAt: effective?.nextFollowUpAt ?? undefined, currentItem, plannedItems, completedItems: mapped.filter((item) => item.state === "done"), droppedItems: mapped.filter((item) => item.state === "dropped"),
       tasks: surfaceTasks,
       checkIns: checkIns.map(mapCheckIn), recentCheckIns: (await this.getRecentCheckInsByDeveloper([developer.accountId], date, scope)).get(developer.accountId) ?? [],
-      signals, isStale: signals.freshness.staleByTime, statusUpdatedAt: effective?.statusUpdatedAt ?? undefined, createdAt: effective?.createdAt ?? `${date}T00:00:00Z`, updatedAt: effective?.updatedAt ?? `${date}T00:00:00Z` };
+      signals, isStale: signals.freshness.staleByTime, participates: developer.participates, statusUpdatedAt: effective?.statusUpdatedAt ?? undefined, createdAt: effective?.createdAt ?? `${date}T00:00:00Z`, updatedAt: effective?.updatedAt ?? `${date}T00:00:00Z` };
   }
 
   private async buildCanonicalDeveloperDays(date: string, developerList: Developer[], config: TrackerSignalConfig, workspaceId?: string, viewer?: TaskPrincipal): Promise<TrackerDeveloperDay[]> {
@@ -3092,7 +3102,7 @@ export class TeamTrackerService {
         managerNotes: notesByOwner.get(developer.accountId), lastCheckInAt: day?.lastCheckInAt ?? undefined, nextFollowUpAt: day?.nextFollowUpAt ?? undefined,
         currentItem, plannedItems, completedItems: mapped.filter((item) => item.state === "done"), droppedItems: mapped.filter((item) => item.state === "dropped"),
         tasks: (surfaceByOwner.get(developer.accountId) ?? []).sort((left, right) => left.position - right.position),
-        checkIns: exact ? checkInsByDay.get(exact.id) ?? [] : [], recentCheckIns: recent.get(developer.accountId) ?? [], signals, isStale: signals.freshness.staleByTime,
+        checkIns: exact ? checkInsByDay.get(exact.id) ?? [] : [], recentCheckIns: recent.get(developer.accountId) ?? [], signals, isStale: signals.freshness.staleByTime, participates: developer.participates,
         statusUpdatedAt: day?.statusUpdatedAt ?? undefined, createdAt: day?.createdAt ?? `${date}T00:00:00Z`, updatedAt: day?.updatedAt ?? `${date}T00:00:00Z` };
     });
   }
@@ -3440,8 +3450,9 @@ export class TeamTrackerService {
       .select()
       .from(developers)
       .where(and(eq(developers.workspaceId, normalizedWorkspaceId), inArray(developers.accountId, accountIds)));
+    const participants = await getParticipatingDeveloperIds(normalizedWorkspaceId);
     const developerMap = new Map(
-      developerRows.map((row) => [row.accountId, mapDeveloper(row)])
+      developerRows.map((row) => [row.accountId, mapDeveloper(row, participants)])
     );
     const itemRows = await db
       .select()
@@ -3614,6 +3625,7 @@ export class TeamTrackerService {
         and(eq(developers.workspaceId, normalizedWorkspaceId), eq(developers.accountId, teamTrackerDays.developerAccountId))
       )
       .where(and(eq(teamTrackerDays.workspaceId, normalizedWorkspaceId), eq(teamTrackerDays.date, fromDate)));
+    const participants = await getParticipatingDeveloperIds(normalizedWorkspaceId);
 
     const plannedEntries: Array<{
       developer: Developer;
@@ -3654,7 +3666,7 @@ export class TeamTrackerService {
         }
 
         plannedEntries.push({
-          developer: mapDeveloper(dayRow.developer),
+          developer: mapDeveloper(dayRow.developer, participants),
           developerAccountId: dayRow.day.developerAccountId,
           originDate: dayRow.day.date,
           item,

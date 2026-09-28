@@ -4,9 +4,9 @@ import { api } from '@/lib/api';
 import { clearDailyNoteDraftsForScope } from '@/lib/daily-note-drafts';
 import { clearNavPreferencesCacheForScope } from '@/lib/nav-preferences-cache';
 import { clearTodaySnapshotsForScope } from '@/lib/today-snapshot-cache';
-import type { AuthUser, AuthSessionResponse, SessionFeatures } from '@/types';
+import { DEFAULT_TEAM_MODE, type AuthUser, type AuthSessionResponse, type SessionFeatures } from '@/types';
 
-const DEFAULT_FEATURES: SessionFeatures = { tasksPhase3: false };
+const DEFAULT_FEATURES: SessionFeatures = { tasksPhase3: false, teamMode: DEFAULT_TEAM_MODE };
 
 interface AuthContextValue {
   user: AuthUser | null;

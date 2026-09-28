@@ -58,6 +58,7 @@ import { UserPasswordResetAction } from '@/components/settings/UserPasswordReset
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
+import { TeamModeSection } from '@/components/settings/TeamModeSection';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
@@ -1481,6 +1482,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               {/* ── TEAM MEMBERS ────── */}
               {activeSection === 'team' ? (
                 <div className="grid items-start gap-5 lg:grid-cols-2">
+                  <div className="lg:col-span-2">
+                    <TeamModeSection />
+                  </div>
                   {/* Tracked team */}
                   <div className="min-w-0">
                     <div className="mb-2.5 flex items-center justify-between">

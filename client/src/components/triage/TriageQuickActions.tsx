@@ -158,7 +158,7 @@ function Chip({
       }}
     >
       <kbd
-        className="text-[9px] font-mono font-bold rounded px-1 py-px leading-none"
+        className="text-[11px] font-mono font-bold rounded px-1 py-px leading-none"
         style={{
           background: 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
           color: 'var(--text-muted)',

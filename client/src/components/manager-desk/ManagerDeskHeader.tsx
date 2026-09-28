@@ -58,7 +58,7 @@ export function ManagerDeskHeader({
               <button
                 type="button"
                 onClick={onToday}
-                className="rounded-md px-2 py-1 text-[11px] font-bold uppercase tracking-[0.12em]"
+                className="rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-[0.12em]"
                 style={{
                   background: isTodayDate ? 'var(--md-accent-glow)' : 'transparent',
                   color: isTodayDate ? 'var(--md-accent)' : 'var(--text-secondary)',
@@ -76,7 +76,7 @@ export function ManagerDeskHeader({
             </span>
 
             <span
-              className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]"
+              className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em]"
               style={{
                 background: viewMode === 'history' ? 'rgba(59,130,246,0.10)' : viewMode === 'planning' ? 'rgba(6,182,212,0.10)' : 'var(--md-accent-glow)',
                 color: viewMode === 'history' ? 'var(--info)' : viewMode === 'planning' ? 'var(--accent)' : 'var(--md-accent)',
@@ -124,7 +124,7 @@ function ActionBtn({ children, label, disabled = false, onClick }: { children: R
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-6 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors disabled:opacity-50"
+      className="flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors disabled:opacity-50"
       style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       aria-label={label}
       title={label}

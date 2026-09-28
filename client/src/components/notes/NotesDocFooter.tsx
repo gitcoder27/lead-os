@@ -1,21 +1,38 @@
 import { forwardRef, useState } from 'react';
 import { CalendarClock, CheckCheck, ChevronDown, ListPlus, SquarePlus } from 'lucide-react';
-import { MenuItem, TaskPopover } from '@/components/tasks/TaskPopover';
+import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { NOTE_ACTION_SHORTCUTS, type NoteLineAction } from './editor/note-editor-extensions';
+import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
 
-export const NOTES_SHORTCUTS: Array<[string, string]> = [
-  [NOTE_ACTION_SHORTCUTS.task.label, 'Turn line into a task'],
-  [NOTE_ACTION_SHORTCUTS.update.label, 'Add line as a task update'],
-  [NOTE_ACTION_SHORTCUTS['follow-up'].label, 'Turn line into a follow-up'],
-  ['/', 'Commands (at line start)'],
-  ['@ · T- · #', 'Mention a person · task · Jira issue'],
-  ['⌘-click', 'Open a chip'],
-  ['⌘⏎', 'Wrap up the day'],
-  ['⌥↑ ⌥↓', 'Previous / next day'],
-  ['⌥T', 'Today'],
-  ['⌘⇧F', 'Search notes'],
-  ['⌘S', 'Save now'],
-  ['?', 'Show shortcuts'],
+// docs/54 K2: grouped, key-left — the same sheet format as every surface.
+export const NOTES_SHORTCUTS: ShortcutGroup[] = [
+  {
+    group: 'Turn a line into',
+    keys: [
+      [NOTE_ACTION_SHORTCUTS.task.label, 'A task'],
+      [NOTE_ACTION_SHORTCUTS.update.label, 'An update on a task'],
+      [NOTE_ACTION_SHORTCUTS['follow-up'].label, 'A follow-up'],
+    ],
+  },
+  {
+    group: 'Write',
+    keys: [
+      ['/', 'Commands (at line start)'],
+      ['@ · T- · #', 'Mention a person · task · Jira issue'],
+      ['⌘-click', 'Open a chip'],
+      ['⌘S', 'Save now'],
+    ],
+  },
+  {
+    group: 'Day',
+    keys: [
+      ['⌥[ / ⌥]', 'Previous / next day (⌥↑ ⌥↓ also work)'],
+      ['⌥T', 'Today'],
+      ['⌘⇧F', 'Search notes'],
+      ['⌘⏎', 'Wrap up the day'],
+      ['?', 'This sheet'],
+    ],
+  },
 ];
 
 interface NotesDocFooterProps {
@@ -150,18 +167,7 @@ export const NotesDocFooter = forwardRef<HTMLButtonElement, NotesDocFooterProps>
       ) : null}
 
       {shortcutsOpen && shortcutsAnchor ? (
-        <TaskPopover anchor={shortcutsAnchor} onClose={() => onShortcutsOpenChange(false)} label="Keyboard shortcuts" width={300} role="dialog">
-          <dl className="notes-shortcuts" tabIndex={-1} data-autofocus="">
-            {NOTES_SHORTCUTS.map(([keys, label]) => (
-              <div key={keys}>
-                <dt>
-                  <kbd>{keys}</kbd>
-                </dt>
-                <dd>{label}</dd>
-              </div>
-            ))}
-          </dl>
-        </TaskPopover>
+        <ShortcutSheet anchor={shortcutsAnchor} groups={NOTES_SHORTCUTS} onClose={() => onShortcutsOpenChange(false)} />
       ) : null}
     </div>
   );

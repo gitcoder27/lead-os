@@ -46,7 +46,8 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     view: 'desk',
     label: 'Tasks',
     icon: Briefcase,
-    accentColor: 'var(--md-accent)',
+    // docs/54 §1.7: Tasks is a cyan surface; amber stays with the legacy Desk.
+    accentColor: 'var(--accent)',
     href: '/tasks',
     matches: ['desk', 'manager-desk'],
   },

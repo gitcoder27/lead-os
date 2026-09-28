@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Clock3, MessageSquare, UserRound } from 'lucide-react';
+import { ArrowRight, CircleCheck, Clock3, MessageSquare, UserRound } from 'lucide-react';
 import {
   formatMemoryDateTime,
   getMemoryLane,
@@ -40,7 +40,7 @@ export function MemoryList({ mode, items, onStatusChange, onOpenDesk, noteSource
     return (
       <div className="flex min-h-[320px] items-center justify-center border-y" style={{ borderColor: 'var(--memory-line)' }}>
         <div className="max-w-sm text-center">
-          <CheckCircle2 size={22} className="mx-auto" style={{ color: 'var(--success)' }} />
+          <CircleCheck size={22} className="mx-auto" style={{ color: 'var(--success)' }} />
           <h2 className="mt-3 text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             {mode === 'follow-ups' ? 'No follow-ups waiting' : 'No meetings captured'}
           </h2>
@@ -66,7 +66,7 @@ export function MemoryList({ mode, items, onStatusChange, onOpenDesk, noteSource
               <h2 className="text-[13px] font-semibold uppercase" style={{ color: lane.id === 'overdue' ? 'var(--danger)' : 'var(--text-secondary)' }}>
                 {lane.label}
               </h2>
-              <span className="rounded-md px-1.5 py-0.5 text-[11px] tabular-nums" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
+              <span className="rounded-md px-1.5 py-0.5 text-[12px] tabular-nums" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
                 {laneItems.length}
               </span>
             </div>
@@ -137,7 +137,7 @@ function MemoryRow({
       </div>
 
       <div>
-        <span className="rounded-md px-2 py-1 text-[11px] font-semibold" style={{ background: statusBackground(item.status), color: statusColor(item.status) }}>
+        <span className="rounded-md px-2 py-1 text-[12px] font-semibold" style={{ background: statusBackground(item.status), color: statusColor(item.status) }}>
           {statusLabel(item.status)}
         </span>
       </div>

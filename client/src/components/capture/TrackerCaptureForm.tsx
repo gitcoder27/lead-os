@@ -103,7 +103,7 @@ export function TrackerCaptureForm({
         {/* Developer picker */}
         <div>
           <label
-            className="block text-[11px] font-semibold uppercase mb-1.5 tracking-widest"
+            className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
             style={{ color: 'var(--text-muted)' }}
           >
             Assign to
@@ -119,7 +119,7 @@ export function TrackerCaptureForm({
         {/* Task title */}
         <div>
           <label
-            className="block text-[11px] font-semibold uppercase mb-1.5 tracking-widest"
+            className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
             style={{ color: 'var(--text-muted)' }}
             htmlFor="tracker-capture-title"
           >
@@ -169,7 +169,7 @@ export function TrackerCaptureForm({
             <button
               type="button"
               onClick={() => setJiraPickerOpen(true)}
-              className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+              className="text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors"
               style={{
                 color: 'var(--accent)',
                 background: 'var(--accent-glow)',
@@ -181,7 +181,7 @@ export function TrackerCaptureForm({
             <button
               type="button"
               onClick={() => setNoteOpen(true)}
-              className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+              className="text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors"
               style={{
                 color: 'var(--text-secondary)',
                 background: 'var(--bg-tertiary)',
@@ -198,7 +198,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-[11px] font-semibold uppercase tracking-widest"
+                className="text-[12px] font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Linked Jira
@@ -210,7 +210,7 @@ export function TrackerCaptureForm({
                   setJiraSearch('');
                   setJiraPickerOpen(true);
                 }}
-                className="text-[11px] px-2 py-0.5 rounded-lg font-medium"
+                className="text-[12px] px-2 py-0.5 rounded-lg font-medium"
                 style={{ color: 'var(--accent)' }}
               >
                 Change
@@ -264,7 +264,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-[11px] font-semibold uppercase tracking-widest"
+                className="text-[12px] font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Link a Jira issue
@@ -275,7 +275,7 @@ export function TrackerCaptureForm({
                   setJiraPickerOpen(false);
                   setJiraSearch('');
                 }}
-                className="text-[11px] px-2 py-0.5 rounded-lg font-medium"
+                className="text-[12px] px-2 py-0.5 rounded-lg font-medium"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Cancel
@@ -330,7 +330,7 @@ export function TrackerCaptureForm({
                       }}
                     >
                       <span
-                        className="font-mono text-[11px] font-semibold shrink-0"
+                        className="font-mono text-[12px] font-semibold shrink-0"
                         style={{ color: 'var(--accent)' }}
                       >
                         {issue.jiraKey}
@@ -366,7 +366,7 @@ export function TrackerCaptureForm({
         {noteOpen && (
           <div>
             <label
-              className="block text-[11px] font-semibold uppercase mb-1.5 tracking-widest"
+              className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
               style={{ color: 'var(--text-muted)' }}
               htmlFor="tracker-capture-note"
             >

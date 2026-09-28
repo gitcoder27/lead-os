@@ -255,12 +255,11 @@ describe('StandupMode', () => {
       </TestWrapper>,
     );
     expect(screen.getByText('1:1 today')).toBeInTheDocument();
-    fireEvent.keyDown(document.body, { key: 'n' });
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
     expect(screen.getByText('1:1 overdue 3d')).toBeInTheDocument();
   });
 
   it.each([
-    ['n', 1],
     ['ArrowRight', 1],
   ])('moves to the next developer with %s', (key, expectedIndex) => {
     renderStandup();
@@ -271,13 +270,13 @@ describe('StandupMode', () => {
     expect(railOptions[expectedIndex]).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('moves back with p / ArrowLeft', () => {
+  it('moves back with ArrowLeft', () => {
     renderStandup();
-    fireEvent.keyDown(document.body, { key: 'n' });
-    fireEvent.keyDown(document.body, { key: 'p' });
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+    fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
     const rail = screen.getByRole('listbox', { name: 'Standup order' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
-    fireEvent.keyDown(document.body, { key: 'n' });
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
     fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
   });
@@ -334,11 +333,11 @@ describe('StandupMode', () => {
     expect(privateToggle).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('s sets the focused task current, d marks it done', () => {
+  it('. sets the focused task current, e marks it done', () => {
     renderStandup();
-    fireEvent.keyDown(document.body, { key: 's' });
+    fireEvent.keyDown(document.body, { key: '.' });
     expect(mockSetCurrentMutate).toHaveBeenCalledWith('T-1', expect.anything());
-    fireEvent.keyDown(document.body, { key: 'd' });
+    fireEvent.keyDown(document.body, { key: 'e' });
     expect(mockUpdateTaskMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
   });
 
@@ -353,7 +352,7 @@ describe('StandupMode', () => {
 
   it('a opens the capture box pre-filled with the developer owner token', async () => {
     renderStandup();
-    fireEvent.keyDown(document.body, { key: 'a' });
+    fireEvent.keyDown(document.body, { key: 'n' });
     expect(screen.getByTestId('capture-box')).toHaveAttribute('data-prefill', '@dev-1 ');
     // Closing marks the developer visited and returns to the board layer.
     fireEvent.click(within(screen.getByTestId('capture-box')).getByRole('button', { name: 'Done' }));
@@ -374,7 +373,7 @@ describe('StandupMode', () => {
 
   it('r opens the reassign layer and reassigns the focused task', () => {
     renderStandup();
-    fireEvent.keyDown(document.body, { key: 'r' });
+    fireEvent.keyDown(document.body, { key: 'a' });
     fireEvent.click(screen.getByRole('button', { name: /Bob Jones/ }));
     expect(mockReassignMutate).toHaveBeenCalledWith({ itemId: 'T-1', toAccountId: 'dev-2' }, expect.anything());
   });
@@ -427,7 +426,7 @@ describe('StandupMode', () => {
     it('marks a developer reviewed on moving past them and tracks progress', () => {
       renderStandup();
       expect(screen.getByTestId('standup-progress')).toHaveTextContent('0 of 2 reviewed');
-      fireEvent.keyDown(document.body, { key: 'n' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 2 reviewed');
       expect(rail()[0]).toHaveAccessibleName('Alice Smith, reviewed');
       expect(rail()[1]).toHaveAccessibleName('Bob Jones');
@@ -455,8 +454,8 @@ describe('StandupMode', () => {
 
     it('opens the wrap-up past the last developer; ← returns and Enter ends', async () => {
       renderStandup();
-      fireEvent.keyDown(document.body, { key: 'n' });
-      fireEvent.keyDown(document.body, { key: 'n' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       const wrapUp = screen.getByTestId('standup-wrapup');
       expect(within(wrapUp).getByRole('heading', { name: 'Standup complete' })).toBeInTheDocument();
       fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
@@ -476,7 +475,7 @@ describe('StandupMode', () => {
     it('End standup seals the round with reviewed ids and clears the session', async () => {
       renderStandup();
       fireEvent.keyDown(document.body, { key: 'f' });        // flag Alice
-      fireEvent.keyDown(document.body, { key: 'n' });        // review Alice → Bob
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });        // review Alice → Bob
       fireEvent.keyDown(document.body, { key: 'w' });        // wrap-up (Bob auto-reviewed on entry)
       fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
       await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
@@ -533,7 +532,7 @@ describe('StandupMode', () => {
 
     it('Esc exits without sealing — the session stays resumable', () => {
       renderStandup();
-      fireEvent.keyDown(document.body, { key: 'n' });  // review Alice
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });  // review Alice
       fireEvent.keyDown(document.body, { key: 'Escape' });
       expect(mockOnClose).toHaveBeenCalledTimes(1);
       expect(mockApiPost.mock.calls.some(([url]) => String(url) === '/team-tracker/standup/session')).toBe(false);
@@ -545,7 +544,7 @@ describe('StandupMode', () => {
       renderStandup();
       fireEvent.keyDown(document.body, { key: 'f' });
       expect(screen.getByText('Follow up')).toBeInTheDocument();
-      fireEvent.keyDown(document.body, { key: 'd' });
+      fireEvent.keyDown(document.body, { key: 'e' });
       fireEvent.keyDown(document.body, { key: 'w' });
       const wrapUp = screen.getByTestId('standup-wrapup');
       expect(within(wrapUp).getByRole('heading', { name: '1 not reviewed yet' })).toBeInTheDocument();
@@ -559,7 +558,7 @@ describe('StandupMode', () => {
 
     it('resumes at the first unreviewed developer after reopening', () => {
       const first = renderStandup();
-      fireEvent.keyDown(document.body, { key: 'n' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       first.unmount();
       renderStandup();
       expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 2 reviewed');
@@ -604,7 +603,7 @@ describe('StandupMode', () => {
           <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
         </TestWrapper>,
       );
-      fireEvent.keyDown(document.body, { key: 'n' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       const empty = screen.getByText('No open tasks').parentElement!;
       fireEvent.click(within(empty).getByRole('button', { name: /Add task/ }));
       expect(screen.getByTestId('capture-box')).toHaveAttribute('data-prefill', '@dev-2 ');
@@ -617,7 +616,7 @@ describe('StandupMode', () => {
     const input = screen.getByPlaceholderText(/General remark/);
     input.focus();
     fireEvent.keyDown(input, { key: 'n' });
-    // Still on dev-1 — n typed into the field, not handled as navigation.
+    // Still on dev-1 — n typed into the field, not handled as a key.
     const rail = screen.getByRole('listbox', { name: 'Standup order' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
   });

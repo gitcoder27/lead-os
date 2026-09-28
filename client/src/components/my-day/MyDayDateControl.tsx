@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { HAIRLINE } from './MyDayUI';
 

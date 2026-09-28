@@ -16,7 +16,7 @@ import {
 import { navigateToTaskPage } from '@/lib/task-nav';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { useModalFocus } from '@/hooks/useModalFocus';
+import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import { useDeleteTaskDetail, useTaskDetail, useUpdateTaskDetail } from '@/hooks/useTaskDetail';
 import { formatRelativeTime, getLocalIsoDate } from '@/lib/utils';
 import type { TaskDetailResponse, UpdateTaskRequest } from '@/types';
@@ -28,7 +28,7 @@ import {
 import { TaskKeyChip } from './TaskKeyChip';
 import { TaskTimeline } from './TaskTimeline';
 import { TaskUpdateComposer } from './TaskUpdateComposer';
-import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from './TaskPopover';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { FOCUS_RING, IconButton, SectionHeader, ShortcutLegend, isEditable, useTaskShortcuts } from './TaskDetailPrimitives';
 import {
   MeetingOutcome,
@@ -75,7 +75,10 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onSt
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (isCoveredByLaterLayer(panelRef.current)) return;
+      // Claim the key so layers underneath (1:1 workspace, standup) stay put.
+      e.preventDefault();
       // First Esc leaves a text field (keeping any draft); the next one closes.
       const active = document.activeElement;
       const panel = panelRef.current;
@@ -106,8 +109,8 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onSt
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className={`workspace-shell-backdrop fixed inset-x-0 bottom-0 ${stacked ? 'z-[70]' : 'z-40'}`}
-          style={{ background: 'rgba(2, 6, 23, 0.42)', backdropFilter: 'blur(2px)' }}
+          className={`workspace-shell-backdrop fixed inset-x-0 bottom-0 ${stacked ? 'z-drawer-stacked' : 'z-drawer'}`}
+          style={{ background: 'var(--scrim-soft)', backdropFilter: 'var(--scrim-soft-blur)' }}
           onClick={onClose}
         />
         <motion.aside
@@ -118,11 +121,11 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onSt
           animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
           exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
           transition={{ type: 'spring', damping: 34, stiffness: 340 }}
-          className={`workspace-shell-drawer fixed right-0 top-0 bottom-0 ${stacked ? 'z-[71]' : 'z-50'} flex w-full max-w-[680px] flex-col overflow-hidden outline-none`}
+          className={`workspace-shell-drawer fixed right-0 top-0 bottom-0 ${stacked ? 'z-drawer-stacked' : 'z-drawer'} flex w-full max-w-[680px] flex-col overflow-hidden outline-none`}
           style={{
             background: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border)',
-            boxShadow: '-24px 0 64px rgba(15, 23, 42, 0.24)',
+            boxShadow: 'var(--drawer-shadow)',
           }}
           aria-label={`Task ${taskKey}`}
           role="dialog"
@@ -312,11 +315,11 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   });
 
   const hints: [string, string][] = [];
-  if (canStep) hints.push(['J / K', 'Prev / next task']);
-  if (canEditStatus) hints.push(['E', isOpenish(task) ? 'Done' : 'Reopen']);
-  if (managerEditable) hints.push(['S', 'Schedule'], ['A', 'Assign'], ['P', 'Priority'], ['L', 'Labels']);
-  if (canEditDetails) hints.push(['D', 'Details']);
-  if (!deleted) hints.push(['U', 'Update']);
+  if (canStep) hints.push(['j / k', 'Prev / next task']);
+  if (canEditStatus) hints.push(['e', isOpenish(task) ? 'Done' : 'Reopen']);
+  if (managerEditable) hints.push(['s', 'Schedule'], ['a', 'Assign'], ['p', 'Priority'], ['l', 'Labels']);
+  if (canEditDetails) hints.push(['d', 'Details']);
+  if (!deleted) hints.push(['u', 'Update']);
 
   const toolbar = (
     <DetailToolbar
@@ -327,7 +330,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           <TaskKeyChip taskKey={task.taskKey} />
           {task.kind === 'meeting' && (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 text-[11px] font-semibold leading-5"
+              className="inline-flex items-center gap-1 rounded-full px-2 text-[12px] font-semibold leading-5"
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >
               <Users size={11} />

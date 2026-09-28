@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, Plus, Search, X } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { TrackerIssueAssignmentConflictPanel } from './TrackerIssueAssignmentConflictPanel';
 
 interface AddTrackerItemFormProps {
@@ -83,7 +83,7 @@ export function AddTrackerItemForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        data-task-shortcut="a"
+        data-task-shortcut="n"
         title="Add a planned task (A)"
         className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
@@ -102,7 +102,7 @@ export function AddTrackerItemForm({
       style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', boxShadow: 'var(--soft-shadow)' }}
     >
       <div>
-        <label htmlFor={`tracker-add-title-${targetAccountId}`} className="mb-1 block text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <label htmlFor={`tracker-add-title-${targetAccountId}`} className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
           Task
         </label>
         <input
@@ -133,7 +133,7 @@ export function AddTrackerItemForm({
 
       <div>
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
             Linked Jira
           </div>
           <button
@@ -156,7 +156,7 @@ export function AddTrackerItemForm({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Link size={10} style={{ color: 'var(--accent)' }} />
-                  <JiraIssueLink issueKey={selectedIssue.jiraKey} className="font-mono text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>
+                  <JiraIssueLink issueKey={selectedIssue.jiraKey} className="font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>
                     {selectedIssue.jiraKey}
                   </JiraIssueLink>
                 </div>
@@ -223,7 +223,7 @@ export function AddTrackerItemForm({
                       <JiraIssueLink
                         issueKey={issue.jiraKey}
                         stopPropagation
-                        className="font-mono text-[11px] font-semibold shrink-0"
+                        className="font-mono text-[12px] font-semibold shrink-0"
                         style={{ color: 'var(--accent)' }}
                       >
                         {issue.jiraKey}
@@ -249,7 +249,7 @@ export function AddTrackerItemForm({
       </div>
 
       <div>
-        <label htmlFor={`tracker-add-note-${targetAccountId}`} className="mb-1 block text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <label htmlFor={`tracker-add-note-${targetAccountId}`} className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
           Note
         </label>
         <textarea

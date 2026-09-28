@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as Popover from '@radix-ui/react-popover';
 import {
-  AlertTriangle,
+  TriangleAlert,
   Ban,
   BellRing,
   CalendarClock,
   CalendarDays,
-  CheckCircle2,
+  CircleCheck,
   Clock3,
   ExternalLink,
   Loader2,
@@ -52,20 +52,20 @@ type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
 
 const iconByType: Record<TodayActionItemType, LucideIcon> = {
   developer_attention: Users,
-  overdue_issue: AlertTriangle,
+  overdue_issue: TriangleAlert,
   due_issue: CalendarClock,
   unassigned_issue: Users,
-  high_priority_issue: AlertTriangle,
+  high_priority_issue: TriangleAlert,
   stale_check_in: MessageSquare,
   follow_up_due: BellRing,
   meeting_outcome: CalendarClock,
   desk_carry_forward: Rows3,
   manual_work: Target,
-  sync_attention: AlertTriangle,
-  jira_drift: AlertTriangle,
+  sync_attention: TriangleAlert,
+  jira_drift: TriangleAlert,
   one_on_one: CalendarDays,
   standup: Users,
-  calm: CheckCircle2,
+  calm: CircleCheck,
 };
 
 export function ManagerActionInbox({
@@ -305,7 +305,7 @@ export function ManagerActionInbox({
             )}
             {attentionCount > 0 ? (
               <span
-                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none"
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none"
                 style={{
                   background: 'var(--danger)',
                   color: '#fff',
@@ -321,11 +321,11 @@ export function ManagerActionInbox({
           <Popover.Content
             align="end"
             sideOffset={10}
-            className="z-[620] w-[min(calc(100vw-24px),430px)] rounded-lg border p-0 outline-none"
+            className="z-popover w-[min(calc(100vw-24px),430px)] rounded-lg border p-0 outline-none"
             style={{
               background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
               borderColor: 'var(--border-strong)',
-              boxShadow: '0 28px 90px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)',
+              boxShadow: 'var(--overlay-shadow)',
               backdropFilter: 'blur(18px)',
             }}
           >
@@ -335,7 +335,7 @@ export function ManagerActionInbox({
                   <p className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Action inbox
                   </p>
-                  <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     {actionsLoading ? 'Syncing queue' : `${actionsData?.totalCount ?? 0} open`}
                   </p>
                 </div>
@@ -345,7 +345,7 @@ export function ManagerActionInbox({
                     setOpen(false);
                     onViewChange('today');
                   }}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{ color: 'var(--accent)' }}
                 >
                   Today
@@ -378,7 +378,7 @@ export function ManagerActionInbox({
                     <div className="mt-1 border-t pt-1.5" style={{ borderColor: 'var(--border)' }}>
                       <div className="flex items-center justify-between px-3 py-1">
                         <span
-                          className="text-[10.5px] font-semibold uppercase tracking-[0.1em]"
+                          className="text-[11px] font-semibold uppercase tracking-[0.1em]"
                           style={{ color: 'var(--text-muted)' }}
                         >
                           Attention signals
@@ -387,7 +387,7 @@ export function ManagerActionInbox({
                           type="button"
                           onClick={clearSignals}
                           disabled={dismissAlerts.isPending}
-                          className="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
+                          className="rounded px-1.5 py-0.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
                           style={{ color: 'var(--text-muted)' }}
                         >
                           Clear all
@@ -451,7 +451,7 @@ function ManagerActionInboxRow({
         <span className="block truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           {item.title}
         </span>
-        <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {item.signal}
         </span>
       </button>
@@ -460,7 +460,7 @@ function ManagerActionInboxRow({
         type="button"
         onClick={() => onRunCommand(item.primaryAction)}
         disabled={isPending}
-        className="h-7 rounded-md px-2 text-[11px] font-semibold transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-45"
+        className="h-7 rounded-md px-2 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-45"
         style={{ color: 'var(--accent)' }}
       >
         {isPending ? 'Working' : item.primaryAction.label}
@@ -478,7 +478,7 @@ function ManagerActionInboxRow({
           style={{
             background: 'var(--bg-primary)',
             borderColor: 'var(--border-strong)',
-            boxShadow: 'var(--shadow-lg)',
+            boxShadow: 'var(--panel-shadow)',
           }}
         >
           {item.secondaryActions.length > 0 ? (
@@ -538,11 +538,11 @@ function SnoozeActions({
 }
 
 const signalMeta = {
-  overdue: { icon: AlertTriangle, label: 'Overdue' },
+  overdue: { icon: TriangleAlert, label: 'Overdue' },
   stale: { icon: Clock3, label: 'Stale' },
   blocked: { icon: Ban, label: 'Blocked' },
   idle_developer: { icon: Users, label: 'No work today' },
-  high_priority_not_started: { icon: AlertTriangle, label: 'High priority' },
+  high_priority_not_started: { icon: TriangleAlert, label: 'High priority' },
 } satisfies Record<Alert['type'], { icon: LucideIcon; label: string }>;
 
 const signalFilterByType: Partial<Record<Alert['type'], FilterType>> = {
@@ -601,7 +601,7 @@ function SignalRow({
         <span className="block truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           {alert.message}
         </span>
-        <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {detail}
         </span>
       </button>
@@ -644,12 +644,12 @@ function InboxEmpty({ title, detail }: { title: string; detail: string }) {
           border: '1px solid color-mix(in srgb, var(--success) 22%, var(--border))',
         }}
       >
-        <CheckCircle2 size={16} />
+        <CircleCheck size={16} />
       </div>
       <p className="mt-3 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
         {title}
       </p>
-      <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
         {detail}
       </p>
     </div>

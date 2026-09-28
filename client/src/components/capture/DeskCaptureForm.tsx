@@ -143,7 +143,7 @@ export function DeskCaptureForm({
                 style={{
                   background: active ? 'var(--md-accent-glow)' : 'var(--bg-tertiary)',
                   color: active ? 'var(--md-accent)' : 'var(--text-muted)',
-                  border: `1px solid ${active ? 'rgba(217,169,78,0.28)' : 'var(--border)'}`,
+                  border: `1px solid ${active ? 'color-mix(in srgb, var(--md-accent) 28%, transparent)' : 'var(--border)'}`,
                 }}
               >
                 {KIND_LABELS[opt]}
@@ -195,7 +195,7 @@ export function DeskCaptureForm({
               <FileText size={11} style={{ color: 'var(--text-muted)' }} />
               Context note
             </span>
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {detailsOpen ? 'Hide' : 'Optional'}
             </span>
           </button>
@@ -229,7 +229,7 @@ export function DeskCaptureForm({
           background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)',
         }}
       >
-        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
           Lands on desk for{' '}
           <span style={{ color: 'var(--text-secondary)' }}>{formattedDate}</span>
         </span>
@@ -250,7 +250,7 @@ export function DeskCaptureForm({
             style={{
               background: 'var(--md-accent)',
               color: '#111',
-              boxShadow: '0 4px 12px rgba(217,169,78,0.2)',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--md-accent) 20%, transparent)',
             }}
           >
             <Briefcase size={11} />

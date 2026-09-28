@@ -214,7 +214,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
       >
         {group.label}
       </h2>
-      <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }} aria-label={`${count} tasks`}>
+      <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} aria-label={`${count} tasks`}>
         {count}
       </span>
       <span className="flex-1" />
@@ -222,7 +222,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
         <button
           type="button"
           onClick={() => onMoveOverdueToToday(movable)}
-          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[11.5px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--accent)' }}
         >
           <CalendarClock size={12} /> Move all to today

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { CalendarClock, CalendarX2, History } from 'lucide-react';
 import type { DeveloperAvailability, MyDayReadOnlyReason } from '@/types';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { Kbd } from './MyDayUI';
 
 interface MyDayInactiveBannerProps {
@@ -73,7 +73,7 @@ export function MyDayReadOnlyBanner({ reason, onToday }: { reason?: MyDayReadOnl
           style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
         >
           Back to today
-          <Kbd>T</Kbd>
+          <Kbd>t</Kbd>
         </button>
       }
     >

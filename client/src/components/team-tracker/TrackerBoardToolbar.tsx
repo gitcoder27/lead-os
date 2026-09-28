@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { CalendarDays, Check, Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import type { TeamTrackerBoardSort, TeamTrackerBoardGroupBy, TeamTrackerSavedView } from '@/types';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import type { SavedViewsMenuProps } from './SavedViewsMenu';
@@ -272,8 +272,8 @@ function ViewOptionsMenu({
 
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-1.5 w-[240px] overflow-hidden rounded-xl border p-1.5"
-          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', boxShadow: 'var(--soft-shadow)' }}
+          className="absolute right-0 top-full z-popover mt-1.5 w-[240px] overflow-hidden rounded-xl p-1.5"
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
         >
           <OptionGroup
             label="Sort by"
@@ -307,7 +307,7 @@ function OptionGroup({
 }) {
   return (
     <div>
-      <div className="px-2 pb-1 pt-1 text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+      <div className="px-2 pb-1 pt-1 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
         {label}
       </div>
       <div className="grid gap-px" role="radiogroup" aria-label={label}>

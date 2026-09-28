@@ -2,7 +2,7 @@ import { Briefcase, Check, Plus } from 'lucide-react';
 import type { TrackerDeveloperDay } from '@/types';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { DrawerSection, EmptyLine } from './DeveloperDrawerSections';
 
 interface ManagerFollowUpRowProps {
@@ -81,14 +81,14 @@ function ManagerFollowUpItem({ item, onComplete }: { item: ManagerDeskItem; onCo
           >
             {item.title}
           </span>
-          <span className="shrink-0 text-[11.5px] font-medium" style={{ color: managerDeskStatusColors[item.status] }}>
+          <span className="shrink-0 text-[12px] font-medium" style={{ color: managerDeskStatusColors[item.status] }}>
             {managerDeskStatusLabels[item.status]}
           </span>
         </div>
         {(meta.issueKey || meta.subtitle) && (
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] leading-[18px]" style={{ color: 'var(--text-muted)' }}>
             {meta.issueKey && (
-              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0 font-mono text-[11.5px] font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
+              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0 font-mono text-[12px] font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
                 {meta.issueKey}
               </JiraIssueLink>
             )}

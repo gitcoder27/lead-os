@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, type CSSProperties } from 're
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Trash2, Users,
-  MoreVertical, FolderMinus, Ban, AlertTriangle, ChevronRight,
+  MoreVertical, FolderMinus, Ban, TriangleAlert, ChevronRight,
 } from 'lucide-react';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import { KIND_LABELS, STATUS_LABELS, CATEGORY_LABELS, PRIORITY_LABELS } from '@/types/manager-desk';
@@ -81,7 +81,7 @@ export function DrawerHeader({
 
   const exec = item.delegatedExecution;
   const hasLinkedWork = !!exec;
-  const chipClass = 'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]';
+  const chipClass = 'rounded-md px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em]';
 
   return (
     <div
@@ -95,7 +95,7 @@ export function DrawerHeader({
         {item.taskKey ? (
           <TaskKeyChip taskKey={item.taskKey} />
         ) : (
-          <span className="font-mono text-[11px] font-bold tracking-wide" style={{ color: 'var(--text-muted)' }}>
+          <span className="font-mono text-[12px] font-bold tracking-wide" style={{ color: 'var(--text-muted)' }}>
             #{item.id}
           </span>
         )}
@@ -157,7 +157,7 @@ export function DrawerHeader({
       />
 
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] mr-0.5" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] mr-0.5" style={{ color: 'var(--text-muted)' }}>
           {exec ? 'My follow-through' : 'Status'}
         </span>
         <span className={chipClass} style={tones.accent}>{KIND_LABELS[item.kind]}</span>
@@ -175,23 +175,23 @@ export function DrawerHeader({
             border: '1px solid var(--border)',
           }}
         >
-          <span className="text-[10px] font-bold uppercase tracking-[0.12em] mr-0.5" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] mr-0.5" style={{ color: 'var(--text-muted)' }}>
             Execution
           </span>
           <span
-            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold"
             style={execTone(exec.state)}
           >
             <Users size={9} />
             {executionLabel(exec.state)}
           </span>
           {exec.note && (
-            <span className="text-[11px] truncate max-w-[260px]" style={{ color: 'var(--text-secondary)' }} title={exec.note}>
+            <span className="text-[12px] truncate max-w-[260px]" style={{ color: 'var(--text-secondary)' }} title={exec.note}>
               {exec.note}
             </span>
           )}
           {exec.state === 'done' && exec.completedAt && (
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Completed {new Date(exec.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -260,7 +260,7 @@ function DelegatedActionMenu({
             className="p-1.5"
           >
             <div className="px-2.5 pt-1.5 pb-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                 This item has linked developer work
               </span>
             </div>
@@ -277,7 +277,7 @@ function DelegatedActionMenu({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold">Remove from my desk</div>
-                <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                <div className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                   {devLabel}'s work stays in Team Tracker
                 </div>
               </div>
@@ -296,7 +296,7 @@ function DelegatedActionMenu({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>Cancel delegated task</div>
-                <div className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                <div className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                   Deletes {devLabel}'s execution work
                 </div>
               </div>
@@ -361,14 +361,14 @@ function DelegatedActionMenu({
           >
             <div className="flex items-start gap-2.5">
               <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--danger)' }}>
-                <AlertTriangle size={12} />
+                <TriangleAlert size={12} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>Cancel delegated task?</div>
                 <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                   This will <strong style={{ color: 'var(--danger)' }}>permanently delete</strong> {devLabel}'s execution item from Team Tracker and My Day. Notes, state changes, and progress on that task will no longer be accessible as active work.
                 </p>
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                   The Manager Desk item will remain as a cancelled record.
                 </p>
               </div>

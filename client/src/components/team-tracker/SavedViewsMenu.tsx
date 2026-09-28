@@ -107,8 +107,9 @@ export function SavedViewsMenu<TView extends SavedViewOption>({
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 w-[260px] rounded-xl shadow-lg overflow-hidden"
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+          // docs/54 V4: the shared popover surface.
+          className="absolute right-0 top-full mt-1 z-popover w-[260px] overflow-hidden rounded-xl"
+          style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
         >
           <MenuHeader mode={mode} onStartCreate={() => { setMode('create'); setEditName(''); }} onCancel={resetMode} />
 

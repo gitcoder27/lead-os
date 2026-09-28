@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { CheckCircle2, NotebookPen } from 'lucide-react';
+import { CircleCheck, NotebookPen } from 'lucide-react';
 import { firstName, formatClock, rowContext } from '@/lib/today-layout';
 import { TodayCompactRow } from './TodayCompactRow';
 import type { TodayRunCommand } from './TodayActionRow';
 import type { TodayActionCommand, TodayActionTarget, TodayFocusPerson, TodayWrapUpFocus } from '@/types';
+import { Avatar } from '@/components/ui/Avatar';
 
 export type TodayBulkRun = (commands: TodayActionCommand[], title: (count: number) => string) => void;
 
@@ -40,7 +41,7 @@ export function TodayWrapUp({ wrapUp, today, queuedPeople, onRunCommand, onBulk,
       <div className="today-panel-head">
         <h2 id="today-wrap-heading" className="today-section-title">Wrap-up</h2>
         <span className="today-section-actions">
-          <button type="button" className="today-ghost" onClick={() => onOpenTarget(wrapUp.eodNoteTarget)}>
+          <button type="button" className="ui-btn-ghost" onClick={() => onOpenTarget(wrapUp.eodNoteTarget)}>
             <NotebookPen size={13} aria-hidden="true" />
             Write EOD note
           </button>
@@ -49,7 +50,7 @@ export function TodayWrapUp({ wrapUp, today, queuedPeople, onRunCommand, onBulk,
 
       {allClosed ? (
         <p className="today-panel-empty">
-          <CheckCircle2 size={14} style={{ color: 'var(--success)' }} aria-hidden="true" />
+          <CircleCheck size={14} style={{ color: 'var(--success)' }} aria-hidden="true" />
           Loops closed for today.
         </p>
       ) : null}
@@ -83,7 +84,7 @@ export function TodayWrapUp({ wrapUp, today, queuedPeople, onRunCommand, onBulk,
             {carryCommands.length > 1 ? (
               <button
                 type="button"
-                className="today-primary today-primary-sm"
+                className="ui-btn ui-btn-sm"
                 onClick={() => onBulk(carryCommands, (count) => `Carried ${count} to tomorrow`)}
               >
                 Carry all {carryCommands.length}
@@ -116,7 +117,7 @@ export function TodayWrapUp({ wrapUp, today, queuedPeople, onRunCommand, onBulk,
             {askable.length > 1 ? (
               <button
                 type="button"
-                className="today-primary today-primary-sm"
+                className="ui-btn ui-btn-sm"
                 onClick={() => onBulk(askable, (count) => `Asked ${count} for an update`)}
               >
                 Ask all {askable.length}
@@ -156,15 +157,15 @@ function PersonAsk({
   return (
     <span className="inline-flex items-center gap-1">
       <button type="button" className="today-person-chip" onClick={() => onOpenTarget(person.target)}>
-        <span className="today-avatar" aria-hidden="true">{initials(person.displayName)}</span>
+        <Avatar name={person.displayName} seed={person.accountId} size={22} tone="var(--tone, var(--border))" />
         {firstName(person.displayName)}
       </button>
       {asked ? (
-        <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>asked {asked}</span>
+        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>asked {asked}</span>
       ) : person.primaryAction ? (
         <button
           type="button"
-          className="today-ghost"
+          className="ui-btn-ghost"
           aria-label={`Ask ${person.displayName} for an update`}
           onClick={() => onRunCommand(person.primaryAction!)}
         >
@@ -173,13 +174,4 @@ function PersonAsk({
       ) : null}
     </span>
   );
-}
-
-export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || '?';
 }

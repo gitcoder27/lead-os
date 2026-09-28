@@ -6,6 +6,7 @@ export interface MyDayShortcutHandlers {
   onPrevDay: () => void;
   onNextDay: () => void;
   onToday: () => void;
+  onShowShortcuts?: () => void;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -33,7 +34,8 @@ export function useMyDayShortcuts(handlers: MyDayShortcutHandlers) {
 
       const h = handlersRef.current;
       const action =
-        event.key === 'u' || event.key === 'U'
+        // docs/54 K1: c is "check-in" app-wide; u stays as the original key.
+        event.key === 'u' || event.key === 'U' || event.key === 'c' || event.key === 'C'
           ? h.onFocusUpdate
           : event.key === 'n' || event.key === 'N'
             ? h.onAddTask
@@ -43,7 +45,9 @@ export function useMyDayShortcuts(handlers: MyDayShortcutHandlers) {
                 ? h.onNextDay
                 : event.key === 't' || event.key === 'T'
                   ? h.onToday
-                  : undefined;
+                  : event.key === '?'
+                    ? h.onShowShortcuts
+                    : undefined;
       if (!action) return;
       event.preventDefault();
       action();

@@ -85,13 +85,14 @@ export function buildTaskViewCommands(views: TaskViewMeta[]): PaletteItem[] {
   }));
 }
 
-export function buildQuickActions(): PaletteItem[] {
+export function buildQuickActions(options?: { tasksPhase3?: boolean }): PaletteItem[] {
   return [
     {
       id: 'action-capture',
       group: 'actions',
       title: 'Quick capture',
-      description: 'Desk or Team quick capture',
+      // docs/54 §1.7: under Phase 3 the surface is Tasks, and capture is one box.
+      description: options?.tasksPhase3 ? 'Tasks, follow-ups, notes' : 'Desk or Team quick capture',
       keywords: 'capture quick add desk team task follow-up meeting',
       actionId: 'capture',
     },
@@ -145,7 +146,7 @@ export const QUICK_ADD_MIN_QUERY_LENGTH = 3;
  * Free-text quick add: a typed sentence becomes a desk item on today's inbox.
  * Returns null for queries too short to look like content.
  */
-export function buildQuickAddItem(query: string): PaletteItem | null {
+export function buildQuickAddItem(query: string, options?: { tasksPhase3?: boolean }): PaletteItem | null {
   const trimmed = query.trim();
   if (trimmed.length < QUICK_ADD_MIN_QUERY_LENGTH) {
     return null;
@@ -153,7 +154,7 @@ export function buildQuickAddItem(query: string): PaletteItem | null {
   return {
     id: 'quick-add-desk',
     group: 'actions',
-    title: 'Add to Desk',
+    title: options?.tasksPhase3 ? 'Add to Tasks' : 'Add to Desk',
     description: `"${trimmed}" · today's inbox`,
     actionId: 'quick-add-desk',
   };

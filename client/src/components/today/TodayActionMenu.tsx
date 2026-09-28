@@ -1,18 +1,6 @@
 import { useState } from 'react';
-import {
-  ArrowUpRight,
-  BellRing,
-  CalendarClock,
-  Check,
-  Ellipsis,
-  MessageSquare,
-  MessageSquarePlus,
-  Rows3,
-  Send,
-  UserRoundCheck,
-  type LucideIcon,
-} from 'lucide-react';
-import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/tasks/TaskPopover';
+import { AlarmClock, ArrowUpRight, CalendarClock, Check, Ellipsis, MessageSquare, MessageSquarePlus, Rows3, Send, UserRoundCheck, type LucideIcon } from 'lucide-react';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { isLaterTodayAvailable } from '@/lib/utils';
 import type { TodayActionCommand } from '@/types';
 
@@ -39,7 +27,7 @@ const iconByKind: Partial<Record<TodayActionCommand['kind'], LucideIcon>> = {
   set_current_work: UserRoundCheck,
   open: ArrowUpRight,
   assign_owner: ArrowUpRight,
-  snooze: BellRing,
+  snooze: AlarmClock,
 };
 
 /** docs/53 U4: menu items show the triage key that runs them. */
@@ -73,7 +61,7 @@ export function TodayActionMenu({ label, actions, primary, open, onRunAction }: 
     <>
       <button
         type="button"
-        className="today-icon-btn"
+        className="ui-icon-btn"
         aria-label={`More actions for ${label}`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
@@ -96,7 +84,7 @@ export function TodayActionMenu({ label, actions, primary, open, onRunAction }: 
               {snoozePresets().map(([preset, presetLabel]) => (
                 <MenuItem
                   key={preset}
-                  icon={<BellRing size={13} />}
+                  icon={<AlarmClock size={13} />}
                   label={presetLabel}
                   hint={preset === 'tomorrow' ? 's' : undefined}
                   onSelect={() => run(snooze, preset)}

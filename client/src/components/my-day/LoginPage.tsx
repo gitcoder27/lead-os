@@ -19,8 +19,8 @@ const ROLE_COPY = {
     tagline: 'Run the desk.',
     note: 'Create developer accounts and manage your team after signing in.',
     accent: 'var(--warning)',
-    glow: 'rgba(245, 158, 11, 0.18)',
-    orbGlow: 'rgba(245, 158, 11, 0.06)',
+    glow: 'color-mix(in srgb, var(--warning) 18%, transparent)',
+    orbGlow: 'color-mix(in srgb, var(--warning) 6%, transparent)',
     icon: BriefcaseBusiness,
     submitLabel: 'Enter Manager Workspace',
   },
@@ -29,8 +29,8 @@ const ROLE_COPY = {
     tagline: 'Start your day.',
     note: 'No account yet? Contact your Lead to get access.',
     accent: 'var(--accent)',
-    glow: 'rgba(6, 182, 212, 0.18)',
-    orbGlow: 'rgba(6, 182, 212, 0.06)',
+    glow: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+    orbGlow: 'color-mix(in srgb, var(--accent) 6%, transparent)',
     icon: UserRound,
     submitLabel: 'Open My Day',
   },
@@ -188,7 +188,7 @@ export function LoginPage({ role = 'developer' }: LoginPageProps) {
             </div>
             <div className="text-left">
               <div
-                className="text-[11px] font-semibold uppercase tracking-[0.3em]"
+                className="text-[12px] font-semibold uppercase tracking-[0.3em]"
                 style={{ color: copy.accent }}
               >
                 {copy.eyebrow}
@@ -474,8 +474,8 @@ function ErrorBanner({ message }: { message: string }) {
       animate={{ opacity: 1, y: 0 }}
       className="rounded-[14px] border px-4 py-3 text-[13px]"
       style={{
-        borderColor: 'rgba(239, 68, 68, 0.35)',
-        background: 'rgba(239, 68, 68, 0.08)',
+        borderColor: 'color-mix(in srgb, var(--danger) 35%, transparent)',
+        background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
         color: '#fca5a5',
       }}
     >
@@ -491,8 +491,8 @@ function SuccessBanner({ message }: { message: string }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex items-center gap-2 rounded-[14px] border px-4 py-3 text-[13px]"
       style={{
-        borderColor: 'rgba(16, 185, 129, 0.35)',
-        background: 'rgba(16, 185, 129, 0.08)',
+        borderColor: 'color-mix(in srgb, var(--success) 35%, transparent)',
+        background: 'color-mix(in srgb, var(--success) 8%, transparent)',
         color: '#6ee7b7',
       }}
     >

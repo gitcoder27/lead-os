@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, Search } from 'lucide-react';
 import { useManagerDeskDeveloperLookup } from '@/hooks/useManagerDesk';
 import type { ManagerDeskDeveloperLookupItem } from '@/types/manager-desk';
+import { initials } from '@/components/ui/Avatar';
 
 const PALETTE = [
   '#06B6D4', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981',
@@ -14,15 +15,6 @@ function avatarColor(name: string): string {
   return PALETTE[Math.abs(h) % PALETTE.length] ?? PALETTE[0]!;
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n.charAt(0))
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
 
 interface DeveloperPickerProps {
   date: string;
@@ -73,10 +65,10 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
         >
           <div
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
             style={{ background: `${c}20`, color: c, border: `1px solid ${c}30` }}
           >
-            {getInitials(selected.displayName)}
+            {initials(selected.displayName)}
           </div>
           <span
             className="text-[13px] font-medium truncate"
@@ -86,8 +78,8 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
           </span>
           {unavail && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
-              style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)' }}
+              className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
+              style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}
             >
               {selected.availability?.note || 'Unavailable'}
             </span>
@@ -99,7 +91,7 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
             setOpen(true);
             onClear();
           }}
-          className="text-[11px] px-2 py-1.5 rounded-lg font-medium shrink-0"
+          className="text-[12px] px-2 py-1.5 rounded-lg font-medium shrink-0"
           style={{
             color: 'var(--text-secondary)',
             background: 'var(--bg-tertiary)',
@@ -175,10 +167,10 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
                 }}
               >
                 <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
                   style={{ background: `${c}15`, color: c, border: `1px solid ${c}20` }}
                 >
-                  {getInitials(dev.displayName)}
+                  {initials(dev.displayName)}
                 </div>
                 <span
                   className="text-[13px] font-medium truncate flex-1"
@@ -188,8 +180,8 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
                 </span>
                 {unavail && (
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 flex items-center gap-0.5"
-                    style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--danger)' }}
+                    className="text-[11px] px-1.5 py-0.5 rounded-md font-medium shrink-0 flex items-center gap-0.5"
+                    style={{ background: 'color-mix(in srgb, var(--danger) 8%, transparent)', color: 'var(--danger)' }}
                   >
                     <Clock size={8} />
                     {dev.availability?.note || 'Out'}

@@ -66,7 +66,7 @@ function ThinkingBlock({
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left"
       >
         <Brain size={12} style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }} />
-        <span className="text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
           {active ? 'Thinking…' : 'Thought process'}
         </span>
         {active ? (

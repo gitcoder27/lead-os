@@ -114,7 +114,7 @@ export function TaskViewRail({
               <span className="flex-1" />
               {value > 0 && (
                 <span
-                  className={`min-w-[20px] rounded-full px-1.5 text-center text-[10.5px] tabular-nums ${tone ? 'font-bold' : 'font-medium'}`}
+                  className={`min-w-[20px] rounded-full px-1.5 text-center text-[11px] tabular-nums ${tone ? 'font-bold' : 'font-medium'}`}
                   style={{
                     color: tone ?? 'var(--text-muted)',
                     background: tone ? `color-mix(in srgb, ${tone} 16%, transparent)` : 'transparent',
@@ -150,7 +150,7 @@ export function TaskViewRail({
   );
 
   const heading = (text: string) => (
-    <p className="px-2 pb-1.5 pt-5 text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{text}</p>
+    <p className="px-2 pb-1.5 pt-5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{text}</p>
   );
 
   return (

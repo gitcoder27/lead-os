@@ -3,7 +3,7 @@ import { AlignLeft, Check, Link2, MessageSquarePlus, PanelRight, StickyNote, X }
 import type { TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { formatAbsoluteDateTime, formatDate, isOverdue, priorityColor } from '@/lib/utils';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { RelatedIssueChips } from '@/components/team-tracker/RelatedIssueChips';
 import { continuedDays, describeLatestEvent, formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
@@ -216,7 +216,7 @@ export function TaskMeta({
       <JiraIssueLink
         key="jira"
         issueKey={item.jiraKey}
-        className="font-mono text-[11.5px] font-semibold hover:underline"
+        className="font-mono text-[12px] font-semibold hover:underline"
         style={{ color: closed ? 'var(--text-muted)' : 'var(--accent)' }}
         title={item.jiraSummary && item.jiraSummary !== item.title ? `${item.jiraKey} · ${item.jiraSummary}` : item.jiraKey}
       >

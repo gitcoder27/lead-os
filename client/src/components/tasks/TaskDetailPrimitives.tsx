@@ -1,46 +1,20 @@
 import { forwardRef, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { CalendarX, ChevronDown, CornerDownLeft } from 'lucide-react';
-import { MenuDivider, MenuItem, TaskPopover } from './TaskPopover';
-import { avatarHue, initials, toneColor, type DateDisplay } from './task-detail-format';
+import { MenuDivider, MenuItem, TaskPopover } from '@/components/ui/Popover';
+import { toneColor, type DateDisplay } from './task-detail-format';
+// docs/54 §2: generic primitives live in components/ui; re-exported here so
+// task-detail code keeps one import site.
+export { FOCUS_RING, isEditable } from '@/components/ui/focus';
+export { SectionHeader } from '@/components/ui/SectionHeader';
+export { IconButton } from '@/components/ui/IconButton';
+export { ShortcutLegend } from '@/components/ui/ShortcutSheet';
+import { FOCUS_RING, isEditable } from '@/components/ui/focus';
 
 /**
  * Building blocks for the task detail surface (drawer + full page). Visual
  * language: sentence-case labels, ghost controls that reveal affordance on
  * hover/focus, one accent, and tone colors reserved for state.
  */
-
-export const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]';
-
-export function SectionHeader({ icon, title, count, hint, action, id, as: Heading = 'h3' }: {
-  icon?: ReactNode;
-  title: string;
-  count?: ReactNode;
-  /** Quiet qualifier after the count, e.g. "Private". */
-  hint?: ReactNode;
-  action?: ReactNode;
-  id?: string;
-  /** Heading level — pages that own their outline use h2. */
-  as?: 'h2' | 'h3';
-}) {
-  return (
-    <div className="flex min-h-[28px] items-center gap-2">
-      {icon && <span className="flex items-center" style={{ color: 'var(--text-muted)' }}>{icon}</span>}
-      <Heading id={id} className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
-        {title}
-      </Heading>
-      {count !== undefined && count !== null && (
-        <span
-          className="rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[18px]"
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
-        >
-          {count}
-        </span>
-      )}
-      {hint && <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
-      {action && <div className="ml-auto flex items-center gap-1">{action}</div>}
-    </div>
-  );
-}
 
 export function PropertyRow({ icon, label, children, align = 'center' }: {
   icon: ReactNode;
@@ -120,7 +94,7 @@ export function DateValue({ display, empty }: { display: DateDisplay | null; emp
     <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="truncate font-medium" style={{ color: toneColor(display.tone) }}>{display.label}</span>
       {display.hint && (
-        <span className="shrink-0 text-[11.5px] font-medium" style={{ color: toneColor(display.tone), opacity: 0.8 }}>
+        <span className="shrink-0 text-[12px] font-medium" style={{ color: toneColor(display.tone), opacity: 0.8 }}>
           {display.hint}
         </span>
       )}
@@ -128,25 +102,7 @@ export function DateValue({ display, empty }: { display: DateDisplay | null; emp
   );
 }
 
-export function Avatar({ name, seed, size = 20, muted = false }: { name: string; seed?: string; size?: number; muted?: boolean }) {
-  const hue = avatarHue(seed ?? name);
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.max(9, Math.round(size * 0.42)),
-        background: muted ? 'var(--bg-tertiary)' : `hsl(${hue} 70% 50% / 0.18)`,
-        color: muted ? 'var(--text-muted)' : `hsl(${hue} 75% 62%)`,
-        border: `1px solid ${muted ? 'var(--border)' : `hsl(${hue} 70% 55% / 0.35)`}`,
-      }}
-    >
-      {initials(name)}
-    </span>
-  );
-}
+export { Avatar } from '@/components/ui/Avatar';
 
 export interface DatePreset {
   key: string;
@@ -209,7 +165,7 @@ export function DatePickerPopover({ anchor, label, kind, value, presets, onCommi
           if (canApply) onCommit(draft);
         }}
       >
-        <label htmlFor={inputId} className="mb-1 block text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <label htmlFor={inputId} className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
           {kind === 'date' ? 'Pick a date' : 'Pick a date & time'}
         </label>
         <div className="flex items-center gap-1.5">
@@ -314,53 +270,9 @@ export function InlineTextField({ value, placeholder, onCommit, ariaLabel, multi
   );
 }
 
-/** Square ghost icon control for drawer toolbars. */
-export function IconButton({ label, hint, onClick, children, expanded, tone, popup }: {
-  label: string;
-  hint?: string;
-  onClick: (anchor: HTMLButtonElement) => void;
-  children: ReactNode;
-  expanded?: boolean;
-  tone?: 'danger';
-  popup?: 'menu' | 'dialog';
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(event) => onClick(event.currentTarget)}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
-      style={{ color: tone === 'danger' ? 'var(--danger)' : 'var(--text-secondary)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
-      title={hint ? `${label} (${hint})` : label}
-      aria-label={label}
-      aria-haspopup={popup}
-      aria-expanded={expanded}
-    >
-      {children}
-    </button>
-  );
-}
 
-export function ShortcutLegend({ hints, className = '' }: { hints: [string, string][]; className?: string }) {
-  return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] ${className}`} style={{ color: 'var(--text-muted)' }} aria-hidden="true">
-      {hints.map(([key, label]) => (
-        <span key={key} className="inline-flex items-center gap-1">
-          <kbd className="rounded px-1 font-mono text-[10px] leading-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>
-            {key}
-          </kbd>
-          {label}
-        </span>
-      ))}
-    </div>
-  );
-}
 
 // ── Keyboard ────────────────────────────────────────────────────────
-
-export function isEditable(el: Element): boolean {
-  const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el as HTMLElement).isContentEditable;
-}
 
 /**
  * Single-key shortcuts scoped to a detail surface. A key maps to the element
@@ -375,7 +287,7 @@ export function useTaskShortcuts(rootRef: RefObject<HTMLElement>, enabled: boole
   useEffect(() => {
     if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.length !== 1) return;
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1) return;
       const root = rootRef.current;
       if (!root) return;
       const active = document.activeElement;
@@ -390,7 +302,8 @@ export function useTaskShortcuts(rootRef: RefObject<HTMLElement>, enabled: boole
           return;
         }
       }
-      const key = event.key.toLowerCase();
+      // docs/54 K1: Shift variants bind as "shift+<key>" (e.g. ⇧S for status).
+      const key = `${event.shiftKey ? 'shift+' : ''}${event.key.toLowerCase()}`;
       const handler = customRef.current[key];
       const target = handler ? null : root.querySelector<HTMLElement>(`[data-task-shortcut="${key}"]`);
       if (!handler && !target) return;

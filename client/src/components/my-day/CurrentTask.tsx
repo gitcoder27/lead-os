@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Play, Plus, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { EASE_OUT, IconAction, Kbd, surfaceStyle } from './MyDayUI';
 import { TaskFooter, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
 
@@ -84,11 +84,11 @@ export function CurrentTask({
             >
               <span
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-transform group-hover/start:scale-105"
-                style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+                style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
               >
                 <Play size={12} fill="currentColor" aria-hidden="true" />
               </span>
-              {nextItem.taskKey && <span className="shrink-0 font-mono text-[11px] font-bold">{nextItem.taskKey}</span>}
+              {nextItem.taskKey && <span className="shrink-0 font-mono text-[12px] font-bold">{nextItem.taskKey}</span>}
               <span className="truncate" style={{ color: 'var(--text-primary)' }}>{nextItem.title}</span>
             </button>
           )}
@@ -101,7 +101,7 @@ export function CurrentTask({
             >
               <Plus size={14} aria-hidden="true" />
               Add a task
-              <Kbd>N</Kbd>
+              <Kbd>n</Kbd>
             </button>
           )}
         </motion.div>

@@ -29,7 +29,7 @@ export function SavedViewItemDescription({ description }: { description?: string
   if (!description) return null;
 
   return (
-    <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+    <div className="text-[12px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
       {description}
     </div>
   );

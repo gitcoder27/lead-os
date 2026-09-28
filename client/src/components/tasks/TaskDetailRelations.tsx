@@ -7,7 +7,7 @@ import { parseCapture, resolveCapture } from 'shared/capture-grammar';
 import type { TaskChildRef, TaskDetailResponse, TaskLink } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskStatusGlyph } from './TaskMenus';
-import { MenuItem, TaskPopover } from './TaskPopover';
+import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { Avatar, FOCUS_RING, SectionHeader } from './TaskDetailPrimitives';
 import type { TaskDetailMode, TaskPeople } from './TaskDetailFields';
 import { isHttpUrl, prettyUrl } from './task-detail-format';
@@ -251,11 +251,11 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
       )}
       {body}
       {link.role === 'primary' && (
-        <span className="shrink-0 rounded-full px-1.5 text-[10.5px] font-semibold leading-[18px]" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
+        <span className="shrink-0 rounded-full px-1.5 text-[11px] font-semibold leading-[18px]" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
           Primary
         </span>
       )}
-      <span className="shrink-0 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{kindLabel}</span>
+      <span className="shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{kindLabel}</span>
       {onRemove && (
         <button
           type="button"
@@ -414,7 +414,7 @@ function ChildRow({ child, people, onOpen }: { child: TaskChildRef; people: Task
         className={`group flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}
       >
         <TaskStatusGlyph status={child.status} size={14} />
-        <span className="shrink-0 font-mono text-[11.5px] font-semibold" style={{ color: 'var(--text-muted)' }}>{child.taskKey}</span>
+        <span className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>{child.taskKey}</span>
         <span
           className={`min-w-0 flex-1 truncate text-[13px] ${closed ? 'line-through decoration-[var(--text-disabled)]' : ''}`}
           style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)' }}

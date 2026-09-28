@@ -5,7 +5,8 @@ import { useToast } from '@/context/ToastContext';
 import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor, type DailyNoteEditor } from '@/hooks/useDailyNoteEditor';
 import { useManagerDeskDeveloperLookup } from '@/hooks/useManagerDesk';
 import { useNoteEntityLookups } from '@/hooks/useNoteEntityLookups';
-import { DatePickerPopover, isEditable } from '@/components/tasks/TaskDetailPrimitives';
+import { DatePickerPopover } from '@/components/tasks/TaskDetailPrimitives';
+import { isEditable } from '@/components/ui/focus';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import { CARRIED_PATTERN, inferFromText, prettyNoteDate, wrapUpCandidates, type WrapUpCandidate } from '@/lib/note-markdown';
 import { isValidIsoDate } from '@/lib/view-params';
@@ -295,7 +296,7 @@ export function NoteDocument({
             <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {editor.loadError.message}
             </p>
-            <button type="button" className="notes-button secondary mt-4" onClick={editor.retryLoad}>
+            <button type="button" className="ui-btn-secondary mt-4" onClick={editor.retryLoad}>
               Retry
             </button>
           </div>
@@ -343,8 +344,8 @@ export function NoteDocument({
 
             {editor.body.trim().length === 0 && !conflicted ? (
               <p className="notes-teach">
-                Type <kbd>@</kbd> for people, <kbd>T-</kbd> for tasks, <kbd>#</kbd> for Jira, <kbd>/</kbd> for commands.
-                Put the caret on a line and press <kbd>⌘⇧E</kbd> to turn it into a task.
+                Type <kbd className="ui-kbd">@</kbd> for people, <kbd className="ui-kbd">T-</kbd> for tasks, <kbd className="ui-kbd">#</kbd> for Jira, <kbd className="ui-kbd">/</kbd> for commands.
+                Put the caret on a line and press <kbd className="ui-kbd">⌘⇧E</kbd> to turn it into a task.
               </p>
             ) : null}
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MotionConfig, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { addDays, format, isToday, parseISO, subDays } from 'date-fns';
 import { Briefcase, CalendarClock, History } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
@@ -372,7 +372,7 @@ export function ManagerDeskPage({
           </div>
         ) : (
           <div className="h-full min-h-0 overflow-y-auto">
-            <MotionConfig reducedMotion="user">
+            <>
               {(sourceItems.length ?? 0) === 0 && !hasAnyNarrowing ? (
                 <EmptyDay date={displayDate} viewMode={viewMode} />
               ) : (
@@ -397,7 +397,7 @@ export function ManagerDeskPage({
                   />
                 </motion.div>
               )}
-            </MotionConfig>
+            </>
           </div>
         )}
       </ManagerDeskWorkspace>
@@ -500,7 +500,7 @@ function HistoryToggleButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      className="rounded-md px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.08em]"
       style={{
         background: active ? 'var(--md-accent-glow)' : 'transparent',
         color: active ? 'var(--md-accent)' : 'var(--text-secondary)',

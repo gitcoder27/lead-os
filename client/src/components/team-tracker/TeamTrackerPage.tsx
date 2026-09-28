@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, History, RefreshCw } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, History, Keyboard, RefreshCw } from 'lucide-react';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useTaskResolution } from '@/hooks/useTasks';
 import { writeDevParam, writeTaskParam } from '@/lib/view-params';
@@ -22,7 +22,7 @@ import { TrackerSummaryStrip } from './TrackerSummaryStrip';
 import { TrackerBoardToolbar } from './TrackerBoardToolbar';
 import { InactiveDeveloperTray } from './InactiveDeveloperTray';
 import { ROSTER_GRID, RosterSurface, TrackerRosterBoard } from './TrackerRosterBoard';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING, isEditable } from '@/components/ui/focus';
 import { TeamTrackerViewSwitcher, type TeamTrackerLens } from './TeamTrackerViewSwitcher';
 import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
 import { AvailabilityDialog } from './AvailabilityDialog';
@@ -52,6 +52,14 @@ import type {
   TrackerAttentionReason,
   TrackerWorkItem,
 } from '@/types';
+import { UNDO_WINDOW_MS } from '@/lib/undo';
+import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+
+const TEAM_BOARD_SHORTCUTS: ShortcutGroup[] = [
+  { group: 'Board', keys: [['j / k', 'Next / previous person'], ['Enter / o', 'Open their drawer'], ['/', 'Search']] },
+  { group: 'Day', keys: [['[ / ]', 'Previous / next day'], ['t', 'Today'], ['?', 'This sheet']] },
+  { group: 'In the drawer', keys: [['⇧ s', 'Status'], ['n', 'New task'], ['u', 'Update'], ['c', 'Check-in'], ['Esc', 'Close']] },
+];
 
 interface TeamTrackerPageProps {
   onViewChange?: (view: AppView) => void;
@@ -194,7 +202,7 @@ function useTeamTrackerWorkflow({
                   );
                 },
               },
-              duration: 8000,
+              duration: UNDO_WINDOW_MS,
             });
           },
           onError: (err) => addToast(err.message, 'error'),
@@ -450,6 +458,55 @@ export function TeamTrackerPage({
     }
   }, [workflow.drawerAccountId, oneOnOnePanel]);
 
+  // docs/54 K2: the board speaks the shared grammar — j/k move between
+  // people, Enter opens, / searches, [ ] t step days, ? shows the sheet.
+  const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  const shortcutsButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (oneOnOnePanel || standupMode) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (isEditable(target) || target.closest('[role="menu"], [role="dialog"], [data-popover-layer]'))) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-roster-row]'));
+      const index = rows.findIndex((row) => row === document.activeElement);
+      switch (event.key) {
+        case 'j':
+        case 'k': {
+          if (!rows.length) return;
+          const next = index < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, index + (event.key === 'j' ? 1 : -1)));
+          rows[next]?.focus();
+          break;
+        }
+        case 'o':
+          if (index < 0) return;
+          rows[index]?.click();
+          break;
+        case '/':
+          document.querySelector<HTMLInputElement>('input[aria-label="Search team"]')?.focus();
+          break;
+        case '[':
+          setDate((current) => shiftLocalIsoDate(current, -1));
+          break;
+        case ']':
+          setDate((current) => shiftLocalIsoDate(current, 1));
+          break;
+        case 't':
+          setDate(getLocalIsoDate());
+          break;
+        case '?':
+          setShortcutsAnchor(shortcutsButtonRef.current ?? document.body);
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [oneOnOnePanel, standupMode]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <motion.header
@@ -461,7 +518,7 @@ export function TeamTrackerPage({
       >
         <div className="mx-auto max-w-[1600px]">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h1 className="text-[19px] font-bold tracking-[-0.015em]" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="ui-page-title">
               Team
             </h1>
 
@@ -489,7 +546,22 @@ export function TeamTrackerPage({
                 <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
               <BoardDateNav date={date} isToday={isToday} onChange={setDate} />
+              <button
+                ref={shortcutsButtonRef}
+                type="button"
+                onClick={(event) => setShortcutsAnchor(event.currentTarget)}
+                className={`hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] md:flex ${FOCUS_RING}`}
+                style={{ color: 'var(--text-muted)' }}
+                aria-label="Keyboard shortcuts"
+                aria-expanded={shortcutsAnchor !== null}
+                title="Keyboard shortcuts (?)"
+              >
+                <Keyboard size={14} />
+              </button>
             </div>
+            {shortcutsAnchor ? (
+              <ShortcutSheet anchor={shortcutsAnchor} groups={TEAM_BOARD_SHORTCUTS} onClose={() => setShortcutsAnchor(null)} />
+            ) : null}
           </div>
 
           {board && (
@@ -572,8 +644,7 @@ export function TeamTrackerPage({
                 type="button"
                 onClick={() => void refetchBoard()}
                 disabled={isBoardFetching}
-                className="mt-4 rounded-md px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                className="ui-btn mt-4"
               >
                 {isBoardFetching ? 'Retrying' : 'Retry'}
               </button>

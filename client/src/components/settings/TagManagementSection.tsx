@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Link2, Loader2, Search, Trash2, X } from 'lucide-react';
+import { TriangleAlert, Link2, Loader2, Search, Trash2, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useTagCounts } from '@/hooks/useTagCounts';
 import { useDeleteTag, useTags, useTagUsage } from '@/hooks/useTags';
@@ -78,7 +78,7 @@ export function TagManagementSection() {
             Unused only
             {unusedCount > 0 ? (
               <span
-                className="rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold"
+                className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
                 style={{ background: unusedOnly ? 'var(--accent)' : 'var(--settings-neutral-chip-bg)', color: unusedOnly ? '#fff' : 'var(--text-muted)', border: unusedOnly ? 'none' : '1px solid var(--border-strong)' }}
               >
                 {unusedCount}
@@ -86,7 +86,7 @@ export function TagManagementSection() {
             ) : null}
           </button>
           <span
-            className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold"
+            className="shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold"
             style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
           >
             {tags.length} total
@@ -128,7 +128,7 @@ export function TagManagementSection() {
 
                   {/* Usage badge */}
                   <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                    className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold"
                     style={{
                       background: isUnused ? 'var(--settings-success-soft-bg)' : 'var(--settings-warning-soft-bg)',
                       color: isUnused ? 'var(--success)' : 'var(--warning)',
@@ -142,7 +142,7 @@ export function TagManagementSection() {
                   <button
                     type="button"
                     onClick={() => setSelectedTag(tag)}
-                    className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors"
+                    className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
                     style={{
                       background: 'var(--settings-danger-soft-bg)',
                       color: 'var(--danger-muted)',
@@ -160,7 +160,7 @@ export function TagManagementSection() {
         </div>
 
         {filteredTags.length > 0 && (
-          <p className="mt-2 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
             Deleting a tag removes it from every linked defect. The impact review shows exactly which issues will be affected before anything is removed.
           </p>
         )}
@@ -299,7 +299,7 @@ function DeleteTagDialog({
                     border: 'var(--settings-danger-soft-border)',
                   }}
                 >
-                  {hasLinkedDefects ? <AlertTriangle size={18} /> : <Trash2 size={18} />}
+                  {hasLinkedDefects ? <TriangleAlert size={18} /> : <Trash2 size={18} />}
                 </div>
                 <div>
                   <div id="delete-tag-dialog-title" className="text-[16px] font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -416,7 +416,7 @@ function DeleteTagDialog({
                             {issue.jiraKey}
                           </span>
                           <span
-                            className="rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                            className="rounded-full px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.12em]"
                             style={{
                               background: 'var(--settings-neutral-chip-bg)',
                               color: 'var(--text-muted)',

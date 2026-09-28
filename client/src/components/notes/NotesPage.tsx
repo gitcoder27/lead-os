@@ -90,10 +90,13 @@ export function NotesPage({ date, kind, onDateChange, onKindChange, onOpenTarget
       if (event.defaultPrevented || event.isComposing || modalLayerOpen()) return;
       const mod = event.metaKey || event.ctrlKey;
       if (event.altKey && !mod && !event.shiftKey) {
-        if (event.code === 'ArrowUp' || event.code === 'ArrowDown') {
+        // docs/54 K4: ⌥[ / ⌥] mirror My Day's [ / ]; ⌥↑ / ⌥↓ stay as aliases.
+        const step = event.code === 'ArrowUp' || event.code === 'BracketLeft' ? -1
+          : event.code === 'ArrowDown' || event.code === 'BracketRight' ? 1 : 0;
+        if (step !== 0) {
           if (!isValidIsoDate(date)) return;
           event.preventDefault();
-          const next = format(addDays(parseISO(date), event.code === 'ArrowUp' ? -1 : 1), 'yyyy-MM-dd');
+          const next = format(addDays(parseISO(date), step), 'yyyy-MM-dd');
           void requestDateChange(next);
           return;
         }

@@ -67,7 +67,7 @@ export function DeskRhythmHeader({
 
 function ContinuedPill({ count, onClick }: { count: number; onClick?: () => void }) {
   const label = `${count} open ${count === 1 ? 'item has' : 'items have'} continued from earlier days.`;
-  const className = `inline-flex h-5 items-center rounded-md border px-1.5 text-[11px] font-medium${
+  const className = `inline-flex h-5 items-center rounded-md border px-1.5 text-[12px] font-medium${
     onClick ? ' transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]' : ''
   }`;
   const style = {
@@ -205,7 +205,7 @@ export function DeskCardRow({
 export function CountPill({ value, subtle = false }: { value: number; subtle?: boolean }) {
   return (
     <span
-      className="inline-flex h-5 items-center rounded-md border px-1.5 font-mono text-[11px] font-semibold tabular-nums"
+      className="inline-flex h-5 items-center rounded-md border px-1.5 font-mono text-[12px] font-semibold tabular-nums"
       style={{
         borderColor: 'var(--border)',
         background: subtle ? 'transparent' : 'color-mix(in srgb, var(--bg-secondary) 86%, transparent)',
@@ -235,7 +235,7 @@ function DeskMetric({
 
   return (
     <span
-      className="inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      className="inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[12px] font-semibold uppercase tracking-[0.08em]"
       style={{ background, borderColor: 'color-mix(in srgb, var(--border) 78%, transparent)', color }}
     >
       <span>{label}</span>

@@ -20,8 +20,11 @@ import { useToast } from '@/context/ToastContext';
 import { useStatusUpdate } from '@/hooks/useTeamTrackerMutations';
 import type { TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
-import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/tasks/TaskPopover';
-import { Avatar, FOCUS_RING, IconButton, SectionHeader } from '@/components/tasks/TaskDetailPrimitives';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
+import { Avatar } from '@/components/ui/Avatar';
+import { IconButton } from '@/components/ui/IconButton';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { describeMoment, describePlanDate, toneColor } from '@/components/tasks/task-detail-format';
 import { TrackerItemRow } from './TrackerItemRow';
 import { getSignalBadges, type SignalTone } from './TrackerSignalBadges';
@@ -119,7 +122,7 @@ export function DrawerToolbar({
     >
       <div className="relative flex min-w-0 flex-1 items-center">
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 text-[11.5px] font-semibold leading-[22px] transition-all duration-200"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] font-semibold leading-[22px] transition-all duration-200"
           style={{
             color: readOnly ? 'var(--warning)' : 'var(--text-secondary)',
             background: readOnly ? 'color-mix(in srgb, var(--warning) 10%, transparent)' : 'var(--bg-tertiary)',
@@ -361,7 +364,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
         aria-label={`Change developer status (currently ${meta.label})`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
-        data-task-shortcut="s"
+        data-task-shortcut="shift+s"
         title={`Change status (S)${since}`}
         className={`group inline-flex h-7 items-center gap-1.5 rounded-full pl-2.5 pr-2 text-[12px] font-semibold transition-[filter] hover:brightness-125 ${FOCUS_RING}`}
         style={statusTint(day.status)}
@@ -394,7 +397,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
                 day.statusSuggestion?.status === status && status !== day.status ? (
                   <span className="flex items-center gap-1.5">
                     {STATUS_META[status].label}
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>suggested</span>
+                    <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>suggested</span>
                   </span>
                 ) : (
                   STATUS_META[status].label
@@ -404,7 +407,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
               onSelect={() => choose(status)}
             />
           ))}
-          <p className="px-2 pb-1 pt-1.5 text-[11px] leading-4" style={{ color: 'var(--text-muted)' }}>
+          <p className="px-2 pb-1 pt-1.5 text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
             At risk, blocked and waiting ask for a short rationale.
           </p>
         </TaskPopover>
@@ -487,7 +490,7 @@ export function HistorySection({ title, items, open, onToggle }: HistorySectionP
           {title}
         </span>
         <span
-          className="rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[18px]"
+          className="rounded-full px-1.5 text-[12px] font-semibold tabular-nums leading-[18px]"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
         >
           {items.length}
@@ -548,7 +551,7 @@ export function CheckInTimeline({ checkIns, recentCheckIns, readOnly }: { checkI
       {recentCheckIns.length > 0 && (
         <>
           <li className="flex items-center gap-3 pb-3 pt-1">
-            <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
               Earlier this week
             </span>
             <span className="h-px flex-1" style={{ background: 'color-mix(in srgb, var(--border) 70%, transparent)' }} />
@@ -597,7 +600,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
           </span>
           {checkIn.status && (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-1.5 text-[10.5px] font-semibold leading-[18px]"
+              className="inline-flex items-center gap-1 rounded-full px-1.5 text-[11px] font-semibold leading-[18px]"
               style={statusTint(checkIn.status)}
             >
               <StatusDot status={checkIn.status} size={5} />
@@ -606,16 +609,16 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
           )}
           {showDate && checkIn.date && (
             <span
-              className="rounded-full px-1.5 text-[10.5px] font-semibold leading-[18px]"
+              className="rounded-full px-1.5 text-[11px] font-semibold leading-[18px]"
               style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
             >
               {formatDate(checkIn.date)}
             </span>
           )}
-          <time className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }} dateTime={checkIn.createdAt} title={absolute}>
+          <time className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} dateTime={checkIn.createdAt} title={absolute}>
             {formatCompactRelative(checkIn.createdAt)}
           </time>
-          <span className="ml-auto text-[11px] tabular-nums" style={{ color: 'var(--text-muted)', opacity: 0.85 }}>
+          <span className="ml-auto text-[12px] tabular-nums" style={{ color: 'var(--text-muted)', opacity: 0.85 }}>
             {absolute}
           </span>
         </div>
@@ -638,7 +641,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
                 <TaskKeyChip key={key} taskKey={key} />
               ))}
               {followUp && (
-                <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                   <BellRing size={11} aria-hidden="true" />
                   Follow up {followUp.label}
                 </span>

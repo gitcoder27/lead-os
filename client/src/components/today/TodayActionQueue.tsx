@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CircleCheck } from 'lucide-react';
 import { TodayActionRow, TodayGroupRow, type TodayRunCommand } from './TodayActionRow';
 import type { TodayQueueGroup } from '@/lib/today-layout';
 import type { TodayQueueView } from '@/lib/today-triage';
@@ -91,7 +91,7 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
 
       {isDone ? (
         <div className="today-done" role="status">
-          <CheckCircle2 size={18} style={{ color: 'var(--success)' }} aria-hidden="true" />
+          <CircleCheck size={18} style={{ color: 'var(--success)' }} aria-hidden="true" />
           <div className="min-w-0">
             <p className="today-done-title">{cleared > 0 ? `Clear for now · ${cleared} cleared` : 'Clear for now'}</p>
             {nextUp ? <p className="today-done-next">Next: {nextUp}</p> : null}

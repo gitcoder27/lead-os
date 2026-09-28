@@ -4,7 +4,7 @@ import {
   Archive,
   Ban,
   CalendarCheck,
-  CheckCircle2,
+  CircleCheck,
   Clock,
   Scale,
   Zap,
@@ -70,7 +70,7 @@ export function SignalChip({
 
   return (
     <span
-      className="inline-flex max-w-[180px] items-center gap-1 rounded-md px-1 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
+      className="inline-flex max-w-[180px] items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
       style={style ?? toneStyle[tone]}
       title={title ?? label}
     >
@@ -90,7 +90,7 @@ function createQuickActions(item: ManagerDeskItem) {
   const done = {
     label: 'Done',
     status: 'done' as const,
-    icon: <CheckCircle2 size={10} />,
+    icon: <CircleCheck size={10} />,
     style: { background: 'rgba(16,185,129,0.10)', color: 'var(--success)', borderColor: 'rgba(16,185,129,0.22)' },
   };
   const drop = {

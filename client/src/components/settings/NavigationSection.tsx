@@ -103,7 +103,7 @@ export function NavigationSection() {
               Today
             </span>
             <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+              className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
               style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: 'var(--settings-inset-border)' }}
             >
               Always first
@@ -177,7 +177,7 @@ export function NavigationSection() {
           <RotateCcw size={12} />
           Restore default
         </button>
-        <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {dirty ? 'Unsaved changes' : 'Applies to your account on every device.'}
         </span>
       </div>
@@ -264,7 +264,7 @@ function RowButton({ label, disabled, onClick, children }: { label: string; disa
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );

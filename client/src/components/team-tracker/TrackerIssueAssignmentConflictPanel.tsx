@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowUpRight, Loader2, UserRound } from 'lucide-react';
+import { TriangleAlert, ArrowUpRight, Loader2, UserRound } from 'lucide-react';
 import { useTrackerIssueAssignments } from '@/hooks/useTeamTracker';
 
 interface TrackerIssueAssignmentConflictPanelProps {
@@ -70,7 +70,7 @@ export function TrackerIssueAssignmentConflictPanel({
       }}
     >
       <div className="flex items-start gap-2">
-        <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: tone }} />
+        <TriangleAlert size={14} className="mt-0.5 shrink-0" style={{ color: tone }} />
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             {heading}
@@ -92,7 +92,7 @@ export function TrackerIssueAssignmentConflictPanel({
             }}
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                 <UserRound size={10} />
                 <span>{assignment.developer.displayName}</span>
                 <span style={{ color: 'var(--border-strong)' }}>·</span>
@@ -105,7 +105,7 @@ export function TrackerIssueAssignmentConflictPanel({
             <button
               type="button"
               onClick={() => onOpenAssignment(assignment.itemId)}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold"
+              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
               style={{
                 background: 'var(--accent-glow)',
                 color: 'var(--accent)',

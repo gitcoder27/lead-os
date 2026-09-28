@@ -31,7 +31,7 @@ export function ToolCallChip({ label, status, summary }: ToolCallChipProps) {
         type="button"
         onClick={() => setExpanded((open) => !open)}
         title={summary}
-        className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] transition-colors"
+        className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] transition-colors"
         style={{
           background: 'var(--bg-tertiary)',
           border: '1px solid var(--border)',
@@ -55,7 +55,7 @@ export function ToolCallChip({ label, status, summary }: ToolCallChipProps) {
         <span>{label}</span>
       </button>
       {expanded && summary ? (
-        <p className="mt-1 pl-1 text-[11px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 pl-1 text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
           {summary}
         </p>
       ) : null}

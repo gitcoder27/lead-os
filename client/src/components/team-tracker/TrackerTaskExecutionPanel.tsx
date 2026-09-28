@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRightLeft, CheckCircle2, History, Play, RotateCcw, UserCircle, X, XCircle } from 'lucide-react';
+import { ArrowRightLeft, CircleCheck, History, Play, RotateCcw, UserCircle, X, CircleX } from 'lucide-react';
 import type { Developer, TrackerWorkItem } from '@/types';
 import { TaskTimeline } from '@/components/tasks/TaskTimeline';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
@@ -52,7 +52,7 @@ export function TrackerTaskExecutionPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+          <div className="text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
             Team Tracker Execution
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px]">
@@ -90,12 +90,12 @@ export function TrackerTaskExecutionPanel({
               disabled={isPending}
               className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
               style={{
-                background: 'rgba(16,185,129,0.12)',
+                background: 'color-mix(in srgb, var(--success) 12%, transparent)',
                 color: 'var(--success)',
-                border: '1px solid rgba(16,185,129,0.24)',
+                border: '1px solid color-mix(in srgb, var(--success) 24%, transparent)',
               }}
             >
-              <CheckCircle2 size={12} />
+              <CircleCheck size={12} />
               Mark Done
             </button>
           )}
@@ -120,7 +120,7 @@ export function TrackerTaskExecutionPanel({
               className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
-              <XCircle size={12} />
+              <CircleX size={12} />
               Drop
             </button>
           )}
@@ -137,7 +137,7 @@ export function TrackerTaskExecutionPanel({
             </button>
           )}
           {isDelegated && !isClosed && (
-            <span className="self-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="self-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
               Close via My follow-through
             </span>
           )}
@@ -151,7 +151,7 @@ export function TrackerTaskExecutionPanel({
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <span
-              className="text-[11px] font-bold uppercase tracking-[0.18em]"
+              className="text-[12px] font-bold uppercase tracking-[0.18em]"
               style={{ color: 'var(--text-muted)' }}
             >
               Reassign to
@@ -182,7 +182,7 @@ export function TrackerTaskExecutionPanel({
 
       <div className="mt-4">
         <div
-          className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em]"
+          className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.18em]"
           style={{ color: 'var(--text-muted)' }}
         >
           <History size={11} />

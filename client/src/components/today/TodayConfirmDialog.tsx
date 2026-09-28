@@ -20,8 +20,8 @@ export function TodayConfirmDialog({ title, description, confirmLabel, isSaving,
       onClose={onClose}
       footer={(
         <>
-          <button type="button" onClick={onClose} className="today-btn today-btn-quiet">Cancel</button>
-          <button type="button" data-autofocus onClick={onConfirm} disabled={isSaving} className="today-btn today-btn-primary">
+          <button type="button" onClick={onClose} className="ui-btn-quiet">Cancel</button>
+          <button type="button" data-autofocus onClick={onConfirm} disabled={isSaving} className="ui-btn-solid">
             {isSaving ? 'Working…' : confirmLabel}
           </button>
         </>

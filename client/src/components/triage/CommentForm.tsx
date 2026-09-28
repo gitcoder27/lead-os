@@ -38,7 +38,7 @@ export function CommentForm({ issueKey }: CommentFormProps) {
         type="submit"
         disabled={addComment.isPending || !body.trim()}
         className="p-2 rounded-lg transition-colors duration-150 disabled:opacity-40"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
       >
         <Send size={13} />
       </button>

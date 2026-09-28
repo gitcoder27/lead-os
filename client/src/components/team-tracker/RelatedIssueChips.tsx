@@ -23,13 +23,13 @@ export function RelatedIssueChips({
   return (
     <div className={`flex min-w-0 flex-wrap items-center gap-1 ${className ?? ''}`}>
       <span
-        className="text-[10px] font-semibold uppercase"
+        className="text-[11px] font-semibold uppercase"
         style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}
       >
         Related
       </span>
       {keys.map((issueKey) => {
-        const className = `font-mono font-semibold ${compact ? 'text-[10px]' : 'text-[11px]'} rounded-full px-1.5 py-0.5`;
+        const className = `font-mono font-semibold ${compact ? 'text-[11px]' : 'text-[12px]'} rounded-full px-1.5 py-0.5`;
         const style = {
           color: muted ? 'var(--text-muted)' : 'var(--accent)',
           background: muted ? 'var(--bg-tertiary)' : 'var(--accent-glow)',

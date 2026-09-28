@@ -52,7 +52,7 @@ export function TriageNotesToday({ value, dateLabel, onChange, onBlur, readOnly 
           {dateLabel}
         </span>
         <span
-          className="rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-[0.1em]"
+          className="rounded-full px-1.5 py-px text-[11px] font-semibold uppercase tracking-[0.1em]"
           style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}
         >
           Today

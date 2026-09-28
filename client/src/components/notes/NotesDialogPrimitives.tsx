@@ -1,19 +1,15 @@
 import type { ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Lock, X } from 'lucide-react';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
 
 /**
  * docs/52 F10: one form vocabulary for every "turn into…" dialog on the
  * Notes page — same shell, source label, field layout, and footer.
  */
 
-export const NOTES_INPUT_CLASS = `w-full rounded-lg px-3 py-2 text-[13px] leading-5 ${FOCUS_RING}`;
-export const NOTES_INPUT_STYLE = {
-  background: 'var(--bg-tertiary)',
-  color: 'var(--text-primary)',
-  border: '1px solid var(--border)',
-} as const;
+// docs/54 V1: the shared dialog field (`.ui-field`) — same as every form dialog.
+export const NOTES_INPUT_CLASS = 'ui-field';
+export const NOTES_INPUT_STYLE = {} as const;
 
 export function NotesDialogShell({
   open,
@@ -34,11 +30,11 @@ export function NotesDialogShell({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[90]" style={{ background: 'rgba(4, 8, 14, 0.5)', backdropFilter: 'blur(4px)' }} />
-        <Dialog.Content className="notes-dialog fixed z-[91] rounded-2xl border p-5">
+        <Dialog.Overlay className="fixed inset-0 z-dialog" style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }} />
+        <Dialog.Content className="notes-dialog fixed z-dialog p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Dialog.Title className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <Dialog.Title className="ui-dialog-title">
                 {title}
               </Dialog.Title>
               <Dialog.Description className="mt-1 inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -49,8 +45,7 @@ export function NotesDialogShell({
             <Dialog.Close asChild>
               <button
                 type="button"
-                className={`flex h-7 w-7 items-center justify-center rounded-lg ${FOCUS_RING}`}
-                style={{ color: 'var(--text-muted)' }}
+                className="ui-icon-btn"
                 aria-label={`Close ${title.toLowerCase()} dialog`}
               >
                 <X size={14} />
@@ -60,7 +55,7 @@ export function NotesDialogShell({
           <div className="mt-4 space-y-3">{children}</div>
           <div className="mt-5 flex items-center justify-end gap-2">
             <Dialog.Close asChild>
-              <button type="button" className="notes-button secondary">
+              <button type="button" className="ui-btn-quiet">
                 Cancel
               </button>
             </Dialog.Close>
@@ -104,7 +99,7 @@ export function NotesField({
       )}
       {children}
       {hint ? (
-        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {hint}
         </p>
       ) : null}
@@ -123,7 +118,7 @@ export function NotesFormError({ message }: { message: string | null }) {
 
 export function NotesSubmitButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className="notes-button primary">
+    <button type="button" onClick={onClick} disabled={disabled} className="ui-btn-solid">
       {children}
     </button>
   );

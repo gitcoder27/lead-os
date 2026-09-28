@@ -227,8 +227,38 @@ describe('OneOnOneWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start 1:1 series' }));
     expect(mockCreateSeries).toHaveBeenCalledWith({ developerAccountId: 'dev-2', cadence: 'weekly' }, expect.anything());
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('leaves Escape to a layer stacked above it and blurs a focused field first (docs/54)', () => {
+    const onClose = vi.fn();
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={onClose} />);
+
+    const layer = document.createElement('div');
+    layer.setAttribute('aria-modal', 'true');
+    document.body.appendChild(layer);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+    layer.remove();
+
+    const agenda = screen.getByLabelText('Add to agenda');
+    agenda.focus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(document.activeElement).not.toBe(agenda);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('n focuses the agenda input and ? opens the shortcut sheet (docs/54 K2)', () => {
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    fireEvent.keyDown(document, { key: 'n' });
+    expect(screen.getByLabelText('Add to agenda')).toHaveFocus();
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document, { key: '?' });
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
   });
 });
 

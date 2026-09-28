@@ -190,6 +190,7 @@ vi.mock('framer-motion', async () => {
     ),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     MotionConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useReducedMotion: () => false,
     useDragControls: () => ({ start: vi.fn() }),
     Reorder: {
       Group: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -279,6 +280,14 @@ describe('MyDayPage', () => {
     // Clicking the row body (not a control) opens it too.
     fireEvent.click(screen.getByText('Shipped keyed task').closest('[data-task-key]')!);
     expect(screen.getByRole('dialog', { name: 'Task T-3' })).toBeInTheDocument();
+  });
+
+  it('? opens the shared shortcut sheet (docs/54 K2)', () => {
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    fireEvent.keyDown(window, { key: '?' });
+    const sheet = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    expect(sheet).toHaveTextContent('New task');
+    expect(sheet).toHaveTextContent('Previous / next day');
   });
 
   it('keeps row controls from opening the drawer', () => {

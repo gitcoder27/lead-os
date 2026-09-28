@@ -1,11 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Minus } from 'lucide-react';
+import { Kbd } from './Kbd';
 
 const POPOVER_FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 /**
- * docs/49 §6/§12: a small anchored popover rendered in a portal (so rows near
+ * docs/49 §6/§12, docs/54 V4: the app's one anchored popover/menu —
+ * used by Tasks, Today, Notes, the Team drawer and every shortcut sheet.
+ * A small anchored popover rendered in a portal (so rows near
  * the bottom of the scrolling list are never clipped). Arrow keys move
  * between menu items, Esc closes and restores focus to where it came from,
  * and `onAccelerator` lets menus bind single-letter shortcuts.
@@ -124,7 +127,7 @@ export function TaskPopover({
       aria-label={label}
       data-popover-layer=""
       onKeyDown={handleKeyDown}
-      className="fixed z-[9000] max-h-[360px] overflow-y-auto rounded-xl p-1 shadow-xl"
+      className="fixed z-popover max-h-[360px] overflow-y-auto rounded-xl p-1"
       style={{
         top: position?.top ?? -9999,
         left: position?.left ?? -9999,
@@ -177,11 +180,7 @@ export function MenuItem({
       )}
       {icon && <span className="flex shrink-0 items-center" style={{ color: 'var(--text-muted)' }}>{icon}</span>}
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {hint && (
-        <kbd className="shrink-0 rounded px-1 font-mono text-[10px]" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-          {hint}
-        </kbd>
-      )}
+      {hint && <Kbd variant="subtle">{hint}</Kbd>}
     </button>
   );
 }
@@ -192,8 +191,11 @@ export function MenuDivider() {
 
 export function MenuHeading({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
+    <p className="px-2 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </p>
   );
 }
+
+/** Neutral name for the shared popover (docs/54). */
+export { TaskPopover as Popover };

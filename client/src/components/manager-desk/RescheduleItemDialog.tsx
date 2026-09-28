@@ -6,6 +6,7 @@ import { ArrowRightFromLine, CalendarDays, Clock, User, X } from 'lucide-react';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import { KIND_LABELS, STATUS_LABELS } from '@/types/manager-desk';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
+import { useModalFocus } from '@/hooks/useModalFocus';
 
 interface Props {
   item: ManagerDeskItem;
@@ -23,6 +24,8 @@ function formatShortDate(iso: string): string {
 }
 
 export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Props) {
+  // docs/54 V1: Tab stays inside the layer; focus returns to the opener on close.
+  const modalRef = useModalFocus<HTMLDivElement>();
   const phase3 = useTasksPhase3();
   const minDate = useMemo(
     () => format(addDays(parseISO(item.originDate), 1), 'yyyy-MM-dd'),
@@ -56,12 +59,12 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-dialog flex items-center justify-center p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="absolute inset-0"
-        style={{ background: 'rgba(6, 10, 15, 0.62)', backdropFilter: 'blur(8px)' }}
+        style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }}
         onClick={onClose}
       />
 
@@ -74,8 +77,9 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
           background:
             'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 95%, rgba(217,169,78,0.04)) 0%, var(--bg-secondary) 100%)',
           border: '1px solid color-mix(in srgb, var(--md-accent) 18%, var(--border-strong) 82%)',
-          boxShadow: '0 32px 88px rgba(0,0,0,0.42)',
+          boxShadow: 'var(--overlay-shadow)',
         }}
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="manager-desk-reschedule-title"
@@ -139,7 +143,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {!phase3 && (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                  className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase"
                   style={{
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-muted)',

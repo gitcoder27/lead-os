@@ -35,6 +35,7 @@ import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
+import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import type { DailyNoteKind, TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
 export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'notes' | 'my-day' | 'settings';
@@ -512,6 +513,9 @@ function AppContent() {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureContext, setCaptureContext] = useState<GlobalCaptureContext>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [globalTaskKey, setGlobalTaskKey] = useState<string | null>(null);
+  const globalTaskDrawerUsed = useRef(false);
+  if (globalTaskKey) globalTaskDrawerUsed.current = true;
   const [assistantOpen, setAssistantOpen] = useState(false);
 
   useSyncRefreshCoordinator({ enabled: isAuthenticatedManager && activeView !== 'today' });
@@ -591,6 +595,22 @@ function AppContent() {
   }, [notesDate]);
 
   const handleOpenTodayTarget = useCallback((target: TodayActionTarget) => {
+    // docs/54 J1: a task opens in the shared drawer over the current surface —
+    // Today, the palette or Copilot keep their place — whoever owns the task.
+    // People (`developer`) still open their Team drawer; deep links (`/t/T-n`)
+    // still resolve through TaskLinkResolver.
+    if (
+      features?.tasksPhase3
+      && target.taskKey
+      && target.type !== 'developer'
+      && (target.view === 'tasks' || target.view === 'desk' || target.view === 'team')
+      && !target.mode
+      && !target.panel
+    ) {
+      setGlobalTaskKey(target.taskKey);
+      return;
+    }
+
     if (target.view === 'work') {
       const nextFilterState: DashboardFilterState = {
         ...dashboardFilterState,
@@ -725,7 +745,7 @@ function AppContent() {
     const nextView = canonicalizeView(target.view as AppView);
     setActiveView(nextView);
     navigateToView(nextView);
-  }, [dashboardFilterState, handleOpenNotes]);
+  }, [dashboardFilterState, features?.tasksPhase3, handleOpenNotes]);
 
   const handleTaskResolved = useCallback((task: TaskResolution) => {
     if (user?.role === 'developer') {
@@ -952,6 +972,7 @@ function AppContent() {
       openCapture,
       openCommandPalette: () => setPaletteOpen(true),
       openNotes: handleOpenNotes,
+      openTask: (taskKey: string) => setGlobalTaskKey(taskKey),
     }),
     [openCapture, handleOpenNotes],
   );
@@ -1225,6 +1246,10 @@ function AppContent() {
             onOpenTarget={handleOpenTodayTarget}
             onViewChange={handleViewChange}
           />
+        )}
+        {/* docs/54 J1: one task drawer for in-app "open T-n" from Today, ⌘K and Copilot. */}
+        {isAuthenticatedManager && (globalTaskKey || globalTaskDrawerUsed.current) && (
+          <TaskDrawer taskKey={globalTaskKey} onClose={() => setGlobalTaskKey(null)} onNavigateTask={setGlobalTaskKey} />
         )}
         {isAuthenticatedManager && (
           <Suspense fallback={null}>

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Archive, CheckCircle2, Inbox, ListChecks, Play } from 'lucide-react';
+import { Archive, CircleCheck, Inbox, ListChecks, Play } from 'lucide-react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import { UnifiedEmptyState } from './UnifiedDeskListPrimitives';
 import {
@@ -202,7 +202,7 @@ function QuietDeskStrip({ sections }: { sections: DeskRhythmSection[] }) {
       {sections.map((section) => (
         <span
           key={section.key}
-          className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[10px] font-semibold uppercase tracking-[0.08em]"
+          className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold uppercase tracking-[0.08em]"
           style={{ color: section.items.length > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}
         >
           {section.icon}
@@ -239,7 +239,7 @@ export function DeskSignalRail({
     >
       <div className="sticky top-2 space-y-3 py-1">
         <div>
-          <div className="text-[9px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             Pulse
           </div>
           <div className="mt-2 space-y-1.5">
@@ -250,7 +250,7 @@ export function DeskSignalRail({
         </div>
 
         <div className="border-t pt-3" style={{ borderColor: 'color-mix(in srgb, var(--border) 52%, transparent)' }}>
-          <div className="text-[9px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             Next
           </div>
           <div className="mt-2 text-[12px] font-semibold leading-5" style={{ color: 'var(--text-primary)' }}>
@@ -263,7 +263,7 @@ export function DeskSignalRail({
 
         {continuedOpenCount > 0 && (
           <div className="border-t pt-3" style={{ borderColor: 'color-mix(in srgb, var(--border) 52%, transparent)' }}>
-            <div className="text-[9px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
               Carried
             </div>
             <button
@@ -280,7 +280,7 @@ export function DeskSignalRail({
               <span className="font-mono text-[18px] font-semibold tabular-nums" style={{ color: 'var(--md-accent)' }}>
                 {continuedOpenCount}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                 from earlier
               </span>
             </button>
@@ -303,10 +303,10 @@ function RailMetric({
   const color = tone === 'active' ? 'var(--accent)' : tone === 'decision' ? 'var(--md-accent)' : 'var(--text-secondary)';
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+      <span className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </span>
-      <span className="font-mono text-[11px] font-semibold tabular-nums" style={{ color }}>
+      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color }}>
         {value}
       </span>
     </div>
@@ -352,6 +352,6 @@ export function buildDeskRhythmSections(items: ManagerDeskItem[]): DeskRhythmSec
     { key: 'triage', title: 'Needs triage', subtitle: 'Fresh captures waiting for a decision.', icon: <Inbox size={12} />, items: items.filter((item) => item.status === 'inbox'), tone: 'decision' },
     { key: 'planned', title: 'Planned', subtitle: 'Committed work and follow-ups that have not started yet.', icon: <ListChecks size={12} />, items: items.filter((item) => item.status === 'planned' || item.status === 'waiting'), tone: 'calm' },
     { key: 'later', title: 'Later', subtitle: 'Parked work, kept out of the active plan.', icon: <Archive size={12} />, items: items.filter((item) => item.status === 'backlog'), tone: 'quiet', quiet: true },
-    { key: 'done', title: 'Done', subtitle: 'Closed work for this date.', icon: <CheckCircle2 size={12} />, items: items.filter((item) => item.status === 'done' || item.status === 'cancelled'), tone: 'quiet', quiet: true },
+    { key: 'done', title: 'Done', subtitle: 'Closed work for this date.', icon: <CircleCheck size={12} />, items: items.filter((item) => item.status === 'done' || item.status === 'cancelled'), tone: 'quiet', quiet: true },
   ];
 }

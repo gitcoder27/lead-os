@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
+import { TriangleAlert, Bell, BellRing, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import type { DayStats } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
@@ -52,7 +52,7 @@ export function StandupPersonHeader({
   return (
     <div>
       <div className="flex items-start gap-3">
-        <Avatar name={day.developer.displayName} size={42} />
+        <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-[17px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>
@@ -62,7 +62,7 @@ export function StandupPersonHeader({
             {/* docs/48 §4.4: read-only 1:1 badge — "1:1 today" / overdue. */}
             {oneOnOne && (
               <span
-                className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
                 style={{
                   color: oneOnOne.overdueDays > 0 ? 'var(--danger)' : 'var(--accent)',
                   background: oneOnOne.overdueDays > 0
@@ -76,10 +76,10 @@ export function StandupPersonHeader({
             )}
             {flagged && (
               <span
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em]"
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
                 style={{ color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)' }}
               >
-                <Flag size={10} /> Follow up
+                <Bell size={10} /> Follow up
               </span>
             )}
           </div>
@@ -98,14 +98,14 @@ export function StandupPersonHeader({
               ))}
             </select>
             {day.nextFollowUpAt && (
-              <span className="inline-flex items-center gap-1 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                 <BellRing size={11} /> Follow-up {formatTime(day.nextFollowUpAt)}
               </span>
             )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="mr-1 text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          <span className="mr-1 text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
             {position} / {total}
           </span>
           <NavButton label="Previous developer" onClick={onPrev} disabled={position <= 1}>
@@ -126,7 +126,7 @@ export function StandupPersonHeader({
         <StripCell label="Current" className="col-span-2 sm:col-span-1">
           {stats.current ? (
             <button type="button" onClick={onFocusCurrent} className="flex min-w-0 max-w-full items-center gap-1.5 text-left hover:underline">
-              <span className="shrink-0 font-mono text-[11px]" style={{ color: 'var(--accent)' }}>{stats.current.taskKey}</span>
+              <span className="shrink-0 font-mono text-[12px]" style={{ color: 'var(--accent)' }}>{stats.current.taskKey}</span>
               <span className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{stats.current.title}</span>
             </button>
           ) : (
@@ -147,14 +147,14 @@ export function StandupPersonHeader({
             <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }} title={stats.lastCheckInAt}>
               {stats.checkInsToday} today
               {stats.lastCheckInAt && (
-                <span className="block text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(stats.lastCheckInAt)}</span>
+                <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(stats.lastCheckInAt)}</span>
               )}
             </span>
           ) : (
             <span className="text-[13px] font-medium" style={{ color: 'var(--warning)' }}>
               None today
               {stats.lastCheckInAt && (
-                <span className="block text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>last {formatRelativeTime(stats.lastCheckInAt)}</span>
+                <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>last {formatRelativeTime(stats.lastCheckInAt)}</span>
               )}
             </span>
           )}
@@ -168,7 +168,7 @@ export function StandupPersonHeader({
           style={{ background: 'color-mix(in srgb, var(--warning) 9%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 32%, transparent)' }}
           data-testid="status-suggestion"
         >
-          <AlertTriangle size={14} style={{ color: 'var(--warning)' }} />
+          <TriangleAlert size={14} style={{ color: 'var(--warning)' }} />
           <span className="min-w-0 flex-1 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
             {suggestion.reasonTaskKey} is blocked
             {suggestion.reasonTaskTitle ? ` — ${suggestion.reasonTaskTitle}` : ''}. Suggested status: blocked.
@@ -176,7 +176,7 @@ export function StandupPersonHeader({
           <button
             type="button"
             onClick={onAcceptSuggestion}
-            className="shrink-0 rounded-md px-2 py-1 text-[11.5px] font-semibold"
+            className="shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold"
             style={{ background: 'var(--warning)', color: '#1a1300' }}
           >
             Accept (y)
@@ -190,7 +190,7 @@ export function StandupPersonHeader({
 function StripCell({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`min-w-0 px-3.5 py-2.5 [&:not(:first-child)]:border-l ${className}`} style={{ borderColor: 'var(--border)' }}>
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </div>
       {children}

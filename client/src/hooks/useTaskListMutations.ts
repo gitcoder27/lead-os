@@ -1,10 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/lib/api';
 import { optimisticTask, undoChanges } from '@/lib/task-list';
 import type { BulkUpdateTasksResponse, CreateTaskRequest, ManagerTask, TaskViewTasksResponse, UpdateTaskRequest } from '@/types';
+import { UNDO_WINDOW_MS } from '@/lib/undo';
 
 export interface TaskChangeItem {
   task: ManagerTask;
@@ -19,7 +20,6 @@ export interface ApplyTaskChangesOptions {
   onUndo?: () => void;
 }
 
-const UNDO_TOAST_MS = 6000;
 
 // docs/51 P1: counts aggregate across every view and re-run heavier queries —
 // debounce them (~500ms trailing) so rapid bulk edits trigger one recount.
@@ -67,6 +67,9 @@ export function useTaskListMutations() {
     onSettled: () => invalidateTaskSurfaces(qc),
   });
 
+  // docs/54 K5: the latest undoable write, so `z` can reverse it like Today's.
+  const lastUndo = useRef<{ run: () => void; expiresAt: number } | null>(null);
+
   const apply = useCallback(
     async (items: TaskChangeItem[], options: ApplyTaskChangesOptions): Promise<boolean> => {
       if (!items.length) return false;
@@ -81,27 +84,38 @@ export function useTaskListMutations() {
         task: optimisticTask(item.task, item.changes),
         changes: undoChanges(item.task, item.changes),
       }));
+      let undone = false;
+      const runUndo = () => {
+        if (undone) return;
+        undone = true;
+        if (lastUndo.current?.run === runUndo) lastUndo.current = null;
+        options.onUndo?.();
+        void apply(inverse, { label: 'Undone', undoable: false });
+      };
+      lastUndo.current = { run: runUndo, expiresAt: Date.now() + UNDO_WINDOW_MS };
       addToast({
         type: 'success',
         title: options.label,
-        duration: UNDO_TOAST_MS,
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            options.onUndo?.();
-            void apply(inverse, { label: 'Undone', undoable: false });
-          },
-        },
+        duration: UNDO_WINDOW_MS,
+        action: { label: 'Undo', onClick: runUndo },
       });
       return true;
     },
     [addToast, bulk],
   );
 
+  /** Reverses the latest write still inside the Undo window; false when there is none. */
+  const undoLast = useCallback((): boolean => {
+    const entry = lastUndo.current;
+    if (!entry || entry.expiresAt < Date.now()) return false;
+    entry.run();
+    return true;
+  }, []);
+
   const create = useMutation({
     mutationFn: (input: CreateTaskRequest) => api.post<ManagerTask>('/tasks', input),
     onSettled: () => invalidateTaskSurfaces(qc),
   });
 
-  return { apply, create, isPending: bulk.isPending };
+  return { apply, create, undoLast, isPending: bulk.isPending };
 }

@@ -138,8 +138,7 @@ export function AttentionCard({ item, index, onOpen, onCaptureFollowUp, onSetCur
               event.stopPropagation();
               onSetCurrent(setCurrentCandidate.id);
             }}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--border-active)]"
-            style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+            className="ui-btn"
           >
             <Play size={13} />
             Set current

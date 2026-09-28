@@ -51,6 +51,7 @@ import { TaskKeyboardHint, TaskListEmpty, TaskListError, TaskListSkeleton, TaskS
 import { AssignMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
 import { TaskToolbar } from './TaskToolbar';
 import { TaskViewRail } from './TaskViewRail';
+import { UNDO_WINDOW_MS } from '@/lib/undo';
 
 interface TasksPageProps {
   /** URL state pushed in by App on popstate/navigation. */
@@ -149,7 +150,10 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const [lingering, setLingering] = useState<Map<string, LingerEntry>>(() => new Map());
   const [menu, setMenu] = useState<OpenMenuState | null>(null);
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  // The sheet anchors to the toolbar's keyboard button (docs/54 K2).
+  const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  const showShortcuts = shortcutsAnchor !== null;
+  const openShortcuts = () => setShortcutsAnchor(mainRef.current?.querySelector<HTMLElement>('[data-shortcuts-anchor]') ?? document.body);
   const [doneTodayOpen, setDoneTodayOpen] = useState(false);
   // docs/51 U6: which input drove the last action, and the mouse-pinned rows.
   const lastInput = useRef<'pointer' | 'keyboard'>('keyboard');
@@ -643,7 +647,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
         break;
       }
       case '/': searchRef.current?.focus(); break;
-      case '?': setShowShortcuts(true); break;
+      case 'z': if (!mutations.undoLast()) handled = false; break;
+      case '?': openShortcuts(); break;
       case 'Escape':
         if (selected.size) setSelected(new Set());
         else if (state.q) setState((current) => ({ ...current, q: undefined }));
@@ -714,7 +719,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       addToast({
         type: 'success',
         title: `Deleted view "${view.name}"`,
-        duration: 6000,
+        duration: UNDO_WINDOW_MS,
         action: {
           label: 'Undo',
           onClick: () => {
@@ -802,7 +807,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           hasOverrides={overridesActive}
           onUpdateView={handleUpdateSaved}
           onRevert={clearFilters}
-          onShowShortcuts={() => setShowShortcuts(true)}
+          onShowShortcuts={(anchor) => setShortcutsAnchor(anchor)}
         />
 
         <div
@@ -865,7 +870,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               onSubmitAdd={handleInlineAdd}
               onMoveOverdueToToday={(rows) => schedule(rows, 'today')}
               onToggleGroup={(key) => { if (key === 'done-today') setDoneTodayOpen((open) => !open); }}
-              footer={<TaskKeyboardHint onShowAll={() => setShowShortcuts(true)} />}
+              footer={<TaskKeyboardHint onShowAll={() => openShortcuts()} />}
             />
           )}
         </div>
@@ -967,7 +972,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           }}
         />
       )}
-      {showShortcuts && <TaskShortcutsDialog onClose={() => setShowShortcuts(false)} />}
+      {showShortcuts && <TaskShortcutsDialog anchor={shortcutsAnchor} onClose={() => setShortcutsAnchor(null)} />}
 
       <TaskDrawer
         taskKey={drawerTaskKey ?? null}

@@ -431,7 +431,6 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       if (view === 'wrapup') {
         switch (event.key) {
           case 'ArrowLeft':
-          case 'p':
             return run(() => moveDeveloper(-1));
           case 'w':
             return run(actions.wrapUp);
@@ -446,12 +445,12 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         }
       }
 
+      // docs/54 K1: letters mean what they mean on Tasks and in the drawer —
+      // e done, a assign, n new; people move on arrows only.
       switch (event.key) {
         case 'ArrowRight':
-        case 'n':
           return run(() => moveDeveloper(1));
         case 'ArrowLeft':
-        case 'p':
           return run(() => moveDeveloper(-1));
         case 'ArrowDown':
         case 'j':
@@ -463,19 +462,19 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           return run(actions.update);
         case 'v':
           return run(actions.togglePrivate);
-        case 's':
+        case '.':
           if (focusedTask) run(actions.setCurrent);
           return;
-        case 'd':
+        case 'e':
           if (focusedTask) run(actions.done);
           return;
         case 'b':
           return run(actions.blocked);
-        case 'a':
+        case 'n':
           return run(actions.add);
         case 'c':
           return run(actions.checkIn);
-        case 'r':
+        case 'a':
           if (focusedTask) run(actions.reassign);
           return;
         case 'y':
@@ -520,15 +519,15 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         ] },
         { label: 'Task', actions: [
           { keys: ['u'], label: 'Update', onRun: actions.update, disabled: !focusedTask },
-          { keys: ['s'], label: 'Current', onRun: actions.setCurrent, disabled: !focusedTask || focusedTask.status === 'active' },
-          { keys: ['d'], label: 'Done', onRun: actions.done, disabled: !focusedTask },
+          { keys: ['.'], label: 'Current', onRun: actions.setCurrent, disabled: !focusedTask || focusedTask.status === 'active' },
+          { keys: ['e'], label: 'Done', onRun: actions.done, disabled: !focusedTask },
           { keys: ['b'], label: 'Blocked', onRun: actions.blocked },
-          { keys: ['r'], label: 'Reassign', onRun: actions.reassign, disabled: !focusedTask },
+          { keys: ['a'], label: 'Reassign', onRun: actions.reassign, disabled: !focusedTask },
           { keys: ['↵'], label: 'Open', onRun: actions.open, disabled: !focusedTask },
         ] },
         { label: 'Person', actions: [
           { keys: ['c'], label: 'Check-in', onRun: actions.checkIn },
-          { keys: ['a'], label: 'Add task', onRun: actions.add },
+          { keys: ['n'], label: 'New task', onRun: actions.add },
           { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
           ...(suggestion ? [{ keys: ['y'], label: 'Accept suggestion', onRun: actions.accept, emphasis: true }] : []),
         ] },
@@ -581,7 +580,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <h1 className="text-[14px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
               Standup
             </h1>
-            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {formatStandupDate(date)}
             </div>
           </div>

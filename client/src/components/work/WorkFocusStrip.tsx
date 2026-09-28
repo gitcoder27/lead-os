@@ -114,7 +114,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
           </span>
           <div className="min-w-0">
             <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</p>
-            <p className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
+            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
           </div>
           {isFetching || overviewLoading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
         </div>
@@ -138,7 +138,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
                   <Icon size={13} className="shrink-0" style={{ color: active || signal.value > 0 ? signal.color : 'var(--text-muted)' }} />
                   <span className="min-w-0">
                     <span className="block truncate text-[12px] font-semibold" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{signal.label}</span>
-                    <span className="block truncate text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
+                    <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
                   </span>
                 </span>
                 <span className="font-mono text-[15px] font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? signal.color : 'var(--text-muted)' }}>
@@ -163,7 +163,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
             >
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{metric.label}</span>
-                <span className="block truncate text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{metric.detail}</span>
+                <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{metric.detail}</span>
               </span>
               <span className="flex shrink-0 items-center gap-1">
                 {metric.id === 'manual-work' ? <Briefcase size={11} style={{ color: severityColor[metric.value > 0 ? metric.severity : 'neutral'] }} /> : null}

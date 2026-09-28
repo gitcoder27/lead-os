@@ -74,7 +74,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       Workload
                     </span>
                     <span
-                      className="rounded-full px-2 py-0.5 text-[11px] font-mono"
+                      className="rounded-full px-2 py-0.5 text-[12px] font-mono"
                       style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}
                     >
                       {workload.length}
@@ -108,7 +108,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       }}
                     >
                       <span
-                        className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold"
+                        className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold"
                         style={{
                           color: isActive ? 'var(--accent)' : color,
                           background: isActive ? 'rgba(255,255,255,0.55)' : `${color}18`,
@@ -130,7 +130,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color: isActive ? 'var(--accent)' : color }}>
                         {loadLabel}
                       </span>
-                      <span className="font-mono text-[11px]" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
+                      <span className="font-mono text-[12px]" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
                         S{dev.score}
                       </span>
                       {hasMismatch && !isActive && (

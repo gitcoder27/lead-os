@@ -31,7 +31,7 @@ export function TodayPanelList({ title, items, today, icon, bulk, onRunCommand }
         <span className="today-section-count">{items.length}</span>
         {bulk ? (
           <span className="today-section-actions">
-            <button type="button" className="today-primary today-primary-sm" onClick={bulk.onRun}>{bulk.label}</button>
+            <button type="button" className="ui-btn ui-btn-sm" onClick={bulk.onRun}>{bulk.label}</button>
           </span>
         ) : null}
       </div>

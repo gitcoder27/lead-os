@@ -60,7 +60,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
             </p>
             {proposal.jiraMutating ? (
               <span
-                className="rounded-full px-1.5 py-px text-[10px] font-semibold"
+                className="rounded-full px-1.5 py-px text-[11px] font-semibold"
                 style={{ background: 'var(--warning)', color: 'var(--bg-primary)' }}
               >
                 Changes Jira
@@ -71,7 +71,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
             <button
               type="button"
               onClick={() => setDetailsOpen((open) => !open)}
-              className="mt-1 inline-flex items-center gap-1 text-[11px]"
+              className="mt-1 inline-flex items-center gap-1 text-[12px]"
               style={{ color: 'var(--text-muted)' }}
               aria-expanded={detailsOpen}
             >
@@ -85,7 +85,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
           {detailsOpen ? (
             <dl className="mt-1.5 space-y-0.5">
               {previewEntries.map(([key, value]) => (
-                <div key={key} className="flex gap-2 text-[11px] leading-4">
+                <div key={key} className="flex gap-2 text-[12px] leading-4">
                   <dt className="shrink-0 font-mono" style={{ color: 'var(--text-muted)' }}>
                     {key}
                   </dt>
@@ -103,7 +103,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
               disabled={busy}
               aria-label="Confirm action"
               className="rounded-lg px-3 py-1 text-[12px] font-semibold transition-opacity disabled:opacity-50"
-              style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+              style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Confirm
             </button>

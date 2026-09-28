@@ -49,7 +49,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
               <time
                 dateTime={ci.createdAt}
                 title={formatAbsoluteDateTime(ci.createdAt)}
-                className="pt-[1px] text-right text-[11.5px] tabular-nums leading-5"
+                className="pt-[1px] text-right text-[12px] tabular-nums leading-5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 {format(new Date(ci.createdAt), 'h:mm a')}
@@ -68,7 +68,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
 
               <div className={`min-w-0 ${isLast ? '' : 'pb-4'}`}>
                 {(fromLead || status) && (
-                  <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] font-medium leading-5">
+                  <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-[12px] font-medium leading-5">
                     {fromLead && <span style={{ color: 'var(--md-accent)' }}>From your lead</span>}
                     {status && (
                       <span className="inline-flex items-center gap-1" style={{ color: status.color }}>
@@ -93,7 +93,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                     {(ci.taskKeys ?? []).map((key) => (
                       <span
                         key={key}
-                        className="rounded-md px-1.5 py-[1px] font-mono text-[10.5px] font-bold"
+                        className="rounded-md px-1.5 py-[1px] font-mono text-[11px] font-bold"
                         style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)', border: `1px solid ${HAIRLINE}` }}
                       >
                         {key}

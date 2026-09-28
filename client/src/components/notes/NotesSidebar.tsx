@@ -97,7 +97,7 @@ export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelect
             <Lock size={11} aria-hidden="true" />
           </span>
         </div>
-        <div className="notes-kind-toggle" role="group" aria-label="Note kind">
+        <div className="ui-tabs notes-kind-toggle" role="group" aria-label="Note kind">
           <button
             type="button"
             className={kind === 'scratchpad' ? 'active' : undefined}
@@ -135,7 +135,7 @@ export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelect
             maxLength={200}
             className="notes-search-input"
           />
-          <kbd className="notes-search-kbd" aria-hidden="true">
+          <kbd className="ui-kbd notes-search-kbd" aria-hidden="true">
             ⌘⇧F
           </kbd>
         </label>
@@ -175,7 +175,7 @@ export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelect
         ) : listQuery.isError ? (
           <div className="notes-sidebar-empty">
             <p>Could not load your notes.</p>
-            <button type="button" onClick={() => void listQuery.refetch()} className="notes-button secondary mt-3">
+            <button type="button" onClick={() => void listQuery.refetch()} className="ui-btn-secondary mt-3">
               Retry
             </button>
           </div>

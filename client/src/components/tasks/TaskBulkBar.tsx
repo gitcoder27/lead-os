@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Ban, CalendarClock, Check, Tag, UserRound, X } from 'lucide-react';
+import { Kbd } from '@/components/ui/Kbd';
 
 /** docs/49 §6/§12: floating bulk toolbar for the multi-selection. */
 export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
@@ -59,13 +60,7 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       {/* docs/51 R2: icon-only below sm — the title/aria-label carry the name. */}
       <span className="hidden sm:inline">{label}</span>
       {/* docs/51 U3: the key is shown where there is room, not only in a tooltip. */}
-      <kbd
-        className="hidden rounded px-1 font-mono text-[10px] leading-4 lg:inline"
-        style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-        aria-hidden="true"
-      >
-        {hint}
-      </kbd>
+      <span className="hidden lg:inline-flex" aria-hidden="true"><Kbd variant="subtle">{hint}</Kbd></span>
     </button>
   );
 }

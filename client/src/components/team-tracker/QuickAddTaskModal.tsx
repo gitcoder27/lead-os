@@ -5,6 +5,8 @@ import { Link, Plus, Search, X, Zap } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TrackerIssueAssignmentConflictPanel } from './TrackerIssueAssignmentConflictPanel';
 import type { Issue } from '@/types';
+import { useModalFocus } from '@/hooks/useModalFocus';
+import { Kbd } from '@/components/ui/Kbd';
 
 interface QuickAddTaskModalProps {
   open: boolean;
@@ -29,6 +31,8 @@ export function QuickAddTaskModal({
   onOpenExistingAssignment,
   onClose,
 }: QuickAddTaskModalProps) {
+  // docs/54 V1: Tab stays inside the layer; focus returns to the opener on close.
+  const modalRef = useModalFocus<HTMLDivElement>(open);
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -124,8 +128,8 @@ export function QuickAddTaskModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[80]"
-            style={{ background: 'rgba(4, 8, 14, 0.68)', backdropFilter: 'blur(8px)' }}
+            className="fixed inset-0 z-dialog"
+            style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }}
             onClick={onClose}
           />
 
@@ -136,15 +140,16 @@ export function QuickAddTaskModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed z-[81] inset-x-4 mx-auto w-full max-w-[480px] overflow-hidden rounded-[24px]"
+            className="fixed z-dialog inset-x-4 mx-auto w-full max-w-[480px] overflow-hidden rounded-2xl"
             style={{
               top: '14vh',
               background:
                 'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 94%, color-mix(in srgb, var(--accent) 8%, transparent)) 0%, var(--bg-secondary) 100%)',
               border: '1px solid color-mix(in srgb, var(--accent) 22%, var(--border-strong) 78%)',
               boxShadow:
-                '0 0 0 1px rgba(255,255,255,0.03) inset, 0 32px 80px rgba(0,0,0,0.48), 0 0 40px color-mix(in srgb, var(--accent) 8%, transparent)',
+                'var(--overlay-shadow)',
             }}
+            ref={modalRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="quick-add-modal-title"
@@ -179,7 +184,7 @@ export function QuickAddTaskModal({
                     {/* Developer chip */}
                     <div className="mt-1 flex items-center gap-1.5">
                       <div
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
                         style={{
                           background: 'linear-gradient(135deg, var(--accent-glow), var(--bg-tertiary))',
                           color: 'var(--accent)',
@@ -211,7 +216,7 @@ export function QuickAddTaskModal({
               {/* Task title */}
               <div>
                 <label
-                  className="block text-[11px] font-semibold uppercase mb-1.5 tracking-widest"
+                  className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
                   style={{ color: 'var(--text-muted)' }}
                   htmlFor="quick-add-title"
                 >
@@ -252,7 +257,7 @@ export function QuickAddTaskModal({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label
-                    className="text-[11px] font-semibold uppercase tracking-widest"
+                    className="text-[12px] font-semibold uppercase tracking-widest"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     Linked Jira
@@ -261,7 +266,7 @@ export function QuickAddTaskModal({
                     <button
                       type="button"
                       onClick={() => setJiraPickerOpen((v) => !v)}
-                      className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+                      className="text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors"
                       style={{
                         color: 'var(--accent)',
                         background: 'var(--accent-glow)',
@@ -363,7 +368,7 @@ export function QuickAddTaskModal({
                             <JiraIssueLink
                               issueKey={issue.jiraKey}
                               stopPropagation
-                              className="font-mono text-[11px] font-semibold shrink-0"
+                              className="font-mono text-[12px] font-semibold shrink-0"
                               style={{ color: 'var(--accent)' }}
                             >
                               {issue.jiraKey}
@@ -400,7 +405,7 @@ export function QuickAddTaskModal({
               {/* Note */}
               <div>
                 <label
-                  className="block text-[11px] font-semibold uppercase mb-1.5 tracking-widest"
+                  className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
                   style={{ color: 'var(--text-muted)' }}
                   htmlFor="quick-add-note"
                 >
@@ -431,10 +436,7 @@ export function QuickAddTaskModal({
               }}
             >
               <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                Press <kbd
-                  className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-mono font-medium"
-                  style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                >Enter</kbd> to add
+                Press <Kbd>Enter</Kbd> to add
               </p>
               <div className="flex items-center gap-2">
                 <button

@@ -157,7 +157,7 @@ export function NotesFollowUpDialog({ open, noteDate, noteKind, selectedText, on
           style={NOTES_INPUT_STYLE}
         />
         {followUpDate && !Number.isNaN(followUpDate.getTime()) ? (
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
             {format(followUpDate, "EEEE, MMM d 'at' h:mm a")}
           </p>
         ) : null}

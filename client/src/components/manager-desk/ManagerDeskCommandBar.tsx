@@ -114,7 +114,7 @@ export function ManagerDeskCommandBar({
                 >
                   <span>{label}</span>
                   <span
-                    className="rounded px-1 font-mono text-[11px] font-semibold tabular-nums"
+                    className="rounded px-1 font-mono text-[12px] font-semibold tabular-nums"
                     style={{
                       background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 14%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)',
                       color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-muted)',
@@ -150,7 +150,7 @@ export function ManagerDeskCommandBar({
               type="button"
               onClick={onToggleFilters}
               aria-label={hasStructuredFilters ? 'Filtered' : 'Filters'}
-              className="flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+              className="flex h-7 items-center gap-1 rounded-lg border px-2 text-[12px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
               style={{
                 background: hasStructuredFilters ? 'var(--md-accent-glow)' : 'color-mix(in srgb, var(--bg-secondary) 58%, transparent)',
                 borderColor: hasStructuredFilters ? 'color-mix(in srgb, var(--md-accent) 52%, transparent)' : 'color-mix(in srgb, var(--border) 66%, transparent)',
@@ -165,7 +165,7 @@ export function ManagerDeskCommandBar({
               <button
                 type="button"
                 onClick={onResetView}
-                className="h-7 rounded-lg border px-2 text-[11px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+                className="h-7 rounded-lg border px-2 text-[12px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
                 style={{
                   background: 'color-mix(in srgb, var(--bg-secondary) 58%, transparent)',
                   borderColor: 'color-mix(in srgb, var(--border) 66%, transparent)',
@@ -224,7 +224,7 @@ function StructuredFilters({
       <button
         type="button"
         onClick={onClear}
-        className="self-end rounded-lg border px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em]"
+        className="self-end rounded-lg border px-2 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em]"
         style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       >
         Clear
@@ -245,7 +245,7 @@ function SelectControl({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-0.5 text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
+    <label className="flex flex-col gap-0.5 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
       {label}
       <select
         value={value}

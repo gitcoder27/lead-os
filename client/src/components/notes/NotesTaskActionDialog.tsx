@@ -238,7 +238,7 @@ export function NotesTaskActionDialog({ open, mode, noteDate, noteKind, selected
             <div className="mt-2">
               <TaskPicker tasks={taskCandidates} text={`${taskQuery} ${text}`} selected={selectedKeys} onChange={setSelectedKeys} />
               {taskCandidates.length === 0 && taskQuery.trim().length >= 2 ? (
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                   {search.isLoading ? 'Searching…' : 'No tasks matched — type a task key like T-12.'}
                 </p>
               ) : null}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Check, CheckCircle2, GripVertical, PencilLine, Play, XCircle } from 'lucide-react';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { Check, CircleCheck, GripVertical, PencilLine, Play, CircleX } from 'lucide-react';
+import { FOCUS_RING } from '@/components/ui/focus';
 import type { TrackerItemState } from '@/types';
 
 export type TrackerItemActionPreset = 'default' | 'none' | 'hover-start' | 'hover-done';
@@ -141,7 +141,7 @@ export function TrackerItemRowActions({
           style={{ background: 'var(--bg-tertiary)' }}
           title="Mark done"
         >
-          <CheckCircle2 size={10} style={{ color: 'var(--success)' }} />
+          <CircleCheck size={10} style={{ color: 'var(--success)' }} />
         </button>
       )}
       {onDrop && (
@@ -154,7 +154,7 @@ export function TrackerItemRowActions({
           style={{ background: 'var(--bg-tertiary)' }}
           title="Drop"
         >
-          <XCircle size={10} style={{ color: 'var(--text-muted)' }} />
+          <CircleX size={10} style={{ color: 'var(--text-muted)' }} />
         </button>
       )}
     </div>

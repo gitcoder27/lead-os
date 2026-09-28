@@ -40,6 +40,8 @@ import {
   type PaletteItem,
 } from './paletteItems';
 import { useTaskViews } from '@/hooks/useTaskViews';
+import { useModalFocus } from '@/hooks/useModalFocus';
+import { Kbd } from '@/components/ui/Kbd';
 
 interface CommandPaletteProps {
   onClose: () => void;
@@ -84,6 +86,8 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandPaletteProps) {
+  // docs/54 V1: Tab stays inside the layer; focus returns to the opener on close.
+  const modalRef = useModalFocus<HTMLDivElement>();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +107,8 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
 
   const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3 }), [tasksPhase3]);
-  const quickActions = useMemo(buildQuickActions, []);
+  const quickActions = useMemo(() => buildQuickActions({ tasksPhase3 }), [tasksPhase3]);
+  const surfaceLabel = tasksPhase3 ? 'Tasks' : 'Desk';
   const taskViews = useTaskViews(tasksPhase3);
 
   const items = useMemo<PaletteItem[]>(() => {
@@ -120,7 +125,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           notes: searchQuery.data?.notes ?? [],
         }, { showTaxonomy: !tasksPhase3 }).flatMap((group) => group.items)
       : [];
-    return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query)), query);
+    return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query, { tasksPhase3 })), query);
   }, [hasResults, navigationCommands, query, quickActions, searchQuery.data, tasksPhase3, taskViews.data]);
 
   useEffect(() => {
@@ -191,7 +196,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           {
             onSuccess: () => {
               onClose();
-              addToast('Added to Desk', 'success');
+              addToast(`Added to ${surfaceLabel}`, 'success');
             },
             onError: (error) => {
               addToast(error.message, 'error');
@@ -217,7 +222,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         return;
       }
     },
-    [addToast, createDeskItem, onClose, onOpenTarget, onViewChange, openCapture, query, today, triggerSync],
+    [addToast, createDeskItem, onClose, onOpenTarget, onViewChange, openCapture, query, surfaceLabel, today, triggerSync],
   );
 
   const handleInputKeyDown = useCallback(
@@ -253,21 +258,22 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-[400]"
-        style={{ background: 'rgba(4, 8, 14, 0.55)', backdropFilter: 'blur(6px)' }}
+        className="fixed inset-0 z-dialog"
+        style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }}
         onClick={onClose}
       />
       <motion.div
         initial={{ opacity: 0, y: -12, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed z-[401] inset-x-4 mx-auto w-full max-w-[560px] overflow-hidden rounded-2xl"
+        className="fixed z-dialog inset-x-4 mx-auto w-full max-w-[560px] overflow-hidden rounded-2xl"
         style={{
           top: '14vh',
           background: 'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 96%, transparent) 0%, var(--bg-secondary) 100%)',
           border: '1px solid var(--border-strong)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 32px 80px rgba(0,0,0,0.48)',
+          boxShadow: 'var(--overlay-shadow)',
         }}
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
@@ -280,22 +286,20 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search, or type to add to Desk…"
+            placeholder={`Search, or type to add to ${surfaceLabel}…`}
             className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-placeholder"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Search"
           />
           {isSearching ? <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} /> : null}
-          <kbd className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            esc
-          </kbd>
+          <Kbd variant="subtle">esc</Kbd>
         </div>
 
         <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-1.5">
           {items.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                {hasResults ? 'No matches found.' : 'Type to search, pick a destination, or start typing to add to Desk.'}
+                {hasResults ? 'No matches found.' : `Type to search, pick a destination, or start typing to add to ${surfaceLabel}.`}
               </p>
             </div>
           ) : (
@@ -307,7 +311,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
               return (
                 <div key={item.id}>
                   {showGroupLabel && (
-                    <div className="px-4 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                       {GROUP_LABELS[item.group]}
                     </div>
                   )}
@@ -333,15 +337,13 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
                         {item.title}
                       </span>
                       {item.description && (
-                        <span className="block truncate text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                        <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
                           {item.description}
                         </span>
                       )}
                     </span>
                     {active && (
-                      <kbd className="shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[10px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                        ↵
-                      </kbd>
+                      <Kbd variant="subtle">↵</Kbd>
                     )}
                   </button>
                 </div>
@@ -350,7 +352,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t px-4 py-2 text-[11px]" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-4 border-t px-4 py-2 text-[12px]" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <span>↑↓ navigate</span>
           <span>↵ open</span>
           <span>esc close</span>

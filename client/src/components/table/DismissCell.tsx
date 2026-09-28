@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, Check, X } from 'lucide-react';
+import { CircleX, Check, X } from 'lucide-react';
 
 interface DismissCellProps {
   issueKey: string;
@@ -66,7 +66,7 @@ export function DismissCell({ issueKey, onConfirm }: DismissCellProps) {
             title="Dismiss — stop tracking this defect"
             aria-label={`Dismiss ${issueKey}`}
           >
-            <XCircle size={15} />
+            <CircleX size={15} />
           </motion.button>
         ) : (
           <motion.div

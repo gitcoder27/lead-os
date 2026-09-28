@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import {
   Activity,
-  AlertTriangle,
+  TriangleAlert,
   ArrowUpRight,
-  CheckCircle2,
+  CircleCheck,
   CirclePlus,
   MessageSquare,
   MessageSquareText,
@@ -18,8 +18,8 @@ import { SectionLabel, TONE_COLORS } from './StandupPrimitives';
 function entryIcon(entry: StandupFeedEntry) {
   if (entry.kind === 'checkin') return MessageSquareText;
   switch (entry.type) {
-    case 'blocker': return entry.blockerAction === 'cleared' ? CheckCircle2 : AlertTriangle;
-    case 'status': return entry.statusTo === 'done' ? CheckCircle2 : Activity;
+    case 'blocker': return entry.blockerAction === 'cleared' ? CircleCheck : TriangleAlert;
+    case 'status': return entry.statusTo === 'done' ? CircleCheck : Activity;
     case 'assign': return UserRoundCheck;
     case 'created': return CirclePlus;
     default: return MessageSquare;
@@ -57,7 +57,7 @@ export function StandupFeed({
     <section className="flex min-h-0 flex-col" aria-label="Since last standup">
       <SectionLabel
         right={data ? (
-          <span className="text-[10.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
             {data.anchoredToSession ? `since ${windowLabel(data.windowStart)}` : `${data.windowHours}h window`}
           </span>
         ) : null}
@@ -90,7 +90,7 @@ export function StandupFeed({
             className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px]"
             style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
           >
-            <AlertTriangle size={14} />
+            <TriangleAlert size={14} />
             <span className="flex-1">Feed unavailable.</span>
             <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold" style={{ border: '1px solid currentColor' }}>
               <RefreshCw size={11} /> Retry
@@ -143,7 +143,7 @@ function FeedGroupCard({
               className="flex min-w-0 flex-1 items-center gap-2 text-left hover:underline"
               title={`Focus ${group.taskKey}`}
             >
-              <span className="shrink-0 font-mono text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
+              <span className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
               <span className="truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
             </button>
             <button
@@ -175,13 +175,13 @@ function FeedGroupCard({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[11.5px] font-semibold" style={{ color: view.tone === 'muted' ? 'var(--text-secondary)' : color }}>
+                  <span className="text-[12px] font-semibold" style={{ color: view.tone === 'muted' ? 'var(--text-secondary)' : color }}>
                     {view.label}
                   </span>
                   {entry.authorType === 'manager' && (
-                    <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>· you</span>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· you</span>
                   )}
-                  <span className="ml-auto shrink-0 text-[10.5px] tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
+                  <span className="ml-auto shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
                     {formatRelativeTime(entry.occurredAt)}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ function FeedGroupCard({
 function CountChip({ label, color }: { label: string; color?: string }) {
   return (
     <span
-      className="rounded-md px-1.5 py-px text-[10.5px] font-semibold tabular-nums"
+      className="rounded-md px-1.5 py-px text-[11px] font-semibold tabular-nums"
       style={{
         color: color ?? 'var(--text-secondary)',
         background: color ? `color-mix(in srgb, ${color} 11%, transparent)` : 'var(--bg-tertiary)',

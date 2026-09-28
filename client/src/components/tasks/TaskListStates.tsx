@@ -1,7 +1,9 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { AlertTriangle, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
-import { useModalFocus } from '@/hooks/useModalFocus';
+import { useState, type CSSProperties, type ReactNode } from 'react';
+import { TriangleAlert, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
+import { Kbd } from '@/components/ui/Kbd';
+import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const SKELETON_TITLE_WIDTHS = ['46%', '32%', '54%', '38%', '28%', '44%'];
 
@@ -59,16 +61,7 @@ function readHintDismissed(): boolean {
   }
 }
 
-function Key({ children }: { children: ReactNode }) {
-  return (
-    <kbd
-      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded px-1 font-mono text-[10.5px] leading-none"
-      style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}
-    >
-      {children}
-    </kbd>
-  );
-}
+const Key = Kbd;
 
 /**
  * docs/51 U3: one quiet, dismissible line under the list that teaches the
@@ -95,7 +88,7 @@ export function TaskKeyboardHint({ onShowAll }: { onShowAll: () => void }) {
   );
   return (
     <div
-      className="mt-4 hidden flex-wrap items-center gap-x-3.5 gap-y-1.5 px-2 text-[11.5px] md:flex [@media(hover:none)]:hidden"
+      className="mt-4 hidden flex-wrap items-center gap-x-3.5 gap-y-1.5 px-2 text-[12px] md:flex [@media(hover:none)]:hidden"
       style={{ color: 'var(--text-muted)' }}
       aria-label="Keyboard shortcuts hint"
       role="note"
@@ -133,7 +126,7 @@ export function TaskListError({ message, onRetry }: { message: string; onRetry: 
         className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px]"
         style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
       >
-        <AlertTriangle size={14} />
+        <TriangleAlert size={14} />
         <span className="min-w-0 flex-1">{message}</span>
         <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ border: '1px solid currentColor' }}>
           <RefreshCw size={12} /> Retry
@@ -203,75 +196,66 @@ export function TaskListEmpty({
     );
   }
   const copy = emptyCopy(viewId, signal, candidates);
-  const color = copy.tone === 'success' ? 'var(--success)' : 'var(--text-muted)';
   return (
-    <div className="flex flex-col items-center gap-2 py-14 text-center">
-      <copy.Icon size={22} style={{ color }} />
-      <p className="text-[13.5px] font-semibold" style={{ color: copy.tone === 'success' ? 'var(--success)' : 'var(--text-secondary)' }}>{copy.title}</p>
-      {copy.body && <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{copy.body}</p>}
-      {viewId === 'today' && (
-        <button type="button" onClick={onPlanDay} className="mt-1 rounded-lg px-3 py-1.5 text-[12px] font-semibold" style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}>
-          Plan your day
-        </button>
-      )}
-    </div>
+    <EmptyState
+      icon={<copy.Icon size={22} />}
+      title={copy.title}
+      body={copy.body}
+      tone={copy.tone === 'success' ? 'success' : 'default'}
+      action={viewId === 'today' ? <button type="button" onClick={onPlanDay} className="ui-btn">Plan your day</button> : undefined}
+    />
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['j / ↓', 'Next task'],
-  ['k / ↑', 'Previous task'],
-  ['Alt + ↑ / ↓', 'Reorder within the day (schedule groups)'],
-  ['Enter / o', 'Open task'],
-  ['x', 'Select / deselect'],
-  ['Shift + j / k', 'Extend selection'],
-  ['Space / e', 'Toggle done'],
-  ['s → t m w l c 1–7', 'Schedule: today, tomorrow, next week, later, clear, or next weekday'],
-  ['a', 'Assign'],
-  ['l', 'Labels'],
-  ['p', 'Priority'],
-  ['#', 'Drop'],
-  ['g then letter', 'Jump views — t Planned today · i Inbox · m My tasks · w Waiting · l Later · a Attention · c Closed'],
-  ['n', 'New task in this group'],
-  ['/', 'Search'],
-  ['?', 'This cheat sheet'],
-  ['Esc', 'Close menu, clear selection, clear search'],
+// docs/54 K2: grouped, key-left, lowercase — the same format as every sheet.
+export const TASK_SHORTCUTS: ShortcutGroup[] = [
+  {
+    group: 'Move',
+    keys: [
+      ['j / k', 'Next / previous task'],
+      ['Enter / o', 'Open task'],
+      ['x', 'Select / deselect'],
+      ['⇧ j / ⇧ k', 'Extend selection'],
+      ['⌥ ↑ / ⌥ ↓', 'Reorder within the day'],
+    ],
+  },
+  {
+    group: 'Act',
+    keys: [
+      ['e / Space', 'Toggle done'],
+      ['s', 'Schedule — then t m w l c or 1–7'],
+      ['a', 'Assign'],
+      ['l', 'Labels'],
+      ['p', 'Priority'],
+      ['#', 'Drop'],
+      ['n', 'New task in this group'],
+      ['z', 'Undo last change'],
+    ],
+  },
+  {
+    group: 'Views',
+    keys: [
+      ['g → t', 'Planned today'],
+      ['g → i', 'Inbox'],
+      ['g → m', 'My tasks'],
+      ['g → w', 'Waiting'],
+      ['g → l', 'Later'],
+      ['g → a', 'Needs attention'],
+      ['g → c', 'Closed'],
+      ['/', 'Search'],
+      ['?', 'This sheet'],
+      ['Esc', 'Close menu, clear selection, clear search'],
+    ],
+  },
 ];
 
-export function TaskShortcutsDialog({ onClose }: { onClose: () => void }) {
-  // docs/51 A5: the cheat sheet is a modal — Tab cycles inside it and closing
-  // returns focus to wherever the `?` key was pressed.
-  const ref = useModalFocus<HTMLDivElement>();
-  useEffect(() => {
-    ref.current?.focus();
-  }, [ref]);
+export function TaskShortcutsDialog({ anchor, onClose }: { anchor: HTMLElement | null; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4" style={{ background: 'color-mix(in srgb, var(--bg-primary) 60%, transparent)' }} onMouseDown={onClose}>
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Keyboard shortcuts"
-        tabIndex={-1}
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => { if (event.key === 'Escape' || event.key === '?') { event.preventDefault(); event.stopPropagation(); onClose(); } }}
-        className="w-full max-w-md rounded-2xl p-5 outline-none"
-        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold" style={{ color: 'var(--text-primary)' }}>Keyboard shortcuts</h2>
-          <button type="button" onClick={onClose} aria-label="Close shortcuts" style={{ color: 'var(--text-muted)' }}><X size={15} /></button>
-        </div>
-        <dl className="space-y-1.5">
-          {SHORTCUTS.map(([keys, action]) => (
-            <div key={keys} className="flex items-center justify-between gap-4 text-[12.5px]">
-              <dt style={{ color: 'var(--text-secondary)' }}>{action}</dt>
-              <dd><kbd className="rounded-md px-1.5 py-0.5 font-mono text-[11px]" style={{ color: 'var(--text-primary)', border: '1px solid var(--border)', background: 'var(--bg-tertiary)' }}>{keys}</kbd></dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-4 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>Shortcuts work when the task list has focus — never inside inputs.</p>
-      </div>
-    </div>
+    <ShortcutSheet
+      anchor={anchor}
+      groups={TASK_SHORTCUTS}
+      footnote="Shortcuts work when the task list has focus — never inside inputs."
+      onClose={onClose}
+    />
   );
 }

@@ -15,6 +15,7 @@ import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDia
 import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
+import { Kbd } from '@/components/ui/Kbd';
 
 interface HeaderProps {
   onOpenMobileSidebar?: () => void;
@@ -112,7 +113,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="relative z-[300] shrink-0 px-1 pt-0.5 md:px-1.5"
+        className="relative z-header shrink-0 px-1 pt-0.5 md:px-1.5"
       >
         <div
           className="dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between"
@@ -141,7 +142,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 >
                   LeadOS
                 </h1>
-                <div className="hidden text-[11.5px] leading-4 sm:block" style={{ color: 'var(--text-secondary)' }}>
+                <div className="hidden text-[12px] leading-4 sm:block" style={{ color: 'var(--text-secondary)' }}>
                   People, work, risks, and planning
                 </div>
               </div>
@@ -208,7 +209,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 >
                   <CopilotMark size={13} monochrome />
                   <span className="hidden sm:inline">Copilot</span>
-                  <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>⌘J</kbd>
+                  <Kbd variant="bare" className="hidden lg:inline">⌘J</Kbd>
                 </button>
               )}
 
@@ -227,7 +228,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 >
                   <Search size={13} />
                   <span className="hidden sm:inline">Search</span>
-                  <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>⌘K</kbd>
+                  <Kbd variant="bare" className="hidden lg:inline">⌘K</Kbd>
                 </button>
               )}
 
@@ -242,16 +243,15 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   }
                   className="inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-[12px] font-semibold transition-all"
                   style={{
-                    background: 'linear-gradient(135deg, var(--md-accent-glow), rgba(217,169,78,0.06))',
-                    color: 'var(--md-accent)',
-                    border: '1px solid rgba(217,169,78,0.22)',
-                    boxShadow: '0 10px 24px rgba(217,169,78,0.08)',
+                    background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+                    color: 'var(--accent)',
+                    border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)',
                   }}
                   title="Quick capture (Ctrl/⌘+I)"
                 >
                   <Plus size={12} />
                   <span>Capture</span>
-                  <kbd className="hidden lg:inline font-mono text-[10px]" style={{ color: 'var(--md-accent)', opacity: 0.7 }}>⌘I</kbd>
+                  <Kbd variant="bare" className="hidden lg:inline">⌘I</Kbd>
                 </button>
               )}
 

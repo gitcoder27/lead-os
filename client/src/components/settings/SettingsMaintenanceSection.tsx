@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, RefreshCcw, ShieldAlert, Trash2 } from 'lucide-react';
+import { TriangleAlert, Loader2, RefreshCcw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import {
   useWorkspaceMaintenancePreview,
@@ -95,7 +95,7 @@ export function SettingsMaintenanceSection({
     return (
       <div className="space-y-3 rounded-xl p-4" style={{ background: 'var(--settings-danger-soft-bg)', border: 'var(--settings-danger-soft-border)' }}>
         <div className="flex items-start gap-2">
-          <AlertTriangle size={15} style={{ color: 'var(--danger-muted)' }} />
+          <TriangleAlert size={15} style={{ color: 'var(--danger-muted)' }} />
           <div>
             <p className="text-[13px] font-semibold" style={{ color: 'var(--danger-muted)' }}>
               Maintenance preview unavailable
@@ -282,7 +282,7 @@ function MaintenanceActionCard({
         {counts.map((count) => (
           <span
             key={`${target}-${count}`}
-            className="rounded-full px-2 py-1 text-[11px] font-semibold"
+            className="rounded-full px-2 py-1 text-[12px] font-semibold"
             style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
           >
             {count}
@@ -298,12 +298,12 @@ function MaintenanceActionCard({
           style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
           aria-label={`Arm ${title}`}
         >
-          <AlertTriangle size={12} />
+          <TriangleAlert size={12} />
           Arm Reset
         </button>
       ) : (
         <div className="mt-4 space-y-3 rounded-xl p-3" style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}>
-          <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--danger-muted)' }}>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--danger-muted)' }}>
             Type {expectedText} to confirm
           </p>
           <input

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle2, MoreHorizontal, XCircle } from 'lucide-react';
+import { CircleCheck, MoreHorizontal, CircleX } from 'lucide-react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import {
   KIND_LABELS,
@@ -157,7 +157,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
 
       {isDone && (
         <div className="hidden shrink-0 items-center justify-end md:flex">
-          {item.status === 'done' ? <CheckCircle2 size={15} style={{ color: 'var(--success)' }} /> : <XCircle size={15} style={{ color: 'var(--text-muted)' }} />}
+          {item.status === 'done' ? <CircleCheck size={15} style={{ color: 'var(--success)' }} /> : <CircleX size={15} style={{ color: 'var(--text-muted)' }} />}
         </div>
       )}
     </div>

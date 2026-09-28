@@ -11,6 +11,7 @@ import type {
   TodayActionTarget,
   TodayResponse,
 } from '@/types';
+import { UNDO_WINDOW_MS } from '@/lib/undo';
 
 interface UseTodayActionsOptions {
   date: string;
@@ -30,7 +31,7 @@ type TodayActionVariables = {
 };
 
 /** docs/53 F11: matches the /tasks Undo window. */
-export const TODAY_UNDO_WINDOW_MS = 6000;
+export const TODAY_UNDO_WINDOW_MS = UNDO_WINDOW_MS;
 
 // docs/53 P4: navigation commands never hit the mutation pipeline — they just
 // open the target, so they can't invalidate/cancel the destination page's

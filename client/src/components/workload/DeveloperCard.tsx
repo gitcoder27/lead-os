@@ -51,7 +51,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           <span className="text-[13px] font-medium truncate block" style={{ color: 'var(--text-primary)' }}>
             {dev.developer.displayName}
           </span>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] flex-wrap">
+          <div className="mt-1 flex items-center gap-1.5 text-[12px] flex-wrap">
             <span
               className="rounded-full px-1.5 py-0.5 font-mono"
               style={{ color, background: `${color}14` }}
@@ -71,7 +71,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
         <div className="flex flex-col items-end gap-0.5 shrink-0">
           {isIdle && (
             <span
-              className="text-[10px] uppercase font-semibold rounded-full px-1.5 py-0.5"
+              className="text-[11px] uppercase font-semibold rounded-full px-1.5 py-0.5"
               style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', letterSpacing: '0.06em' }}
             >
               idle
@@ -79,7 +79,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           )}
           {hasMismatch && (
             <span
-              className="text-[10px] uppercase font-semibold rounded-full px-1.5 py-0.5"
+              className="text-[11px] uppercase font-semibold rounded-full px-1.5 py-0.5"
               style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', letterSpacing: '0.06em' }}
             >
               mismatch
@@ -87,7 +87,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           )}
           {noCurrentItem && !isIdle && (
             <span
-              className="text-[10px] uppercase font-semibold rounded-full px-1.5 py-0.5"
+              className="text-[11px] uppercase font-semibold rounded-full px-1.5 py-0.5"
               style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', letterSpacing: '0.06em' }}
             >
               no current

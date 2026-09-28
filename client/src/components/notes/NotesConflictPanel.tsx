@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { conflictHunks } from '@/lib/daily-note-merge';
 import type { DailyNote } from '@/types';
 
@@ -25,7 +25,7 @@ export function NotesConflictPanel({ remote, base, local, error, onKeepBoth, onU
   return (
     <div className="notes-conflict" role="status">
       <p className="notes-conflict-title">
-        <AlertTriangle size={13} aria-hidden="true" />
+        <TriangleAlert size={13} aria-hidden="true" />
         This note changed in another tab or device
       </p>
       <p className="notes-conflict-detail">
@@ -60,19 +60,19 @@ export function NotesConflictPanel({ remote, base, local, error, onKeepBoth, onU
         </p>
       ) : null}
       <div className="notes-conflict-actions">
-        <button type="button" className="notes-button secondary" onClick={onKeepBoth}>
+        <button type="button" className="ui-btn-secondary" onClick={onKeepBoth}>
           Keep both
         </button>
-        <button type="button" className="notes-button danger" onClick={() => setDiscardConfirmOpen(true)}>
+        <button type="button" className="ui-btn-danger" onClick={() => setDiscardConfirmOpen(true)}>
           Use saved version
         </button>
       </div>
 
       <Dialog.Root open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[90]" style={{ background: 'rgba(4, 8, 14, 0.5)' }} />
-          <Dialog.Content className="notes-dialog notes-dialog-narrow fixed z-[91] rounded-2xl border p-5">
-            <Dialog.Title className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <Dialog.Overlay className="fixed inset-0 z-dialog" style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }} />
+          <Dialog.Content className="notes-dialog notes-dialog-narrow fixed z-dialog p-5">
+            <Dialog.Title className="ui-dialog-title">
               Discard your draft?
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-[12.5px] leading-5" style={{ color: 'var(--text-secondary)' }}>
@@ -80,13 +80,13 @@ export function NotesConflictPanel({ remote, base, local, error, onKeepBoth, onU
             </Dialog.Description>
             <div className="mt-4 flex justify-end gap-2">
               <Dialog.Close asChild>
-                <button type="button" className="notes-button secondary">
+                <button type="button" className="ui-btn-quiet">
                   Keep draft
                 </button>
               </Dialog.Close>
               <button
                 type="button"
-                className="notes-button danger"
+                className="ui-btn-danger"
                 onClick={() => {
                   setDiscardConfirmOpen(false);
                   onUseSavedVersion();

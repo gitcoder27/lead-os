@@ -395,7 +395,7 @@ describe('TriagePanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /add to desk/i }));
 
-    expect(screen.queryByPlaceholderText('Quick context so future-you remembers why...')).not.toBeInTheDocument();
-    expect(screen.getByText('Optional')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Quick context so future-you remembers why…')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add a context note/i })).toBeInTheDocument();
   });
 });

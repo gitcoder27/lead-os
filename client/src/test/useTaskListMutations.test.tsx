@@ -74,6 +74,22 @@ describe('useTaskListMutations (docs/49 R7)', () => {
     expect(mockAddToast).toHaveBeenCalledTimes(1);
   });
 
+  it('undoLast reverses the latest write once, like the toast (docs/54 K5)', async () => {
+    mockPost.mockResolvedValue({ tasks: [] });
+    const { result } = setup();
+    expect(result.current.undoLast()).toBe(false);
+    await act(async () => { await result.current.apply([{ task: task(), changes: { status: 'done' } }], { label: 'Done' }); });
+    let undone = false;
+    await act(async () => { undone = result.current.undoLast(); });
+    expect(undone).toBe(true);
+    expect(mockPost).toHaveBeenLastCalledWith('/tasks/bulk', { items: [{ key: 'T-1', changes: { status: 'open' } }] });
+    const calls = mockPost.mock.calls.length;
+    // The toast's Undo and a second `z` are now no-ops.
+    await act(async () => { mockAddToast.mock.calls[0]![0].action.onClick(); });
+    expect(result.current.undoLast()).toBe(false);
+    expect(mockPost.mock.calls.length).toBe(calls);
+  });
+
   it('skips the toast when undoable is false and no-ops on empty input', async () => {
     mockPost.mockResolvedValue({ tasks: [] });
     const { result } = setup();

@@ -43,7 +43,7 @@ export function DeskSection({
               {title}
             </span>
             <span
-              className="text-[10px] font-mono font-bold rounded px-1 py-0.5"
+              className="text-[11px] font-mono font-bold rounded px-1 py-0.5"
               style={{
                 background: count > 0 ? `color-mix(in srgb, ${accentVar} 15%, transparent)` : 'var(--bg-tertiary)',
                 color: count > 0 ? accentVar : 'var(--text-muted)',
@@ -76,7 +76,7 @@ export function DeskSection({
             <div className="px-1.5 pb-1.5">
               {count === 0 ? (
                 <div
-                  className="rounded-lg px-3 py-3 text-center text-[11px]"
+                  className="rounded-lg px-3 py-3 text-center text-[12px]"
                   style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
                 >
                   {emptyMessage}

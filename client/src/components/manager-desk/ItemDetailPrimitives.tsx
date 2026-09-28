@@ -41,7 +41,7 @@ export function MetaChip({
 
   return (
     <span
-      className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+      className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em]"
       style={toneStyles[tone]}
     >
       {label}
@@ -74,13 +74,13 @@ export function SectionCard({
         aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${title}`}
       >
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             {eyebrow}
           </div>
           <div className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             {title}
           </div>
-          <p className="mt-0.5 text-[11px] leading-4" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-0.5 text-[12px] leading-4" style={{ color: 'var(--text-secondary)' }}>
             {collapsed ? 'Tap to expand.' : description}
           </p>
         </div>
@@ -126,7 +126,7 @@ export function LinkActionButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all"
+      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all"
       style={{
         background: 'var(--bg-tertiary)',
         color: 'var(--text-secondary)',
@@ -158,7 +158,7 @@ export function FieldSelect<T extends string>({
     <div>
       <label
         htmlFor={fieldId}
-        className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]"
+        className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]"
         style={{ color: 'var(--text-muted)' }}
       >
         {label}
@@ -209,7 +209,7 @@ export function FieldText({
     <div className={className}>
       <label
         htmlFor={fieldId}
-        className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]"
+        className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]"
         style={{ color: 'var(--text-muted)' }}
       >
         {label}
@@ -252,7 +252,7 @@ export function FieldDatetime({
     <div className={className}>
       <label
         htmlFor={fieldId}
-        className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]"
+        className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]"
         style={{ color: 'var(--text-muted)' }}
       >
         {label}

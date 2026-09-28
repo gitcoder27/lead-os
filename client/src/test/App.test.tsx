@@ -114,6 +114,15 @@ vi.mock('@/components/notes/NotesPage', () => ({
   NotesPage: ({ date }: { date: string }) => <div>Notes loaded {date}</div>,
 }));
 
+const taskDrawerPropsSpy = vi.fn();
+vi.mock('@/components/tasks/TaskDrawer', () => ({
+  TaskDrawer: (props: { taskKey: string | null }) => {
+    taskDrawerPropsSpy(props);
+    return props.taskKey ? <div role="dialog" aria-label={`Task ${props.taskKey}`}>drawer</div> : null;
+  },
+  navigateToTaskPage: vi.fn(),
+}));
+
 vi.mock('@/components/settings/SettingsPanel', () => ({
   SettingsPage: () => <div>Settings loaded</div>,
 }));
@@ -666,5 +675,31 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: /workspace not found/i })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/t/T-77');
+  });
+
+  it('opens task targets in the shared drawer over the current view (docs/54 J1)', async () => {
+    useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      features: { tasksPhase3: true },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+    expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    const onOpenTodayTarget = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as
+      (target: import('@/types').TodayActionTarget) => void;
+
+    act(() => {
+      onOpenTodayTarget({ type: 'tracker_item', view: 'team', taskKey: 'T-5', trackerItemId: 10 });
+    });
+
+    expect(await screen.findByRole('dialog', { name: 'Task T-5' })).toBeInTheDocument();
+    // Today keeps its place — no navigation to the owner's surface.
+    expect(window.location.pathname).toBe('/');
+    expect(screen.getByText('Today loaded')).toBeInTheDocument();
   });
 });

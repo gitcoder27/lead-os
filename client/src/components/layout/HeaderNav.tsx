@@ -144,11 +144,8 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
             <div className="absolute right-0 top-full z-[320] w-48 pt-1.5">
               <div
                 role="menu"
-                className="overflow-hidden rounded-xl border p-1 shadow-2xl"
-                style={{
-                  borderColor: 'var(--border)',
-                  background: 'color-mix(in srgb, var(--bg-secondary) 96%, transparent)',
-                }}
+                className="overflow-hidden rounded-xl p-1"
+                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
               >
                 {morePages.map((id) => {
                   const meta = NAV_PAGE_META[id];

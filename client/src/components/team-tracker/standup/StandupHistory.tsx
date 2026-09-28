@@ -1,4 +1,4 @@
-import { Flag, RefreshCw } from 'lucide-react';
+import { Bell, RefreshCw } from 'lucide-react';
 import type { StandupSessionDetail } from '@/types';
 import { describeLogEntry } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
@@ -65,7 +65,7 @@ export function StandupHistory({
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {flagged.map((id) => (
               <ToneChip key={id} tone="warning">
-                <Flag size={10} /> {nameFor(id)}
+                <Bell size={10} /> {nameFor(id)}
               </ToneChip>
             ))}
           </div>
@@ -83,7 +83,7 @@ export function StandupHistory({
                   {entries.map((entry, index) => (
                     <li key={index} className="flex items-baseline gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
                       <span className="min-w-0 flex-1">{describeLogEntry(entry)}</span>
-                      <span className="shrink-0 text-[10.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(entry.at)}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(entry.at)}</span>
                     </li>
                   ))}
                 </ul>

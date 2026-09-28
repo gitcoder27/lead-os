@@ -35,11 +35,11 @@ export function TodayCompactRow({ title, detail, severity, target, primary, seco
       </button>
       <span className="today-row-actions">
         {secondary ? (
-          <button type="button" className="today-ghost" onClick={() => onRunCommand(secondary.command, secondary.preset)}>
+          <button type="button" className="ui-btn-ghost" onClick={() => onRunCommand(secondary.command, secondary.preset)}>
             {secondary.label}
           </button>
         ) : null}
-        <button type="button" className="today-primary" onClick={() => onRunCommand(primary)}>
+        <button type="button" className="ui-btn" onClick={() => onRunCommand(primary)}>
           {primary.label}
         </button>
       </span>

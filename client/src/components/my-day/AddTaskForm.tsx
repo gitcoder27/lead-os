@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { AlignLeft, Link2, Plus, Search, X } from 'lucide-react';
 import { useMyDayIssues } from '@/hooks/useIssues';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { formatDate } from '@/lib/utils';
 import { HAIRLINE, Kbd } from './MyDayUI';
 
@@ -143,7 +143,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
               <div className="flex min-w-0 items-baseline gap-2">
                 <JiraIssueLink
                   issueKey={selectedIssue.jiraKey}
-                  className="shrink-0 font-mono text-[11.5px] font-semibold"
+                  className="shrink-0 font-mono text-[12px] font-semibold"
                   style={{ color: 'var(--accent)' }}
                 >
                   {selectedIssue.jiraKey}
@@ -204,7 +204,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                         <JiraIssueLink
                           issueKey={issue.jiraKey}
                           stopPropagation
-                          className="shrink-0 font-mono text-[11px] font-semibold"
+                          className="shrink-0 font-mono text-[12px] font-semibold"
                           style={{ color: 'var(--accent)' }}
                         >
                           {issue.jiraKey}
@@ -219,7 +219,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                         </button>
                       </div>
                       {(issue.priorityName || issue.developmentDueDate || issue.dueDate) && (
-                        <div className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        <div className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                           {[
                             issue.priorityName,
                             (issue.developmentDueDate ?? issue.dueDate)
@@ -284,10 +284,10 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                 onClick={handleSubmit}
                 disabled={!title.trim() || isPending || disabled}
                 className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
-                style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+                style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
               >
                 Add task
-                <span className="hidden text-[11px] font-medium opacity-70 sm:inline" aria-hidden="true">↵</span>
+                <span className="hidden text-[12px] font-medium opacity-70 sm:inline" aria-hidden="true">↵</span>
               </button>
             </div>
           </div>

@@ -5,7 +5,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Check,
-  CheckCircle2,
+  CircleCheck,
   Eye,
   EyeOff,
   Loader2,
@@ -599,7 +599,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               <LeadOSMark size={26} />
             </div>
             <div className="text-left">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.3em]" style={{ color: '#fbbf24' }}>
+              <div className="text-[12px] font-semibold uppercase tracking-[0.3em]" style={{ color: '#fbbf24' }}>
                 Workspace Setup
               </div>
               <div className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -1184,7 +1184,7 @@ function StepContent(props: StepContentProps) {
                         </div>
                       </div>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase"
                         style={{
                           background: account.role === 'manager' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(6, 182, 212, 0.14)',
                           color: account.role === 'manager' ? 'var(--warning)' : 'var(--accent)',
@@ -1342,7 +1342,7 @@ function UserRow({
           {user.email || user.accountId}
         </div>
       </div>
-      {selected && <CheckCircle2 size={16} className="ml-2 shrink-0" style={{ color: colors.check }} />}
+      {selected && <CircleCheck size={16} className="ml-2 shrink-0" style={{ color: colors.check }} />}
     </button>
   );
 }

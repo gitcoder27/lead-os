@@ -780,8 +780,7 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     const { unmount } = render(<TasksPage />);
     const hint = screen.getByRole('note', { name: 'Keyboard shortcuts hint' });
     fireEvent.click(within(hint).getByRole('button', { name: /all shortcuts/ }));
-    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Close shortcuts' }));
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss keyboard hint' }));
     expect(screen.queryByRole('note', { name: 'Keyboard shortcuts hint' })).toBeNull();
     unmount();

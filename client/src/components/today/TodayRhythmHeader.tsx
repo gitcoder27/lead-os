@@ -1,11 +1,11 @@
 import { useRef } from 'react';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { Keyboard, Loader2, RefreshCw } from 'lucide-react';
-import { TaskPopover } from '@/components/tasks/TaskPopover';
 import { deltaChips, formatClock, formatSince, headerMetrics, metricLabel } from '@/lib/today-layout';
 import { TODAY_TRIAGE_KEYS } from '@/lib/today-triage';
 import type { TodayFreshness } from '@/lib/today-freshness';
 import type { TodayActionTarget, TodayResponse } from '@/types';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 
 interface TodayRhythmHeaderProps {
   today: TodayResponse;
@@ -81,7 +81,7 @@ export function TodayRhythmHeader({
         <button
           type="button"
           onClick={onRefresh}
-          className="today-icon-btn"
+          className="ui-icon-btn"
           aria-label={isStale ? 'Retry' : 'Refresh today'}
           title={isStale ? 'Retry' : 'Refresh'}
         >
@@ -91,7 +91,7 @@ export function TodayRhythmHeader({
           ref={shortcutsRef}
           type="button"
           onClick={() => onToggleShortcuts(!shortcutsOpen)}
-          className="today-icon-btn hidden md:inline-flex"
+          className="ui-icon-btn hidden md:inline-flex"
           aria-label="Keyboard shortcuts"
           aria-expanded={shortcutsOpen}
           title="Keyboard shortcuts (?)"
@@ -100,22 +100,11 @@ export function TodayRhythmHeader({
         </button>
       </span>
       {shortcutsOpen ? (
-        <TaskPopover anchor={shortcutsRef.current} role="dialog" label="Keyboard shortcuts" width={236} onClose={() => onToggleShortcuts(false)}>
-          <div className="px-2 pb-1 pt-1.5">
-            <p className="pb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Queue shortcuts</p>
-            <dl className="space-y-1">
-              {[...TODAY_TRIAGE_KEYS, { keys: ['?'], label: 'This sheet' }].map((entry) => (
-                <div key={entry.label} className="flex items-center justify-between gap-3 text-[12px]">
-                  <dt style={{ color: 'var(--text-secondary)' }}>{entry.label}</dt>
-                  <dd className="flex gap-1">
-                    {entry.keys.map((key) => <kbd key={key} className="today-kbd">{key}</kbd>)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <button type="button" data-autofocus className="sr-only" onClick={() => onToggleShortcuts(false)}>Close</button>
-          </div>
-        </TaskPopover>
+        <ShortcutSheet
+          anchor={shortcutsRef.current}
+          groups={[{ group: 'Queue', keys: [...TODAY_TRIAGE_KEYS.map((entry): [string, string] => [entry.keys.join(' / '), entry.label]), ['?', 'This sheet']] }]}
+          onClose={() => onToggleShortcuts(false)}
+        />
       ) : null}
     </div>
   );

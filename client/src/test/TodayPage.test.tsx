@@ -518,6 +518,26 @@ describe('TodayPage V2', () => {
     });
   });
 
+  it('posts a check-in on Enter, like every other check-in composer (docs/54 K3)', async () => {
+    const fetchMock = mockFetch(todayResponse());
+    renderToday();
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Check-in$/i }));
+    await screen.findByRole('dialog', { name: 'Add check-in' });
+    const note = screen.getByLabelText('Check-in note');
+    fireEvent.change(note, { target: { value: 'Pairing on the migration' } });
+    fireEvent.keyDown(note, { key: 'Enter', shiftKey: true });
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/manager-actions/commands', expect.anything());
+    fireEvent.keyDown(note, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('Pairing on the migration'),
+      }));
+    });
+  });
+
   it('sends the picked task key with a developer check-in', async () => {
     const board = {
       date: '2026-03-08',

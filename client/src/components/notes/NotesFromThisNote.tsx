@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ArrowUpRight, Link2 } from 'lucide-react';
-import { SectionHeader } from '@/components/tasks/TaskDetailPrimitives';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 import { prettyNoteDate } from '@/lib/note-markdown';
 import type { DailyNoteRef, DailyNoteRefRelation } from '@/types';
 import { statusLabel } from './editor/note-editor-extensions';

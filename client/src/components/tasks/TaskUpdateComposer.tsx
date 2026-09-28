@@ -201,7 +201,7 @@ export function TaskUpdateComposer({
               key={option.value}
               type="button"
               onClick={() => setType(option.value)}
-              className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+              className="rounded-md px-2 py-0.5 text-[12px] font-semibold transition-colors"
               style={{
                 background: type === option.value ? 'var(--bg-elevated)' : 'transparent',
                 color: type === option.value ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -219,7 +219,7 @@ export function TaskUpdateComposer({
                 key={action}
                 type="button"
                 onClick={() => setBlockerAction(action)}
-                className="rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize transition-colors"
+                className="rounded-md px-2 py-0.5 text-[12px] font-semibold capitalize transition-colors"
                 style={{
                   background: blockerAction === action ? 'var(--bg-elevated)' : 'transparent',
                   color: blockerAction === action ? (action === 'raised' ? 'var(--danger)' : 'var(--success)') : 'var(--text-muted)',
@@ -235,9 +235,9 @@ export function TaskUpdateComposer({
           <button
             type="button"
             onClick={() => setIsPrivate((value) => !value)}
-            className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-colors"
+            className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[12px] font-semibold transition-colors"
             style={{
-              background: isPrivate ? 'rgba(245,158,11,0.12)' : 'var(--bg-tertiary)',
+              background: isPrivate ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'var(--bg-tertiary)',
               color: isPrivate ? 'var(--warning)' : 'var(--text-muted)',
             }}
             aria-pressed={isPrivate}

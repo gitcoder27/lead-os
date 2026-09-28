@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Link2, Play, StickyNote, X, XCircle } from 'lucide-react';
+import { Check, CircleCheck, ChevronDown, ChevronUp, GripVertical, Link2, Play, StickyNote, X, CircleX } from 'lucide-react';
 import type { TrackerItemState, TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { formatDate, formatRelativeTime, priorityColor } from '@/lib/utils';
@@ -41,8 +41,8 @@ interface TrackerItemRowProps {
 const stateIcons: Record<TrackerItemState, { icon: typeof Play; color: string }> = {
   planned: { icon: GripVertical, color: 'var(--text-muted)' },
   in_progress: { icon: Play, color: 'var(--accent)' },
-  done: { icon: CheckCircle2, color: 'var(--success)' },
-  dropped: { icon: XCircle, color: 'var(--text-muted)' },
+  done: { icon: CircleCheck, color: 'var(--success)' },
+  dropped: { icon: CircleX, color: 'var(--text-muted)' },
 };
 
 /** Developer-drawer variants render the drawer row grammar; everything else keeps the classic row. */
@@ -115,7 +115,7 @@ function ClassicTrackerItemRow({
       data-task-key={item.taskKey ?? undefined}
       className={`group relative flex items-center gap-2.5 rounded-xl px-2 py-1.5 transition-colors ${canOpen ? 'cursor-pointer' : ''}`}
       style={{
-        background: isActive ? 'rgba(6, 182, 212, 0.08)' : 'transparent',
+        background: isActive ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent',
         borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
       }}
       onClick={canOpen ? (event) => {
@@ -258,11 +258,11 @@ function ClassicTrackerItemRow({
         {isLinked && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
               style={{
-                background: 'rgba(217,169,78,0.10)',
+                background: 'color-mix(in srgb, var(--md-accent) 10%, transparent)',
                 color: 'var(--md-accent, var(--warning))',
-                border: '1px solid rgba(217,169,78,0.22)',
+                border: '1px solid color-mix(in srgb, var(--md-accent) 22%, transparent)',
               }}
               title="Managed from Manager Desk — title edits must be made there"
             >
@@ -274,7 +274,7 @@ function ClassicTrackerItemRow({
         {isContinued && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-muted)',

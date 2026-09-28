@@ -29,7 +29,7 @@ export function DrawerProperties({ item, readOnly = false, onFieldChange }: Draw
 
   return (
     <details className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-      <summary className="cursor-pointer select-none text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+      <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
         Details
       </summary>
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -64,7 +64,7 @@ function InlineSelect<T extends string>({ label, value, options, onChange, empty
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
+      <label htmlFor={id} className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="w-full cursor-pointer rounded-lg px-2 py-1.5 text-[12px] font-medium outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
         {emptyLabel && <option value="">{emptyLabel}</option>}
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -81,7 +81,7 @@ function InlineText({ label, value, placeholder, onChange, className, disabled =
   useEffect(() => { setLocal(value); }, [value]);
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
+      <label htmlFor={id} className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
       <input id={id} type="text" value={local} onChange={(e) => setLocal(e.target.value)} onBlur={() => { if (local !== value) onChange(local); }} placeholder={placeholder} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-[12px] outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
     </div>
   );
@@ -107,7 +107,7 @@ function InlineDatetime({ label, value, onChange, className, disabled = false }:
   const localValue = value ? toLocalDateTimeInputValue(value) : '';
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
+      <label htmlFor={id} className="mb-0.5 block text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
       <input id={id} type="datetime-local" value={localValue} onChange={(e) => onChange(fromLocalDateTimeInputValue(e.target.value))} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-[12px] outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
     </div>
   );

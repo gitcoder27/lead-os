@@ -1,6 +1,6 @@
 import { formatClock } from '@/lib/today-layout';
 import { TodayActionMenu } from './TodayActionMenu';
-import { initials } from './TodayWrapUp';
+import { Avatar } from '@/components/ui/Avatar';
 import type { TodayRunCommand } from './TodayActionRow';
 import type { TodayActionCommand, TodayActionSeverity, TodayActionTarget, TodayFocusPerson, TodayTeamPulseItem } from '@/types';
 
@@ -67,7 +67,7 @@ export function TodayPeoplePulse({ title, people, onRunCommand, onViewAll }: Tod
         <h2 className="today-section-title">{title}</h2>
         <span className="today-section-count">{people.length}</span>
         <span className="today-section-actions">
-          <button type="button" className="today-link" onClick={onViewAll}>Team</button>
+          <button type="button" className="ui-link" onClick={onViewAll}>Team</button>
         </span>
       </div>
       {visible.map((person) => (
@@ -85,13 +85,11 @@ function PulseRow({ person, onRunCommand }: { person: TodayPulsePerson; onRunCom
   const open: TodayActionCommand = { kind: 'open', label: 'Open', target: person.target };
   return (
     <div className={`today-row today-tone-${person.tone}`} data-testid="today-pulse-row">
-      <span className="today-avatar" aria-hidden="true" style={{ width: 22, height: 22, fontSize: 9 }}>
-        {initials(person.displayName)}
-      </span>
+      <Avatar name={person.displayName} seed={person.accountId} size={22} tone="var(--tone)" />
       <button type="button" className="today-row-link" onClick={() => onRunCommand(open)}>
         <span className="today-row-title-line">
           <span className="today-row-title">{person.displayName}</span>
-          {person.status ? <span className="today-chip">{person.status}</span> : null}
+          {person.status ? <span className="ui-chip">{person.status}</span> : null}
         </span>
         <span className="today-row-meta">
           {asked ? <span className="today-row-meta-muted">Asked {asked} · </span> : null}
@@ -100,7 +98,7 @@ function PulseRow({ person, onRunCommand }: { person: TodayPulsePerson; onRunCom
       </button>
       <span className="today-row-actions">
         {person.primary ? (
-          <button type="button" className="today-primary" onClick={() => onRunCommand(person.primary!)}>
+          <button type="button" className="ui-btn" onClick={() => onRunCommand(person.primary!)}>
             {person.primary.label}
           </button>
         ) : null}

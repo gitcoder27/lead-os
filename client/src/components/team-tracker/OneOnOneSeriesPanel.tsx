@@ -77,7 +77,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           <div className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             1:1s
           </div>
-          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
             Recurring manager-private one-on-one series
           </div>
         </div>
@@ -138,8 +138,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
             type="button"
             onClick={submit}
             disabled={!newDev || createSeries.isPending}
-            className="h-8 rounded-lg px-3 text-[12px] font-semibold disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            className="ui-btn"
           >
             {createSeries.isPending ? 'Creating…' : 'Create series'}
           </button>
@@ -193,7 +192,7 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
           <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             {series.developerName}
           </div>
-          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
             {CADENCE_LABELS[series.cadence]}
             {series.active ? '' : ' · paused'}
           </div>
@@ -206,13 +205,13 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
             {series.nextSessionDate ?? '—'}
           </div>
           {overdue && (
-            <div className="text-[10px] font-semibold" style={{ color: 'var(--danger)' }}>
+            <div className="text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
               overdue {series.nextSessionOverdueDays}d
             </div>
           )}
         </div>
         <span
-          className="rounded px-1.5 py-0.5 text-[10px] font-mono"
+          className="rounded px-1.5 py-0.5 text-[11px] font-mono"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
           title="Open agenda items"
         >

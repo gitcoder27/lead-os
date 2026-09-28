@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertOctagon,
-  AlertTriangle,
+  TriangleAlert,
   CalendarClock,
   CalendarX2,
   ChevronRight,
@@ -25,6 +25,7 @@ import { useWorkload } from '@/hooks/useWorkload';
 import { useTags } from '@/hooks/useTags';
 import { useTagCounts } from '@/hooks/useTagCounts';
 import type { FilterType, OverviewCounts } from '@/types';
+import { initials } from '@/components/ui/Avatar';
 
 interface FilterSidebarProps {
   activeFilter: FilterType;
@@ -69,21 +70,13 @@ const FILTER_ICON_MAP: Record<FilterType, LucideIcon> = {
   dueToday: CalendarClock,
   dueThisWeek: CalendarClock,
   noDueDate: CalendarX2,
-  overdue: AlertTriangle,
+  overdue: TriangleAlert,
   blocked: AlertOctagon,
   stale: CalendarClock,
   highPriority: Flame,
   outOfTeam: Users,
 };
 
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 interface SectionProps {
   title: string;
@@ -224,7 +217,7 @@ export function FilterSidebar({
 
           <div className="grid grid-cols-3 gap-1 mt-2">
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[11px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Views
               </div>
               <div className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -232,7 +225,7 @@ export function FilterSidebar({
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[11px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Tags
               </div>
               <div className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -240,7 +233,7 @@ export function FilterSidebar({
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[11px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Active
               </div>
               <div className="mt-0.5 text-[13px] font-semibold" style={{ color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-primary)' }}>
@@ -321,7 +314,7 @@ export function FilterSidebar({
                       }
                     }}
                     isIdle={dev.activeDefects === 0}
-                    icon={<span className="text-[12px] font-semibold">{getInitials(dev.developer.displayName)}</span>}
+                    icon={<span className="text-[12px] font-semibold">{initials(dev.developer.displayName)}</span>}
                   />
                 ))}
               </div>
@@ -422,7 +415,7 @@ export function FilterSidebar({
 
             <div className="flex flex-col items-center gap-2">
               <div
-                className="min-w-[40px] rounded-full px-2 py-1 text-center text-[11px] font-mono"
+                className="min-w-[40px] rounded-full px-2 py-1 text-center text-[12px] font-mono"
                 style={{
                   background: activeSelectionCount > 0 ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
                   color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-muted)',
@@ -430,7 +423,7 @@ export function FilterSidebar({
               >
                 {activeSelectionCount}
               </div>
-              <div className="text-[11px] uppercase" style={{ letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
+              <div className="text-[12px] uppercase" style={{ letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
                 Focus
               </div>
             </div>

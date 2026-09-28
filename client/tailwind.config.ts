@@ -32,7 +32,9 @@ const config: Config = {
         accent: {
           DEFAULT: 'var(--accent)',
           glow: 'var(--accent-glow)',
+          solid: 'var(--accent-solid)',
         },
+        'on-accent': 'var(--on-accent)',
         success: 'var(--success)',
         warning: 'var(--warning)',
         danger: {
@@ -40,6 +42,16 @@ const config: Config = {
           muted: 'var(--danger-muted)',
         },
         info: 'var(--info)',
+      },
+      zIndex: {
+        drawer: 'var(--z-drawer)',
+        'drawer-stacked': 'var(--z-drawer-stacked)',
+        header: 'var(--z-header)',
+        copilot: 'var(--z-copilot)',
+        dialog: 'var(--z-dialog)',
+        'dialog-stacked': 'var(--z-dialog-stacked)',
+        popover: 'var(--z-popover)',
+        toast: 'var(--z-toast)',
       },
       animation: {
         'pulse-blocked': 'pulseBlocked 2s ease-in-out infinite',

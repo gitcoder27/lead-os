@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { CircleDashed, Lock, MessageSquarePlus, TriangleAlert, Users } from 'lucide-react';
 import type { Issue, TrackerAttentionItem, TrackerDeveloperDay, TrackerDeveloperGroup, TrackerWorkItem } from '@/types';
 import { formatAbsoluteDateTime } from '@/lib/utils';
-import { Avatar, FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { Avatar } from '@/components/ui/Avatar';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { TrackerStatusMark } from './TrackerStatusPill';
 import { RelatedIssueChips } from './RelatedIssueChips';
 import { describeLatestEvent, formatCompactRelative } from './trackerItemFormat';
@@ -14,6 +15,8 @@ import {
   getRosterLoad,
   type RosterAttention,
 } from './rosterSignals';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 interface TrackerRosterBoardProps {
   date: string;
@@ -63,7 +66,7 @@ const sortByAttention = (developers: TrackerDeveloperDay[], ranks: Map<string, n
 
 function MobileLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mr-1.5 text-[11.5px] md:hidden" style={{ color: 'var(--text-muted)' }}>
+    <span className="mr-1.5 text-[12px] md:hidden" style={{ color: 'var(--text-muted)' }}>
       {children}
     </span>
   );
@@ -97,14 +100,14 @@ function CurrentWork({
   const meta: ReactNode[] = [];
   if (item.taskKey) {
     meta.push(
-      <span key="task" className="shrink-0 font-mono text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-disabled)' }}>
+      <span key="task" className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-disabled)' }}>
         {item.taskKey}
       </span>,
     );
   }
   if (item.jiraKey) {
     meta.push(
-      <span key="jira" className="shrink-0 font-mono text-[11px] font-semibold" style={{ color: 'var(--accent)' }}>
+      <span key="jira" className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>
         {item.jiraKey}
       </span>,
     );
@@ -132,7 +135,7 @@ function CurrentWork({
         {item.title}
       </span>
       {meta.length > 0 && (
-        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[11.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
           {meta.flatMap((node, index) => (index === 0 ? [node] : [<MetaSeparator key={`sep-${index}`} />, node]))}
         </span>
       )}
@@ -176,7 +179,7 @@ function UpNext({ items }: { items: TrackerWorkItem[] }) {
         {first.title}
       </div>
       {rest.length > 0 && (
-        <div className="mt-0.5 text-[11.5px] leading-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-0.5 text-[12px] leading-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
           +{rest.length} more planned
         </div>
       )}
@@ -252,7 +255,7 @@ function AttentionFlags({ attention }: { attention: RosterAttention }) {
         </span>
       </div>
       {rest.length > 0 && (
-        <div className="truncate pl-3 text-[11.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <div className="truncate pl-3 text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
           {rest.map((flag) => flag.label).join(' · ')}
         </div>
       )}
@@ -281,7 +284,6 @@ function RosterRow({
   onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   readOnly?: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
   const attention = getRosterAttention(day, attentionItem);
   const done = day.status === 'done_for_today';
   const name = day.developer.displayName;
@@ -289,11 +291,12 @@ function RosterRow({
 
   return (
     <motion.div
-      initial={reduceMotion ? false : { opacity: 0 }}
+      // docs/54 M3: no mount stagger — rows appear with the data.
+      initial={false}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.12) }}
       role="button"
       tabIndex={0}
+      data-roster-row=""
       data-attention={attention.rail ?? undefined}
       onClick={() => onOpenDrawer(day.developer.accountId)}
       onKeyDown={(event) => {
@@ -330,7 +333,7 @@ function RosterRow({
                   onAcceptSuggestion(day);
                 }}
                 onKeyDown={(event) => event.stopPropagation()}
-                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-[11px] font-medium leading-[18px] transition-colors hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] ${FOCUS_RING}`}
+                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-[12px] font-medium leading-[18px] transition-colors hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] ${FOCUS_RING}`}
                 style={{ color: 'var(--warning)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent)' }}
                 title={`${day.statusSuggestion.reasonTaskKey} is blocked — set status to blocked`}
                 aria-label={`Accept suggested blocked status for ${name}`}
@@ -387,7 +390,7 @@ function RosterRow({
 function ColumnHeader() {
   return (
     <div
-      className={`hidden gap-3 px-4 py-2 text-[11.5px] font-medium md:grid ${ROSTER_GRID}`}
+      className={`hidden gap-3 px-4 py-2 text-[12px] font-medium md:grid ${ROSTER_GRID}`}
       style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
     >
       <span>Developer</span>
@@ -408,13 +411,11 @@ function GroupHeader({ group }: { group: TrackerDeveloperGroup }) {
       className="flex items-center gap-2 border-t px-4 pb-2 pt-3.5"
       style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-      <h3 className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-        {group.label}
-      </h3>
-      <span className="rounded-full px-1.5 text-[11px] font-semibold tabular-nums leading-[18px]" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}>
-        {group.count}
-      </span>
+      <SectionHeader
+        icon={<span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />}
+        title={group.label}
+        count={group.count}
+      />
     </div>
   );
 }
@@ -452,18 +453,11 @@ export function TrackerRosterBoard({
 
   if (visibleCount === 0) {
     return (
-      <div
-        className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-10 text-center"
-        style={{ borderColor: 'var(--border)' }}
-      >
-        <Users size={18} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-        <div className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {searchActive ? 'No developers match this search.' : 'No developers match this view.'}
-        </div>
-        <div className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-          {searchActive ? 'Try a different name, task, or Jira key.' : 'Change the filters or add team members from settings.'}
-        </div>
-      </div>
+      <EmptyState
+        icon={<Users size={22} />}
+        title={searchActive ? 'No developers match this search.' : 'No developers match this view.'}
+        body={searchActive ? 'Try a different name, task, or Jira key.' : 'Change the filters or add team members from settings.'}
+      />
     );
   }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MotionConfig, motion } from 'framer-motion';
-import { CheckCircle2, ListTodo, LogOut, Radio, ScrollText, Target, XCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { CircleCheck, ListTodo, LogOut, Radio, ScrollText, Target, CircleX } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
@@ -25,7 +25,15 @@ import { AddTaskForm } from './AddTaskForm';
 import { FinishedWork } from './FinishedWork';
 import { RecentActivity } from './RecentActivity';
 import { HAIRLINE, Kbd, MyDaySection, pageVariants, sectionVariants, surfaceStyle } from './MyDayUI';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { MyDayTaskDetailContext, type MyDayTaskDetailActions } from './MyDayTaskDetailContext';
+import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+
+// docs/54 K2: My Day's full map, in the shared sheet format.
+const MY_DAY_SHORTCUTS: ShortcutGroup[] = [
+  { group: 'Work', keys: [['n', 'New task'], ['c / u', 'Check in']] },
+  { group: 'Day', keys: [['[ / ]', 'Previous / next day'], ['t', 'Today'], ['?', 'This sheet']] },
+];
 
 function readOnlyReasonFor(day: MyDayResponse | undefined): MyDayReadOnlyReason | undefined {
   if (!day) return undefined;
@@ -88,12 +96,15 @@ export function MyDayPage() {
   } = useMyDayHandlers(date, isReadOnly, day);
 
   const goToday = () => setDate(getLocalIsoDate());
+  const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+
   useMyDayShortcuts({
     onFocusUpdate: isReadOnly ? undefined : () => quickUpdateRef.current?.focus(),
     onAddTask: isReadOnly ? undefined : () => setAddTaskOpen(true),
     onPrevDay: () => setDate((d) => shiftLocalIsoDate(d, -1)),
     onNextDay: () => setDate((d) => shiftLocalIsoDate(d, 1)),
     onToday: goToday,
+    onShowShortcuts: () => setShortcutsAnchor(document.querySelector<HTMLElement>('[data-my-day-shortcuts]') ?? document.body),
   });
 
   useEffect(() => setAddTaskOpen(false), [date]);
@@ -161,8 +172,8 @@ export function MyDayPage() {
     return (
       <div className="flex h-full items-center justify-center p-4" style={{ background: 'var(--bg-canvas)' }}>
         <div className="w-full max-w-sm rounded-2xl p-7 text-center" style={{ ...surfaceStyle, boxShadow: 'var(--panel-shadow)' }}>
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--danger)' }}>
-            <XCircle size={22} />
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
+            <CircleX size={22} />
           </div>
           <h2 className="mb-1.5 text-[16px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>Couldn’t load your day</h2>
           <p className="mb-6 text-[13px]" style={{ color: 'var(--text-secondary)' }}>{error.message}</p>
@@ -170,7 +181,7 @@ export function MyDayPage() {
             <button
               onClick={() => refetch()}
               className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
-              style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+              style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Try again
             </button>
@@ -185,7 +196,7 @@ export function MyDayPage() {
               <button
                 onClick={async () => { await logout(); window.location.reload(); }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-medium"
-                style={{ color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.24)' }}
+                style={{ color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
               >
                 <LogOut size={14} /> Sign out
               </button>
@@ -210,7 +221,7 @@ export function MyDayPage() {
     .filter((key): key is string => Boolean(key));
 
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <MyDayTaskDetailContext.Provider value={taskDetailActions}>
       <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
         <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
@@ -295,7 +306,7 @@ export function MyDayPage() {
               {completedItems.length + droppedItems.length > 0 && (
                 <MyDaySection
                   id="done"
-                  icon={<CheckCircle2 size={14} />}
+                  icon={<CircleCheck size={14} />}
                   title={isToday ? 'Done today' : 'Done'}
                   count={completedItems.length}
                   hint={droppedItems.length > 0 ? `· ${droppedItems.length} dropped` : undefined}
@@ -331,7 +342,7 @@ export function MyDayPage() {
                 }
                 action={
                   day?.lastCheckInAt ? (
-                    <span className="text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }} title="Last check-in">
+                    <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} title="Last check-in">
                       {formatCompactRelative(day.lastCheckInAt)}
                     </span>
                   ) : undefined
@@ -374,16 +385,32 @@ export function MyDayPage() {
                 </div>
               </MyDaySection>
 
-              <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[11.5px] md:flex" style={{ color: 'var(--text-muted)' }}>
+              <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[12px] md:flex" style={{ color: 'var(--text-muted)' }}>
                 {!isReadOnly && (
                   <>
-                    <span className="inline-flex items-center gap-1.5"><Kbd>N</Kbd> new task</span>
-                    <span className="inline-flex items-center gap-1.5"><Kbd>U</Kbd> check in</span>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>n</Kbd> new task</span>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>c</Kbd> check in</span>
                   </>
                 )}
                 <span className="inline-flex items-center gap-1.5"><Kbd>[</Kbd><Kbd>]</Kbd> change day</span>
-                <span className="inline-flex items-center gap-1.5"><Kbd>T</Kbd> today</span>
+                <span className="inline-flex items-center gap-1.5"><Kbd>t</Kbd> today</span>
+                <button
+                  type="button"
+                  data-my-day-shortcuts=""
+                  onClick={(event) => setShortcutsAnchor(event.currentTarget)}
+                  className={`inline-flex items-center gap-1.5 rounded-md underline-offset-2 hover:underline ${FOCUS_RING}`}
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Kbd>?</Kbd> all shortcuts
+                </button>
               </motion.div>
+              {shortcutsAnchor ? (
+                <ShortcutSheet
+                  anchor={shortcutsAnchor}
+                  groups={MY_DAY_SHORTCUTS.filter((group) => !isReadOnly || group.group !== 'Work')}
+                  onClose={() => setShortcutsAnchor(null)}
+                />
+              ) : null}
             </aside>
           </motion.div>
         </div>
@@ -396,7 +423,7 @@ export function MyDayPage() {
         onStepTask={openTask}
       />
       </MyDayTaskDetailContext.Provider>
-    </MotionConfig>
+    </>
   );
 }
 

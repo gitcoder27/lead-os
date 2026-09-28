@@ -191,11 +191,11 @@ export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates,
   return (
     <Dialog.Root open={open} onOpenChange={(next) => (!next && !running ? onClose() : undefined)}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[90]" style={{ background: 'rgba(4, 8, 14, 0.5)', backdropFilter: 'blur(4px)' }} />
-        <Dialog.Content className="notes-dialog notes-dialog-wide fixed z-[91] rounded-2xl border p-5">
+        <Dialog.Overlay className="fixed inset-0 z-dialog" style={{ background: 'var(--scrim)', backdropFilter: 'var(--scrim-blur)' }} />
+        <Dialog.Content className="notes-dialog notes-dialog-wide fixed z-dialog p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Dialog.Title className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <Dialog.Title className="ui-dialog-title">
                 Wrap up {prettyNoteDate(noteDate, 'EEEE')}
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -205,7 +205,7 @@ export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates,
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
-              <button type="button" className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label="Close wrap-up">
+              <button type="button" className="ui-icon-btn" aria-label="Close wrap-up">
                 <X size={14} />
               </button>
             </Dialog.Close>
@@ -272,17 +272,17 @@ export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates,
           ) : null}
 
           <div className="mt-5 flex items-center justify-between gap-2">
-            <p className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               Keys on a row: T · F · C · D
             </p>
             <div className="flex items-center gap-2">
               <Dialog.Close asChild>
-                <button type="button" className="notes-button secondary" disabled={running}>
+                <button type="button" className="ui-btn-quiet" disabled={running}>
                   {pending.length === 0 ? 'Close' : 'Not now'}
                 </button>
               </Dialog.Close>
               {pending.length > 0 ? (
-                <button type="button" className="notes-button primary" onClick={() => void apply()} disabled={running || decided.length === 0}>
+                <button type="button" className="ui-btn-solid" onClick={() => void apply()} disabled={running || decided.length === 0}>
                   <CheckCheck size={12} />
                   {running ? 'Applying…' : decided.length === 0 ? 'Choose to apply' : `Apply ${decided.length}`}
                 </button>

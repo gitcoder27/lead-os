@@ -40,7 +40,7 @@ export function FilterButton({ label, count, isActive, onClick, shortcut, isIdle
           {label}
         </span>
         {isIdle && (
-          <span className="text-[11px] animate-glow-idle" style={{ color: 'var(--warning)' }}>
+          <span className="text-[12px] animate-glow-idle" style={{ color: 'var(--warning)' }}>
             ⚠
           </span>
         )}
@@ -57,7 +57,7 @@ export function FilterButton({ label, count, isActive, onClick, shortcut, isIdle
         </span>
         {shortcut && (
           <span
-            className="text-[11px] font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-[12px] font-mono opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ color: 'var(--text-muted)' }}
           >
             {shortcut}

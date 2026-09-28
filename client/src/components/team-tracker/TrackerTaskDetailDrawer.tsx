@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, X } from 'lucide-react';
+import { TriangleAlert, ArrowLeft, ArrowUpRight, Loader2, X } from 'lucide-react';
 import { ItemDetailDrawer } from '@/components/manager-desk/ItemDetailDrawer';
 import {
   useCancelDelegatedManagerDeskTask,
@@ -14,6 +14,8 @@ import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { RelatedIssueChips } from './RelatedIssueChips';
+import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
+import { isEditable } from '@/components/ui/focus';
 
 interface TrackerTaskDetailDrawerProps {
   trackerItemId: number | null;
@@ -154,12 +156,25 @@ function TrackerOnlyDrawer({
   reassignItem: ReturnType<typeof useReassignTrackerItem>;
   onReassign: (itemId: number, toAccountId: string) => void;
 }) {
+  // docs/54 V1: Tab stays inside the layer; focus returns to the opener on close.
+  const modalRef = useModalFocus<HTMLElement>(isOpen);
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // docs/54 V3: the drawers' Esc policy — a layer above goes first, the
+    // first Esc leaves a field (keeping the draft), the next one closes.
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || isCoveredByLaterLayer(modalRef.current)) return;
+      e.preventDefault();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && modalRef.current?.contains(active) && isEditable(active)) {
+        active.blur();
+        return;
+      }
+      onClose();
+    };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, modalRef]);
 
   if (!isOpen) return null;
 
@@ -170,19 +185,20 @@ function TrackerOnlyDrawer({
     <>
       {/* Backdrop */}
       <div
-        className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-[70]"
-        style={{ background: 'rgba(4,8,14,0.52)', backdropFilter: 'blur(6px)' }}
+        className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-drawer-stacked"
+        style={{ background: 'var(--scrim-soft)', backdropFilter: 'var(--scrim-soft-blur)' }}
         onClick={onClose}
       />
 
       {/* Drawer */}
       <aside
-        className="workspace-shell-drawer fixed right-0 z-[71] flex w-full max-w-lg flex-col overflow-hidden"
+        className="workspace-shell-drawer fixed right-0 z-drawer-stacked flex w-full max-w-[680px] flex-col overflow-hidden"
         style={{
           background: 'var(--bg-primary)',
           borderLeft: '1px solid var(--border)',
-          boxShadow: '0 0 60px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--drawer-shadow)',
         }}
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
         aria-label="Team Tracker task detail"
@@ -200,7 +216,7 @@ function TrackerOnlyDrawer({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span
-                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider"
+                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider"
                   style={{
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-secondary)',
@@ -348,7 +364,7 @@ function TrackerTaskDetailPlaceholder({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--md-accent)' }}>
+            <div className="text-[12px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--md-accent)' }}>
               Item Detail
             </div>
             <div className="mt-2 text-[20px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
@@ -381,7 +397,7 @@ function TrackerTaskDetailPlaceholder({
             {isLoading ? (
               <Loader2 size={16} className="mt-0.5 animate-spin" style={{ color: 'var(--accent)' }} />
             ) : (
-              <AlertTriangle size={16} className="mt-0.5" style={{ color: 'var(--warning)' }} />
+              <TriangleAlert size={16} className="mt-0.5" style={{ color: 'var(--warning)' }} />
             )}
             <div className="min-w-0">
               <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>

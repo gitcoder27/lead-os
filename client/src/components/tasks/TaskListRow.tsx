@@ -156,7 +156,7 @@ export const TaskListRow = memo(function TaskListRow({
       tabIndex={focused ? 0 : -1}
       onClick={handleClick}
       onFocus={(event) => { if (event.target === event.currentTarget) handlers.onFocusRow(task.taskKey); }}
-      className="group relative cursor-pointer px-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
+      className="group relative cursor-pointer px-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)]"
       style={{
         background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined,
       }}
@@ -179,7 +179,7 @@ export const TaskListRow = memo(function TaskListRow({
         <span className="relative flex h-6 w-5 shrink-0 items-center md:w-12">
           <span className="hidden md:inline" style={{ opacity: dim }}>
             <span
-              className={`font-mono text-[11px] tabular-nums transition-opacity ${checkboxShown ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'}`}
+              className={`font-mono text-[12px] tabular-nums transition-opacity ${checkboxShown ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'}`}
               style={{ color: 'var(--text-disabled)' }}
             >
               {task.taskKey}
@@ -201,7 +201,7 @@ export const TaskListRow = memo(function TaskListRow({
         {/* docs/51 F13: only title/meta dim on a lingering row — controls stay opaque. */}
         <span className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: dim }}>
           {time && (
-            <span className="shrink-0 font-mono text-[11.5px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>
+            <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>
           )}
           <span
             className="min-w-0 truncate text-[13px] font-medium"
@@ -213,17 +213,17 @@ export const TaskListRow = memo(function TaskListRow({
             {task.title}
           </span>
           {labels.slice(0, 2).map((label) => (
-            <span key={label} className="hidden shrink-0 rounded-md px-1.5 py-px text-[10.5px] font-semibold sm:inline" style={labelChipStyle(labelColor(label))}>
+            <span key={label} className="hidden shrink-0 rounded-md px-1.5 py-px text-[11px] font-semibold sm:inline" style={labelChipStyle(labelColor(label))}>
               {taskLabelDisplayName(label)}
             </span>
           ))}
           {labels.length > 2 && (
-            <span className="hidden shrink-0 text-[10.5px] font-semibold sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>
+            <span className="hidden shrink-0 text-[11px] font-semibold sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>
               +{labels.length - 2}
             </span>
           )}
           {task.lingering && isOpenStatus(task.status) && (
-            <span className="shrink-0 text-[10.5px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>
+            <span className="shrink-0 text-[11px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>
           )}
         </span>
 
@@ -247,7 +247,7 @@ export const TaskListRow = memo(function TaskListRow({
           {(attentionReasons.length > 0 || iconSignals.length > 0) && (
             <span className="flex items-center gap-1.5" style={{ opacity: dim }}>
               {attentionReasons.map((reason) => (
-                <span key={reason.label} className="text-[10.5px]">
+                <span key={reason.label} className="text-[11px]">
                   <SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark>
                 </span>
               ))}
@@ -257,7 +257,7 @@ export const TaskListRow = memo(function TaskListRow({
             </span>
           )}
           {jira && (
-            <span className="hidden rounded px-1 py-px font-mono text-[10px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: dim }}>
+            <span className="hidden rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: dim }}>
               {jira.ref}
             </span>
           )}
@@ -271,7 +271,7 @@ export const TaskListRow = memo(function TaskListRow({
             </span>
           )}
           {(dateColumn || date) && (
-            <span className="flex w-[84px] justify-end text-[11.5px] tabular-nums" title={date?.title} style={{ opacity: dim }}>
+            <span className="flex w-[84px] justify-end text-[12px] tabular-nums" title={date?.title} style={{ opacity: dim }}>
               {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? (
                 <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark>
               ) : (

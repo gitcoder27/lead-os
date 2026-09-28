@@ -34,7 +34,7 @@ export function DrawerLinks({ item, date, readOnly = false, addLink, onDeleteLin
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             Connections
           </span>
           {!readOnly && (
@@ -76,7 +76,7 @@ export function DrawerLinks({ item, date, readOnly = false, addLink, onDeleteLin
             ))}
           </div>
         ) : (
-          <div className="rounded-lg px-2.5 py-2 text-[11px]" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
+          <div className="rounded-lg px-2.5 py-2 text-[12px]" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px dashed var(--border)' }}>
             No linked context yet.
           </div>
         )}
@@ -86,7 +86,7 @@ export function DrawerLinks({ item, date, readOnly = false, addLink, onDeleteLin
         )}
       </div>
 
-      <div className="flex flex-wrap gap-x-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+      <div className="flex flex-wrap gap-x-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>
         <span>Created {formatSafe(item.createdAt)}</span>
         <span>Updated {formatSafe(item.updatedAt)}</span>
         {item.completedAt && <span>Completed {formatSafe(item.completedAt)}</span>}
@@ -99,7 +99,7 @@ function AddButton({ icon, label, onClick }: { icon: ReactNode; label: string; o
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] transition-all hover:brightness-110"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] transition-all hover:brightness-110"
       style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
     >
       {icon} {label}

@@ -12,13 +12,13 @@ export interface SignalBadge {
 const toneStyles: Record<SignalTone, CSSProperties> = {
   danger: {
     color: 'var(--danger)',
-    background: 'rgba(239, 68, 68, 0.12)',
-    borderColor: 'rgba(239, 68, 68, 0.18)',
+    background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
+    borderColor: 'color-mix(in srgb, var(--danger) 18%, transparent)',
   },
   warning: {
     color: 'var(--warning)',
-    background: 'rgba(245, 158, 11, 0.14)',
-    borderColor: 'rgba(245, 158, 11, 0.2)',
+    background: 'color-mix(in srgb, var(--warning) 14%, transparent)',
+    borderColor: 'color-mix(in srgb, var(--warning) 20%, transparent)',
   },
   info: {
     color: 'var(--info)',
@@ -87,7 +87,7 @@ export function TrackerSignalBadges({
       {badges.map((badge) => (
         <span
           key={badge.key}
-          className={`rounded-lg font-medium ${compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[12px]'}`}
+          className={`rounded-lg font-medium ${compact ? 'px-2 py-0.5 text-[12px]' : 'px-2.5 py-1 text-[12px]'}`}
           style={toneStyles[badge.tone]}
         >
           {badge.label}

@@ -76,7 +76,7 @@ export function TodayTextCaptureDialog({
       onSubmit={save}
       footer={<TodayDialogActions saveLabel={saveLabel} isSaving={isSaving} canSave={canSave} onCancel={onClose} onSave={save} />}
     >
-      <label htmlFor={fieldId} className="today-field-label">{label}</label>
+      <label htmlFor={fieldId} className="ui-field-label">{label}</label>
       {multiline ? (
         <textarea
           id={fieldId}
@@ -84,7 +84,7 @@ export function TodayTextCaptureDialog({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           rows={4}
-          className="today-field"
+          className="ui-field"
         />
       ) : (
         <input
@@ -98,29 +98,29 @@ export function TodayTextCaptureDialog({
               save();
             }
           }}
-          className="today-field"
+          className="ui-field"
         />
       )}
       {withNextAction ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_148px]">
           <div className="min-w-0">
-            <label htmlFor={nextActionId} className="today-field-label">Next action (optional)</label>
+            <label htmlFor={nextActionId} className="ui-field-label">Next action (optional)</label>
             <input
               id={nextActionId}
               value={nextAction}
               onChange={(event) => setNextAction(event.target.value)}
-              className="today-field"
+              className="ui-field"
               placeholder="Becomes a follow-up for tomorrow"
             />
           </div>
           <div>
-            <label htmlFor={ownerFieldId} className="today-field-label">Owner</label>
+            <label htmlFor={ownerFieldId} className="ui-field-label">Owner</label>
             <select
               id={ownerFieldId}
               value={ownerId}
               onChange={(event) => setOwnerId(event.target.value)}
               disabled={!nextAction.trim()}
-              className="today-field"
+              className="ui-field"
             >
               <option value="">Me</option>
               {nextActionOwners.map((owner) => (
@@ -132,8 +132,8 @@ export function TodayTextCaptureDialog({
       ) : null}
       {presets && presets.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>Due</span>
-          <div className="today-segment" role="group" aria-label="Due">
+          <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>Due</span>
+          <div className="ui-segment" role="group" aria-label="Due">
             {presets.map((option) => (
               <button
                 key={option.id}

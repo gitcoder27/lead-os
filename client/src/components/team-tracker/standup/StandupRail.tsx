@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Flag, ListChecks } from 'lucide-react';
+import { TriangleAlert, Bell, Check, ListChecks } from 'lucide-react';
 import type { TrackerDeveloperDay } from '@/types';
 import { openTasksFor } from '@/lib/standup';
 import { TrackerStatusPill } from '../TrackerStatusPill';
@@ -35,10 +35,10 @@ export function StandupRail({
       aria-label="Standup roster"
     >
       <div className="hidden items-center justify-between px-4 pb-1.5 pt-3.5 md:flex">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
           Order
         </span>
-        <span className="text-[11px] font-semibold tabular-nums" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-muted)' }}>
+        <span className="text-[12px] font-semibold tabular-nums" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-muted)' }}>
           {reviewedCount}/{days.length}
         </span>
       </div>
@@ -65,7 +65,7 @@ export function StandupRail({
                 <span className="absolute inset-y-1.5 left-0 w-[2px] rounded-full" style={{ background: 'var(--accent)' }} aria-hidden="true" />
               )}
               <span className="relative">
-                <Avatar name={day.developer.displayName} size={30} ring={active ? 'accent' : 'none'} />
+                <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={30} ring={active} />
                 {isReviewed && (
                   <span
                     className="absolute -bottom-1 -right-1 flex h-[14px] w-[14px] items-center justify-center rounded-full"
@@ -85,14 +85,14 @@ export function StandupRail({
                 </span>
                 <span className="mt-1 flex items-center gap-1.5">
                   <TrackerStatusPill status={day.status} />
-                  <span className="text-[10.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {openCount} open
                   </span>
                 </span>
               </span>
               <span className="hidden shrink-0 flex-col items-end gap-1 md:flex">
-                {isFlagged && <Flag size={12} style={{ color: 'var(--accent)' }} aria-hidden="true" />}
-                {day.statusSuggestion && <AlertTriangle size={12} style={{ color: 'var(--warning)' }} aria-label="Status suggestion" />}
+                {isFlagged && <Bell size={12} style={{ color: 'var(--accent)' }} aria-hidden="true" />}
+                {day.statusSuggestion && <TriangleAlert size={12} style={{ color: 'var(--warning)' }} aria-label="Status suggestion" />}
               </span>
             </button>
           );
@@ -101,7 +101,7 @@ export function StandupRail({
 
       <div className="border-t p-2" style={{ borderColor: 'var(--border)' }}>
         {allReviewed && !wrapUpActive && (
-          <div className="mb-2 hidden rounded-md px-2 py-1.5 text-[11px] font-medium md:block" style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' }}>
+          <div className="mb-2 hidden rounded-md px-2 py-1.5 text-[12px] font-medium md:block" style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' }}>
             Everyone reviewed — wrap up when ready.
           </div>
         )}

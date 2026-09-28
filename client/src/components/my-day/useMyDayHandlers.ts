@@ -7,6 +7,7 @@ import {
   useAddMyDayCheckIn,
 } from '@/hooks/useMyDay';
 import type { MyDayResponse, TrackerDeveloperStatus, TrackerItemState, TrackerWorkItem } from '@/types';
+import { UNDO_WINDOW_MS } from '@/lib/undo';
 
 function findItem(day: MyDayResponse | undefined, itemId: number): TrackerWorkItem | undefined {
   if (!day) return undefined;
@@ -60,7 +61,7 @@ export function useMyDayHandlers(date: string, readOnly = false, day?: MyDayResp
             title: state === 'done' ? 'Marked done' : 'Dropped from today',
             message: item?.title,
             action: { label: 'Undo', onClick: () => restoreState(itemId, previousState) },
-            duration: 6000,
+            duration: UNDO_WINDOW_MS,
           });
         },
         onError,

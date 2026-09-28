@@ -524,6 +524,27 @@ describe('TeamTrackerPage', () => {
     expect(screen.getAllByText('Bob Jones').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('speaks the shared keyboard grammar on the board (docs/54 K2)', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+    const rows = document.querySelectorAll<HTMLElement>('[data-roster-row]');
+    expect(rows.length).toBeGreaterThan(1);
+    fireEvent.keyDown(document.body, { key: 'j' });
+    expect(rows[0]).toHaveFocus();
+    fireEvent.keyDown(rows[0]!, { key: 'j' });
+    expect(rows[1]).toHaveFocus();
+    fireEvent.keyDown(rows[1]!, { key: 'k' });
+    expect(rows[0]).toHaveFocus();
+    fireEvent.keyDown(rows[0]!, { key: '/' });
+    expect(screen.getByLabelText('Search team')).toHaveFocus();
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: '?' });
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveTextContent('Next / previous person');
+  });
+
   it('opens the task drawer for an initial task key and mirrors it into ?task=', () => {
     mockTaskResolution = {
       data: {
@@ -781,9 +802,10 @@ describe('TeamTrackerPage', () => {
 
     const dialog = screen.getByRole('dialog', { name: /mark alice smith inactive/i });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(screen.getByRole('button', { name: /close inactive dialog/i })).toHaveFocus();
+    // docs/54 V1: like every dialog, focus lands on the first field.
+    expect(screen.getByLabelText(/^Note/)).toHaveFocus();
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
 
     rerender(
@@ -1689,7 +1711,7 @@ describe('TrackerStatusPill', () => {
     expect(screen.getByText('Blocked')).toBeInTheDocument();
 
     rerender(<TrackerStatusPill status="at_risk" />);
-    expect(screen.getByText('At Risk')).toBeInTheDocument();
+    expect(screen.getByText('At risk')).toBeInTheDocument();
 
     rerender(<TrackerStatusPill status="done_for_today" />);
     expect(screen.getByText('Done')).toBeInTheDocument();

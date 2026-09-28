@@ -33,8 +33,7 @@ function DeletedTaskState({ task, onGoToday }: { task: TaskResolution; onGoToday
         <button
           type="button"
           onClick={onGoToday}
-          className="mt-6 rounded-lg px-4 py-2.5 text-[13px] font-semibold"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          className="ui-btn mt-6"
         >
           Go to Today
         </button>

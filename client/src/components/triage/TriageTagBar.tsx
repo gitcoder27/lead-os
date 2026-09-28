@@ -32,7 +32,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
               key={tag.id}
               onClick={() => onToggle(tag.id)}
               disabled={isPending}
-              className="text-[11px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 hover:opacity-70 transition-opacity disabled:cursor-wait"
+              className="text-[12px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 hover:opacity-70 transition-opacity disabled:cursor-wait"
               style={{ background: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}30` }}
               title={`Remove "${tag.name}"`}
             >
@@ -40,7 +40,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
             </button>
           ))}
           {tags.length === 0 && !expanded && (
-            <button onClick={() => setExpanded(true)} className="text-[11.5px] font-medium" style={{ color: 'var(--accent)' }}>
+            <button onClick={() => setExpanded(true)} className="text-[12px] font-medium" style={{ color: 'var(--accent)' }}>
               + Add tag
             </button>
           )}
@@ -65,7 +65,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
                     key={tag.id}
                     onClick={() => onToggle(tag.id)}
                     disabled={isPending}
-                    className="text-[11px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 transition-opacity disabled:cursor-wait"
+                    className="text-[12px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 transition-opacity disabled:cursor-wait"
                     style={{
                       background: isAssigned ? `${tag.color}35` : `${tag.color}12`,
                       color: tag.color,
@@ -97,8 +97,8 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
             <button
               onClick={() => onCreate(newTagName, { onSuccess: () => setNewTagName('') })}
               disabled={!newTagName.trim() || isPending}
-              className="text-[11px] px-2 py-0.5 rounded font-medium disabled:opacity-30"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              className="text-[12px] px-2 py-0.5 rounded font-medium disabled:opacity-30"
+              style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Add
             </button>

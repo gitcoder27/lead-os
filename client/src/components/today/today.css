@@ -4,11 +4,7 @@
  * derives from it so severity reads the same on chips, icons and avatars.
  */
 
-.today-tone-critical { --tone: var(--danger); }
-.today-tone-warning  { --tone: var(--warning); }
-.today-tone-info     { --tone: var(--accent); }
-.today-tone-neutral  { --tone: var(--text-muted); }
-.today-tone-success  { --tone: var(--success); }
+/* Tone classes (`today-tone-*`, `tone-*`) live in index.css. */
 
 /* ── Page frame ──────────────────────────────────────────────────────── */
 
@@ -18,7 +14,8 @@
   flex: 1;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-primary);
+  /* docs/54 D4: pages sit on the shared workspace canvas, like Tasks and Team. */
+  background: transparent;
 }
 
 /*
@@ -149,13 +146,6 @@
   gap: 8px;
 }
 
-.today-primary-sm {
-  height: 24px;
-  padding: 0 8px;
-  font-size: 11.5px;
-  letter-spacing: 0;
-  text-transform: none;
-}
 
 .today-panel.today-status-line {
   margin: 0;
@@ -300,96 +290,14 @@
 
 .today-freshness[data-state='stale'] { color: var(--warning); }
 
-/* ── Buttons ─────────────────────────────────────────────────────────── */
-
-.today-icon-btn {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  color: var(--text-muted);
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.today-icon-btn:hover,
-.today-icon-btn[aria-expanded='true'] { background: var(--bg-tertiary); color: var(--text-primary); }
-
-.today-icon-btn:focus-visible,
-.today-primary:focus-visible,
-.today-ghost:focus-visible,
 .today-row-link:focus-visible,
-.today-link:focus-visible,
 .today-person-chip:focus-visible,
 .today-chip-btn:focus-visible {
   outline: 2px solid var(--border-active);
   outline-offset: 1px;
 }
 
-/* docs/53 R1: the primary action is a compact trailing button at every width. */
-.today-primary {
-  display: inline-flex;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 5px;
-  border-radius: 7px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
-  transition: background-color 120ms ease;
-}
-
-.today-primary:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.today-primary:disabled { opacity: 0.55; cursor: wait; }
-
-@media (max-width: 639px) {
-  .today-primary { padding: 0 8px; }
-}
-
-.today-ghost {
-  display: inline-flex;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 5px;
-  border-radius: 7px;
-  padding: 0 8px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  transition: background-color 120ms ease;
-}
-
-.today-ghost:hover { background: var(--bg-tertiary); color: var(--text-primary); }
-
-.today-link {
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent);
-}
-
-.today-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-
-.today-btn {
-  display: inline-flex;
-  height: 30px;
-  align-items: center;
-  border-radius: 8px;
-  padding: 0 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.today-btn-primary { background: var(--accent); color: #fff; }
-.today-btn-primary:disabled { opacity: 0.45; }
-.today-btn-quiet { color: var(--text-secondary); }
-.today-btn-quiet:hover { background: var(--bg-tertiary); }
+/* Buttons are the shared `ui-btn*` classes in index.css (docs/54 V5). */
 
 /* ── Sections ────────────────────────────────────────────────────────── */
 
@@ -425,7 +333,7 @@
 
 .today-subhead {
   padding: 12px 12px 4px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -448,7 +356,7 @@
   padding: 7px 8px 7px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   transition: background-color 120ms ease;
-  animation: today-row-in 160ms ease-out both;
+  /* docs/54 M3: rows don't animate on mount — only real changes move. */
 }
 
 .today-row:hover { background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent); }
@@ -517,35 +425,13 @@
   gap: 2px;
 }
 
-.today-chip {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  border-radius: 5px;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 550;
-  line-height: 16px;
-  color: var(--tone, var(--text-secondary));
-  background: color-mix(in srgb, var(--tone, var(--text-muted)) 12%, transparent);
-}
-
-.today-chip[data-quiet='true'] {
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-}
+/* Chips are the shared `.ui-chip` (index.css, docs/54 V5/V6). */
 
 @media (max-width: 639px) {
-  .today-chip + .today-chip { display: none; }
-}
-
-@keyframes today-row-in {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: none; }
+  .ui-chip + .ui-chip { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .today-row { animation: none; }
   .today-progress-fill { transition: none; }
 }
 
@@ -674,43 +560,7 @@
 
 /* ── People ──────────────────────────────────────────────────────────── */
 
-.today-avatar {
-  position: relative;
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 650;
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tone, var(--border)) 70%, transparent);
-}
-
-.today-avatar-strip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px 2px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-}
-
-.today-avatar-stack {
-  display: flex;
-}
-
-.today-avatar-stack > * + * { margin-left: -6px; }
-
-.today-avatar-stack .today-avatar {
-  width: 24px;
-  height: 24px;
-  font-size: 9.5px;
-  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 3px color-mix(in srgb, var(--tone, var(--border)) 70%, transparent);
-}
+/* Avatars are the shared `ui/Avatar` (docs/54 V8). */
 
 .today-person-chip {
   display: inline-flex;
@@ -726,7 +576,6 @@
 
 .today-person-chip:hover { color: var(--text-primary); background: var(--bg-tertiary); }
 
-.today-person-chip .today-avatar { width: 22px; height: 22px; font-size: 9px; }
 
 /* ── People chips (wrap-up asks) ─────────────────────────────────────── */
 
@@ -751,152 +600,9 @@
   background: color-mix(in srgb, var(--warning) 8%, transparent);
 }
 
-.today-kbd {
-  display: inline-flex;
-  min-width: 18px;
-  justify-content: center;
-  border-radius: 4px;
-  padding: 0 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
-  line-height: 16px;
-  color: var(--text-muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
+/* .today-kbd is the shared `.ui-kbd` (index.css, docs/54 V9). */
 
-/* ── Dialog shell (docs/53 D5) ───────────────────────────────────────── */
-
-.today-dialog-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 700;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-@media (min-width: 640px) {
-  .today-dialog-layer { align-items: center; padding: 16px; }
-}
-
-.today-dialog-backdrop {
-  position: absolute;
-  inset: 0;
-  cursor: default;
-  background: rgb(0 0 0 / 0.5);
-}
-
-.today-dialog {
-  position: relative;
-  display: flex;
-  width: 100%;
-  max-height: calc(100dvh - 32px);
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 14px 14px 0 0;
-  background: var(--bg-elevated);
-  box-shadow: var(--panel-shadow), inset 0 0 0 1px var(--border);
-  outline: none;
-}
-
-@media (min-width: 640px) {
-  .today-dialog { max-width: 460px; border-radius: 14px; }
-}
-
-.today-dialog-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px 14px 4px 16px;
-}
-
-.today-dialog-title {
-  font-size: 14.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-.today-dialog-subtitle {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.today-dialog-body {
-  min-height: 0;
-  overflow-y: auto;
-  padding: 10px 16px 14px;
-}
-
-.today-dialog-foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid var(--border);
-  padding: 10px 14px;
-}
-
-.today-dialog-foot-hint {
-  margin-right: auto;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.today-field-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.today-field {
-  width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-primary);
-  padding: 8px 10px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-primary);
-  outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.today-field::placeholder { color: var(--text-placeholder); }
-.today-field:focus-visible { border-color: var(--border-active); box-shadow: 0 0 0 2px var(--accent-glow); }
-.today-field:disabled { opacity: 0.55; }
-textarea.today-field { resize: none; }
-
-.today-segment {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.today-segment button {
-  border-radius: 7px;
-  padding: 4px 9px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.today-segment button[aria-pressed='true'] {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-.today-error {
-  margin-top: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--danger);
-}
+/* Dialog shell, fields and segments are shared `ui-*` classes (index.css, docs/54 §2). */
 
 /* ── Skeleton ────────────────────────────────────────────────────────── */
 

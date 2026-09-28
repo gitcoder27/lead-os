@@ -481,7 +481,7 @@ describe('NotesPage', () => {
 
     fireEvent.keyDown(document.body, { key: '?' });
     const legend = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
-    expect(within(legend).getByText('Turn line into a task')).toBeInTheDocument();
+    expect(within(legend).getByText('A task')).toBeInTheDocument();
     expect(within(legend).getByText('⌘⇧E')).toBeInTheDocument();
   });
 

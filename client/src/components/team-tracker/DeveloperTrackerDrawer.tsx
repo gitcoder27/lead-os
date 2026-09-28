@@ -1,17 +1,6 @@
 import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
-import {
-  ArrowUpRight,
-  Briefcase,
-  CalendarClock,
-  CornerDownLeft,
-  Crosshair,
-  ListTodo,
-  MessagesSquare,
-  NotebookPen,
-  UserMinus,
-  Users,
-} from 'lucide-react';
+import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, UserMinus, Users } from 'lucide-react';
 import type { Issue, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
@@ -19,7 +8,9 @@ import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskC
 import { useManagerDesk, useUpdateManagerDeskItem } from '@/hooks/useManagerDesk';
 import { TaskPicker, taskKeysForSubmit, tasksFromItems, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
-import { FOCUS_RING, InlineTextField, ShortcutLegend, isEditable, useTaskShortcuts } from '@/components/tasks/TaskDetailPrimitives';
+import { InlineTextField, useTaskShortcuts } from '@/components/tasks/TaskDetailPrimitives';
+import { ShortcutLegend } from '@/components/ui/ShortcutSheet';
+import { FOCUS_RING, isEditable } from '@/components/ui/focus';
 import { describePlanDate } from '@/components/tasks/task-detail-format';
 import { getLocalIsoDate } from '@/lib/utils';
 import {
@@ -41,6 +32,7 @@ import {
   getTrackerIssueContextChips,
   getTrackerIssueLinks,
 } from './trackerIssueContext';
+import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 
 interface DeveloperTrackerDrawerProps {
   date: string;
@@ -253,11 +245,12 @@ export function DeveloperTrackerDrawer({
   const shortcutHints: [string, string][] = readOnly
     ? [['Esc', 'Close']]
     : [
-        ['S', 'Status'],
-        ['A', 'Add task'],
-        ...(currentComposerId !== undefined ? [['U', 'Update'] as [string, string]] : []),
-        ['C', 'Check-in'],
-        ...(localPlannedItems.length > 1 ? [['Alt ↑↓', 'Reorder'] as [string, string]] : []),
+        // docs/54 K1: n new task, ⇧s developer status (s stays "schedule").
+        ['⇧ s', 'Status'],
+        ['n', 'New task'],
+        ...(currentComposerId !== undefined ? [['u', 'Update'] as [string, string]] : []),
+        ['c', 'Check-in'],
+        ...(localPlannedItems.length > 1 ? [['⌥ ↑ / ⌥ ↓', 'Reorder'] as [string, string]] : []),
         ['Esc', 'Close'],
       ];
 
@@ -271,7 +264,7 @@ export function DeveloperTrackerDrawer({
 
   const menuActions: DrawerMenuAction[] = [];
   if (day && !readOnly) {
-    menuActions.push({ key: 'capture', label: 'Capture follow-up', icon: <Briefcase size={13} />, onSelect: () => setDeskCaptureOpen(true) });
+    menuActions.push({ key: 'capture', label: 'Capture follow-up', icon: <Bell size={13} />, onSelect: () => setDeskCaptureOpen(true) });
   }
   if (day && onOpenOneOnOne) {
     menuActions.push({ key: 'one-on-one', label: 'Open 1:1 workspace', icon: <Users size={13} />, onSelect: () => onOpenOneOnOne(day.developer.accountId) });
@@ -296,8 +289,8 @@ export function DeveloperTrackerDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-[60]"
-            style={{ background: 'rgba(2, 6, 23, 0.42)', backdropFilter: 'blur(2px)' }}
+            className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-drawer"
+            style={{ background: 'var(--scrim-soft)', backdropFilter: 'var(--scrim-soft-blur)' }}
             onClick={onClose}
           />
           <motion.div
@@ -308,11 +301,11 @@ export function DeveloperTrackerDrawer({
             animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
             transition={{ type: 'spring', damping: 34, stiffness: 340 }}
-            className="workspace-shell-drawer fixed right-0 z-[61] flex w-full max-w-[680px] flex-col overflow-hidden outline-none"
+            className="workspace-shell-drawer fixed right-0 z-drawer flex w-full max-w-[680px] flex-col overflow-hidden outline-none"
             style={{
               background: 'var(--bg-primary)',
               borderLeft: '1px solid var(--border)',
-              boxShadow: '-24px 0 64px rgba(15, 23, 42, 0.24)',
+              boxShadow: 'var(--drawer-shadow)',
             }}
             role="dialog"
             aria-modal="true"
@@ -728,22 +721,15 @@ function CheckInComposer({
 function useDrawerLayer(panelRef: RefObject<HTMLElement>, active: boolean, onClose: () => void) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // docs/54 V3: Tab trap, stacking and focus return come from the shared hook.
+  useModalFocus(active, panelRef);
 
   useEffect(() => {
     if (!active) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panelRef.current?.focus({ preventScroll: true });
 
-    const covered = () => {
-      const panel = panelRef.current;
-      if (!panel) return true;
-      return Array.from(document.querySelectorAll('[aria-modal="true"]')).some(
-        (layer) => layer !== panel && Boolean(panel.compareDocumentPosition(layer) & Node.DOCUMENT_POSITION_FOLLOWING),
-      );
-    };
-
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || covered()) return;
+      if (event.key !== 'Escape' || event.defaultPrevented || isCoveredByLaterLayer(panelRef.current)) return;
       const panel = panelRef.current;
       const focused = document.activeElement;
       if (panel && focused instanceof HTMLElement && panel.contains(focused) && isEditable(focused)) {
@@ -754,45 +740,8 @@ function useDrawerLayer(panelRef: RefObject<HTMLElement>, active: boolean, onClo
       onCloseRef.current();
     };
 
-    const onTab = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      if (event.target instanceof Element && event.target.closest('[data-popover-layer]')) return;
-      const root = panelRef.current;
-      if (!root || covered()) return;
-      const focusables = Array.from(
-        root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
-      ).filter((el) => el.offsetParent !== null && !el.closest('[aria-hidden="true"]'));
-      if (!focusables.length) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusables[0]!;
-      const last = focusables[focusables.length - 1]!;
-      const current = document.activeElement as HTMLElement | null;
-      if (current === root) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-        return;
-      }
-      const inside = current !== null && root.contains(current);
-      if (event.shiftKey) {
-        if (!inside || current === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (!inside || current === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
     document.addEventListener('keydown', onEscape);
-    document.addEventListener('keydown', onTab, true);
-    return () => {
-      document.removeEventListener('keydown', onEscape);
-      document.removeEventListener('keydown', onTab, true);
-      if (previous?.isConnected) previous.focus();
-    };
+    return () => document.removeEventListener('keydown', onEscape);
   }, [active, panelRef]);
 }
 

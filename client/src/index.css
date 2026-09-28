@@ -24,6 +24,9 @@
   --text-disabled: #64748B;
   --accent:        #0891B2;
   --accent-glow:   rgba(8, 145, 178, 0.15);
+  /* docs/54 T1: solid accent fills + their text (≥4.5:1 in both themes). */
+  --accent-solid:  #0E7490;
+  --on-accent:     #FFFFFF;
   --panel-shadow:  0 24px 60px rgba(15, 23, 42, 0.08);
   --soft-shadow:   0 14px 32px rgba(15, 23, 42, 0.06);
   --success:       #10B981;
@@ -32,6 +35,26 @@
   --danger-muted:  #DC2626;
   --info:          #8B5CF6;
   --app-header-height: 72px;
+
+  /* docs/54 T4/T6/V2: one overlay vocabulary — scrims, shadows, stacking. */
+  --avatar-text-l:  36%;
+  --scrim:          rgba(15, 23, 42, 0.36);
+  --scrim-soft:     rgba(15, 23, 42, 0.18);
+  --scrim-blur:     blur(4px);
+  --scrim-soft-blur: blur(2px);
+  --overlay-shadow: 0 24px 64px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --drawer-shadow:  -24px 0 64px rgba(15, 23, 42, 0.16);
+  --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:        120ms;
+  --dur-overlay:     180ms;
+  --z-drawer:         60;
+  --z-drawer-stacked: 70;
+  --z-header:        300;
+  --z-copilot:       350;
+  --z-dialog:        400;
+  --z-dialog-stacked: 450;
+  --z-popover:       500;
+  --z-toast:         600;
 
   /* Manager Desk — light theme amber */
   --md-accent:     #B8860B;
@@ -62,6 +85,8 @@
   --text-disabled: #7B8598;
   --accent:        #06B6D4;
   --accent-glow:   rgba(6, 182, 212, 0.15);
+  --accent-solid:  #06B6D4;
+  --on-accent:     #09090B;
   --panel-shadow:  0 22px 60px rgba(0, 0, 0, 0.34);
   --soft-shadow:   0 10px 30px rgba(0, 0, 0, 0.16);
   --success:       #10B981;
@@ -69,6 +94,12 @@
   --danger:        #EF4444;
   --danger-muted:  #DC2626;
   --info:          #8B5CF6;
+
+  --avatar-text-l:  66%;
+  --scrim:          rgba(4, 8, 14, 0.55);
+  --scrim-soft:     rgba(2, 6, 23, 0.42);
+  --overlay-shadow: 0 32px 80px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --drawer-shadow:  -24px 0 64px rgba(0, 0, 0, 0.4);
 
   /* Manager Desk — warm amber command surface */
   --md-accent:     #D9A94E;
@@ -96,16 +127,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.text-\[9px\],
-.text-\[10px\],
-.text-\[10\.5px\] {
-  font-size: 11px;
-}
-
-.text-\[11px\],
-.text-\[11\.5px\] {
-  font-size: 12px;
-}
+/* docs/54 T5: the 11px floor is authored, not patched — meta text is
+ * text-[11px], secondary text-[12px], rows/body text-[13px]. */
 
 input[type='date'],
 input[type='datetime-local'] {
@@ -165,6 +188,346 @@ body::after {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* docs/54 V9: key cap for CSS-authored surfaces — mirrors components/ui/Kbd. */
+.ui-kbd {
+  display: inline-flex;
+  height: 18px;
+  min-width: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  padding: 0 4px;
+  font-family: 'Geist Mono Variable', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+/* ── Buttons (docs/54 V5) ─────────────────────────────────────────────
+ * One vocabulary, promoted from Today. `ui-btn` (tinted) is the default
+ * primary action; `ui-btn-solid` is for dialog footers only.
+ */
+.ui-btn, .ui-btn-ghost, .ui-btn-solid, .ui-btn-quiet, .ui-btn-secondary, .ui-btn-danger, .ui-btn-danger-solid {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ui-btn { height: 28px; padding: 0 10px; color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent); }
+.ui-btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ui-btn-sm { height: 24px; padding: 0 8px; font-size: 11.5px; }
+.ui-btn-ghost { height: 28px; padding: 0 8px; font-weight: 500; color: var(--text-secondary); }
+.ui-btn-ghost:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+.ui-btn-solid, .ui-btn-quiet, .ui-btn-secondary, .ui-btn-danger, .ui-btn-danger-solid { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; }
+.ui-btn-solid { background: var(--accent-solid); color: var(--on-accent); }
+.ui-btn-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-solid) 88%, var(--text-primary)); }
+.ui-btn-quiet { color: var(--text-secondary); }
+.ui-btn-quiet:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.ui-btn-secondary { color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--border); }
+.ui-btn-secondary:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.ui-btn-danger { color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.ui-btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.ui-btn-danger-solid { background: var(--danger-muted); color: #fff; }
+
+.ui-btn:disabled, .ui-btn-ghost:disabled, .ui-btn-solid:disabled, .ui-btn-quiet:disabled,
+.ui-btn-secondary:disabled, .ui-btn-danger:disabled, .ui-btn-danger-solid:disabled { opacity: 0.5; }
+
+.ui-icon-btn {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--text-muted);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.ui-icon-btn:hover, .ui-icon-btn[aria-expanded='true'] { background: var(--bg-tertiary); color: var(--text-primary); }
+
+.ui-link { border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--accent); }
+.ui-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.ui-btn:focus-visible, .ui-btn-ghost:focus-visible, .ui-btn-solid:focus-visible, .ui-btn-quiet:focus-visible,
+.ui-btn-secondary:focus-visible, .ui-btn-danger:focus-visible, .ui-btn-danger-solid:focus-visible,
+.ui-icon-btn:focus-visible, .ui-link:focus-visible {
+  outline: 2px solid var(--border-active);
+  outline-offset: 1px;
+}
+
+@media (max-width: 639px) {
+  .ui-btn { padding: 0 8px; }
+}
+
+/* ── Tone + chips (docs/54 V6) ───────────────────────────────────────
+ * A tone class sets `--tone`; chips, icons and avatar rings derive from it
+ * so severity reads the same on every surface.
+ */
+.tone-danger, .today-tone-critical { --tone: var(--danger); }
+.tone-warning, .today-tone-warning { --tone: var(--warning); }
+.tone-accent, .today-tone-info { --tone: var(--accent); }
+.tone-info { --tone: var(--info); }
+.tone-muted, .today-tone-neutral { --tone: var(--text-muted); }
+.tone-success, .today-tone-success { --tone: var(--success); }
+
+.ui-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 16px;
+  color: var(--tone, var(--text-secondary));
+  background: color-mix(in srgb, var(--tone, var(--text-muted)) 12%, transparent);
+}
+
+.ui-chip[data-quiet='true'] {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+/* ── Dialog shell (docs/53 D5 → docs/54 V1) ──────────────────────────
+ * The one modal shell: scrim, elevated card, head / body / foot. A bottom
+ * sheet on phones. Used by ui/Dialog.tsx and every form dialog.
+ */
+
+.ui-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .ui-dialog-layer { align-items: center; padding: 16px; }
+}
+
+.ui-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+  background: var(--scrim);
+  backdrop-filter: var(--scrim-blur);
+}
+
+.ui-dialog {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-height: calc(100dvh - 32px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-elevated);
+  box-shadow: var(--overlay-shadow), inset 0 0 0 1px var(--border);
+  outline: none;
+  animation: ui-dialog-in 180ms var(--ease-out) both;
+}
+
+.ui-dialog[data-size='sm'] { --ui-dialog-width: 420px; }
+.ui-dialog[data-size='lg'] { --ui-dialog-width: 560px; }
+
+@keyframes ui-dialog-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (min-width: 640px) {
+  .ui-dialog { max-width: var(--ui-dialog-width, 480px); border-radius: 16px; }
+}
+
+.ui-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 4px 16px;
+}
+
+.ui-dialog-icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ui-dialog-head-extra { padding: 6px 16px 2px; }
+
+.ui-dialog-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.ui-dialog-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ui-dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 16px 14px;
+}
+
+.ui-dialog-body-flush { padding: 0; border-top: 1px solid var(--border); margin-top: 8px; }
+
+.ui-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+}
+
+.ui-dialog-foot-hint {
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ui-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ui-field {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ui-field::placeholder { color: var(--text-placeholder); }
+.ui-field:focus-visible { border-color: var(--border-active); box-shadow: 0 0 0 2px var(--accent-glow); }
+.ui-field:disabled { opacity: 0.55; }
+textarea.ui-field { resize: none; }
+
+.ui-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ui-segment-fill { display: flex; }
+.ui-segment-fill button { flex: 1; }
+
+.ui-segment button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.ui-segment button[aria-pressed='true'] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.ui-error {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--danger);
+}
+
+
+/* docs/54 D1: the one page-title step (Tasks, Team, My Day). Today's band
+ * title and the Notes document heading are deliberate exceptions. */
+.ui-page-title {
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 26px;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+/* 1:1 workspace columns (docs/54 §1.7): flat, divided by hairlines — no card-in-card. */
+@media (min-width: 1024px) {
+  .one-on-one-column { padding: 0 16px; }
+  .one-on-one-column:first-child { padding-left: 0; }
+  .one-on-one-column:last-child { padding-right: 0; }
+  .one-on-one-column + .one-on-one-column { border-left: 1px solid var(--border); }
+}
+
+/* ── Tabs vs segments (docs/54 V11) ───────────────────────────────────
+ * `ui-tabs`: switch between views of the same surface (header nav, Team
+ * lenses, Notes kinds) — a track with an elevated active pill.
+ * `ui-segment`: pick a value inside a form (cadence, kind, capture target).
+ */
+.ui-tabs {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  border-radius: 9px;
+  padding: 2px;
+  background: var(--bg-tertiary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.ui-tabs > button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.ui-tabs > button:hover { color: var(--text-primary); }
+.ui-tabs > button[aria-selected='true'],
+.ui-tabs > button[aria-pressed='true'],
+.ui-tabs > button.active {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: var(--soft-shadow), inset 0 0 0 1px var(--border);
+}
+.ui-tabs > button:focus-visible { outline: 2px solid var(--border-active); outline-offset: 1px; }
 
 /* Tabular numerals */
 .tabular-nums {

@@ -6,6 +6,8 @@ export interface QuickActionsValue {
   openCapture: (context?: GlobalCaptureContext) => void;
   openCommandPalette: () => void;
   openNotes?: (date?: string, kind?: DailyNoteKind) => void;
+  /** docs/54 J1: open a task in the shared drawer over the current surface. */
+  openTask?: (taskKey: string) => void;
 }
 
 const QuickActionsContext = createContext<QuickActionsValue>({

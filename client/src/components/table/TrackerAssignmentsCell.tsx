@@ -35,7 +35,7 @@ export function TrackerAssignmentsCell({
 
   return (
     <span
-      className="inline-flex min-w-[2.25rem] items-center justify-center gap-1 rounded-full px-1.5 py-0.5 text-[11.5px] font-semibold"
+      className="inline-flex min-w-[2.25rem] items-center justify-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-semibold"
       title={label}
       aria-label={label}
       style={{

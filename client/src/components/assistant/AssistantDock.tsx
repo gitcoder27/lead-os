@@ -54,8 +54,8 @@ export function AssistantDock() {
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
       className={
         expanded
-          ? 'fixed inset-2 z-[350] flex flex-col overflow-hidden rounded-2xl sm:inset-4'
-          : 'fixed inset-2 z-[350] flex flex-col overflow-hidden rounded-2xl sm:inset-auto sm:bottom-3 sm:right-3 sm:top-[calc(var(--app-header-height,64px)+10px)] sm:w-[400px] sm:max-w-[calc(100vw-24px)]'
+          ? 'fixed inset-2 z-copilot flex flex-col overflow-hidden rounded-2xl sm:inset-4'
+          : 'fixed inset-2 z-copilot flex flex-col overflow-hidden rounded-2xl sm:inset-auto sm:bottom-3 sm:right-3 sm:top-[calc(var(--app-header-height,64px)+10px)] sm:w-[400px] sm:max-w-[calc(100vw-24px)]'
       }
       style={{
         background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)',
@@ -87,7 +87,7 @@ export function AssistantDock() {
         <>
           {thread.error ? (
             <div
-              className="shrink-0 border-b px-3 py-1.5 text-[11.5px]"
+              className="shrink-0 border-b px-3 py-1.5 text-[12px]"
               style={{ borderColor: 'var(--border)', color: 'var(--danger)' }}
               role="alert"
             >
@@ -144,7 +144,7 @@ export function AssistantDock() {
               close();
             }}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold"
-            style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
           >
             <Settings size={13} />
             Open Settings
@@ -164,8 +164,8 @@ export function AssistantDock() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.18 }}
-          className="fixed inset-0 z-[340]"
-          style={{ background: 'rgba(5, 8, 12, 0.55)' }}
+          className="fixed inset-0 z-copilot"
+          style={{ background: 'var(--scrim)' }}
           onClick={() => setExpanded(false)}
           aria-hidden="true"
         />

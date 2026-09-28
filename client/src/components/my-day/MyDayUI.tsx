@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { FOCUS_RING, SectionHeader } from '@/components/tasks/TaskDetailPrimitives';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { FOCUS_RING } from '@/components/ui/focus';
 
 /**
  * My Day building blocks. The page follows the task-detail language —
@@ -108,17 +109,5 @@ export function IconAction({
   );
 }
 
-export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd
-      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] px-1 font-sans text-[10.5px] font-medium leading-none"
-      style={{
-        color: 'var(--text-muted)',
-        background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)',
-        border: `1px solid ${HAIRLINE}`,
-      }}
-    >
-      {children}
-    </kbd>
-  );
-}
+// docs/54 V9: the shared key cap.
+export { Kbd } from '@/components/ui/Kbd';

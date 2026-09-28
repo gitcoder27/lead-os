@@ -137,7 +137,7 @@ export function LabelsSection() {
                   <button
                     type="button"
                     onClick={() => handleRename(label)}
-                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[11.5px] font-semibold"
+                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[12px] font-semibold"
                     style={{ background: 'var(--settings-success-soft-bg)', color: 'var(--success)', border: 'var(--settings-success-soft-border)' }}
                     aria-label="Save rename"
                   >
@@ -146,7 +146,7 @@ export function LabelsSection() {
                   <button
                     type="button"
                     onClick={() => setEditing(null)}
-                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[11.5px] font-semibold"
+                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[12px] font-semibold"
                     style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
                     aria-label="Cancel rename"
                   >
@@ -156,12 +156,12 @@ export function LabelsSection() {
               ) : (
                 <>
                   <TaskLabelChip name={label.name} color={label.color} />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     {label.name}
                   </span>
                   {label.system && (
                     <span
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.05em]"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
                       style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                       title={`"${taskLabelDisplayName(label.name)}" is a system label`}
                     >
@@ -185,7 +185,7 @@ export function LabelsSection() {
                       <button
                         type="button"
                         onClick={() => setEditing({ name: label.name, draft: label.name })}
-                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors"
+                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
                         aria-label={`Rename label ${label.name}`}
                       >
@@ -195,7 +195,7 @@ export function LabelsSection() {
                       <button
                         type="button"
                         onClick={() => handleDelete(label)}
-                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors"
+                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
                         style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
                         aria-label={`Delete label ${label.name}`}
                       >
@@ -211,7 +211,7 @@ export function LabelsSection() {
         )}
       </div>
 
-      <p className="mt-2 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
         Renaming a label rewrites it on every task. Deleting removes it from every task and the registry.
         System labels can be recolored but not renamed or deleted.
       </p>

@@ -581,7 +581,7 @@ function TodayPartialDataNotice({
   return (
     <div className="today-notice" role="status">
       <p>{unavailable.join(', ') || 'Some sources'} unavailable — showing what loaded.</p>
-      <button type="button" onClick={onRetry} disabled={isFetching} className="today-ghost" style={{ color: 'var(--warning)' }}>
+      <button type="button" onClick={onRetry} disabled={isFetching} className="ui-btn-ghost" style={{ color: 'var(--warning)' }}>
         {isFetching ? 'Retrying…' : 'Retry'}
       </button>
     </div>
@@ -597,7 +597,7 @@ function TodayLoadingState({ isError, onRetry }: { isError: boolean; onRetry: ()
     <section className="flex min-h-0 flex-1 items-center justify-center px-5">
       <div className="text-center">
         <p className="text-[14px] font-medium" style={{ color: 'var(--text-primary)' }}>Today didn&apos;t load</p>
-        <button type="button" onClick={onRetry} className="today-btn today-btn-primary mt-3">Retry</button>
+        <button type="button" onClick={onRetry} className="ui-btn-solid mt-3">Retry</button>
       </div>
     </section>
   );

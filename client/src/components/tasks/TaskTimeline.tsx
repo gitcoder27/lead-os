@@ -125,7 +125,7 @@ function authorLabel(event: TaskEvent, accountId?: string): string {
   return event.author.displayName ?? `${AUTHOR_LABELS[event.author.type] ?? event.author.type}${event.author.id ? ` (${event.author.id})` : ''}`;
 }
 
-const BADGE = 'rounded-full px-1.5 text-[10.5px] font-semibold leading-[18px]';
+const BADGE = 'rounded-full px-1.5 text-[11px] font-semibold leading-[18px]';
 
 function EventBadges({ event }: { event: TaskEvent }) {
   const meta = eventMeta(event);
@@ -370,7 +370,7 @@ export function TaskTimeline({ taskKey, mode, emptyLabel = 'No activity yet.', r
           );
 
           const meta = (
-            <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               <span>{authorLabel(event, user?.accountId)}</span>
               <span aria-hidden="true"> · </span>
               <time dateTime={event.occurredAt} title={formatAbsoluteDateTime(event.occurredAt)}>{formatRelativeTime(event.occurredAt)}</time>

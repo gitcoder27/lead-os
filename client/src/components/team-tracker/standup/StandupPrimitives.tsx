@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react';
 import type { FeedTone, ReasonTone } from '@/lib/standup';
+import { Kbd as SharedKbd } from '@/components/ui/Kbd';
 
-export const getInitials = (name: string) => {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1]![0] : '')).toUpperCase() || '?';
-};
+export { initials as getInitials } from '@/components/ui/Avatar';
 
 export const TONE_COLORS: Record<FeedTone | ReasonTone, string> = {
   danger: 'var(--danger)',
@@ -15,65 +13,30 @@ export const TONE_COLORS: Record<FeedTone | ReasonTone, string> = {
   muted: 'var(--text-muted)',
 };
 
-export function Avatar({ name, size = 28, ring }: { name: string; size?: number; ring?: 'accent' | 'none' }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex shrink-0 items-center justify-center rounded-lg font-bold"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.36),
-        background: 'var(--bg-tertiary)',
-        color: 'var(--accent)',
-        border: '1px solid var(--border)',
-        boxShadow: ring === 'accent' ? '0 0 0 2px var(--bg-secondary), 0 0 0 3.5px var(--accent)' : undefined,
-      }}
-    >
-      {getInitials(name)}
-    </span>
-  );
-}
+// docs/54 V8: Standup uses the app-wide avatar (seed by account id).
+export { Avatar } from '@/components/ui/Avatar';
 
+// docs/54 V9: the shared key cap; `subtle` keeps the old call sites working.
 export function Kbd({ children, subtle = false }: { children: ReactNode; subtle?: boolean }) {
-  return (
-    <kbd
-      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded px-1 font-mono text-[10.5px] font-semibold leading-none"
-      style={{
-        color: subtle ? 'var(--text-muted)' : 'var(--text-secondary)',
-        background: 'var(--bg-tertiary)',
-        border: '1px solid var(--border)',
-        boxShadow: subtle ? undefined : 'inset 0 -1px 0 var(--border)',
-      }}
-    >
-      {children}
-    </kbd>
-  );
+  return <SharedKbd variant={subtle ? 'subtle' : 'default'}>{children}</SharedKbd>;
 }
 
+/** docs/54 V6: the shared tone chip (`.ui-chip`), tinted by `--tone`. */
 export function ToneChip({ tone, children, title }: { tone: FeedTone | ReasonTone; children: ReactNode; title?: string }) {
-  const color = TONE_COLORS[tone];
   return (
-    <span
-      title={title}
-      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-px text-[10.5px] font-semibold"
-      style={{
-        color,
-        background: `color-mix(in srgb, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${color} 24%, transparent)`,
-      }}
-    >
+    <span title={title} className="ui-chip gap-1 whitespace-nowrap" style={{ ['--tone' as string]: TONE_COLORS[tone] }}>
       {children}
     </span>
   );
 }
 
+/** docs/54 V10: sentence-case section header, the same as `ui/SectionHeader`. */
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-2">
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+    <div className="mb-2 flex min-h-[28px] items-center justify-between gap-2">
+      <h3 className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
         {children}
-      </span>
+      </h3>
       {right}
     </div>
   );

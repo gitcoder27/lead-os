@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useOverview } from '@/hooks/useOverview';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -41,7 +41,7 @@ export function ErrorBanner() {
         }}
       >
         <span className="h-6 w-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: isWarning ? 'rgba(245,158,11,0.14)' : 'rgba(239,68,68,0.14)' }}>
-          <AlertTriangle size={13} />
+          <TriangleAlert size={13} />
         </span>
         <div>
           <div className="text-[13px]" style={{ color: isWarning ? 'var(--warning)' : 'var(--danger)' }}>

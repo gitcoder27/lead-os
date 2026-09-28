@@ -73,7 +73,7 @@ export function TaskPicker({ tasks, text = '', selected, onChange, disabled }: T
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-[12px] font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
         about:
       </span>
       {tasks.map((task) => {
@@ -85,7 +85,7 @@ export function TaskPicker({ tasks, text = '', selected, onChange, disabled }: T
             type="button"
             onClick={() => toggle(task.taskKey)}
             disabled={disabled}
-            className="rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold transition-colors disabled:opacity-50"
+            className="rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold transition-colors disabled:opacity-50"
             style={{
               background: active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-tertiary)',
               color: active ? 'var(--accent)' : 'var(--text-muted)',
@@ -101,7 +101,7 @@ export function TaskPicker({ tasks, text = '', selected, onChange, disabled }: T
       {unknownTokens.map((token) => (
         <span
           key={token}
-          className="rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold"
+          className="rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold"
           style={{
             color: 'var(--text-muted)',
             border: '1px dashed var(--border-strong)',

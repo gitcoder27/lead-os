@@ -49,16 +49,23 @@ export function TodayCheckInDialog({
       subtitle={developerName}
       onClose={onClose}
       onSubmit={save}
-      footer={<TodayDialogActions saveLabel="Save check-in" isSaving={isSaving} canSave={canSave} onCancel={onClose} onSave={save} />}
+      footer={<TodayDialogActions saveLabel="Save check-in" submitKey="enter" isSaving={isSaving} canSave={canSave} onCancel={onClose} onSave={save} />}
     >
-      <label htmlFor={fieldId} className="today-field-label">Check-in note</label>
+      <label htmlFor={fieldId} className="ui-field-label">Check-in note</label>
       <textarea
         id={fieldId}
         data-autofocus
         value={summary}
         onChange={(event) => setSummary(event.target.value)}
+        onKeyDown={(event) => {
+          // docs/54 K3: a check-in composer posts on Enter everywhere (⇧↵ newline).
+          if (event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            save();
+          }
+        }}
         rows={4}
-        className="today-field"
+        className="ui-field"
         placeholder={placeholder}
       />
       {pickerTasks.length > 0 && (

@@ -107,7 +107,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
             onClick={send}
             disabled={disabled || !value.trim()}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-opacity disabled:opacity-40"
-            style={{ background: 'var(--accent)', color: 'var(--bg-primary)' }}
+            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             title="Send message"
             aria-label="Send message"
           >
@@ -115,7 +115,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
           </button>
         )}
       </div>
-      <p className="mt-1.5 text-[10.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1.5 text-[11px] leading-4" style={{ color: 'var(--text-muted)' }}>
         Copilot can make mistakes — review proposed actions before confirming.
       </p>
       </div>

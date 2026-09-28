@@ -177,7 +177,7 @@ function DrawerContent({
         />
         {item.taskKey ? (
           <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
               <History size={11} />
               Task timeline
             </div>

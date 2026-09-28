@@ -71,7 +71,7 @@ export function TriageNotesEditor({ value, onChange, onBlurSave, isSaved, readOn
           <FileText size={10} /> Notes
         </span>
         <span
-          className="text-[10.5px] transition-opacity"
+          className="text-[11px] transition-opacity"
           style={{ color: !isSaved ? 'var(--warning)' : 'var(--success)', opacity: value ? 1 : 0 }}
         >
           {!isSaved ? 'Saving…' : (

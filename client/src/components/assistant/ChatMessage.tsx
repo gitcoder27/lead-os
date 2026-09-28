@@ -84,7 +84,7 @@ export function ChatMessage({ message, canRegenerate, onRegenerate, onOpenTarget
         <button
           type="button"
           onClick={onRegenerate}
-          className="mt-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="mt-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--text-muted)' }}
           title="Regenerate response"
           aria-label="Regenerate response"

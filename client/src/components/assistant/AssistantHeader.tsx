@@ -69,7 +69,7 @@ export function AssistantHeader({
             Copilot
           </p>
           <p
-            className="truncate text-[10.5px] leading-tight"
+            className="truncate text-[11px] leading-tight"
             style={{ color: 'var(--text-muted)' }}
             title="What Copilot sees — this screen and its active filters go with each message"
           >
@@ -101,7 +101,7 @@ export function AssistantHeader({
             >
               <div className="max-h-64 overflow-y-auto">
                 {conversations.length === 0 ? (
-                  <p className="px-3 py-2.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="px-3 py-2.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     No conversations yet
                   </p>
                 ) : (
@@ -127,7 +127,7 @@ export function AssistantHeader({
                         <p className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                           {conversation.title}
                         </p>
-                        <p className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                           {formatRelativeTime(conversation.updatedAt)}
                         </p>
                       </button>

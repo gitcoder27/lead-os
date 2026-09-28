@@ -1,4 +1,4 @@
-import { Archive, ArrowRight, CheckCircle2, MoreHorizontal, RotateCcw, XCircle } from 'lucide-react';
+import { Archive, ArrowRight, CircleCheck, MoreHorizontal, RotateCcw, CircleX } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ManagerDeskItem, ManagerDeskStatus } from '@/types/manager-desk';
 import { STATUS_LABELS } from '@/types/manager-desk';
@@ -71,7 +71,7 @@ export function DrawerWorkflowActions({
     >
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto min-w-[136px]">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
             {hasLinkedWork ? 'My follow-through' : 'Workflow'}
           </div>
           <div className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -85,7 +85,7 @@ export function DrawerWorkflowActions({
         {moreActions.length > 0 && (
           <details className="relative" onClick={(event) => event.stopPropagation()}>
             <summary
-              className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] [&::-webkit-details-marker]:hidden"
+              className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] [&::-webkit-details-marker]:hidden"
               style={toneStyles.neutral}
               aria-label={`More workflow actions for ${item.title}`}
               title="More actions"
@@ -110,7 +110,7 @@ export function DrawerWorkflowActions({
                     action.onClick();
                   }}
                   disabled={action.disabled}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-[0.08em] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
                   style={{ color: action.tone === 'danger' ? 'var(--danger)' : action.tone === 'success' ? 'var(--success)' : 'var(--text-secondary)' }}
                   aria-label={action.ariaLabel ?? action.label}
                 >
@@ -139,7 +139,7 @@ function getPrimaryAction(
   }
 
   if (item.status === 'in_progress') {
-    return statusAction(item, 'done', 'Done', <CheckCircle2 size={11} />, 'success', onUpdate);
+    return statusAction(item, 'done', 'Done', <CircleCheck size={11} />, 'success', onUpdate);
   }
 
   if (item.status === 'inbox') {
@@ -176,7 +176,7 @@ function getMoreActions(
   const actions: WorkflowAction[] = [];
 
   if (item.status !== 'backlog' && item.status !== 'in_progress') {
-    actions.push(statusAction(item, 'done', 'Mark done', <CheckCircle2 size={11} />, 'success', onUpdate));
+    actions.push(statusAction(item, 'done', 'Mark done', <CircleCheck size={11} />, 'success', onUpdate));
   }
 
   if (item.status !== 'backlog' && !hasLinkedWork) {
@@ -195,7 +195,7 @@ function getMoreActions(
   }
 
   if (!hasLinkedWork) {
-    actions.push(statusAction(item, 'cancelled', 'Drop', <XCircle size={11} />, 'danger', onUpdate));
+    actions.push(statusAction(item, 'cancelled', 'Drop', <CircleX size={11} />, 'danger', onUpdate));
   }
 
   return actions;
@@ -224,7 +224,7 @@ function WorkflowButton({ action, variant }: { action: WorkflowAction; variant: 
       onClick={action.onClick}
       disabled={action.disabled}
       className={[
-        'inline-flex h-8 items-center gap-1.5 rounded-lg border text-[11px] font-semibold uppercase tracking-[0.08em]',
+        'inline-flex h-8 items-center gap-1.5 rounded-lg border text-[12px] font-semibold uppercase tracking-[0.08em]',
         'transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45',
         variant === 'primary' ? 'px-3' : 'px-2.5',
       ].join(' ')}

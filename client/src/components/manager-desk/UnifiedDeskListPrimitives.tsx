@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Archive, CheckCircle2, History, Inbox, ListChecks } from 'lucide-react';
+import { Archive, CircleCheck, History, Inbox, ListChecks } from 'lucide-react';
 import type { ManagerDeskItem } from '@/types/manager-desk';
 import type { ManagerDeskQuickFilter } from './workbench-utils';
 
@@ -66,7 +66,7 @@ export function SignalChip({
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
       style={{ borderColor: 'var(--border)', background, color }}
     >
       {icon}
@@ -84,7 +84,7 @@ export function UnifiedEmptyState({
   message: string;
 }) {
   const Icon = quickFilter === 'done'
-    ? CheckCircle2
+    ? CircleCheck
     : quickFilter === 'inbox'
     ? Inbox
     : quickFilter === 'backlog'

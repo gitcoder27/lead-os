@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { TrackerDeveloperStatus } from '@/types';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { STATUS_ORDER, getStatusInfo } from './status-config';
 
 export { getStatusInfo } from './status-config';
@@ -40,8 +40,8 @@ export function StatusSelector({ current, onUpdate, isPending, disabled }: Statu
             disabled={disabled}
             aria-pressed={isActive}
             aria-label={cfg.label}
-            title={cfg.label}
-            className={`relative flex h-[50px] min-w-0 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-[11.5px] font-medium transition-colors disabled:cursor-not-allowed ${
+            title={cfg.description}
+            className={`relative flex h-[50px] min-w-0 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed ${
               isActive ? '' : 'hover:text-[var(--text-primary)]'
             } ${FOCUS_RING}`}
             style={{ color: isActive ? cfg.color : 'var(--text-muted)' }}
@@ -54,7 +54,7 @@ export function StatusSelector({ current, onUpdate, isPending, disabled }: Statu
                 style={{
                   background: `color-mix(in srgb, ${cfg.color} 13%, var(--bg-elevated))`,
                   border: `1px solid color-mix(in srgb, ${cfg.color} 34%, transparent)`,
-                  boxShadow: `0 1px 2px rgba(0,0,0,0.12), 0 0 16px color-mix(in srgb, ${cfg.color} 12%, transparent)`,
+                  boxShadow: 'var(--soft-shadow)',
                 }}
                 transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
               />

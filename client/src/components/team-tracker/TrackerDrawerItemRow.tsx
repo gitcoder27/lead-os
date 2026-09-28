@@ -1,13 +1,14 @@
 import { useEffect, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import { Check, CheckCircle2, GripVertical, Link2, Lock, StickyNote, X, XCircle } from 'lucide-react';
+import { Check, GripVertical, Link2, Lock, StickyNote, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { formatAbsoluteDateTime, formatDate } from '@/lib/utils';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { TrackerItemRowActions, type TrackerItemActionPreset } from './TrackerItemRowActions';
 import { RelatedIssueChips } from './RelatedIssueChips';
 import { continuedDays, describeLatestEvent, formatCompactRelative } from './trackerItemFormat';
+import { TaskStatusGlyph } from '@/components/tasks/TaskMenus';
 
 export type TrackerDrawerItemVariant = 'drawer-current' | 'drawer-planned' | 'drawer-history';
 
@@ -112,7 +113,7 @@ export function TrackerDrawerItemRow({
     ? 'text-[14px] font-semibold leading-5 tracking-[-0.005em]'
     : isHistory
       ? 'text-[13px] leading-5'
-      : 'text-[13.5px] font-medium leading-5';
+      : 'text-[13px] font-medium leading-5';
   const titleColor = isClosed ? 'var(--text-secondary)' : 'var(--text-primary)';
   const titleDecoration = item.state === 'dropped' ? 'line-through' : 'none';
 
@@ -122,7 +123,7 @@ export function TrackerDrawerItemRow({
       <JiraIssueLink
         key="jira"
         issueKey={item.jiraKey}
-        className="font-mono text-[11.5px] font-semibold hover:underline"
+        className="font-mono text-[12px] font-semibold hover:underline"
         style={{ color: 'var(--accent)' }}
         title={item.jiraSummary && item.jiraSummary !== item.title ? `${item.jiraKey} · ${item.jiraSummary}` : item.jiraKey}
       >
@@ -348,26 +349,17 @@ function LeadingGlyph({
 }) {
   const box = 'flex h-5 w-5 shrink-0 items-center justify-center';
 
+  // docs/54 V7: the shared task glyph — current work is "active", closed
+  // work reads exactly as it does on Tasks, Standup and My Day.
   if (variant === 'drawer-current') {
-    return (
-      <span className={box} aria-hidden="true">
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{ background: 'var(--accent)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)' }}
-        />
-      </span>
-    );
+    return <span className={box} aria-hidden="true"><TaskStatusGlyph status="active" /></span>;
   }
-
-  if (item.state === 'done') {
-    return <span className={box} aria-hidden="true"><CheckCircle2 size={14} style={{ color: 'var(--success)' }} /></span>;
-  }
-  if (item.state === 'dropped') {
-    return <span className={box} aria-hidden="true"><XCircle size={14} style={{ color: 'var(--text-muted)' }} /></span>;
+  if (item.state === 'done' || item.state === 'dropped') {
+    return <span className={box} aria-hidden="true"><TaskStatusGlyph status={item.state} /></span>;
   }
 
   const number = typeof index === 'number' ? (
-    <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
+    <span className="text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
   ) : null;
 
   if (!draggable) {

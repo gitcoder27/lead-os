@@ -1,13 +1,14 @@
 import { useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Check, CheckCircle2, GripVertical, Play, RotateCcw, X, XCircle } from 'lucide-react';
+import { Check, GripVertical, Play, RotateCcw, X } from 'lucide-react';
 import { format } from 'date-fns';
 import type { TrackerWorkItem } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { IconAction } from './MyDayUI';
 import { InlineTaskActions, RowComposer, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
 import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
+import { TaskStatusGlyph } from '@/components/tasks/TaskMenus';
 
 export type MyDayTaskRowVariant = 'planned' | 'done' | 'dropped';
 
@@ -98,7 +99,7 @@ export function MyDayTaskRow({
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
             onCommit={onUpdateTitle}
-            className={closed ? 'text-[13px] leading-5' : 'text-[13.5px] font-medium leading-5'}
+            className={closed ? 'text-[13px] leading-5' : 'text-[13px] font-medium leading-5'}
             color={closed ? 'var(--text-secondary)' : 'var(--text-primary)'}
             strike={variant === 'dropped'}
           />
@@ -201,15 +202,13 @@ function LeadingGlyph({
 }) {
   const box = 'mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center';
 
-  if (variant === 'done') {
-    return <span className={box} aria-hidden="true"><CheckCircle2 size={15} style={{ color: 'var(--success)' }} /></span>;
-  }
-  if (variant === 'dropped') {
-    return <span className={box} aria-hidden="true"><XCircle size={15} style={{ color: 'var(--text-disabled)' }} /></span>;
+  // docs/54 V7: closed work wears the same glyph it has on Tasks and Standup.
+  if (variant === 'done' || variant === 'dropped') {
+    return <span className={box} aria-hidden="true"><TaskStatusGlyph status={variant} /></span>;
   }
 
   const number = typeof index === 'number' ? (
-    <span className="text-[11.5px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
+    <span className="text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
   ) : null;
 
   if (!reorderable) {

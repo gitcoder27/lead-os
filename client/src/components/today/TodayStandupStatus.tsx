@@ -1,4 +1,4 @@
-import { CheckCircle2, PlayCircle } from 'lucide-react';
+import { CircleCheck, PlayCircle } from 'lucide-react';
 import { firstName, formatClock } from '@/lib/today-layout';
 import type { TodayActionItem, TodayActionTarget, TodayStandupFocus } from '@/types';
 
@@ -29,7 +29,7 @@ export function TodayStandupCard({ standup, row, completedOnly = false, onOpenTa
             <h2 className="today-section-title">Standup</h2>
             <p className="today-standup-meta">Not started{row?.context ? ` · ${row.context}` : ''}</p>
           </div>
-          <button type="button" className="today-primary" onClick={() => onOpenTarget(standup.target)}>
+          <button type="button" className="ui-btn" onClick={() => onOpenTarget(standup.target)}>
             Start standup
           </button>
         </div>
@@ -41,7 +41,7 @@ export function TodayStandupCard({ standup, row, completedOnly = false, onOpenTa
   return (
     <section className="today-panel" aria-label="Standup">
       <div className="today-standup">
-        <CheckCircle2 size={18} className="today-standup-icon" style={{ color: 'var(--success)' }} aria-hidden="true" />
+        <CircleCheck size={18} className="today-standup-icon" style={{ color: 'var(--success)' }} aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h2 className="today-section-title">Standup{endedAt ? ` ✓ ${endedAt}` : ' ✓'}</h2>
           <p className="today-standup-meta">
@@ -51,7 +51,7 @@ export function TodayStandupCard({ standup, row, completedOnly = false, onOpenTa
           {standup.flagged.length > 0 ? (
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
               {standup.flagged.map((person) => (
-                <button key={person.accountId} type="button" className="today-link" onClick={() => onOpenTarget(person.target)}>
+                <button key={person.accountId} type="button" className="ui-link" onClick={() => onOpenTarget(person.target)}>
                   {firstName(person.displayName)}
                 </button>
               ))}
@@ -60,7 +60,7 @@ export function TodayStandupCard({ standup, row, completedOnly = false, onOpenTa
         </div>
         <button
           type="button"
-          className="today-ghost"
+          className="ui-btn-ghost"
           onClick={() => onOpenTarget({ type: 'view', view: 'team', mode: 'standup', date: standup.date })}
         >
           Run again

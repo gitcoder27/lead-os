@@ -9,7 +9,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpDown, Ban, Filter, Search, X, XCircle } from 'lucide-react';
+import { TriangleAlert, ArrowUpDown, Ban, Filter, Search, X, CircleX } from 'lucide-react';
 import { PriorityCell } from './PriorityCell';
 import { StatusBadge } from './StatusBadge';
 import { AssigneeCell } from './AssigneeCell';
@@ -795,7 +795,7 @@ export function DefectTable({
             onClick={() => void refetch()}
             disabled={isFetching}
             className="mt-4 rounded-md px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
           >
             {isFetching ? 'Retrying' : 'Retry'}
           </button>
@@ -834,7 +834,7 @@ export function DefectTable({
           aria-label="Clear all defect filters"
           title="Clear all filters"
         >
-          <XCircle size={15} />
+          <CircleX size={15} />
           <span className="text-[13px] font-medium hidden sm:inline">Clear filters</span>
         </button>
 
@@ -901,7 +901,7 @@ export function DefectTable({
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-4 text-center">
         <div className="max-w-[420px] rounded-2xl px-5 py-4" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-strong)' }}>
           <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--danger)' }}>
-            <AlertTriangle size={18} />
+            <TriangleAlert size={18} />
           </div>
           <p className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             Jira defects could not be refreshed
@@ -980,7 +980,7 @@ export function DefectTable({
                         <th
                           key={header.id}
                           aria-sort={canSort ? sortState === 'asc' ? 'ascending' : sortState === 'desc' ? 'descending' : 'none' : undefined}
-                          className="text-left text-[11.5px] font-semibold uppercase px-2 py-1.5 select-none sticky top-0 z-30"
+                          className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 select-none sticky top-0 z-30"
                           style={{
                             letterSpacing: '0.08em',
                             color: 'var(--text-muted)',

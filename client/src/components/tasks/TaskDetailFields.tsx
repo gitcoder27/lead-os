@@ -23,7 +23,7 @@ import { isOpenStatus, scheduleChanges, type SchedulePreset } from '@/lib/task-l
 import { getLocalIsoDate } from '@/lib/utils';
 import type { TaskDetailResponse, TaskStatus, UpdateTaskRequest } from '@/types';
 import { AssignMenu, StatusMenu, TASK_STATUS_META, TaskStatusGlyph, type AssignTarget } from './TaskMenus';
-import { MenuItem, TaskPopover } from './TaskPopover';
+import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { TaskLabelChip, TaskLabelPicker } from './TaskLabelPicker';
 import {
   Avatar,
@@ -256,7 +256,7 @@ function OwnerRow({ task, editable, onPatch, people }: { task: TaskDetailRespons
           <>
             <Avatar name="?" muted />
             <Placeholder>Unassigned</Placeholder>
-            <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>Inbox</span>
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Inbox</span>
           </>
         )}
       </PropertyButton>
@@ -339,7 +339,7 @@ function ScheduleRow({ task, editable, canLater, onPatch }: { task: TaskDetailRe
         {later ? (
           <span className="flex min-w-0 items-baseline gap-1.5">
             <span className="font-medium" style={{ color: 'var(--info)' }}>Later</span>
-            <span className="truncate text-[11.5px]" style={{ color: 'var(--text-muted)' }}>parked, off today&apos;s list</span>
+            <span className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>parked, off today&apos;s list</span>
           </span>
         ) : (
           <DateValue display={display} empty="Not scheduled" />
@@ -619,7 +619,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
           style={{ color: 'var(--text-primary)' }}
         />
         <div className="flex items-center gap-2 px-2 pt-1">
-          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
             {draft.length > TASK_DETAILS_MAX * 0.9 ? `${draft.length.toLocaleString()} / ${TASK_DETAILS_MAX.toLocaleString()}` : '⌘/Ctrl ↵ to save · Esc to discard'}
           </span>
           <div className="ml-auto flex items-center gap-1">

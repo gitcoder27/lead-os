@@ -2,7 +2,7 @@ import { ChevronRight, LogOut, RefreshCw, Sun, Moon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { AuthUser, MyDayResponse } from '@/types';
 import { getLocalIsoDate } from '@/lib/utils';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { getStatusInfo } from './status-config';
 import { MyDayDateControl, relativeDayLabel } from './MyDayDateControl';
 import { HAIRLINE, IconAction } from './MyDayUI';
@@ -55,8 +55,7 @@ export function MyDayHeader({
           {eyebrow}
         </p>
         <h1
-          className="mt-1 truncate text-[26px] font-semibold leading-[32px] tracking-[-0.025em] sm:text-[28px] sm:leading-[34px]"
-          style={{ color: 'var(--text-primary)' }}
+          className="ui-page-title mt-1 truncate"
         >
           {title}
         </h1>

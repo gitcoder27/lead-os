@@ -27,7 +27,7 @@ export function TaskKeyChip({ taskKey, className }: TaskKeyChipProps) {
         void copyLink();
       }}
       onKeyDown={(event) => event.stopPropagation()}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide transition-colors ${className ?? ''}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[12px] font-bold tracking-wide transition-colors ${className ?? ''}`}
       style={{
         background: 'var(--bg-tertiary)',
         color: copied ? 'var(--success)' : 'var(--text-secondary)',

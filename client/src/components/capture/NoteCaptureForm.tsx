@@ -137,11 +137,11 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           maxLength={50000}
           disabled={submitting}
         />
-        <p className="mt-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
           Added to your private daily note
         </p>
         {storageWarning ? (
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--warning)' }}>
+          <p className="mt-1 text-[12px]" style={{ color: 'var(--warning)' }}>
             Draft recovery unavailable in this browser. Keep this dialog open until it saves.
           </p>
         ) : null}
@@ -154,7 +154,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)',
         }}
       >
-        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {targetDate === date ? formattedDate : targetDate}
         </span>
         <div className="flex items-center gap-2">
@@ -177,8 +177,8 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
             disabled={!text.trim() || submitting}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40"
             style={{
-              background: 'var(--accent)',
-              color: '#fff',
+              background: 'var(--accent-solid)',
+              color: 'var(--on-accent)',
             }}
           >
             <NotebookPen size={11} />

@@ -1,5 +1,5 @@
 import type { TrackerBoardSummary, TrackerBoardSummaryFilter } from '@/types';
-import { FOCUS_RING } from '@/components/tasks/TaskDetailPrimitives';
+import { FOCUS_RING } from '@/components/ui/focus';
 import { STATUS_META } from './TrackerStatusPill';
 
 interface TrackerSummaryStripProps {

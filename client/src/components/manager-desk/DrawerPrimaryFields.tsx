@@ -43,7 +43,7 @@ export function DrawerPrimaryFields({
         >
           <div className="mb-2 flex items-center gap-2">
             <UserRound size={12} style={{ color: 'var(--md-accent)' }} />
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
               Owner
             </span>
           </div>
@@ -62,12 +62,12 @@ export function DrawerPrimaryFields({
             emptyLabel="Unassigned"
           />
           {hasLinkedWork && assigneeId && (
-            <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               Delegated on the team board — reassigning moves it, Unassigned removes it.
             </p>
           )}
           {selectedDev?.availability?.state === 'inactive' && (
-            <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--warning)' }}>
+            <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--warning)' }}>
               {selectedDev.availability.note || `${selectedDev.displayName} is inactive for ${date}.`}
             </p>
           )}
@@ -83,7 +83,7 @@ export function DrawerPrimaryFields({
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <ArrowRight size={12} style={{ color: 'var(--md-accent)' }} />
-              <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                 Next move
               </span>
             </div>
@@ -122,7 +122,7 @@ function InlineSelect<T extends string>({
   const id = useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </label>
       <select
@@ -199,7 +199,7 @@ function SaveIndicator({ state }: { state: 'idle' | 'dirty' | 'saving' | 'saved'
   if (state === 'idle') return null;
   return (
     <span
-      className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+      className="text-[11px] font-semibold uppercase tracking-[0.12em]"
       style={{ color: state === 'saved' ? 'var(--success)' : 'var(--warning)' }}
     >
       {state === 'saved' ? 'Saved' : 'Saving...'}

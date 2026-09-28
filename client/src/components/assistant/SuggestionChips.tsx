@@ -59,7 +59,7 @@ export function SuggestionChips({ currentView, items, onPick }: SuggestionChipsP
           key={suggestion}
           type="button"
           onClick={() => onPick(suggestion)}
-          className="rounded-full px-2.5 py-1 text-[11.5px] transition-colors"
+          className="rounded-full px-2.5 py-1 text-[12px] transition-colors"
           style={{
             background: 'var(--bg-tertiary)',
             border: '1px solid var(--border)',

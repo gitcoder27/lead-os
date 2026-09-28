@@ -24,7 +24,7 @@ import { taskLabelDisplayName, type TaskLabel, type TaskStatus } from '@/types';
 import { nextWeekday, type SchedulePreset } from '@/lib/task-list';
 import { labelChipStyle } from './label-colors';
 import { DatePickerPopover, type DatePreset } from './TaskDetailPrimitives';
-import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from './TaskPopover';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 
 /** docs/49 §5: status glyphs — never a done-checkbox. */
 export const TASK_STATUS_META: Record<TaskStatus, { label: string; color: string; Icon: typeof Circle }> = {

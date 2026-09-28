@@ -150,14 +150,14 @@ function DeveloperResults({
           </span>
           {developer.availability?.state === 'inactive' ? (
             <span
-              className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase"
+              className="rounded-full px-1.5 py-0.5 text-[11px] font-bold uppercase"
               style={{ background: 'rgba(245, 158, 11, 0.12)', color: 'var(--warning)' }}
             >
               Inactive
             </span>
           ) : null}
           {developer.email ? (
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {developer.email}
             </span>
           ) : null}

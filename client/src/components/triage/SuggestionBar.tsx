@@ -18,7 +18,7 @@ function AssigneeMetrics({ suggestion }: { suggestion: AssignmentSuggestion }) {
   return (
     <span className="flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
       👤 <strong style={{ color: 'var(--text-primary)' }}>{suggestion.developer.displayName}</strong>
-      <span className="flex items-center gap-1 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
+      <span className="flex items-center gap-1 text-[12px] font-mono" style={{ color: 'var(--text-muted)' }}>
         <span
           className="rounded-full px-1.5 py-0.5"
           style={{ background: 'var(--bg-tertiary)' }}
@@ -99,8 +99,8 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
           <button
             onClick={handleApplyAll}
             disabled={updateIssue.isPending}
-            className="px-2.5 py-1 rounded-md text-[11.5px] font-semibold transition-all duration-150 active:scale-[0.97]"
-            style={{ background: 'var(--accent)', color: '#fff', opacity: updateIssue.isPending ? 0.6 : 1 }}
+            className="px-2.5 py-1 rounded-md text-[12px] font-semibold transition-all duration-150 active:scale-[0.97]"
+            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)', opacity: updateIssue.isPending ? 0.6 : 1 }}
           >
             {updateIssue.isPending ? 'Applying…' : 'Apply All'}
           </button>

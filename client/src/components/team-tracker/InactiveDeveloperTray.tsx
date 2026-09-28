@@ -51,13 +51,13 @@ export function InactiveDeveloperTray({
                 Inactive
               </span>
               <span
-                className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
+                className="rounded-full px-1.5 py-0.5 text-[12px] font-semibold"
                 style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
               >
                 {items.length}
               </span>
             </div>
-            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
               {readOnly
                 ? 'Historical inactive state for the selected date.'
                 : 'Hidden from the active board. Expand only when you need to restore someone.'}
@@ -65,7 +65,7 @@ export function InactiveDeveloperTray({
           </div>
         </div>
         <span
-          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold"
           style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}
         >
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -88,7 +88,7 @@ export function InactiveDeveloperTray({
                   <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {item.developer.displayName}
                   </div>
-                  <div className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  <div className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     {item.availability.note || `Inactive since ${item.availability.startDate}`}
                   </div>
                 </div>
@@ -97,7 +97,7 @@ export function InactiveDeveloperTray({
                     type="button"
                     onClick={() => onReactivate(item.developer.accountId)}
                     disabled={isPending}
-                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[12px] font-semibold transition-colors disabled:opacity-50"
                     style={{
                       color: 'var(--accent)',
                       background: 'var(--bg-secondary)',

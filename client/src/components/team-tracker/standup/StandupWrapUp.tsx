@@ -112,7 +112,7 @@ export function StandupWrapUp({
       <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {tiles.map(([label, value, color]) => (
           <div key={label} className="rounded-xl px-3.5 py-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>{label}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>{label}</div>
             <div className="mt-1 text-[22px] font-semibold leading-none tabular-nums" style={{ color: color ?? 'var(--text-primary)' }}>{value}</div>
           </div>
         ))}
@@ -160,7 +160,7 @@ export function StandupWrapUp({
           <div className="space-y-2">
             {logged.map(({ day, entries }) => (
               <div key={day.developer.accountId} className="flex gap-3 rounded-xl px-3.5 py-2.5" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                <Avatar name={day.developer.displayName} size={26} />
+                <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={26} />
                 <div className="min-w-0 flex-1">
                   <div className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{day.developer.displayName}</div>
                   <ul className="mt-0.5 space-y-0.5">
@@ -181,7 +181,7 @@ export function StandupWrapUp({
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex items-center gap-1 text-[11.5px] font-medium hover:underline"
+          className="inline-flex items-center gap-1 text-[12px] font-medium hover:underline"
           style={{ color: 'var(--text-muted)' }}
         >
           <RotateCcw size={11} /> Reset session
@@ -200,7 +200,7 @@ function PersonRow({ day, onClick, children }: { day: TrackerDeveloperDay; onCli
         className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
         aria-label={`Go to ${day.developer.displayName}`}
       >
-        <Avatar name={day.developer.displayName} size={24} />
+        <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={24} />
         <span className="w-[130px] shrink-0 truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
           {day.developer.displayName}
         </span>
@@ -241,12 +241,7 @@ function WrapButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-colors disabled:opacity-50"
-      style={
-        primary
-          ? { background: 'var(--accent)', color: '#fff' }
-          : { color: 'var(--text-secondary)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }
-      }
+      className={primary ? 'ui-btn' : 'ui-btn-ghost'}
     >
       {icon}
       {children}

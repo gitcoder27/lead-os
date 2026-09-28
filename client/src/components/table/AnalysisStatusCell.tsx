@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CircleCheck, Circle } from 'lucide-react';
 
 interface AnalysisStatusCellProps {
   hasNotes: boolean;
@@ -12,7 +12,7 @@ export function AnalysisStatusCell({ hasNotes }: AnalysisStatusCellProps) {
         title="Analysis complete"
         aria-label="Analysis complete"
       >
-        <CheckCircle2 size={14} style={{ color: 'var(--success)', opacity: 0.9 }} />
+        <CircleCheck size={14} style={{ color: 'var(--success)', opacity: 0.9 }} />
       </span>
     );
   }

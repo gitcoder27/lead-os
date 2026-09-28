@@ -187,7 +187,7 @@ function DescriptionSection({ content }: { content: string }) {
     <div className="triage-section">
       <button type="button" onClick={() => setExpanded((p) => !p)} className="triage-section-label flex items-center gap-1 mb-1.5">
         Description
-        <span className="text-[10px] ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
+        <span className="text-[11px] ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
       </button>
       <div
         className={`text-[13px] leading-relaxed prose prose-sm max-w-none ${expanded ? '' : 'line-clamp-2 cursor-pointer'}`}

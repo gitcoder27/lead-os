@@ -32,7 +32,7 @@ const TOKEN_COLORS: Record<CaptureTokenKind, string> = {
 };
 
 const TOKEN_BG: Record<CaptureTokenKind, string> = {
-  command: 'rgba(184,134,11,0.12)',
+  command: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
   person: 'var(--accent-glow)',
   jira: 'color-mix(in srgb, var(--info) 14%, transparent)',
   parent: 'color-mix(in srgb, var(--success) 12%, transparent)',
@@ -40,7 +40,7 @@ const TOKEN_BG: Record<CaptureTokenKind, string> = {
   date: 'color-mix(in srgb, var(--warning) 14%, transparent)',
   priority: 'color-mix(in srgb, var(--danger) 12%, transparent)',
   later: 'var(--bg-tertiary)',
-  meeting: 'rgba(184,134,11,0.12)',
+  meeting: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
   followup: 'color-mix(in srgb, var(--warning) 12%, transparent)',
   label: 'var(--accent-glow)',
 };
@@ -57,7 +57,7 @@ function Chip({ icon, children, tone }: { icon?: React.ReactNode; children: Reac
   const color = tone === 'error' ? 'var(--danger)' : tone === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium"
       style={{ background: 'var(--bg-tertiary)', color, border: '1px solid var(--border)' }}
     >
       {icon}
@@ -363,7 +363,7 @@ export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProp
               >
                 <Tags size={10} style={{ color: 'var(--accent)' }} />
                 <span className="font-mono font-semibold">+{name}</span>
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{taskLabelDisplayName(name)}</span>
+                <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{taskLabelDisplayName(name)}</span>
               </button>
             ))}
           </div>
@@ -390,7 +390,7 @@ export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProp
                       key={candidate.accountId}
                       type="button"
                       onClick={() => chooseCandidate(d.tokenIndex, candidate.accountId)}
-                      className="rounded-md px-2 py-0.5 text-[11px] font-medium"
+                      className="rounded-md px-2 py-0.5 text-[12px] font-medium"
                       style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
                     >
                       {candidate.displayName}
@@ -411,15 +411,14 @@ export function CaptureBox({ prefill = '', onClose, onCaptured }: CaptureBoxProp
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
-        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {resolved?.intent === 'update' ? 'Logs a shared update on the task' : resolved?.intent === 'note' ? 'Appends to today\u2019s daily note' : 'Creates a task'}
         </span>
         <button
           type="button"
           onClick={() => submit(confirmArmed)}
           disabled={!text.trim() || blocked || capture.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff', boxShadow: '0 4px 12px color-mix(in srgb, var(--accent) 25%, transparent)' }}
+          className="ui-btn-solid"
         >
           <Zap size={11} />
           {capture.isPending ? 'Capturing…' : confirmArmed ? 'Confirm' : 'Capture'}

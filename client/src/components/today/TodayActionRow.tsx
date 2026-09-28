@@ -1,10 +1,10 @@
 import { memo } from 'react';
 import {
-  AlertTriangle,
+  TriangleAlert,
   Bell,
   CalendarClock,
   CalendarDays,
-  CheckCircle2,
+  CircleCheck,
   GitCompareArrows,
   Loader2,
   MessageSquare,
@@ -23,10 +23,10 @@ import type { TodayActionCommand, TodayActionItem, TodayActionItemType } from '@
 
 const iconByType: Record<TodayActionItemType, LucideIcon> = {
   developer_attention: Users,
-  overdue_issue: AlertTriangle,
+  overdue_issue: TriangleAlert,
   due_issue: CalendarClock,
   unassigned_issue: UserRoundX,
-  high_priority_issue: AlertTriangle,
+  high_priority_issue: TriangleAlert,
   stale_check_in: MessageSquare,
   follow_up_due: Bell,
   meeting_outcome: CalendarClock,
@@ -36,7 +36,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   jira_drift: GitCompareArrows,
   one_on_one: CalendarDays,
   standup: PlayCircle,
-  calm: CheckCircle2,
+  calm: CircleCheck,
 };
 
 export type TodayRunCommand = (command: TodayActionCommand, preset?: 'later_today' | 'tomorrow' | 'next_week') => void;
@@ -95,7 +95,7 @@ export const TodayActionRow = memo(function TodayActionRow({
         <span className="today-row-title-line">
           <span className="today-row-title">{item.title}</span>
           {chips.map((chip, index) => (
-            <span key={chip} className="today-chip" data-quiet={index > 0 ? 'true' : undefined}>
+            <span key={chip} className="ui-chip" data-quiet={index > 0 ? 'true' : undefined}>
               {chip}
             </span>
           ))}
@@ -116,7 +116,7 @@ export const TodayActionRow = memo(function TodayActionRow({
         {/* Every row ends in its next step; plain "Open …" steps read quieter. */}
         <button
           type="button"
-          className={primaryIsOpen && item.type !== 'standup' ? 'today-ghost' : 'today-primary'}
+          className={primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-btn'}
           onClick={() => onRunCommand(item.primaryAction)}
           disabled={isPending}
         >
@@ -171,14 +171,14 @@ export function TodayGroupRow({ item, group, expanded, featured = false, isActiv
           <span className="today-row-title-line">
             <ChevronRight size={13} aria-hidden="true" className="today-group-chevron" data-open={expanded ? 'true' : undefined} />
             <span className="today-row-title">{item.title}</span>
-            <span className="today-chip">{group.reason}</span>
+            <span className="ui-chip">{group.reason}</span>
           </span>
           <span className="today-row-meta">{[item.context, item.freshness].filter(Boolean).join(' · ')}</span>
         </button>
         <span className="today-row-actions">
           <button
             type="button"
-            className={item.primaryAction.kind === 'open' ? 'today-ghost' : 'today-primary'}
+            className={item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-btn'}
             onClick={() => onRunCommand(item.primaryAction)}
           >
             {item.primaryAction.label}

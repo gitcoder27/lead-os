@@ -5,7 +5,7 @@ import {
   Save,
   RefreshCw,
   Search,
-  AlertTriangle,
+  TriangleAlert,
   Check,
   Loader2,
   LogOut,
@@ -15,7 +15,7 @@ import {
   Shield,
   ChevronDown,
   Copy,
-  CheckCircle2,
+  CircleCheck,
   Dices,
   Eye,
   EyeOff,
@@ -810,7 +810,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
     ...(tasksPhase3 ? [{ id: 'labels' as const, icon: <Tags size={13} />, label: 'Task Labels', status: null, sv: 'muted' as const }] : []),
-    { id: 'maintenance', icon: <AlertTriangle size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
+    { id: 'maintenance', icon: <TriangleAlert size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
     { id: 'access', icon: <Shield size={13} />, label: 'Developer Access', status: !loadingUsers ? `${appUsers.length} user${appUsers.length !== 1 ? 's' : ''}` : null, sv: 'muted' },
   ];
 
@@ -915,7 +915,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     </p>
                     {item.status ? (
                       <p
-                        className="mt-0.5 truncate text-[11px]"
+                        className="mt-0.5 truncate text-[12px]"
                         style={{ color: item.sv === 'success' ? 'var(--success)' : item.sv === 'warning' ? 'var(--warning)' : 'var(--text-muted)' }}
                       >
                         {item.status}
@@ -931,7 +931,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           <div className="hidden border-t p-2.5 md:block" style={{ borderColor: 'var(--border-strong)' }}>
             <div className="flex items-center gap-2">
               <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10.5px] font-bold"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
                 style={{ background: 'var(--settings-warning-soft-bg)', color: 'var(--warning)' }}
               >
                 {(user?.displayName ?? '').split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase() || 'M'}
@@ -940,7 +940,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <p className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                   {user?.displayName || 'Manager'}
                 </p>
-                <p className="truncate text-[10.5px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
                   @{user?.username}
                 </p>
               </div>
@@ -977,7 +977,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                   {SECTION_LABELS[activeSection].title}
                 </h2>
-                <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                   {SECTION_LABELS[activeSection].description}
                 </p>
               </motion.div>
@@ -1041,7 +1041,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       style={{ background: 'var(--settings-danger-soft-bg)', border: 'var(--settings-danger-soft-border)' }}
                     >
                       <div className="flex items-start gap-2">
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: 'var(--danger-muted)' }} />
+                        <TriangleAlert size={14} className="mt-0.5 shrink-0" style={{ color: 'var(--danger-muted)' }} />
                         <div className="min-w-0">
                           <p className="text-[13px] font-semibold" style={{ color: 'var(--danger-muted)' }}>
                             Jira sync is failing
@@ -1124,7 +1124,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
-                        {checkingJiraConnection ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                        {checkingJiraConnection ? <Loader2 size={12} className="animate-spin" /> : <CircleCheck size={12} />}
                         {jiraApiTokenInput.trim() ? 'Test new token' : 'Check saved token'}
                       </button>
                     </div>
@@ -1175,11 +1175,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     </div>
                     <div className="mt-3">
                       <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                           Directory picks
                         </p>
                         {discoveringTeam ? (
-                          <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                             <Loader2 size={10} className="animate-spin" /> Refreshing
                           </span>
                         ) : null}
@@ -1200,10 +1200,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               <IdentityAvatar user={u} accent={u.accountId === managerJiraAccountId ? 'var(--accent)' : 'var(--text-muted)'} />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
-                                <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
+                                <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
                               </div>
                               {u.accountId === managerJiraAccountId ? (
-                                <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
+                                <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
                                   Active
                                 </span>
                               ) : null}
@@ -1252,7 +1252,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
                           Scheduled Jira sync
                         </p>
-                        <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                           {autoSyncEnabled
                             ? 'On — Jira issues refresh automatically.'
                             : 'Off — manual sync only, via the refresh button.'}
@@ -1335,7 +1335,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-semibold leading-5">{option.label}</span>
                                 <span
-                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase"
+                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
                                   style={{
                                     letterSpacing: '0.08em',
                                     background: selected ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-tertiary)',
@@ -1376,7 +1376,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     />
                     <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                       Use{' '}
-                      <code className="rounded px-1 py-0.5 font-mono text-[11.5px]" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
+                      <code className="rounded px-1 py-0.5 font-mono text-[12px]" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
                         {'{ PROJECT_KEY }'}
                       </code>{' '}
                       to insert the configured project key dynamically.
@@ -1472,7 +1472,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <div className="mb-2.5 flex items-center justify-between">
                       <SettingsGroupLabel>Tracked Team</SettingsGroupLabel>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         {developers.length}
@@ -1545,7 +1545,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       onClick={() => void handleSaveEditedMember()}
                                       disabled={!editingMemberName.trim() || isSavingEdit}
                                       aria-label="Save team member changes"
-                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold disabled:opacity-50"
+                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
                                       style={{ background: 'var(--settings-success-soft-bg)', color: 'var(--success)', border: 'var(--settings-success-soft-border)' }}
                                     >
                                       {isSavingEdit ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save
@@ -1554,7 +1554,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       type="button"
                                       onClick={cancelEditingMember}
                                       disabled={isSavingEdit}
-                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold disabled:opacity-50"
+                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
                                       style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                                     >
                                       <X size={11} /> Cancel
@@ -1566,9 +1566,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                   <div className="min-w-0 flex-1">
                                     <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{member.displayName}</p>
                                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                      <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{member.email ?? member.accountId}</p>
+                                      <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{member.email ?? member.accountId}</p>
                                       <span
-                                        className="rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold"
+                                        className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
                                         style={{
                                           background: member.source === 'manual' ? 'var(--settings-neutral-chip-bg)' : 'var(--settings-accent-soft-bg)',
                                           color: member.source === 'manual' ? 'var(--text-muted)' : 'var(--accent)',
@@ -1661,7 +1661,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         type="button"
                         onClick={() => handleDiscoverTeamMembers({ query: discoveredSearch.trim(), startAt: 0, append: false, silentEmpty: false })}
                         disabled={!canUseJiraDirectory || teamActionLoading || discoveringTeam}
-                        className="rounded-full px-2.5 py-1 text-[11.5px] font-semibold transition-colors disabled:opacity-50"
+                        className="rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors disabled:opacity-50"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         {discoveringTeam ? 'Refreshing…' : 'Refresh Jira'}
@@ -1681,7 +1681,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         />
                       </div>
                       <span
-                        className="flex items-center justify-center rounded-lg px-2.5 text-[11.5px] font-semibold"
+                        className="flex items-center justify-center rounded-lg px-2.5 text-[12px] font-semibold"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)', whiteSpace: 'nowrap' }}
                       >
                         {addableSelectionCount} sel.
@@ -1724,7 +1724,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 style={{ background: idx % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)', borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                               >
                                 <span
-                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[11px] font-semibold"
+                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[12px] font-semibold"
                                   style={{
                                     borderWidth: 1, borderStyle: 'solid',
                                     borderColor: isAlready || isSel ? 'color-mix(in srgb, var(--accent) 26%, var(--border-strong))' : 'color-mix(in srgb, var(--border-strong) 88%, transparent)',
@@ -1737,10 +1737,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 <IdentityAvatar user={u} accent={isSel ? 'var(--accent)' : 'var(--text-muted)'} />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
-                                  <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
+                                  <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
                                 </div>
                                 {isAlready ? (
-                                  <span className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>Added</span>
+                                  <span className="rounded-full px-1.5 py-0.5 text-[12px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>Added</span>
                                 ) : null}
                               </button>
                             );
@@ -1817,7 +1817,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           border: copiedLink ? 'var(--settings-success-soft-border)' : 'var(--settings-accent-soft-border)',
                         }}
                       >
-                        {copiedLink ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                        {copiedLink ? <CircleCheck size={13} /> : <Copy size={13} />}
                         {copiedLink ? 'Copied' : 'Copy'}
                       </button>
                     </div>
@@ -1828,7 +1828,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <div className="mb-2.5 flex items-center justify-between">
                       <SettingsGroupLabel>App Accounts</SettingsGroupLabel>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11.5px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                       >
                         {loadingUsers ? '…' : appUsers.length}
@@ -1848,7 +1848,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-2">
                               <div
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10.5px] font-bold"
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
                                 style={{ background: u.role === 'manager' ? 'var(--settings-warning-soft-bg)' : 'var(--settings-accent-soft-bg)', color: u.role === 'manager' ? 'var(--warning)' : 'var(--accent)' }}
                               >
                                 {u.displayName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
@@ -1857,18 +1857,18 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
                                   <span
-                                    className="rounded-full px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em]"
+                                    className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em]"
                                     style={{ background: u.role === 'manager' ? 'var(--settings-warning-soft-bg)' : 'var(--settings-accent-soft-bg)', color: u.role === 'manager' ? 'var(--warning)' : 'var(--accent)' }}
                                   >
                                     {u.role}
                                   </span>
                                   {u.developerAccountId ? (
-                                    <span className="rounded-full px-1.5 py-0.5 text-[10.5px] font-medium" style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}>
+                                    <span className="rounded-full px-1.5 py-0.5 text-[11px] font-medium" style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}>
                                       Team linked
                                     </span>
                                   ) : null}
                                 </div>
-                                <p className="truncate text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                                <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
                                   @{u.username}{u.developerAccountId ? ` · ${u.developerAccountId}` : ''}
                                 </p>
                               </div>
@@ -1885,7 +1885,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 />
                               ) : (
                                 <div
-                                  className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.1em]"
+                                  className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
                                   style={{ background: 'var(--settings-warning-soft-bg)', color: 'var(--warning)', border: 'var(--settings-warning-soft-border)' }}
                                 >
                                   Manager access
@@ -1973,13 +1973,13 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 <button type="button" onClick={() => { setNewPassword(generateStrongPassword(pwLength, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }} className="rounded-md p-1.5" style={{ color: 'var(--accent)' }} aria-label="Generate password" title="Generate password"><Dices size={13} /></button>
                                 <button type="button" onClick={() => setShowNewPw((v) => !v)} className="rounded-md p-1.5" style={{ color: 'var(--text-muted)' }} aria-label={showNewPw ? 'Hide' : 'Show'} title={showNewPw ? 'Hide password' : 'Show password'}>{showNewPw ? <EyeOff size={13} /> : <Eye size={13} />}</button>
                                 {newPassword ? (
-                                  <button type="button" onClick={() => { navigator.clipboard.writeText(newPassword); setCopiedPw(true); setTimeout(() => setCopiedPw(false), 2000); }} className="rounded-md p-1.5" style={{ color: copiedPw ? 'var(--success)' : 'var(--text-muted)' }} aria-label={copiedPw ? 'Copied' : 'Copy password'} title={copiedPw ? 'Copied!' : 'Copy password'}>{copiedPw ? <CheckCircle2 size={13} /> : <Copy size={13} />}</button>
+                                  <button type="button" onClick={() => { navigator.clipboard.writeText(newPassword); setCopiedPw(true); setTimeout(() => setCopiedPw(false), 2000); }} className="rounded-md p-1.5" style={{ color: copiedPw ? 'var(--success)' : 'var(--text-muted)' }} aria-label={copiedPw ? 'Copied' : 'Copy password'} title={copiedPw ? 'Copied!' : 'Copy password'}>{copiedPw ? <CircleCheck size={13} /> : <Copy size={13} />}</button>
                                 ) : null}
                               </div>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>Auto-generated · {pwLength} chars</span>
-                              <button type="button" onClick={() => setShowPasswordGen((v) => !v)} className="text-[11.5px] font-medium" style={{ color: 'var(--accent)' }}>
+                              <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Auto-generated · {pwLength} chars</span>
+                              <button type="button" onClick={() => setShowPasswordGen((v) => !v)} className="text-[12px] font-medium" style={{ color: 'var(--accent)' }}>
                                 {showPasswordGen ? 'Hide options' : 'Customize'}
                               </button>
                             </div>
@@ -1993,11 +1993,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}
                               >
                                 <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>Generator options</span>
+                                  <span className="text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>Generator options</span>
                                   <button
                                     type="button"
                                     onClick={() => { setNewPassword(generateStrongPassword(pwLength, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
-                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] font-medium"
+                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium"
                                     style={{ background: 'var(--settings-cta-bg)', color: 'var(--settings-cta-text)', border: 'var(--settings-cta-border)' }}
                                   >
                                     <RefreshCcw size={11} /> Regenerate
@@ -2013,7 +2013,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                     onChange={(e) => { const len = Number(e.target.value); setPwLength(len); setNewPassword(generateStrongPassword(len, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
                                     className="mt-1 w-full accent-[var(--accent)]"
                                   />
-                                  <div className="flex justify-between text-[10.5px]" style={{ color: 'var(--text-muted)' }}><span>8</span><span>32</span></div>
+                                  <div className="flex justify-between text-[11px]" style={{ color: 'var(--text-muted)' }}><span>8</span><span>32</span></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-1.5">
                                   <ToggleChip label="A–Z" checked={pwUppercase} onChange={(v) => { setPwUppercase(v); setNewPassword(generateStrongPassword(pwLength, v, pwLowercase, pwDigits, pwSymbols)); setCopiedPw(false); }} disabled={!pwLowercase && !pwDigits && !pwSymbols} />
@@ -2107,7 +2107,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50"
               style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
             >
-              <AlertTriangle size={12} />
+              <TriangleAlert size={12} />
               Reset &amp; Reconfigure App
             </button>
           </div>
@@ -2124,7 +2124,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50"
                 style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
               >
-                <AlertTriangle size={12} />
+                <TriangleAlert size={12} />
                 Reset &amp; Reconfigure
               </button>
               <button
@@ -2162,7 +2162,7 @@ export const SettingsPanel = SettingsPage;
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );
@@ -2171,7 +2171,7 @@ function SettingsGroupLabel({ children }: { children: ReactNode }) {
 function SettingsLabeledInput({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[11.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </label>
       {children}
@@ -2209,12 +2209,12 @@ function CompactFieldRow({
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
-          <p className="mt-0.5 text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{description}</p>
+          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{description}</p>
         </div>
         <button
           type="button"
           onClick={onDiscover}
-          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors"
+          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
           style={{
             background: active ? 'var(--settings-accent-chip-bg)' : 'var(--settings-neutral-chip-bg)',
             color: active ? 'var(--accent)' : 'var(--text-secondary)',
@@ -2410,7 +2410,7 @@ function FieldListGroup({
   return (
     <>
       <div
-        className="px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em]"
+        className="px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em]"
         style={{ color: accent ? 'var(--accent)' : 'var(--text-muted)', background: 'var(--settings-neutral-chip-bg)' }}
       >
         {title}
@@ -2428,7 +2428,7 @@ function FieldListGroup({
             <p className="truncate font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>{field.id}</p>
           </div>
           {field.id === currentFieldValue ? (
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
+            <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
               Selected
             </span>
           ) : null}
@@ -2444,7 +2444,7 @@ function IdentityAvatar({ user, accent }: { user: { displayName: string; avatarU
   }
   return (
     <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold"
       style={{ background: 'var(--settings-neutral-chip-bg)', color: accent, border: '1px solid var(--border-strong)' }}
     >
       {user.displayName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'U'}
@@ -2528,7 +2528,7 @@ function ToggleChip({
       }}
     >
       <span
-        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-[10px] transition-colors"
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-[11px] transition-colors"
         style={{
           background: checked ? 'var(--accent)' : 'transparent',
           border: checked ? 'none' : '1.5px solid var(--border-strong)',

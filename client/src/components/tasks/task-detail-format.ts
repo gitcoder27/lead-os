@@ -70,20 +70,8 @@ export function formatStamp(value: string | null | undefined): string {
   return date ? format(date, 'MMM d, yyyy · HH:mm') : value;
 }
 
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  const first = parts[0]!.charAt(0);
-  const last = parts.length > 1 ? parts[parts.length - 1]!.charAt(0) : parts[0]!.charAt(1);
-  return `${first}${last}`.toUpperCase();
-}
-
-/** Stable hue per person so avatars are recognisable across the app. */
-export function avatarHue(seed: string): number {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) hash = (hash * 31 + seed.charCodeAt(index)) | 0;
-  return Math.abs(hash) % 360;
-}
+// docs/54 V8: person helpers live with the shared Avatar.
+export { avatarHue, initials } from '@/components/ui/Avatar';
 
 export interface MomentPreset {
   key: string;

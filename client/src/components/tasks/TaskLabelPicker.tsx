@@ -7,7 +7,7 @@ import { labelChipStyle } from './label-colors';
 export function TaskLabelChip({ name, color, onRemove }: { name: string; color?: string; onRemove?: () => void }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-semibold"
       style={labelChipStyle(color)}
     >
       <Tag size={9} className="opacity-60" />

@@ -5,7 +5,8 @@ import { OWNER_TOKENS, type TaskViewGroupOverride, type TaskViewOverrides } from
 import { labelChipStyle } from './label-colors';
 import { FilterMenu, TASK_STATUS_META } from './TaskMenus';
 import { TASK_LIST_CONTAINER } from './TaskList';
-import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from './TaskPopover';
+import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
+import { Kbd } from '@/components/ui/Kbd';
 
 const STATUSES: TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
 const SIGNALS: { value: TaskAttentionSignal; label: string }[] = [
@@ -59,7 +60,7 @@ interface TaskToolbarProps {
   hasOverrides: boolean;
   onUpdateView: () => void;
   onRevert: () => void;
-  onShowShortcuts: () => void;
+  onShowShortcuts: (anchor: HTMLElement) => void;
 }
 
 /** docs/49 §9: search · filter chips · Display popover · view actions. */
@@ -119,7 +120,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
                 );
               })}
             </select>
-            <h1 className="flex items-center gap-2 text-[19px] font-bold" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="ui-page-title flex items-center gap-2">
               {title}
               {isSavedView && hasOverrides && (
                 <span className="h-2 w-2 rounded-full" style={{ background: 'var(--warning)' }} title="Unsaved filter changes" aria-label="Unsaved filter changes" />
@@ -131,7 +132,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
               </span>
             )}
             {updating && (
-              <span className="flex items-center gap-1 text-[11.5px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+              <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
                 <Loader2 size={11} className="animate-spin" /> Updating…
               </span>
             )}
@@ -145,7 +146,8 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
             {hasOverrides && !isSavedView && <ToolbarButton onClick={onRevert}>Reset</ToolbarButton>}
             <button
               type="button"
-              onClick={onShowShortcuts}
+              onClick={(event) => onShowShortcuts(event.currentTarget)}
+              data-shortcuts-anchor=""
               className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Keyboard shortcuts"
@@ -177,7 +179,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
               {query ? (
                 <button type="button" onClick={() => onQuery('')} aria-label="Clear search" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
               ) : (
-                <kbd className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>/</kbd>
+                <Kbd variant="subtle">/</Kbd>
               )}
             </label>
 

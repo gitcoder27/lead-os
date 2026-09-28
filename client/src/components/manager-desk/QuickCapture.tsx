@@ -111,7 +111,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
         <button
           onClick={handleSubmit}
           disabled={!title.trim() || isPending || disabled}
-          className="h-5 rounded px-2 text-[10px] font-bold uppercase tracking-wide transition-all disabled:opacity-30"
+          className="h-5 rounded px-2 text-[11px] font-bold uppercase tracking-wide transition-all disabled:opacity-30"
           style={{
             background: 'var(--md-accent)',
             color: '#000',
@@ -135,7 +135,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
               aria-label="Quick capture kind"
               value={kind}
               onChange={e => setKind(e.target.value as ManagerDeskItemKind | '')}
-              className="bg-transparent text-[11px] font-medium outline-none cursor-pointer"
+              className="bg-transparent text-[12px] font-medium outline-none cursor-pointer"
               style={{ color: kind ? 'var(--text-primary)' : 'var(--text-muted)' }}
             >
               <option value="">Kind…</option>
@@ -153,7 +153,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
               aria-label="Quick capture category"
               value={category}
               onChange={e => setCategory(e.target.value as ManagerDeskCategory | '')}
-              className="bg-transparent text-[11px] font-medium outline-none cursor-pointer"
+              className="bg-transparent text-[12px] font-medium outline-none cursor-pointer"
               style={{ color: category ? 'var(--text-primary)' : 'var(--text-muted)' }}
             >
               <option value="">Category…</option>
@@ -169,7 +169,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
 
       {disabled && (
         <div
-          className="border-t px-2 py-1 text-[11px]"
+          className="border-t px-2 py-1 text-[12px]"
           style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
         >
           {disabledLabel}

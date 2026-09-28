@@ -90,13 +90,13 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
 
 ### Verify first (answers change later items)
 
-- [ ] **P0-V1** Confirm whether 1:1 agenda topics and session actions are visible to developers or count in Load and Up next.
+- [x] **P0-V1** Confirm whether 1:1 agenda topics and session actions are visible to developers or count in Load and Up next.
   - Look at: `server/src/services/one-on-one.service.ts:634-639,927`, `my-day.service.ts:124-128`, `task.service.ts` (`meta.source` on the created event).
   - Output: one paragraph appended under "Findings from verification" at the end of this doc. If leaking, add a fix item to P0 as **P0-S5**.
-- [ ] **P0-V2** Confirm whether a manager-authored status change resets `lastCheckInAt`, and whether a manager-authored check-in resets developer staleness.
+- [x] **P0-V2** Confirm whether a manager-authored status change resets `lastCheckInAt`, and whether a manager-authored check-in resets developer staleness.
   - Look at: `team-tracker.service.ts:405-410,1645,2143-2148,2225`.
   - Output: paragraph under "Findings from verification". This shapes P1-02.
-- [ ] **P0-V3** Record which task flags are on in dev and prod (canonical tasks, `tasksPhase3`), from `task-keys.service.ts:12-45`.
+- [x] **P0-V3** Record which task flags are on in dev and prod (canonical tasks, `tasksPhase3`), from `task-keys.service.ts:12-45`.
   - This gates P3-06 (removing the Follow-ups/Meetings pages). They must be backed by the canonical Tasks model first. Record findings under "Findings from verification".
 
 ### Safety fixes (`parallel-ok`)
@@ -112,9 +112,22 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
 - [ ] **P0-S3** Fix the login throttle behind the tunnel and add an admin password reset.
   - Files: `server/src/routes/auth.ts:82-84`, `server/src/app.ts`, `auth.service.ts:300-324`, `docs/42-auth-admin-cli.md`.
   - Accept: `trust proxy` configured from env (default safe for local dev), throttle keys on the real client IP, and a manager can reset a developer's password (Settings action, plus CLI command in `server/src/scripts/`).
-- [ ] **P0-S4** Add a root error boundary and reload on chunk-load failure.
+- [x] **P0-S4** (`task/p0-s4-error-boundary`) Add a root error boundary and reload on chunk-load failure.
   - Files: `client/src/main.tsx:15-19`, `client/src/App.tsx:51-74`, `client/src/index.css:117-121`.
   - Accept: a render exception shows a recovery screen ("Reload / Go to Today"). `vite:preloadError` triggers one reload. Test with a throwing child.
+- [ ] **P0-S5** Stop 1:1 agenda topics (and default session actions) from becoming developer-visible tasks. Found by P0-V1. Sonnet implements; Opus reviews (developer-visible data).
+  - Files: `server/src/services/one-on-one.service.ts:634-644` (`createSessionAction`) and `:923-931` (`resolveOrCreateAgendaTask`), `task.service.ts:246-269` (`create`), plus a cleanup script under `server/src/scripts/`.
+  - Do:
+    - Agenda topics created from the agenda (`attachAgenda` with `title`, `quickAttach`) are manager-owned (`ownerType: "manager"`, `trackedByManagerId` = the manager) with a `person` link to the developer, not `ownerType: "developer"`.
+    - Session actions default to manager-owned. Assigning one to the developer stays possible but is an explicit choice, and the UI says "Visible to {name}" (same wording as P0-S6). Confirm this default change with the user before merging.
+    - Existing rows: a dry-run-by-default CLI that lists open developer-owned tasks attached to a 1:1 agenda (`one_on_one_agenda_items`) whose `created` event has `meta.source = "one_on_one"` and that have no developer-authored events. The manager picks which to move to manager ownership. Do not auto-reassign: a session action may have been assigned to the developer on purpose, and the agenda table cannot tell topics from actions.
+  - Accept:
+    - A newly created agenda topic is absent from the developer's `/api/my-day` (`tasks`, `plannedItems`, `currentItem`), and `/api/my-day/tasks/:key` returns 404 for it.
+    - It is not counted in `assignedTodayCount` / `plannedCount` (Team workload, Load) or shown as the developer's "Up next".
+    - The developer cannot read its events (`getTaskEvents` returns 404), and no `created` event for it is visible to the developer.
+    - It still appears in the manager's 1:1 panel, Tasks and the person's linked work.
+    - A session action explicitly assigned to the developer is still visible to them.
+  - Test: route-level test that creates a topic via `POST /api/one-on-ones/:id/agenda` as a manager, then asserts the above as a developer (`/api/my-day`, task events) and as a manager. Add a service test for the workload counts and a test for the cleanup script's dry run.
 - [ ] **P0-S6** Warn when a manager-authored check-in or status rationale will be visible to the developer.
   - Files: `team-tracker.service.ts:472-487`, `StatusRationaleDialog.tsx`, `my-day.service.ts:82`.
   - Accept: the dialog says "Visible to {name}" in collab mode, and offers a private variant. Otherwise strip `rationale` and `nextFollowUpAt` from developer responses.
@@ -368,11 +381,50 @@ Depends on P1. Items are independent (`parallel-ok`).
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
-| | | | | |
+| 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
+| 2026-09-29 | P0-S4 | task/p0-s4-error-boundary | Sonnet | Root error boundary, guarded reload on `vite:preloadError` and lazy-chunk errors (30s sessionStorage guard). |
 
 ## Findings from verification
 
-_(P0-V1 to P0-V3 results go here.)_
+### P0-V1: 1:1 agenda topics and session actions (2026-09-29): LEAK, developers see them and they count in Load and Up next
+
+Static read, the app was not run. Every 1:1 agenda topic and, by default, every session action is a real canonical task **owned by the developer**, and nothing downstream tells it apart from ordinary developer work.
+
+- Topics: `resolveOrCreateAgendaTask` calls `taskService.create({ title, ownerType: "developer", ownerId: series.developerAccountId }, principal, { source: "one_on_one" })` (`one-on-one.service.ts:919-931`). This is the path for `attachAgenda` (`:397-409`) and `quickAttach` (`:414-460`).
+- Session actions: `createSessionAction` does the same, with `ownerType = input.ownerType ?? "developer"` and `ownerId` defaulting to the series developer (`one-on-one.service.ts:626-645`).
+- `TaskService.create` sets `scheduledOn` to today when none is given (`task.service.ts:260`), writes a `day_focus` row (`:267`) and emits a `created` event (`:269`). `meta.source` (`"one_on_one"`) is only recorded in that event's metadata. No code reads it as a filter: `grep` finds `one_on_one` as a task source only at `task.service.ts:246`, `task-events.service.ts:16` (enum) and the two call sites.
+- Developer visibility: the topic is a normal row for `TaskService.list` when the principal is a developer (`task.service.ts:176-185`, owner filter only), and `developerBoardRows` returns all open developer-owned tasks with no source filter (`task.service.ts:677-693`). `MyDayService.getMyDay` builds from that board (`my-day.service.ts:69-72`, `team-tracker.service.ts:3035,3094`) and `nativeTasks` uses `list` directly (`my-day.service.ts:124-129`), so the topic title appears in My Day as planned work.
+- Events: the `created` event is `shared` (`task-events.service.ts:101-102`: non-update types are always shared), and the developer visibility rule returns shared events on tasks they own (`task-events.service.ts:132-147`). `getTaskEvents` (`my-day.service.ts:51-53`, route `GET /tasks/:key/events` at `routes/my-day.ts:135`) therefore shows the topic's history to the developer.
+- Load and Up next: `workload.service.ts:140-147` takes `plannedCount`, `currentCount` and `assignedTodayCount` from the canonical day, which includes these tasks. They also feed `idle`, `noCurrentItem` and `backlogTrackerMismatch` (`:145-167`), and the "Up next" list is the same `plannedItems`.
+- Not leaking: the agenda rows and sessions themselves (`one_on_one_agenda_items`, sessions, private notes) are only served by `/api/one-on-ones`, which is `requireManager` (`app.ts:197`), and the router does not mount under `/api/my-day`. Only the materialised task is exposed. A session action created with `ownerType: "manager"` is not exposed.
+- Reach: `one_on_one_enabled` is `true` in the prod default and workspace `workspace_317591b1-…` rows and in the dev sandbox DB (see P0-V3), so this is live in prod, not theoretical. `server/tests/one-on-ones.test.ts` has no developer-side assertion.
+- Consequence: a private agenda topic such as "performance concerns" would appear on the developer's board once attached. The developer cannot rename it (creator rule, `task.service.ts:284`) but can see it and its history. Fix item added as **P0-S5**.
+
+### P0-V2: manager status changes and check-ins vs `lastCheckInAt` (2026-09-29)
+
+Static read. Short answers: a status change through `updateDay` does **not** reset `lastCheckInAt`; a manager-authored check-in **does**, and so does every other author, because the reset ignores who wrote it.
+
+- `updateDay` (`team-tracker.service.ts:1619-1653`) sets `status`, `statusUpdatedAt` (only when the status changed) and `updatedAt`. It never writes `lastCheckInAt`. It has no actor parameter, so a developer's own status change from My Day (`my-day.service.ts:113-122`), a manager's PATCH (`routes/team-tracker.ts:452-468`) and the Copilot `update_day` tool (`assistant/tools.ts:1465`) behave the same.
+- `addCheckIn` unconditionally writes `lastCheckInAt: now` and `nextFollowUpAt` on the day row (`team-tracker.service.ts:2143-2148`) and, when the status changes, also `statusUpdatedAt` (`:2149-2153`). The actor only sets `authorType` / `authorAccountId` on the check-in row (`:2135-2136`); it does not gate the reset. Manager callers: `POST /:accountId/checkins` (`routes/team-tracker.ts:562-578`, actor is the logged-in role), Today's `add_check_in` command (`today.service.ts:619-625`), and the status-update flow `submitStatusUpdate` (`team-tracker.service.ts:2225`).
+- Effect on signals (`buildSignals`, `:355-425`): `staleByTime` and `staleWithoutCurrentWork` read `hoursSinceCheckIn` from `lastCheckInAt` (`:380-394`), so a manager check-in makes the developer look fresh even if the developer has not said anything. `statusChangeWithoutFollowUp` (`:399-412`) compares `lastCheckInAt` with `statusUpdatedAt`. A plain manager status change to blocked / at_risk / waiting leaves `lastCheckInAt` older than `statusUpdatedAt`, so it flags after the threshold unless a check-in follows. Any check-in, by anyone, clears it.
+- Staleness carries across days: the board uses the latest day row at or before the date (`effectiveDay`, `:2809`, `:2951`), and `lastCheckInAt` is only ever written at `:2145`.
+- Data needed for P1-02: `team_tracker_check_ins.author_type` already exists (`schema.ts:205`, default `manager`), so "developer-authored check-in" and "manager touch" can be derived without a schema change. `lastCheckInAt` on the day row cannot distinguish them and should be split or recomputed from check-in rows filtered by author.
+- Shapes P1-02: in collab, only developer-authored check-ins may reset developer staleness (manager check-ins become manager touches); in solo, manager touch is the only clock. `updateDay` needs an actor so the developer's own status change and a manager's can be told apart for the `statusChangeWithoutFollowUp` skip on non-participating developers.
+
+### P0-V3: task flags in dev and prod (2026-09-29)
+
+Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no secrets were read). Flag logic: `canonicalEnabled` is true for `tasks_phase2_stage` in `2b`/`2c`/`2d` (`task-keys.service.ts:10-15`); `phase3Enabled` needs stage `2c`/`2d` **and** `tasks_phase3_enabled = "true"` (`:40-45`); `contracted` is stage `2d` only (`:69-71`).
+
+| Where | DB | `tasks_phase1_enabled` | `tasks_phase2_stage` | `tasks_phase3_enabled` | `one_on_one_enabled` |
+|---|---|---|---|---|---|
+| Prod, `default` workspace | `/home/ubuntu/apps/lead-os-prod/data/dashboard.db` | true | **2c** | true | true |
+| Prod, `workspace_317591b1-5cb2-4ecd-a46d-7542ffe6c725` | same file | true | **2c** | true | true |
+| Dev, `default` workspace | `data/dashboard.sandbox.db` (selected by `DASHBOARD_DB_PATH` in the dev checkout `.env`) | true | **2c** | true | true |
+
+- Canonical tasks and Phase 3 are on everywhere that matters, so P3-06's precondition ("Follow-ups and Meetings backed by the canonical Tasks model") holds in prod and dev. `useCanonicalMemoryTasks` (`useCanonicalTasks.ts:24-40`) already feeds `/follow-ups` and `/meetings` from canonical view definitions.
+- Nobody is at `2d` yet, so the contract has not run: legacy fields are still accepted (`assertLegacyFieldsAllowed`), `npm run tasks:drop-legacy` is not eligible, and P7-11's `canonicalEnabled` branch removal must wait until `2d` plus the 30-day soak. Check the stage again before P3-06 and P7-11; it is a moving target.
+- `ManagerMemoryPage.tsx:56` still has a non-canonical branch (`day.data?.taskModel === 'canonical'`). It is dead in prod and dev today but P3-06 should delete it with the page.
+- Caveat: `/home/ubuntu/Development/lead-os/data/dashboard.db` is a stale pre-workspace file (config has no `workspace_id`, no `tasks` table, last modified 2026-06-01). It is not the dev runtime DB (`.env` points at the sandbox DB). Other worktrees may set their own `DASHBOARD_DB_PATH`; check that worktree's `.env` before assuming these values.
 
 ## Open risks
 

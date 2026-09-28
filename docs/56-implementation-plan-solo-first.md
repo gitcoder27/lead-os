@@ -101,7 +101,7 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
 
 ### Safety fixes (`parallel-ok`)
 
-- [ ] **P0-S1** Restrict `/api/my-day/issues` to a developer-safe projection.
+- [x] **P0-S1** (`task/p0-s1-my-day-issues-projection`) Restrict `/api/my-day/issues` to a developer-safe projection.
   - Files: `server/src/routes/my-day.ts:145-153`, `issue.service.ts:546-549`, `shared/types.ts`.
   - Accept: response has only key, summary, priority, status, due dates. No `localTags`, `analysisNotes`, `trackerAssignmentsToday`, `excluded`.
   - Test: route test asserting the field allowlist.
@@ -382,6 +382,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
 | 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
+| 2026-09-29 | P0-S1 | task/p0-s1-my-day-issues-projection | Sonnet | `DeveloperIssue` allowlist projection for `GET /api/my-day/issues` (`IssueService.getForDeveloper`), route tests incl. exact-key allowlist. Needs Opus review (developer-visible data). |
 
 ## Findings from verification
 

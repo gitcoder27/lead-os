@@ -76,6 +76,17 @@ export interface Issue {
   excluded?: boolean;
 }
 
+/**
+ * Developer-safe projection of a Jira issue, served by `GET /api/my-day/issues`.
+ * Allowlist only: never add manager triage data (`localTags`, `analysisNotes`,
+ * `trackerAssignmentsToday`, `excluded`) or other people's names. The server
+ * builds it field by field and `my-day-issues.test.ts` pins the exact key set.
+ */
+export type DeveloperIssue = Pick<
+  Issue,
+  "jiraKey" | "summary" | "priorityName" | "statusName" | "dueDate" | "developmentDueDate"
+>;
+
 export interface IssueTrackerAssignmentSummary {
   activeCount: number;
   developerNames: string[];

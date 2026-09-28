@@ -145,7 +145,7 @@ export function createMyDayRouter(
   router.get("/issues", async (req, res, next) => {
     try {
       const accountId = req.auth!.user.developerAccountId!;
-      const issues = await issueService.getAll({ assignee: accountId }, req.auth!.user.workspaceId);
+      const issues = await issueService.getForDeveloper(accountId, req.auth!.user.workspaceId);
       res.json({ issues });
     } catch (error) {
       next(error);

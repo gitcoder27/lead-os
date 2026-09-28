@@ -1,5 +1,6 @@
 import { and, desc, eq, ne, or } from "drizzle-orm";
 import type {
+  DeveloperIssue,
   FilterType,
   Issue as SharedIssue,
   IssueUpdate,
@@ -103,6 +104,22 @@ export class IssueService {
 
 
     return this.sortIssues(result, query.sort ?? "priority", query.order ?? "desc");
+  }
+
+  /**
+   * Issues assigned to one developer, projected to the developer-safe allowlist.
+   * Built field by field (not spread) so a new `Issue` field can never leak by default.
+   */
+  async getForDeveloper(accountId: string, workspaceId?: string): Promise<DeveloperIssue[]> {
+    const all = await this.getAll({ assignee: accountId, includeTrackerAssignments: false }, workspaceId);
+    return all.map((issue) => ({
+      jiraKey: issue.jiraKey,
+      summary: issue.summary,
+      priorityName: issue.priorityName,
+      statusName: issue.statusName,
+      dueDate: issue.dueDate,
+      developmentDueDate: issue.developmentDueDate,
+    }));
   }
 
   async getTodaySnapshot(date: string, workspaceId?: string): Promise<TodayIssueSnapshot> {

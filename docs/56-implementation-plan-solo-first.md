@@ -112,7 +112,7 @@ P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel
 - [ ] **P0-S3** Fix the login throttle behind the tunnel and add an admin password reset.
   - Files: `server/src/routes/auth.ts:82-84`, `server/src/app.ts`, `auth.service.ts:300-324`, `docs/42-auth-admin-cli.md`.
   - Accept: `trust proxy` configured from env (default safe for local dev), throttle keys on the real client IP, and a manager can reset a developer's password (Settings action, plus CLI command in `server/src/scripts/`).
-- [ ] **P0-S4** Add a root error boundary and reload on chunk-load failure.
+- [x] **P0-S4** (`task/p0-s4-error-boundary`) Add a root error boundary and reload on chunk-load failure.
   - Files: `client/src/main.tsx:15-19`, `client/src/App.tsx:51-74`, `client/src/index.css:117-121`.
   - Accept: a render exception shows a recovery screen ("Reload / Go to Today"). `vite:preloadError` triggers one reload. Test with a throwing child.
 - [ ] **P0-S5** Stop 1:1 agenda topics (and default session actions) from becoming developer-visible tasks. Found by P0-V1. Sonnet implements; Opus reviews (developer-visible data).
@@ -382,6 +382,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
 | 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
+| 2026-09-29 | P0-S4 | task/p0-s4-error-boundary | Sonnet | Root error boundary, guarded reload on `vite:preloadError` and lazy-chunk errors (30s sessionStorage guard). |
 
 ## Findings from verification
 

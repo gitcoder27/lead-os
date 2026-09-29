@@ -12,6 +12,7 @@ import { createAuthRouter } from "../src/routes/auth";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
+import { todayIsoDate } from "../src/utils/date";
 
 const auth = new AuthService();
 const keys = new TaskKeysService();
@@ -255,7 +256,7 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Open task" });
     await createTask(headers, { title: "Done task", status: "done" });
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIsoDate();
 
     const openOnly = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: {} })}`, headers });
     expect(openOnly.body.tasks.some((t: { title: string }) => t.title === "Done task")).toBe(false);

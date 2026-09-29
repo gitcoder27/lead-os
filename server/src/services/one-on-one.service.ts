@@ -36,7 +36,7 @@ import {
   teamTrackerDays,
 } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
-import { todayIsoDate } from "../utils/date";
+import { isoDatePart, todayIsoDate } from "../utils/date";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService, type TaskPrincipal } from "./task.service";
@@ -550,7 +550,7 @@ export class OneOnOneService {
     ranked.sort((a, b) => b.score - a.score || a.since.localeCompare(b.since) || a.task.taskId - b.task.taskId);
 
     const lastCheckInAt = checkIn[0]?.last ?? null;
-    const checkInDays = lastCheckInAt ? diffDaysIso(lastCheckInAt.slice(0, 10), today) : null;
+    const checkInDays = lastCheckInAt ? diffDaysIso(isoDatePart(lastCheckInAt) ?? lastCheckInAt.slice(0, 10), today) : null;
     return {
       tasks: ranked.slice(0, ONE_ON_ONE_SUGGESTION_LIMIT).map(({ task, reasons }) => ({ task, reasons })),
       checkIn:

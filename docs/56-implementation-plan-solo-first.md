@@ -72,6 +72,26 @@ Run these one at a time. Each step is one agent session; finish, verify and comm
 | 13 | Opus then Sonnet | P6-05 (Opus); rest of P6 and all of P7 (Sonnet) | Reporting, safety, polish. |
 | 14 | Review | Anything after step 8 | Second batch before deploy. |
 
+## Wrap-up scope (decided 2026-09-29, supersedes the run order above)
+
+The run order above is superseded. Only these steps remain; everything else is parked.
+
+| # | Owner | Items |
+|---|---|---|
+| W1 | Opus | P3-00a (fresh workspaces start on the canonical model) |
+| W2 | Sonnet | P3-06, P2-04 (remove Follow-ups/Meetings pages, nav defaults and hiding) |
+| W3 | Sonnet | Hardening bundle: P5-01, P5-02, P6-01, P6-06, P7-01, P7-05, P7-12 |
+| W4 | Review | Opus reviews P3-00a, P3-02/03 migrations, P5-02 and other Jira-writing changes; Sonnet reviews the rest |
+| W5 | Deploy | Back up prod, test migrations on a copy of the prod DB, set `TRUST_PROXY=loopback`, deploy via `scripts/deploy.sh prod` |
+
+**Parked backlog (not part of this release; revisit later):**
+- P3-07, P3-08, P3-09, P3-10 (recurrence, weekly review, list scale, decisions).
+- All of P4 (collaborative loop).
+- P5-03 to P5-10 (Jira polish).
+- P6-02, P6-03, P6-04 (exports, digest, Copilot brief).
+- **P6-05 (Copilot full-access safety): explicitly declined by the user.** Keep Copilot "full access" off.
+- P7-02, P7-03, P7-04, P7-06 to P7-11, P7-13.
+
 ## Phase overview
 
 | Phase | Goal | Depends on |

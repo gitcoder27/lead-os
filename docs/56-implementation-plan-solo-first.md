@@ -14,8 +14,8 @@ Source: [docs/55-solo-vs-collaborative-review.md](55-solo-vs-collaborative-revie
 
 ## How agents use this doc
 
-- Pick the **first unchecked item whose dependencies are done**. Items in the same phase marked `parallel-ok` can run in different worktrees at once.
-- Work on a task branch (`task/<id>-<slug>`) in your own worktree. Keep it to one item, or a few tightly coupled ones. Do not broaden scope.
+- **Working rules (single checkout).** This is a solo project, so all work happens sequentially in `/home/ubuntu/Development/lead-os` directly on `main`. No worktrees and no task branches. Start with a clean `git status`. Make **one commit per item** (message `type(scope): summary (ITEM-ID)`), so any item can be undone with `git revert`. Do not push, and do not deploy, unless the user asks. Never run against runtime data, and never trigger Jira sync or write-back against the real Jira account: use test DBs, or copies of databases.
+- Pick the **first unchecked item whose dependencies are done**, following the run order below. Ignore `parallel-ok` labels; everything runs one item at a time. Do not broaden scope.
 - Before editing, re-read the cited files. Line numbers come from the 2026-09-29 review and may have drifted.
 - Definition of done for every item:
   - Code and tests for the acceptance criteria.
@@ -23,10 +23,10 @@ Source: [docs/55-solo-vs-collaborative-review.md](55-solo-vs-collaborative-revie
   - If runtime exports were added to `shared/types.ts`, regenerate `shared/types.js` (command in AGENTS.md).
   - Route or behavior changes include route-level and service tests. Server services keep the coverage thresholds in `server/vitest.config.ts`.
   - Manager-only vs developer-only role boundaries are preserved.
-- Track progress **in the PR that finishes the item**: tick the box, and add a row to the Progress log. Merge conflicts on this file are expected between parallel PRs; resolve by keeping both ticks.
-- Status legend: `[ ]` todo, `[~]` in progress (add your branch name after it), `[x]` done (add PR/commit), `[!]` blocked (add reason).
+- Track progress **in the same commit that finishes the item**: tick the box, and add a row to the Progress log.
+- Status legend: `[ ]` todo, `[~]` in progress, `[x]` done (add the commit hash in the Progress log), `[!]` blocked (add reason).
 - Never deploy to production from the development checkout. Production is `/home/ubuntu/apps/lead-os-prod` via `scripts/deploy.sh prod`.
-- Do not commit secrets, and do not commit unless the user asks.
+- Do not commit secrets. `.env` files are git-ignored: never add them.
 
 ## Ownership: who does what
 
@@ -50,24 +50,27 @@ Opus (expert model) takes the small set of items that need judgment or have a wi
 **Review rules**
 - Opus PRs: a Sonnet agent reviews for test coverage, role boundaries (manager-only vs developer-only) and AGENTS.md conventions before merge.
 - Sonnet PRs that touch auth, sessions, developer-visible data, or migrations: Opus reviews before merge.
-- **Only one agent edits `shared/types.ts` at a time.** Opus lands the P1-01 type changes first; other agents rebase onto it.
 
-## Execution order (waves)
+## Run order (sequential, on `main`)
 
-The repo has two extra worktrees (A and B), so at most about three streams run at once. Do not start a wave's items until the listed "gate" is merged.
+Run these one at a time. Each step is one agent session; finish, verify and commit before starting the next. "Review" steps are batched and only need to happen before deploying or pushing.
 
-| Wave | Opus stream | Sonnet stream(s) | Gate to start |
+| Step | Owner | Items | Notes |
 |---|---|---|---|
-| 1 | P1-01 | P0-V1..V3 (one agent); P0-S4; then P0-S1, S2, S3 | none |
-| 2 | P1-02, then P1-03 | P2-01..P2-05; P0-S6; Opus reviews S1-S3 | Opus P1-02 needs P0-V2 recorded and P1-01 merged. P2 needs P1-01 merged (P2-03 can start earlier). |
-| 3 | P1-05; then P3-00 spec (user sign-off) | P1-04, P1-06, P1-07; P5-01..P5-04 | Sonnet P1-04/06/07 need P1-02 and P1-03 merged. P5 needs P2-03 merged. |
-| 4 | P3-02, P3-03 | P3-01, P3-04, P3-05; P5-05..P5-10 | Gate: P3-00 signed off by the user. |
-| 5 | P4-01, P4-02, P4-06 | P3-06 (after P3-03 and P0-V3), P3-07..P3-10; P4-03, P4-04, P4-05, P4-07 | P4 needs P1-01. P3-06 needs P3-03 merged. |
-| 6 | P6-05 | P6-01..P6-04, P6-06; all of P7 | P6 needs P1. |
-
-Wave notes:
-- Wave 1 has a merge hazard: P0-S2/S3 and P1-01 both touch auth and session code. Merge P1-01 first if both are ready; the other rebases.
-- Within a wave, finish and merge before advancing when the "gate" column says so. Otherwise streams overlap freely.
+| 1 | Sonnet | P0-S5 | Close the live 1:1 topic leak. |
+| 2 | Sonnet | P0-S6 | Visibility of manager check-ins to developers. |
+| 3 | Opus | P1-02 | Mode-aware freshness. Needs P0-V2 (recorded). |
+| 4 | Opus | P1-03 | Suppress participation flows on the server. |
+| 5 | Sonnet | P1-04, P1-06, P1-07 | Client relabeling, delete second attention model, standup follow-through. Needs steps 3-4. |
+| 6 | Sonnet | P2-01, P2-02, P2-03, P2-05 | Solo onboarding and Jira-optional. (P2-04 waits for the Tasks consolidation.) |
+| 7 | Opus | P1-05 | Central attention rules and working-hours logic. |
+| 8 | Review | S1-S3, S5, S6 by Opus; P1-01..P1-03, P1-05 by Sonnet | One batch. Fix findings before pushing or deploying. |
+| 9 | Opus | P3-00 spec | User signs off before step 10. |
+| 10 | Opus then Sonnet | P3-02, P3-03 (Opus); P3-01, P3-04, P3-05, then P3-06 (Sonnet) | Then P2-04. |
+| 11 | Sonnet | P5-01..P5-10 | Jira fixes. Can go before step 9 if preferred. |
+| 12 | Opus then Sonnet | P4-01, P4-02, P4-06 (Opus); P4-03..05, P4-07 (Sonnet) | Collaborative loop. |
+| 13 | Opus then Sonnet | P6-05 (Opus); rest of P6 and all of P7 (Sonnet) | Reporting, safety, polish. |
+| 14 | Review | Anything after step 8 | Second batch before deploy. |
 
 ## Phase overview
 
@@ -82,7 +85,7 @@ Wave notes:
 | P6 | Reporting and data safety | P1 |
 | P7 | Polish, accessibility, cleanup | any |
 
-P0 → P1 is the critical path. After P1-01 lands, P2 and P4 can run in parallel worktrees. P3 and P5 touch different areas and can also run in parallel, but P3 items should be serialized among themselves because they touch capture and Tasks.
+P0 → P1 is the critical path. Everything runs sequentially per the run order above.
 
 ---
 

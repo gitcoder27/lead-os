@@ -1,13 +1,18 @@
 vi.mock("../src/services/task-keys.service", () => ({ TaskKeysService: class { async canonicalEnabled() { return false; } } }));
 // docs/56 P1-03: staleness comes from the tracker's mode-aware clock.
+const clocks = vi.hoisted(() => ({ touch: new Set<string>(["dev-2"]), noCurrentTracked: new Set<string>() }));
 vi.mock("../src/services/team-tracker.service", () => ({
   TeamTrackerService: class {
     async getFreshnessByDeveloper(_date: string, accountIds: string[]) {
-      return new Map(accountIds.map((accountId) => [accountId, { clock: accountId === "dev-2" ? "manager_touch" : "check_in", staleByTime: accountId === "dev-1" }]));
+      return new Map(accountIds.map((accountId) => [accountId, {
+        clock: clocks.touch.has(accountId) ? "manager_touch" : "check_in",
+        staleByTime: accountId === "dev-1",
+        noCurrentTracked: clocks.touch.has(accountId) ? clocks.noCurrentTracked.has(accountId) : true,
+      }]));
     }
   },
 }));
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkloadService } from "../src/services/workload.service";
 
 const devRows = [
@@ -145,6 +150,24 @@ describe("WorkloadService", () => {
     expect(stale("dev-3")).toBe(false);
     // No tracker row today: unchanged, not stale.
     expect(stale("dev-4")).toBe(false);
+  });
+
+  describe("participation signals (docs/56 P1-03)", () => {
+    afterEach(() => {
+      clocks.touch = new Set(["dev-2"]);
+      clocks.noCurrentTracked = new Set();
+    });
+
+    it("does not read a manager-touch developer with no plan as idle or mismatched", async () => {
+      // dev-4 has a Jira issue and no plan today: idle + mismatch on the check-in clock.
+      const participating = (await new WorkloadService().getTeamWorkload("2026-03-09")).find((entry) => entry.developer.accountId === "dev-4");
+      expect(participating?.signals).toMatchObject({ idle: true, backlogTrackerMismatch: true });
+
+      clocks.touch = new Set(["dev-2", "dev-4"]);
+      const team = await new WorkloadService().getTeamWorkload("2026-03-09");
+      expect(team.find((entry) => entry.developer.accountId === "dev-4")?.signals).toMatchObject({ idle: false, noCurrentItem: false, backlogTrackerMismatch: false });
+      expect((await new WorkloadService().getIdleDevelopers("2026-03-09")).map((dev) => dev.accountId)).not.toContain("dev-4");
+    });
   });
 
   it("returns idle developers and ranked suggestions using service methods", async () => {

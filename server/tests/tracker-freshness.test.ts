@@ -223,8 +223,11 @@ describe("buildSignals — solo (manager-touch clock)", () => {
 
     const on = signals({ ...base, config: { ...solo, soloNoCurrentEnabled: true }, freshness: { lastManagerTouchAt: "2026-03-09T11:00:00.000Z" } });
     expect(on.freshness.staleWithoutCurrentWork).toBe(false);
+    expect(on.freshness.noCurrentTracked).toBe(true);
+    // Never the "stale" variant on the touch clock, however long since the touch.
     const onStale = signals({ ...base, config: { ...solo, soloNoCurrentEnabled: true }, freshness: { lastManagerTouchAt: "2026-03-09T08:00:00.000Z" } });
-    expect(onStale.freshness.staleWithoutCurrentWork).toBe(true);
+    expect(onStale.freshness.staleWithoutCurrentWork).toBe(false);
+    expect(onStale.freshness.noCurrentTracked).toBe(true);
   });
 
   it("skips the status follow-up for a manager-authored or unattributed change", () => {
@@ -253,11 +256,22 @@ describe("buildSignals — collab, non-participating developer (manager-touch cl
     expect(result.freshness.untouched).toBe(true);
   });
 
-  it("keeps no_current on in collab, on the touch clock", () => {
+  it("keeps no_current on in collab, but never as a 'stale' reason on the touch clock", () => {
     const stale = signals({ ...base, freshness: { lastManagerTouchAt: "2026-03-09T08:00:00.000Z" } });
-    expect(stale.freshness.staleWithoutCurrentWork).toBe(true);
-    const fresh = signals({ ...base, freshness: { lastManagerTouchAt: "2026-03-09T11:00:00.000Z" } });
-    expect(fresh.freshness.staleWithoutCurrentWork).toBe(false);
+    expect(stale.freshness.noCurrentTracked).toBe(true);
+    expect(stale.freshness.staleWithoutCurrentWork).toBe(false);
+    expect(stale.freshness.staleByTime).toBe(false);
+  });
+
+  it("counts working days from the tracker's own calendar day, whatever the rules zone", () => {
+    // Touch at 23:30 UTC Friday is already Saturday in Kolkata; the tracker day
+    // (`date`) is the server's, so the baseline must use the same calendar.
+    const tz = { ...base.config, window: { timeZone: "Asia/Kolkata", startMinutes: 9 * 60, endMinutes: 18 * 60 } };
+    const touch = local(2026, 3, 6, 23);
+    const kolkata = signals({ ...base, config: tz, date: "2026-03-13", freshness: { lastManagerTouchAt: touch } });
+    const utc = signals({ ...base, date: "2026-03-13", freshness: { lastManagerTouchAt: touch } });
+    expect(kolkata.freshness.workingDaysSinceTouch).toBe(utc.freshness.workingDaysSinceTouch);
+    expect(kolkata.freshness.workingDaysSinceTouch).toBe(5);
   });
 
   it("skips the status follow-up for the manager's own change", () => {

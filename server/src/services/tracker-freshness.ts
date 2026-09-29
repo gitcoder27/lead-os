@@ -157,7 +157,11 @@ export function buildSignals(params: {
 
   const lastManagerTouchAt = params.freshness?.lastManagerTouchAt ?? undefined;
   const baseline = lastManagerTouchAt ?? params.freshness?.trackingSince ?? undefined;
-  const baselineDate = isoDatePart(baseline, window.timeZone);
+  // `params.date` is a tracker day: keyed in the server's local zone, like every
+  // other tracker date. The baseline must land on the same calendar or the day
+  // count is off by one whenever the Attention-rules zone differs from the
+  // server's (that zone only shapes the working-hours window).
+  const baselineDate = isoDatePart(baseline);
   const workingDaysSinceTouch = baselineDate
     ? workingDaysBetween(baselineDate, params.date)
     : undefined;
@@ -166,10 +170,10 @@ export function buildSignals(params: {
     workingDaysSinceTouch >= params.config.touchStaleWorkingDays;
   const noCurrentEnabled =
     params.config.teamMode === "collab" || params.config.soloNoCurrentEnabled;
-  const staleWithoutCurrentWork =
-    noCurrentEnabled &&
-    noCurrentWork &&
-    workingHoursSince(lastManagerTouchAt, params.config.noCurrentThresholdHours);
+  // The time-based "stale without current work" reason is a check-in judgement,
+  // so it stays on the check-in clock. Touch-clock people who are tracked for
+  // no-current work get the plain `no_current` reason (`noCurrentTracked`).
+  const staleWithoutCurrentWork = false;
   // The manager's own status change needs no follow-up from the manager.
   const developerAuthoredChange = params.statusUpdatedBy === "developer";
   const statusChangeWithoutFollowUp =

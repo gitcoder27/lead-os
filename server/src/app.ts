@@ -168,7 +168,8 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
 
   app.use("/api/issues", requireManager(services.authService), createIssuesRouter(services.issueService));
   app.use("/api/overview", requireManager(services.authService), createOverviewRouter(services.issueService));
-  app.use("/api/team", requireManager(services.authService), createTeamRouter(services.workloadService, services.authService));
+  // docs/56: developer participation feeds Today, so a roster write drops its cache too.
+  app.use("/api/team", requireManager(services.authService), clearTodayCacheOnWrite, createTeamRouter(services.workloadService, services.authService));
   app.use("/api/alerts", requireManager(services.authService), createAlertsRouter(services.alertService));
   app.use(
     "/api/suggestions",
@@ -176,9 +177,12 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     createSuggestionsRouter(services.automationService, services.issueService)
   );
   app.use("/api/sync", requireManager(services.authService), createSyncRouter(services.syncEngine));
+  // docs/56 P1-01/P1-05: `team_mode` and the Attention rules change what Today
+  // emits, so a successful config write must not be served from the 25s cache.
   app.use(
     "/api/config",
     requireManager(services.authService),
+    clearTodayCacheOnWrite,
     createConfigRouter(services.syncEngine, services.backupService)
   );
   app.use("/api/backups", requireAdmin(services.authService), createBackupsRouter(services.backupService));

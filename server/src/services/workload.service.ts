@@ -141,8 +141,15 @@ export class WorkloadService {
       const droppedTodayCount = canonicalDay?.droppedItems.length ?? trackerDayItems.filter((item) => item.state === "dropped").length;
       const assignedTodayCount = currentCount + plannedCount;
       const hasCurrentItem = currentCount === 1;
-      const noCurrentItem = assignedTodayCount > 0 && !hasCurrentItem;
-      const idle = assignedTodayCount === 0 && trackerDay?.status !== "done_for_today";
+      // docs/56 P1-03: "no plan" and "no current item" are participation signals.
+      // People on the manager-touch clock (solo, or no developer login) plan no
+      // day of their own, so they do not read as idle; no-current follows the
+      // tracker's own rule (`noCurrentTracked`).
+      const dayFreshness = freshness.get(dev.accountId);
+      const plansOwnDay = dayFreshness?.clock !== "manager_touch";
+      const tracksNoCurrent = plansOwnDay || dayFreshness?.noCurrentTracked === true;
+      const noCurrentItem = tracksNoCurrent && assignedTodayCount > 0 && !hasCurrentItem;
+      const idle = plansOwnDay && assignedTodayCount === 0 && trackerDay?.status !== "done_for_today";
 
       return {
         developer: dev,
@@ -162,7 +169,7 @@ export class WorkloadService {
         signals: {
           idle,
           noCurrentItem,
-          backlogTrackerMismatch: mine.length > 0 && assignedTodayCount === 0,
+          backlogTrackerMismatch: plansOwnDay && mine.length > 0 && assignedTodayCount === 0,
         },
       };
     });

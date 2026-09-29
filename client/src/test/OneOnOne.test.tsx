@@ -348,6 +348,29 @@ describe('OneOnOneWorkspace — agenda guidance and suggestions', () => {
     expect(within(panel).queryByText('Quarterly report')).not.toBeInTheDocument();
   });
 
+  it('words the manager-touch suggestion as a catch-up, not a missing check-in (docs/56 P1-03)', () => {
+    mockSuggestions = {
+      isLoading: false,
+      data: { tasks: [], checkIn: { lastCheckInAt: '2026-03-02T10:00:00.000Z', days: 5, basis: 'manager_touch' } },
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    const panel = screen.getByTestId('one-on-one-suggestions');
+    expect(within(panel).getByText('Not touched 5d')).toBeInTheDocument();
+    expect(within(panel).queryByText(/check-in/i)).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /Add to agenda: Catch up — not touched since/ })).toBeInTheDocument();
+  });
+
+  it('never-touched manager-touch suggestion reads "Not touched yet"', () => {
+    mockSuggestions = {
+      isLoading: false,
+      data: { tasks: [], checkIn: { lastCheckInAt: null, days: null, basis: 'manager_touch' } },
+    };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    const panel = screen.getByTestId('one-on-one-suggestions');
+    expect(within(panel).getByText('Not touched yet')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Add to agenda: Catch up — how are things going?' })).toBeInTheDocument();
+  });
+
   it('caps suggestions and reveals the rest on demand', () => {
     mockSuggestions = {
       isLoading: false,

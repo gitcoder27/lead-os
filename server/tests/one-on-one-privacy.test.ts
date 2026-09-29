@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import { invoke } from "./helpers/http";
 import { configTable, dayFocus, developers, oneOnOneAgendaItems, oneOnOneSeries, taskLinks, tasks } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
@@ -137,6 +138,9 @@ describe("P0-S5: agenda topics are private to the manager", () => {
   it("does not appear in developer load, up next or attention signals", async () => {
     const { seriesId } = await startSeries();
     const workload = new WorkloadService();
+    // "Idle" is a participation signal (docs/56 P1-03): it only reads as a fact
+    // about the plan in collab, for developers with a login (alice and bob have one).
+    await enableCollabParticipation([]);
     const control = await taskService.create({ title: "Real work", ownerType: "developer", ownerId: "dev-2" }, managerPrincipal);
     expect(control.ownerId).toBe("dev-2");
 

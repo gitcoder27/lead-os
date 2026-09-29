@@ -184,7 +184,15 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
     it("honours the solo no_current opt-in", async () => {
       await db.insert(configTable).values({ key: "team_tracker_solo_no_current_enabled", value: "true" });
       vi.setSystemTime(at(MONDAY, "12:00:00.000Z"));
-      expect((await boardDay(MONDAY, "dev-1")).signals.freshness.staleWithoutCurrentWork).toBe(true);
+      const day = await boardDay(MONDAY, "dev-1");
+      // The opt-in tracks no-current work (plain `no_current`); the "stale without
+      // current work" reason is a check-in judgement and stays off this clock.
+      expect(day.signals.freshness.noCurrentTracked).toBe(true);
+      expect(day.signals.freshness.staleWithoutCurrentWork).toBe(false);
+      const board = await service.getBoard(MONDAY);
+      const reasons = board.attentionQueue.find((item) => item.developer.accountId === "dev-1")?.reasons.map((reason) => reason.code);
+      expect(reasons).toContain("no_current");
+      expect(reasons).not.toContain("stale_without_current_work");
     });
 
     it("counts working days from tracking start, skipping the weekend", async () => {

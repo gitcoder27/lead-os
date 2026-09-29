@@ -15,6 +15,7 @@ import { TaskStatusGlyph } from '@/components/tasks/TaskMenus';
 import { toneColor, type DateTone } from '@/components/tasks/task-detail-format';
 import { getLocalIsoDate } from '@/lib/utils';
 import {
+  checkInSuggestionChip,
   checkInTopicTitle,
   closedSessions,
   describeAgendaTask,
@@ -383,7 +384,7 @@ function Suggestions({
             title={checkInTopicTitle(checkIn, today)}
             chips={[
               {
-                label: checkIn.days === null ? 'No check-ins yet' : `No check-in ${checkIn.days}d`,
+                label: checkInSuggestionChip(checkIn),
                 tone: 'warning',
               },
             ]}

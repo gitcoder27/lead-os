@@ -356,9 +356,12 @@ function mapSavedView(
   };
 }
 
+/** Standup rounds scanned for manager touches (about a year of daily rounds). */
+const STANDUP_TOUCH_LOOKBACK_SESSIONS = 400;
+
 export type TrackerFreshnessClockSignals = Pick<
   TrackerFreshnessSignals,
-  "staleByTime" | "hoursSinceCheckIn" | "lastManagerTouchAt" | "workingDaysSinceTouch" | "touchStaleWorkingDays" | "untouched"
+  "staleByTime" | "hoursSinceCheckIn" | "lastManagerTouchAt" | "workingDaysSinceTouch" | "touchStaleWorkingDays" | "untouched" | "noCurrentTracked"
 > & { clock: TrackerFreshnessClock };
 
 function forDeveloperSignals(signals: TrackerDeveloperSignals): TrackerDeveloperSignals {
@@ -2673,8 +2676,14 @@ export class TeamTrackerService {
     const [config, participants, dayRows] = await Promise.all([
       this.getSignalConfig(scope),
       getParticipatingDeveloperIds(scope),
+      // The effective row only: the latest day at or before `date` per developer.
       db.select().from(teamTrackerDays)
-        .where(and(eq(teamTrackerDays.workspaceId, scope), inArray(teamTrackerDays.developerAccountId, accountIds), lte(teamTrackerDays.date, date)))
+        .where(and(
+          eq(teamTrackerDays.workspaceId, scope),
+          inArray(teamTrackerDays.developerAccountId, accountIds),
+          lte(teamTrackerDays.date, date),
+          sql`${teamTrackerDays.date} = (select max(d2.date) from team_tracker_days d2 where d2.workspace_id = ${teamTrackerDays.workspaceId} and d2.developer_account_id = ${teamTrackerDays.developerAccountId} and d2.date <= ${date})`
+        ))
         .orderBy(desc(teamTrackerDays.date)),
     ]);
     const effectiveDay = new Map<string, typeof teamTrackerDays.$inferSelect>();
@@ -2710,6 +2719,7 @@ export class TeamTrackerService {
         workingDaysSinceTouch: freshness.workingDaysSinceTouch,
         touchStaleWorkingDays: freshness.touchStaleWorkingDays,
         untouched: freshness.untouched,
+        noCurrentTracked: freshness.noCurrentTracked,
       });
     }
     return result;
@@ -3382,7 +3392,11 @@ export class TeamTrackerService {
       db
         .select({ endedAt: standupSessions.endedAt, reviewedJson: standupSessions.reviewedJson, flaggedJson: standupSessions.flaggedJson })
         .from(standupSessions)
-        .where(and(eq(standupSessions.workspaceId, scope), lte(standupSessions.endedAt, asOf))),
+        .where(and(eq(standupSessions.workspaceId, scope), lte(standupSessions.endedAt, asOf)))
+        // Newest rounds only: anything older is far past any touch threshold,
+        // and this runs on every board build.
+        .orderBy(desc(standupSessions.endedAt))
+        .limit(STANDUP_TOUCH_LOOKBACK_SESSIONS),
       // docs/56 P1-07: reviews recorded during an unsealed round.
       db
         .select({ developerAccountId: standupReviews.developerAccountId, last: max(standupReviews.reviewedAt) })

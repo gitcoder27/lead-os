@@ -45,11 +45,24 @@ export function isWeekendIsoDay(isoDay: string): boolean {
   return dow === 0 || dow === 6;
 }
 
+/**
+ * A local wall-clock time resolves to the same instant every time, and a scan
+ * touches the same handful of days for every issue on the board, so results are
+ * memoized (bounded; the zone math is the expensive part of a Jira stale pass).
+ */
+const localInstantCache = new Map<string, number>();
+const LOCAL_INSTANT_CACHE_LIMIT = 4096;
+
 function localInstant(isoDay: string, minutes: number, timeZone: string): number {
-  if (minutes >= 24 * 60) {
-    return zonedTimeToUtc(addDaysToIsoDay(isoDay, 1), 0, 0, timeZone).getTime();
-  }
-  return zonedTimeToUtc(isoDay, Math.floor(minutes / 60), minutes % 60, timeZone).getTime();
+  const key = `${timeZone}|${isoDay}|${minutes}`;
+  const cached = localInstantCache.get(key);
+  if (cached !== undefined) return cached;
+  const value = minutes >= 24 * 60
+    ? zonedTimeToUtc(addDaysToIsoDay(isoDay, 1), 0, 0, timeZone).getTime()
+    : zonedTimeToUtc(isoDay, Math.floor(minutes / 60), minutes % 60, timeZone).getTime();
+  if (localInstantCache.size >= LOCAL_INSTANT_CACHE_LIMIT) localInstantCache.clear();
+  localInstantCache.set(key, value);
+  return value;
 }
 
 /** Local midnight (in the window's zone) of the day `instant` falls on. */

@@ -119,4 +119,16 @@ describe("legacy /api/config Jira stale hours", () => {
     expect(save.status).toBe(200);
     expect((await settings.getAttentionRules()).jiraStaleHours).toBe(96);
   });
+
+  it("holds the legacy field to the same limits as the Attention rules", async () => {
+    const base = { jiraBaseUrl: "https://tenant.atlassian.net", jiraEmail: "ops@example.com", jiraProjectKey: "AM", jiraApiToken: "token" };
+    for (const staleThresholdHours of [0, 2161, 1.5]) {
+      const res = await invoke(app, { method: "PUT", url: "/api/config", headers: managerHeaders, body: { ...base, staleThresholdHours } });
+      expect(res.status).toBe(400);
+    }
+    expect((await settings.getAttentionRules()).jiraStaleHours).toBe(48);
+    const ok = await invoke(app, { method: "PUT", url: "/api/config", headers: managerHeaders, body: { ...base, staleThresholdHours: 72 } });
+    expect(ok.status).toBe(200);
+    expect((await settings.getAttentionRules()).jiraStaleHours).toBe(72);
+  });
 });

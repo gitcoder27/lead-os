@@ -3,7 +3,7 @@ import express from "express";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers, oneOnOneAgendaItems, oneOnOneSeries, tasks, teamTrackerDays, workspaces } from "../src/db/schema";
+import { configTable, developers, oneOnOneAgendaItems, oneOnOneSeries, tasks, teamTrackerCheckIns, teamTrackerDays, workspaces } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { createOneOnOnesRouter } from "../src/routes/one-on-ones";
@@ -357,14 +357,18 @@ describe("one-on-one routes: agenda suggestions", () => {
     expect(future.tasks[0]!.reasons).toContainEqual({ code: "carried", days: 6 });
 
     const now = new Date().toISOString();
-    await db.insert(teamTrackerDays).values({
+    const [day] = await db.insert(teamTrackerDays).values({
       workspaceId: "default",
       date: todayIsoDate(),
       developerAccountId: "dev-1",
       lastCheckInAt: now,
       createdAt: now,
       updatedAt: now,
-    });
+    }).returning({ id: teamTrackerDays.id });
+    // A note the manager wrote is not an update from the developer (docs/56 P0-V2).
+    await db.insert(teamTrackerCheckIns).values({ workspaceId: "default", dayId: day!.id, summary: "Manager note", authorType: "manager", createdAt: now });
+    expect((await service.suggestions(seriesId, "default")).checkIn).toEqual({ lastCheckInAt: null, days: null });
+    await db.insert(teamTrackerCheckIns).values({ workspaceId: "default", dayId: day!.id, summary: "Own update", authorType: "developer", createdAt: now });
     expect((await service.suggestions(seriesId, "default")).checkIn).toBeNull();
     expect((await service.suggestions(seriesId, "default", later)).checkIn).toEqual({ lastCheckInAt: now, days: 6 });
   });

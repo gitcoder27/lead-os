@@ -33,6 +33,7 @@ import {
   oneOnOneSeries,
   oneOnOneSessions,
   tasks,
+  teamTrackerCheckIns,
   teamTrackerDays,
 } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
@@ -520,9 +521,16 @@ export class OneOnOneService {
             .groupBy(dayFocus.taskId)
         : Promise.resolve([]),
       db
-        .select({ last: max(teamTrackerDays.lastCheckInAt) })
-        .from(teamTrackerDays)
-        .where(and(eq(teamTrackerDays.workspaceId, scope), eq(teamTrackerDays.developerAccountId, developerId))),
+        // Only the developer's own check-ins: a note the manager wrote is not
+        // an update from them (docs/56 P0-V2), same rule as the tracker clock.
+        .select({ last: max(teamTrackerCheckIns.createdAt) })
+        .from(teamTrackerCheckIns)
+        .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerCheckIns.dayId))
+        .where(and(
+          eq(teamTrackerCheckIns.workspaceId, scope),
+          eq(teamTrackerDays.developerAccountId, developerId),
+          eq(teamTrackerCheckIns.authorType, "developer"),
+        )),
     ]);
     const originByTask = new Map(origins.map((row) => [row.taskId, row.origin]));
     const facts = { lastActivity, drifted: new Set<number>(), jiraLinked: null };

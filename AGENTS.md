@@ -102,6 +102,7 @@ Backend conventions:
 - Schema is in `server/src/db/schema.ts`; migrations run on backend startup.
 - Backend startup initializes backups and scheduled Jira sync in `server/src/index.ts`.
 - Production serves `client/dist` for non-API routes when built.
+- Workspace `team_mode` (`solo` default | `collab`, `GET/PUT /api/config/team-mode`, `features.teamMode` on every session) plus per-developer `participates` (an active developer `app_users` row maps to them) decide the freshness clock: `collab && participates` keeps the check-in clock, everyone else uses the manager-touch clock (`tracker-freshness.ts`). Participation flows (asks, stale check-ins, "Quiet since standup", idle alerts) apply only on the check-in clock. Thresholds live in one Attention rules block (`AttentionRules` in `shared/types.ts`, `GET/PUT /api/config/attention-rules`, Settings → Attention Rules); hour rules count working time (`working-hours.ts`). Writes under `/api/config` and `/api/team` clear the Today cache.
 - Auth uses the `dcc_session` cookie.
 - The first app account must be a manager.
 - Most API routes are manager-only.

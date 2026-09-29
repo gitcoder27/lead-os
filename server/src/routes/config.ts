@@ -36,7 +36,7 @@ const configSchema = z.object({
     managerJiraAccountId: z.string().trim().optional(),
     jiraApiToken: z.string().trim().min(1).optional(),
     syncIntervalMs: z.number().int().positive().default(300000),
-    staleThresholdHours: z.number().int().positive().optional(),
+    staleThresholdHours: z.number().int().min(ATTENTION_RULE_LIMITS.jiraStaleHours.min).max(ATTENTION_RULE_LIMITS.jiraStaleHours.max).optional(),
     jiraAutoSyncEnabled: z.boolean().optional(),
     backupEnabled: z.boolean().optional(),
     backupIntervalMinutes: z.number().int().positive().optional(),

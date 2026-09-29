@@ -110,7 +110,14 @@ export function reasonLabel(reason: OneOnOneSuggestionReason): { label: string; 
   }
 }
 
-export function checkInTopicTitle(checkIn: { lastCheckInAt: string | null }, today: string): string {
+export function checkInTopicTitle(checkIn: { lastCheckInAt: string | null; basis?: 'manager_touch' }, today: string): string {
+  // docs/56 P1-03: on the manager-touch clock the timestamp is the manager's own
+  // last touch, not an update from the person, so the wording is about catching up.
+  if (checkIn.basis === 'manager_touch') {
+    return checkIn.lastCheckInAt
+      ? `Catch up — not touched since ${formatShortDay(checkIn.lastCheckInAt, today)}`
+      : 'Catch up — how are things going?';
+  }
   return checkIn.lastCheckInAt
     ? `Check in — no update since ${formatShortDay(checkIn.lastCheckInAt, today)}`
     : 'Check in — how are things going?';
@@ -167,4 +174,12 @@ export function notesPreview(notes: string): string {
     )
     .filter(Boolean)
     .join(' · ');
+}
+
+/** The chip on the 1:1 "check in" suggestion; `days` are working days on the touch clock. */
+export function checkInSuggestionChip(checkIn: { days: number | null; basis?: 'manager_touch' }): string {
+  if (checkIn.basis === 'manager_touch') {
+    return checkIn.days === null ? 'Not touched yet' : `Not touched ${checkIn.days}d`;
+  }
+  return checkIn.days === null ? 'No check-ins yet' : `No check-in ${checkIn.days}d`;
 }

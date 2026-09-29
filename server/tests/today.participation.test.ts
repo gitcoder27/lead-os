@@ -37,7 +37,7 @@ const todayService = new TodayService(issueService, trackerService, managerDeskS
   getRuntimeStatus: () => ({ status: "idle" }),
 }, { todayCacheTtlMs: 0 });
 
-function createTestApp() {
+function createTestApp(today: TodayService = todayService) {
   return createApp({
     issueService,
     workloadService: {} as any,
@@ -50,7 +50,7 @@ function createTestApp() {
     authService,
     myDayService: {} as any,
     managerDeskService,
-    todayService,
+    todayService: today,
     searchService: {} as any,
     workSavedViewsService: {} as any,
   });
@@ -159,6 +159,17 @@ describe("GET /api/today developer-participation flows (P1-03)", () => {
       expect(wrapUp.focus).toMatchObject({ stage: "wrap_up", wrapUp: { missingCheckIns: [] } });
     });
 
+    it("words the pulse freshness as the manager's last touch, never as a missing check-in", async () => {
+      // The opt-in puts never-touched dev-2 in the pulse; dev-1's blocked status was set by the manager.
+      await db.insert(configTable).values({ workspaceId, key: "team_tracker_solo_no_current_enabled", value: "true" });
+      const today = await getToday(MORNING);
+      const byId = new Map(today.teamPulse.map((item) => [item.accountId, item]));
+      expect(byId.get("dev-2")?.lastUpdate).toBe("Not touched yet");
+      expect(byId.get("dev-1")?.lastUpdate).toBe("Touched just now");
+      expect(JSON.stringify(today)).not.toContain("No check-in\"");
+      expect(developerRow(today, "dev-1")?.freshness).toBe("Touched just now");
+    });
+
     it("hides a lingering ask and refuses a new one", async () => {
       await todayService.state.createCheckInAsk({ managerAccountId: "manager", developerAccountId: "dev-1", date: DATE, title: "Check-in request: quick status update" }, workspaceId);
       const today = await getToday(MORNING);
@@ -168,6 +179,40 @@ describe("GET /api/today developer-participation flows (P1-03)", () => {
       const response = await ask("dev-1");
       expect(response.status).toBe(409);
       expect(response.body).toMatchObject({ status: 409, error: expect.stringContaining("doesn't check in") });
+    });
+  });
+
+  describe("mode and rule changes", () => {
+    // The in-process `invoke` helper never emits `finish`, which is what the
+    // cache-clearing middleware listens for, so this one talks over a socket.
+    it("are visible on the next /api/today even with the 25s cache on (F1)", async () => {
+      const cached = new TodayService(issueService, trackerService, managerDeskService, {
+        getLastSyncLog: async () => undefined,
+        getRuntimeStatus: () => ({ status: "idle" }),
+      }, { todayCacheTtlMs: 60_000 });
+      const server = createTestApp(cached).listen(0, "127.0.0.1");
+      try {
+        await new Promise<void>((resolve) => server.once("listening", resolve));
+        const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+        const call = (path: string, init: RequestInit = {}) =>
+          fetch(`${base}${path}`, { ...init, headers: { cookie, "content-type": "application/json", ...(init.headers ?? {}) } });
+        const metrics = async () =>
+          ((await (await call(`/api/today?date=${DATE}&tz=${encodeURIComponent(TZ)}`)).json()) as TodayResponse).summary.map((metric) => metric.id);
+        vi.setSystemTime(new Date(MORNING));
+
+        // Solo: no stale-check-in metric.
+        expect(await metrics()).not.toContain("stale");
+        // Flipped out-of-band (as the CLI does): the cached payload is still served.
+        await enableCollabParticipation(["dev-1"], workspaceId);
+        expect(await metrics()).not.toContain("stale");
+
+        // A config write drops the cache; the next read reflects the mode.
+        const put = await call("/api/config/team-mode", { method: "PUT", body: JSON.stringify({ teamMode: "collab" }) });
+        expect(put.status).toBe(200);
+        expect(await metrics()).toContain("stale");
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
     });
   });
 
@@ -199,6 +244,21 @@ describe("GET /api/today developer-participation flows (P1-03)", () => {
       const missing = wrapUp.focus && "wrapUp" in wrapUp.focus ? wrapUp.focus.wrapUp.missingCheckIns : [];
       expect(missing.map((person) => person.accountId)).toEqual(["dev-1"]);
       expect(missing[0]?.primaryAction).toMatchObject({ kind: "ask_check_in" });
+    });
+
+    it("does not let a manager's note close 'Quiet since standup' or 'No check-in today' (P0-V2)", async () => {
+      await trackerService.addCheckIn("dev-1", DATE, { summary: "Manager note" }, { type: "manager" });
+      const midday = await getToday(MIDDAY);
+      const silent = midday.focus && "midday" in midday.focus ? midday.focus.midday.silentSinceStandup : [];
+      expect(silent.map((person) => person.accountId)).toEqual(["dev-1"]);
+      const wrapUp = await getToday(WRAP_UP);
+      const missing = wrapUp.focus && "wrapUp" in wrapUp.focus ? wrapUp.focus.wrapUp.missingCheckIns : [];
+      expect(missing.map((person) => person.accountId)).toEqual(["dev-1"]);
+
+      await trackerService.addCheckIn("dev-1", DATE, { summary: "My own update" }, { type: "developer", accountId: "dev-1" });
+      const answered = await getToday(WRAP_UP);
+      const stillMissing = answered.focus && "wrapUp" in answered.focus ? answered.focus.wrapUp.missingCheckIns : [];
+      expect(stillMissing).toEqual([]);
     });
 
     it("accepts an ask for the participating developer and refuses the other", async () => {

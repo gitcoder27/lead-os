@@ -90,3 +90,20 @@ describe("helpers", () => {
     expect(isWeekendIsoDay("2026-03-09")).toBe(false);
   });
 });
+
+describe("memoized day boundaries", () => {
+  it("keep zones apart and give the same answer on a repeat scan", () => {
+    const kolkata: WorkingWindow = { timeZone: "Asia/Kolkata", startMinutes: 9 * 60, endMinutes: 18 * 60 };
+    const from = "2026-03-06T16:00:00Z";
+    const to = "2026-03-09T10:00:00Z";
+    const utcFirst = workingHoursBetween(from, to, utc);
+    const kolkataFirst = workingHoursBetween(from, to, kolkata);
+    expect(utcFirst).toBe(3);
+    expect(kolkataFirst).not.toBe(utcFirst);
+    expect(workingHoursBetween(from, to, utc)).toBe(utcFirst);
+    expect(workingHoursBetween(from, to, kolkata)).toBe(kolkataFirst);
+    // A weekday-only window (Jira) across the weekend and the US DST change:
+    // Fri 07:00 EST → midnight (17h) + Mon (24h) + Tue to 08:00 EDT (8h).
+    expect(workingHoursBetween("2026-03-06T12:00:00Z", "2026-03-10T12:00:00Z", weekdayWindow("America/New_York"))).toBe(49);
+  });
+});

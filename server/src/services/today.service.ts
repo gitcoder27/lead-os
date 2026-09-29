@@ -43,6 +43,7 @@ import type {
   TrackerAttentionActionItem,
   TrackerAttentionItem,
   TrackerDeveloperDay,
+  TrackerDeveloperSignals,
   TrackerWorkItem,
   UserRole,
 } from "shared/types";
@@ -321,7 +322,7 @@ export class TodayService {
     const phase3Promise = taskKeys.phase3Enabled(workspaceId).catch(() => false);
     const canonicalPromise = taskKeys.canonicalEnabled(workspaceId).catch(() => false);
     // docs/56 P1-03: collab-only surfaces (the "Stale check-ins" metric).
-    const teamModePromise = this.settings.getTeamMode(workspaceId).catch(() => "collab" as const);
+    const teamModePromise = this.settings.getTeamMode(workspaceId).catch(() => "solo" as const);
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult, stateResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
       measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId })),
@@ -1015,7 +1016,7 @@ function buildDeveloperActions(
       primaryKind: primary.kind,
       primaryLabel: primary.label,
       secondaryKinds: primary.secondaryKinds,
-      freshness: formatFreshness(day?.lastCheckInAt ?? item.lastCheckInAt),
+      freshness: rowFreshness(item.signals, day?.lastCheckInAt ?? item.lastCheckInAt),
       actionPreview: primary.actionPreview,
       askedAt: ask?.askedAt,
     });
@@ -1475,7 +1476,7 @@ function buildTeamPulse(
         currentWork: day.currentItem?.jiraKey
           ? `${day.currentItem.jiraKey} ${day.currentItem.title}`
           : day.currentItem?.title ?? "No current work",
-        lastUpdate: formatFreshness(day.lastCheckInAt) ?? "No check-in",
+        lastUpdate: rowFreshness(day.signals, day.lastCheckInAt) ?? (usesCheckIns(day.signals) ? "No check-in" : "Not touched yet"),
         target: primary.target,
         primaryAction: command(primary.kind, primary.label, primary.target),
         secondaryActions: primary.secondaryKinds.map((kind) => command(kind, commandLabel(kind), pulseTarget)),
@@ -1773,12 +1774,42 @@ function shouldRequestDeveloperCheckIn(params: {
   return params.isStale || params.status === "blocked" || params.status === "at_risk" || params.status === "waiting";
 }
 
-function hasTrackerCheckInForDate(day: TrackerDeveloperDay | undefined, lastCheckInAt: string | undefined, clock: DayClock): boolean {
+/**
+ * `developerOnly` (docs/56 P0-V2): the "No check-in today" list is about people
+ * on the check-in clock, so only the developer's own check-in closes it; a note
+ * the manager wrote for them does not.
+ */
+function hasTrackerCheckInForDate(day: TrackerDeveloperDay | undefined, lastCheckInAt: string | undefined, clock: DayClock, developerOnly = false): boolean {
+  if (developerOnly) {
+    return (day?.checkIns ?? []).some((checkIn) => checkIn.authorType === "developer");
+  }
   if ((day?.checkIns.length ?? 0) > 0) {
     return true;
   }
 
   return isDueToday(lastCheckInAt, clock);
+}
+
+/** A developer-authored check-in at or after `sinceMs` ("Quiet since standup"). */
+function hasDeveloperCheckInSince(day: TrackerDeveloperDay, sinceMs: number): boolean {
+  return [...day.checkIns, ...day.recentCheckIns].some(
+    (checkIn) => checkIn.authorType === "developer" && Date.parse(checkIn.createdAt) >= sinceMs,
+  );
+}
+
+/**
+ * docs/56 P1-03: "3h ago" is a check-in age only on the check-in clock; for
+ * everyone else the manager's own last touch is the one that means something.
+ */
+function rowFreshness(signals: TrackerDeveloperSignals | undefined, lastCheckInAt: string | undefined): string | undefined {
+  if (usesCheckIns(signals)) {
+    return formatFreshness(lastCheckInAt);
+  }
+  const touched = formatFreshness(signals?.freshness.lastManagerTouchAt);
+  if (!touched) {
+    return undefined;
+  }
+  return touched === "Just now" ? "Touched just now" : `Touched ${touched}`;
 }
 
 function formatIsoDateSignal(value: string, clock: DayClock): string {
@@ -2135,7 +2166,7 @@ function buildFocus(params: {
       const anchorMs = standup?.endedAt ? Date.parse(standup.endedAt) : zonedTimeToUtc(clock.date, 0, 0, clock.tz).getTime();
       const silentSinceStandup = activeDays
         .filter((day) => day.status !== "done_for_today" && usesCheckIns(day.signals))
-        .filter((day) => !day.lastCheckInAt || Date.parse(day.lastCheckInAt) < anchorMs)
+        .filter((day) => !hasDeveloperCheckInSince(day, anchorMs))
         .map((day) => focusPerson(day, clock.date, params.openAsks));
       return {
         stage: "midday_check",
@@ -2145,7 +2176,7 @@ function buildFocus(params: {
     case "wrap_up": {
       const tomorrow = addDaysToIsoDay(clock.date, 1);
       const missingCheckIns = activeDays
-        .filter((day) => usesCheckIns(day.signals) && !hasTrackerCheckInForDate(day, day.lastCheckInAt, clock))
+        .filter((day) => usesCheckIns(day.signals) && !hasTrackerCheckInForDate(day, day.lastCheckInAt, clock, true))
         .map((day) => focusPerson(day, clock.date, params.openAsks));
       // EOD carry targets tomorrow, not today.
       const carryCandidates = params.carryActions.map((item) => ({

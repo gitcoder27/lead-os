@@ -2225,7 +2225,10 @@ export const oneOnOneAgendaReorderSchema = z.object({
 
 export const oneOnOneSessionActionSchema = z.object({
   title: z.string().trim().min(1).max(500),
-  /** Defaults to the series developer (48 §4.2, OO-D8). */
+  /**
+   * Defaults to `manager` (P0-S5): the action stays private. `developer`
+   * assigns it to the series developer, making it visible to them in My Day.
+   */
   ownerType: z.enum(["manager", "developer"]).optional(),
   ownerId: z.string().trim().min(1).max(200).optional(),
   scheduledOn: oneOnOneIsoDate.nullable().optional(),

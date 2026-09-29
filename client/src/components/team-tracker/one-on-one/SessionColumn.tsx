@@ -183,9 +183,12 @@ function LiveSession({
   const createAction = useCreateOneOnOneSessionAction(seriesId);
   const lookups = useNoteEntityLookups();
   const today = getLocalIsoDate();
+  const developerFirstName = detail.series.developerName.split(' ')[0] ?? detail.series.developerName;
   const [confirmingComplete, setConfirmingComplete] = useState(false);
   const [dateAnchor, setDateAnchor] = useState<HTMLElement | null>(null);
   const [actionDraft, setActionDraft] = useState('');
+  // P0-S5: actions are private to the manager unless explicitly assigned.
+  const [assignToDeveloper, setAssignToDeveloper] = useState(false);
   const [notes, setNotes] = useState(session.notes);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -244,16 +247,16 @@ function LiveSession({
   );
 
   const createActionItem = useCallback(
-    (title: string, options: { owner?: 'manager'; onCreated?: (taskKey: string) => void } = {}) => {
+    (title: string, options: { owner?: 'manager' | 'developer'; onCreated?: (taskKey: string) => void } = {}) => {
       createAction.mutate(
-        { sessionId: session.id, title, ...(options.owner ? { ownerType: options.owner } : {}) },
+        { sessionId: session.id, title, ownerType: options.owner ?? (assignToDeveloper ? 'developer' : 'manager') },
         {
           onSuccess: (result) => options.onCreated?.(result.item.task.taskKey),
           onError: (error) => addToast(errorMessage(error, 'Could not create the action item'), 'error'),
         },
       );
     },
-    [addToast, createAction, session.id],
+    [addToast, assignToDeveloper, createAction, session.id],
   );
 
   const submitAction = () => {
@@ -262,8 +265,9 @@ function LiveSession({
     createActionItem(title, { onCreated: () => setActionDraft('') });
   };
 
-  // ⌘⇧E / ⌘⇧L on a notes line: the line becomes an action item for the
-  // developer, or a follow-up owned by you — marked `→ KEY` like in Notes.
+  // ⌘⇧E / ⌘⇧L on a notes line: the line becomes an action item (private, or
+  // assigned to the developer when the toggle is on), or a follow-up owned by
+  // you — marked `→ KEY` like in Notes.
   const lineAction = useCallback(
     (action: NoteLineAction) => {
       const source = editorRef.current?.captureActionSource() ?? null;
@@ -276,11 +280,16 @@ function LiveSession({
         owner: action === 'follow-up' ? 'manager' : undefined,
         onCreated: (taskKey) => {
           editorRef.current?.appendMarker(source, taskKey);
-          addToast(action === 'follow-up' ? `Follow-up ${taskKey} created for you` : `Action item ${taskKey} added to the agenda`, 'success');
+          addToast(
+            action === 'follow-up'
+              ? `Follow-up ${taskKey} created for you`
+              : `Action item ${taskKey} added to the agenda${assignToDeveloper ? ` · visible to ${developerFirstName}` : ''}`,
+            'success',
+          );
         },
       });
     },
-    [addToast, createActionItem],
+    [addToast, assignToDeveloper, createActionItem, developerFirstName],
   );
 
   const agendaTasks = useMemo(() => detail.agenda.filter((item) => !item.task.deletedAt).map((item) => item.task), [detail.agenda]);
@@ -318,7 +327,7 @@ function LiveSession({
   const openCount = detail.agenda.filter(isOpenAgendaItem).length;
   const date = describeSessionDate(session.scheduledFor, today);
   const live = Boolean(session.startedAt);
-  const firstName = detail.series.developerName.split(' ')[0] ?? detail.series.developerName;
+  const firstName = developerFirstName;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -463,7 +472,7 @@ function LiveSession({
           <input
             value={actionDraft}
             onChange={(event) => setActionDraft(event.target.value)}
-            placeholder={`Action item for ${firstName}…`}
+            placeholder="Action item…"
             className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Add action item"
@@ -473,11 +482,20 @@ function LiveSession({
             disabled={!actionDraft.trim() || createAction.isPending}
             className="ui-icon-btn h-7 w-7 disabled:opacity-40"
             aria-label="Create action item"
-            title="Create a task for them and put it on the agenda"
+            title={assignToDeveloper ? `Create a task visible to ${firstName} and put it on the agenda` : 'Create a private task and put it on the agenda'}
           >
             <Plus size={13} />
           </button>
         </div>
+        <label className="mt-1 flex w-fit cursor-pointer items-center gap-1.5 text-[12px]" style={{ color: assignToDeveloper ? 'var(--warning)' : 'var(--text-muted)' }}>
+          <input
+            type="checkbox"
+            checked={assignToDeveloper}
+            onChange={(event) => setAssignToDeveloper(event.target.checked)}
+            aria-label={`Assign action items to ${firstName}`}
+          />
+          {assignToDeveloper ? `Assigned to ${firstName} — visible to ${firstName} in My Day` : `Action items stay private · tick to assign to ${firstName}`}
+        </label>
       </form>
 
       <div className="flex min-h-0 flex-1 flex-col" data-testid="one-on-one-notes">

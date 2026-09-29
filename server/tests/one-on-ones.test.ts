@@ -268,9 +268,9 @@ describe("one-on-one routes: agenda", () => {
     const freeform = await invoke(app, { method: "POST", url: `/api/one-on-ones/${seriesId}/agenda`, headers, body: { title: "Talk about growth" } });
     expect(freeform.status).toBe(201);
     expect(freeform.body.item.task.title).toBe("Talk about growth");
-    // OO-D8: freeform capture defaults the task owner to the series developer.
-    expect(freeform.body.item.task.ownerType).toBe("developer");
-    expect(freeform.body.item.task.ownerId).toBe("dev-1");
+    // P0-S5: freeform topics are the manager's private prep, never developer-owned.
+    expect(freeform.body.item.task.ownerType).toBe("manager");
+    expect(freeform.body.item.task.ownerId).not.toBe("dev-1");
 
     const agenda = await invoke(app, { method: "GET", url: `/api/one-on-ones/${seriesId}/agenda`, headers });
     expect(agenda.body.items.map((item: { task: { title: string } }) => item.task.title)).toEqual(["Existing", "Owned", "Talk about growth"]);
@@ -476,8 +476,8 @@ describe("one-on-one routes: session action items", () => {
     });
     expect(action.status).toBe(201);
     expect(action.body.item.task.title).toBe("Ship the perf fix");
-    expect(action.body.item.task.ownerType).toBe("developer");
-    expect(action.body.item.task.ownerId).toBe("dev-1");
+    // P0-S5: private by default; developer assignment is explicit (see one-on-one-privacy.test.ts).
+    expect(action.body.item.task.ownerType).toBe("manager");
     expect(action.body.item.task.taskKey).toMatch(/^T-/);
 
     const agenda = await invoke(app, { method: "GET", url: `/api/one-on-ones/${seriesId}/agenda`, headers });

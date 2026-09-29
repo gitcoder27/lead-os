@@ -631,17 +631,24 @@ export class OneOnOneService {
       if (session.status !== "scheduled") {
         throw new HttpError(409, `Cannot add action items to a ${session.status} session`);
       }
-      const ownerType = input.ownerType ?? "developer";
+      // P0-S5: private by default. An action is developer-visible (My Day, task
+      // events, workload) only when the manager explicitly assigns it to the
+      // series developer.
+      const ownerType = input.ownerType ?? "manager";
+      if (ownerType === "developer" && input.ownerId !== undefined && input.ownerId !== series.developerAccountId) {
+        throw new HttpError(400, "Action items can only be assigned to the developer of this 1:1");
+      }
       const task = await this.taskService.create(
         {
           title: input.title,
           ownerType,
-          ownerId: input.ownerId ?? (ownerType === "developer" ? series.developerAccountId : principal.accountId),
+          ownerId: ownerType === "developer" ? series.developerAccountId : input.ownerId ?? principal.accountId,
           scheduledOn: input.scheduledOn ?? undefined,
         },
         principal,
         { source: "one_on_one" },
       );
+      if (ownerType === "manager") await this.linkDeveloper(task, series, principal);
       const item = await this.attachTask(series.id, task.id, scope);
       const boundary = await this.latestClosedSession(series.id, scope);
       return { item: this.toAgendaItem(item, task, boundary) };
@@ -916,6 +923,10 @@ export class OneOnOneService {
     await this.reindexAgenda(seriesId, workspaceId);
   }
 
+  private async linkDeveloper(task: TaskRow, series: OneOnOneSeriesRow, principal: TaskPrincipal): Promise<void> {
+    await this.taskService.addLink(task.taskKey, { kind: "person", ref: series.developerAccountId }, principal);
+  }
+
   private async resolveOrCreateAgendaTask(
     series: OneOnOneSeriesRow,
     input: OneOnOneAgendaAttachRequest,
@@ -923,11 +934,17 @@ export class OneOnOneService {
     workspaceId: string,
   ): Promise<TaskRow> {
     if (input.title !== undefined) {
-      return this.taskService.create(
-        { title: input.title, ownerType: "developer", ownerId: series.developerAccountId },
+      // P0-S5: a topic is the manager's private prep, not developer work. It is
+      // manager-owned (never on the developer's board, My Day, task events or
+      // Load) and linked to the developer so the 1:1 workspace and manager
+      // surfaces still tie it to them. Undated: a topic is not a Today commitment.
+      const task = await this.taskService.create(
+        { title: input.title, ownerType: "manager", ownerId: principal.accountId, scheduledOn: null },
         principal,
         { source: "one_on_one" },
       );
+      await this.linkDeveloper(task, series, principal);
+      return task;
     }
     if (input.taskId !== undefined) {
       const row = (

@@ -252,7 +252,18 @@ describe('OneOnOneWorkspace', () => {
 
     fireEvent.change(screen.getByLabelText('Add action item'), { target: { value: 'Ship perf fix' } });
     fireEvent.click(screen.getByLabelText('Create action item'));
-    expect(mockCreateAction).toHaveBeenCalledWith({ sessionId: 11, title: 'Ship perf fix' }, expect.anything());
+    // P0-S5: private by default — the developer never sees it unless assigned.
+    expect(mockCreateAction).toHaveBeenCalledWith({ sessionId: 11, title: 'Ship perf fix', ownerType: 'manager' }, expect.anything());
+    expect(screen.getByText(/stay private/)).toBeInTheDocument();
+  });
+
+  it('assigns action items to the developer only after an explicit, labelled choice', () => {
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText(/Assign action items to/));
+    expect(screen.getByText(/visible to .* in My Day/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Add action item'), { target: { value: 'Write the RFC' } });
+    fireEvent.click(screen.getByLabelText('Create action item'));
+    expect(mockCreateAction).toHaveBeenCalledWith({ sessionId: 11, title: 'Write the RFC', ownerType: 'developer' }, expect.anything());
   });
 
   it('offers series creation when none exists and closes on Escape', () => {

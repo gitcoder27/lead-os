@@ -27,6 +27,7 @@ Recurring manager↔developer one-on-ones as a first-class workspace: a persiste
 | OO-D7 | The workspace **lives inside the Team surface**: `/team?dev=<accountId>&panel=one-on-one` URL state (same pattern as `?mode=standup`). Series overview is a Team-level "1:1s" affordance, not a new nav page. | Confirmed — keep it in Team. `NavPageId` unchanged; no top-level route. Deep links still work since the state is in the URL. |
 | OO-D8 | Action items from a session are **created as tasks** during/after the session — same mechanism as meeting action items (Wave 3c). | One pipeline, one inbox. No parallel "1:1 action" type. |
 | OO-D9 | No changes to `tasks`, `task_events`, `developers`, or any existing table. Three new tables + one config key. | Additive and reversible — rollback = flag off. |
+| OO-D10 | **Private by ownership (P0-S5, docs/56).** Agenda topics created from the agenda are *manager-owned* tasks (undated, `person` link to the developer). Session actions default to manager-owned; assigning one to the series developer is an explicit choice (`ownerType: "developer"`, UI: "visible to {name} in My Day"). Existing developer-owned topics are moved with `npm run one-on-one:topics` (dry run by default). | Developer reads and workload counts filter on developer ownership, so a manager-owned task is invisible there by construction. Marking rows with `source = one_on_one` and excluding them at every developer-facing read would fail open the next time a read path is added. |
 
 ---
 

@@ -23,6 +23,7 @@
     "tasks:drop-legacy": "npm run tasks:drop-legacy --workspace=server --",
     "tasks:phase3": "npm run tasks:phase3 --workspace=server --",
     "one-on-one": "npm run one-on-one --workspace=server --",
+    "one-on-one:topics": "npm run one-on-one:topics --workspace=server --",
     "team-mode": "npm run team-mode --workspace=server --",
     "start": "npm run start --workspace=server",
     "test": "npm run test:server && npm run test:client",

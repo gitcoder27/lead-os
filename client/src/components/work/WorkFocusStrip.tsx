@@ -1,47 +1,47 @@
-import { AlertCircle, ArrowRight, Briefcase, CalendarClock, ClipboardList, Loader2, RadioTower, ShieldAlert, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarClock, ClipboardList, Loader2, RadioTower, Sparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type { AppView } from '@/App';
 import { useOverview } from '@/hooks/useOverview';
-import { useManagerAttention } from '@/hooks/useManagerAttention';
-import type { FilterType } from '@/types';
-import type { ManagerPulseMetric, ManagerAttentionSeverity } from '@/lib/manager-attention';
+import { useToday } from '@/hooks/useToday';
+import { headerMetrics } from '@/lib/today-layout';
+import type { FilterType, TodayActionSeverity, TodayActionTarget, TodaySummaryMetric } from '@/types';
 
 interface WorkFocusStripProps {
   activeFilter: FilterType;
   onFilterChange: (filter: FilterType) => void;
-  onOpenDesk?: () => void;
-  onOpenTeam?: () => void;
+  /** Open a Today metric's target (the same opener Today's own rows use). */
+  onOpenTarget?: (target: TodayActionTarget) => void;
+  onViewChange?: (view: AppView) => void;
   actions?: ReactNode;
 }
 
-const severityColor: Record<ManagerAttentionSeverity, string> = {
+const severityColor: Record<TodayActionSeverity, string> = {
   critical: 'var(--danger)',
   warning: 'var(--warning)',
   info: 'var(--info)',
+  success: 'var(--success)',
   neutral: 'var(--text-secondary)',
 };
 
-export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpenTeam, actions }: WorkFocusStripProps) {
+/**
+ * docs/56 P1-06: the right-hand tiles are Today's own summary metrics (the
+ * server ranks them, mode-aware), not a second client-side attention model.
+ * "Due today" is left out because the defect tiles already carry it.
+ */
+const TODAY_TILE_IDS = new Set(['attention', 'stale', 'promises', 'sync']);
+
+export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenTarget, onViewChange, actions }: WorkFocusStripProps) {
   const { data: overview, isLoading: overviewLoading } = useOverview();
-  const { data: snapshot, isFetching } = useManagerAttention();
-  const metrics = snapshot.workMetrics;
-  const manualMetric = metrics.find((metric) => metric.id === 'manual-work');
-  const blockedMetric = metrics.find((metric) => metric.id === 'blocked');
-  const dueSoonMetric = metrics.find((metric) => metric.id === 'due-soon');
+  const today = useToday();
+  const todayTiles = headerMetrics(today.data?.summary ?? []).filter((metric) => TODAY_TILE_IDS.has(metric.id));
 
-  const handleClick = (metric: ManagerPulseMetric) => {
-    if (metric.id === 'manual-work' && onOpenDesk) {
-      onOpenDesk();
+  // A metric without a target is the "Attention" total, which is what Today itself lists.
+  const handleClick = (metric: TodaySummaryMetric) => {
+    if (metric.target && onOpenTarget) {
+      onOpenTarget(metric.target);
       return;
     }
-
-    if (metric.id === 'at-risk' && onOpenTeam) {
-      onOpenTeam();
-      return;
-    }
-
-    if (metric.filter) {
-      onFilterChange(metric.filter);
-    }
+    onViewChange?.('today');
   };
 
   const defectSignals = [
@@ -92,12 +92,6 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
     },
   ];
 
-  const workSignals = [
-    manualMetric,
-    dueSoonMetric,
-    blockedMetric,
-  ].filter((metric): metric is ManagerPulseMetric => Boolean(metric));
-
   return (
     <section
       className="border-b px-3 py-2"
@@ -116,7 +110,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
             <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</p>
             <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
           </div>
-          {isFetching || overviewLoading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
+          {today.isFetching || overviewLoading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
         </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto no-scrollbar">
@@ -150,31 +144,34 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenDesk, onOpe
 
           <span className="mx-1 h-7 w-px shrink-0" style={{ background: 'var(--border)' }} />
 
-          {workSignals.map((metric) => (
-            <button
-              key={metric.id}
-              type="button"
-              onClick={() => handleClick(metric)}
-              className="group flex h-10 min-w-[132px] items-center justify-between gap-2 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] active:scale-[0.99]"
-              style={{
-                borderColor: metric.value > 0 ? `color-mix(in srgb, ${severityColor[metric.severity]} 30%, var(--border))` : 'var(--border)',
-                background: metric.value > 0 ? `color-mix(in srgb, ${severityColor[metric.severity]} 8%, var(--bg-primary))` : 'color-mix(in srgb, var(--bg-primary) 66%, transparent)',
-              }}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{metric.label}</span>
-                <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{metric.detail}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1">
-                {metric.id === 'manual-work' ? <Briefcase size={11} style={{ color: severityColor[metric.value > 0 ? metric.severity : 'neutral'] }} /> : null}
-                {metric.id === 'blocked' ? <ShieldAlert size={11} style={{ color: severityColor[metric.value > 0 ? metric.severity : 'neutral'] }} /> : null}
-                <span className="text-[13px] font-semibold tabular-nums" style={{ color: severityColor[metric.value > 0 ? metric.severity : 'neutral'] }}>
-                  {metric.value}
+          {todayTiles.length > 0 ? <span className="mx-1 h-7 w-px shrink-0" style={{ background: 'var(--border)' }} /> : null}
+
+          {todayTiles.map((metric) => {
+            const color = severityColor[metric.value > 0 ? metric.severity : 'neutral'];
+            return (
+              <button
+                key={metric.id}
+                type="button"
+                onClick={() => handleClick(metric)}
+                className="group flex h-10 min-w-[132px] items-center justify-between gap-2 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] active:scale-[0.99]"
+                style={{
+                  borderColor: metric.value > 0 ? `color-mix(in srgb, ${severityColor[metric.severity]} 30%, var(--border))` : 'var(--border)',
+                  background: metric.value > 0 ? `color-mix(in srgb, ${severityColor[metric.severity]} 8%, var(--bg-primary))` : 'color-mix(in srgb, var(--bg-primary) 66%, transparent)',
+                }}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{metric.label}</span>
+                  <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{metric.detail}</span>
                 </span>
-                <ArrowRight size={10} className="opacity-0 transition-opacity group-hover:opacity-100" style={{ color: 'var(--text-muted)' }} />
-              </span>
-            </button>
-          ))}
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="text-[13px] font-semibold tabular-nums" style={{ color }}>
+                    {metric.value}
+                  </span>
+                  <ArrowRight size={10} className="opacity-0 transition-opacity group-hover:opacity-100" style={{ color: 'var(--text-muted)' }} />
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {actions && (

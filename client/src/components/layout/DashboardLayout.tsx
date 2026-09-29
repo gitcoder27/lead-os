@@ -493,8 +493,8 @@ export function DashboardLayout({
           <WorkFocusStrip
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
-            onOpenDesk={onViewChange ? () => onViewChange('desk') : undefined}
-            onOpenTeam={onViewChange ? () => onViewChange('team') : undefined}
+            onOpenTarget={onOpenActionTarget}
+            onViewChange={onViewChange}
             actions={workViewsMenu}
           />
 

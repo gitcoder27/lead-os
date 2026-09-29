@@ -420,6 +420,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
           <StatusRationaleDialog
             status={pendingStatus}
             developerName={day.developer.displayName}
+            developerParticipates={day.participates}
             tasks={tasks}
             initialSelectedKeys={
               day.statusSuggestion?.status === pendingStatus
@@ -434,7 +435,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
                 setPendingStatus(null);
               }
             }}
-            onSubmit={({ rationale, taskKey, nextFollowUpAt }) =>
+            onSubmit={({ rationale, taskKey, nextFollowUpAt, visibility }) =>
               statusUpdate.mutate(
                 {
                   accountId: day.developer.accountId,
@@ -442,6 +443,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
                   rationale,
                   taskKey,
                   nextFollowUpAt,
+                  visibility,
                 },
                 {
                   onSuccess: () => setPendingStatus(null),

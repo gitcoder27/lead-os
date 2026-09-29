@@ -713,6 +713,7 @@ export function TeamTrackerPage({
         <StatusRationaleDialog
           status={suggestionTarget.statusSuggestion.status}
           developerName={suggestionTarget.developer.displayName}
+          developerParticipates={suggestionTarget.participates}
           tasks={
             suggestionTarget.tasks?.length
               ? suggestionTarget.tasks.map((task) => ({ taskKey: task.taskKey, title: task.title }))
@@ -730,14 +731,16 @@ export function TeamTrackerPage({
               setSuggestionTarget(null);
             }
           }}
-          onSubmit={({ rationale, taskKey, nextFollowUpAt }) =>
+          onSubmit={({ rationale, taskKey, nextFollowUpAt, visibility }) =>
             statusUpdate.mutate(
               {
                 accountId: suggestionTarget.developer.accountId,
                 status: 'blocked',
                 rationale,
-                taskKey: taskKey ?? suggestionTarget.statusSuggestion!.reasonTaskKey,
+                // A private update cannot be linked to a task (the blocker event would be shared).
+                taskKey: visibility === 'private' ? undefined : taskKey ?? suggestionTarget.statusSuggestion!.reasonTaskKey,
                 nextFollowUpAt,
+                visibility,
               },
               { onSuccess: () => setSuggestionTarget(null) },
             )

@@ -204,6 +204,8 @@ export const teamTrackerCheckIns = sqliteTable("team_tracker_checkins", {
   nextFollowUpAt: text("next_follow_up_at"),
   authorType: text("author_type").notNull().default("manager"),
   authorAccountId: text("author_account_id"),
+  /** P0-S6: `private` check-ins are manager-only and never returned to developers. */
+  visibility: text("visibility").notNull().default("shared"),
   createdAt: text("created_at").notNull(),
 });
 

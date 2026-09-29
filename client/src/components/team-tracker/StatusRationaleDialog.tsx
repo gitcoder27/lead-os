@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import type { TrackerDeveloperStatus } from '@/types';
 import { Dialog, DialogActions, DialogError } from '@/components/ui/Dialog';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { TaskPicker, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TrackerStatusPill } from './TrackerStatusPill';
 
@@ -13,8 +14,11 @@ interface StatusRationaleDialogProps {
   error?: string | null;
   /** Pre-picked task keys (e.g. the task that triggered a status suggestion). */
   initialSelectedKeys?: string[];
+  /** Whether this developer has a login (`Developer.participates`). Defaults to true. */
+  developerParticipates?: boolean;
   onClose: () => void;
-  onSubmit: (params: { rationale: string; taskKey?: string; nextFollowUpAt?: string | null }) => void;
+  /** `visibility: 'private'` (collab only) keeps the rationale and follow-up manager-only. */
+  onSubmit: (params: { rationale: string; taskKey?: string; nextFollowUpAt?: string | null; visibility?: 'private' }) => void;
 }
 
 const RATIONALE_REQUIRED_STATUSES: TrackerDeveloperStatus[] = ['blocked', 'at_risk'];
@@ -26,9 +30,16 @@ export function StatusRationaleDialog({
   isPending,
   error,
   initialSelectedKeys,
+  developerParticipates = true,
   onClose,
   onSubmit,
 }: StatusRationaleDialogProps) {
+  // docs/56 P0-S6: in solo mode nothing developer-facing exists, so the dialog
+  // stays simple. Visibility only matters when the developer can log in.
+  const askVisibility = useTeamMode() === 'collab' && developerParticipates;
+  const firstName = developerName.split(' ')[0] || developerName;
+  const [isPrivate, setIsPrivate] = useState(false);
+  const privateUpdate = askVisibility && isPrivate;
   const rationaleRef = useRef<HTMLTextAreaElement>(null);
   const [rationale, setRationale] = useState('');
   const [selectedKeys, setSelectedKeys] = useState<string[]>(initialSelectedKeys ?? []);
@@ -48,7 +59,7 @@ export function StatusRationaleDialog({
       );
       return;
     }
-    const taskKeys = taskKeysForSubmit(selectedKeys, rationale, tasks);
+    const taskKeys = privateUpdate ? [] : taskKeysForSubmit(selectedKeys, rationale, tasks);
     if (taskKeys.length > 1) {
       setFormError('Pick a single task for this update.');
       return;
@@ -72,6 +83,7 @@ export function StatusRationaleDialog({
       rationale: trimmed || `Status updated.`,
       taskKey: taskKeys[0],
       nextFollowUpAt,
+      ...(privateUpdate ? { visibility: 'private' as const } : {}),
     });
   };
 
@@ -122,7 +134,30 @@ export function StatusRationaleDialog({
             style={{ minHeight: '72px' }}
           />
         </div>
-        {tasks.length > 0 && (
+        {askVisibility && (
+          <fieldset className="space-y-1" data-testid="status-visibility">
+            <legend className="ui-field-label">Who sees this</legend>
+            <label className="flex items-start gap-2 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+              <input type="radio" name="status-visibility" checked={!isPrivate} onChange={() => setIsPrivate(false)} className="mt-0.5" />
+              <span>
+                Visible to {firstName}
+                <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  {firstName} sees the status and this rationale on My Day. Your follow-up time stays private.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+              <input type="radio" name="status-visibility" checked={isPrivate} onChange={() => setIsPrivate(true)} className="mt-0.5" />
+              <span>
+                Private — only you
+                <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  {firstName} still sees the new status, but not the rationale or follow-up. Can&apos;t be linked to a task.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+        )}
+        {tasks.length > 0 && !privateUpdate && (
           <div>
             <span className="ui-field-label">
               Link a task <span style={{ color: 'var(--text-muted)' }}>(optional — raises a blocker event on it)</span>

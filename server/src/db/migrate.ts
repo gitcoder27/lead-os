@@ -184,6 +184,7 @@ CREATE TABLE IF NOT EXISTS team_tracker_checkins (
   next_follow_up_at TEXT,
   author_type TEXT NOT NULL DEFAULT 'manager',
   author_account_id TEXT,
+  visibility  TEXT NOT NULL DEFAULT 'shared',
   created_at  TEXT NOT NULL,
   FOREIGN KEY (day_id) REFERENCES team_tracker_days(id)
 );
@@ -687,6 +688,7 @@ const alterStatements = [
   "ALTER TABLE team_tracker_checkins ADD COLUMN next_follow_up_at TEXT",
   "ALTER TABLE team_tracker_checkins ADD COLUMN author_type TEXT NOT NULL DEFAULT 'manager'",
   "ALTER TABLE team_tracker_checkins ADD COLUMN author_account_id TEXT",
+  "ALTER TABLE team_tracker_checkins ADD COLUMN visibility TEXT NOT NULL DEFAULT 'shared'",
   "CREATE TABLE IF NOT EXISTS team_tracker_saved_views (id INTEGER PRIMARY KEY AUTOINCREMENT, manager_account_id TEXT NOT NULL, name TEXT NOT NULL, search_query TEXT, summary_filter TEXT NOT NULL DEFAULT 'all', sort_by TEXT NOT NULL DEFAULT 'name', group_by TEXT NOT NULL DEFAULT 'none', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_tracker_saved_views_manager ON team_tracker_saved_views(manager_account_id)",
   "CREATE INDEX IF NOT EXISTS idx_tracker_days_workspace_developer_date ON team_tracker_days(workspace_id, developer_account_id, date DESC)",

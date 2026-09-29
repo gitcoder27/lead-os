@@ -210,6 +210,7 @@ const addCheckInSchema = z.object({
     summary: z.string().trim().min(1).max(2000),
     status: trackerStatusSchema.optional(),
     taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
+    visibility: z.enum(["shared", "private"]).optional(),
   }),
   query: z.any().optional(),
 });
@@ -226,6 +227,7 @@ const statusUpdateSchema = z
       summary: z.string().trim().max(2000).optional(),
       nextFollowUpAt: isoDateTimeSchema.nullable().optional(),
       taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
+      visibility: z.enum(["shared", "private"]).optional(),
     }),
     query: z.any().optional(),
   })
@@ -566,11 +568,12 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, summary, status, taskKeys } = req.body;
+        const { date, summary, status, taskKeys, visibility } = req.body;
         const checkIn = await trackerService.addCheckIn(accountId, date, {
           summary,
           status,
           taskKeys,
+          visibility,
         }, {
           type: req.auth?.user.role ?? "manager",
           accountId: req.auth?.user.accountId,
@@ -588,7 +591,7 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, status, rationale, summary, nextFollowUpAt, taskKey } = req.body;
+        const { date, status, rationale, summary, nextFollowUpAt, taskKey, visibility } = req.body;
         const day = await trackerService.recordStatusUpdate(
           accountId,
           date,
@@ -598,6 +601,7 @@ export function createTeamTrackerRouter(
             summary,
             nextFollowUpAt,
             taskKey,
+            visibility,
           },
           {
             type: req.auth?.user.role ?? "manager",

@@ -6,6 +6,7 @@ import type {
   TrackerDeveloperSignals,
   TrackerWorkItem,
   TrackerCheckIn,
+  TrackerCheckInVisibility,
   TeamTrackerBoardResponse,
   TrackerBoardSummary,
   TrackerAttentionItem,
@@ -483,8 +484,18 @@ function mapCheckIn(
     status: (row.status as TrackerDeveloperStatus | null) ?? undefined,
     rationale: row.rationale ?? undefined,
     nextFollowUpAt: row.nextFollowUpAt ?? undefined,
+    visibility: row.visibility === "private" ? "private" : "shared",
     taskKeys: [],
   };
+}
+
+function isSharedCheckIn(checkIn: TrackerCheckIn): boolean {
+  return checkIn.visibility !== "private";
+}
+
+/** A shared check-in shows the developer its status and rationale; the manager's follow-up schedule stays private. */
+function forDeveloper(checkIn: TrackerCheckIn): TrackerCheckIn {
+  return { ...checkIn, nextFollowUpAt: undefined };
 }
 
 function mapAttentionActionItem(item: TrackerWorkItem): TrackerAttentionActionItem {
@@ -1364,6 +1375,11 @@ export class TeamTrackerService {
           ? {
               ...day,
               managerNotes: undefined,
+              // P0-S6: private manager check-ins, and the manager's follow-up
+              // schedule, never reach a developer response.
+              nextFollowUpAt: undefined,
+              checkIns: day.checkIns.filter(isSharedCheckIn).map(forDeveloper),
+              recentCheckIns: day.recentCheckIns.filter(isSharedCheckIn).map(forDeveloper),
             }
           : day,
     };
@@ -2109,6 +2125,8 @@ export class TeamTrackerService {
       rationale?: string;
       nextFollowUpAt?: string | null;
       taskKeys?: string[];
+      /** P0-S6: `private` = manager-only check-in (never returned to developers). */
+      visibility?: TrackerCheckInVisibility;
     },
     actor?: {
       type: UserRole;
@@ -2128,6 +2146,13 @@ export class TeamTrackerService {
     if (!summary) {
       throw new HttpError(400, "summary is required");
     }
+    const isPrivate = params.visibility === "private";
+    if (isPrivate) {
+      // Developers only ever write shared check-ins, and a private one must not
+      // leak through task events (`checkin_ref` excerpts are shared).
+      if (actor?.type === "developer") throw new HttpError(403, "Developers cannot write private check-ins");
+      if (params.taskKeys?.length) throw new HttpError(400, "Private check-ins cannot reference tasks");
+    }
 
     const inserted = await db
       .insert(teamTrackerCheckIns)
@@ -2140,6 +2165,7 @@ export class TeamTrackerService {
         nextFollowUpAt,
         authorType: actor?.type ?? "manager",
         authorAccountId: actor?.accountId ?? null,
+        visibility: isPrivate ? "private" : "shared",
         createdAt: now,
       })
       .returning();
@@ -2164,7 +2190,7 @@ export class TeamTrackerService {
       .where(eq(teamTrackerDays.id, day.id));
 
     const taskKeys = new Set<string>();
-    if (await this.taskKeys.enabled(normalizedWorkspaceId)) {
+    if (!isPrivate && await this.taskKeys.enabled(normalizedWorkspaceId)) {
       for (const raw of params.taskKeys ?? []) {
         if (!TASK_KEY_PATTERN.test(raw)) throw new HttpError(400, "Invalid task key");
         const key = await this.taskKeys.resolve(normalizedWorkspaceId, raw);
@@ -2207,6 +2233,8 @@ export class TeamTrackerService {
       summary?: string;
       nextFollowUpAt?: string | null;
       taskKey?: string;
+      /** P0-S6: `private` keeps rationale and follow-up manager-only; the status itself stays visible. */
+      visibility?: TrackerCheckInVisibility;
     },
     actor?: {
       type: UserRole;
@@ -2218,6 +2246,9 @@ export class TeamTrackerService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const rationale = normalizeOptionalText(params.rationale);
     const summary = normalizeOptionalText(params.summary);
+    // The linked-task blocker event carries the rationale as a shared event on a
+    // task the developer owns, so a private update cannot link a task.
+    if (params.visibility === "private" && params.taskKey) throw new HttpError(400, "Private updates cannot be linked to a task");
 
     if ((requiresStatusRationale(params.status) || (params.taskKey && params.status === "waiting")) && !rationale) {
       throw new HttpError(
@@ -2241,6 +2272,7 @@ export class TeamTrackerService {
         rationale,
         nextFollowUpAt: params.nextFollowUpAt ?? null,
         taskKeys: resolution ? [resolution.taskKey] : undefined,
+        visibility: params.visibility,
       },
       actor,
       normalizedWorkspaceId

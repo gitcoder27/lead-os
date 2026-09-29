@@ -1172,6 +1172,9 @@ export type TeamTrackerViewMode = "live" | "history";
 export type MyDayViewMode = "live" | "history" | "planning";
 export type MyDayReadOnlyReason = "inactive" | "history" | "future";
 
+/** P0-S6: `private` check-ins are manager-only; developer responses never include them. */
+export type TrackerCheckInVisibility = "shared" | "private";
+
 export interface TrackerCheckIn {
   id: number;
   dayId: number;
@@ -1182,6 +1185,7 @@ export interface TrackerCheckIn {
   status?: TrackerDeveloperStatus;
   rationale?: string;
   nextFollowUpAt?: string;
+  visibility?: TrackerCheckInVisibility;
   date?: string;
   taskKeys: string[];
 }

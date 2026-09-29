@@ -215,6 +215,7 @@ export function useStatusUpdate(date: string) {
       summary?: string;
       nextFollowUpAt?: string | null;
       taskKey?: string;
+      visibility?: 'private';
     }) => {
       const { accountId, ...body } = params;
       return api.post(`/team-tracker/${accountId}/status-update`, {

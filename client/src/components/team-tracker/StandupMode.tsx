@@ -805,6 +805,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         <StatusRationaleDialog
           status={pendingStatus}
           developerName={day.developer.displayName}
+          developerParticipates={day.participates}
           tasks={pickerTasks}
           initialSelectedKeys={statusPreselect}
           isPending={statusUpdate.isPending}
@@ -815,11 +816,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               closeLayer();
             }
           }}
-          onSubmit={({ rationale, taskKey, nextFollowUpAt }) => {
+          onSubmit={({ rationale, taskKey, nextFollowUpAt, visibility }) => {
             const status = pendingStatus;
             const target = day.developer.accountId;
             statusUpdate.mutate(
-              { accountId: target, status, rationale, taskKey, nextFollowUpAt },
+              { accountId: target, status, rationale, taskKey, nextFollowUpAt, visibility },
               {
                 onSuccess: () => {
                   log(target, status === 'blocked' ? 'blocked' : 'status', taskKey, STATUS_LABELS[status]);

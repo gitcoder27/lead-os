@@ -11,7 +11,7 @@ interface TodayActionQueueProps {
   onToggleExpanded: () => void;
   activeItemId?: string;
   pendingTargetKey?: string;
-  /** docs/53 U2: rows cleared this session (session-local). */
+  /** docs/53 U2 / docs/57 §6: tasks finished today (from real completions). */
   cleared: number;
   /** What comes next once the queue is empty (e.g. "Wrap-up at 16:00"). */
   nextUp?: string;

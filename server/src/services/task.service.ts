@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { TaskWaitingOn, TaskWaitingOnInput, TaskWaitingOnType } from "shared/types";
+import { TODAY_TOP_LIMIT, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
 import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
@@ -17,6 +17,9 @@ import { isoDatePart, todayIsoDate } from "../utils/date";
 export type TaskRow = typeof tasks.$inferSelect;
 export type TaskLinkRow = typeof taskLinks.$inferSelect;
 export type DayFocusRow = typeof dayFocus.$inferSelect;
+
+/** `day_focus.source` of a manager pin (docs/57 §6). */
+const TOP3_SOURCE = "top3";
 
 export interface TaskPrincipal {
   type: "manager" | "developer" | "copilot";
@@ -916,6 +919,60 @@ export class TaskService {
       ))
       .groupBy(tasks.ownerId);
     return new Map(rows.map((row) => [row.ownerId ?? "", row.count]));
+  }
+
+  /**
+   * docs/57 §6 (P3-01): the manager's pinned top tasks for a day, in pin order.
+   * Pins are `day_focus` rows with `owner_type = 'manager'` and
+   * `source = 'top3'`; a pin outlives a reload and never touches the task.
+   */
+  async top3Rows(managerAccountId: string, date: string, workspaceId?: string): Promise<TaskRow[]> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const rows = await db.select({ task: tasks }).from(dayFocus)
+      .innerJoin(tasks, eq(tasks.id, dayFocus.taskId))
+      .where(and(
+        eq(dayFocus.workspaceId, scope),
+        eq(dayFocus.ownerType, "manager"),
+        eq(dayFocus.ownerId, managerAccountId),
+        eq(dayFocus.date, date),
+        eq(dayFocus.source, TOP3_SOURCE),
+        isNull(tasks.deletedAt),
+      ))
+      .orderBy(dayFocus.position, dayFocus.id);
+    return rows.map((row) => row.task);
+  }
+
+  /**
+   * Replace the manager's pins for `date` with `taskKeys` (order kept). Only my
+   * own open tasks can be pinned, at most TODAY_TOP_LIMIT of them. Other
+   * `day_focus` rows (developer plan rows) are never touched.
+   */
+  async setTop3(principal: TaskPrincipal, date: string, taskKeys: string[]): Promise<TaskRow[]> {
+    if (principal.type !== "manager") throw new HttpError(403, "Only a manager can pin tasks");
+    const scope = normalizeWorkspaceId(principal.workspaceId);
+    const keys = [...new Set(taskKeys.map((key) => key.trim().toUpperCase()))];
+    if (keys.length > TODAY_TOP_LIMIT) throw new HttpError(400, `Pin at most ${TODAY_TOP_LIMIT} tasks`);
+    const picked: TaskRow[] = [];
+    for (const key of keys) {
+      const row = await this.getByKey(key, scope);
+      if (!row || row.deletedAt || row.ownerId !== principal.accountId) throw new HttpError(404, `Task ${key} not found`);
+      if (!["open", "active", "blocked"].includes(row.status)) throw new HttpError(409, `Task ${key} is closed`);
+      picked.push(row);
+    }
+    await runInTransaction(async () => {
+      await db.delete(dayFocus).where(and(
+        eq(dayFocus.workspaceId, scope),
+        eq(dayFocus.ownerType, "manager"),
+        eq(dayFocus.ownerId, principal.accountId),
+        eq(dayFocus.date, date),
+        eq(dayFocus.source, TOP3_SOURCE),
+      ));
+      const createdAt = new Date().toISOString();
+      for (const [position, row] of picked.entries()) {
+        await db.insert(dayFocus).values({ workspaceId: scope, taskId: row.id, date, ownerType: "manager", ownerId: principal.accountId, position, source: TOP3_SOURCE, createdAt });
+      }
+    });
+    return picked;
   }
 
   async focusRowsFor(ownerType: string, ownerId: string, date: string, workspaceId?: string): Promise<DayFocusRow[]> {

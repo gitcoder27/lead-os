@@ -15,7 +15,6 @@ import {
   splitPanelRows,
   withoutWrapUpItems,
 } from '@/lib/today-layout';
-import { nextTodayProgress, EMPTY_TODAY_PROGRESS } from '@/lib/today-progress';
 import type { TodayActionItem, TodayDelta, TodayFocus, TodayPromiseItem, TodayResponse, TodayTeamPulseItem } from '@/types';
 
 const dev = (id: string) => ({ type: 'developer' as const, view: 'team' as const, developerAccountId: id });
@@ -61,11 +60,11 @@ function promise(id: number): TodayPromiseItem {
 
 describe('todayPanelOrder (docs/53 F6)', () => {
   it('fills the stage panel by stage; the queue always owns the left column', () => {
-    expect(todayPanelOrder('morning_plan')).toEqual(['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
-    expect(todayPanelOrder('standup_window')).toEqual(['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
-    expect(todayPanelOrder('midday_check')).toEqual(['dueSoon', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('morning_plan')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('standup_window')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder('midday_check')).toEqual(['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people']);
     expect(todayPanelOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
-    expect(todayPanelOrder(undefined)).toEqual(['delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    expect(todayPanelOrder(undefined)).toEqual(['plan', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
   });
 });
 
@@ -187,17 +186,6 @@ describe('since-last-visit strip', () => {
     expect(formatSince(new Date(2026, 2, 8, 7, 5).toISOString(), now)).toBe('07:05');
     expect(formatSince(new Date(2026, 2, 7, 18, 40).toISOString(), now)).toBe('yesterday 18:40');
     expect(formatSince(new Date(2026, 2, 5, 18, 40).toISOString(), now)).toBe('Thu 18:40');
-  });
-});
-
-describe('session progress (docs/53 U2)', () => {
-  it('counts rows that left the queue and un-counts ones that return', () => {
-    let state = nextTodayProgress(EMPTY_TODAY_PROGRESS, ['a', 'b', 'c']);
-    expect(state.cleared).toEqual([]);
-    state = nextTodayProgress(state, ['b', 'c', 'd']);
-    expect(state.cleared).toEqual(['a']);
-    state = nextTodayProgress(state, ['a', 'd']);
-    expect(state.cleared.sort()).toEqual(['b', 'c']);
   });
 });
 

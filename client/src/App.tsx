@@ -639,6 +639,14 @@ function AppContent() {
         navigateToTaskPage(target.taskKey);
         return;
       }
+      if (target.taskView) {
+        setTasksUrlState({ view: target.taskView, overrides: {} });
+        setTasksUrlNonce((nonce) => nonce + 1);
+        preloadView('desk');
+        setActiveView('desk');
+        navigateToView('desk', { params: { view: target.taskView } });
+        return;
+      }
       setTasksUrlState({ view: 'attention', overrides: { signal: ['drift'] } });
       setTasksUrlNonce((nonce) => nonce + 1);
       preloadView('desk');

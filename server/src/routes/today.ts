@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import type { TodayRhythmBoundaries } from "shared/types";
+import { TASK_KEY_PATTERN, TODAY_TOP_LIMIT, type SetTodayTop3Request, type TodayRhythmBoundaries } from "shared/types";
 import { validate } from "../middleware/validate";
 import { TodayService } from "../services/today.service";
 
@@ -25,6 +25,17 @@ const rhythmSettingsSchema = z.object({
       middayStart: clockTime,
       wrapUpStart: clockTime,
     }),
+  }),
+});
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
+
+const top3Schema = z.object({
+  query: z.any().optional(),
+  params: z.any().optional(),
+  body: z.object({
+    date: isoDate,
+    taskKeys: z.array(z.string().trim().regex(TASK_KEY_PATTERN, "invalid task key")).max(TODAY_TOP_LIMIT),
   }),
 });
 
@@ -68,6 +79,17 @@ export function createTodayRouter(todayService: TodayService): Router {
     try {
       const { boundaries } = req.body as { boundaries: TodayRhythmBoundaries };
       res.json(await todayService.updateRhythmSettings(boundaries, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // docs/57 §6 (P3-01): the day's pinned top 3 (my own open tasks only).
+  router.put("/top3", validate(top3Schema), async (req, res, next) => {
+    try {
+      const { date, taskKeys } = req.body as SetTodayTop3Request;
+      const keys = await todayService.setTop3(req.auth!.user.accountId, date, taskKeys, req.auth!.user.workspaceId);
+      res.json({ date, taskKeys: keys });
     } catch (error) {
       next(error);
     }

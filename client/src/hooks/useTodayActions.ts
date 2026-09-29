@@ -9,6 +9,7 @@ import type {
   ManagerActionUndo,
   TodayActionCommand,
   TodayActionTarget,
+  TodayPlanFocus,
   TodayResponse,
 } from '@/types';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
@@ -61,13 +62,14 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     qc.invalidateQueries({ queryKey: ['workload'] });
   };
 
-  const removeTargetOptimistically = (target: TodayActionTarget) => {
+  const removeTargetOptimistically = (target: TodayActionTarget, kind?: TodayActionCommand['kind']) => {
     qc.setQueriesData<TodayResponse>({ queryKey: ['today', date] }, (current) => {
       if (!current) {
         return current;
       }
 
       const matchesTarget = (itemTarget: TodayActionTarget) =>
+        itemTarget.taskKey === target.taskKey &&
         itemTarget.managerDeskItemId === target.managerDeskItemId &&
         itemTarget.developerAccountId === target.developerAccountId &&
         itemTarget.issueKey === target.issueKey &&
@@ -86,6 +88,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         totalCount: current.totalCount === undefined ? undefined : Math.max(current.totalCount - removed, 0),
         promises: current.promises.filter((item) => !matchesTarget(item.target)),
         meetingPrompts: current.meetingPrompts.filter((item) => !matchesTarget(item.target)),
+        focus: current.focus ? { ...current.focus, plan: planWithout(current.focus.plan, target.taskKey, kind === 'mark_done') } : current.focus,
       };
     });
   };
@@ -188,11 +191,11 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, visibility, nextAction, nextActionOwnerAccountId }: TodayActionVariables) => {
       const { target } = command;
 
-      if (command.kind === 'mark_done' && target.managerDeskItemId) {
+      if (command.kind === 'mark_done' && (target.managerDeskItemId || target.taskKey)) {
         return postCommand({ command });
       }
 
-      if (command.kind === 'snooze' && target.managerDeskItemId) {
+      if (command.kind === 'snooze' && (target.managerDeskItemId || target.taskKey)) {
         return postCommand({ command, preset });
       }
 
@@ -220,7 +223,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         return postCommand({ command, title: title.trim(), preset });
       }
 
-      if (command.kind === 'carry_forward' && target.managerDeskItemId) {
+      if (command.kind === 'carry_forward' && (target.managerDeskItemId || target.taskKey)) {
         return postCommand({ command });
       }
 
@@ -250,7 +253,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         command.kind === 'capture_meeting_outcome' ||
         command.kind === 'set_current_work'
       ) {
-        removeTargetOptimistically(command.target);
+        removeTargetOptimistically(command.target, command.kind);
       }
       if (command.kind === 'add_check_in' && summary?.trim()) {
         completeDeveloperCheckInOptimistically(command.target);
@@ -325,7 +328,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     await qc.cancelQueries({ queryKey: ['today', date] });
     for (const command of commands) {
       if (command.kind === 'ask_check_in') markAskedOptimistically(command.target);
-      else removeTargetOptimistically(command.target);
+      else removeTargetOptimistically(command.target, command.kind);
     }
     const undos: ManagerActionUndo[] = [];
     let done = 0;
@@ -385,6 +388,27 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     isPending: mutation.isPending,
     pendingKind: mutation.variables?.command.kind,
     pendingTarget: mutation.variables?.command.target,
+  };
+}
+
+/**
+ * A row leaving the queue also leaves the plan; finishing it counts toward
+ * "Done today" straight away (the refetch replaces this with the real list).
+ */
+function planWithout(plan: TodayPlanFocus | undefined, taskKey: string | undefined, done: boolean): TodayPlanFocus | undefined {
+  if (!plan || !taskKey) return plan;
+  const gone = plan.items.find((item) => item.taskKey === taskKey);
+  if (!gone) return plan;
+  return {
+    ...plan,
+    items: plan.items.filter((item) => item.taskKey !== taskKey),
+    top3: plan.top3.filter((key) => key !== taskKey),
+    doneToday: done
+      ? {
+        count: plan.doneToday.count + 1,
+        items: [{ taskKey, title: gone.title, closedAt: new Date().toISOString(), target: gone.target }, ...plan.doneToday.items],
+      }
+      : plan.doneToday,
   };
 }
 

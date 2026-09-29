@@ -40,6 +40,7 @@ const actionTargetSchema = z.object({
   managerDeskItemId: z.number().int().positive().optional(),
   trackerItemId: z.number().int().positive().optional(),
   taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
+  taskView: z.string().max(64).optional(),
   date: z.string().regex(dateRegex, "target date must be YYYY-MM-DD").optional(),
   filter: z.string().optional(),
   panel: z.string().optional(),

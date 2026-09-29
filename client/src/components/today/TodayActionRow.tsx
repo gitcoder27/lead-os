@@ -13,6 +13,7 @@ import {
   Rows3,
   Target,
   UserRoundX,
+  Pin,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   jira_drift: GitCompareArrows,
   one_on_one: CalendarDays,
   standup: PlayCircle,
+  top_three: Pin,
   calm: CircleCheck,
 };
 

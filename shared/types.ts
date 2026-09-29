@@ -248,6 +248,8 @@ export type TodayActionItemType =
   | "jira_drift"
   | "one_on_one"
   | "sync_attention"
+  /** docs/57 §6 (P3-01): a task pinned in the day's top 3. */
+  | "top_three"
   /** docs/53 F7: "Start standup" row before/during the standup window. */
   | "standup"
   | "calm";
@@ -297,6 +299,8 @@ export interface TodayActionTarget {
   managerDeskItemId?: number;
   trackerItemId?: number;
   taskKey?: string;
+  /** Tasks lens to open when view === "tasks" and there is no `taskKey` (e.g. "inbox"). */
+  taskView?: string;
   date?: string;
   /** Notes facet to open when view === "notes" (defaults to the scratchpad). */
   kind?: DailyNoteKind;
@@ -423,11 +427,65 @@ export interface TodayMiddayFocus {
   silentSinceStandup: TodayFocusPerson[];
 }
 
-export type TodayFocus =
+/** docs/57 §6 (P3-01): how many tasks the manager can pin as the day's top. */
+export const TODAY_TOP_LIMIT = 3;
+
+/** One of the manager's own tasks on today's plan (or pinned for tomorrow). */
+export interface TodayPlanItem {
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  priority: "normal" | "high";
+  scheduledOn: string | null;
+  dueAt: string | null;
+  /** The plan date passed without the task being done. */
+  overdue: boolean;
+  /** Pinned in the day's top 3. */
+  pinned: boolean;
+  target: TodayActionTarget;
+  /** Mark done (the same undoable command the queue uses). */
+  primaryAction: TodayActionCommand;
+}
+
+/** A task the manager closed today — from real `closed_at`, not the session. */
+export interface TodayDoneItem {
+  taskKey: string;
+  title: string;
+  closedAt: string;
+  target: TodayActionTarget;
+}
+
+/**
+ * docs/57 §6 (P3-01): the manager's own plan for the day. `items` are open
+ * tasks I own with a plan date on or before today (not waiting, not Later)
+ * plus my active work; pinned rows lead. Present in every stage.
+ */
+export interface TodayPlanFocus {
+  date: string;
+  /** Pinned rows first (in pin order), then the rest by plan date. */
+  items: TodayPlanItem[];
+  /** Keys pinned for today, in order (at most TODAY_TOP_LIMIT). */
+  top3: string[];
+  /** Inbox tasks waiting to be triaged. */
+  inboxCount: number;
+  /** Tasks I marked done today. */
+  doneToday: { count: number; items: TodayDoneItem[] };
+  /** The top 3 already picked for the next day. */
+  tomorrowTop3: { date: string; items: TodayPlanItem[] };
+}
+
+/** `PUT /api/today/top3`: replaces the pins for `date` (at most TODAY_TOP_LIMIT). */
+export interface SetTodayTop3Request {
+  date: string;
+  taskKeys: string[];
+}
+
+export type TodayFocus = (
   | { stage: "morning_plan"; morning: TodayMorningFocus }
   | { stage: "standup_window"; morning: TodayMorningFocus }
   | { stage: "midday_check"; midday: TodayMiddayFocus }
-  | { stage: "wrap_up"; wrapUp: TodayWrapUpFocus };
+  | { stage: "wrap_up"; wrapUp: TodayWrapUpFocus }
+) & { plan?: TodayPlanFocus };
 
 // ── Since-last-visit delta ──────────────────────────────
 

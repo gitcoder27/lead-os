@@ -389,6 +389,11 @@ export class TaskViewsService {
     return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)! }));
   }
 
+  /** How many tasks a definition matches, without building DTOs. */
+  async count(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate()): Promise<number> {
+    return (await this.evaluate(principal, definition, today)).length;
+  }
+
   /**
    * docs/49 §10: counts for every built-in and saved view from one candidate
    * universe (open rows plus rows closed since the earliest bounded closed

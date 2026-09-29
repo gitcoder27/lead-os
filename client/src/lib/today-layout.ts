@@ -21,6 +21,7 @@ import { usesCheckIns } from '@/lib/participation';
  * ranks the queue — the client only decides which blocks fill the panel.
  */
 export type TodayPanelSectionId =
+  | 'plan'
   | 'wrapUp'
   | 'standup'
   | 'delta'
@@ -35,13 +36,14 @@ export function todayPanelOrder(stage: TodayRhythmStage | undefined): TodayPanel
   switch (stage) {
     case 'morning_plan':
     case 'standup_window':
-      return ['standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
     case 'midday_check':
-      return ['dueSoon', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people'];
     case 'wrap_up':
+      // The wrap-up block carries Done today and tomorrow's top 3 itself.
       return ['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people'];
     default:
-      return ['delta', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['plan', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
   }
 }
 

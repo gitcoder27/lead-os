@@ -1,5 +1,6 @@
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
+import { buildTopThreeActions, TodayPlanService } from "./today-plan.service";
 import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
 import { OneOnOneService } from "./one-on-one.service";
 import { performance } from "node:perf_hooks";
@@ -27,6 +28,7 @@ import type {
   TodayDeltaIssue,
   TodayFocus,
   TodayFocusPerson,
+  TodayPlanFocus,
   TodayMeetingPrompt,
   OneOnOneDueSignal,
   TodayPromiseItem,
@@ -265,6 +267,16 @@ export class TodayService {
   }
 
   /**
+   * docs/57 §6 (P3-01): pin up to three of the manager's own tasks for a day.
+   * Replaces that day's pins; the returned keys are in pin order.
+   */
+  async setTop3(managerAccountId: string, date: string, taskKeys: string[], workspaceId?: string): Promise<string[]> {
+    const rows = await new TaskService().setTop3({ type: "manager", accountId: managerAccountId, workspaceId }, date, taskKeys);
+    this.clearTodayCache(workspaceId);
+    return rows.map((row) => row.taskKey);
+  }
+
+  /**
    * docs/56 P2-02: which first-run steps are done. A source that failed to load
    * counts as done, so a hiccup never nags the manager to redo setup.
    */
@@ -323,6 +335,15 @@ export class TodayService {
     const canonicalPromise = taskKeys.canonicalEnabled(workspaceId).catch(() => false);
     // docs/56 P1-03: collab-only surfaces (the "Stale check-ins" metric).
     const teamModePromise = this.settings.getTeamMode(workspaceId).catch(() => "solo" as const);
+    // docs/57 §6 (P3-01): the manager's own plan. Additive — a failure only drops it.
+    const planPromise: Promise<TodayPlanFocus | undefined> = canonicalPromise
+      .then((enabled) => (enabled
+        ? new TodayPlanService().build({ type: "manager", accountId: managerAccountId, workspaceId }, date)
+        : undefined))
+      .catch((error: unknown) => {
+        logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), date, err: error }, "Today plan unavailable");
+        return undefined;
+      });
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult, stateResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
       measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId })),
@@ -346,6 +367,7 @@ export class TodayService {
       measureSource(() => this.loadTodayState(managerAccountId, date, workspaceId, context, phase3Promise)),
     ]);
     const canonical = await canonicalPromise;
+    const plan = await planPromise;
     const collab = (await teamModePromise) === "collab";
     const sourceStatus: TodaySourceStatus = {
       issues: issueResult.status === "fulfilled" ? "ready" : "unavailable",
@@ -405,16 +427,26 @@ export class TodayService {
     const meetings = getMeetingPrompts(deskItems, clock);
     const carryActions = buildDeskCarryForwardActions(deskItems, clock, { canonical });
     const oneOnOneActions = buildOneOnOneActions(oneOnOneSignals);
+    const pinnedActions = plan ? buildTopThreeActions(plan) : [];
+    const pinnedKeys = new Set(plan?.top3 ?? []);
+    // A pinned task is one row, at the top — its carry or follow-up row folds into it.
+    const isPinnedDuplicate = (item: TodayActionItem) => {
+      const key = item.target.taskKey ?? item.target.context?.taskKey;
+      return Boolean(key && pinnedKeys.has(key));
+    };
     const actionItems = rankActionItems([
-      ...buildStandupActions(standup, rhythm, teamBoard, collab),
-      ...buildDeveloperActions(teamBoard, clock, openAsks),
-      ...buildIssueActions(issues, clock),
-      ...buildFollowUpActions(followUps, clock),
-      ...buildMeetingActions(meetings),
-      ...carryActions,
-      ...buildJiraDriftActions(jiraDrift),
-      ...oneOnOneActions,
-      ...buildSyncActions(syncStatus),
+      ...pinnedActions,
+      ...[
+        ...buildStandupActions(standup, rhythm, teamBoard, collab),
+        ...buildDeveloperActions(teamBoard, clock, openAsks),
+        ...buildIssueActions(issues, clock),
+        ...buildFollowUpActions(followUps, clock),
+        ...buildMeetingActions(meetings),
+        ...carryActions,
+        ...buildJiraDriftActions(jiraDrift),
+        ...oneOnOneActions,
+        ...buildSyncActions(syncStatus),
+      ].filter((item) => !isPinnedDuplicate(item)),
     ]);
     const visibleActions = actionItems.slice(0, VISIBLE_ACTION_LIMIT);
     const overflowActions = actionItems.slice(VISIBLE_ACTION_LIMIT, VISIBLE_ACTION_LIMIT + OVERFLOW_ACTION_LIMIT);
@@ -451,7 +483,7 @@ export class TodayService {
       totalCount: actionItems.length,
       groupCounts: countGroups(actionItems),
       ...(overflowActions.length > 0 ? { overflowActionItems: overflowActions } : {}),
-      focus: buildFocus({
+      focus: withPlan(buildFocus({
         rhythm,
         standup,
         clock,
@@ -463,7 +495,7 @@ export class TodayService {
         promiseItems,
         carryActions,
         openAsks,
-      }),
+      }), plan),
       ...(state ? { checkInAsks: [...openAsks.values()] } : {}),
       ...(gettingStarted ? { gettingStarted } : {}),
       ...(state?.delta
@@ -2114,6 +2146,10 @@ function buildStandupActions(
       secondaryKinds: [],
     }),
   ];
+}
+
+function withPlan(focus: TodayFocus, plan: TodayPlanFocus | undefined): TodayFocus {
+  return plan ? { ...focus, plan } : focus;
 }
 
 function countGroups(items: TodayActionItem[]): Record<TodayActionGroup, number> {

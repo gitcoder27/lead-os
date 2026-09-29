@@ -6,7 +6,7 @@ import { useQuickActions } from '@/context/QuickActionsContext';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTodayKeyboardTriage } from '@/hooks/useTodayKeyboardTriage';
-import { useTodayProgress } from '@/hooks/useTodayProgress';
+import { useTodayTop3 } from '@/hooks/useTodayTop3';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useLocalDate } from '@/hooks/useLocalDate';
 import { buildTodayQueueView, shouldIgnoreTriageEvent } from '@/lib/today-triage';
@@ -29,6 +29,7 @@ import {
   type TodayQueueGroup,
 } from '@/lib/today-layout';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
+import { TODAY_TOP_LIMIT } from '@/types';
 import type {
   FilterType,
   TodayActionCommand,
@@ -45,6 +46,7 @@ import { TodayConfirmDialog } from './TodayConfirmDialog';
 import { TodayGettingStarted } from './TodayGettingStarted';
 import { TodayDueSoon } from './TodayDueSoon';
 import { TodayPeoplePulse, pulsePersonFromFocus, pulsePersonFromItem } from './TodayPeoplePulse';
+import { TodayPlanPanel } from './TodayPlanPanel';
 import { TodayPromisesList } from './TodayPromisesList';
 import { TodayRhythmHeader } from './TodayRhythmHeader';
 import { TodaySinceStrip } from './TodaySinceStrip';
@@ -205,7 +207,18 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       }),
     };
   }, [snapshot?.actionItems, snapshot?.overflowActionItems, snapshot?.totalCount, focus, queueExpanded]);
-  const cleared = useTodayProgress(date, snapshot ? allQueueItems : undefined);
+  // docs/57 §6: "cleared" is what I actually finished today — read from the
+  // tasks' closed times, so it survives a reload and shows on every device.
+  const plan = focus?.plan;
+  const cleared = plan?.doneToday.count ?? 0;
+  const top3 = useTodayTop3();
+  const togglePin = (taskKey: string) => {
+    if (!plan) return;
+    const next = plan.top3.includes(taskKey)
+      ? plan.top3.filter((key) => key !== taskKey)
+      : [...plan.top3, taskKey].slice(0, TODAY_TOP_LIMIT);
+    top3.mutate({ date: plan.date, taskKeys: next });
+  };
   const pulse = useMemo(() => splitPulse(snapshot?.teamPulse ?? [], allQueueItems), [snapshot?.teamPulse, allQueueItems]);
   const rail = useMemo(
     () => railItems(focus && 'wrapUp' in focus ? [] : snapshot?.promises ?? [], snapshot?.meetingPrompts ?? [], allQueueItems),
@@ -384,11 +397,27 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           />
         );
       }
+      case 'plan':
+        return plan ? (
+          <TodayPlanPanel
+            key="plan"
+            plan={plan}
+            today={snapshot.date}
+            pinning={top3.isPending}
+            onTogglePin={togglePin}
+            onRunCommand={runCommand}
+            onOpenTarget={openTarget}
+            onCapture={() => openCapture()}
+          />
+        ) : null;
       case 'wrapUp':
         return focus && 'wrapUp' in focus ? (
           <TodayWrapUp
             key="wrapUp"
             wrapUp={focus.wrapUp}
+            plan={plan}
+            pinning={top3.isPending}
+            onSetTomorrowTop3={plan ? (taskKeys) => top3.mutate({ date: plan.tomorrowTop3.date, taskKeys }) : undefined}
             today={snapshot.date}
             queuedPeople={queuedPeople}
             onRunCommand={runCommand}
@@ -433,6 +462,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const hasSection = (section: TodayPanelSectionId): boolean => {
     if (!snapshot) return false;
     switch (section) {
+      case 'plan': return Boolean(plan);
       case 'wrapUp': return Boolean(focus && 'wrapUp' in focus);
       case 'standup': return Boolean(standup && (standup.status === 'completed' || stage !== 'midday_check'));
       case 'delta': return deltaChips(snapshot.delta, snapshot.date).length > 0;

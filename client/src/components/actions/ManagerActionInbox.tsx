@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageSquare,
   MoreHorizontal,
+  Pin,
   Rows3,
   Sparkles,
   Target,
@@ -65,6 +66,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
   jira_drift: TriangleAlert,
   one_on_one: CalendarDays,
   standup: Users,
+  top_three: Pin,
   calm: CircleCheck,
 };
 

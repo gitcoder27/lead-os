@@ -25,6 +25,7 @@ import {
   Globe,
   Pencil,
   PanelTop,
+  Clock3,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -59,16 +60,17 @@ import { SettingsMaintenanceSection } from '@/components/settings/SettingsMainte
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
 import { TeamModeSection } from '@/components/settings/TeamModeSection';
+import { DayRhythmSection } from '@/components/settings/DayRhythmSection';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
-type SectionId = 'navigation' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'maintenance' | 'access';
+type SectionId = 'navigation' | 'rhythm' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'maintenance' | 'access';
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
 const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_assignees';
 
-const SECTION_IDS: readonly SectionId[] = ['navigation', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'maintenance', 'access'];
+const SECTION_IDS: readonly SectionId[] = ['navigation', 'rhythm', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'maintenance', 'access'];
 
 function isSectionId(value: string | null | undefined): value is SectionId {
   return value !== null && value !== undefined && (SECTION_IDS as readonly string[]).includes(value);
@@ -807,6 +809,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
   const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
     navigation: { title: 'Navigation', description: 'Choose which pages stay in the top bar and arrange their order.' },
+    rhythm: { title: 'Day Rhythm', description: 'Set when standup, midday and wrap-up start on Today.' },
     connection: { title: 'Jira Connection', description: 'Review the active workspace and set the lead manager identity.' },
     sync: { title: 'Sync Scope', description: 'Control scheduled Jira syncs, the base defect query, and custom field mapping.' },
     assistant: { title: 'Copilot', description: 'AI assistant provider, model, and API key.' },
@@ -819,6 +822,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
   const navItems: Array<{ id: SectionId; icon: ReactNode; label: string; status: string | null; sv: 'success' | 'warning' | 'muted' }> = [
     { id: 'navigation', icon: <PanelTop size={13} />, label: 'Navigation', status: null, sv: 'muted' },
+    { id: 'rhythm', icon: <Clock3 size={13} />, label: 'Day Rhythm', status: null, sv: 'muted' },
     { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl ? 'success' : 'muted' },
     { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: !autoSyncEnabled ? 'muted' : jql ? 'muted' : 'warning' },
     { id: 'assistant', icon: <Sparkles size={13} />, label: 'Copilot', status: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'On' : 'Off', sv: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'success' : 'muted' },
@@ -1013,6 +1017,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               {/* ── NAVIGATION ────── */}
               {activeSection === 'navigation' ? (
                 <NavigationSection />
+              ) : null}
+
+              {/* ── DAY RHYTHM ────── */}
+              {activeSection === 'rhythm' ? (
+                <DayRhythmSection />
               ) : null}
 
               {/* ── CONNECTION ────── */}

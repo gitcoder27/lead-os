@@ -965,4 +965,18 @@ describe('SettingsPage', () => {
       window.history.replaceState(null, '', '/settings');
     }
   });
+
+  it('opens Day Rhythm from the getting-started link (?section=rhythm) and lists it in the nav (docs/56 P2-05)', async () => {
+    mockGet.mockImplementation(async (path: string) => (path === '/today/settings'
+      ? { boundaries: { standupStart: '10:00', middayStart: '12:00', wrapUpStart: '16:00' } }
+      : {}));
+    render(
+      <TestWrapper>
+        <SettingsPage requestedSection={{ section: 'rhythm', nonce: 1 }} />
+      </TestWrapper>
+    );
+
+    expect(await screen.findByLabelText(/Standup window starts/)).toHaveValue('10:00');
+    expect(screen.getAllByText('Day Rhythm').length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -9,16 +9,17 @@ import { getPersistedJiraApiToken } from "./jira-credentials.service";
 import path from "node:path";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "./workspace.service";
-import { DEFAULT_TEAM_MODE, TASK_STALE_DAYS, type JiraSyncScopeMode, type TeamMode } from "shared/types";
+import {
+  DEFAULT_ATTENTION_RULES,
+  DEFAULT_TEAM_MODE,
+  type AttentionRules,
+  type JiraSyncScopeMode,
+  type TeamMode,
+} from "shared/types";
+import { isValidTimeZone, parseClockTime, serverTimeZone } from "./today-clock";
 
 export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
 export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
-export const DEFAULT_STALE_THRESHOLD_HOURS = 48;
-export const DEFAULT_TEAM_TRACKER_STALE_THRESHOLD_HOURS = 4;
-export const DEFAULT_TEAM_TRACKER_NO_CURRENT_THRESHOLD_HOURS = 2;
-export const DEFAULT_TEAM_TRACKER_STATUS_FOLLOW_UP_THRESHOLD_HOURS = 2;
-/** docs/56 P1-02: manager-touch clock flags after this many working days. */
-export const DEFAULT_TEAM_TRACKER_TOUCH_STALE_WORKING_DAYS = TASK_STALE_DAYS;
 /** docs/56 P1-02: the no-current-work signal is opt-in in solo mode. */
 export const DEFAULT_TEAM_TRACKER_SOLO_NO_CURRENT_ENABLED = false;
 export const DEFAULT_JIRA_SYNC_SCOPE_MODE: JiraSyncScopeMode = "team_assignees";
@@ -31,6 +32,27 @@ export const DEFAULT_BACKUP_STARTUP_MAX_AGE_HOURS = 12;
 export const DEFAULT_BACKUP_BEFORE_RESET = true;
 /** docs/56 P1-01: workspace `team_mode` config key (`solo` | `collab`). */
 export const TEAM_MODE_KEY = "team_mode";
+
+/**
+ * docs/56 P1-05: config keys behind the "Attention rules" block. The older
+ * keys are kept so saved values carry over; defaults live only in
+ * `DEFAULT_ATTENTION_RULES` (shared/types).
+ */
+export const ATTENTION_RULE_KEYS = {
+  staleHours: "team_tracker_stale_threshold_hours",
+  noCurrentHours: "team_tracker_no_current_threshold_hours",
+  statusFollowUpHours: "team_tracker_status_follow_up_threshold_hours",
+  managerTouchDays: "team_tracker_touch_stale_working_days",
+  jiraStaleHours: "stale_threshold_hours",
+  dayStart: "attention_day_start",
+  dayEnd: "attention_day_end",
+  timeZone: "attention_time_zone",
+} as const satisfies Record<keyof AttentionRules, string>;
+
+/** Defaults with the zone filled in (the server's until a manager sets one). */
+export function defaultAttentionRules(): AttentionRules {
+  return { ...DEFAULT_ATTENTION_RULES, timeZone: serverTimeZone() };
+}
 
 export function normalizeJiraSyncScopeMode(value: string | null | undefined): JiraSyncScopeMode {
   return value === "base_query" ? "base_query" : DEFAULT_JIRA_SYNC_SCOPE_MODE;
@@ -138,40 +160,48 @@ export class SettingsService {
     return this.getBooleanConfig("jira_auto_sync_enabled", DEFAULT_JIRA_AUTO_SYNC_ENABLED, workspaceId);
   }
 
-  async getStaleThresholdHours(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig("stale_threshold_hours", DEFAULT_STALE_THRESHOLD_HOURS, workspaceId);
+  /** docs/56 P1-05: the effective Attention rules; bad stored values fall back per field. */
+  async getAttentionRules(workspaceId?: string): Promise<AttentionRules> {
+    const defaults = defaultAttentionRules();
+    const [staleHours, noCurrentHours, statusFollowUpHours, managerTouchDays, jiraStaleHours, dayStart, dayEnd, timeZone] =
+      await Promise.all([
+        this.getPositiveIntegerConfig(ATTENTION_RULE_KEYS.staleHours, defaults.staleHours, workspaceId),
+        this.getPositiveIntegerConfig(ATTENTION_RULE_KEYS.noCurrentHours, defaults.noCurrentHours, workspaceId),
+        this.getPositiveIntegerConfig(ATTENTION_RULE_KEYS.statusFollowUpHours, defaults.statusFollowUpHours, workspaceId),
+        this.getPositiveIntegerConfig(ATTENTION_RULE_KEYS.managerTouchDays, defaults.managerTouchDays, workspaceId),
+        this.getPositiveIntegerConfig(ATTENTION_RULE_KEYS.jiraStaleHours, defaults.jiraStaleHours, workspaceId),
+        this.getConfigValue(ATTENTION_RULE_KEYS.dayStart, workspaceId),
+        this.getConfigValue(ATTENTION_RULE_KEYS.dayEnd, workspaceId),
+        this.getConfigValue(ATTENTION_RULE_KEYS.timeZone, workspaceId),
+      ]);
+    const start = dayStart && parseClockTime(dayStart) ? dayStart : defaults.dayStart;
+    const end = dayEnd && parseClockTime(dayEnd) ? dayEnd : defaults.dayEnd;
+    const validDay = start < end;
+    return {
+      staleHours,
+      noCurrentHours,
+      statusFollowUpHours,
+      managerTouchDays,
+      jiraStaleHours,
+      dayStart: validDay ? start : defaults.dayStart,
+      dayEnd: validDay ? end : defaults.dayEnd,
+      timeZone: isValidTimeZone(timeZone?.trim()) ? timeZone!.trim() : defaults.timeZone,
+    };
   }
 
-  async getTeamTrackerStaleThresholdHours(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig(
-      "team_tracker_stale_threshold_hours",
-      DEFAULT_TEAM_TRACKER_STALE_THRESHOLD_HOURS,
-      workspaceId
-    );
-  }
-
-  async getTeamTrackerNoCurrentThresholdHours(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig(
-      "team_tracker_no_current_threshold_hours",
-      DEFAULT_TEAM_TRACKER_NO_CURRENT_THRESHOLD_HOURS,
-      workspaceId
-    );
-  }
-
-  async getTeamTrackerStatusFollowUpThresholdHours(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig(
-      "team_tracker_status_follow_up_threshold_hours",
-      DEFAULT_TEAM_TRACKER_STATUS_FOLLOW_UP_THRESHOLD_HOURS,
-      workspaceId
-    );
-  }
-
-  async getTeamTrackerTouchStaleWorkingDays(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig(
-      "team_tracker_touch_stale_working_days",
-      DEFAULT_TEAM_TRACKER_TOUCH_STALE_WORKING_DAYS,
-      workspaceId
-    );
+  /** Writes only the given fields; callers validate the merged result first. */
+  async setAttentionRules(workspaceId: string | undefined, update: Partial<AttentionRules>): Promise<AttentionRules> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const entries = (Object.keys(ATTENTION_RULE_KEYS) as Array<keyof AttentionRules>)
+      .filter((field) => update[field] !== undefined)
+      .map((field) => ({ workspaceId: normalizedWorkspaceId, key: ATTENTION_RULE_KEYS[field], value: String(update[field]) }));
+    for (const entry of entries) {
+      await db
+        .insert(configTable)
+        .values(entry)
+        .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: entry.value } });
+    }
+    return this.getAttentionRules(normalizedWorkspaceId);
   }
 
   async getTeamTrackerSoloNoCurrentEnabled(workspaceId?: string): Promise<boolean> {

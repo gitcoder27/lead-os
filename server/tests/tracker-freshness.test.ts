@@ -14,6 +14,8 @@ const collab: TrackerSignalConfig = {
   teamMode: "collab",
   touchStaleWorkingDays: 5,
   soloNoCurrentEnabled: false,
+  // docs/56 P1-05: a UTC 09:00–18:00 working day keeps the fixtures zone-proof.
+  window: { timeZone: "UTC", startMinutes: 9 * 60, endMinutes: 18 * 60 },
 };
 const solo: TrackerSignalConfig = { ...collab, teamMode: "solo" };
 
@@ -71,14 +73,56 @@ describe("workingDaysBetween", () => {
   });
 });
 
+describe("buildSignals — working hours (P1-05)", () => {
+  const base = { config: collab, participates: true };
+
+  it("reads nobody as stale before day start, even with no check-in yet", () => {
+    const morning = signals({ ...base, now: new Date("2026-03-09T08:30:00.000Z"), freshness: { lastDeveloperCheckInAt: null } });
+    expect(morning.freshness.staleByTime).toBe(false);
+    expect(morning.freshness.staleWithoutCurrentWork).toBe(false);
+  });
+
+  it("does not age a Friday check-in over the weekend", () => {
+    const friday = { lastDeveloperCheckInAt: "2026-03-06T15:00:00.000Z" };
+    const monday830 = signals({ ...base, now: new Date("2026-03-09T08:30:00.000Z"), freshness: friday });
+    expect(monday830.freshness.hoursSinceCheckIn).toBe(65.5);
+    expect(monday830.freshness.staleByTime).toBe(false);
+    const saturday = signals({ ...base, date: "2026-03-07", now: new Date("2026-03-07T15:00:00.000Z"), freshness: friday });
+    expect(saturday.freshness.staleByTime).toBe(false);
+    // Fri 15–18 (3h) + Mon 09–10 (1h) = 4 working hours.
+    const monday10 = signals({ ...base, now: new Date("2026-03-09T10:00:00.000Z"), freshness: friday });
+    expect(monday10.freshness.staleByTime).toBe(true);
+  });
+
+  it("counts status follow-ups in working hours", () => {
+    const fridayEvening = { ...base, status: "blocked" as const, statusUpdatedAt: "2026-03-06T17:30:00.000Z", statusUpdatedBy: "developer", freshness: { lastDeveloperCheckInAt: "2026-03-09T09:00:00.000Z" } };
+    // Fri 17:30–18:00 + Mon 09:00–09:30 = 1h < 2h.
+    expect(signals({ ...fridayEvening, lastCheckInAt: null, now: new Date("2026-03-09T09:30:00.000Z") }).freshness.statusChangeWithoutFollowUp).toBe(false);
+    expect(signals({ ...fridayEvening, lastCheckInAt: null, now: new Date("2026-03-09T11:00:00.000Z") }).freshness.statusChangeWithoutFollowUp).toBe(true);
+  });
+
+  it("follows the configured day start and zone", () => {
+    const lateStart = { ...collab, window: { timeZone: "Asia/Kolkata", startMinutes: 10 * 60, endMinutes: 19 * 60 } };
+    // 2026-03-09T06:00Z = 11:30 in Kolkata: 1.5 working hours into the day.
+    const early = signals({ ...base, config: lateStart, now: new Date("2026-03-09T06:00:00.000Z"), freshness: { lastDeveloperCheckInAt: null } });
+    expect(early.freshness.staleByTime).toBe(false);
+    expect(early.freshness.staleWithoutCurrentWork).toBe(false);
+    // 09:30Z = 15:00 in Kolkata: 5 working hours.
+    const later = signals({ ...base, config: lateStart, now: new Date("2026-03-09T09:30:00.000Z"), freshness: { lastDeveloperCheckInAt: null } });
+    expect(later.freshness.staleByTime).toBe(true);
+  });
+});
+
 describe("buildSignals — collab, participating developer (check-in clock)", () => {
   const base = { config: collab, participates: true };
 
   it("is stale without a developer check-in even if a manager checked in", () => {
+    // 14:00: five working hours into the day (P1-05 counts from day start).
     const result = signals({
       ...base,
       lastCheckInAt: "2026-03-09T11:30:00.000Z",
       freshness: { lastDeveloperCheckInAt: null },
+      now: new Date("2026-03-09T14:00:00.000Z"),
     });
     expect(result.freshness.clock).toBe("check_in");
     expect(result.freshness.staleByTime).toBe(true);
@@ -93,7 +137,8 @@ describe("buildSignals — collab, participating developer (check-in clock)", ()
     expect(fresh.freshness.staleByTime).toBe(false);
     expect(fresh.freshness.staleWithoutCurrentWork).toBe(true);
 
-    const stale = signals({ ...base, status: "blocked", statusUpdatedAt: "2026-03-09T11:00:00.000Z", freshness: { lastDeveloperCheckInAt: "2026-03-09T08:00:00.000Z" } });
+    // Friday 16:00 → Monday 12:00 = 2h + 3h of working time.
+    const stale = signals({ ...base, status: "blocked", statusUpdatedAt: "2026-03-09T11:00:00.000Z", freshness: { lastDeveloperCheckInAt: "2026-03-06T16:00:00.000Z" } });
     expect(stale.freshness.staleByTime).toBe(true);
     expect(stale.freshness.staleWithOpenRisk).toBe(true);
   });

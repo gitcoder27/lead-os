@@ -74,6 +74,8 @@ export interface Issue {
   analysisNotes?: string;
   trackerAssignmentsToday?: IssueTrackerAssignmentSummary;
   excluded?: boolean;
+  /** docs/56 P1-05: computed server-side from the Attention rules (open issues only). */
+  stale?: boolean;
 }
 
 /**
@@ -1003,6 +1005,82 @@ export type TaskAttentionSignal = "overdue" | "stale" | "drift";
 
 /** docs/49 D9: days without activity before an open task reads as stale. */
 export const TASK_STALE_DAYS = 5;
+
+/**
+ * docs/56 P1-05: the one "Attention rules" block. The server is the single
+ * source; `GET /api/config/attention-rules` serves the effective rules and the
+ * defaults. Hour rules count working time only: Mon–Fri between `dayStart` and
+ * `dayEnd` in `timeZone` (Jira staleness counts whole weekdays, weekends off).
+ */
+export interface AttentionRules {
+  /** Collab check-in clock: working hours without a developer check-in. */
+  staleHours: number;
+  /** Working hours with no current work before "no current" shows. */
+  noCurrentHours: number;
+  /** Working hours after a blocked / at-risk / waiting change with no follow-up. */
+  statusFollowUpHours: number;
+  /** Manager-touch clock (solo): working days untouched before "untouched". */
+  managerTouchDays: number;
+  /** Weekday hours (weekends excluded) since the last Jira update. */
+  jiraStaleHours: number;
+  /** Local "HH:MM"; working time starts here. */
+  dayStart: string;
+  /** Local "HH:MM"; working time ends here. */
+  dayEnd: string;
+  /** IANA zone the working day is measured in. */
+  timeZone: string;
+}
+
+/** Defaults for every rule but `timeZone` (the server's zone until set). */
+export const DEFAULT_ATTENTION_RULES: Omit<AttentionRules, "timeZone"> = {
+  staleHours: 4,
+  noCurrentHours: 2,
+  statusFollowUpHours: 2,
+  managerTouchDays: TASK_STALE_DAYS,
+  jiraStaleHours: 48,
+  dayStart: "09:00",
+  dayEnd: "18:00",
+};
+
+export const ATTENTION_RULE_LIMITS = {
+  staleHours: { min: 1, max: 168 },
+  noCurrentHours: { min: 1, max: 168 },
+  statusFollowUpHours: { min: 1, max: 168 },
+  managerTouchDays: { min: 1, max: 60 },
+  jiraStaleHours: { min: 1, max: 2160 },
+} as const;
+
+export type AttentionRuleNumberKey = keyof typeof ATTENTION_RULE_LIMITS;
+
+export interface AttentionRulesResponse {
+  rules: AttentionRules;
+  defaults: AttentionRules;
+}
+
+export type AttentionRulesUpdateRequest = Partial<AttentionRules>;
+
+const ATTENTION_CLOCK_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/**
+ * Cross-field checks shared by the server route and the Settings card. The
+ * time zone is checked separately (the server knows the valid IANA list).
+ */
+export function validateAttentionRules(rules: Omit<AttentionRules, "timeZone">): string | undefined {
+  for (const key of Object.keys(ATTENTION_RULE_LIMITS) as AttentionRuleNumberKey[]) {
+    const value = rules[key];
+    const { min, max } = ATTENTION_RULE_LIMITS[key];
+    if (!Number.isInteger(value) || value < min || value > max) {
+      return `${key} must be a whole number from ${min} to ${max}`;
+    }
+  }
+  if (!ATTENTION_CLOCK_PATTERN.test(rules.dayStart) || !ATTENTION_CLOCK_PATTERN.test(rules.dayEnd)) {
+    return "Day start and end must be HH:MM";
+  }
+  if (rules.dayStart >= rules.dayEnd) {
+    return "Day start must be before day end";
+  }
+  return undefined;
+}
 
 /** docs/49 §2: per-row signals computed by the view engine. */
 export interface TaskSignals {

@@ -13,7 +13,12 @@ import { db } from "../db/connection";
 import { configTable, developers, issueScopeHistory, issues, issueTags, localTags, syncLog } from "../db/schema";
 import { JiraClient } from "../jira/client";
 import { endOfWeekIsoDate, todayIsoDate } from "../utils/date";
-import { getEffectiveDueDate, isOutOfTeamIssue, isStaleIssue, isVisibleWorkIssue } from "./issue-rules";
+import { getEffectiveDueDate, isOutOfTeamIssue, isStaleIssue, isVisibleWorkIssue, type JiraStaleRule } from "./issue-rules";
+
+/** docs/56 P1-05: the client reads staleness from here instead of its own 48h copy. */
+function withStale(issue: SharedIssue, rule: JiraStaleRule, now: Date): SharedIssue {
+  return { ...issue, stale: issue.statusCategory !== "done" && isStaleIssue(issue, rule, now) };
+}
 import { SettingsService } from "./settings.service";
 import { TeamTrackerService } from "./team-tracker.service";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -44,13 +49,13 @@ export type TodayIssue = Pick<
   | "developmentDueDate"
   | "updatedAt"
   | "createdAt"
+  | "stale"
 >;
 
 export interface TodayIssueSnapshot {
   issues: TodayIssue[];
   activeDefects: number;
   dueToday: number;
-  staleThresholdHours: number;
 }
 
 type JiraMutationClient = Pick<JiraClient, "updateIssue" | "addComment">;
@@ -73,7 +78,7 @@ export class IssueService {
     const tagMap = await this.getTagMapForAll(normalizedWorkspaceId);
     const managerJiraAccountId = await this.settings.getManagerJiraAccountId(normalizedWorkspaceId);
     const jiraSyncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
-    const staleThresholdHours = await this.settings.getStaleThresholdHours(normalizedWorkspaceId);
+    const attentionRules = await this.settings.getAttentionRules(normalizedWorkspaceId);
     const now = new Date();
     const today = todayIsoDate(now);
     const trackerDate = query.trackerDate ?? today;
@@ -85,16 +90,20 @@ export class IssueService {
       : await this.teamTrackerService.getIssueAssignmentSummaryMap(trackerDate, normalizedWorkspaceId);
 
     let result: SharedIssue[] = rows.map((row: typeof issues.$inferSelect) =>
-      this.toSharedIssue(
-        row,
-        tagMap.get(row.jiraKey) ?? [],
-        trackerAssignmentSummaryMap.get(row.jiraKey)
+      withStale(
+        this.toSharedIssue(
+          row,
+          tagMap.get(row.jiraKey) ?? [],
+          trackerAssignmentSummaryMap.get(row.jiraKey)
+        ),
+        attentionRules,
+        now
       )
     );
     result = this.applyIssueQuery(result, query, {
       managerJiraAccountId,
       jiraSyncScopeMode,
-      staleThresholdHours,
+      attentionRules,
       now,
       today,
       weekEnd,
@@ -124,10 +133,11 @@ export class IssueService {
 
   async getTodaySnapshot(date: string, workspaceId?: string): Promise<TodayIssueSnapshot> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
-    const [jiraSyncScopeMode, staleThresholdHours] = await Promise.all([
+    const [jiraSyncScopeMode, attentionRules] = await Promise.all([
       this.settings.getJiraSyncScopeMode(normalizedWorkspaceId),
-      this.settings.getStaleThresholdHours(normalizedWorkspaceId),
+      this.settings.getAttentionRules(normalizedWorkspaceId),
     ]);
+    const now = new Date();
     const visibilityConditions = [
       eq(issues.workspaceId, normalizedWorkspaceId),
       ne(issues.statusCategory, "done"),
@@ -168,13 +178,13 @@ export class IssueService {
       developmentDueDate: row.developmentDueDate ?? undefined,
       updatedAt: row.updatedAt,
       createdAt: row.createdAt,
+      stale: isStaleIssue(row, attentionRules, now),
     }));
 
     return {
       issues: todayIssues,
       activeDefects: todayIssues.length,
       dueToday: todayIssues.filter((issue) => getEffectiveDueDate(issue) === date).length,
-      staleThresholdHours,
     };
   }
 
@@ -190,7 +200,8 @@ export class IssueService {
     }
     const tags = await this.getTagsForIssue(jiraKey, normalizedWorkspaceId);
     const trackerAssignmentSummaryMap = await this.teamTrackerService.getIssueAssignmentSummaryMap(trackerDate, normalizedWorkspaceId);
-    return this.toSharedIssue(row[0], tags, trackerAssignmentSummaryMap.get(jiraKey));
+    const attentionRules = await this.settings.getAttentionRules(normalizedWorkspaceId);
+    return withStale(this.toSharedIssue(row[0], tags, trackerAssignmentSummaryMap.get(jiraKey)), attentionRules, new Date());
   }
 
   async update(jiraKey: string, payload: IssueUpdate, workspaceId?: string): Promise<SharedIssue> {
@@ -318,7 +329,7 @@ export class IssueService {
     const all = rows.map((row) => this.toSharedIssue(row));
     const managerJiraAccountId = await this.settings.getManagerJiraAccountId(normalizedWorkspaceId);
     const jiraSyncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
-    const staleThresholdHours = await this.settings.getStaleThresholdHours(normalizedWorkspaceId);
+    const attentionRules = await this.settings.getAttentionRules(normalizedWorkspaceId);
     const now = new Date();
     const today = todayIsoDate(now);
     const weekEnd = endOfWeekIsoDate(now);
@@ -331,7 +342,7 @@ export class IssueService {
       .where(eq(syncLog.workspaceId, normalizedWorkspaceId))
       .orderBy(desc(syncLog.id))
       .limit(1);
-    const filterContext = { managerJiraAccountId, jiraSyncScopeMode, staleThresholdHours, now, today, weekEnd, dayAgo, recentlyAssignedIssueKeys };
+    const filterContext = { managerJiraAccountId, jiraSyncScopeMode, attentionRules, now, today, weekEnd, dayAgo, recentlyAssignedIssueKeys };
 
     return {
       new: this.applyIssueQuery(all, { filter: "new" }, filterContext).length,
@@ -376,7 +387,7 @@ export class IssueService {
     context: {
       managerJiraAccountId: string;
       jiraSyncScopeMode: JiraSyncScopeMode;
-      staleThresholdHours: number;
+      attentionRules: JiraStaleRule;
       now: Date;
       today: string;
       weekEnd: string;
@@ -441,7 +452,7 @@ export class IssueService {
       case "blocked":
         return visibleWorkIssues().filter((issue) => issue.flagged);
       case "stale":
-        return visibleWorkIssues().filter((issue) => isStaleIssue(issue, context.staleThresholdHours, context.now));
+        return visibleWorkIssues().filter((issue) => issue.stale ?? isStaleIssue(issue, context.attentionRules, context.now));
       case "highPriority":
         return visibleWorkIssues().filter((issue) => issue.priorityName === "Highest" || issue.priorityName === "High");
       case "outOfTeam":

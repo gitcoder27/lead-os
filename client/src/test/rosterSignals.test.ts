@@ -148,7 +148,7 @@ describe('getRosterCheckIn', () => {
       day({ lastCheckInAt: '2026-03-07T06:00:00Z', signals: buildSignals({ freshness: { staleByTime: true } }) }),
       NOW.getTime(),
     );
-    expect(stale).toEqual({ label: '6h ago', stale: true, title: 'Stale — no check-in within 4h' });
+    expect(stale).toEqual({ label: '6h ago', stale: true, title: 'Stale — no check-in within 4 working hours' });
   });
 });
 

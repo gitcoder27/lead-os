@@ -6,28 +6,9 @@ import {
   isDueToday,
   isLaterTodayAvailable,
   isOverdue,
-  isStale,
   shiftLocalIsoDate,
 } from '@/lib/utils';
 import { snoozePresets } from '@/components/today/TodayActionMenu';
-
-describe('isStale', () => {
-  it('returns true for issue updated more than 48 hours ago', () => {
-    const old = new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString();
-    expect(isStale(old)).toBe(true);
-  });
-
-  it('returns false for issue updated less than 48 hours ago', () => {
-    const recent = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
-    expect(isStale(recent)).toBe(false);
-  });
-
-  it('respects custom threshold', () => {
-    const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-    expect(isStale(old, 24)).toBe(true);
-    expect(isStale(old, 48)).toBe(false);
-  });
-});
 
 describe('isOverdue', () => {
   it('returns true for past date', () => {

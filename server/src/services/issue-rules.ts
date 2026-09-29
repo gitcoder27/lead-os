@@ -1,5 +1,5 @@
-import { isOlderThanHours } from "../utils/date";
-import type { JiraSyncScopeMode } from "shared/types";
+import type { AttentionRules, JiraSyncScopeMode } from "shared/types";
+import { hasWorkingHoursElapsed, weekdayWindow } from "./working-hours";
 
 type RuleIssue = {
   statusCategory: string;
@@ -48,6 +48,9 @@ export function isOutOfTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "excl
     (issue.syncScopeState ?? "active") === "active";
 }
 
-export function isStaleIssue(issue: Pick<RuleIssue, "updatedAt">, staleThresholdHours: number, now = new Date()): boolean {
-  return isOlderThanHours(issue.updatedAt, staleThresholdHours, now);
+export type JiraStaleRule = Pick<AttentionRules, "jiraStaleHours" | "timeZone">;
+
+/** docs/56 P1-05: stale after `jiraStaleHours` of weekday time (weekends do not count). */
+export function isStaleIssue(issue: Pick<RuleIssue, "updatedAt">, rule: JiraStaleRule, now = new Date()): boolean {
+  return hasWorkingHoursElapsed(issue.updatedAt, now, rule.jiraStaleHours, weekdayWindow(rule.timeZone));
 }

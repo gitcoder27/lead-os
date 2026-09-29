@@ -140,7 +140,7 @@ export function getRosterCheckIn(day: TrackerDeveloperDay, now = Date.now()): Ro
   return {
     label: relative,
     stale: staleByTime,
-    title: staleByTime ? `Stale — no check-in within ${staleThresholdHours}h` : undefined,
+    title: staleByTime ? `Stale — no check-in within ${staleThresholdHours} working hours` : undefined,
   };
 }
 

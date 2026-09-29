@@ -65,6 +65,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { SettingsService } from "./settings.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { getParticipatingDeveloperIds } from "./developer-participation.service";
+import { workingWindowFromRules } from "./working-hours";
 import { buildSignals, getFreshnessClock, tracksNoCurrent, type TrackerFreshnessInputs, type TrackerSignalConfig } from "./tracker-freshness";
 import { runInTransaction } from "../db/transaction";
 import {
@@ -3269,29 +3270,21 @@ export class TeamTrackerService {
   }
 
   private async getSignalConfig(workspaceId?: string): Promise<TrackerSignalConfig> {
-    const [
-      staleThresholdHours,
-      noCurrentThresholdHours,
-      statusFollowUpThresholdHours,
-      teamMode,
-      touchStaleWorkingDays,
-      soloNoCurrentEnabled,
-    ] = await Promise.all([
-      this.settings.getTeamTrackerStaleThresholdHours(workspaceId),
-      this.settings.getTeamTrackerNoCurrentThresholdHours(workspaceId),
-      this.settings.getTeamTrackerStatusFollowUpThresholdHours(workspaceId),
+    // docs/56 P1-05: every threshold comes from the one Attention rules block.
+    const [rules, teamMode, soloNoCurrentEnabled] = await Promise.all([
+      this.settings.getAttentionRules(workspaceId),
       this.settings.getTeamMode(workspaceId),
-      this.settings.getTeamTrackerTouchStaleWorkingDays(workspaceId),
       this.settings.getTeamTrackerSoloNoCurrentEnabled(workspaceId),
     ]);
 
     return {
-      staleThresholdHours,
-      noCurrentThresholdHours,
-      statusFollowUpThresholdHours,
+      staleThresholdHours: rules.staleHours,
+      noCurrentThresholdHours: rules.noCurrentHours,
+      statusFollowUpThresholdHours: rules.statusFollowUpHours,
       teamMode,
-      touchStaleWorkingDays,
+      touchStaleWorkingDays: rules.managerTouchDays,
       soloNoCurrentEnabled,
+      window: workingWindowFromRules(rules),
     };
   }
 

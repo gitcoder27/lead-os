@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { DEFAULT_ATTENTION_RULES } from "shared/types";
 import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
@@ -79,7 +80,7 @@ describe("alerts routes", () => {
       getIdleDevelopers: async () => [],
     } as unknown as WorkloadService,
     {
-      getStaleThresholdHours: async () => 48,
+      getAttentionRules: async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 48, timeZone: "UTC" }),
       getJiraSyncScopeMode: async () => "team_assignees",
       getTeamMode: async () => "collab",
     } as any,

@@ -6,6 +6,7 @@ import type {
   TrackerWorkItem,
 } from "shared/types";
 import { isoDatePart } from "../utils/date";
+import { hasWorkingHoursElapsed, startOfLocalDay, type WorkingWindow } from "./working-hours";
 
 export interface TrackerSignalConfig {
   staleThresholdHours: number;
@@ -15,6 +16,8 @@ export interface TrackerSignalConfig {
   teamMode: TeamMode;
   touchStaleWorkingDays: number;
   soloNoCurrentEnabled: boolean;
+  /** docs/56 P1-05: hour thresholds count working time in this window. */
+  window: WorkingWindow;
 }
 
 /**
@@ -102,10 +105,16 @@ export function buildSignals(params: {
     (item): item is TrackerWorkItem =>
       Boolean(item?.jiraDueDate && item.jiraDueDate < params.date)
   ).length;
+  const window = params.config.window;
+  // docs/56 P1-05: hour rules count working time, so nights, weekends and the
+  // hours before day start never age anything. With no timestamp at all the
+  // clock starts at today's local midnight: nobody is stale at 8:30.
+  const workingHoursSince = (value: string | null | undefined, hours: number) =>
+    hasWorkingHoursElapsed(value ?? startOfLocalDay(now, window.timeZone), now, hours, window);
   const statusFollowUpDue = Boolean(
     effectiveStatusUpdatedAt &&
       openRisk &&
-      (hoursSinceStatusChange ?? 0) >= params.config.statusFollowUpThresholdHours
+      workingHoursSince(effectiveStatusUpdatedAt, params.config.statusFollowUpThresholdHours)
   );
   const thresholds = {
     staleThresholdHours: params.config.staleThresholdHours,
@@ -123,13 +132,9 @@ export function buildSignals(params: {
     // check-in is a manager touch, not a developer update (P0-V2).
     const lastDeveloperCheckInAt = params.freshness?.lastDeveloperCheckInAt ?? null;
     const hoursSinceCheckIn = getHoursSince(lastDeveloperCheckInAt, now);
-    const staleByTime =
-      hoursSinceCheckIn === undefined ||
-      hoursSinceCheckIn >= params.config.staleThresholdHours;
+    const staleByTime = workingHoursSince(lastDeveloperCheckInAt, params.config.staleThresholdHours);
     const staleWithoutCurrentWork =
-      noCurrentWork &&
-      (hoursSinceCheckIn === undefined ||
-        hoursSinceCheckIn >= params.config.noCurrentThresholdHours);
+      noCurrentWork && workingHoursSince(lastDeveloperCheckInAt, params.config.noCurrentThresholdHours);
     // Any check-in after the change (the manager's included) is a follow-up.
     const statusChangeWithoutFollowUp =
       statusFollowUpDue && !isAtOrAfter(params.lastCheckInAt, effectiveStatusUpdatedAt!);
@@ -152,7 +157,7 @@ export function buildSignals(params: {
 
   const lastManagerTouchAt = params.freshness?.lastManagerTouchAt ?? undefined;
   const baseline = lastManagerTouchAt ?? params.freshness?.trackingSince ?? undefined;
-  const baselineDate = isoDatePart(baseline);
+  const baselineDate = isoDatePart(baseline, window.timeZone);
   const workingDaysSinceTouch = baselineDate
     ? workingDaysBetween(baselineDate, params.date)
     : undefined;
@@ -161,12 +166,10 @@ export function buildSignals(params: {
     workingDaysSinceTouch >= params.config.touchStaleWorkingDays;
   const noCurrentEnabled =
     params.config.teamMode === "collab" || params.config.soloNoCurrentEnabled;
-  const hoursSinceTouch = getHoursSince(lastManagerTouchAt, now);
   const staleWithoutCurrentWork =
     noCurrentEnabled &&
     noCurrentWork &&
-    (hoursSinceTouch === undefined ||
-      hoursSinceTouch >= params.config.noCurrentThresholdHours);
+    workingHoursSince(lastManagerTouchAt, params.config.noCurrentThresholdHours);
   // The manager's own status change needs no follow-up from the manager.
   const developerAuthoredChange = params.statusUpdatedBy === "developer";
   const statusChangeWithoutFollowUp =

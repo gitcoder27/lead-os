@@ -28,7 +28,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
-import { isOverdue, isDueToday, isStale } from '@/lib/utils';
+import { isOverdue, isDueToday } from '@/lib/utils';
 import type { Issue, FilterType } from '@/types';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { JiraNotConnectedState, NothingSyncedState, ProjectCleanState } from './DefectEmptyStates';
@@ -1027,7 +1027,8 @@ export function DefectTable({
               const effectiveDueDate = getEffectiveDueDate(issue);
               const overdue = isOverdue(effectiveDueDate);
               const dueToday = isDueToday(effectiveDueDate);
-            const stale = issue.statusCategory !== 'done' && isStale(issue.updatedAt);
+            // docs/56 P1-05: the server applies the Attention rules; no client threshold.
+            const stale = issue.statusCategory !== 'done' && Boolean(issue.stale);
             const isLastVisited = lastVisitedKey === issue.jiraKey;
             const selectionState = isSelected ? 'active' : isHighlighted ? 'retained' : 'none';
             const rowBackgroundColor = selectionState !== 'none'
@@ -1065,7 +1066,7 @@ export function DefectTable({
               indicatorReason = 'Flagged issue';
             } else if (stale) {
               leftBorder = 'var(--text-muted)';
-              indicatorReason = 'Stale: not updated in the last 48 hours';
+              indicatorReason = 'Stale: no recent Jira update (see Attention rules)';
             }
 
             const shouldAnimate = !hasAnimated;

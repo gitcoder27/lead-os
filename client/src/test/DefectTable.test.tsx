@@ -84,7 +84,9 @@ const mockIssues: Issue[] = [
     labels: [],
     flagged: false,
     createdAt: '2026-02-01T09:00:00Z',
-    updatedAt: '2026-02-01T09:00:00Z', // very old → stale
+    updatedAt: '2026-02-01T09:00:00Z',
+    // docs/56 P1-05: staleness is decided by the server's Attention rules.
+    stale: true,
     localTags: [],
   },
 ];
@@ -440,10 +442,11 @@ describe('DefectTable', () => {
       </TestWrapper>
     );
 
-    // PROJ-103 is stale (updatedAt is Feb 2026)
+    // PROJ-103 is stale because the server says so; no client threshold.
     expect(screen.getByText('PROJ-103')).toBeInTheDocument();
     expect(screen.getByText('Stale defect not updated')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('Row indicator: Stale: not updated in the last 48 hours').length).toBeGreaterThan(0);
+    const staleLabel = 'Row indicator: Stale: no recent Jira update (see Attention rules)';
+    expect(screen.getAllByLabelText(staleLabel).length).toBe(1);
   });
 
   it('animates rows beyond the initial viewport cutoff on first load', () => {

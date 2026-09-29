@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_ATTENTION_RULES } from "shared/types";
 import { IssueService } from "../src/services/issue.service";
 import { JiraClient } from "../src/jira/client";
 
@@ -339,7 +340,7 @@ describe("IssueService", () => {
     getManagerJiraAccountId: vi.fn(async () => "lead-1"),
     getJiraLeadAccountId: vi.fn(async () => "lead-1"),
     getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
-    getStaleThresholdHours: vi.fn(async () => 48),
+    getAttentionRules: vi.fn(async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 48, timeZone: "UTC" })),
     getJiraDevDueDateField: vi.fn(async () => "customfield_10128"),
     createJiraClient: vi.fn(async () => jiraClient),
   };
@@ -437,12 +438,19 @@ describe("IssueService", () => {
   it("uses the configured stale threshold for stale filters and overview counts", async () => {
     const strictThresholdSettings = {
       ...settings,
-      getStaleThresholdHours: vi.fn(async () => 96),
+      getAttentionRules: vi.fn(async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 96, timeZone: "UTC" })),
     };
     const strictService = new IssueService(jiraClient, strictThresholdSettings as any, teamTrackerService as any);
 
     expect(await strictService.getAll({ filter: "stale" })).toHaveLength(0);
     expect((await strictService.getOverviewCounts()).stale).toBe(0);
+  });
+
+  it("marks open issues stale server-side so the client needs no threshold (P1-05)", async () => {
+    const byKey = new Map((await service.getAll()).map((issue) => [issue.jiraKey, issue]));
+    expect(byKey.get("PROJ-2")?.stale).toBe(true);
+    expect(byKey.get("PROJ-1")?.stale).toBe(false);
+    expect((await service.getById("PROJ-2"))?.stale).toBe(true);
   });
 
   it("filters defects that entered the team bucket in the last 24 hours", async () => {

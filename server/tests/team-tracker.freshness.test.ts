@@ -4,6 +4,7 @@ import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { MyDayService } from "../src/services/my-day.service";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
+import { pinAttentionTimeZone } from "./helpers/attention";
 import {
   appUsers,
   configTable,
@@ -68,6 +69,7 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(at(MONDAY));
     await resetDatabase();
+    await pinAttentionTimeZone();
     await db.insert(developers).values([
       { accountId: "dev-1", displayName: "Alice Smith", email: null, avatarUrl: null, isActive: 1 },
       { accountId: "dev-2", displayName: "Bob Jones", email: null, avatarUrl: null, isActive: 1 },
@@ -102,11 +104,15 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
       vi.setSystemTime(at("2026-03-04", "09:00:00.000Z"));
       await service.ensureDay("2026-03-04", "dev-1");
       vi.setSystemTime(at("2026-03-04", "10:00:00.000Z"));
+      // P1-05: a new day row without a check-in is quiet until the working
+      // day has run past the threshold (09:00 start, 4h).
+      expect((await boardDay("2026-03-04", "dev-1")).signals.freshness.staleByTime).toBe(false);
+      vi.setSystemTime(at("2026-03-04", "14:00:00.000Z"));
       // A new day row starts without a check-in, exactly as before P1-02.
       expect((await boardDay("2026-03-04", "dev-1")).signals.freshness.staleByTime).toBe(true);
 
       await service.addCheckIn("dev-1", "2026-03-04", { summary: "On it" }, { type: "developer", accountId: "dev-1" });
-      vi.setSystemTime(at("2026-03-04", "11:00:00.000Z"));
+      vi.setSystemTime(at("2026-03-04", "15:00:00.000Z"));
       const day = await boardDay("2026-03-04", "dev-1");
       expect(day.signals.freshness.hoursSinceCheckIn).toBe(1);
       expect(day.signals.freshness.staleByTime).toBe(false);
@@ -330,7 +336,7 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
       await enableCollabParticipation(["dev-1"]);
       await startTracking("dev-2");
       await service.addCheckIn("dev-1", MONDAY, { summary: "Manager ping" });
-      vi.setSystemTime(at(NEXT_MONDAY));
+      vi.setSystemTime(at(NEXT_MONDAY, "14:00:00.000Z"));
 
       const board = await service.getBoard(NEXT_MONDAY);
       const byId = new Map(board.developers.map((day) => [day.developer.accountId, day]));

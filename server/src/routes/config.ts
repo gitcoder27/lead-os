@@ -12,14 +12,21 @@ import { BackupService } from "../services/backup.service";
 import { AssistantConfigService } from "../services/assistant-config.service";
 import { OpenAiCompatibleClient } from "../assistant/llm-client";
 import { getPersistedJiraApiToken, storeJiraApiToken } from "../services/jira-credentials.service";
-import { normalizeJiraSyncScopeMode, SettingsService } from "../services/settings.service";
+import { defaultAttentionRules, normalizeJiraSyncScopeMode, SettingsService } from "../services/settings.service";
+import { isValidTimeZone } from "../services/today-clock";
 import { WorkspaceMaintenanceService } from "../services/workspace-maintenance.service";
 import { SyncEngine } from "../sync/engine";
 import { logger } from "../utils/logger";
 import { HttpError } from "../middleware/errorHandler";
 import { runInTransaction } from "../db/transaction";
 import { DEFAULT_WORKSPACE_ID } from "../services/workspace.service";
-import { TEAM_MODES, type TeamModeResponse } from "shared/types";
+import {
+  ATTENTION_RULE_LIMITS,
+  TEAM_MODES,
+  validateAttentionRules,
+  type AttentionRulesResponse,
+  type TeamModeResponse,
+} from "shared/types";
 
 const configSchema = z.object({
   body: z.object({
@@ -29,7 +36,7 @@ const configSchema = z.object({
     managerJiraAccountId: z.string().trim().optional(),
     jiraApiToken: z.string().trim().min(1).optional(),
     syncIntervalMs: z.number().int().positive().default(300000),
-    staleThresholdHours: z.number().int().positive().default(48),
+    staleThresholdHours: z.number().int().positive().optional(),
     jiraAutoSyncEnabled: z.boolean().optional(),
     backupEnabled: z.boolean().optional(),
     backupIntervalMinutes: z.number().int().positive().optional(),
@@ -173,6 +180,26 @@ const teamModeUpdateSchema = z.object({
   query: z.any().optional(),
 });
 
+const attentionHours = (key: keyof typeof ATTENTION_RULE_LIMITS) =>
+  z.number().int().min(ATTENTION_RULE_LIMITS[key].min).max(ATTENTION_RULE_LIMITS[key].max).optional();
+
+const attentionRulesUpdateSchema = z.object({
+  body: z
+    .object({
+      staleHours: attentionHours("staleHours"),
+      noCurrentHours: attentionHours("noCurrentHours"),
+      statusFollowUpHours: attentionHours("statusFollowUpHours"),
+      managerTouchDays: attentionHours("managerTouchDays"),
+      jiraStaleHours: attentionHours("jiraStaleHours"),
+      dayStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM").optional(),
+      dayEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM").optional(),
+      timeZone: z.string().trim().min(1).max(64).optional(),
+    })
+    .strict(),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
 const aiConfigTestSchema = z.object({
   body: z.object({
     providerId: z.string().trim().min(1).optional(),
@@ -217,7 +244,8 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const managerJiraAccountId = await getStoredManagerJiraAccountId(workspaceId);
       const jiraApiToken = await getConfiguredJiraToken(workspaceId);
       const syncIntervalMs = Number((await getConfigValue(workspaceId, "sync_interval_ms")) ?? "300000");
-      const staleThresholdHours = Number((await getConfigValue(workspaceId, "stale_threshold_hours")) ?? "48");
+      // docs/56 P1-05: legacy field; the value lives in the Attention rules.
+      const staleThresholdHours = (await settings.getAttentionRules(workspaceId)).jiraStaleHours;
       const jiraAutoSyncEnabled = await settings.getJiraAutoSyncEnabled(workspaceId);
       const backupEnabled = await settings.getBackupEnabled(workspaceId);
       const backupIntervalMinutes = await settings.getBackupIntervalMinutes(workspaceId);
@@ -274,7 +302,6 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
     try {
       const workspaceId = req.auth!.user.workspaceId;
       const syncIntervalMs = req.body.syncIntervalMs ?? 300000;
-      const staleThresholdHours = req.body.staleThresholdHours ?? 48;
       validateJiraBaseUrl(req.body.jiraBaseUrl);
       const tokenForLookup = req.body.jiraApiToken ?? await getConfiguredJiraToken(workspaceId);
       const managerJiraAccountId = normalizeManagerJiraAccountId(req.body.managerJiraAccountId);
@@ -296,7 +323,9 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         await deleteConfigValue(workspaceId, "jira_lead_account_id");
       }
       await upsertConfig(workspaceId, "sync_interval_ms", String(syncIntervalMs));
-      await upsertConfig(workspaceId, "stale_threshold_hours", String(staleThresholdHours));
+      if (req.body.staleThresholdHours !== undefined) {
+        await settings.setAttentionRules(workspaceId, { jiraStaleHours: req.body.staleThresholdHours });
+      }
       if (req.body.jiraAutoSyncEnabled !== undefined) {
         await upsertConfig(workspaceId, "jira_auto_sync_enabled", String(req.body.jiraAutoSyncEnabled));
       }
@@ -520,6 +549,41 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
     try {
       const response: TeamModeResponse = {
         teamMode: await settings.setTeamMode(req.auth!.user.workspaceId, req.body.teamMode),
+      };
+      res.json(response);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // docs/56 P1-05: the one "Attention rules" block (manager-only via the /api/config mount).
+  router.get("/attention-rules", async (req, res, next) => {
+    try {
+      const response: AttentionRulesResponse = {
+        rules: await settings.getAttentionRules(req.auth!.user.workspaceId),
+        defaults: defaultAttentionRules(),
+      };
+      res.json(response);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/attention-rules", validate(attentionRulesUpdateSchema), async (req, res, next) => {
+    try {
+      const workspaceId = req.auth!.user.workspaceId;
+      const update = req.body as z.infer<typeof attentionRulesUpdateSchema>["body"];
+      if (update.timeZone !== undefined && !isValidTimeZone(update.timeZone)) {
+        throw new HttpError(400, "Time zone must be a valid IANA zone");
+      }
+      const merged = { ...(await settings.getAttentionRules(workspaceId)), ...update };
+      const invalid = validateAttentionRules(merged);
+      if (invalid) {
+        throw new HttpError(400, invalid);
+      }
+      const response: AttentionRulesResponse = {
+        rules: await settings.setAttentionRules(workspaceId, update),
+        defaults: defaultAttentionRules(),
       };
       res.json(response);
     } catch (error) {

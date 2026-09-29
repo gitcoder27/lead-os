@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
+exports.validateAttentionRules = validateAttentionRules;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
 exports.isCompleteNavPreferences = isCompleteNavPreferences;
@@ -37,6 +38,44 @@ function taskLabelDisplayName(name) {
 }
 /** docs/49 D9: days without activity before an open task reads as stale. */
 exports.TASK_STALE_DAYS = 5;
+/** Defaults for every rule but `timeZone` (the server's zone until set). */
+exports.DEFAULT_ATTENTION_RULES = {
+    staleHours: 4,
+    noCurrentHours: 2,
+    statusFollowUpHours: 2,
+    managerTouchDays: exports.TASK_STALE_DAYS,
+    jiraStaleHours: 48,
+    dayStart: "09:00",
+    dayEnd: "18:00",
+};
+exports.ATTENTION_RULE_LIMITS = {
+    staleHours: { min: 1, max: 168 },
+    noCurrentHours: { min: 1, max: 168 },
+    statusFollowUpHours: { min: 1, max: 168 },
+    managerTouchDays: { min: 1, max: 60 },
+    jiraStaleHours: { min: 1, max: 2160 },
+};
+const ATTENTION_CLOCK_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+/**
+ * Cross-field checks shared by the server route and the Settings card. The
+ * time zone is checked separately (the server knows the valid IANA list).
+ */
+function validateAttentionRules(rules) {
+    for (const key of Object.keys(exports.ATTENTION_RULE_LIMITS)) {
+        const value = rules[key];
+        const { min, max } = exports.ATTENTION_RULE_LIMITS[key];
+        if (!Number.isInteger(value) || value < min || value > max) {
+            return `${key} must be a whole number from ${min} to ${max}`;
+        }
+    }
+    if (!ATTENTION_CLOCK_PATTERN.test(rules.dayStart) || !ATTENTION_CLOCK_PATTERN.test(rules.dayEnd)) {
+        return "Day start and end must be HH:MM";
+    }
+    if (rules.dayStart >= rules.dayEnd) {
+        return "Day start must be before day end";
+    }
+    return undefined;
+}
 const taskViewIsoDate = zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const taskViewDateRange = zod_1.z.object({
     from: taskViewIsoDate.optional(),

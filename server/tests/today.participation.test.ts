@@ -17,13 +17,16 @@ import type { TodayResponse } from "shared/types";
  * collab team whose developers check in.
  *
  * Scenario: dev-1 is blocked (manager-set), dev-2 has nothing planned. Both
- * have no current work and no check-in. Times are Asia/Kolkata.
+ * have no current work and no check-in. Times are Asia/Kolkata, on a Monday.
+ * docs/56 P1-05: hour rules count working time (09:00 start), so the flows
+ * are checked at 11:30 with a 2h stale threshold; 08:00 is always quiet.
  */
-const DATE = "2026-03-08";
+const DATE = "2026-03-09";
 const TZ = "Asia/Kolkata";
-const MORNING = "2026-03-08T02:30:00.000Z"; // 08:00 IST, morning_plan
-const MIDDAY = "2026-03-08T06:30:00.000Z"; // 12:00 IST, midday_check
-const WRAP_UP = "2026-03-08T10:30:00.000Z"; // 16:00 IST, wrap_up
+const EARLY = "2026-03-09T02:30:00.000Z"; // 08:00 IST, before day start
+const MORNING = "2026-03-09T06:00:00.000Z"; // 11:30 IST, standup_window
+const MIDDAY = "2026-03-09T06:30:00.000Z"; // 12:00 IST, midday_check
+const WRAP_UP = "2026-03-09T10:30:00.000Z"; // 16:00 IST, wrap_up
 
 const authService = new AuthService();
 const trackerService = new TeamTrackerService();
@@ -117,6 +120,8 @@ describe("GET /api/today developer-participation flows (P1-03)", () => {
       { workspaceId, key: "tasks_phase1_enabled", value: "true" },
       { workspaceId, key: "tasks_phase2_stage", value: "2c" },
       { workspaceId, key: "tasks_phase3_enabled", value: "true" },
+      { workspaceId, key: "attention_time_zone", value: TZ },
+      { workspaceId, key: "team_tracker_stale_threshold_hours", value: "2" },
     ]);
     await trackerService.updateDay("dev-1", DATE, { status: "blocked" }, workspaceId, { type: "manager" });
     await trackerService.ensureDay(DATE, "dev-2", workspaceId);
@@ -205,6 +210,12 @@ describe("GET /api/today developer-participation flows (P1-03)", () => {
   describe("collab, everyone participates (unchanged)", () => {
     beforeEach(async () => {
       await enableCollabParticipation(["dev-1", "dev-2"], workspaceId);
+    });
+
+    it("reads nobody as stale before day start (P1-05 morning noise)", async () => {
+      const early = await getToday(EARLY);
+      expect(allRows(early).some((item) => item.type === "stale_check_in")).toBe(false);
+      expect(early.summary.find((metric) => metric.id === "stale")?.value ?? 0).toBe(0);
     });
 
     it("keeps every check-in flow as before", async () => {

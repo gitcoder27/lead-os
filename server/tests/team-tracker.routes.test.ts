@@ -10,6 +10,7 @@ import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
+import { pinAttentionTimeZone } from "./helpers/attention";
 import { checkinTaskRefs, configTable, developerAvailabilityPeriods, developers, issues, managerDeskItems, teamTrackerSavedViews } from "../src/db/schema";
 
 const trackerService = new TeamTrackerService();
@@ -413,6 +414,9 @@ describe("team tracker routes", () => {
   });
 
   it("GET /api/team-tracker returns a ranked attention queue", async () => {
+    // docs/56 P1-05: a weekday afternoon in UTC, so the check-in clock has run.
+    vi.setSystemTime(new Date("2026-03-06T08:00:00.000Z"));
+    await pinAttentionTimeZone();
     await db.insert(developers).values([
       { accountId: "dev-3", displayName: "Cara Diaz", email: null, avatarUrl: null, isActive: 1 },
       { accountId: "dev-4", displayName: "Derek Long", email: null, avatarUrl: null, isActive: 1 },
@@ -420,36 +424,36 @@ describe("team tracker routes", () => {
       { accountId: "dev-6", displayName: "Fiona West", email: null, avatarUrl: null, isActive: 1 },
     ]);
     await seedIssue("AM-123", {
-      developmentDueDate: "2026-03-06",
+      developmentDueDate: "2026-03-05",
       dueDate: "2026-03-09",
     });
     const devRows = await db.select({ accountId: developers.accountId }).from(developers);
     await enableCollabParticipation(devRows.map((row) => row.accountId));
 
-    await trackerService.updateDay("dev-1", "2026-03-07", { status: "blocked" });
-    await trackerService.updateDay("dev-3", "2026-03-07", { status: "at_risk" });
-    await trackerService.updateDay("dev-4", "2026-03-07", { status: "waiting" });
-    await trackerService.addCheckIn("dev-4", "2026-03-07", { summary: "Waiting on QA handoff" });
-    const waitingItem = await trackerService.addItem("dev-4", "2026-03-07", {
+    await trackerService.updateDay("dev-1", "2026-03-06", { status: "blocked" });
+    await trackerService.updateDay("dev-3", "2026-03-06", { status: "at_risk" });
+    await trackerService.updateDay("dev-4", "2026-03-06", { status: "waiting" });
+    await trackerService.addCheckIn("dev-4", "2026-03-06", { summary: "Waiting on QA handoff" });
+    const waitingItem = await trackerService.addItem("dev-4", "2026-03-06", {
       title: "Follow up with QA",
     });
     await trackerService.setCurrentItem(waitingItem.id);
-    const overdueItem = await trackerService.addItem("dev-1", "2026-03-07", {
+    const overdueItem = await trackerService.addItem("dev-1", "2026-03-06", {
       jiraKey: "AM-123",
       title: "Linked Jira task",
     });
     await trackerService.setCurrentItem(overdueItem.id);
-    const noCurrentPlannedItem = await trackerService.addItem("dev-6", "2026-03-07", {
+    const noCurrentPlannedItem = await trackerService.addItem("dev-6", "2026-03-06", {
       title: "Pick next bug to investigate",
     });
 
-    await trackerService.addCheckIn("dev-6", "2026-03-07", { summary: "Planning next work" });
-    vi.setSystemTime(new Date("2026-03-07T12:00:00.000Z"));
+    await trackerService.addCheckIn("dev-6", "2026-03-06", { summary: "Planning next work" });
+    vi.setSystemTime(new Date("2026-03-06T14:00:00.000Z"));
 
     const app = createTestApp();
     const res = await invoke(app, {
       method: "GET",
-      url: "/api/team-tracker?date=2026-03-07",
+      url: "/api/team-tracker?date=2026-03-06",
     });
 
     expect(res.status).toBe(200);

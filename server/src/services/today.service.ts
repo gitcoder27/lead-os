@@ -48,7 +48,6 @@ import type {
 } from "shared/types";
 import { HttpError } from "../middleware/errorHandler";
 import { IssueService, type TodayIssue } from "./issue.service";
-import { isStaleIssue } from "./issue-rules";
 import { ManagerDeskService } from "./manager-desk.service";
 import { TeamTrackerService } from "./team-tracker.service";
 import { SettingsService } from "./settings.service";
@@ -380,7 +379,7 @@ export class TodayService {
 
     const issueSnapshot = issueResult.status === "fulfilled"
       ? issueResult.value
-      : { issues: [], activeDefects: 0, dueToday: 0, staleThresholdHours: 24 };
+      : { issues: [], activeDefects: 0, dueToday: 0 };
     const teamBoard = teamResult.status === "fulfilled" ? teamResult.value : emptyTeamBoard(date);
     const deskItems = deskResult.status === "fulfilled" ? deskResult.value : [];
     const rawSyncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
@@ -408,7 +407,7 @@ export class TodayService {
     const actionItems = rankActionItems([
       ...buildStandupActions(standup, rhythm, teamBoard, collab),
       ...buildDeveloperActions(teamBoard, clock, openAsks),
-      ...buildIssueActions(issues, clock, issueSnapshot.staleThresholdHours),
+      ...buildIssueActions(issues, clock),
       ...buildFollowUpActions(followUps, clock),
       ...buildMeetingActions(meetings),
       ...carryActions,
@@ -1165,9 +1164,8 @@ const MAX_PRIORITY_ISSUE_ROWS = 3;
  * started, or stale. Beyond a few rows the rest fold into one aggregate row
  * that deep-links to the filtered Work view.
  */
-function buildIssueActions(issues: TodayIssue[], clock: DayClock, staleThresholdHours: number): TodayActionItem[] {
+function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionItem[] {
   const date = clock.date;
-  const now = new Date();
   const rows: TodayActionItem[] = [];
   const priorityIssues: TodayIssue[] = [];
 
@@ -1189,7 +1187,8 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock, staleThreshold
     if (!overdue && !dueToday && !unassigned) {
       // High-priority only counts if it is also not started or has gone stale.
       const notStarted = issue.statusCategory === "new";
-      const stale = isStaleIssue(issue, staleThresholdHours, now);
+      // docs/56 P1-05: staleness comes from the Attention rules, set by IssueService.
+      const stale = Boolean(issue.stale);
       if (!notStarted && !stale) {
         continue;
       }
@@ -1227,7 +1226,7 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock, staleThreshold
   }
 
   for (const issue of priorityIssues.slice(0, MAX_PRIORITY_ISSUE_ROWS)) {
-    const stale = isStaleIssue(issue, staleThresholdHours, now);
+    const stale = Boolean(issue.stale);
     const notStarted = issue.statusCategory === "new";
     const actionTarget = target("issue", "work", { issueKey: issue.jiraKey, filter: "highPriority", date });
     rows.push(

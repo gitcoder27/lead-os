@@ -6,6 +6,7 @@ import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
+import { pinAttentionTimeZone } from "./helpers/attention";
 import {
   configTable,
   developers,
@@ -69,6 +70,7 @@ describe("TeamTrackerService", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-07T08:00:00.000Z"));
     await resetDatabase();
+    await pinAttentionTimeZone();
     await seedDevelopers();
   });
 
@@ -234,21 +236,23 @@ describe("TeamTrackerService", () => {
 
     it("computes smarter freshness and risk signals for the board", async () => {
       await enableCollabParticipation(["dev-1", "dev-2"]);
-      await seedIssue({ developmentDueDate: "2026-03-06", dueDate: "2026-03-09" });
-      await service.updateDay("dev-1", "2026-03-07", {
+      // P1-05: a weekday, since weekends never age anything.
+      vi.setSystemTime(new Date("2026-03-06T08:00:00.000Z"));
+      await seedIssue({ developmentDueDate: "2026-03-05", dueDate: "2026-03-09" });
+      await service.updateDay("dev-1", "2026-03-06", {
         status: "blocked",
       });
-      const jiraItem = await service.addItem("dev-1", "2026-03-07", {
+      const jiraItem = await service.addItem("dev-1", "2026-03-06", {
         jiraKey: "AM-123",
         title: "Linked Jira task",
       });
-      await service.addItem("dev-1", "2026-03-07", {
+      await service.addItem("dev-1", "2026-03-06", {
         title: "Secondary task",
       });
       await service.setCurrentItem(jiraItem.id);
-      vi.setSystemTime(new Date("2026-03-07T12:00:00.000Z"));
+      vi.setSystemTime(new Date("2026-03-06T14:00:00.000Z"));
 
-      const board = await service.getBoard("2026-03-07");
+      const board = await service.getBoard("2026-03-06");
       const devDay = board.developers.find(
         (d) => d.developer.accountId === "dev-1"
       )!;
@@ -1864,11 +1868,19 @@ describe("TeamTrackerService", () => {
   describe("stale detection", () => {
     it("marks developer as stale when no check-in", async () => {
       await enableCollabParticipation(["dev-1", "dev-2"]);
-      const board = await service.getBoard("2026-03-07");
+      vi.setSystemTime(new Date("2026-03-06T14:00:00.000Z"));
+      const board = await service.getBoard("2026-03-06");
       const devDay = board.developers.find(
         (d) => d.developer.accountId === "dev-1"
       )!;
       expect(devDay.isStale).toBe(true);
+    });
+
+    it("reads nobody as stale on a weekend (P1-05)", async () => {
+      await enableCollabParticipation(["dev-1", "dev-2"]);
+      vi.setSystemTime(new Date("2026-03-07T15:00:00.000Z"));
+      const board = await service.getBoard("2026-03-07");
+      expect(board.developers.every((day) => !day.isStale)).toBe(true);
     });
 
     it("marks developer as not stale after recent check-in", async () => {

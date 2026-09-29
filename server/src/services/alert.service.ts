@@ -81,7 +81,7 @@ export class AlertService {
   async computeAlerts(now = new Date(), workspaceId?: string): Promise<Alert[]> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const rows = await db.select().from(issues).where(eq(issues.workspaceId, normalizedWorkspaceId));
-    const staleThresholdHours = await this.settings.getStaleThresholdHours(normalizedWorkspaceId);
+    const attentionRules = await this.settings.getAttentionRules(normalizedWorkspaceId);
     const jiraSyncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
     const today = todayIsoDate(now);
     const alerts: Alert[] = [];
@@ -96,7 +96,7 @@ export class AlertService {
       if (effectiveDueDate && effectiveDueDate < today) {
         alerts.push(this.makeIssueAlert("overdue", "high", row.jiraKey, `Issue ${row.jiraKey} is overdue.`));
       }
-      if (isStaleIssue(row, staleThresholdHours, now)) {
+      if (isStaleIssue(row, attentionRules, now)) {
         alerts.push(this.makeIssueAlert("stale", "medium", row.jiraKey, `Issue ${row.jiraKey} is stale.`));
       }
       if (row.flagged === 1) {

@@ -63,11 +63,6 @@ export function isOverdue(dateStr?: string): boolean {
   return isBefore(date, startOfDay(new Date()));
 }
 
-export function isStale(updatedAt: string, thresholdHours = 48): boolean {
-  const dt = new Date(updatedAt);
-  return dt.getTime() < Date.now() - thresholdHours * 60 * 60 * 1000;
-}
-
 /**
  * docs/53 F1: the "Later today" snooze preset is only offered while ~3h of the
  * day remain — past ~18:00 it is hidden because it would land after hours.

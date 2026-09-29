@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
+import { pinAttentionTimeZone } from "./helpers/attention";
 import { configureJira } from "./helpers/jira-config";
 import { configTable, developers, issues, managerDeskDays, teamTrackerDays } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
@@ -106,6 +107,7 @@ describe("TodayService", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-08T08:30:00.000Z"));
     await resetDatabase();
+    await pinAttentionTimeZone();
     await seedDeveloper();
     // These contracts describe a collab team whose developers check in;
     // solo / non-participating suppression lives in today.participation.test.ts.
@@ -117,31 +119,33 @@ describe("TodayService", () => {
   });
 
   it("builds exact ranked action targets across people, work, and manager memory", async () => {
-    await trackerService.updateDay("dev-1", "2026-03-08", { status: "blocked" });
-    await seedIssue("AM-1", { dueDate: "2026-03-07" });
+    // docs/56 P1-05: weekends never age anyone, so this runs on a Monday afternoon.
+    vi.setSystemTime(new Date("2026-03-09T13:30:00.000Z"));
+    await trackerService.updateDay("dev-1", "2026-03-09", { status: "blocked" });
+    await seedIssue("AM-1", { dueDate: "2026-03-08" });
     await seedIssue("AM-2", {
       summary: "Needs owner",
       assigneeId: null,
       assigneeName: null,
-      dueDate: "2026-03-08",
+      dueDate: "2026-03-09",
     });
     const followUp = await managerDeskService.createItem("manager-1", {
-      date: "2026-03-08",
+      date: "2026-03-09",
       title: "Follow up with QA",
       kind: "action",
       category: "follow_up",
       status: "planned",
-      followUpAt: "2026-03-07T10:00:00.000Z",
+      followUpAt: "2026-03-08T10:00:00.000Z",
     });
     const meeting = await managerDeskService.createItem("manager-1", {
-      date: "2026-03-08",
+      date: "2026-03-09",
       title: "Migration review",
       kind: "meeting",
       category: "planning",
       status: "planned",
     });
 
-    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const response = await todayService().getToday("manager-1", "2026-03-09");
 
     expect(response.summary).toHaveLength(6);
     expect(response.currentPriority?.target.developerAccountId).toBe("dev-1");
@@ -457,7 +461,8 @@ describe("TodayService", () => {
       dueDate: null,
       updatedAt: "2026-03-08T07:30:00.000Z",
     });
-    await seedIssue("AM-12", { dueDate: null, updatedAt: "2026-03-05T08:00:00.000Z" });
+    // P1-05: 48 weekday hours; the weekend does not count.
+    await seedIssue("AM-12", { dueDate: null, updatedAt: "2026-03-04T08:00:00.000Z" });
     await seedIssue("AM-13", { assigneeId: null, assigneeName: null, dueDate: null });
     await seedIssue("AM-14", { priorityName: "Low", statusCategory: "new", dueDate: null });
 
@@ -531,8 +536,10 @@ describe("TodayService", () => {
   });
 
   it("stops asking for another check-in once a no-current developer has a same-day check-in", async () => {
+    // docs/56 P1-05: weekends never age anyone, so this runs on a Monday afternoon.
+    vi.setSystemTime(new Date("2026-03-09T13:30:00.000Z"));
     // Only the developer's own check-in resets their freshness (docs/56 P1-02).
-    const before = await todayService().getToday("manager-1", "2026-03-08");
+    const before = await todayService().getToday("manager-1", "2026-03-09");
     const beforeDeveloperAction = before.actionItems.find((item) => item.target.developerAccountId === "dev-1");
 
     expect(beforeDeveloperAction).toMatchObject({
@@ -544,11 +551,11 @@ describe("TodayService", () => {
       kind: "add_check_in",
     });
 
-    await trackerService.addCheckIn("dev-1", "2026-03-08", {
+    await trackerService.addCheckIn("dev-1", "2026-03-09", {
       summary: "Asked about next work",
     }, { type: "developer", accountId: "dev-1" });
 
-    const after = await todayService().getToday("manager-1", "2026-03-08");
+    const after = await todayService().getToday("manager-1", "2026-03-09");
     const afterDeveloperAction = after.actionItems.find((item) => item.target.developerAccountId === "dev-1");
 
     expect(afterDeveloperAction).toMatchObject({

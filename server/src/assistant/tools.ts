@@ -913,7 +913,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
       summarize: () => "Read workspace settings",
       execute: async (_args, ctx) => {
         const s = ctx.services.settingsService;
-        const [jiraBaseUrl, jiraProjectKey, jiraEmail, jiraToken, autoSync, syncIntervalMs, staleH, backupEnabled] =
+        const [jiraBaseUrl, jiraProjectKey, jiraEmail, jiraToken, autoSync, syncIntervalMs, attentionRules, backupEnabled] =
           await Promise.all([
             s.getJiraBaseUrl(ctx.workspaceId),
             s.getJiraProjectKey(ctx.workspaceId),
@@ -921,7 +921,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             s.getJiraToken(ctx.workspaceId),
             s.getJiraAutoSyncEnabled(ctx.workspaceId),
             s.getSyncIntervalMs(ctx.workspaceId),
-            s.getStaleThresholdHours(ctx.workspaceId),
+            s.getAttentionRules(ctx.workspaceId),
             s.getBackupEnabled(ctx.workspaceId),
           ]);
         return {
@@ -932,7 +932,8 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             jiraConfigured: Boolean(jiraToken),
             autoSyncEnabled: autoSync,
             syncIntervalMinutes: Math.round(syncIntervalMs / 60000),
-            staleThresholdHours: staleH,
+            staleThresholdHours: attentionRules.jiraStaleHours,
+            attentionRules,
             backupEnabled,
           }),
           summary: "Read workspace settings",

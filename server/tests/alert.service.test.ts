@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_ATTENTION_RULES } from "shared/types";
 import { AlertService } from "../src/services/alert.service";
 import { WorkloadService } from "../src/services/workload.service";
 
@@ -135,7 +136,7 @@ describe("AlertService", () => {
     ]),
   } as unknown as WorkloadService;
   const settings = {
-    getStaleThresholdHours: vi.fn(async () => 48),
+    getAttentionRules: vi.fn(async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 48, timeZone: "UTC" })),
     getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
     getTeamMode: vi.fn(async () => "collab"),
   };
@@ -166,7 +167,7 @@ describe("AlertService", () => {
 
   it("uses the configured stale threshold", async () => {
     const relaxedThresholdService = new AlertService(workloadService, {
-      getStaleThresholdHours: vi.fn(async () => 72),
+      getAttentionRules: vi.fn(async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 72, timeZone: "UTC" })),
       getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
     getTeamMode: vi.fn(async () => "collab"),
     } as any);
@@ -186,7 +187,7 @@ describe("AlertService", () => {
 
   it("includes outside-roster issue alerts in base-query mode", async () => {
     const baseQueryService = new AlertService(workloadService, {
-      getStaleThresholdHours: vi.fn(async () => 48),
+      getAttentionRules: vi.fn(async () => ({ ...DEFAULT_ATTENTION_RULES, jiraStaleHours: 48, timeZone: "UTC" })),
       getJiraSyncScopeMode: vi.fn(async () => "base_query"),
       getTeamMode: vi.fn(async () => "collab"),
     } as any);

@@ -1012,6 +1012,8 @@ function AppContent() {
         <SetupWizard
           onComplete={async () => {
             await bootstrapQuery.refetch();
+            // docs/56 P2-02: an open wizard pins the view to Work; setup ends on Today.
+            replaceView('today');
           }}
         />
       </Suspense>

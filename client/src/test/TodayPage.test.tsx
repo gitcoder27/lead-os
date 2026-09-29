@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '@/context/ToastContext';
@@ -143,6 +143,7 @@ describe('TodayPage V2', () => {
     vi.restoreAllMocks();
     teamModeMock.mode = 'collab';
     window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   it('shows the shaped Today skeleton while the first request is pending', () => {
@@ -585,6 +586,77 @@ describe('TodayPage V2', () => {
     const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
     expect(within(panel).getByText('Loops closed for today.')).toBeInTheDocument();
     expect(within(panel).queryByText(/No check-in today/)).not.toBeInTheDocument();
+  });
+
+  describe('getting started (docs/56 P2-02)', () => {
+    const fresh = { people: false, tasks: false, jira: false, rhythm: false };
+
+    it('shows the four first-run steps and opens each one', async () => {
+      const response = todayResponse({ gettingStarted: fresh });
+      mockFetch(response);
+      const { onOpenTodayTarget, openCapture } = renderToday(response);
+
+      const card = await screen.findByTestId('today-getting-started');
+      expect(within(card).getByText('0 of 4')).toBeInTheDocument();
+      for (const title of ['Capture a task', 'Add people', 'Connect Jira', 'Set your day rhythm']) {
+        expect(within(card).getByText(title)).toBeInTheDocument();
+      }
+
+      fireEvent.click(within(card).getByRole('button', { name: 'Capture' }));
+      expect(openCapture).toHaveBeenCalledTimes(1);
+      fireEvent.click(within(card).getByRole('button', { name: 'Add' }));
+      expect(onOpenTodayTarget).toHaveBeenLastCalledWith(expect.objectContaining({ view: 'settings', section: 'team' }));
+      fireEvent.click(within(card).getByRole('button', { name: 'Connect' }));
+      expect(onOpenTodayTarget).toHaveBeenLastCalledWith(expect.objectContaining({ view: 'settings', section: 'connection' }));
+      fireEvent.click(within(card).getByRole('button', { name: 'Set times' }));
+      expect(onOpenTodayTarget).toHaveBeenLastCalledWith(expect.objectContaining({ view: 'settings', section: 'rhythm' }));
+    });
+
+    it('ticks finished steps and drops their button', async () => {
+      const response = todayResponse({ gettingStarted: { people: true, tasks: true, jira: false, rhythm: false } });
+      mockFetch(response);
+      renderToday(response);
+
+      const card = await screen.findByTestId('today-getting-started');
+      expect(within(card).getByText('2 of 4')).toBeInTheDocument();
+      expect(within(card).queryByRole('button', { name: 'Capture' })).not.toBeInTheDocument();
+      expect(within(card).queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
+      expect(within(card).getByRole('button', { name: 'Connect' })).toBeInTheDocument();
+      expect(within(card).getAllByText('(done)')).toHaveLength(2);
+    });
+
+    it('is absent once everything is done, and when the server sends no checklist', async () => {
+      const done = todayResponse({ gettingStarted: { people: true, tasks: true, jira: true, rhythm: true } });
+      mockFetch(done);
+      const first = renderToday(done);
+      await screen.findByRole('heading', { name: 'Queue' });
+      expect(screen.queryByTestId('today-getting-started')).not.toBeInTheDocument();
+      void first;
+    });
+
+    it('does not show without a checklist in the response', async () => {
+      const response = todayResponse();
+      mockFetch(response);
+      renderToday(response);
+      await screen.findByRole('heading', { name: 'Queue' });
+      expect(screen.queryByTestId('today-getting-started')).not.toBeInTheDocument();
+    });
+
+    it('Dismiss hides it and the choice survives a reload', async () => {
+      const response = todayResponse({ gettingStarted: fresh });
+      mockFetch(response);
+      const view = renderToday(response);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Dismiss getting started' }));
+      expect(screen.queryByTestId('today-getting-started')).not.toBeInTheDocument();
+      void view;
+      cleanup();
+
+      mockFetch(response);
+      renderToday(response);
+      await screen.findByRole('heading', { name: 'Queue' });
+      expect(screen.queryByTestId('today-getting-started')).not.toBeInTheDocument();
+    });
   });
 
   it('posts a check-in on Enter, like every other check-in composer (docs/54 K3)', async () => {

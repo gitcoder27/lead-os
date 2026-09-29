@@ -30,6 +30,7 @@ import type {
   TodayMeetingPrompt,
   OneOnOneDueSignal,
   TodayPromiseItem,
+  TodayGettingStarted,
   TodayResponse,
   TodayRhythmBoundaries,
   TodayRhythmSettings,
@@ -263,6 +264,24 @@ export class TodayService {
     return settings;
   }
 
+  /**
+   * docs/56 P2-02: which first-run steps are done. A source that failed to load
+   * counts as done, so a hiccup never nags the manager to redo setup.
+   */
+  private async buildGettingStarted(workspaceId: string | undefined, hasPeople: boolean | undefined): Promise<TodayGettingStarted | undefined> {
+    try {
+      const [tasks, jira, rhythm] = await Promise.all([
+        this.stateService.hasTasks(workspaceId),
+        this.settings.isJiraConfigured(workspaceId),
+        this.stateService.hasCustomRhythm(workspaceId),
+      ]);
+      return { people: hasPeople ?? true, tasks, jira, rhythm };
+    } catch (error) {
+      logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), err: error }, "Today getting-started flags unavailable");
+      return undefined;
+    }
+  }
+
   private getCachedToday(cacheKey: string): Promise<TodayBuildResult> | undefined {
     if (this.todayCacheTtlMs <= 0) {
       return undefined;
@@ -373,9 +392,11 @@ export class TodayService {
     const asks = state?.asks ?? [];
     const openAsks = unansweredAsks(asks, teamBoard);
     const rhythm = getRhythmState(now, context.tz, state?.rhythm.boundaries);
-    const standup = state?.phase3 && sourceStatus.team === "ready"
+    // docs/56 P2-02: a standup needs people; with an empty roster there is no card.
+    const standup = state?.phase3 && sourceStatus.team === "ready" && teamBoard.summary.total > 0
       ? buildStandupFocus(state.standup, teamBoard, date)
       : undefined;
+    const gettingStarted = await this.buildGettingStarted(workspaceId, sourceStatus.team === "ready" ? teamBoard.summary.total > 0 : undefined);
 
     const followUps = getDueFollowUps(deskItems, clock.nowMs);
     const meetings = getMeetingPrompts(deskItems, clock);
@@ -440,6 +461,7 @@ export class TodayService {
         openAsks,
       }),
       ...(state ? { checkInAsks: [...openAsks.values()] } : {}),
+      ...(gettingStarted ? { gettingStarted } : {}),
       ...(state?.delta
         ? {
           delta: buildDelta({

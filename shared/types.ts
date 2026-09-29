@@ -571,6 +571,20 @@ export interface TodayResponse {
   delta?: TodayDelta;
   /** docs/53 F15: today's open check-in asks, keyed by developer. */
   checkInAsks?: TodayCheckInAsk[];
+  /** docs/56 P2-02: first-run checklist; absent when it could not be computed. */
+  gettingStarted?: TodayGettingStarted;
+}
+
+/** Which first-run steps are already done. Each is true once the workspace has it. */
+export interface TodayGettingStarted {
+  /** At least one active person on the team. */
+  people: boolean;
+  /** At least one task exists. */
+  tasks: boolean;
+  /** A complete Jira connection is saved. */
+  jira: boolean;
+  /** The manager has saved their own day-rhythm times. */
+  rhythm: boolean;
 }
 
 // ── Manager action engine contracts ─────────────────────

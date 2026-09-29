@@ -6,6 +6,7 @@ import {
   developers,
   issues,
   standupSessions,
+  tasks,
   teamTrackerCheckIns,
   teamTrackerDays,
   todayCheckInAsks,
@@ -55,6 +56,28 @@ export class TodayStateService {
       parsed = undefined;
     }
     return { boundaries: normalizeRhythmBoundaries(parsed) };
+  }
+
+  /** docs/56 P2-02: the manager has saved their own stage times (otherwise the defaults apply). */
+  async hasCustomRhythm(workspaceId?: string): Promise<boolean> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const row = (await db
+      .select({ value: configTable.value })
+      .from(configTable)
+      .where(and(eq(configTable.workspaceId, scope), eq(configTable.key, RHYTHM_CONFIG_KEY)))
+      .limit(1))[0];
+    return Boolean(row);
+  }
+
+  /** docs/56 P2-02: any live task in the workspace (for the getting-started checklist). */
+  async hasTasks(workspaceId?: string): Promise<boolean> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const row = (await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(eq(tasks.workspaceId, scope), isNull(tasks.deletedAt)))
+      .limit(1))[0];
+    return Boolean(row);
   }
 
   async updateRhythmSettings(boundaries: TodayRhythmBoundaries, workspaceId?: string): Promise<TodayRhythmSettings> {

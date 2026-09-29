@@ -619,3 +619,38 @@
 @media (prefers-reduced-motion: reduce) {
   .today-skeleton { animation: none; }
 }
+
+/* ── Getting started (docs/56 P2-02) ─────────────────────────────────── */
+
+.today-getting-started {
+  margin-bottom: 18px;
+  padding: 10px 8px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+}
+
+.today-getting-started-list { margin: 0; padding: 0; list-style: none; }
+
+.today-getting-started-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.today-getting-started-step[data-done='true'] .today-getting-started-title { color: var(--text-muted); }
+
+.today-getting-started-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.today-getting-started-detail {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}

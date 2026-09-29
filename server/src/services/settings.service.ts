@@ -97,6 +97,20 @@ export class SettingsService {
       this.envFallback(workspaceId, config.JIRA_API_TOKEN);
   }
 
+  /**
+   * docs/56 P2-03: a complete connection (URL, email, project key and a token)
+   * is saved or set in the environment. Reads config only; never calls Jira.
+   */
+  async isJiraConfigured(workspaceId?: string): Promise<boolean> {
+    const [baseUrl, email, projectKey, token] = await Promise.all([
+      this.getJiraBaseUrl(workspaceId),
+      this.getJiraEmail(workspaceId),
+      this.getJiraProjectKey(workspaceId),
+      this.getJiraToken(workspaceId),
+    ]);
+    return Boolean(baseUrl && email && projectKey && token);
+  }
+
   async getJiraSyncJql(workspaceId?: string): Promise<string | undefined> {
     return (await this.getConfigValue("jira_sync_jql", workspaceId)) ?? this.envFallback(workspaceId, config.JIRA_SYNC_JQL);
   }

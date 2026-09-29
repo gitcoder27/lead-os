@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } fr
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
 import { useTeamMode } from '@/hooks/useTeamMode';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTodayKeyboardTriage } from '@/hooks/useTodayKeyboardTriage';
 import { useTodayProgress } from '@/hooks/useTodayProgress';
@@ -40,6 +42,7 @@ import { snoozePresets } from './TodayActionMenu';
 import { TodayActionQueue, targetKey } from './TodayActionQueue';
 import { TodayCheckInDialog } from './TodayCheckInDialog';
 import { TodayConfirmDialog } from './TodayConfirmDialog';
+import { TodayGettingStarted } from './TodayGettingStarted';
 import { TodayDueSoon } from './TodayDueSoon';
 import { TodayPeoplePulse, pulsePersonFromFocus, pulsePersonFromItem } from './TodayPeoplePulse';
 import { TodayPromisesList } from './TodayPromisesList';
@@ -55,6 +58,7 @@ type SnoozePreset = 'later_today' | 'tomorrow' | 'next_week';
 
 /** Enough rows to fill a laptop-height column before "+N more". */
 const QUEUE_VISIBLE_ROWS = 12;
+const GETTING_STARTED_DISMISSED_KEY = 'today-getting-started-dismissed';
 
 interface TodayPageProps {
   onViewChange: (view: AppView) => void;
@@ -105,6 +109,24 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
 
   const today = useToday(date);
   const teamMode = useTeamMode();
+  const { openCapture } = useQuickActions();
+  // docs/56 P2-02: the first-run card is dismissible; a per-viewer choice, so storage is best-effort.
+  const dismissedKey = useScopedStorageKey(GETTING_STARTED_DISMISSED_KEY);
+  const [gettingStartedDismissed, setGettingStartedDismissed] = useState(() => {
+    try {
+      return window.localStorage.getItem(dismissedKey) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const dismissGettingStarted = () => {
+    setGettingStartedDismissed(true);
+    try {
+      window.localStorage.setItem(dismissedKey, '1');
+    } catch {
+      // Blocked storage: the card stays dismissed for this visit only.
+    }
+  };
   // docs/56 P1-04: "Add check-in" reads "Add note" for people who do not check in.
   const snapshot = useMemo(
     () => (today.data ? relabelCheckInCommands(today.data, teamMode) : today.data),
@@ -455,6 +477,14 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
             onFocus={trackRowFocus}
           >
             <div className="today-main-col">
+              {snapshot.gettingStarted && !gettingStartedDismissed && Object.values(snapshot.gettingStarted).some((done) => !done) ? (
+                <TodayGettingStarted
+                  steps={snapshot.gettingStarted}
+                  onCapture={() => openCapture()}
+                  onOpenTarget={openTarget}
+                  onDismiss={dismissGettingStarted}
+                />
+              ) : null}
               <TodayActionQueue
                 ref={queueHeadingRef}
                 view={queueView}

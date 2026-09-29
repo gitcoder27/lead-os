@@ -91,7 +91,12 @@ vi.mock('@/components/team-tracker/TeamTrackerPage', () => ({
 }));
 
 vi.mock('@/components/setup/SetupWizard', () => ({
-  SetupWizard: () => <div>Setup wizard</div>,
+  SetupWizard: ({ onComplete }: { onComplete: () => Promise<void> | void }) => (
+    <div>
+      Setup wizard
+      <button type="button" onClick={() => void onComplete()}>Finish setup</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/my-day/MyDayPage', () => ({
@@ -179,6 +184,29 @@ describe('App', () => {
 
     render(<App />);
     expect(await screen.findByText('Setup wizard')).toBeInTheDocument();
+  });
+
+  it('finishing setup lands on Today, not Work (docs/56 P2-02)', async () => {
+    const closed = { data: { bootstrapOpen: false, userCount: 1 }, isLoading: false };
+    const refetch = vi.fn(async () => {
+      useBootstrapStateMock.mockReturnValue({ ...closed, refetch });
+    });
+    useBootstrapStateMock.mockReturnValue({ data: { bootstrapOpen: true, userCount: 0 }, isLoading: false, refetch });
+    useAuthMock.mockReturnValue({
+      user: { username: 'manager', displayName: 'Manager', role: 'manager', workspaceId: 'default' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish setup' }));
+
+    expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(window.location.pathname).toBe('/');
   });
 
   it('renders manager login on / when bootstrap is closed and the user is unauthenticated', async () => {

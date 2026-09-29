@@ -1581,6 +1581,11 @@ export interface TrackerFreshnessSignals {
   touchStaleWorkingDays?: number;
   /** No manager touch for `touchStaleWorkingDays` working days. */
   untouched?: boolean;
+  /**
+   * docs/56 P1-03: whether "no current work" is tracked for this person
+   * (false in solo unless opted in). Absent = tracked.
+   */
+  noCurrentTracked?: boolean;
 }
 
 export interface TrackerRiskSignals {
@@ -2152,8 +2157,12 @@ export interface OneOnOneSuggestionsResponse {
   /**
    * Present when the developer has had no check-in for
    * `ONE_ON_ONE_NO_CHECK_IN_DAYS` or more — suggests a freeform topic.
+   * docs/56 P1-03: on the manager-touch clock (solo, or a non-participating
+   * developer) `basis` is `"manager_touch"`: it is present after the tracker's
+   * N working days untouched, `lastCheckInAt` holds the last manager touch and
+   * `days` counts working days.
    */
-  checkIn: { lastCheckInAt: string | null; days: number | null } | null;
+  checkIn: { lastCheckInAt: string | null; days: number | null; basis?: "manager_touch" } | null;
 }
 
 export const ONE_ON_ONE_NO_CHECK_IN_DAYS = 3;

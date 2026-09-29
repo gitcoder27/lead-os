@@ -81,6 +81,7 @@ describe("alerts routes", () => {
     {
       getStaleThresholdHours: async () => 48,
       getJiraSyncScopeMode: async () => "team_assignees",
+      getTeamMode: async () => "collab",
     } as any,
   );
 

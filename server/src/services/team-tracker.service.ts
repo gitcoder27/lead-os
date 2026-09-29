@@ -4,6 +4,8 @@ import type {
   TrackerItemState,
   TrackerDeveloperDay,
   TrackerDeveloperSignals,
+  TrackerFreshnessClock,
+  TrackerFreshnessSignals,
   TrackerWorkItem,
   TrackerCheckIn,
   TrackerCheckInVisibility,
@@ -61,7 +63,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { SettingsService } from "./settings.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { getParticipatingDeveloperIds } from "./developer-participation.service";
-import { buildSignals, getFreshnessClock, type TrackerFreshnessInputs, type TrackerSignalConfig } from "./tracker-freshness";
+import { buildSignals, getFreshnessClock, tracksNoCurrent, type TrackerFreshnessInputs, type TrackerSignalConfig } from "./tracker-freshness";
 import { runInTransaction } from "../db/transaction";
 import {
   normalizeBoardSearchQuery,
@@ -351,6 +353,11 @@ function mapSavedView(
   };
 }
 
+export type TrackerFreshnessClockSignals = Pick<
+  TrackerFreshnessSignals,
+  "staleByTime" | "hoursSinceCheckIn" | "lastManagerTouchAt" | "workingDaysSinceTouch" | "touchStaleWorkingDays" | "untouched"
+> & { clock: TrackerFreshnessClock };
+
 function forDeveloperSignals(signals: TrackerDeveloperSignals): TrackerDeveloperSignals {
   const { lastManagerTouchAt: _touchAt, workingDaysSinceTouch: _days, touchStaleWorkingDays: _threshold, untouched: _untouched, ...freshness } = signals.freshness;
   return { ...signals, freshness };
@@ -636,7 +643,7 @@ function buildAttentionReasons(
   ) {
     reasons.push("stale_by_time");
   }
-  if (!day.currentItem && day.status !== "done_for_today") {
+  if (!day.currentItem && day.status !== "done_for_today" && tracksNoCurrent(day.signals)) {
     reasons.push("no_current");
   }
   if (day.status === "waiting") {
@@ -730,7 +737,7 @@ function matchesSummaryFilter(
     case "status_follow_up":
       return day.signals.freshness.statusChangeWithoutFollowUp;
     case "no_current":
-      return !day.currentItem && day.status !== "done_for_today";
+      return !day.currentItem && day.status !== "done_for_today" && tracksNoCurrent(day.signals);
     case "done_for_today":
       return day.status === "done_for_today";
     case "all":
@@ -2521,7 +2528,7 @@ export class TeamTrackerService {
       blocked: days.filter((d) => d.status === "blocked").length,
       atRisk: days.filter((d) => d.status === "at_risk").length,
       waiting: days.filter((d) => d.status === "waiting").length,
-      noCurrent: days.filter((d) => !d.currentItem && d.status !== "done_for_today").length,
+      noCurrent: days.filter((d) => !d.currentItem && d.status !== "done_for_today" && tracksNoCurrent(d.signals)).length,
       overdueLinkedWork: days.filter((d) => d.signals.risk.overdueLinkedWork).length,
       statusFollowUp: days.filter((d) => d.signals.freshness.statusChangeWithoutFollowUp).length,
       doneForToday: days.filter((d) => d.status === "done_for_today").length,
@@ -2573,6 +2580,64 @@ export class TeamTrackerService {
 
       return leftName.localeCompare(rightName);
     });
+  }
+
+  /**
+   * docs/56 P1-03: the P1-02 freshness clock for other services (workload,
+   * 1:1 suggestions) without building work items. Only the clock fields are
+   * returned; no-current and status signals need the full day.
+   */
+  async getFreshnessByDeveloper(
+    date: string,
+    accountIds: string[],
+    workspaceId?: string
+  ): Promise<Map<string, TrackerFreshnessClockSignals>> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const result = new Map<string, TrackerFreshnessClockSignals>();
+    if (accountIds.length === 0) return result;
+    const [config, participants, dayRows] = await Promise.all([
+      this.getSignalConfig(scope),
+      getParticipatingDeveloperIds(scope),
+      db.select().from(teamTrackerDays)
+        .where(and(eq(teamTrackerDays.workspaceId, scope), inArray(teamTrackerDays.developerAccountId, accountIds), lte(teamTrackerDays.date, date)))
+        .orderBy(desc(teamTrackerDays.date)),
+    ]);
+    const effectiveDay = new Map<string, typeof teamTrackerDays.$inferSelect>();
+    for (const day of dayRows) if (!effectiveDay.has(day.developerAccountId)) effectiveDay.set(day.developerAccountId, day);
+    const history = getTrackerViewMode(date) === "history";
+    const now = history ? endOfIsoDate(date) : new Date();
+    const developerList = accountIds.map((accountId) => ({ accountId, participates: participants.has(accountId) }) as Developer);
+    const inputs = await this.getFreshnessInputs(
+      developerList,
+      new Map(accountIds.map((accountId) => [accountId, effectiveDay.get(accountId)?.id])),
+      config,
+      scope,
+      now.toISOString()
+    );
+    for (const developer of developerList) {
+      const day = effectiveDay.get(developer.accountId);
+      const { freshness } = buildSignals({
+        date,
+        status: "on_track",
+        lastCheckInAt: day?.lastCheckInAt,
+        updatedAt: day?.updatedAt ?? `${date}T00:00:00Z`,
+        plannedItems: [],
+        config,
+        participates: developer.participates,
+        freshness: inputs.get(developer.accountId),
+        now,
+      });
+      result.set(developer.accountId, {
+        clock: freshness.clock!,
+        staleByTime: freshness.staleByTime,
+        hoursSinceCheckIn: freshness.hoursSinceCheckIn,
+        lastManagerTouchAt: freshness.lastManagerTouchAt,
+        workingDaysSinceTouch: freshness.workingDaysSinceTouch,
+        touchStaleWorkingDays: freshness.touchStaleWorkingDays,
+        untouched: freshness.untouched,
+      });
+    }
+    return result;
   }
 
   private async getDeveloperByAccountId(accountId: string, workspaceId?: string): Promise<Developer> {

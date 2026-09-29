@@ -41,6 +41,7 @@ import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService, type TaskPrincipal } from "./task.service";
 import { taskSignals } from "./task-views.service";
+import { TeamTrackerService } from "./team-tracker.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 export const ONE_ON_ONE_FLAG = "one_on_one_enabled";
@@ -146,6 +147,7 @@ export class OneOnOneService {
   private readonly keys = new TaskKeysService();
   private readonly taskService = new TaskService();
   private readonly events = new TaskEventsService();
+  private readonly tracker = new TeamTrackerService();
 
   /** 48 §0: `one_on_one_enabled` — purely additive, no stage prerequisite. */
   async enabled(workspaceId?: string): Promise<boolean> {
@@ -549,10 +551,22 @@ export class OneOnOneService {
     // Strongest combined signal first; ties go to the longest-quiet task.
     ranked.sort((a, b) => b.score - a.score || a.since.localeCompare(b.since) || a.task.taskId - b.task.taskId);
 
+    const topTasks = ranked.slice(0, ONE_ON_ONE_SUGGESTION_LIMIT).map(({ task, reasons }) => ({ task, reasons }));
+    // docs/56 P1-03: without developer check-ins, "no check-in" is noise —
+    // suggest a topic when the manager hasn't touched this person instead.
+    const freshness = (await this.tracker.getFreshnessByDeveloper(today, [developerId], scope)).get(developerId);
+    if (freshness?.clock === "manager_touch") {
+      return {
+        tasks: topTasks,
+        checkIn: freshness.untouched
+          ? { lastCheckInAt: freshness.lastManagerTouchAt ?? null, days: freshness.workingDaysSinceTouch ?? null, basis: "manager_touch" }
+          : null,
+      };
+    }
     const lastCheckInAt = checkIn[0]?.last ?? null;
     const checkInDays = lastCheckInAt ? diffDaysIso(isoDatePart(lastCheckInAt) ?? lastCheckInAt.slice(0, 10), today) : null;
     return {
-      tasks: ranked.slice(0, ONE_ON_ONE_SUGGESTION_LIMIT).map(({ task, reasons }) => ({ task, reasons })),
+      tasks: topTasks,
       checkIn:
         checkInDays === null || checkInDays >= ONE_ON_ONE_NO_CHECK_IN_DAYS
           ? { lastCheckInAt, days: checkInDays }

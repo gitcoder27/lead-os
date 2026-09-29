@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql } from "dri
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
-import { taskEvents, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
+import { appUsers, taskEvents, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -350,12 +350,20 @@ export class TaskEventsService {
   /**
    * docs/56 P1-02: latest manager-authored event at or before `asOf` on tasks
    * each developer owns or is `person`-linked to (the manager-touch clock).
+   * Structural events (created/status/schedule/focus…) are written as
+   * `system` with the acting principal in `author_id`; a manager principal's
+   * account id is their username, so those count when it is a manager login.
    */
   async latestManagerTouchByDeveloper(developerAccountIds: string[], asOf: string, workspaceId?: string): Promise<Map<string, string>> {
     const latest = new Map<string, string>();
     if (developerAccountIds.length === 0) return latest;
     const scope = normalizeWorkspaceId(workspaceId);
-    const managerEvents = and(eq(taskEvents.workspaceId, scope), eq(taskEvents.authorType, "manager"), lte(taskEvents.occurredAt, asOf));
+    const managerIds = (await db.select({ username: appUsers.username }).from(appUsers)
+      .where(and(eq(appUsers.workspaceId, scope), eq(appUsers.role, "manager")))).map((row) => row.username);
+    const byManager = managerIds.length
+      ? or(eq(taskEvents.authorType, "manager"), and(eq(taskEvents.authorType, "system"), inArray(taskEvents.authorId, managerIds)))
+      : eq(taskEvents.authorType, "manager");
+    const managerEvents = and(eq(taskEvents.workspaceId, scope), byManager, lte(taskEvents.occurredAt, asOf));
     const joinTask = and(eq(tasks.workspaceId, taskEvents.workspaceId), eq(tasks.taskKey, taskEvents.taskKey));
     const [owned, linked] = await Promise.all([
       db.select({ accountId: tasks.ownerId, last: max(taskEvents.occurredAt) }).from(taskEvents).innerJoin(tasks, joinTask)

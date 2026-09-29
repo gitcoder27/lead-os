@@ -314,6 +314,11 @@ describe("one-on-one routes: agenda", () => {
 });
 
 describe("one-on-one routes: agenda suggestions", () => {
+  // Collab + dev-1's developer login: the check-in rule (unchanged by P1-03).
+  beforeEach(async () => {
+    await db.insert(configTable).values({ key: "team_mode", value: "collab" });
+  });
+
   it("ranks the developer's blocked, overdue and high-priority tasks and skips agenda items", async () => {
     const headers = { cookie: await cookie("manager-a") };
     const seriesId = (await createSeries()).body.series.id;
@@ -362,6 +367,35 @@ describe("one-on-one routes: agenda suggestions", () => {
     });
     expect((await service.suggestions(seriesId, "default")).checkIn).toBeNull();
     expect((await service.suggestions(seriesId, "default", later)).checkIn).toEqual({ lastCheckInAt: now, days: 6 });
+  });
+});
+
+describe("one-on-one suggestions: manager-touch clock (P1-03)", () => {
+  it("suggests a no-touch topic only after N working days untouched, in solo", async () => {
+    const seriesId = (await createSeries("dev-1")).body.series.id;
+    const now = new Date().toISOString();
+    await db.insert(teamTrackerDays).values({ workspaceId: "default", date: todayIsoDate(), developerAccountId: "dev-1", lastCheckInAt: now, createdAt: now, updatedAt: now });
+
+    // A developer check-in 0 days ago is irrelevant in solo, and so is "never checked in".
+    expect((await service.suggestions(seriesId, "default")).checkIn).toBeNull();
+
+    const later = addDaysIso(todayIsoDate(), 14);
+    expect((await service.suggestions(seriesId, "default", later)).checkIn).toEqual({ lastCheckInAt: null, days: 10, basis: "manager_touch" });
+
+    // A manager-authored task event on the person's work is a touch.
+    // Structural events are `system`-authored with the manager's login (username) as author.
+    await taskService.create({ title: "Review design doc", ownerType: "developer", ownerId: "dev-1" }, { ...manager, accountId: "manager-a" });
+    const touched = await service.suggestions(seriesId, "default", later);
+    expect(touched.checkIn).toEqual({ lastCheckInAt: expect.any(String), days: 10, basis: "manager_touch" });
+    expect(touched.checkIn!.lastCheckInAt! >= now).toBe(true);
+    expect((await service.suggestions(seriesId, "default", addDaysIso(todayIsoDate(), 1))).checkIn).toBeNull();
+  });
+
+  it("uses the touch clock for a non-participating developer in collab", async () => {
+    await db.insert(configTable).values({ key: "team_mode", value: "collab" });
+    const seriesId = (await createSeries("dev-2")).body.series.id;
+    // dev-2 has no developer login: no tracker rows and no touches → no topic, not "never checked in".
+    expect((await service.suggestions(seriesId, "default")).checkIn).toBeNull();
   });
 });
 

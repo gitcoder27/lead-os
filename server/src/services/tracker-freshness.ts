@@ -144,6 +144,7 @@ export function buildSignals(params: {
         staleWithoutCurrentWork,
         statusChangeWithoutFollowUp,
         clock,
+        noCurrentTracked: true,
       },
       risk,
     };
@@ -188,7 +189,22 @@ export function buildSignals(params: {
       workingDaysSinceTouch,
       touchStaleWorkingDays: params.config.touchStaleWorkingDays,
       untouched,
+      noCurrentTracked: noCurrentEnabled,
     },
     risk,
   };
+}
+
+/**
+ * docs/56 P1-03: developer-participation flows (asks, "quiet since standup",
+ * "no check-in today", stale counts) apply only on the check-in clock. A
+ * missing clock (pre-P1-02 payloads) keeps the old behaviour.
+ */
+export function usesCheckIns(signals: TrackerDeveloperSignals | undefined): boolean {
+  return signals?.freshness.clock !== "manager_touch";
+}
+
+/** docs/56 P1-03: "no current work" counts and reasons; absent = tracked. */
+export function tracksNoCurrent(signals: TrackerDeveloperSignals | undefined): boolean {
+  return signals?.freshness.noCurrentTracked !== false;
 }

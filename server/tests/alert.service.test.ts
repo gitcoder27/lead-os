@@ -129,11 +129,15 @@ vi.mock("../src/db/connection", () => ({
 
 describe("AlertService", () => {
   const workloadService = {
-    getIdleDevelopers: vi.fn(async () => [{ accountId: "dev-2", displayName: "Bob", isActive: true }]),
+    getIdleDevelopers: vi.fn(async () => [
+      { accountId: "dev-2", displayName: "Bob", isActive: true, participates: true },
+      { accountId: "dev-3", displayName: "Cara", isActive: true, participates: false },
+    ]),
   } as unknown as WorkloadService;
   const settings = {
     getStaleThresholdHours: vi.fn(async () => 48),
     getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
+    getTeamMode: vi.fn(async () => "collab"),
   };
   const service = new AlertService(workloadService, settings as any);
 
@@ -164,6 +168,7 @@ describe("AlertService", () => {
     const relaxedThresholdService = new AlertService(workloadService, {
       getStaleThresholdHours: vi.fn(async () => 72),
       getJiraSyncScopeMode: vi.fn(async () => "team_assignees"),
+    getTeamMode: vi.fn(async () => "collab"),
     } as any);
 
     const alerts = await relaxedThresholdService.computeAlerts(new Date("2026-03-05T12:00:00.000Z"));
@@ -183,12 +188,23 @@ describe("AlertService", () => {
     const baseQueryService = new AlertService(workloadService, {
       getStaleThresholdHours: vi.fn(async () => 48),
       getJiraSyncScopeMode: vi.fn(async () => "base_query"),
+      getTeamMode: vi.fn(async () => "collab"),
     } as any);
 
     const alerts = await baseQueryService.computeAlerts(new Date("2026-03-05T12:00:00.000Z"));
 
     expect(alerts.some((alert) => alert.issueKey === "PROJ-7")).toBe(true);
     expect(alerts.some((alert) => alert.issueKey === "PROJ-8")).toBe(false);
+  });
+
+  it("raises idle_developer only for participating developers in collab (P1-03)", async () => {
+    const collabAlerts = await service.computeAlerts(new Date("2026-03-05T12:00:00.000Z"));
+    expect(collabAlerts.filter((a) => a.type === "idle_developer").map((a) => a.developerAccountId)).toEqual(["dev-2"]);
+
+    const soloService = new AlertService(workloadService, { ...settings, getTeamMode: vi.fn(async () => "solo") } as any);
+    const soloAlerts = await soloService.computeAlerts(new Date("2026-03-05T12:00:00.000Z"));
+    expect(soloAlerts.some((a) => a.type === "idle_developer")).toBe(false);
+    expect(soloAlerts.some((a) => a.type === "overdue")).toBe(true);
   });
 
   it("passes the computed date into idle-developer detection", async () => {

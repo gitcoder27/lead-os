@@ -106,6 +106,9 @@ describe("TodayService", () => {
     vi.setSystemTime(new Date("2026-03-08T08:30:00.000Z"));
     await resetDatabase();
     await seedDeveloper();
+    // These contracts describe a collab team whose developers check in;
+    // solo / non-participating suppression lives in today.participation.test.ts.
+    await enableCollabParticipation(["dev-1"]);
   });
 
   afterEach(() => {
@@ -113,7 +116,6 @@ describe("TodayService", () => {
   });
 
   it("builds exact ranked action targets across people, work, and manager memory", async () => {
-    await enableCollabParticipation(["dev-1"]);
     await trackerService.updateDay("dev-1", "2026-03-08", { status: "blocked" });
     await seedIssue("AM-1", { dueDate: "2026-03-07" });
     await seedIssue("AM-2", {
@@ -488,8 +490,7 @@ describe("TodayService", () => {
   });
 
   it("stops asking for another check-in once a no-current developer has a same-day check-in", async () => {
-    // Collab: only the developer's own check-in resets their freshness (docs/56 P1-02).
-    await enableCollabParticipation(["dev-1"]);
+    // Only the developer's own check-in resets their freshness (docs/56 P1-02).
     const before = await todayService().getToday("manager-1", "2026-03-08");
     const beforeDeveloperAction = before.actionItems.find((item) => item.target.developerAccountId === "dev-1");
 

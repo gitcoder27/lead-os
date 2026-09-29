@@ -50,6 +50,9 @@ import { IssueService, type TodayIssue } from "./issue.service";
 import { isStaleIssue } from "./issue-rules";
 import { ManagerDeskService } from "./manager-desk.service";
 import { TeamTrackerService } from "./team-tracker.service";
+import { SettingsService } from "./settings.service";
+import { getParticipatingDeveloperIds } from "./developer-participation.service";
+import { tracksNoCurrent, usesCheckIns } from "./tracker-freshness";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { logger } from "../utils/logger";
 import { addDaysToIsoDay, getRhythmState, resolveTimeZone, toZonedIsoDay, zonedTimeToUtc } from "./today-clock";
@@ -164,6 +167,7 @@ export class TodayService {
   private readonly todayCacheTtlMs: number;
   private readonly oneOnOneService?: OneOnOneService;
   private readonly stateService: TodayStateService;
+  private readonly settings = new SettingsService();
 
   constructor(
     private readonly issueService: IssueService,
@@ -299,6 +303,8 @@ export class TodayService {
     const taskKeys = new TaskKeysService();
     const phase3Promise = taskKeys.phase3Enabled(workspaceId).catch(() => false);
     const canonicalPromise = taskKeys.canonicalEnabled(workspaceId).catch(() => false);
+    // docs/56 P1-03: collab-only surfaces (the "Stale check-ins" metric).
+    const teamModePromise = this.settings.getTeamMode(workspaceId).catch(() => "collab" as const);
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult, stateResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
       measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId })),
@@ -322,6 +328,7 @@ export class TodayService {
       measureSource(() => this.loadTodayState(managerAccountId, date, workspaceId, context, phase3Promise)),
     ]);
     const canonical = await canonicalPromise;
+    const collab = (await teamModePromise) === "collab";
     const sourceStatus: TodaySourceStatus = {
       issues: issueResult.status === "fulfilled" ? "ready" : "unavailable",
       team: teamResult.status === "fulfilled" ? "ready" : "unavailable",
@@ -375,7 +382,7 @@ export class TodayService {
     const carryActions = buildDeskCarryForwardActions(deskItems, clock, { canonical });
     const oneOnOneActions = buildOneOnOneActions(oneOnOneSignals);
     const actionItems = rankActionItems([
-      ...buildStandupActions(standup, rhythm, teamBoard),
+      ...buildStandupActions(standup, rhythm, teamBoard, collab),
       ...buildDeveloperActions(teamBoard, clock, openAsks),
       ...buildIssueActions(issues, clock, issueSnapshot.staleThresholdHours),
       ...buildFollowUpActions(followUps, clock),
@@ -399,6 +406,7 @@ export class TodayService {
         activeDefects: issueSnapshot.activeDefects,
         teamSize: teamBoard.summary.total,
         staleCheckIns: teamBoard.summary.stale,
+        showStaleCheckIns: collab,
         dueToday: issueSnapshot.dueToday,
         followUpsDue: followUps.length,
         syncStatus,
@@ -753,6 +761,14 @@ export class TodayService {
   ): Promise<ManagerActionCommandResponse> {
     const { command, date } = request;
     const developerAccountId = requireDeveloperAccountId(command.target, command.kind);
+    // docs/56 P1-03: the ask lands on a My Day only a participating developer sees.
+    const [teamMode, participants] = await Promise.all([
+      this.settings.getTeamMode(workspaceId),
+      getParticipatingDeveloperIds(workspaceId),
+    ]);
+    if (teamMode !== "collab" || !participants.has(developerAccountId)) {
+      throw new HttpError(409, "This person doesn't check in through LeadOS, so there is no one to ask");
+    }
     const existing = await this.stateService.findOpenAsk(managerAccountId, developerAccountId, date, workspaceId);
     if (existing) {
       return commandResponse(command.kind, command.target, { ask: existing, reused: true });
@@ -875,6 +891,8 @@ function buildSummary(params: {
   activeDefects: number;
   teamSize: number;
   staleCheckIns: number;
+  /** docs/56 P1-03: solo workspaces have no check-in metric. */
+  showStaleCheckIns: boolean;
   dueToday: number;
   followUpsDue: number;
   syncStatus?: SyncStatus;
@@ -890,7 +908,7 @@ function buildSummary(params: {
     params.teamAvailable
       ? metric("team", "People", params.teamSize, "on team", "info", target("view", "team"))
       : undefined,
-    params.teamAvailable
+    params.teamAvailable && params.showStaleCheckIns
       ? metric("stale", "Stale check-ins", params.staleCheckIns, "need update", params.staleCheckIns > 0 ? "warning" : "neutral", target("view", "team"))
       : undefined,
     params.issuesAvailable
@@ -956,7 +974,7 @@ function buildDeveloperActions(
       ? `${item.currentItem.jiraKey} ${item.currentItem.title}`
       : item.currentItem?.title ?? "No current work";
     const ask = openAsks.get(item.developer.accountId);
-    const primary = getDeveloperAttentionPrimary(item, clock, day, ask);
+    const primary = getDeveloperAttentionPrimary(item, clock, day, ask, usesCheckIns(item.signals));
     const actionTarget = primary.target;
 
     return action({
@@ -984,6 +1002,7 @@ function getDeveloperAttentionPrimary(
   clock: DayClock,
   day?: TrackerDeveloperDay,
   ask?: TodayCheckInAsk,
+  canAsk = true,
 ): {
   kind: TodayActionCommand["kind"];
   label: string;
@@ -1032,8 +1051,9 @@ function getDeveloperAttentionPrimary(
       kind: "add_check_in",
       label: "Add check-in",
       target: currentTarget,
-      // docs/53 F15: asking is usually the real move; hidden while an ask is open.
-      secondaryKinds: ask ? ["capture_follow_up", "open"] : ["ask_check_in", "capture_follow_up", "open"],
+      // docs/53 F15: asking is usually the real move; hidden while an ask is
+      // open, and never offered to someone who doesn't check in (P1-03).
+      secondaryKinds: ask || !canAsk ? ["capture_follow_up", "open"] : ["ask_check_in", "capture_follow_up", "open"],
     };
   }
 
@@ -1050,6 +1070,7 @@ function getDeveloperPulsePrimary(
   attentionItem: TrackerAttentionItem | undefined,
   clock: DayClock,
   ask?: TodayCheckInAsk,
+  canAsk = true,
 ): {
   kind: TodayActionCommand["kind"];
   label: string;
@@ -1098,7 +1119,7 @@ function getDeveloperPulsePrimary(
       kind: "add_check_in",
       label: "Check-in",
       target: openTarget,
-      secondaryKinds: ask ? ["capture_follow_up", "open"] : ["ask_check_in", "capture_follow_up", "open"],
+      secondaryKinds: ask || !canAsk ? ["capture_follow_up", "open"] : ["ask_check_in", "capture_follow_up", "open"],
     };
   }
 
@@ -1398,7 +1419,7 @@ function buildTeamPulse(
   const attentionByDeveloper = new Map(board.attentionQueue.map((item) => [item.developer.accountId, item]));
 
   return board.developers
-    .filter((day) => attentionByDeveloper.has(day.developer.accountId) || day.isStale || !day.currentItem)
+    .filter((day) => attentionByDeveloper.has(day.developer.accountId) || day.isStale || (!day.currentItem && tracksNoCurrent(day.signals)))
     .sort((left, right) => {
       const leftAttention = attentionByDeveloper.get(left.developer.accountId);
       const rightAttention = attentionByDeveloper.get(right.developer.accountId);
@@ -1417,7 +1438,7 @@ function buildTeamPulse(
         },
       });
       const ask = openAsks.get(day.developer.accountId);
-      const primary = getDeveloperPulsePrimary(day, attentionItem, clock, ask);
+      const primary = getDeveloperPulsePrimary(day, attentionItem, clock, ask, usesCheckIns(day.signals));
 
       return {
         accountId: day.developer.accountId,
@@ -1928,8 +1949,11 @@ function unansweredAsks(asks: TodayCheckInAsk[], board: TeamTrackerAttentionSnap
   const open = new Map<string, TodayCheckInAsk>();
   for (const ask of asks) {
     if (open.has(ask.developerAccountId)) continue;
+    // docs/56 P1-03: nobody will answer an ask to someone who doesn't check in.
+    const day = dayByDeveloper.get(ask.developerAccountId);
+    if (day && !usesCheckIns(day.signals)) continue;
     const askedMs = Date.parse(ask.askedAt);
-    const answered = (dayByDeveloper.get(ask.developerAccountId)?.checkIns ?? []).some((checkIn) =>
+    const answered = (day?.checkIns ?? []).some((checkIn) =>
       checkIn.authorType === "developer" && Date.parse(checkIn.createdAt) > askedMs,
     );
     if (!answered) open.set(ask.developerAccountId, ask);
@@ -2009,13 +2033,14 @@ function buildStandupActions(
   standup: TodayStandupFocus | undefined,
   rhythm: TodayRhythmState,
   board: TeamTrackerAttentionSnapshot,
+  collab = true,
 ): TodayActionItem[] {
   if (!standup || standup.status !== "not_started" || board.summary.total === 0) return [];
   if (rhythm.stage !== "morning_plan" && rhythm.stage !== "standup_window") return [];
   const inWindow = rhythm.stage === "standup_window";
   const signals = [
     board.summary.blocked ? `${board.summary.blocked} blocked` : undefined,
-    board.summary.stale ? `${board.summary.stale} stale` : undefined,
+    collab && board.summary.stale ? `${board.summary.stale} stale` : undefined,
   ].filter(Boolean);
   return [
     action({
@@ -2084,7 +2109,7 @@ function buildFocus(params: {
         .map((item) => buildPromiseItem(item, clock));
       const anchorMs = standup?.endedAt ? Date.parse(standup.endedAt) : zonedTimeToUtc(clock.date, 0, 0, clock.tz).getTime();
       const silentSinceStandup = activeDays
-        .filter((day) => day.status !== "done_for_today")
+        .filter((day) => day.status !== "done_for_today" && usesCheckIns(day.signals))
         .filter((day) => !day.lastCheckInAt || Date.parse(day.lastCheckInAt) < anchorMs)
         .map((day) => focusPerson(day, clock.date, params.openAsks));
       return {
@@ -2095,7 +2120,7 @@ function buildFocus(params: {
     case "wrap_up": {
       const tomorrow = addDaysToIsoDay(clock.date, 1);
       const missingCheckIns = activeDays
-        .filter((day) => !hasTrackerCheckInForDate(day, day.lastCheckInAt, clock))
+        .filter((day) => usesCheckIns(day.signals) && !hasTrackerCheckInForDate(day, day.lastCheckInAt, clock))
         .map((day) => focusPerson(day, clock.date, params.openAsks));
       // EOD carry targets tomorrow, not today.
       const carryCandidates = params.carryActions.map((item) => ({

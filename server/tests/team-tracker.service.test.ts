@@ -1885,7 +1885,22 @@ describe("TeamTrackerService", () => {
   });
 
   describe("summary computation", () => {
+    it("counts no-current people only where no-current is tracked (P1-03)", async () => {
+      await service.updateDay("dev-1", "2026-03-07", { status: "blocked" });
+      const solo = await service.getBoard("2026-03-07");
+      expect(solo.summary.noCurrent).toBe(0);
+      expect(solo.summary.stale).toBe(0);
+      expect(solo.summary.blocked).toBe(1);
+      expect(solo.attentionQueue.flatMap((item) => item.reasons.map((reason) => reason.code))).not.toContain("no_current");
+      const filtered = await service.getBoard("2026-03-07", { query: { summaryFilter: "no_current" } });
+      expect(filtered.developers).toHaveLength(0);
+
+      await db.insert(configTable).values({ key: "team_tracker_solo_no_current_enabled", value: "true" });
+      expect((await service.getBoard("2026-03-07")).summary.noCurrent).toBe(2);
+    });
+
     it("computes correct summary counts", async () => {
+      await enableCollabParticipation(["dev-1", "dev-2"]);
       await service.updateDay("dev-1", "2026-03-07", { status: "blocked" });
       await service.updateDay("dev-2", "2026-03-07", { status: "at_risk" });
 

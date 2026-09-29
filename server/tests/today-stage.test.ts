@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import { configTable, developers, issues, standupSessions, todayCheckInAsks, todayVisits } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -124,6 +125,8 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     vi.setSystemTime(new Date("2026-03-08T04:00:00.000Z")); // 09:30 IST
     await resetDatabase();
     await seedDeveloper();
+    // Collab team with check-ins; see today.participation.test.ts for solo.
+    await enableCollabParticipation(["dev-1"]);
   });
 
   afterEach(() => {

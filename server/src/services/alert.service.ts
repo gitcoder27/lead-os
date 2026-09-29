@@ -118,7 +118,11 @@ export class AlertService {
       }
     }
 
-    const idleDevelopers = await this.workloadService.getIdleDevelopers(today, normalizedWorkspaceId);
+    // docs/56 P1-03: "no planned work" is a participation signal — only for
+    // developers who plan their own day (collab + active developer login).
+    const idleDevelopers = (await this.settings.getTeamMode(normalizedWorkspaceId)) === "collab"
+      ? (await this.workloadService.getIdleDevelopers(today, normalizedWorkspaceId)).filter((dev) => dev.participates)
+      : [];
     for (const dev of idleDevelopers) {
       alerts.push({
         id: `idle_developer:${dev.accountId}`,

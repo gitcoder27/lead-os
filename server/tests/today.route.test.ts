@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import { checkinTaskRefs, configTable, developers } from "../src/db/schema";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { IssueService } from "../src/services/issue.service";
@@ -50,6 +51,9 @@ async function managerSession() {
     password: "secret123",
     role: "manager",
   });
+  // Collab team with check-ins (after the manager: the first account must be
+  // a manager); see today.participation.test.ts for solo.
+  await enableCollabParticipation(["dev-1"], user.workspaceId);
   const session = await authService.authenticate("manager", "secret123");
   return {
     cookie: serializeSessionCookie(session.sessionId),

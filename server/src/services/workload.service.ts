@@ -18,22 +18,12 @@ const PRIORITY_WEIGHTS: Record<string, number> = {
   Lowest: 0.5,
 };
 
-const TRACKER_STALE_HOURS = 4;
 const ACTIVE_TRACKER_STATUSES = new Set([
   "on_track",
   "at_risk",
   "waiting",
   undefined,
 ]);
-
-function isTrackerStale(lastCheckInAt: string | null, now = new Date()): boolean {
-  if (!lastCheckInAt) {
-    return true;
-  }
-
-  const diff = now.getTime() - new Date(lastCheckInAt).getTime();
-  return diff > TRACKER_STALE_HOURS * 60 * 60 * 1000;
-}
 
 function getTrackerAvailabilityRank(status?: DeveloperWorkload["trackerStatus"]): number {
   if (ACTIVE_TRACKER_STATUSES.has(status)) {
@@ -103,8 +93,13 @@ export class WorkloadService {
     const devs = (await this.getDevelopers(date, normalizedWorkspaceId)).filter(
       (developer) => developer.availability?.state !== "inactive"
     );
+    const tracker = new TeamTrackerService();
     const canonicalDays = await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)
-      ? (await new TeamTrackerService().getBoard(date, { workspaceId: normalizedWorkspaceId })).developers : undefined;
+      ? (await tracker.getBoard(date, { workspaceId: normalizedWorkspaceId })).developers : undefined;
+    // docs/56 P1-03: the tracker's mode-aware clock (P1-02), not a local 4h copy.
+    const freshness = canonicalDays
+      ? new Map(canonicalDays.map((day) => [day.developer.accountId, day.signals.freshness]))
+      : await tracker.getFreshnessByDeveloper(date, devs.map((dev) => dev.accountId), normalizedWorkspaceId);
     const issueRows = await db.select().from(issues).where(eq(issues.workspaceId, normalizedWorkspaceId));
     const dayRows = await db
       .select()
@@ -162,7 +157,7 @@ export class WorkloadService {
         completedTodayCount,
         droppedTodayCount,
         trackerStatus: trackerDay?.status as DeveloperWorkload["trackerStatus"],
-        isTrackerStale: trackerDay ? isTrackerStale(trackerDay.lastCheckInAt) : false,
+        isTrackerStale: trackerDay ? freshness.get(dev.accountId)?.staleByTime ?? false : false,
         hasCurrentItem,
         signals: {
           idle,

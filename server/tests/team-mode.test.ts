@@ -151,6 +151,8 @@ describe("developer participation", () => {
   });
 
   it("sets participates on board developers, developer days, and the Today pulse", async () => {
+    // Collab keeps no-current people in the pulse (P1-03 drops them in solo).
+    await db.insert(configTable).values({ key: TEAM_MODE_KEY, value: "collab" });
     const tracker = new TeamTrackerService();
     const board = await tracker.getBoard("2026-03-08");
     const byId = new Map(board.developers.map((day) => [day.developer.accountId, day]));

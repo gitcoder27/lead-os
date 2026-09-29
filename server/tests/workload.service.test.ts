@@ -1,4 +1,12 @@
 vi.mock("../src/services/task-keys.service", () => ({ TaskKeysService: class { async canonicalEnabled() { return false; } } }));
+// docs/56 P1-03: staleness comes from the tracker's mode-aware clock.
+vi.mock("../src/services/team-tracker.service", () => ({
+  TeamTrackerService: class {
+    async getFreshnessByDeveloper(_date: string, accountIds: string[]) {
+      return new Map(accountIds.map((accountId) => [accountId, { clock: accountId === "dev-2" ? "manager_touch" : "check_in", staleByTime: accountId === "dev-1" }]));
+    }
+  },
+}));
 import { describe, expect, it, vi } from "vitest";
 import { WorkloadService } from "../src/services/workload.service";
 
@@ -126,6 +134,17 @@ describe("WorkloadService", () => {
     expect(team.find((entry) => entry.developer.accountId === "dev-4")?.signals?.idle).toBe(true);
     expect(team.find((entry) => entry.developer.accountId === "dev-5")?.signals?.idle).toBe(false);
     expect(team.find((entry) => entry.developer.accountId === "dev-4")?.signals?.backlogTrackerMismatch).toBe(true);
+  });
+
+  it("takes isTrackerStale from the tracker's mode-aware clock, not a local 4h rule (P1-03)", async () => {
+    const team = await new WorkloadService().getTeamWorkload("2026-03-09");
+    const stale = (accountId: string) => team.find((entry) => entry.developer.accountId === accountId)?.isTrackerStale;
+    expect(stale("dev-1")).toBe(true);
+    // Same 08:00 check-in as dev-1, but on the manager-touch clock: never check-in stale.
+    expect(stale("dev-2")).toBe(false);
+    expect(stale("dev-3")).toBe(false);
+    // No tracker row today: unchanged, not stale.
+    expect(stale("dev-4")).toBe(false);
   });
 
   it("returns idle developers and ranked suggestions using service methods", async () => {

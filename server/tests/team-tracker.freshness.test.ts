@@ -5,6 +5,7 @@ import { MyDayService } from "../src/services/my-day.service";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
 import {
+  appUsers,
   configTable,
   developers,
   oneOnOneSeries,
@@ -48,7 +49,7 @@ async function seedTask(taskKey: string, ownerId: string | null, ownerType: "dev
   return row!;
 }
 
-async function seedEvent(task: { id: number; taskKey: string }, occurredAt: string, authorType: "manager" | "developer" | "system" = "manager") {
+async function seedEvent(task: { id: number; taskKey: string }, occurredAt: string, authorType: "manager" | "developer" | "system" = "manager", authorId?: string) {
   await db.insert(taskEvents).values({
     taskKey: task.taskKey,
     taskId: task.id,
@@ -56,7 +57,7 @@ async function seedEvent(task: { id: number; taskKey: string }, occurredAt: stri
     body: "note",
     visibility: "shared",
     authorType,
-    authorId: authorType === "manager" ? "manager-1" : "dev-1",
+    authorId: authorId ?? (authorType === "manager" ? "manager-1" : "dev-1"),
     occurredAt,
     createdAt: occurredAt,
   });
@@ -161,19 +162,22 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
     });
 
     it("never flags check-in staleness or no_current by default", async () => {
-      vi.setSystemTime(at(MONDAY, "20:00:00.000Z"));
+      // Midday UTC keeps MONDAY "live" in any server TZ within ±11h.
+      vi.setSystemTime(at(MONDAY, "12:00:00.000Z"));
       const board = await service.getBoard(MONDAY);
       const day = board.developers.find((entry) => entry.developer.accountId === "dev-1")!;
       expect(day.signals.freshness.clock).toBe("manager_touch");
       expect(day.signals.freshness.staleByTime).toBe(false);
       expect(day.signals.freshness.staleWithoutCurrentWork).toBe(false);
+      expect(board.viewMode).toBe("live");
       expect(board.summary.stale).toBe(0);
+      expect(board.summary.noCurrent).toBe(0);
       expect(board.attentionQueue.find((item) => item.developer.accountId === "dev-1")).toBeUndefined();
     });
 
     it("honours the solo no_current opt-in", async () => {
       await db.insert(configTable).values({ key: "team_tracker_solo_no_current_enabled", value: "true" });
-      vi.setSystemTime(at(MONDAY, "20:00:00.000Z"));
+      vi.setSystemTime(at(MONDAY, "12:00:00.000Z"));
       expect((await boardDay(MONDAY, "dev-1")).signals.freshness.staleWithoutCurrentWork).toBe(true);
     });
 
@@ -257,6 +261,14 @@ describe("TeamTrackerService freshness by mode (P1-02)", () => {
 
       await seedEvent(owned, at("2026-03-03").toISOString());
       expect(await touchedAt()).toBe(at("2026-03-03").toISOString());
+
+      // Structural events are `system` with the acting login as author: a
+      // manager login counts, anyone else doesn't.
+      await db.insert(appUsers).values({ username: "boss", displayName: "Boss", passwordHash: "x", role: "manager", createdAt: at(MONDAY).toISOString(), updatedAt: at(MONDAY).toISOString() });
+      await seedEvent(owned, at("2026-03-03", "15:00:00.000Z").toISOString(), "system", "not-a-manager");
+      expect(await touchedAt()).toBe(at("2026-03-03").toISOString());
+      await seedEvent(owned, at("2026-03-03", "16:00:00.000Z").toISOString(), "system", "boss");
+      expect(await touchedAt()).toBe(at("2026-03-03", "16:00:00.000Z").toISOString());
 
       await seedEvent(linked, at("2026-03-04").toISOString());
       expect(await touchedAt()).toBe(at("2026-03-04").toISOString());

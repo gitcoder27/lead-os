@@ -169,7 +169,9 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
   const severity = overdue ? worstOverdueTone(group.tasks, today) : null;
   const tone = severity
     ? `var(--${severity})`
-    : context.mode === 'scheduled' && context.bucket === 'Today' ? 'var(--accent)' : undefined;
+    : context.mode === 'scheduled' && context.bucket === 'Today' ? 'var(--accent)'
+      : context.mode === 'meeting' && context.bucket === 'Today' ? 'var(--accent)'
+        : context.mode === 'meeting' && context.bucket === 'Needs outcome' ? 'var(--warning)' : undefined;
   const movable = overdue ? group.tasks.filter((task) => !task.lingering) : [];
   const count = group.count ?? group.tasks.length;
 

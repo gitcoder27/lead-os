@@ -31,6 +31,8 @@ import {
   taskViewParamsFromState,
   taskViewStateFromParams,
   taskParty,
+  meetingBucket,
+  MEETING_GROUP_ORDER,
 } from '@/lib/task-views';
 import { taskLane, type TaskLaneInput } from 'shared/types';
 
@@ -199,9 +201,10 @@ describe('URL contract (docs/49 §9, D6)', () => {
     }
     expect(taskViewStateFromParams(new URLSearchParams('view=blocked&status=open')).overrides).toEqual({ status: ['open'] });
     expect(taskViewStateFromParams(new URLSearchParams('view=jira-drift'))).toEqual({ view: 'attention', overrides: { signal: ['drift'] } });
-    // docs/51 F4/F18: Upcoming resolves to My tasks; meetings still lands via kind.
+    // docs/51 F4/F18: Upcoming resolves to My tasks. docs/57 P3-06: `meetings` is a real built-in view now.
     expect(taskViewStateFromParams(new URLSearchParams('view=upcoming'))).toEqual({ view: 'my-tasks', overrides: {} });
-    expect(taskViewStateFromParams(new URLSearchParams('view=meetings'))).toEqual({ view: 'my-tasks', overrides: { kind: 'meeting' } });
+    expect(taskViewStateFromParams(new URLSearchParams('view=meetings'))).toEqual({ view: 'meetings', overrides: {} });
+    expect(taskViewStateFromParams(new URLSearchParams('view=follow-ups'))).toEqual({ view: 'waiting', overrides: {} });
   });
 
   it('applies overrides onto a definition', () => {
@@ -449,5 +452,52 @@ describe('inline add as capture defaults (docs/57 P3-05)', () => {
 
   it('a Later view never asks for a developer owner or a date together with later', () => {
     expect(inlineCaptureDefaults('later', { filters: { later: true, owner: ['dev-1'] } }, { mode: 'none' }, TODAY)).toEqual({ ownerAccountId: 'dev-1' });
+  });
+});
+
+describe('Meetings lens grouping (docs/57 §4, P3-06)', () => {
+  const at = (overrides: Partial<ManagerTask>) => task({ kind: 'meeting', ...overrides });
+  const ownerName = () => 'Me';
+
+  it.each([
+    ['today', { scheduledOn: TODAY }, 'Today'],
+    ['a future day', { scheduledOn: '2026-09-30' }, 'Upcoming'],
+    ['yesterday, no outcome', { scheduledOn: '2026-09-25' }, 'Needs outcome'],
+    ['long past, no outcome', { scheduledOn: '2026-08-01' }, 'Needs outcome'],
+    ['undated', { scheduledOn: null }, 'Upcoming'],
+    ['past with an outcome', { scheduledOn: '2026-09-20', outcome: 'Agreed' }, 'Recent'],
+    ['past with a blank outcome', { scheduledOn: '2026-09-20', outcome: '   ' }, 'Needs outcome'],
+    ['done', { scheduledOn: TODAY, status: 'done' }, 'Recent'],
+    ['dropped', { scheduledOn: '2026-09-30', status: 'dropped' }, 'Recent'],
+    ['a future meeting that already has an outcome', { scheduledOn: '2026-09-30', outcome: 'Cancelled — decided by email' }, 'Recent'],
+  ] as const)('%s → %s', (_name, overrides, bucket) => {
+    expect(meetingBucket(at(overrides as Partial<ManagerTask>), TODAY)).toBe(bucket);
+  });
+
+  it('the start time decides the day when there is one', () => {
+    // Scheduled for the 30th but the meeting moved to yesterday evening (local time).
+    const started = new Date(2026, 8, 25, 18, 0).toISOString();
+    expect(meetingBucket(at({ scheduledOn: '2026-09-30', startsAt: started }), TODAY)).toBe('Needs outcome');
+    const tomorrow = new Date(2026, 8, 27, 9, 0).toISOString();
+    expect(meetingBucket(at({ scheduledOn: null, startsAt: tomorrow }), TODAY)).toBe('Upcoming');
+  });
+
+  it('groups in the fixed order and drops empty buckets', () => {
+    const rows = [
+      at({ id: 1, taskKey: 'T-1', scheduledOn: '2026-09-20', outcome: 'Done deal' }),
+      at({ id: 2, taskKey: 'T-2', scheduledOn: '2026-09-24' }),
+      at({ id: 3, taskKey: 'T-3', scheduledOn: TODAY }),
+    ];
+    const groups = groupTaskViewTasks(rows, 'meeting', TODAY, ownerName);
+    expect(groups.map((group) => group.label)).toEqual(['Today', 'Needs outcome', 'Recent']);
+    expect(MEETING_GROUP_ORDER).toEqual(['Today', 'Upcoming', 'Needs outcome', 'Recent']);
+    expect(groups[1]!.context).toEqual({ mode: 'meeting', bucket: 'Needs outcome' });
+  });
+
+  it('inline add under a bucket lands on that bucket\'s day', () => {
+    const view = { filters: { kind: 'meeting' as const, withClosed: { from: '2026-09-13' } } };
+    expect(inlineAddDefaults('meetings', view, { mode: 'meeting', bucket: 'Today' }, TODAY)).toMatchObject({ kind: 'meeting', scheduledOn: TODAY });
+    expect(inlineAddDefaults('meetings', view, { mode: 'meeting', bucket: 'Upcoming' }, TODAY)).toMatchObject({ kind: 'meeting', scheduledOn: '2026-09-27' });
+    expect(inlineAddDefaults('meetings', view, { mode: 'meeting', bucket: 'Needs outcome' }, TODAY)).toMatchObject({ scheduledOn: TODAY });
   });
 });

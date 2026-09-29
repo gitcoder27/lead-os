@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import App from '@/App';
+import App, { legacyTaskViewRedirect } from '@/App';
 import { ApiRequestError } from '@/lib/api';
 import type { TaskResolution } from '@/types';
 
@@ -109,10 +109,6 @@ vi.mock('@/components/my-day/LoginPage', () => ({
 
 vi.mock('@/components/manager-desk', () => ({
   ManagerDeskPage: () => <div>Desk loaded</div>,
-}));
-
-vi.mock('@/components/manager-memory', () => ({
-  ManagerMemoryPage: ({ mode }: { mode: 'follow-ups' | 'meetings' }) => <div>{mode === 'follow-ups' ? 'Follow-ups loaded' : 'Meetings loaded'}</div>,
 }));
 
 vi.mock('@/components/notes/NotesPage', () => ({
@@ -328,26 +324,109 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/desk');
   });
 
-  it('renders follow-ups and meetings as manager memory routes', async () => {
-    useAuthMock.mockReturnValue({
-      user: { role: 'manager' },
-      isLoading: false,
-      isAuthenticated: true,
-      login: vi.fn(),
-      logout: vi.fn(),
-      refreshSession: vi.fn(),
+  describe('retired Follow-ups and Meetings routes (docs/57 P3-06)', () => {
+    const asManager = (features: { tasksPhase3?: boolean } = { tasksPhase3: true }) =>
+      useAuthMock.mockReturnValue({
+        user: { role: 'manager' },
+        features,
+        isLoading: false,
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+        refreshSession: vi.fn(),
+      });
+
+    it.each([
+      ['/follow-ups', 'waiting'],
+      ['/follow-ups/', 'waiting'],
+      ['/followups', 'waiting'],
+      ['/followups/', 'waiting'],
+      ['/meetings', 'meetings'],
+      ['/meetings/', 'meetings'],
+      ['/meeting', 'meetings'],
+      ['/meeting/', 'meetings'],
+    ])('%s redirects to the %s view of Tasks', async (path, view) => {
+      asManager();
+      window.history.pushState(null, '', path);
+      render(<App />);
+      expect(await screen.findByText('Tasks loaded')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/tasks');
+      expect(new URLSearchParams(window.location.search).get('view')).toBe(view);
     });
 
-    window.history.pushState(null, '', '/follow-ups');
-    const { unmount } = render(<App />);
-    expect(await screen.findByText('Follow-ups loaded')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/follow-ups');
-    unmount();
+    it('keeps the rest of the query string and replaces history instead of adding to it', async () => {
+      asManager();
+      window.history.pushState(null, '', '/follow-ups?q=vendor&view=stale');
+      const lengthBefore = window.history.length;
+      render(<App />);
+      expect(await screen.findByText('Tasks loaded')).toBeInTheDocument();
+      expect(window.location.search).toBe('?q=vendor&view=waiting');
+      expect(window.history.length).toBe(lengthBefore);
+    });
 
-    window.history.pushState(null, '', '/meeting');
-    render(<App />);
-    expect(await screen.findByText('Meetings loaded')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/meetings');
+    it('a workspace without Phase 3 lands on the desk instead of a missing page', async () => {
+      asManager({ tasksPhase3: false });
+      window.history.pushState(null, '', '/meetings');
+      render(<App />);
+      expect(await screen.findByText('Desk loaded')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/desk');
+    });
+
+    it('redirects on back/forward navigation too', async () => {
+      asManager();
+      render(<App />);
+      expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+      act(() => {
+        window.history.pushState(null, '', '/follow-ups');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      expect(await screen.findByText('Tasks loaded')).toBeInTheDocument();
+      expect(window.location.pathname + window.location.search).toBe('/tasks?view=waiting');
+    });
+
+    it('opens the matching Tasks view for a stale follow-ups or meetings target', async () => {
+      asManager();
+      render(<App />);
+      expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+      const open = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as (target: import('@/types').TodayActionTarget) => void;
+
+      act(() => open({ type: 'view', view: 'follow-ups' }));
+      expect(await screen.findByText('Tasks loaded')).toBeInTheDocument();
+      expect(window.location.pathname + window.location.search).toBe('/tasks?view=waiting');
+
+      act(() => open({ type: 'view', view: 'meetings' }));
+      await waitFor(() => expect(window.location.search).toBe('?view=meetings'));
+    });
+
+    it('opens the Tasks view a Today row names, and the drawer when it also names a task', async () => {
+      asManager();
+      render(<App />);
+      expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+      const open = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as (target: import('@/types').TodayActionTarget) => void;
+
+      act(() => open({ type: 'view', view: 'tasks', taskView: 'inbox' }));
+      await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/tasks?view=inbox'));
+
+      act(() => open({ type: 'follow_up', view: 'tasks', taskView: 'waiting', taskKey: 'T-9' }));
+      expect(await screen.findByRole('dialog', { name: 'Task T-9' })).toBeInTheDocument();
+      expect(window.location.search).toBe('?view=inbox');
+    });
+  });
+
+  describe('legacyTaskViewRedirect', () => {
+    it.each([
+      ['/follow-ups', '', '/tasks?view=waiting'],
+      ['/followups/', '', '/tasks?view=waiting'],
+      ['/meetings', '?date=2026-09-30', '/tasks?date=2026-09-30&view=meetings'],
+      ['/meeting/', '', '/tasks?view=meetings'],
+      ['/follow-ups', '?view=meetings', '/tasks?view=waiting'],
+    ])('%s%s → %s', (path, search, expected) => {
+      expect(legacyTaskViewRedirect(path, search)).toBe(expected);
+    });
+
+    it.each(['/', '/tasks', '/desk', '/notes', '/follow-ups-archive', '/meetings/2026', '/t/T-5'])('leaves %s alone', (path) => {
+      expect(legacyTaskViewRedirect(path, '?view=waiting')).toBeNull();
+    });
   });
 
   it('renders the Notes workspace for authenticated managers on /notes', async () => {

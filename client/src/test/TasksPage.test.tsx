@@ -97,6 +97,7 @@ const BUILTIN_VIEWS: TaskViewMeta[] = [
   { id: 'inbox', name: 'Inbox', builtin: true, section: 'plan', definition: { filters: { owner: 'inbox', status: ['open'] }, sort: 'created' } },
   { id: 'my-tasks', name: 'My tasks', builtin: true, section: 'plan', definition: { filters: { owner: 'me', later: false }, sort: 'scheduled', group: 'scheduled' } },
   { id: 'waiting', name: 'Waiting on others', builtin: true, section: 'plan', definition: { filters: { waiting: true, later: false, status: [...OPENISH] }, sort: 'updated', group: 'owner' } },
+  { id: 'meetings', name: 'Meetings', builtin: true, section: 'plan', definition: { filters: { kind: 'meeting', withClosed: { from: '2026-09-13' } }, sort: 'scheduled', group: 'meeting' } },
   { id: 'attention', name: 'Needs attention', builtin: true, section: 'review', definition: { filters: { attention: ['overdue', 'stale', 'drift'], later: false }, sort: 'scheduled' } },
 ];
 
@@ -206,10 +207,15 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     expect(lastDefinition()).toEqual(BUILTIN_VIEWS[2]!.definition);
   });
 
-  it('keeps the meetings alias working through the kind URL param (docs/51 F18)', () => {
+  it('opens the built-in Meetings view, and keeps the kind URL param working (docs/51 F18, docs/57 P3-06)', () => {
     window.history.replaceState(null, '', '/tasks?view=meetings');
+    const { unmount } = render(<TasksPage />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Meetings' })).toBeTruthy();
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS.find((view) => view.id === 'meetings')!.definition);
+    unmount();
+
+    window.history.replaceState(null, '', '/tasks?view=my-tasks&kind=meeting');
     render(<TasksPage />);
-    expect(screen.getByRole('heading', { level: 1, name: 'My tasks' })).toBeTruthy();
     expect(lastDefinition().filters.kind).toBe('meeting');
   });
 
@@ -613,6 +619,74 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.queryByRole('listbox', { name: 'Label suggestions' })).toBeNull();
     expect(screen.getByLabelText('New task in Today')).toBeTruthy();
+  });
+
+  describe('Meetings view (docs/57 P3-06)', () => {
+    const meeting = (overrides: Partial<TaskViewTask>) => task({ kind: 'meeting', scheduledOn: null, ...overrides });
+    const openMeetings = (rows: TaskViewTask[]) => {
+      window.history.replaceState(null, '', '/tasks?view=meetings');
+      mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => definition?.filters?.closed ? tasksResult([]) : tasksResult(rows));
+    };
+
+    it('groups Today / Upcoming / Needs outcome / Recent, and never lanes a past meeting as Upcoming', () => {
+      openMeetings([
+        meeting({ id: 10, taskKey: 'T-10', title: 'Standup sync', scheduledOn: TODAY }),
+        meeting({ id: 11, taskKey: 'T-11', title: 'Roadmap review', scheduledOn: '2026-09-30' }),
+        meeting({ id: 12, taskKey: 'T-12', title: 'Last week retro', scheduledOn: '2026-09-21' }),
+        meeting({ id: 13, taskKey: 'T-13', title: 'Vendor call', scheduledOn: '2026-09-22', status: 'done', closedAt: '2026-09-22T10:00:00Z' }),
+        meeting({ id: 14, taskKey: 'T-14', title: 'Board prep', scheduledOn: '2026-09-23', outcome: 'Agreed on scope' }),
+      ]);
+      render(<TasksPage />);
+
+      const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+      expect(headings).toEqual(['Today', 'Upcoming', 'Needs outcome', 'Recent']);
+      const inGroup = (label: string) => within(screen.getByRole('listbox', { name: label })).getAllByRole('option').map((option) => option.getAttribute('data-task-row'));
+      expect(inGroup('Today')).toEqual(['T-10']);
+      expect(inGroup('Upcoming')).toEqual(['T-11']);
+      expect(inGroup('Needs outcome')).toEqual(['T-12']);
+      expect(inGroup('Recent')).toEqual(['T-13', 'T-14']);
+    });
+
+    it('shows how many action items are done, and says so to screen readers', () => {
+      openMeetings([
+        meeting({ id: 10, taskKey: 'T-10', title: 'Design review', scheduledOn: TODAY, signals: { ...NO_SIGNALS, actions: { done: 2, total: 3 } } }),
+        meeting({ id: 11, taskKey: 'T-11', title: 'No actions yet', scheduledOn: TODAY, signals: { ...NO_SIGNALS, actions: { done: 0, total: 0 } } }),
+      ]);
+      render(<TasksPage />);
+
+      expect(within(row('T-10')).getByTestId('meeting-actions')).toHaveTextContent('2/3 actions');
+      expect(row('T-10').getAttribute('aria-label')).toContain('2/3 actions');
+      expect(within(row('T-11')).queryByTestId('meeting-actions')).toBeNull();
+    });
+
+    it('a plain task never shows an action tally', () => {
+      window.history.replaceState(null, '', '/tasks?view=my-tasks');
+      render(<TasksPage />);
+      expect(screen.queryByTestId('meeting-actions')).toBeNull();
+    });
+
+    it('g then e jumps to Meetings', () => {
+      render(<TasksPage />);
+      press('g');
+      press('e');
+      expect(screen.getByRole('heading', { level: 1, name: 'Meetings' })).toBeTruthy();
+    });
+
+    it('adds under a group with the meeting kind and that group\'s day', async () => {
+      openMeetings([meeting({ id: 11, taskKey: 'T-11', title: 'Roadmap review', scheduledOn: '2026-09-30' })]);
+      render(<TasksPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'Add task to Upcoming' }));
+      const input = screen.getByLabelText('New task in Upcoming');
+      fireEvent.change(input, { target: { value: 'Planning sync' } });
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockCreate).toHaveBeenCalledWith({ text: 'Planning sync', defaults: { kind: 'meeting', scheduledOn: '2026-09-27' } });
+    });
+
+    it('an empty Meetings view says how to capture one', () => {
+      openMeetings([]);
+      render(<TasksPage />);
+      expect(screen.getByText(/No meetings/)).toBeTruthy();
+    });
   });
 
   it('n opens the standalone add row on an empty view (docs/51 F14)', async () => {

@@ -5,6 +5,7 @@ import {
   buildQuickActions,
   buildQuickAddItem,
   buildResultGroups,
+  buildTaskViewCommands,
   checkInToPaletteItem,
   deskItemToPaletteItem,
   developerToPaletteItem,
@@ -204,8 +205,8 @@ describe('palette commands', () => {
     const navigation = buildNavigationCommands();
     const commands = [...navigation, ...buildQuickActions()];
 
-    expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(8);
-    expect(navigation.filter((command) => command.target).length).toBe(7);
+    expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(6);
+    expect(navigation.filter((command) => command.target).length).toBe(5);
     expect(commands.some((command) => command.actionId === 'capture')).toBe(true);
     expect(commands.some((command) => command.actionId === 'capture-note')).toBe(true);
     expect(commands.some((command) => command.actionId === 'sync')).toBe(true);
@@ -214,8 +215,6 @@ describe('palette commands', () => {
       'work',
       'team',
       'desk',
-      'follow-ups',
-      'meetings',
       'notes',
       'settings',
     ]);
@@ -229,7 +228,7 @@ describe('palette commands', () => {
       'nav-work',
       'nav-settings',
     ]);
-    expect(filterCommands(commands, 'follow ups')).toEqual([commands.find((command) => command.id === 'nav-follow-ups')]);
+    expect(filterCommands([...buildNavigationCommands({ tasksPhase3: true }), ...buildQuickActions()], 'delegated').map((command) => command.id)).toEqual(['nav-waiting']);
     expect(filterCommands(commands, 'zzz')).toEqual([]);
   });
 
@@ -336,3 +335,38 @@ describe('exact task-key pinning', () => {
   });
 });
 
+describe('Waiting and Meetings are Tasks views (docs/57 P3-06)', () => {
+  it('has Go to Waiting and Go to Meetings under Phase 3, opening the Tasks lenses', () => {
+    const commands = buildNavigationCommands({ tasksPhase3: true });
+    expect(commands.find((command) => command.id === 'nav-waiting')).toMatchObject({ title: 'Go to Waiting', href: '/tasks?view=waiting' });
+    expect(commands.find((command) => command.id === 'nav-meetings')).toMatchObject({ title: 'Go to Meetings', href: '/tasks?view=meetings' });
+    // Neither is an app view of its own any more.
+    expect(commands.filter((command) => command.id === 'nav-waiting' || command.id === 'nav-meetings').every((command) => !command.view && !command.target)).toBe(true);
+  });
+
+  it('finds Waiting by its old and new names', () => {
+    const commands = buildNavigationCommands({ tasksPhase3: true });
+    for (const query of ['follow-ups', 'followups', 'promises', 'delegated', 'waiting']) {
+      expect(filterCommands(commands, query).map((command) => command.id)).toContain('nav-waiting');
+    }
+    expect(filterCommands(commands, 'minutes').map((command) => command.id)).toContain('nav-meetings');
+  });
+
+  it('has neither command without Phase 3, where there is no Tasks page to open', () => {
+    expect(buildNavigationCommands().some((command) => command.id === 'nav-waiting' || command.id === 'nav-meetings')).toBe(false);
+  });
+
+  it('does not list the two built-in views a second time as "Tasks: …"', () => {
+    const views = [
+      { id: 'waiting', name: 'Waiting / Delegated', builtin: true, definition: {} },
+      { id: 'meetings', name: 'Meetings', builtin: true, definition: {} },
+      { id: 'inbox', name: 'Inbox', builtin: true, definition: {} },
+      { id: 'saved:3', name: 'Meetings', builtin: false, definition: {} },
+    ];
+    expect(buildTaskViewCommands(views).map((command) => command.id)).toEqual(['taskview-inbox', 'taskview-saved:3']);
+  });
+
+  it('the capture hint mentions waiting, not follow-ups', () => {
+    expect(buildQuickActions({ tasksPhase3: true }).find((command) => command.id === 'action-capture')?.description).toBe('Tasks, waiting, notes');
+  });
+});

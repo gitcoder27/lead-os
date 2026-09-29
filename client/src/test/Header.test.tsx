@@ -70,7 +70,7 @@ describe('Header', () => {
       isPending: false,
     });
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['work', 'team', 'desk'], moreNav: ['follow-ups', 'notes', 'meetings'] },
+      preferences: { topNav: ['work', 'team', 'desk'], moreNav: ['notes'] },
     });
   });
 
@@ -89,12 +89,11 @@ describe('Header', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
 
-    expect(screen.getByText('Follow-ups')).toBeInTheDocument();
     expect(screen.getByText('Notes')).toBeInTheDocument();
-    expect(screen.getByText('Meetings')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open follow-ups in new tab/i })).toHaveAttribute('href', '/follow-ups');
     expect(screen.getByRole('link', { name: /open notes in new tab/i })).toHaveAttribute('href', '/notes');
-    expect(screen.getByRole('link', { name: /open meetings in new tab/i })).toHaveAttribute('href', '/meetings');
+    // docs/57 P3-06: Follow-ups and Meetings are Tasks views, not pages.
+    expect(screen.queryByText('Follow-ups')).not.toBeInTheDocument();
+    expect(screen.queryByText('Meetings')).not.toBeInTheDocument();
     expect(screen.queryByText('My Day')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
@@ -108,12 +107,12 @@ describe('Header', () => {
     expect(screen.getByRole('link', { name: /open desk in new tab/i })).toHaveAttribute('href', '/desk');
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
-    expect(screen.getByRole('link', { name: /open meetings in new tab/i })).toHaveAttribute('href', '/meetings');
+    expect(screen.getByRole('link', { name: /open notes in new tab/i })).toHaveAttribute('href', '/notes');
   });
 
   it('renders a customized layout with promoted pages and reordered chips', () => {
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['notes', 'work', 'team', 'desk'], moreNav: ['follow-ups', 'meetings'] },
+      preferences: { topNav: ['notes', 'work', 'team'], moreNav: ['desk'] },
     });
     render(<Header activeView="notes" onViewChange={vi.fn()} />);
 
@@ -125,14 +124,13 @@ describe('Header', () => {
     expect(notesIndex).toBeLessThan(workIndex);
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
-    expect(screen.getByRole('menuitem', { name: 'Follow-ups' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Meetings' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Desk' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Notes' })).not.toBeInTheDocument();
   });
 
   it('moves demoted pages into the More menu and hides More when empty', () => {
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk', 'follow-ups', 'meetings'] },
+      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk'] },
     });
     const { unmount } = render(<Header activeView="today" onViewChange={vi.fn()} />);
 
@@ -146,17 +144,17 @@ describe('Header', () => {
     unmount();
 
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['work', 'team', 'desk', 'follow-ups', 'notes', 'meetings'], moreNav: [] },
+      preferences: { topNav: ['work', 'team', 'desk', 'notes'], moreNav: [] },
     });
     render(<Header activeView="today" onViewChange={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
-    expect(screen.getByText('Meetings')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
   });
 
   it('keeps the fixed Work and Team layout for non-manager users', () => {
     useAuthMock.mockReturnValue({ user: { role: 'developer' } });
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['notes', 'meetings'], moreNav: ['work', 'team', 'desk', 'follow-ups'] },
+      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk'] },
     });
     render(<Header activeView="today" onViewChange={vi.fn()} />);
 
@@ -172,8 +170,7 @@ describe('Header', () => {
 
     fireEvent.mouseEnter(screen.getByRole('button', { name: /more/i }).parentElement as HTMLElement);
 
-    expect(screen.getByText('Follow-ups')).toBeInTheDocument();
-    expect(screen.getByText('Meetings')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
   });
 
   it('shows the manager action inbox across manager views', () => {
@@ -194,7 +191,7 @@ describe('Header', () => {
   });
 
   it('shows the capture button on all manager views including desk', () => {
-    const views = ['today', 'work', 'team', 'desk', 'follow-ups', 'meetings'] as const;
+    const views = ['today', 'work', 'team', 'desk', 'notes'] as const;
 
     for (const view of views) {
       const { unmount } = render(<Header activeView={view} onViewChange={vi.fn()} />);

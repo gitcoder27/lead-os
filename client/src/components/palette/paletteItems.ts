@@ -44,8 +44,6 @@ const NAVIGATION_COMMANDS: Array<{ view: AppView; title: string; keywords?: stri
   { view: 'work', title: 'Go to Work', keywords: 'defects jira issues triage dashboard', targetView: 'work' },
   { view: 'team', title: 'Go to Team', keywords: 'tracker developers day check-in', targetView: 'team' },
   { view: 'desk', title: 'Go to Desk', keywords: 'manager planning', targetView: 'desk' },
-  { view: 'follow-ups', title: 'Go to Follow-ups', keywords: 'promises reminders', targetView: 'follow-ups' },
-  { view: 'meetings', title: 'Go to Meetings', keywords: 'actions minutes', targetView: 'meetings' },
   { view: 'notes', title: 'Go to Notes', keywords: 'scratchpad journal private writing', targetView: 'notes' },
   { view: 'settings', title: 'Go to Settings', keywords: 'config jira users backups', targetView: 'settings' },
 ];
@@ -61,6 +59,25 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): Pa
     target: command.targetView ? { type: 'view' as const, view: command.targetView } : undefined,
   }));
   if (options?.tasksPhase3) {
+    // docs/57 §5 (P3-06): Follow-ups and Meetings are Tasks views now.
+    commands.push(
+      {
+        id: 'nav-waiting',
+        group: 'actions',
+        title: 'Go to Waiting',
+        description: 'Tasks · Waiting / Delegated',
+        keywords: 'follow-ups followups promises reminders delegated waiting on',
+        href: '/tasks?view=waiting',
+      },
+      {
+        id: 'nav-meetings',
+        group: 'actions',
+        title: 'Go to Meetings',
+        description: 'Tasks · Meetings',
+        keywords: 'actions minutes outcome',
+        href: '/tasks?view=meetings',
+      },
+    );
     // P3-D5: standup mode is a deep-linked overlay on the Team page.
     commands.push({
       id: 'action-standup',
@@ -75,8 +92,11 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): Pa
 }
 
 /** §5.2: every task view (built-in + saved) is a palette destination. */
+/** Waiting and Meetings have their own "Go to" commands, so they are not listed twice. */
+const VIEWS_WITH_NAV_COMMANDS = new Set(['waiting', 'meetings']);
+
 export function buildTaskViewCommands(views: TaskViewMeta[]): PaletteItem[] {
-  return views.map((view) => ({
+  return views.filter((view) => !(view.builtin && VIEWS_WITH_NAV_COMMANDS.has(view.id))).map((view) => ({
     id: `taskview-${view.id}`,
     group: 'actions' as const,
     title: `Tasks: ${view.name}`,
@@ -92,7 +112,7 @@ export function buildQuickActions(options?: { tasksPhase3?: boolean; jiraConfigu
       group: 'actions',
       title: 'Quick capture',
       // docs/54 §1.7: under Phase 3 the surface is Tasks, and capture is one box.
-      description: options?.tasksPhase3 ? 'Tasks, follow-ups, notes' : 'Desk or Team quick capture',
+      description: options?.tasksPhase3 ? 'Tasks, waiting, notes' : 'Desk or Team quick capture',
       keywords: 'capture quick add desk team task follow-up meeting',
       actionId: 'capture',
     },

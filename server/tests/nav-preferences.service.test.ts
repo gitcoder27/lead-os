@@ -17,7 +17,7 @@ describe("NavPreferencesService.get", () => {
     const prefs = await service.get(MANAGER);
     expect(prefs).toEqual(DEFAULT_NAV_PREFERENCES);
     expect(prefs.topNav).toEqual(["work", "team", "desk"]);
-    expect(prefs.moreNav).toEqual(["follow-ups", "notes", "meetings"]);
+    expect(prefs.moreNav).toEqual(["notes"]);
   });
 
   it("returns a defensive copy so callers cannot mutate the shared default", async () => {
@@ -32,7 +32,7 @@ describe("NavPreferencesService.get", () => {
       workspaceId: "default",
       managerAccountId: MANAGER,
       topNav: JSON.stringify(["notes", "unknown-page", "notes", "work"]),
-      moreNav: JSON.stringify(["meetings"]),
+      moreNav: JSON.stringify(["team"]),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -40,7 +40,22 @@ describe("NavPreferencesService.get", () => {
     const prefs = await service.get(MANAGER);
     expect(prefs.topNav).toEqual(["notes", "work"]);
     // Unseen pages are appended to More; stored zone order is preserved.
-    expect(prefs.moreNav).toEqual(["meetings", "team", "desk", "follow-ups"]);
+    expect(prefs.moreNav).toEqual(["team", "desk"]);
+    expect([...prefs.topNav, ...prefs.moreNav].sort()).toEqual([...NAV_PAGE_IDS].sort());
+  });
+
+  it("drops the retired Follow-ups and Meetings pages from stored rows (docs/57 P3-06)", async () => {
+    await db.insert(userNavPreferences).values({
+      workspaceId: "default",
+      managerAccountId: MANAGER,
+      topNav: JSON.stringify(["follow-ups", "work", "meetings", "desk"]),
+      moreNav: JSON.stringify(["team", "notes"]),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const prefs = await service.get(MANAGER);
+    expect(prefs).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
     expect([...prefs.topNav, ...prefs.moreNav].sort()).toEqual([...NAV_PAGE_IDS].sort());
   });
 
@@ -64,7 +79,7 @@ describe("NavPreferencesService.get", () => {
       workspaceId: "default",
       managerAccountId: MANAGER,
       topNav: JSON.stringify(["tasks", "work"]),
-      moreNav: JSON.stringify(["meetings"]),
+      moreNav: JSON.stringify(["notes"]),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -79,29 +94,42 @@ describe("NavPreferencesService.get", () => {
     // Flag on: stored `desk` entries surface as `tasks` without a rewrite.
     prefs = await service.get(MANAGER);
     expect(prefs.topNav).toEqual(["tasks", "work"]);
-    expect(prefs.moreNav).toContain("meetings");
+    expect(prefs.moreNav).toContain("notes");
     expect(prefs.topNav.concat(prefs.moreNav)).not.toContain("desk");
   });
 
   it("scopes preferences per manager and workspace", async () => {
-    await service.save(MANAGER, { topNav: ["notes"], moreNav: ["work", "team", "desk", "follow-ups", "meetings"] });
+    await service.save(MANAGER, { topNav: ["notes"], moreNav: ["work", "team", "desk"] });
     await service.save(
       OTHER_MANAGER,
-      { topNav: ["meetings"], moreNav: ["work", "team", "desk", "follow-ups", "notes"] },
+      { topNav: ["desk"], moreNav: ["work", "team", "notes"] },
       "other-workspace"
     );
 
     expect((await service.get(MANAGER)).topNav).toEqual(["notes"]);
     expect((await service.get(OTHER_MANAGER)).topNav).toEqual(DEFAULT_NAV_PREFERENCES.topNav);
-    expect((await service.get(OTHER_MANAGER, "other-workspace")).topNav).toEqual(["meetings"]);
+    expect((await service.get(OTHER_MANAGER, "other-workspace")).topNav).toEqual(["desk"]);
   });
 });
 
 describe("NavPreferencesService.save", () => {
+  it("ignores the retired pages a stale client still sends, instead of failing the save", async () => {
+    const saved = await service.save(MANAGER, {
+      topNav: ["work", "follow-ups", "desk"],
+      moreNav: ["team", "notes", "meetings"],
+    });
+    expect(saved).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
+    expect(await service.get(MANAGER)).toEqual(saved);
+    // A layout that is only complete once the retired ids are ignored is still rejected.
+    await expect(
+      service.save(MANAGER, { topNav: ["work", "follow-ups"], moreNav: ["meetings", "desk", "notes"] })
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
   it("persists a complete layout and reads it back", async () => {
     const saved = await service.save(MANAGER, {
       topNav: ["notes", "desk", "work"],
-      moreNav: ["team", "follow-ups", "meetings"],
+      moreNav: ["team"],
     });
 
     expect(saved.topNav).toEqual(["notes", "desk", "work"]);
@@ -110,11 +138,11 @@ describe("NavPreferencesService.save", () => {
   });
 
   it("overwrites the previous layout on repeat saves", async () => {
-    await service.save(MANAGER, { topNav: ["notes"], moreNav: ["work", "team", "desk", "follow-ups", "meetings"] });
-    await service.save(MANAGER, { topNav: ["meetings"], moreNav: ["work", "team", "desk", "follow-ups", "notes"] });
+    await service.save(MANAGER, { topNav: ["notes"], moreNav: ["work", "team", "desk"] });
+    await service.save(MANAGER, { topNav: ["desk"], moreNav: ["work", "team", "notes"] });
 
     const prefs = await service.get(MANAGER);
-    expect(prefs.topNav).toEqual(["meetings"]);
+    expect(prefs.topNav).toEqual(["desk"]);
   });
 
   it("accepts moving every page into the More menu", async () => {
@@ -127,14 +155,14 @@ describe("NavPreferencesService.save", () => {
     await expect(
       service.save(MANAGER, {
         topNav: ["work", "team", "desk", "notes"],
-        moreNav: ["follow-ups", "notes", "meetings"],
+        moreNav: ["notes"],
       })
     ).rejects.toMatchObject({ status: 400 });
   });
 
   it("rejects a layout missing a page", async () => {
     await expect(
-      service.save(MANAGER, { topNav: ["work", "team"], moreNav: ["follow-ups", "notes", "meetings"] })
+      service.save(MANAGER, { topNav: ["work", "team"], moreNav: ["notes"] })
     ).rejects.toMatchObject({ status: 400 });
   });
 
@@ -145,13 +173,13 @@ describe("NavPreferencesService.save", () => {
     ]);
     const saved = await service.save(MANAGER, {
       topNav: ["tasks", "work"],
-      moreNav: ["team", "follow-ups", "notes", "meetings"],
+      moreNav: ["team", "notes"],
     });
     expect(saved.topNav).toEqual(["tasks", "work"]);
     // Under Phase 3, submitting the legacy id normalizes to `tasks`.
     const aliased = await service.save(MANAGER, {
       topNav: ["desk", "work"],
-      moreNav: ["team", "follow-ups", "notes", "meetings"],
+      moreNav: ["team", "notes"],
     });
     expect(aliased.topNav).toEqual(["tasks", "work"]);
   });
@@ -160,7 +188,7 @@ describe("NavPreferencesService.save", () => {
     await expect(
       service.save(MANAGER, {
         topNav: ["work", "team", "desk", "settings" as never],
-        moreNav: ["follow-ups", "notes"],
+        moreNav: ["notes"],
       })
     ).rejects.toMatchObject({ status: 400 });
   });

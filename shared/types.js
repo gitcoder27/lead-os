@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isTaskHidden = isTaskHidden;
@@ -142,9 +142,10 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
         attention: zod_1.z.array(zod_1.z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
         lane: zod_1.z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
         waitingOn: zod_1.z.boolean().optional(),
+        withClosed: taskViewDateRange.optional(),
     }).strict().optional(),
     sort: zod_1.z.enum(["scheduled", "updated", "created", "priority", "checkBy"]).optional(),
-    group: zod_1.z.enum(["owner", "status", "label", "scheduled", "party"]).optional(),
+    group: zod_1.z.enum(["owner", "status", "label", "scheduled", "party", "meeting"]).optional(),
 }).strict();
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
@@ -211,12 +212,18 @@ exports.oneOnOneSessionActionSchema = zod_1.z.object({
     ownerId: zod_1.z.string().trim().min(1).max(200).optional(),
     scheduledOn: oneOnOneIsoDate.nullable().optional(),
 }).strict();
-exports.NAV_PAGE_IDS = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
+/**
+ * docs/57 §5 (P3-06): the Follow-ups and Meetings pages are Tasks views now.
+ * Stored preferences and stale clients may still name them; reads drop them and
+ * saves ignore them, so nothing needs a data migration.
+ */
+exports.LEGACY_NAV_PAGE_IDS = ["follow-ups", "meetings"];
+exports.NAV_PAGE_IDS = ["work", "team", "desk", "notes"];
 /** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
-exports.NAV_PAGE_IDS_TASKS = ["work", "team", "tasks", "follow-ups", "notes", "meetings"];
+exports.NAV_PAGE_IDS_TASKS = ["work", "team", "tasks", "notes"];
 exports.DEFAULT_NAV_PREFERENCES = {
     topNav: ["work", "team", "desk"],
-    moreNav: ["follow-ups", "notes", "meetings"],
+    moreNav: ["notes"],
 };
 const NAV_PAGE_ID_SET = new Set([...exports.NAV_PAGE_IDS, ...exports.NAV_PAGE_IDS_TASKS]);
 function isNavPageId(value) {
@@ -274,7 +281,10 @@ function isCompleteNavPreferences(value, options = {}) {
     }
     const liveIds = liveNavPageIds(options.tasksNav);
     const liveSet = new Set(liveIds);
-    const combined = [...prefs.topNav, ...prefs.moreNav].map((id) => normalizeNavPageId(id, options.tasksNav));
+    // A stale client may still send the retired pages; they are ignored, not counted.
+    const combined = [...prefs.topNav, ...prefs.moreNav]
+        .filter((id) => !exports.LEGACY_NAV_PAGE_IDS.includes(id))
+        .map((id) => normalizeNavPageId(id, options.tasksNav));
     if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {
         return false;
     }

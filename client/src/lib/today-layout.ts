@@ -364,7 +364,7 @@ export function deltaChips(delta: TodayDelta | undefined, date: string): TodayDe
       tone: 'warning',
       target: followUpsNewlyDue.count === 1 && followUpsNewlyDue.items[0]
         ? followUpsNewlyDue.items[0].target
-        : { type: 'view', view: 'follow-ups', date },
+        : { type: 'view', view: 'tasks', taskView: 'waiting', date },
       detail: followUpsNewlyDue.items.map((item) => item.title).join(', '),
     });
   }

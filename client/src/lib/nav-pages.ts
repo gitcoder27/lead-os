@@ -1,4 +1,4 @@
-import { Bell, Briefcase, CalendarDays, ClipboardList, NotebookPen, Users, type LucideIcon } from 'lucide-react';
+import { Briefcase, ClipboardList, NotebookPen, Users, type LucideIcon } from 'lucide-react';
 import type { ActiveAppView, AppView } from '@/App';
 import type { NavPageId } from '@/types';
 
@@ -51,15 +51,6 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     href: '/tasks',
     matches: ['desk', 'manager-desk'],
   },
-  'follow-ups': {
-    id: 'follow-ups',
-    view: 'follow-ups',
-    label: 'Follow-ups',
-    icon: Bell,
-    accentColor: 'var(--warning)',
-    href: '/follow-ups',
-    matches: ['follow-ups'],
-  },
   notes: {
     id: 'notes',
     view: 'notes',
@@ -68,14 +59,5 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     accentColor: 'var(--accent)',
     href: '/notes',
     matches: ['notes'],
-  },
-  meetings: {
-    id: 'meetings',
-    view: 'meetings',
-    label: 'Meetings',
-    icon: CalendarDays,
-    accentColor: 'var(--accent)',
-    href: '/meetings',
-    matches: ['meetings'],
   },
 };

@@ -152,6 +152,13 @@ The Follow-ups page's `overdue/today/upcoming/unscheduled` lanes (`lib/manager-m
   - Frontend map: remove `manager-memory/` and add `tasks/`.
   - Add a one-line capture grammar summary and the `contacts` table.
 
+**As built in P3-06, differences from the text above:**
+- The `waiting` view is named "Waiting / Delegated"; Meetings is a plan-section built-in right after it.
+- `Go to Waiting` and `Go to Meetings` are palette commands with a `href`, not app views, and the two built-ins are left out of the generic "Tasks: …" list so nothing appears twice.
+- Retired-view aliases: `follow-ups` still resolves to `waiting`; `meetings` is now a real view id, so its alias (`my-tasks` + `kind`) is gone.
+- `LEGACY_NAV_PAGE_IDS` (`follow-ups`, `meetings`) are dropped on read and ignored on save; the nav route also accepts `tasks`.
+- Without Phase 3 the two old paths land on `/desk`. P3-00a is what would make that case disappear for new workspaces; it was still open.
+
 ## 6. Today, deadlines, recurrence, weekly review
 
 - **P3-01 Today plan and top 3.**

@@ -85,6 +85,7 @@ const GO_CHORD_VIEWS: Record<string, string> = {
   i: 'inbox',
   m: 'my-tasks',
   w: 'waiting',
+  e: 'meetings',
   l: 'later',
   a: 'attention',
   c: 'closed-week',

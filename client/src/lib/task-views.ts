@@ -8,7 +8,7 @@ import type {
   TaskWaitingOnInput,
 } from '@/types';
 import { shiftLocalIsoDate } from '@/lib/utils';
-import { taskPlanDate } from '@/lib/task-list';
+import { isOpenStatus, localDateOf, taskPlanDate } from '@/lib/task-list';
 
 /**
  * Phase 3 (P3-D9/D10, spec §5.2; docs/49 §3/§9): client-side helpers for task
@@ -42,7 +42,7 @@ export interface TaskViewOverrides {
 }
 
 const TASK_STATUSES: readonly TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
-const TASK_VIEW_GROUPS: readonly TaskViewGroupOverride[] = ['owner', 'status', 'label', 'scheduled', 'party', 'none'];
+const TASK_VIEW_GROUPS: readonly TaskViewGroupOverride[] = ['owner', 'status', 'label', 'scheduled', 'party', 'meeting', 'none'];
 const TASK_VIEW_SORTS: readonly TaskViewSort[] = ['scheduled', 'updated', 'created', 'priority', 'checkBy'];
 const TASK_SIGNALS: readonly TaskAttentionSignal[] = ['overdue', 'stale', 'drift'];
 export const OWNER_TOKENS = ['me', 'team', 'inbox'] as const;
@@ -63,7 +63,6 @@ export const RETIRED_TASK_VIEWS: Record<string, { view: string; overrides: TaskV
   watching: { view: 'waiting', overrides: { owner: 'team' } },
   blocked: { view: 'waiting', overrides: { status: ['blocked'] } },
   'follow-ups': { view: 'waiting', overrides: {} },
-  meetings: { view: 'my-tasks', overrides: { kind: 'meeting' } },
   upcoming: { view: 'my-tasks', overrides: {} },
   stale: { view: 'attention', overrides: { signal: ['stale'] } },
   'jira-drift': { view: 'attention', overrides: { signal: ['drift'] } },
@@ -145,7 +144,9 @@ export type TaskGroupContext =
   | { mode: 'status'; status: TaskStatus }
   | { mode: 'label'; label: string | null }
   /** docs/57 §4: the party a task waits on (null = my own blocked work). */
-  | { mode: 'party'; waitingOn: TaskWaitingOnInput | null };
+  | { mode: 'party'; waitingOn: TaskWaitingOnInput | null }
+  /** docs/57 §4 (P3-06): the Meetings lens' buckets. */
+  | { mode: 'meeting'; bucket: MeetingBucket };
 
 export interface TaskViewGroupBucket {
   key: string;
@@ -171,6 +172,25 @@ export function scheduledBucket(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'>
   if (plan === shiftLocalIsoDate(today, 1)) return 'Tomorrow';
   if (plan <= shiftLocalIsoDate(today, 7)) return 'Next 7 days';
   return 'Beyond';
+}
+
+export type MeetingBucket = 'Today' | 'Upcoming' | 'Needs outcome' | 'Recent';
+export const MEETING_GROUP_ORDER: MeetingBucket[] = ['Today', 'Upcoming', 'Needs outcome', 'Recent'];
+
+/**
+ * docs/57 §4 (P3-06): closed meetings and those with an outcome are Recent; an
+ * open one is Today, Upcoming, or — once its day has passed with no outcome —
+ * Needs outcome. A past meeting is never "Upcoming". Undated meetings are upcoming.
+ */
+export function meetingBucket(
+  task: Pick<ManagerTask, 'status' | 'outcome' | 'startsAt' | 'scheduledOn'>,
+  today: string,
+): MeetingBucket {
+  if (!isOpenStatus(task.status) || task.outcome?.trim()) return 'Recent';
+  const day = localDateOf(task.startsAt) ?? task.scheduledOn;
+  if (!day) return 'Upcoming';
+  if (day < today) return 'Needs outcome';
+  return day === today ? 'Today' : 'Upcoming';
 }
 
 const PARTY_BLOCKED = 'party:blocked';
@@ -246,12 +266,18 @@ export function groupTaskViewTasks(
         push(party.key, party.label, { mode: 'party', waitingOn: party.waitingOn }, task);
         break;
       }
+      case 'meeting': {
+        const bucket = meetingBucket(task, today);
+        push(bucket, bucket, { mode: 'meeting', bucket }, task);
+        break;
+      }
     }
   }
   const keys = [...buckets.keys()];
   const ownerRank = (key: string) => (key.startsWith('manager:') ? 0 : key === 'inbox' ? 2 : 1);
   if (group === 'status') keys.sort((a, b) => STATUS_GROUP_ORDER.indexOf(a as TaskStatus) - STATUS_GROUP_ORDER.indexOf(b as TaskStatus));
   else if (group === 'scheduled') keys.sort((a, b) => SCHEDULED_GROUP_ORDER.indexOf(a as ScheduledBucket) - SCHEDULED_GROUP_ORDER.indexOf(b as ScheduledBucket));
+  else if (group === 'meeting') keys.sort((a, b) => MEETING_GROUP_ORDER.indexOf(a as MeetingBucket) - MEETING_GROUP_ORDER.indexOf(b as MeetingBucket));
   else if (group === 'owner') keys.sort((a, b) => ownerRank(a) - ownerRank(b) || buckets.get(a)!.label.localeCompare(buckets.get(b)!.label));
   // docs/57 §4: parties A→Z, my own blocked work last; rows keep the server's check-by order.
   else if (group === 'party') keys.sort((a, b) => Number(a === PARTY_BLOCKED) - Number(b === PARTY_BLOCKED) || buckets.get(a)!.label.localeCompare(buckets.get(b)!.label));

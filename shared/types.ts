@@ -290,6 +290,7 @@ export interface TodayActionTargetContext {
 
 export interface TodayActionTarget {
   type: TodayActionTargetType;
+  /** `follow-ups` and `meetings` are retired (docs/57 §5): still accepted for one release, they mean `tasks` with `taskView` `waiting` / `meetings`. */
   view: "work" | "team" | "desk" | "tasks" | "follow-ups" | "meetings" | "notes" | "settings";
   /** Settings sub-section to open when view === "settings" (e.g. "assistant"). */
   section?: string;
@@ -1114,6 +1115,8 @@ export interface TaskViewFilters {
   lane?: TaskLane;
   /** docs/57 §2: an explicit waiting-on party is set (true) or not (false). */
   waitingOn?: boolean;
+  /** docs/57 §4 (P3-06): open rows plus rows closed inside this range (the Meetings lens' "Recent"). */
+  withClosed?: TaskViewDateRange;
 }
 
 /**
@@ -1261,6 +1264,8 @@ export interface TaskSignals {
   followUpDue: boolean;
   /** docs/57 §4 (P3-03): aging for the Waiting lens — days since `waitingOn.since`, else since the last activity. Null when closed. */
   waitingDays?: number | null;
+  /** docs/57 §4 (P3-06): a meeting's action items (child tasks), closed of total. Set on meeting rows only. */
+  actions?: { done: number; total: number };
 }
 
 export type TaskViewTask = ManagerTask & { signals: TaskSignals };
@@ -1293,8 +1298,8 @@ export interface BulkUpdateTasksResponse {
 
 /** `checkBy` (docs/57 §4): check-by date (`followUpAt`) first, then longest waiting. */
 export type TaskViewSort = "scheduled" | "updated" | "created" | "priority" | "checkBy";
-/** `party` (docs/57 §4): the person waited on, else the owner; "Blocked" last. */
-export type TaskViewGroup = "owner" | "status" | "label" | "scheduled" | "party";
+/** `party` (docs/57 §4): the person waited on, else the owner; "Blocked" last. `meeting` (P3-06): Today / Upcoming / Needs outcome / Recent. */
+export type TaskViewGroup = "owner" | "status" | "label" | "scheduled" | "party" | "meeting";
 
 export interface TaskViewDefinition {
   filters?: TaskViewFilters;
@@ -1333,9 +1338,10 @@ export const taskViewDefinitionSchema = z.object({
     attention: z.array(z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
     lane: z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
     waitingOn: z.boolean().optional(),
+    withClosed: taskViewDateRange.optional(),
   }).strict().optional(),
   sort: z.enum(["scheduled", "updated", "created", "priority", "checkBy"]).optional(),
-  group: z.enum(["owner", "status", "label", "scheduled", "party"]).optional(),
+  group: z.enum(["owner", "status", "label", "scheduled", "party", "meeting"]).optional(),
 }).strict();
 
 export interface TaskViewMeta {
@@ -2569,20 +2575,27 @@ export type OneOnOneSessionActionRequest = z.infer<typeof oneOnOneSessionActionS
 
 // ── Navigation preferences ────────────────────────────
 
-export type NavPageId = "work" | "team" | "desk" | "tasks" | "follow-ups" | "notes" | "meetings";
+export type NavPageId = "work" | "team" | "desk" | "tasks" | "notes";
+
+/**
+ * docs/57 §5 (P3-06): the Follow-ups and Meetings pages are Tasks views now.
+ * Stored preferences and stale clients may still name them; reads drop them and
+ * saves ignore them, so nothing needs a data migration.
+ */
+export const LEGACY_NAV_PAGE_IDS: readonly string[] = ["follow-ups", "meetings"];
 
 export interface NavPreferences {
   topNav: NavPageId[];
   moreNav: NavPageId[];
 }
 
-export const NAV_PAGE_IDS: readonly NavPageId[] = ["work", "team", "desk", "follow-ups", "notes", "meetings"];
+export const NAV_PAGE_IDS: readonly NavPageId[] = ["work", "team", "desk", "notes"];
 /** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
-export const NAV_PAGE_IDS_TASKS: readonly NavPageId[] = ["work", "team", "tasks", "follow-ups", "notes", "meetings"];
+export const NAV_PAGE_IDS_TASKS: readonly NavPageId[] = ["work", "team", "tasks", "notes"];
 
 export const DEFAULT_NAV_PREFERENCES: NavPreferences = {
   topNav: ["work", "team", "desk"],
-  moreNav: ["follow-ups", "notes", "meetings"],
+  moreNav: ["notes"],
 };
 
 export interface NavPreferencesResponse {
@@ -2660,7 +2673,10 @@ export function isCompleteNavPreferences(value: unknown, options: NavSanitizeOpt
   }
   const liveIds = liveNavPageIds(options.tasksNav);
   const liveSet = new Set<string>(liveIds);
-  const combined = [...prefs.topNav, ...prefs.moreNav].map((id) => normalizeNavPageId(id, options.tasksNav));
+  // A stale client may still send the retired pages; they are ignored, not counted.
+  const combined = [...prefs.topNav, ...prefs.moreNav]
+    .filter((id) => !LEGACY_NAV_PAGE_IDS.includes(id as string))
+    .map((id) => normalizeNavPageId(id, options.tasksNav));
   if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {
     return false;
   }

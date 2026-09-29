@@ -995,7 +995,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
               },
               view: {
                 type: "string",
-                enum: ["work", "team", "desk", "follow-ups", "meetings", "notes", "settings"],
+                enum: ["work", "team", "desk", "tasks", "follow-ups", "meetings", "notes", "settings"],
               },
               issueKey: { type: "string" },
               relatedIssueKeys: { type: "array", items: { type: "string" } },
@@ -1003,6 +1003,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
               managerDeskItemId: { type: "integer" },
               trackerItemId: { type: "integer" },
               taskKey: { type: "string" },
+              taskView: { type: "string", description: "Tasks lens to open when view is tasks (waiting, meetings, inbox)" },
               date: dateProperty("YYYY-MM-DD"),
               filter: { type: "string", enum: filterTypeSchema.options },
             },
@@ -1043,7 +1044,8 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             ]),
             target: z.object({
               type: z.enum(["issue", "developer", "manager_desk_item", "tracker_item", "follow_up", "meeting", "view"]),
-              view: z.enum(["work", "team", "desk", "follow-ups", "meetings", "notes", "settings"]),
+              view: z.enum(["work", "team", "desk", "tasks", "follow-ups", "meetings", "notes", "settings"]),
+              taskView: z.string().max(64).optional(),
               issueKey: z.string().optional(),
               relatedIssueKeys: z.array(z.string()).optional(),
               developerAccountId: z.string().optional(),

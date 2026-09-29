@@ -386,6 +386,10 @@ export function inlineAddDefaults(
     case 'label':
       if (context.label) defaults.labels = [context.label];
       break;
+    case 'meeting':
+      // Today and Needs outcome are today's; Upcoming is tomorrow's; Recent has no day of its own.
+      defaults.scheduledOn = context.bucket === 'Upcoming' ? shiftLocalIsoDate(today, 1) : today;
+      break;
     case 'party':
       // docs/57 §4: a task added under a party waits on them (owned by me).
       if (context.waitingOn) defaults.waitingOn = context.waitingOn;

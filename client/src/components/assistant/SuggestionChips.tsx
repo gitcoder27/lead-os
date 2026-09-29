@@ -14,7 +14,7 @@ export function suggestionsForView(path: string): string[] {
   if (path.startsWith('/work')) {
     return ['Which defects are overdue?', 'Unassigned high-priority defects', "What's due today?"];
   }
-  if (path.startsWith('/desk') || path.startsWith('/follow-ups') || path.startsWith('/meetings')) {
+  if (path.startsWith('/desk') || path.startsWith('/tasks')) {
     return ['What follow-ups are due?', 'Create a follow-up', "What's on my desk today?"];
   }
   if (path.startsWith('/notes')) {

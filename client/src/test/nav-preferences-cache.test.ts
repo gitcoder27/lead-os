@@ -11,7 +11,7 @@ const OTHER_SCOPE = 'ws-1:manager-b:manager:';
 
 const CUSTOM: NavPreferences = {
   topNav: ['notes', 'desk', 'work', 'team'],
-  moreNav: ['follow-ups', 'meetings'],
+  moreNav: [],
 };
 
 function key(scope: string): string {
@@ -52,7 +52,8 @@ describe('nav preferences cache', () => {
     );
     const prefs = readNavPreferencesCache(SCOPE);
     expect(prefs?.topNav).toEqual(['notes']);
-    expect(prefs?.moreNav).toEqual(['meetings', 'work', 'team', 'desk', 'follow-ups']);
+    // The retired Meetings page is dropped; unseen pages are appended to More.
+    expect(prefs?.moreNav).toEqual(['work', 'team', 'desk']);
   });
 
   it('discards malformed JSON', () => {

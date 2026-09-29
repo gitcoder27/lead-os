@@ -1039,7 +1039,7 @@ function buildSummary(params: {
       ? metric("due-work", "Due today", params.dueToday, "defects", params.dueToday > 0 ? "warning" : "neutral", target("view", "work", { filter: "dueToday" }))
       : undefined,
     params.deskAvailable
-      ? metric("promises", "Follow-ups", params.followUpsDue, "due now", params.followUpsDue > 0 ? "warning" : "neutral", target("view", "follow-ups"))
+      ? metric("promises", "Follow-ups", params.followUpsDue, "due now", params.followUpsDue > 0 ? "warning" : "neutral", target("view", "tasks", { taskView: "waiting" }))
       : undefined,
   ];
 
@@ -1372,7 +1372,7 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionIt
 function buildFollowUpActions(items: ManagerDeskItem[], clock: DayClock): TodayActionItem[] {
   const date = clock.date;
   return items.map((item) => {
-    const actionTarget = target("follow_up", "follow-ups", {
+    const actionTarget = target("follow_up", "tasks", { taskView: "waiting",
       managerDeskItemId: item.id,
       taskKey: item.taskKey ?? undefined,
       date: item.originDate || date,
@@ -1398,7 +1398,7 @@ function buildFollowUpActions(items: ManagerDeskItem[], clock: DayClock): TodayA
 
 function buildMeetingActions(items: ManagerDeskItem[]): TodayActionItem[] {
   return items.map((item) => {
-    const actionTarget = target("meeting", "meetings", {
+    const actionTarget = target("meeting", "tasks", { taskView: "meetings",
       managerDeskItemId: item.id,
       taskKey: item.taskKey ?? undefined,
       date: item.originDate,
@@ -1587,7 +1587,7 @@ function buildTeamPulse(
 
 function buildPromiseItem(item: ManagerDeskItem, clock: DayClock): TodayPromiseItem {
   const date = clock.date;
-  const promiseTarget = target("follow_up", "follow-ups", {
+  const promiseTarget = target("follow_up", "tasks", { taskView: "waiting",
     managerDeskItemId: item.id,
     taskKey: item.taskKey ?? undefined,
     date: item.originDate || date,
@@ -1605,7 +1605,7 @@ function buildPromiseItem(item: ManagerDeskItem, clock: DayClock): TodayPromiseI
 }
 
 function buildMeetingPrompt(item: ManagerDeskItem): TodayMeetingPrompt {
-  const meetingTarget = target("meeting", "meetings", {
+  const meetingTarget = target("meeting", "tasks", { taskView: "meetings",
     managerDeskItemId: item.id,
     taskKey: item.taskKey ?? undefined,
     date: item.originDate,
@@ -1658,7 +1658,7 @@ function buildStandupPrompts(
       };
     });
   const promisePrompts = followUps.slice(0, 2).map((item) => {
-    const promiseTarget = target("follow_up", "follow-ups", { managerDeskItemId: item.id, taskKey: item.taskKey ?? undefined, date: item.originDate || date });
+    const promiseTarget = target("follow_up", "tasks", { taskView: "waiting", managerDeskItemId: item.id, taskKey: item.taskKey ?? undefined, date: item.originDate || date });
     return {
       id: `standup-follow-up-${item.id}`,
       title: item.title,

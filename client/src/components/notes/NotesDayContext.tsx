@@ -88,7 +88,7 @@ export function buildContextChips(
       label: text,
       summary: text,
       tone: 'accent',
-      onOpen: () => onOpenTarget({ type: 'view', view: 'follow-ups' }),
+      onOpen: () => onOpenTarget({ type: 'view', view: 'tasks', taskView: 'waiting' }),
       openLabel: 'Open Follow-ups',
     });
   }

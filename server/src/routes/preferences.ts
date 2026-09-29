@@ -3,7 +3,8 @@ import { z } from "zod";
 import { validate } from "../middleware/validate";
 import type { NavPreferencesService } from "../services/nav-preferences.service";
 
-const navPageIdSchema = z.enum(["work", "team", "desk", "follow-ups", "notes", "meetings"]);
+// The retired `follow-ups` / `meetings` ids stay accepted for one release (docs/57 §5): stale tabs still send them.
+const navPageIdSchema = z.enum(["work", "team", "desk", "tasks", "notes", "follow-ups", "meetings"]);
 
 const saveNavigationSchema = z.object({
   body: z.object({

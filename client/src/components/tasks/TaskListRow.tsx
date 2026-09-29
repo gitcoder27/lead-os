@@ -126,7 +126,9 @@ export const TaskListRow = memo(function TaskListRow({
   // docs/57 §4 (P3-03): the Waiting lens reads as aging + check-by text.
   const waiting = context.mode === 'party' || definition?.filters?.waiting === true ? waitingChips(task, today) : null;
   const waitingText = waiting ? [waiting.check?.label, waiting.aging].filter((label): label is string => Boolean(label)) : [];
-  const signalText = [...waitingText, ...(attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label))];
+  // docs/57 §4 (P3-06): a meeting's action items are its child tasks — "2/3 actions".
+  const actions = task.kind === 'meeting' && signals?.actions && signals.actions.total > 0 ? `${signals.actions.done}/${signals.actions.total} actions` : null;
+  const signalText = [...(actions ? [actions] : []), ...waitingText, ...(attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label))];
 
   const ariaLabel = [
     `${task.taskKey} ${task.title}`,
@@ -248,8 +250,11 @@ export const TaskListRow = memo(function TaskListRow({
             </RowAction>
           </span>
 
-          {(attentionReasons.length > 0 || iconSignals.length > 0 || waitingText.length > 0) && (
+          {(attentionReasons.length > 0 || iconSignals.length > 0 || waitingText.length > 0 || actions) && (
             <span className="flex items-center gap-1.5" style={{ opacity: dim }}>
+              {actions && (
+                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="meeting-actions">{actions}</span>
+              )}
               {waiting?.check && (
                 <span className="text-[11px]" data-testid="waiting-check">
                   {waiting.check.tone === 'muted'

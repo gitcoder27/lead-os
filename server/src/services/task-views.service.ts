@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
@@ -50,7 +50,10 @@ export function builtinTaskViews(today: string): { id: string; name: string; sec
     { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
     // docs/57 §4 (P3-03): replaces /follow-ups — grouped by the party waited on,
     // oldest check-by first.
-    { id: "waiting", name: "Waiting", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "checkBy", group: "party" } },
+    { id: "waiting", name: "Waiting / Delegated", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "checkBy", group: "party" } },
+    // docs/57 §4 (P3-06): replaces the /meetings page — open meetings plus those closed in the
+    // last two weeks, grouped Today / Upcoming / Needs outcome / Recent.
+    { id: "meetings", name: "Meetings", section: "plan", definition: { filters: { kind: "meeting", withClosed: { from: shiftDays(today, -13) } }, sort: "scheduled", group: "meeting" } },
     { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
     // §8.1 drift, overdue plan dates, and stale work in one review queue.
     // docs/51 F2: parked work is deliberate, and idle developer-owned tasks
@@ -115,7 +118,7 @@ export function taskSignals(row: TaskRow, facts: RowFacts, today: string): TaskS
   const open = OPEN_STATUSES.has(row.status);
   const plan = taskPlanDate(row);
   const overdue = open && plan.date !== null && plan.date < today;
-  const lastActivity = (facts.lastActivity.get(row.id) ?? row.updatedAt).slice(0, 10);
+  const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt)!;
   const idleDays = daysBetween(lastActivity, today);
   const stale = open && idleDays >= TASK_STALE_DAYS;
   const followUpDate = isoDatePart(row.followUpAt);
@@ -209,6 +212,11 @@ export function matchesTaskViewFilters(
     const closedDate = isoDatePart(row.closedAt)!;
     if (filters.closed.from && closedDate < filters.closed.from) return false;
     if (filters.closed.to && closedDate > filters.closed.to) return false;
+  } else if (filters.withClosed && row.closedAt) {
+    // Open rows always match; a closed row only inside the bounded range.
+    const closedDate = isoDatePart(row.closedAt)!;
+    if (filters.withClosed.from && closedDate < filters.withClosed.from) return false;
+    if (filters.withClosed.to && closedDate > filters.withClosed.to) return false;
   } else if (row.closedAt && filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
     return false;
   }
@@ -218,7 +226,7 @@ export function matchesTaskViewFilters(
   }
   if (filters.jiraDrift !== undefined && signals.drift !== filters.jiraDrift) return false;
   if (filters.staleDays !== undefined) {
-    const lastActivity = (facts.lastActivity.get(row.id) ?? row.updatedAt).slice(0, 10);
+    const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt)!;
     if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
   }
   if (filters.lane && taskRowLane(row, today) !== filters.lane) return false;
@@ -339,6 +347,13 @@ export class TaskViewsService {
       const closedDate = sql`substr(${tasks.closedAt}, 1, 10)`;
       if (filters.closed.from) conditions.push(gte(closedDate, shiftDays(filters.closed.from, -1)));
       if (filters.closed.to) conditions.push(lte(closedDate, shiftDays(filters.closed.to, 1)));
+    } else if (filters.withClosed) {
+      // Open rows, plus closed ones inside the (bounded) range; the same widening as `closed`.
+      const closedDate = sql`substr(${tasks.closedAt}, 1, 10)`;
+      const inRange: SQL[] = [];
+      if (filters.withClosed.from) inRange.push(gte(closedDate, shiftDays(filters.withClosed.from, -1)));
+      if (filters.withClosed.to) inRange.push(lte(closedDate, shiftDays(filters.withClosed.to, 1)));
+      conditions.push(or(isNull(tasks.closedAt), and(...inRange))!);
     } else if (filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
       conditions.push(isNull(tasks.closedAt));
     }
@@ -384,6 +399,21 @@ export class TaskViewsService {
   async run(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate()): Promise<TaskViewTask[]> {
     const matched = await this.evaluate(principal, definition, today);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
+    // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
+    const meetingIds = matched.filter((entry) => entry.row.kind === "meeting").map((entry) => entry.row.id);
+    if (meetingIds.length) {
+      const children = await db.select({ parentId: tasks.parentId, status: tasks.status }).from(tasks)
+        .where(and(eq(tasks.workspaceId, normalizeWorkspaceId(principal.workspaceId)), inArray(tasks.parentId, meetingIds), isNull(tasks.deletedAt)));
+      const byParent = new Map<number, { done: number; total: number }>(meetingIds.map((id) => [id, { done: 0, total: 0 }]));
+      for (const child of children) {
+        const entry = byParent.get(child.parentId!)!;
+        // A dropped action item is neither open nor done: it leaves the tally.
+        if (child.status === "dropped") continue;
+        entry.total += 1;
+        if (child.status === "done") entry.done += 1;
+      }
+      for (const [id, actions] of byParent) signalsById.get(id)!.actions = actions;
+    }
     const sorted = sortRows(matched.map((entry) => entry.row), definition.sort);
     const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
     return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)! }));
@@ -405,7 +435,7 @@ export class TaskViewsService {
     const views = await this.list(principal.accountId, principal.workspaceId, today);
     let closedFloor = shiftDays(today, -JIRA_DRIFT_CLOSED_WINDOW_DAYS);
     for (const view of views) {
-      const from = view.definition.filters?.closed?.from;
+      const from = view.definition.filters?.closed?.from ?? view.definition.filters?.withClosed?.from;
       if (from && from < closedFloor) closedFloor = from;
     }
     const universe = await db.select().from(tasks).where(and(

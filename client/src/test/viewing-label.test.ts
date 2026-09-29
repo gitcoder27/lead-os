@@ -8,7 +8,7 @@ describe('viewingLabel', () => {
     expect(viewingLabel('/work', '')).toBe('Work');
     expect(viewingLabel('/dashboard', '')).toBe('Work');
     expect(viewingLabel('/manager-desk', '')).toBe('Desk');
-    expect(viewingLabel('/followups', '')).toBe('Follow-ups');
+    expect(viewingLabel('/tasks', '')).toBe('Tasks');
     expect(viewingLabel('/my-day', '')).toBe('My Day');
     expect(viewingLabel('/work/', '')).toBe('Work');
   });

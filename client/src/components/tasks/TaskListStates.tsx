@@ -156,7 +156,9 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
     case 'my-tasks':
       return { title: 'No open tasks', body: 'Add one below or capture with ⌘I.', Icon: CalendarCheck };
     case 'waiting':
-      return { title: 'Nobody owes you anything right now.', Icon: CheckCheck, tone: 'success' };
+      return { title: 'Nobody owes you anything right now.', body: 'Capture a promise with /w @who, or delegate with @dev.', Icon: CheckCheck, tone: 'success' };
+    case 'meetings':
+      return { title: 'No meetings in the last two weeks or ahead.', body: 'Capture one with /m, for example "/m Design review !fri".', Icon: CalendarCheck };
     case 'later':
       return { title: 'Nothing parked for later.', Icon: Inbox };
     case 'attention':

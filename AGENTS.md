@@ -34,14 +34,12 @@ Canonical routes:
 - `/`: Today, the manager daily command view (`focus.plan` is my plan; up to three tasks can be pinned per day with `PUT /api/today/top3` and lead the queue).
 - `/work`: Jira defect and work triage dashboard.
 - `/team`: Team Tracker for day plans, current work, status, check-ins, attention signals, saved views, and carry-forward.
-- `/desk`: Manager Desk for capture, planning, decisions, linked people, and linked Jira issues.
-- `/follow-ups`: focused manager follow-up workflow backed by the Manager Desk data model.
-- `/meetings`: lightweight meeting notes/actions workflow backed by the Manager Desk data model.
+- `/tasks`: the Tasks workspace (`?view=<id>` plus filter overrides; `?task=` opens the drawer). Built-in views: Planned today, Inbox, My tasks, Waiting / Delegated (`waiting`, the old Follow-ups), Meetings (`meetings`, with `n/m actions` from child tasks), Later, Needs attention, Closed · last 7 days; saved views are per manager. Needs Phase 3 (stage `2c`); `/desk` is the legacy Manager Desk page and the same route in a workspace without Phase 3.
 - `/notes`: manager-private daily scratchpad (`?date=YYYY-MM-DD`), served by `/api/notes`; never part of Manager Desk or Today data.
 - `/settings`: Jira config, field discovery, team membership, app users, backups, and workspace maintenance.
 - `/my-day`: developer-only daily workspace for current, planned, completed, and dropped work plus check-ins.
 
-Legacy paths normalize in `App.tsx`: `/dashboard` -> `/work`, `/team-tracker` -> `/team`, `/manager-desk` -> `/desk`, `/today` -> `/`, `/followups` -> `/follow-ups`, `/meeting` -> `/meetings`.
+Legacy paths normalize in `App.tsx`: `/dashboard` -> `/work`, `/team-tracker` -> `/team`, `/manager-desk` -> `/desk`, `/today` -> `/`. `/follow-ups` and `/followups` redirect to `/tasks?view=waiting`, `/meetings` and `/meeting` to `/tasks?view=meetings` (`legacyTaskViewRedirect` in `App.tsx`; the rest of the query string is kept). The server still accepts `follow-ups` / `meetings` in action targets, nav preferences and `list_tasks` for one release (docs/57 P7-13); Today rows now target `view: "tasks"` with a `taskView`.
 
 Work (`?filter/dev/tag/noTags`), Team (`?q/filter/sort/group/view`), and Desk (`?date`) keep their filter state in the URL (see `client/src/lib/view-params.ts`), so views are shareable; changes sync back with debounced `replaceState`. Ctrl/Cmd+K opens the global command palette (`client/src/components/palette/`), which searches issues, desk items, check-ins, and developers via `/api/search`, and can jump anywhere or run capture/sync.
 
@@ -57,7 +55,7 @@ Feature folders under `client/src/components/`:
 - `team-tracker/`: manager team board and developer day tracking.
 - `my-day/`: developer workspace and shared login screen.
 - `manager-desk/`: Desk workspace, item drawer, rhythm lists, carry-forward, linked issue/developer workflows.
-- `manager-memory/`: Follow-ups and Meetings views.
+- `tasks/`: the Tasks workspace (list, views rail, drawer, menus, task page).
 - `notes/`: private daily Notes workspace (sidebar history, editor, follow-up creation).
 - `assistant/`: Copilot dock, chat thread, tool chips, action confirm cards.
 - `capture/`: global capture dialogs and capture forms.

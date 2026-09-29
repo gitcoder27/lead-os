@@ -38,7 +38,7 @@ import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import type { DailyNoteKind, TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
-export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'follow-ups' | 'meetings' | 'notes' | 'my-day' | 'settings';
+export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'notes' | 'my-day' | 'settings';
 export type LegacyAppView = 'dashboard' | 'team-tracker' | 'manager-desk';
 export type AppView = CanonicalAppView | LegacyAppView;
 export type ActiveAppView = AppView | 'not-found' | 'task';
@@ -54,7 +54,6 @@ const loadLoginPage = () => import('@/components/my-day/LoginPage');
 const loadManagerDeskPage = () => import('@/components/manager-desk');
 const loadTasksPage = () => import('@/components/tasks/TasksPage');
 const loadTaskPage = () => import('@/components/tasks/TaskPage');
-const loadManagerMemoryPage = () => import('@/components/manager-memory');
 const loadNotesPage = () => import('@/components/notes/NotesPage');
 const loadSettingsPage = () => import('@/components/settings/SettingsPanel');
 const loadAssistantDock = () => import('@/components/assistant/AssistantDock');
@@ -99,11 +98,6 @@ const TaskPage = lazy(async () => {
   return { default: module.TaskPage };
 });
 
-const ManagerMemoryPage = lazy(async () => {
-  const module = await loadManagerMemoryPage();
-  return { default: module.ManagerMemoryPage };
-});
-
 const NotesPage = lazy(async () => {
   const module = await loadNotesPage();
   return { default: module.NotesPage };
@@ -126,6 +120,26 @@ function canonicalizeView(view: AppView): CanonicalAppView {
   return view;
 }
 
+const LEGACY_TASK_VIEW_PATHS: Record<string, string> = {
+  '/follow-ups': 'waiting',
+  '/followups': 'waiting',
+  '/meetings': 'meetings',
+  '/meeting': 'meetings',
+};
+
+/**
+ * docs/57 §5 (P3-06): `/follow-ups` (`/followups`) and `/meetings` (`/meeting`)
+ * became the Waiting and Meetings views of Tasks. Returns the replacement URL
+ * (query string kept, `view` set), or null for any other path.
+ */
+export function legacyTaskViewRedirect(pathname: string, search: string): string | null {
+  const view = LEGACY_TASK_VIEW_PATHS[pathname.replace(/\/+$/, '')];
+  if (!view) return null;
+  const params = new URLSearchParams(search);
+  params.set('view', view);
+  return `/tasks?${params.toString()}`;
+}
+
 function pathToView(pathname: string): ResolvedAppView {
   if (TASK_LINK_PATH_PATTERN.test(pathname)) return 'task';
   if (pathname === '/my-day' || pathname === '/my-day/') return 'my-day';
@@ -133,8 +147,8 @@ function pathToView(pathname: string): ResolvedAppView {
   // P3-D1: `/tasks` is the Phase 3 name; `/desk`/`/manager-desk` normalize to
   // whichever path the workspace flag names canonical.
   if (pathname === '/tasks' || pathname === '/tasks/' || pathname === '/desk' || pathname === '/desk/' || pathname === '/manager-desk' || pathname === '/manager-desk/') return 'desk';
-  if (pathname === '/follow-ups' || pathname === '/follow-ups/' || pathname === '/followups' || pathname === '/followups/') return 'follow-ups';
-  if (pathname === '/meetings' || pathname === '/meetings/' || pathname === '/meeting' || pathname === '/meeting/') return 'meetings';
+  // docs/57 §5 (P3-06): Follow-ups and Meetings are Tasks views; `legacyTaskViewRedirect` rewrites the URL.
+  if (legacyTaskViewRedirect(pathname, '')) return 'desk';
   if (pathname === '/notes' || pathname === '/notes/') return 'notes';
   if (pathname === '/work' || pathname === '/work/' || pathname === '/dashboard' || pathname === '/dashboard/') return 'work';
   if (pathname === '/today' || pathname === '/today/' || pathname === '/' || pathname === '') return 'today';
@@ -156,8 +170,6 @@ function viewToPath(view: AppView): string {
   if (canonicalView === 'my-day') return '/my-day';
   if (canonicalView === 'team') return '/team';
   if (canonicalView === 'desk') return tasksNavEnabled ? '/tasks' : '/desk';
-  if (canonicalView === 'follow-ups') return '/follow-ups';
-  if (canonicalView === 'meetings') return '/meetings';
   if (canonicalView === 'notes') return '/notes';
   if (canonicalView === 'work') return '/work';
   if (canonicalView === 'settings') return '/settings';
@@ -185,10 +197,6 @@ function preloadView(view: AppView) {
     case 'desk':
       void loadManagerDeskPage();
       void loadTasksPage();
-      break;
-    case 'follow-ups':
-    case 'meetings':
-      void loadManagerMemoryPage();
       break;
     case 'notes':
       void loadNotesPage();
@@ -265,6 +273,10 @@ function navigateToView(view: AppView, options: NavigateOptions = {}) {
 }
 
 function replaceLegacyPathIfNeeded() {
+  const redirect = legacyTaskViewRedirect(window.location.pathname, window.location.search);
+  if (redirect) {
+    window.history.replaceState(null, '', redirect);
+  }
   const currentView = pathToView(window.location.pathname);
   if (currentView === 'not-found' || currentView === 'task') {
     return;
@@ -430,7 +442,11 @@ function AppContent() {
   // P3-D1: sync the flag-scoped canonical desk path before any navigation runs.
   setTasksNavEnabled(Boolean(features?.tasksPhase3));
 
-  const [activeView, setActiveView] = useState<ResolvedAppView>(() => pathToView(window.location.pathname));
+  // Retired /follow-ups and /meetings URLs are rewritten before any view state reads the location.
+  const [activeView, setActiveView] = useState<ResolvedAppView>(() => {
+    replaceLegacyPathIfNeeded();
+    return pathToView(window.location.pathname);
+  });
   const [dashboardFilterState, setDashboardFilterState] = useState<DashboardFilterState>(() =>
     pathToView(window.location.pathname) === 'work'
       ? dashboardFilterStateFromParams(new URLSearchParams(window.location.search))
@@ -594,7 +610,17 @@ function AppContent() {
     });
   }, [notesDate]);
 
-  const handleOpenTodayTarget = useCallback((target: TodayActionTarget) => {
+  const handleOpenTodayTarget = useCallback((incoming: TodayActionTarget) => {
+    // docs/57 §5 (P3-06): stale tabs and old Copilot history still send the retired
+    // follow-ups/meetings views; they mean the matching Tasks view. Without Phase 3 an
+    // item that only has a desk id opens the legacy desk.
+    let target = incoming;
+    if (target.view === 'follow-ups' || target.view === 'meetings') {
+      target = { ...target, view: 'tasks', taskView: target.taskView ?? (target.view === 'meetings' ? 'meetings' : 'waiting') };
+    }
+    if (!features?.tasksPhase3 && target.view === 'tasks' && target.managerDeskItemId && !target.taskKey) {
+      target = { ...target, view: 'desk' };
+    }
     // docs/54 J1: a task opens in the shared drawer over the current surface —
     // Today, the palette or Copilot keep their place — whoever owns the task.
     // People (`developer`) still open their Team drawer; deep links (`/t/T-n`)
@@ -735,10 +761,10 @@ function AppContent() {
       return;
     }
 
-    if (target.view === 'desk' || target.view === 'follow-ups' || target.view === 'meetings') {
-      preloadView(target.view === 'desk' ? 'desk' : target.view);
-      setActiveView(target.view);
-      navigateToView(target.view);
+    if (target.view === 'desk') {
+      preloadView('desk');
+      setActiveView('desk');
+      navigateToView('desk');
       return;
     }
 
@@ -1161,16 +1187,6 @@ function AppContent() {
             oneOnOneDeveloperId={teamPanelDev}
             onOneOnOnePanelChange={handleOneOnOnePanelChange}
           />
-        </Suspense>
-      </WorkspaceShell>
-    );
-  }
-
-  if (activeView === 'follow-ups' || activeView === 'meetings') {
-    return (
-      <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
-        <Suspense fallback={<PanelLoading />}>
-          <ManagerMemoryPage mode={activeView} onViewChange={handleViewChange} onOpenTarget={handleOpenTodayTarget} />
         </Suspense>
       </WorkspaceShell>
     );

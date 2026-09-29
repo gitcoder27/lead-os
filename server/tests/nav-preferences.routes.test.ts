@@ -28,7 +28,7 @@ async function loginCookie(username: string, password = "secret123"): Promise<st
 
 const DEFAULT_LAYOUT = {
   topNav: ["work", "team", "desk"],
-  moreNav: ["follow-ups", "notes", "meetings"],
+  moreNav: ["notes"],
 };
 
 beforeEach(async () => {
@@ -93,7 +93,7 @@ describe("preferences routes happy path", () => {
 
     const custom = {
       topNav: ["notes", "desk"],
-      moreNav: ["work", "team", "follow-ups", "meetings"],
+      moreNav: ["work", "team"],
     };
     const saved = await invoke(app, {
       method: "PUT",
@@ -119,7 +119,7 @@ describe("preferences routes happy path", () => {
     const duplicate = await invoke(app, {
       method: "PUT",
       url: "/api/preferences/navigation",
-      body: { topNav: ["work", "notes"], moreNav: ["team", "desk", "follow-ups", "notes", "meetings"] },
+      body: { topNav: ["work", "notes"], moreNav: ["team", "desk", "notes"] },
       headers: { cookie },
     });
     expect(duplicate.status).toBe(400);
@@ -133,6 +133,22 @@ describe("preferences routes happy path", () => {
     expect(missing.status).toBe(400);
   });
 
+  it("a stale client that still sends the retired pages saves cleanly (docs/57 P3-06)", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    const saved = await invoke(app, {
+      method: "PUT",
+      url: "/api/preferences/navigation",
+      body: { topNav: ["work", "follow-ups", "desk"], moreNav: ["team", "notes", "meetings"] },
+      headers: { cookie },
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.preferences).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
+    const reloaded = await invoke(app, { method: "GET", url: "/api/preferences/navigation", headers: { cookie } });
+    expect(reloaded.body.preferences).toEqual(saved.body.preferences);
+  });
+
   it("rejects unknown page ids at the schema layer", async () => {
     const app = createTestApp();
     const cookie = await loginCookie("manager");
@@ -140,7 +156,7 @@ describe("preferences routes happy path", () => {
     const res = await invoke(app, {
       method: "PUT",
       url: "/api/preferences/navigation",
-      body: { topNav: ["work", "team", "desk", "settings"], moreNav: ["follow-ups", "notes"] },
+      body: { topNav: ["work", "team", "desk", "settings"], moreNav: ["notes"] },
       headers: { cookie },
     });
     expect(res.status).toBe(400);

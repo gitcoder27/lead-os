@@ -557,7 +557,7 @@ describe('NotesPage', () => {
     fireEvent.click(toggle);
 
     fireEvent.click(screen.getByRole('button', { name: '2 follow-ups due' }));
-    expect(onOpenTarget).toHaveBeenCalledWith({ type: 'view', view: 'follow-ups' });
+    expect(onOpenTarget).toHaveBeenCalledWith({ type: 'view', view: 'tasks', taskView: 'waiting' });
     fireEvent.click(screen.getByRole('button', { name: '1:1 with Deepak Singh' }));
     expect(onOpenTarget).toHaveBeenCalledWith({
       type: 'developer',

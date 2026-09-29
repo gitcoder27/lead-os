@@ -44,7 +44,7 @@ describe('NavigationSection', () => {
     expect(top[0]).toContain('Today');
     expect(top[0]).toContain('Always first');
     expect(top.slice(1)).toEqual(['Work', 'Team', 'Desk']);
-    expect(labelsIn(moreList())).toEqual(['Follow-ups', 'Notes', 'Meetings']);
+    expect(labelsIn(moreList())).toEqual(['Notes']);
     expect(topList().queryByLabelText(/move today/i)).not.toBeInTheDocument();
   });
 
@@ -58,7 +58,7 @@ describe('NavigationSection', () => {
     await vi.waitFor(() => expect(saveMutateAsyncMock).toHaveBeenCalledTimes(1));
     expect(saveMutateAsyncMock).toHaveBeenCalledWith({
       topNav: ['work', 'desk', 'team'],
-      moreNav: ['follow-ups', 'notes', 'meetings'],
+      moreNav: ['notes'],
     });
     expect(addToastMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
   });
@@ -68,31 +68,31 @@ describe('NavigationSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Move Notes to top navigation' }));
     expect(labelsIn(topList()).slice(1)).toEqual(['Work', 'Team', 'Desk', 'Notes']);
-    expect(labelsIn(moreList())).toEqual(['Follow-ups', 'Meetings']);
+    expect(screen.getByText(/Every page is in the top navigation/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Move Desk to More menu' }));
     expect(labelsIn(topList()).slice(1)).toEqual(['Work', 'Team', 'Notes']);
-    expect(labelsIn(moreList())).toEqual(['Follow-ups', 'Meetings', 'Desk']);
+    expect(labelsIn(moreList())).toEqual(['Desk']);
   });
 
   it('keeps Save disabled until the layout changes', () => {
     render(<NavigationSection />);
     expect(screen.getByRole('button', { name: 'Save layout' })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move Meetings up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move Team up' }));
     expect(screen.getByRole('button', { name: 'Save layout' })).toBeEnabled();
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
 
   it('restores the default layout into the draft for saving', async () => {
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk', 'follow-ups', 'meetings'] } satisfies NavPreferences,
+      preferences: { topNav: ['notes'], moreNav: ['work', 'team', 'desk'] } satisfies NavPreferences,
     });
     render(<NavigationSection />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore default' }));
     expect(labelsIn(topList()).slice(1)).toEqual(['Work', 'Team', 'Desk']);
-    expect(labelsIn(moreList())).toEqual(['Follow-ups', 'Notes', 'Meetings']);
+    expect(labelsIn(moreList())).toEqual(['Notes']);
 
     fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
     await vi.waitFor(() => expect(saveMutateAsyncMock).toHaveBeenCalledWith(DEFAULT_NAV_PREFERENCES));
@@ -100,7 +100,7 @@ describe('NavigationSection', () => {
 
   it('shows the empty-state hint when every page is in the top navigation', () => {
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['work', 'team', 'desk', 'follow-ups', 'notes', 'meetings'], moreNav: [] },
+      preferences: { topNav: ['work', 'team', 'desk', 'notes'], moreNav: [] },
     });
     render(<NavigationSection />);
     expect(screen.getByText(/Every page is in the top navigation/)).toBeInTheDocument();
@@ -110,12 +110,12 @@ describe('NavigationSection', () => {
     saveMutateAsyncMock.mockRejectedValue(new Error('network down'));
     render(<NavigationSection />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move Meetings up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move Team up' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save layout' }));
 
     await vi.waitFor(() =>
       expect(addToastMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
     );
-    expect(labelsIn(moreList())).toEqual(['Follow-ups', 'Meetings', 'Notes']);
+    expect(labelsIn(topList()).slice(1)).toEqual(['Team', 'Work', 'Desk']);
   });
 });

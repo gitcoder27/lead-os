@@ -9,7 +9,7 @@ import { getPersistedJiraApiToken } from "./jira-credentials.service";
 import path from "node:path";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "./workspace.service";
-import { DEFAULT_TEAM_MODE, type JiraSyncScopeMode, type TeamMode } from "shared/types";
+import { DEFAULT_TEAM_MODE, TASK_STALE_DAYS, type JiraSyncScopeMode, type TeamMode } from "shared/types";
 
 export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
 export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
@@ -17,6 +17,10 @@ export const DEFAULT_STALE_THRESHOLD_HOURS = 48;
 export const DEFAULT_TEAM_TRACKER_STALE_THRESHOLD_HOURS = 4;
 export const DEFAULT_TEAM_TRACKER_NO_CURRENT_THRESHOLD_HOURS = 2;
 export const DEFAULT_TEAM_TRACKER_STATUS_FOLLOW_UP_THRESHOLD_HOURS = 2;
+/** docs/56 P1-02: manager-touch clock flags after this many working days. */
+export const DEFAULT_TEAM_TRACKER_TOUCH_STALE_WORKING_DAYS = TASK_STALE_DAYS;
+/** docs/56 P1-02: the no-current-work signal is opt-in in solo mode. */
+export const DEFAULT_TEAM_TRACKER_SOLO_NO_CURRENT_ENABLED = false;
 export const DEFAULT_JIRA_SYNC_SCOPE_MODE: JiraSyncScopeMode = "team_assignees";
 export const DEFAULT_BACKUP_ENABLED = true;
 export const DEFAULT_BACKUP_INTERVAL_MINUTES = 30;
@@ -144,6 +148,22 @@ export class SettingsService {
     return this.getPositiveIntegerConfig(
       "team_tracker_status_follow_up_threshold_hours",
       DEFAULT_TEAM_TRACKER_STATUS_FOLLOW_UP_THRESHOLD_HOURS,
+      workspaceId
+    );
+  }
+
+  async getTeamTrackerTouchStaleWorkingDays(workspaceId?: string): Promise<number> {
+    return this.getPositiveIntegerConfig(
+      "team_tracker_touch_stale_working_days",
+      DEFAULT_TEAM_TRACKER_TOUCH_STALE_WORKING_DAYS,
+      workspaceId
+    );
+  }
+
+  async getTeamTrackerSoloNoCurrentEnabled(workspaceId?: string): Promise<boolean> {
+    return this.getBooleanConfig(
+      "team_tracker_solo_no_current_enabled",
+      DEFAULT_TEAM_TRACKER_SOLO_NO_CURRENT_ENABLED,
       workspaceId
     );
   }

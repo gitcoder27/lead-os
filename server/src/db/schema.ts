@@ -156,6 +156,8 @@ export const teamTrackerDays = sqliteTable("team_tracker_days", {
   lastCheckInAt: text("last_check_in_at"),
   nextFollowUpAt: text("next_follow_up_at"),
   statusUpdatedAt: text("status_updated_at"),
+  /** docs/56 P1-02: who made the last status change (`manager` | `developer`); NULL = seeded or legacy. */
+  statusUpdatedBy: text("status_updated_by"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [

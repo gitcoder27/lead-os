@@ -463,7 +463,7 @@ export function createTeamTrackerRouter(
         const day = await trackerService.updateDay(accountId, date, {
           status,
           managerNotes,
-        }, req.auth!.user.workspaceId);
+        }, req.auth!.user.workspaceId, { type: req.auth!.user.role });
         res.json(day);
       } catch (error) {
         next(error);

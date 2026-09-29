@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import { configTable, developers, issues, managerDeskDays, teamTrackerDays } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -112,6 +113,7 @@ describe("TodayService", () => {
   });
 
   it("builds exact ranked action targets across people, work, and manager memory", async () => {
+    await enableCollabParticipation(["dev-1"]);
     await trackerService.updateDay("dev-1", "2026-03-08", { status: "blocked" });
     await seedIssue("AM-1", { dueDate: "2026-03-07" });
     await seedIssue("AM-2", {
@@ -486,6 +488,8 @@ describe("TodayService", () => {
   });
 
   it("stops asking for another check-in once a no-current developer has a same-day check-in", async () => {
+    // Collab: only the developer's own check-in resets their freshness (docs/56 P1-02).
+    await enableCollabParticipation(["dev-1"]);
     const before = await todayService().getToday("manager-1", "2026-03-08");
     const beforeDeveloperAction = before.actionItems.find((item) => item.target.developerAccountId === "dev-1");
 
@@ -500,7 +504,7 @@ describe("TodayService", () => {
 
     await trackerService.addCheckIn("dev-1", "2026-03-08", {
       summary: "Asked about next work",
-    });
+    }, { type: "developer", accountId: "dev-1" });
 
     const after = await todayService().getToday("manager-1", "2026-03-08");
     const afterDeveloperAction = after.actionItems.find((item) => item.target.developerAccountId === "dev-1");

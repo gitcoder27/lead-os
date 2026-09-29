@@ -117,7 +117,7 @@ export class MyDayService {
     workspaceId?: string
   ): Promise<MyDayResponse> {
     await this.assertWritable(accountId, date, workspaceId);
-    await this.trackerService.updateDay(accountId, date, { status }, workspaceId);
+    await this.trackerService.updateDay(accountId, date, { status }, workspaceId, { type: "developer" });
     return this.getMyDay(accountId, date, workspaceId);
   }
 

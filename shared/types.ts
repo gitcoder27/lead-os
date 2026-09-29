@@ -1555,16 +1555,32 @@ export interface TrackerBoardSummary {
   doneForToday: number;
 }
 
+/**
+ * docs/56 P1-02: which clock drives freshness. `check_in` (collab and a
+ * participating developer) = developer-authored check-ins; `manager_touch`
+ * (solo, or a non-participating developer) = the manager's own activity.
+ */
+export type TrackerFreshnessClock = "check_in" | "manager_touch";
+
 export interface TrackerFreshnessSignals {
   staleThresholdHours: number;
   noCurrentThresholdHours: number;
   statusFollowUpThresholdHours: number;
+  /** Check-in clock: hours since the developer's own last check-in. */
   hoursSinceCheckIn?: number;
   hoursSinceStatusChange?: number;
+  /** Check-in staleness; always false on the `manager_touch` clock. */
   staleByTime: boolean;
   staleWithOpenRisk: boolean;
   staleWithoutCurrentWork: boolean;
   statusChangeWithoutFollowUp: boolean;
+  clock?: TrackerFreshnessClock;
+  /** Manager-touch clock only (never sent to developers). */
+  lastManagerTouchAt?: string;
+  workingDaysSinceTouch?: number;
+  touchStaleWorkingDays?: number;
+  /** No manager touch for `touchStaleWorkingDays` working days. */
+  untouched?: boolean;
 }
 
 export interface TrackerRiskSignals {

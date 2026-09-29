@@ -1466,7 +1466,8 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
           args.accountId,
           args.date ?? ctx.date,
           { status: args.status, managerNotes: args.managerNotes },
-          ctx.workspaceId
+          ctx.workspaceId,
+          { type: "manager" }
         );
         return {
           result: compact({ date: day.date, status: day.status }),

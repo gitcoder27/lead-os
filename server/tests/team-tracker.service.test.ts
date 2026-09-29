@@ -5,6 +5,7 @@ import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { resetDatabase, db } from "./helpers/db";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import {
   configTable,
   developers,
@@ -232,6 +233,7 @@ describe("TeamTrackerService", () => {
     });
 
     it("computes smarter freshness and risk signals for the board", async () => {
+      await enableCollabParticipation(["dev-1", "dev-2"]);
       await seedIssue({ developmentDueDate: "2026-03-06", dueDate: "2026-03-09" });
       await service.updateDay("dev-1", "2026-03-07", {
         status: "blocked",
@@ -1861,6 +1863,7 @@ describe("TeamTrackerService", () => {
 
   describe("stale detection", () => {
     it("marks developer as stale when no check-in", async () => {
+      await enableCollabParticipation(["dev-1", "dev-2"]);
       const board = await service.getBoard("2026-03-07");
       const devDay = board.developers.find(
         (d) => d.developer.accountId === "dev-1"
@@ -1869,9 +1872,10 @@ describe("TeamTrackerService", () => {
     });
 
     it("marks developer as not stale after recent check-in", async () => {
+      await enableCollabParticipation(["dev-1", "dev-2"]);
       await service.addCheckIn("dev-1", "2026-03-07", {
         summary: "All good",
-      });
+      }, { type: "developer", accountId: "dev-1" });
       const board = await service.getBoard("2026-03-07");
       const devDay = board.developers.find(
         (d) => d.developer.accountId === "dev-1"

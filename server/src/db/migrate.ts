@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS team_tracker_days (
   last_check_in_at      TEXT,
   next_follow_up_at     TEXT,
   status_updated_at     TEXT,
+  status_updated_by     TEXT,
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL,
   UNIQUE(workspace_id, date, developer_account_id)
@@ -681,6 +682,7 @@ const alterStatements = [
   "ALTER TABLE team_tracker_days ADD COLUMN capacity_units INTEGER",
   "ALTER TABLE team_tracker_days ADD COLUMN next_follow_up_at TEXT",
   "ALTER TABLE team_tracker_days ADD COLUMN status_updated_at TEXT",
+  "ALTER TABLE team_tracker_days ADD COLUMN status_updated_by TEXT",
   "CREATE TABLE IF NOT EXISTS developer_availability_periods (id INTEGER PRIMARY KEY AUTOINCREMENT, developer_account_id TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT, note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_dev_availability_dev_dates ON developer_availability_periods(developer_account_id, start_date, end_date)",
   "ALTER TABLE team_tracker_checkins ADD COLUMN status TEXT",

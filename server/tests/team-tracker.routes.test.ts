@@ -9,6 +9,7 @@ import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { resetDatabase, db } from "./helpers/db";
+import { enableCollabParticipation } from "./helpers/team-mode";
 import { checkinTaskRefs, configTable, developerAvailabilityPeriods, developers, issues, managerDeskItems, teamTrackerSavedViews } from "../src/db/schema";
 
 const trackerService = new TeamTrackerService();
@@ -422,6 +423,8 @@ describe("team tracker routes", () => {
       developmentDueDate: "2026-03-06",
       dueDate: "2026-03-09",
     });
+    const devRows = await db.select({ accountId: developers.accountId }).from(developers);
+    await enableCollabParticipation(devRows.map((row) => row.accountId));
 
     await trackerService.updateDay("dev-1", "2026-03-07", { status: "blocked" });
     await trackerService.updateDay("dev-3", "2026-03-07", { status: "at_risk" });

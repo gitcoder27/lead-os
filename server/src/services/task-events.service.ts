@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, isNull, like, lt, max, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
-import { taskEvents, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
+import { taskEvents, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -345,6 +345,33 @@ export class TaskEventsService {
     if (!(await this.keys.canonicalEnabled(workspaceId))) return eq(taskEvents.taskKey, key);
     const resolved = await this.keys.resolve(normalizeWorkspaceId(workspaceId), key);
     return sql`${taskEvents.taskId} IN (SELECT id FROM tasks WHERE workspace_id = ${normalizeWorkspaceId(workspaceId)} AND task_key = ${resolved ?? ""})`;
+  }
+
+  /**
+   * docs/56 P1-02: latest manager-authored event at or before `asOf` on tasks
+   * each developer owns or is `person`-linked to (the manager-touch clock).
+   */
+  async latestManagerTouchByDeveloper(developerAccountIds: string[], asOf: string, workspaceId?: string): Promise<Map<string, string>> {
+    const latest = new Map<string, string>();
+    if (developerAccountIds.length === 0) return latest;
+    const scope = normalizeWorkspaceId(workspaceId);
+    const managerEvents = and(eq(taskEvents.workspaceId, scope), eq(taskEvents.authorType, "manager"), lte(taskEvents.occurredAt, asOf));
+    const joinTask = and(eq(tasks.workspaceId, taskEvents.workspaceId), eq(tasks.taskKey, taskEvents.taskKey));
+    const [owned, linked] = await Promise.all([
+      db.select({ accountId: tasks.ownerId, last: max(taskEvents.occurredAt) }).from(taskEvents).innerJoin(tasks, joinTask)
+        .where(and(managerEvents, eq(tasks.ownerType, "developer"), inArray(tasks.ownerId, developerAccountIds)))
+        .groupBy(tasks.ownerId),
+      db.select({ accountId: taskLinks.ref, last: max(taskEvents.occurredAt) }).from(taskEvents).innerJoin(tasks, joinTask)
+        .innerJoin(taskLinks, and(eq(taskLinks.workspaceId, tasks.workspaceId), eq(taskLinks.taskId, tasks.id)))
+        .where(and(managerEvents, eq(taskLinks.kind, "person"), inArray(taskLinks.ref, developerAccountIds)))
+        .groupBy(taskLinks.ref),
+    ]);
+    for (const row of [...owned, ...linked]) {
+      if (!row.accountId || !row.last) continue;
+      const current = latest.get(row.accountId);
+      if (!current || row.last > current) latest.set(row.accountId, row.last);
+    }
+    return latest;
   }
 
   async repointKeyToTaskId(workspaceId: string, taskKey: string, taskId: number): Promise<void> {

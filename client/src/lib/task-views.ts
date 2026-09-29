@@ -5,6 +5,7 @@ import type {
   TaskViewDefinition,
   TaskViewGroup,
   TaskViewSort,
+  TaskWaitingOnInput,
 } from '@/types';
 import { shiftLocalIsoDate } from '@/lib/utils';
 import { taskPlanDate } from '@/lib/task-list';
@@ -41,8 +42,8 @@ export interface TaskViewOverrides {
 }
 
 const TASK_STATUSES: readonly TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
-const TASK_VIEW_GROUPS: readonly TaskViewGroupOverride[] = ['owner', 'status', 'label', 'scheduled', 'none'];
-const TASK_VIEW_SORTS: readonly TaskViewSort[] = ['scheduled', 'updated', 'created', 'priority'];
+const TASK_VIEW_GROUPS: readonly TaskViewGroupOverride[] = ['owner', 'status', 'label', 'scheduled', 'party', 'none'];
+const TASK_VIEW_SORTS: readonly TaskViewSort[] = ['scheduled', 'updated', 'created', 'priority', 'checkBy'];
 const TASK_SIGNALS: readonly TaskAttentionSignal[] = ['overdue', 'stale', 'drift'];
 export const OWNER_TOKENS = ['me', 'team', 'inbox'] as const;
 
@@ -142,7 +143,9 @@ export type TaskGroupContext =
   | { mode: 'scheduled'; bucket: ScheduledBucket }
   | { mode: 'owner'; ownerType: 'manager' | 'developer' | null; ownerId: string | null }
   | { mode: 'status'; status: TaskStatus }
-  | { mode: 'label'; label: string | null };
+  | { mode: 'label'; label: string | null }
+  /** docs/57 §4: the party a task waits on (null = my own blocked work). */
+  | { mode: 'party'; waitingOn: TaskWaitingOnInput | null };
 
 export interface TaskViewGroupBucket {
   key: string;
@@ -168,6 +171,33 @@ export function scheduledBucket(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'>
   if (plan === shiftLocalIsoDate(today, 1)) return 'Tomorrow';
   if (plan <= shiftLocalIsoDate(today, 7)) return 'Next 7 days';
   return 'Beyond';
+}
+
+const PARTY_BLOCKED = 'party:blocked';
+
+/**
+ * docs/57 §4: who a task waits on — the explicit party, else another owner
+ * (a delegated task waits on its developer), else my own blocked work. A party
+ * and an owner that are the same developer share one group.
+ */
+export function taskParty(
+  task: Pick<ManagerTask, 'waitingOn' | 'ownerType' | 'ownerId'>,
+  ownerName: (ownerType: string | null, ownerId: string | null) => string,
+  selfAccountId?: string,
+): { key: string; label: string; waitingOn: TaskWaitingOnInput | null } {
+  const waiting = task.waitingOn;
+  if (waiting) {
+    if (waiting.type === 'developer' && waiting.ref) {
+      return { key: `party:developer:${waiting.ref}`, label: ownerName('developer', waiting.ref) || waiting.label, waitingOn: { type: 'developer', ref: waiting.ref } };
+    }
+    const label = waiting.label || 'Someone';
+    if (waiting.type === 'contact' && waiting.ref) return { key: `party:contact:${waiting.ref}`, label, waitingOn: { type: 'contact', ref: waiting.ref, label } };
+    return { key: `party:text:${label.toLowerCase()}`, label, waitingOn: { type: 'text', label } };
+  }
+  if (task.ownerType === 'developer' && task.ownerId && task.ownerId !== selfAccountId) {
+    return { key: `party:developer:${task.ownerId}`, label: ownerName('developer', task.ownerId), waitingOn: { type: 'developer', ref: task.ownerId } };
+  }
+  return { key: PARTY_BLOCKED, label: 'Blocked', waitingOn: null };
 }
 
 /**
@@ -211,6 +241,11 @@ export function groupTaskViewTasks(
         push(bucket, bucket, { mode: 'scheduled', bucket }, task);
         break;
       }
+      case 'party': {
+        const party = taskParty(task, ownerName, selfAccountId);
+        push(party.key, party.label, { mode: 'party', waitingOn: party.waitingOn }, task);
+        break;
+      }
     }
   }
   const keys = [...buckets.keys()];
@@ -218,6 +253,8 @@ export function groupTaskViewTasks(
   if (group === 'status') keys.sort((a, b) => STATUS_GROUP_ORDER.indexOf(a as TaskStatus) - STATUS_GROUP_ORDER.indexOf(b as TaskStatus));
   else if (group === 'scheduled') keys.sort((a, b) => SCHEDULED_GROUP_ORDER.indexOf(a as ScheduledBucket) - SCHEDULED_GROUP_ORDER.indexOf(b as ScheduledBucket));
   else if (group === 'owner') keys.sort((a, b) => ownerRank(a) - ownerRank(b) || buckets.get(a)!.label.localeCompare(buckets.get(b)!.label));
+  // docs/57 §4: parties A→Z, my own blocked work last; rows keep the server's check-by order.
+  else if (group === 'party') keys.sort((a, b) => Number(a === PARTY_BLOCKED) - Number(b === PARTY_BLOCKED) || buckets.get(a)!.label.localeCompare(buckets.get(b)!.label));
   else keys.sort((a, b) => (a === 'label:' ? 1 : b === 'label:' ? -1 : a.localeCompare(b)));
   // docs/51 F7: mirror the server's scheduled sort — plan date first, then a
   // manual rank, so an optimistic schedulePosition patch reorders rows without

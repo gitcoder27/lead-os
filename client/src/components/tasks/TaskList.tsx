@@ -196,6 +196,11 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
     ) : (
       <span className="h-[18px] w-[18px] rounded-full" style={{ border: '1px dashed var(--border-strong)' }} aria-hidden="true" />
     );
+  } else if (context.mode === 'party') {
+    // docs/57 §4: the party waited on; my own blocked work has no avatar.
+    indicator = context.waitingOn
+      ? <Avatar name={group.label} seed={context.waitingOn.ref ?? group.label} size={18} />
+      : <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--danger)' }} aria-hidden="true" />;
   } else if (tone) {
     indicator = <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone }} aria-hidden="true" />;
   }

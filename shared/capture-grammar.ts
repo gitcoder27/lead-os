@@ -12,8 +12,11 @@
  *   note      = "/note" ws text                     — today's daily note
  *   create    = { token | word }
  *   token     = person | jira | parent | taskref | date | priority | later
- *             | meeting | followup | label
- *   person    = "@" ident                           — first @ owns; later @s link
+ *             | meeting | followup | waiting | label
+ *   person    = "@" ident                           — first @ owns; later @s link;
+ *                                                   ident may contain ":" (Jira ids)
+ *                                                   and matches developers or contacts
+ *                                                   (a contact never owns — it links)
  *   jira      = "#" project "-" digits              — primary if first
  *   parent    = "^" taskref
  *   taskref   = "T-" digits                         — bare ref → task link
@@ -25,8 +28,14 @@
  *   later     = "/later" | "/l"                    — a !date with /later is the resurface
  *                                                   date (hideUntil); @people become links
  *   meeting   = "/meeting" | "/m"
- *   followup  = ("/followup" | "/f") [ ws date ]
+ *   followup  = ("/followup" | "/f") [ ws person ] [ ws date ]
+ *                                                   — with @who it means waiting on them
+ *   waiting   = ("/waiting" | "/w") ws person [ ws date ]
+ *                                                   — waiting on who; date = check-by
  *   label     = "+" ident
+ *
+ *   `/w` and `/f` bind the first @person and first !date within the next two
+ *   words, in either order (docs/57 §3).
  *
  * Dates are resolved against a caller-supplied `today` (todayIsoDate
  * semantics, D29); the client passes its local today, the server re-resolves
@@ -47,6 +56,7 @@ export type CaptureTokenKind =
   | "later"
   | "meeting"
   | "followup"
+  | "waiting"
   | "label"
   /** The leading `T-n:` / `/note` marker for update and note intents. */
   | "command";
@@ -59,15 +69,21 @@ export interface CaptureToken {
   end: number;
   /** Normalized payload: person ident, label name, jira/task key, ISO date. */
   value?: string;
-  /** A `!date` consumed by a preceding `/f` sets followUpAt, not scheduledOn. */
+  /** A `!date` consumed by a preceding `/f` or `/w` sets followUpAt (check-by), not scheduledOn. */
   forFollowup?: boolean;
+  /** A `@person` consumed by a preceding `/w` or `/f` is the waiting-on party (docs/57 §3). */
+  forWaiting?: boolean;
   /** Resolution demoted the token back into the title text ("kept as text"). */
   dropped?: boolean;
 }
 
 export interface CapturePersonCandidate {
+  /** Developer account id, or the contact's handle. */
   accountId: string;
   displayName: string;
+  /** docs/57 §2: contacts are external stakeholders; they can be waited on or linked, never own. */
+  kind?: "developer" | "contact";
+  contactId?: number;
 }
 
 export type CaptureDiagnosticCode =
@@ -86,7 +102,8 @@ export type CaptureDiagnosticCode =
   | "jira-not-synced"
   | "bad-update-target"
   | "bad-parent"
-  | "bad-task-ref";
+  | "bad-task-ref"
+  | "waiting-needs-person";
 
 export interface CaptureDiagnostic {
   severity: "error" | "warning" | "info";
@@ -97,6 +114,8 @@ export interface CaptureDiagnostic {
   /** Index into `tokens[]` — the ambiguous-person chooser targets this token. */
   tokenIndex?: number;
   candidates?: CapturePersonCandidate[];
+  /** docs/57 §3: `unknown-person` — the alias a "Create contact" action would use. */
+  suggestContact?: string;
 }
 
 /** Every whitespace-delimited word, tagged when a token consumed it. */
@@ -139,8 +158,10 @@ export interface ResolvedCapture {
   confirmRequired: boolean;
   /** The `T-n:` update target (normalized). */
   updateTargetKey?: string;
-  /** First `@person` — the owner. */
+  /** First unbound developer `@person` — the owner. */
   owner: CapturePersonCandidate | null;
+  /** docs/57 §3 (P3-03): the `@person` bound by `/w` or `/f` — who this waits on. */
+  waitingOn: CapturePersonCandidate | null;
   /** Additional `@person`s — person links. */
   peopleLinks: CapturePersonCandidate[];
   /** Jira links in order; the first is primary. */
@@ -153,7 +174,7 @@ export interface ResolvedCapture {
   /** docs/57 §3: `/later !date` — the date the parked task resurfaces in Inbox. */
   hideUntil: string | null;
   followUp: boolean;
-  /** `/f` optionally followed by `!date`; null → caller defaults to today. */
+  /** `/f` or `/w` with a bound `!date` — the check-by date. */
   followUpAt: string | null;
   later: boolean;
   meeting: boolean;
@@ -220,7 +241,8 @@ function resolveDateIdent(ident: string, today: string): string | null {
 const UPDATE_PREFIX = /^\s*([Tt]-\d{1,9})\s*:\s*/;
 const NOTE_PREFIX = /^\s*\/note(?:\s+|$)/i;
 const TASK_REF = /^[Tt]-\d{1,9}$/;
-const PERSON_REF = /^@([A-Za-z0-9][A-Za-z0-9._-]*)$/;
+// docs/57 §3: ":" allowed so Jira account ids like `557058:ab-12` parse.
+const PERSON_REF = /^@([A-Za-z0-9][A-Za-z0-9._:-]*)$/;
 const JIRA_REF = /^#([A-Za-z][A-Za-z0-9]*-\d{1,7})$/;
 const PARENT_REF = /^\^([Tt]-\d{1,9})$/;
 const LABEL_REF = /^\+([A-Za-z0-9][A-Za-z0-9_-]{0,49})$/;
@@ -300,7 +322,10 @@ export function parseCapture(text: string, today: string): ParsedCapture {
   // create = { token | word }
   const words = splitWords(text);
   const tokens: CaptureToken[] = [];
-  let expectFollowupDate = false;
+  // `/f` and `/w` bind the first @person and !date within the next two words.
+  let bindWindow = 0;
+  let bindPerson = false;
+  let bindDate = false;
 
   const consume = (word: CaptureWord, token: CaptureToken): void => {
     word.tokenIndex = tokens.length;
@@ -317,7 +342,8 @@ export function parseCapture(text: string, today: string): ParsedCapture {
     const label = LABEL_REF.exec(word.raw);
 
     if (person) {
-      token = { ...base, kind: "person", value: person[1] };
+      token = { ...base, kind: "person", value: person[1], ...(bindWindow > 0 && bindPerson ? { forWaiting: true } : {}) };
+      if (token.forWaiting) bindPerson = false;
     } else if (jira) {
       token = { ...base, kind: "jira", value: jira[1]!.toUpperCase() };
     } else if (parent) {
@@ -329,7 +355,8 @@ export function parseCapture(text: string, today: string): ParsedCapture {
     } else if (word.raw.startsWith("!")) {
       const date = resolveDateIdent(word.raw.slice(1), today);
       if (date) {
-        token = { ...base, kind: "date", value: date, ...(expectFollowupDate ? { forFollowup: true } : {}) };
+        token = { ...base, kind: "date", value: date, ...(bindWindow > 0 && bindDate ? { forFollowup: true } : {}) };
+        if (token.forFollowup) bindDate = false;
       } else {
         pushDiagnostic(diagnostics, "warning", "unparsed-date", `"${word.raw}" isn't a date — kept as text`, undefined);
       }
@@ -339,6 +366,8 @@ export function parseCapture(text: string, today: string): ParsedCapture {
       token = { ...base, kind: "meeting" };
     } else if (/^\/(followup|f)$/i.test(word.raw)) {
       token = { ...base, kind: "followup" };
+    } else if (/^\/(waiting|w)$/i.test(word.raw)) {
+      token = { ...base, kind: "waiting" };
     } else if (label) {
       token = { ...base, kind: "label", value: label[1]!.toLowerCase() };
     } else if (/^[@^+#]/.test(word.raw)) {
@@ -347,8 +376,13 @@ export function parseCapture(text: string, today: string): ParsedCapture {
     }
 
     if (token) consume(word, token);
-    // `/f`'s optional [ws date] binds only to the very next word.
-    expectFollowupDate = token?.kind === "followup";
+    if (token?.kind === "followup" || token?.kind === "waiting") {
+      bindWindow = 2;
+      bindPerson = true;
+      bindDate = true;
+    } else if (bindWindow > 0) {
+      bindWindow -= 1;
+    }
   }
 
   // ── Structural diagnostics (no lookups needed) ──
@@ -368,6 +402,10 @@ export function parseCapture(text: string, today: string): ParsedCapture {
   }
   // docs/57 §3 (P3-02): with /later the date is the resurface date and every
   // @person is a link — parked work stays mine, so neither is an error.
+  const waitingToken = tokens.find((entry) => entry.kind === "waiting");
+  if (waitingToken && !tokens.some((entry) => entry.kind === "person" && entry.forWaiting)) {
+    pushDiagnostic(diagnostics, "error", "waiting-needs-person", "Add @who right after /w", waitingToken, tokens.indexOf(waitingToken));
+  }
   for (const entry of tokens) {
     if (entry.kind === "date" && entry.value && entry.value < today) {
       pushDiagnostic(diagnostics, "warning", "past-date", `${entry.value} is in the past`, entry, tokens.indexOf(entry));
@@ -391,22 +429,28 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
   const diagnostics: CaptureDiagnostic[] = [...parsed.diagnostics];
   const people = lookups.people ?? [];
 
-  // People — first @ owns the task, the rest become person links.
+  // People — the @ bound by /w or /f is the waiting-on party; the first other
+  // developer @ owns the task (never under /later); every other match links.
+  // Contacts can be waited on or linked, never own (docs/57 §3).
   const personTokens = tokens.filter((token) => token.kind === "person");
   // docs/57 §3: developer tasks cannot be Later, so /later keeps me as owner.
   const later = tokens.some((token) => token.kind === "later");
   let owner: CapturePersonCandidate | null = null;
+  let waitingOn: CapturePersonCandidate | null = null;
   const peopleLinks: CapturePersonCandidate[] = [];
+  const ownerToken = personTokens.find((token) => !token.forWaiting);
   for (const token of personTokens) {
     const index = tokens.indexOf(token);
     const matches = matchCapturePeople(token.value ?? "", people);
     if (matches.length === 0) {
-      pushDiagnostic(diagnostics, "error", "unknown-person", `Nobody matches @${token.value}`, token, index);
+      diagnostics.push({ severity: "error", code: "unknown-person", message: `Nobody matches @${token.value}`, token: token.raw, tokenIndex: index, suggestContact: token.value });
     } else if (matches.length > 1) {
       diagnostics.push({ severity: "error", code: "ambiguous-person", message: `@${token.value} is ambiguous — pick someone`, token: token.raw, tokenIndex: index, candidates: matches });
-    } else if (token === personTokens[0] && !later) {
+    } else if (token.forWaiting && !waitingOn) {
+      waitingOn = matches[0]!;
+    } else if (token === ownerToken && !later && matches[0]!.kind !== "contact") {
       owner = matches[0]!;
-    } else {
+    } else if (!peopleLinks.some((person) => person.accountId === matches[0]!.accountId && person.kind === matches[0]!.kind)) {
       peopleLinks.push(matches[0]!);
     }
   }
@@ -462,10 +506,12 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
   const title = parsed.intent === "create" ? buildTitle(parsed.words, tokens) : parsed.title;
 
   const firstDate = tokens.find((entry) => entry.kind === "date" && !entry.forFollowup)?.value ?? null;
-  const scheduledOn = later ? null : firstDate;
-  const hideUntil = later ? firstDate : null;
   const followUpAt = tokens.find((entry) => entry.kind === "date" && entry.forFollowup)?.value ?? null;
   const followUp = tokens.some((entry) => entry.kind === "followup");
+  // docs/57 §3: `/f !date` with nobody to wait on is my own reminder, so it is
+  // also planned on that date.
+  const scheduledOn = later ? null : firstDate ?? (followUp && !waitingOn && followUpAt ? followUpAt : null);
+  const hideUntil = later ? firstDate : null;
   const labels = tokens.filter((entry) => entry.kind === "label").map((entry) => entry.value!);
   if (followUp) labels.unshift("category:follow_up");
 
@@ -481,6 +527,7 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
     confirmRequired,
     updateTargetKey,
     owner,
+    waitingOn,
     peopleLinks,
     jiraLinks,
     taskLinks,

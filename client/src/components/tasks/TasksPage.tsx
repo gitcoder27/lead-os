@@ -34,6 +34,7 @@ import {
   scheduleChanges,
   searchTasks,
   taskPlanDate,
+  localDateOf,
   shortDay,
   toggledDoneStatus,
   type LingerEntry,
@@ -42,13 +43,14 @@ import {
   type SchedulePreset,
 } from '@/lib/task-list';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
-import type { ManagerTask, TaskStatus, TaskViewDefinition, TaskViewMeta, UpdateTaskRequest } from '@/types';
+import type { ManagerTask, TaskStatus, TaskViewDefinition, TaskViewMeta, TaskWaitingOnInput, UpdateTaskRequest } from '@/types';
 import { TaskDrawer, navigateToTaskPage } from './TaskDrawer';
 import { TaskBulkBar } from './TaskBulkBar';
 import { InlineAddRow, TASK_LIST_CONTAINER, TaskList } from './TaskList';
 import type { TaskRowHandlers } from './TaskListRow';
 import { TaskKeyboardHint, TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
-import { AssignMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
+import { AssignMenu, CheckByMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, WaitingMenu, checkByTimestamp, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
+import { useContacts } from '@/hooks/useContacts';
 import { TaskToolbar } from './TaskToolbar';
 import { TaskViewRail } from './TaskViewRail';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
@@ -232,6 +234,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   // docs/51 F3: my linked developer account is me — same identity the server
   // uses (the session accountId IS the developer id for linked managers).
   const selfAccountId = user?.accountId;
+  const contacts = useContacts();
   const assignableDevelopers = useMemo(
     () => developerList.filter((dev) => dev.accountId !== selfAccountId),
     [developerList, selfAccountId],
@@ -435,6 +438,26 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     );
   }, [applyChanges]);
 
+  // docs/57 §4 (P3-03): `w` sets who a task waits on, `c` its check-by date (followUpAt).
+  const setWaitingOn = useCallback((targets: ManagerTask[], waitingOn: TaskWaitingOnInput | null) => {
+    const sameParty = (task: ManagerTask) => waitingOn
+      ? task.waitingOn?.type === waitingOn.type && (task.waitingOn.ref ?? null) === (waitingOn.ref ?? null) && (waitingOn.type !== 'text' || task.waitingOn.label === waitingOn.label)
+      : !task.waitingOn;
+    void applyChanges(
+      targets,
+      (task) => (sameParty(task) ? null : { waitingOn }),
+      (count) => (waitingOn ? `${plural(count)} → waiting on ${waitingOn.label ?? 'them'}` : `${plural(count)} → no longer waiting`),
+    );
+  }, [applyChanges]);
+
+  const setCheckBy = useCallback((targets: ManagerTask[], date: string | null) => {
+    void applyChanges(
+      targets,
+      (task) => (localDateOf(task.followUpAt) === date ? null : { followUpAt: date ? checkByTimestamp(date) : null }),
+      (count) => (date ? `Check ${shortDay(date, today)} · ${plural(count)}` : `Check date cleared · ${plural(count)}`),
+    );
+  }, [applyChanges, today]);
+
   const setPriority = useCallback((targets: ManagerTask[], priority: TaskPriority) => {
     void applyChanges(
       targets,
@@ -637,6 +660,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       case 'a': openMenu('assign', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'l': openMenu('label', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'p': openMenu('priority', targetsFor().map((task) => task.taskKey), anchor); break;
+      case 'w': openMenu('waiting', targetsFor().map((task) => task.taskKey), anchor); break;
+      case 'c': openMenu('checkBy', targetsFor().map((task) => task.taskKey), anchor); break;
       case '#': drop(targetsFor()); break;
       case 'n': {
         const group = groups.find((candidate) => candidate.tasks.some((row) => row.taskKey === focused)) ?? groups[0];
@@ -945,6 +970,25 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onSelect={(priority) => { setPriority(menuTargets, priority); closeMenu(); }}
         />
       )}
+      {menu?.kind === 'waiting' && (
+        <WaitingMenu
+          anchor={menu.anchor}
+          developers={assignableDevelopers}
+          contacts={contacts.data ?? []}
+          current={menuTargets.some((task) => Boolean(task.waitingOn))}
+          onClose={closeMenu}
+          onSelect={(waitingOn) => { setWaitingOn(menuTargets, waitingOn); closeMenu(); }}
+        />
+      )}
+      {menu?.kind === 'checkBy' && (
+        <CheckByMenu
+          anchor={menu.anchor}
+          today={today}
+          current={menuTargets.length === 1 ? localDateOf(menuTarget?.followUpAt) : undefined}
+          onClose={closeMenu}
+          onPick={(date) => { setCheckBy(menuTargets, date); closeMenu(); }}
+        />
+      )}
       {menu?.kind === 'more' && menuTarget && (
         <MoreMenu
           anchor={menu.anchor}
@@ -955,6 +999,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onAssign={() => setMenu({ ...menu, kind: 'assign' })}
           onLabels={() => setMenu({ ...menu, kind: 'label' })}
           onPriority={() => setMenu({ ...menu, kind: 'priority' })}
+          onWaiting={() => setMenu({ ...menu, kind: 'waiting' })}
+          onCheckBy={() => setMenu({ ...menu, kind: 'checkBy' })}
           onLater={() => { schedule(menuTargets, 'later'); closeMenu(); }}
           onDrop={() => { drop(menuTargets); closeMenu(); }}
           onCopyLink={() => {

@@ -76,7 +76,7 @@ export function surfaceTaskToDeskLinks(task: SurfaceTask, developerNames?: Map<s
 
 export function surfaceTaskToDeskItem(task: ManagerSurfaceTask, developerNames?: Map<string, string>): ManagerDeskItem {
   const labels = task.labels ?? [];
-  const kind: ManagerDeskItemKind = task.kind === "meeting" ? "meeting" : labels.includes("kind:decision") ? "decision" : labels.includes("kind:waiting") ? "waiting" : "action";
+  const kind: ManagerDeskItemKind = task.kind === "meeting" ? "meeting" : labels.includes("kind:decision") ? "decision" : labels.includes("kind:waiting") || task.waitingOn ? "waiting" : "action";
   const category = (labels.find((label) => label.startsWith("category:"))?.slice(9) ?? "other") as ManagerDeskCategory;
   // docs/57 §1: untriaged captures read as Desk inbox items too.
   const status: ManagerDeskStatus = (!task.ownerType || task.needsTriage) && task.status === "open" ? "inbox" : taskStatusToDeskStatus(task.status, task.later ? 1 : 0) as ManagerDeskStatus;

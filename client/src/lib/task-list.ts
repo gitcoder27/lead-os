@@ -35,6 +35,27 @@ function daysBetween(from: string, to: string): number {
   return Math.round((parseISO(to).getTime() - parseISO(from).getTime()) / 86_400_000);
 }
 
+/**
+ * docs/57 §4 (P3-03): Waiting-lens row chips — aging ("Waiting 6d") and the
+ * check-by date ("Check Fri", "Check today", "Check 2d late"). Check-by is
+ * `followUpAt`, compared as a local date.
+ */
+export function waitingChips(
+  task: Pick<ManagerTask, 'followUpAt' | 'status'> & { signals?: { waitingDays?: number | null } },
+  today: string,
+): { aging: string | null; check: { label: string; tone: 'danger' | 'warning' | 'muted' } | null } {
+  if (!isOpenStatus(task.status)) return { aging: null, check: null };
+  const days = task.signals?.waitingDays;
+  const aging = days === null || days === undefined ? null : `Waiting ${days}d`;
+  const due = localDateOf(task.followUpAt);
+  if (!due) return { aging, check: null };
+  const diff = daysBetween(today, due);
+  const check = diff < 0 ? { label: `Check ${-diff}d late`, tone: 'danger' as const }
+    : diff === 0 ? { label: 'Check today', tone: 'warning' as const }
+      : { label: `Check ${shortDay(due, today)}`, tone: 'muted' as const };
+  return { aging, check };
+}
+
 export type RelativeDateTone = 'default' | 'muted' | 'warning' | 'danger';
 
 /**
@@ -290,6 +311,14 @@ export function optimisticTask<T extends ManagerTask>(task: T, changes: UpdateTa
   if (changes.later !== undefined && changes.hideUntil === undefined) next.hideUntil = null;
   if (triaged !== undefined) next.needsTriage = !triaged;
   else if (isTriagePatch(changes)) next.needsTriage = false;
+  // docs/57 §2: the write shape has no `since`; keep the old one for the same party.
+  if (changes.waitingOn !== undefined) {
+    const input = changes.waitingOn;
+    const same = input && task.waitingOn && input.type === task.waitingOn.type && (input.ref ?? null) === task.waitingOn.ref;
+    next.waitingOn = input
+      ? { type: input.type, ref: input.ref ?? null, label: input.label ?? task.waitingOn?.label ?? '', since: same ? task.waitingOn!.since : now }
+      : null;
+  }
   const reassigned = changes.ownerType !== undefined && (changes.ownerType !== task.ownerType || changes.ownerId !== task.ownerId);
   if (reassigned && task.status === 'active' && changes.status === undefined) next.status = 'open';
   next.closedAt = isOpenStatus(next.status) ? null : task.closedAt ?? now;
@@ -313,6 +342,11 @@ export function undoChanges(task: ManagerTask, changes: UpdateTaskRequest): Upda
   // docs/57 §1: any `later` patch clears the resurface date server-side, so
   // restoring a parked task restores its date too.
   if (undo.later === true && task.hideUntil) undo.hideUntil = task.hideUntil;
+  // The DTO carries `since`; the write shape does not.
+  if (fields.has('waitingOn')) {
+    const previous = task.waitingOn;
+    undo.waitingOn = previous ? { type: previous.type, ref: previous.ref, label: previous.label } : null;
+  }
   // Triaging takes a task out of Inbox; undo puts it back.
   if (task.needsTriage && isTriagePatch(changes)) undo.triaged = false;
   return undo as UpdateTaskRequest;
@@ -350,6 +384,11 @@ export function inlineAddDefaults(
       break;
     case 'label':
       if (context.label) defaults.labels = [context.label];
+      break;
+    case 'party':
+      // docs/57 §4: a task added under a party waits on them (owned by me).
+      if (context.waitingOn) defaults.waitingOn = context.waitingOn;
+      else defaults.status = 'blocked';
       break;
     default:
       break;

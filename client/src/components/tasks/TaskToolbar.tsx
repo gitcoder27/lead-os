@@ -19,6 +19,7 @@ const SORTS: { value: TaskViewSort; label: string }[] = [
   { value: 'updated', label: 'Recently updated' },
   { value: 'created', label: 'Recently created' },
   { value: 'priority', label: 'Priority' },
+  { value: 'checkBy', label: 'Check-by date' },
 ];
 // docs/51 F16: no Label grouping — multi-label tasks would duplicate rows and
 // break counts, selection, and j/k. The `?group=label` URL param still parses.
@@ -27,6 +28,7 @@ const GROUPS: { value: TaskViewGroupOverride; label: string }[] = [
   { value: 'scheduled', label: 'Schedule' },
   { value: 'owner', label: 'Owner' },
   { value: 'status', label: 'Status' },
+  { value: 'party', label: 'Waiting on' },
 ];
 
 // docs/51 F18: no 'kind' menu — the ?kind= URL param stays for the meetings alias.

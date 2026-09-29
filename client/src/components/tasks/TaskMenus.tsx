@@ -15,13 +15,16 @@ import {
   CircleX,
   Circle,
   Flag,
+  Hourglass,
   Link2,
   Moon,
   Tag,
   UserRound,
+  UserX,
 } from 'lucide-react';
-import { taskLabelDisplayName, type TaskLabel, type TaskStatus } from '@/types';
-import { nextWeekday, type SchedulePreset } from '@/lib/task-list';
+import { taskLabelDisplayName, type TaskLabel, type TaskStatus, type TaskWaitingOnInput } from '@/types';
+import { nextMonday, nextWeekday, type SchedulePreset } from '@/lib/task-list';
+import { shiftLocalIsoDate } from '@/lib/utils';
 import { labelChipStyle } from './label-colors';
 import { DatePickerPopover, type DatePreset } from './TaskDetailPrimitives';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
@@ -59,7 +62,7 @@ export function TaskStatusGlyph({ status, size = 15 }: { status: TaskStatus; siz
   );
 }
 
-export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'priority' | 'more';
+export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'priority' | 'waiting' | 'checkBy' | 'more';
 
 export function StatusMenu({ anchor, current, onClose, onSelect }: {
   anchor: HTMLElement;
@@ -211,6 +214,110 @@ export function AssignMenu({ anchor, developers, onClose, onSelect }: {
   );
 }
 
+/**
+ * docs/57 §4 (P3-03): `w` — who the task waits on: a developer, one of my
+ * contacts, or free text typed in the filter. Clearing ends the wait.
+ */
+export function WaitingMenu({ anchor, developers, contacts, current, onClose, onSelect }: {
+  anchor: HTMLElement;
+  developers: { accountId: string; displayName: string }[];
+  contacts: { id: number; displayName: string }[];
+  /** Whether any target currently waits on someone (offers "Stop waiting"). */
+  current: boolean;
+  onClose: () => void;
+  onSelect: (waitingOn: TaskWaitingOnInput | null) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const text = query.trim();
+  const options = useMemo(() => {
+    const all: { key: string; label: string; value: TaskWaitingOnInput }[] = [
+      ...developers.map((dev) => ({ key: `d:${dev.accountId}`, label: dev.displayName, value: { type: 'developer' as const, ref: dev.accountId, label: dev.displayName } })),
+      ...contacts.map((contact) => ({ key: `c:${contact.id}`, label: `${contact.displayName} · contact`, value: { type: 'contact' as const, ref: String(contact.id), label: contact.displayName } })),
+    ];
+    const needle = text.toLowerCase();
+    const matches = needle ? all.filter((option) => option.label.toLowerCase().includes(needle)) : all;
+    const exact = matches.some((option) => option.label.toLowerCase().split(' · ')[0] === needle);
+    return text && !exact ? [...matches, { key: 'text', label: `Someone else: “${text}”`, value: { type: 'text' as const, label: text } }] : matches;
+  }, [contacts, developers, text]);
+
+  return (
+    <TaskPopover anchor={anchor} onClose={onClose} label="Waiting on" width={240}>
+      <input
+        data-autofocus
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && options[0]) {
+            event.preventDefault();
+            onSelect(options[0].value);
+          }
+        }}
+        placeholder="Waiting on…"
+        aria-label="Waiting on"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-[12.5px] outline-none"
+        style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+      />
+      {options.map((option) => (
+        <MenuItem key={option.key} icon={<Hourglass size={13} />} label={option.label} onSelect={() => onSelect(option.value)} />
+      ))}
+      {options.length === 0 && <p className="px-2 py-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>Type a name</p>}
+      {current && (
+        <>
+          <MenuDivider />
+          <MenuItem icon={<UserX size={13} />} label="Stop waiting" onSelect={() => onSelect(null)} />
+        </>
+      )}
+    </TaskPopover>
+  );
+}
+
+/** Check-by is stored as `followUpAt`: a local 09:00 on the chosen day (capture's convention). */
+export function checkByTimestamp(date: string): string {
+  return new Date(`${date}T09:00:00`).toISOString();
+}
+
+/** docs/57 §4 (P3-03): `c` — when to chase (stored in `followUpAt`). */
+export function CheckByMenu({ anchor, today, current, onClose, onPick }: {
+  anchor: HTMLElement;
+  today: string;
+  /** Single-target check-by as a local date ('' when mixed or unset). */
+  current?: string | null;
+  onClose: () => void;
+  onPick: (date: string | null) => void;
+}) {
+  const presets: DatePreset[] = [
+    { key: 't', label: 'Today', hint: 't', icon: <CalendarClock size={13} />, onSelect: () => onPick(today) },
+    { key: 'm', label: 'Tomorrow', hint: 'm', icon: <CalendarArrowUp size={13} />, onSelect: () => onPick(shiftLocalIsoDate(today, 1)) },
+    { key: 'w', label: 'Next week (Mon)', hint: 'w', icon: <CalendarDays size={13} />, onSelect: () => onPick(nextMonday(today)) },
+    { key: 'c', label: 'No check date', hint: 'c', icon: <CalendarX size={13} />, onSelect: () => onPick(null) },
+  ];
+  return (
+    <DatePickerPopover
+      anchor={anchor}
+      label="Check by"
+      kind="date"
+      value={current ?? ''}
+      presets={presets}
+      clearLabel={null}
+      onCommit={(date) => { if (date) onPick(date); }}
+      onClose={onClose}
+      onAccelerator={(key) => {
+        const preset = presets.find((candidate) => candidate.key === key.toLowerCase());
+        if (preset) {
+          preset.onSelect();
+          return true;
+        }
+        const weekday = Number(key);
+        if (Number.isInteger(weekday) && weekday >= 1 && weekday <= 7) {
+          onPick(nextWeekday(today, weekday));
+          return true;
+        }
+        return false;
+      }}
+    />
+  );
+}
+
 export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   anchor: HTMLElement;
   labels: TaskLabel[];
@@ -250,7 +357,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   );
 }
 
-export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels, onPriority, onLater, onDrop, onCopyLink, canLater }: {
+export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater }: {
   anchor: HTMLElement;
   onClose: () => void;
   onOpen: () => void;
@@ -258,6 +365,8 @@ export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels
   onAssign: () => void;
   onLabels: () => void;
   onPriority: () => void;
+  onWaiting: () => void;
+  onCheckBy: () => void;
   onLater: () => void;
   onDrop: () => void;
   onCopyLink: () => void;
@@ -270,6 +379,8 @@ export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
+      <MenuItem icon={<Hourglass size={13} />} label="Waiting on…" hint="w" onSelect={onWaiting} />
+      <MenuItem icon={<CalendarClock size={13} />} label="Check by…" hint="c" onSelect={onCheckBy} />
       {canLater && <MenuItem icon={<Moon size={13} />} label="Move to Later" hint="s l" onSelect={onLater} />}
       <MenuItem icon={<Link2 size={13} />} label="Copy link" onSelect={onCopyLink} />
       <MenuDivider />

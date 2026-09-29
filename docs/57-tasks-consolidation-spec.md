@@ -87,7 +87,7 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
 | id | Name | Definition (new filter fields in bold) | Replaces |
 |---|---|---|---|
 | `inbox` | Inbox | `{ **lane: "inbox"** }`, sort `created` | `owner: "inbox"` |
-| `today` | Planned today | adds **`waiting: false`** to today's definition (`:44`) | — |
+| `today` | Planned today | adds **`waitingOn: false`** to today's definition (`:44`). P3-03 deviation: this is a new filter meaning "no explicit waiting-on party". `waiting: false` would also have dropped my own blocked tasks. | — |
 | `waiting` | Waiting | `{ **lane: "waiting"**, later: false }` plus the legacy clause (below), sort **`checkBy`**, group **`party`** | the `waiting` view (`:47`) and the `/follow-ups` page |
 | `meetings` | Meetings | `{ kind: "meeting", **withClosed: { from: today-13 }** }`, sort `scheduled`, group **`meeting`** | the `/meetings` page and the `my-tasks` + `kind` alias |
 | `my-tasks`, `later`, `attention`, `closed-week` | unchanged | — | — |
@@ -99,7 +99,15 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
 3. **Legacy clause, kept** so existing data doesn't disappear: `blocked`, `kind:waiting`, and a follow-up on someone else's task.
 4. **Grouped by the party waited on**: the waiting-on person or contact, otherwise the owner, and "Blocked" last. Each group sorts by check-by, oldest first.
 5. **Row chips:** `Waiting 6d` (from `waiting_since`, else the last assign or status event) and `Check Fri`, or `Check 2d late` in the danger colour. They come from `TaskSignals.checkDue`/`waitingDays` next to `followUpDue` (`:109`).
-6. **Keys:** `w` sets or clears Waiting on (a person picker plus a date). `c` sets check-by.
+6. **Keys:** `w` sets or clears Waiting on (developers, my contacts, or free text typed in the picker). `c` sets check-by. Both are also in the row's More menu.
+
+**As built in P3-03, differences from the text above:**
+- `w` picks only the party. The date is its own key (`c`), which reuses the Schedule picker's accelerators.
+- There is no drawer field yet: the drawer shows the waiting change in the timeline, but it does not edit it.
+- A task added under a party group waits on that party. Under "Blocked" it is created blocked.
+- A new sort `checkBy` and a new group `party` were added, and both are also offered in the toolbar.
+- Contacts get `/api/contacts` (list, create, archive), with no Settings screen yet. The capture box's "Create contact @x" is the way in.
+- Contact links (`task_links.kind = 'contact'`) and `waiting_on` / contact-link events are manager-private. Developers never see them.
 
 The Follow-ups page's `overdue/today/upcoming/unscheduled` lanes (`lib/manager-memory.ts:35-44`) turn into this lens's sort and chips.
 

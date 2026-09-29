@@ -8,6 +8,7 @@ import {
   lingerEntriesFor,
   nextMonday,
   optimisticTask,
+  waitingChips,
   overdueLevel,
   overdueTone,
   relativeTaskDate,
@@ -27,10 +28,39 @@ import {
   scheduledBucket,
   taskViewParamsFromState,
   taskViewStateFromParams,
+  taskParty,
 } from '@/lib/task-views';
 import { taskLane, type TaskLaneInput } from 'shared/types';
 
 const TODAY = '2026-09-26'; // Saturday
+
+describe('Waiting lens grouping (docs/57 §4)', () => {
+  const ownerName = (_type: string | null, id: string | null) => (id === 'd' ? 'Dee' : id === 'e' ? 'Eve' : 'Me');
+
+  it('groups by the explicit party, else another owner, else Blocked — same developer shares a group', () => {
+    const rows = [
+      task({ id: 1, taskKey: 'T-1', waitingOn: { type: 'contact', ref: '7', label: 'Acme Legal', since: null } }),
+      task({ id: 2, taskKey: 'T-2', ownerType: 'developer', ownerId: 'd' }),
+      task({ id: 3, taskKey: 'T-3', waitingOn: { type: 'developer', ref: 'd', label: 'Dee', since: null } }),
+      task({ id: 4, taskKey: 'T-4', status: 'blocked' }),
+      task({ id: 5, taskKey: 'T-5', waitingOn: { type: 'text', label: 'Finance', ref: null, since: null } }),
+      task({ id: 6, taskKey: 'T-6', ownerType: 'developer', ownerId: 'self' }),
+    ];
+    const groups = groupTaskViewTasks(rows, 'party', TODAY, ownerName, 'self');
+    expect(groups.map((group) => [group.label, group.tasks.map((row) => row.taskKey)])).toEqual([
+      ['Acme Legal', ['T-1']],
+      ['Dee', ['T-2', 'T-3']],
+      ['Finance', ['T-5']],
+      ['Blocked', ['T-4', 'T-6']],
+    ]);
+    expect(taskParty(rows[4]!, ownerName).waitingOn).toEqual({ type: 'text', label: 'Finance' });
+  });
+
+  it('inline add under a party waits on them; under Blocked it is blocked', () => {
+    expect(inlineAddDefaults('waiting', {}, { mode: 'party', waitingOn: { type: 'developer', ref: 'd' } }, TODAY)).toEqual({ waitingOn: { type: 'developer', ref: 'd' } });
+    expect(inlineAddDefaults('waiting', {}, { mode: 'party', waitingOn: null }, TODAY)).toEqual({ status: 'blocked' });
+  });
+});
 
 describe('taskLane (docs/57 §1)', () => {
   const lane = (overrides: Partial<TaskLaneInput>) => taskLane({
@@ -276,6 +306,27 @@ describe('actions and undo (docs/49 §6)', () => {
       .toEqual({ later: false, scheduledOn: null, triaged: false });
     // Non-triage edits leave Inbox membership alone.
     expect(undoChanges(task({ needsTriage: true }), { labels: ['x'] })).toEqual({ labels: [] });
+  });
+
+  it('P3-03: waitingOn undo uses the write shape; optimistic keeps since for the same party', () => {
+    const waitingOn = { type: 'developer' as const, ref: 'd', label: 'Dee', since: '2026-09-20T10:00:00Z' };
+    expect(undoChanges(task({ waitingOn }), { waitingOn: null })).toEqual({ waitingOn: { type: 'developer', ref: 'd', label: 'Dee' } });
+    expect(undoChanges(task({ waitingOn: null }), { waitingOn: { type: 'text', label: 'Legal' } })).toEqual({ waitingOn: null });
+    expect(optimisticTask(task({ waitingOn }), { waitingOn: { type: 'developer', ref: 'd', label: 'Dee' } }).waitingOn?.since).toBe(waitingOn.since);
+    expect(optimisticTask(task({ waitingOn }), { waitingOn: { type: 'text', label: 'Legal' } }, '2026-09-26T08:00:00Z').waitingOn)
+      .toEqual({ type: 'text', ref: null, label: 'Legal', since: '2026-09-26T08:00:00Z' });
+    expect(optimisticTask(task({ waitingOn }), { waitingOn: null }).waitingOn).toBeNull();
+  });
+
+  it('P3-03: waiting chips show aging and the check-by date', () => {
+    const chips = (followUpAt: string | null, waitingDays: number | null = 3, status: ManagerTask['status'] = 'open') =>
+      waitingChips({ followUpAt, status, signals: { waitingDays } }, TODAY);
+    expect(chips(null)).toEqual({ aging: 'Waiting 3d', check: null });
+    expect(chips(new Date('2026-09-24T09:00:00').toISOString()).check).toEqual({ label: 'Check 2d late', tone: 'danger' });
+    expect(chips(new Date('2026-09-26T09:00:00').toISOString()).check).toEqual({ label: 'Check today', tone: 'warning' });
+    expect(chips(new Date('2026-09-29T09:00:00').toISOString()).check?.tone).toBe('muted');
+    expect(chips(null, null).aging).toBeNull();
+    expect(chips(new Date('2026-09-24T09:00:00').toISOString(), 3, 'done')).toEqual({ aging: null, check: null });
   });
 
   it('P3-02: optimistic patches mirror the triage and resurface side effects', () => {

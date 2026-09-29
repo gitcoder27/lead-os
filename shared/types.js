@@ -129,9 +129,10 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
         waiting: zod_1.z.boolean().optional(),
         attention: zod_1.z.array(zod_1.z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
         lane: zod_1.z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
+        waitingOn: zod_1.z.boolean().optional(),
     }).strict().optional(),
-    sort: zod_1.z.enum(["scheduled", "updated", "created", "priority"]).optional(),
-    group: zod_1.z.enum(["owner", "status", "label", "scheduled"]).optional(),
+    sort: zod_1.z.enum(["scheduled", "updated", "created", "priority", "checkBy"]).optional(),
+    group: zod_1.z.enum(["owner", "status", "label", "scheduled", "party"]).optional(),
 }).strict();
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",

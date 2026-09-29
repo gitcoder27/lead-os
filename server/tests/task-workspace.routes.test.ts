@@ -222,7 +222,7 @@ describe("consolidated built-in views (docs/49 §3)", () => {
     const headers = { cookie: await cookie("manager-a") };
     await createTask(headers, { title: "Nudge", followUpAt: `${shift(-1)}T09:00:00.000Z` });
     const [row] = await runView(headers, "my-tasks");
-    expect(row!.signals).toEqual({ overdue: false, overdueDays: null, overdueSource: null, stale: false, staleDays: null, drift: false, followUpDue: true });
+    expect(row!.signals).toEqual({ overdue: false, overdueDays: null, overdueSource: null, stale: false, staleDays: null, drift: false, followUpDue: true, waitingDays: 0 });
   });
 
   it("honours the client's today for relative horizons (D3)", async () => {

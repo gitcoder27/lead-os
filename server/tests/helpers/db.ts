@@ -89,6 +89,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM task_legacy_map;
     DELETE FROM developer_notes;
     DELETE FROM tasks;
+    DELETE FROM contacts;
     DELETE FROM user_nav_preferences;
     DELETE FROM manager_desk_item_history;
     DELETE FROM manager_desk_links;

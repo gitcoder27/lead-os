@@ -9,6 +9,7 @@ import {
   overdueLevel,
   overdueTone,
   relativeTaskDate,
+  waitingChips,
   type ListTask,
   type OverdueLevel,
   type RelativeDateTone,
@@ -122,7 +123,10 @@ export const TaskListRow = memo(function TaskListRow({
     if (signals?.stale) iconSignals.push({ label: `No activity for ${signals.staleDays}d`, color: 'var(--warning)', icon: <Hourglass size={12} /> });
     if (signals?.drift) iconSignals.push({ label: 'Jira and task disagree on done-ness', color: 'var(--warning)', icon: <GitCompareArrows size={12} /> });
   }
-  const signalText = attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label);
+  // docs/57 §4 (P3-03): the Waiting lens reads as aging + check-by text.
+  const waiting = context.mode === 'party' || definition?.filters?.waiting === true ? waitingChips(task, today) : null;
+  const waitingText = waiting ? [waiting.check?.label, waiting.aging].filter((label): label is string => Boolean(label)) : [];
+  const signalText = [...waitingText, ...(attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label))];
 
   const ariaLabel = [
     `${task.taskKey} ${task.title}`,
@@ -244,8 +248,18 @@ export const TaskListRow = memo(function TaskListRow({
             </RowAction>
           </span>
 
-          {(attentionReasons.length > 0 || iconSignals.length > 0) && (
+          {(attentionReasons.length > 0 || iconSignals.length > 0 || waitingText.length > 0) && (
             <span className="flex items-center gap-1.5" style={{ opacity: dim }}>
+              {waiting?.check && (
+                <span className="text-[11px]" data-testid="waiting-check">
+                  {waiting.check.tone === 'muted'
+                    ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span>
+                    : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}
+                </span>
+              )}
+              {waiting?.aging && (
+                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>
+              )}
               {attentionReasons.map((reason) => (
                 <span key={reason.label} className="text-[11px]">
                   <SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark>

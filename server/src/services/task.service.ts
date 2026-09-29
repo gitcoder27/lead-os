@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
+import type { TaskWaitingOn, TaskWaitingOnInput, TaskWaitingOnType } from "shared/types";
 import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
@@ -9,6 +10,7 @@ import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService, type TaskEventInput } from "./task-events.service";
 import { TaskLabelsService } from "./task-labels.service";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
+import { ContactsService } from "./contacts.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { isoDatePart, todayIsoDate } from "../utils/date";
 
@@ -43,11 +45,17 @@ export const taskCreateSchema = z.object({
   participants: z.string().max(4000).nullable().optional(), nextAction: z.string().max(4000).nullable().optional(), outcome: z.string().max(4000).nullable().optional(),
   parentId: z.number().int().positive().nullable().optional(),
   hideUntil: dateOnly.nullable().optional(),
+  // docs/57 §2 (P3-03): the waiting-on party; check-by stays followUpAt.
+  waitingOn: z.object({
+    type: z.enum(["developer", "contact", "text"]),
+    ref: z.string().trim().min(1).max(128).nullable().optional(),
+    label: z.string().trim().min(1).max(200).nullable().optional(),
+  }).strict().nullable().optional(),
 }).strict();
 export const taskUpdateSchema = taskCreateSchema.partial().extend({ triaged: z.boolean().optional() }).strict();
 /** docs/57 §1: a patch touching any of these fields is a triage decision. */
-const TRIAGE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status"] as const;
-export const taskLinkSchema = z.object({ kind: z.enum(["jira", "person", "external", "task"]), ref: z.string().trim().min(1).max(2000), role: z.enum(["primary", "related"]).nullable().optional() }).strict();
+const TRIAGE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status", "waitingOn"] as const;
+export const taskLinkSchema = z.object({ kind: z.enum(["jira", "person", "external", "task", "contact"]), ref: z.string().trim().min(1).max(2000), role: z.enum(["primary", "related"]).nullable().optional() }).strict();
 
 function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
   const parsed = schema.safeParse(input);
@@ -96,10 +104,21 @@ export function taskStatusToDeskStatus(status: string, later: number): string {
   }
 }
 
-/** docs/57 §2: resurface date and Inbox marker are tracking-manager-private. */
-function triageFields(row: TaskRow, ownsPrivate: boolean): Pick<ManagerTask, "hideUntil" | "needsTriage"> {
-  return { hideUntil: ownsPrivate ? row.hideUntil : null, needsTriage: ownsPrivate && row.needsTriage === 1 };
+/** docs/57 §2: resurface date, Inbox marker and waiting-on are tracking-manager-private. */
+function triageFields(row: TaskRow, ownsPrivate: boolean): Pick<ManagerTask, "hideUntil" | "needsTriage" | "waitingOn"> {
+  return {
+    hideUntil: ownsPrivate ? row.hideUntil : null,
+    needsTriage: ownsPrivate && row.needsTriage === 1,
+    waitingOn: ownsPrivate ? taskWaitingOn(row) : null,
+  };
 }
+
+export function taskWaitingOn(row: Pick<TaskRow, "waitingOnType" | "waitingOnRef" | "waitingOnLabel" | "waitingSince">): TaskWaitingOn | null {
+  if (!row.waitingOnType || !row.waitingOnLabel) return null;
+  return { type: row.waitingOnType as TaskWaitingOnType, ref: row.waitingOnRef, label: row.waitingOnLabel, since: row.waitingSince };
+}
+
+type WaitingOnColumns = Pick<TaskRow, "waitingOnType" | "waitingOnRef" | "waitingOnLabel">;
 
 function toProjection(row: TaskRow): TaskProjection {
   return {
@@ -142,7 +161,8 @@ export class TaskService {
       ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId, priority: row.priority as DeveloperTask["priority"],
       scheduledOn: row.scheduledOn, dueAt: row.dueAt, startsAt: row.startsAt, endsAt: row.endsAt, participants: row.participants, outcome: row.outcome,
       createdByType: row.createdByType, createdById: row.createdById, createdAt: row.createdAt, updatedAt: row.updatedAt, closedAt: row.closedAt, deletedAt: row.deletedAt,
-      links: links.map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] })),
+      links: links.filter((link) => principal.type !== "developer" || link.kind !== "contact")
+        .map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] })),
     };
     if (principal.type === "developer") return shared;
     const ownsPrivate = row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
@@ -231,6 +251,29 @@ export class TaskService {
     }
   }
 
+  /**
+   * docs/57 §2 (P3-03): resolve a waiting-on write into columns. Developers must
+   * be active in the workspace and contacts must belong to the acting manager;
+   * the label is a display snapshot (free text for `text`).
+   */
+  private async resolveWaitingOn(input: TaskWaitingOnInput | null, principal: TaskPrincipal, workspaceId: string): Promise<WaitingOnColumns> {
+    if (!input) return { waitingOnType: null, waitingOnRef: null, waitingOnLabel: null };
+    if (input.type === "text") {
+      if (!input.label) throw new HttpError(400, "Waiting on needs a name");
+      return { waitingOnType: "text", waitingOnRef: null, waitingOnLabel: input.label };
+    }
+    if (!input.ref) throw new HttpError(400, "Waiting on needs a person");
+    if (input.type === "developer") {
+      const person = (await db.select().from(developers).where(and(eq(developers.workspaceId, workspaceId), eq(developers.accountId, input.ref), eq(developers.isActive, 1))).limit(1))[0];
+      if (!person) throw new HttpError(400, "Active developer not found");
+      return { waitingOnType: "developer", waitingOnRef: person.accountId, waitingOnLabel: person.displayName };
+    }
+    const id = Number(input.ref);
+    const contact = Number.isInteger(id) && id > 0 ? await new ContactsService().get(principal.accountId, id, workspaceId) : undefined;
+    if (!contact) throw new HttpError(400, "Contact not found");
+    return { waitingOnType: "contact", waitingOnRef: String(contact.id), waitingOnLabel: contact.displayName };
+  }
+
   private async emit(row: TaskRow, input: Omit<TaskEventInput, "taskKey" | "workspaceId" | "taskId">, principal: TaskPrincipal): Promise<void> {
     await this.events.append({ ...input, taskId: row.id, taskKey: row.taskKey, workspaceId: row.workspaceId } as TaskEventInput, { type: "system", accountId: principal.accountId });
   }
@@ -269,7 +312,8 @@ export class TaskService {
       const now = new Date().toISOString();
       const ownerType = principal.type === "developer" ? "developer" : data.ownerType === undefined ? "manager" : data.ownerType;
       const ownerId = principal.type === "developer" ? principal.accountId : data.ownerId === undefined && ownerType === "manager" ? principal.accountId : data.ownerId ?? null;
-      const values = { ...data, details: normalizeDetails(data.details) ?? null, labels: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
+      const waiting = await this.resolveWaitingOn(data.waitingOn ?? null, principal, scope);
+      const values = { ...data, ...waiting, waitingSince: waiting.waitingOnType ? now : null, details: normalizeDetails(data.details) ?? null, labels: undefined, waitingOn: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
         startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, hideUntil: data.hideUntil ?? null,
         needsTriage: options.untriaged && principal.type !== "developer" ? 1 : 0,
         scheduledOn: data.scheduledOn === undefined ? (data.later ? null : todayIsoDate()) : data.scheduledOn,
@@ -292,13 +336,13 @@ export class TaskService {
     const data = parseInput(taskUpdateSchema, input);
     return runInTransaction(async () => {
       const before = await this.requireTask(key, principal);
-      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later", "hideUntil", "triaged"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
+      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later", "hideUntil", "triaged", "waitingOn"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
       if (principal.type === "developer") {
         // `details` is shared by design: the owning developer edits it like the manager does.
         if (Object.keys(data).some((field) => !["title", "details", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
       }
-      const { labels, later, triaged, ...fields } = data;
+      const { labels, later, triaged, waitingOn, ...fields } = data;
       if (fields.details !== undefined) fields.details = normalizeDetails(fields.details);
       // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
       if (labels && labels.length && await this.keys.phase3Enabled(before.workspaceId)) {
@@ -315,6 +359,11 @@ export class TaskService {
       // `triaged` wins (undo restores `triaged: false`).
       if (triaged !== undefined) next.needsTriage = triaged ? 0 : 1;
       else if (TRIAGE_FIELDS.some((field) => Object.hasOwn(data, field))) next.needsTriage = 0;
+      if (waitingOn !== undefined) {
+        const waiting = await this.resolveWaitingOn(waitingOn, principal, before.workspaceId);
+        const sameParty = waiting.waitingOnType === before.waitingOnType && waiting.waitingOnRef === before.waitingOnRef && waiting.waitingOnLabel === before.waitingOnLabel;
+        Object.assign(next, waiting, { waitingSince: !waiting.waitingOnType ? null : sameParty ? before.waitingSince : new Date().toISOString() });
+      }
       const reassigned = next.ownerType !== before.ownerType || next.ownerId !== before.ownerId;
       if (reassigned) {
         if (["done", "dropped"].includes(before.status)) throw new HttpError(409, "Reopen closed work before reassigning");
@@ -333,7 +382,7 @@ export class TaskService {
         await this.emit(next, { type: "status", body: null, meta: { domain: "task_status", from: before.status, to: next.status, reason: reassigned ? "reassigned" : "user" } }, principal);
         if (before.status === "active" || next.status === "active") await this.emit(next, { type: "focus", body: null, meta: { action: next.status === "active" ? "set_current" : "unset_current", date: todayIsoDate() } }, principal);
       }
-      for (const [field, eventField] of [["scheduledOn", "day"], ["startsAt", "planned_start_at"], ["endsAt", "planned_end_at"], ["followUpAt", "follow_up_at"]] as const) {
+      for (const [field, eventField] of [["scheduledOn", "day"], ["startsAt", "planned_start_at"], ["endsAt", "planned_end_at"], ["followUpAt", "follow_up_at"], ["waitingOnLabel", "waiting_on"]] as const) {
         if (before[field] !== next[field]) await this.emit(next, { type: "schedule", body: null, meta: { field: eventField, from: before[field], to: next[field], via: field === "scheduledOn" ? "reschedule" : "edit" } }, principal);
       }
       if (data.scheduledOn) await this.focus(next, data.scheduledOn);
@@ -394,6 +443,8 @@ export class TaskService {
       if (data.kind === "jira" && !(await db.select().from(issues).where(and(eq(issues.workspaceId, row.workspaceId), eq(issues.jiraKey, ref))).limit(1))[0]) throw new HttpError(404, "Issue not found");
       if (data.kind === "person" && !(await db.select().from(developers).where(and(eq(developers.workspaceId, row.workspaceId), eq(developers.accountId, ref))).limit(1))[0]) throw new HttpError(404, "Developer not found");
       if (data.kind === "task") await this.requireTask(ref, principal);
+      // docs/57 §2: contacts are manager-private — only the owner's own contacts link.
+      if (data.kind === "contact" && !(await new ContactsService().get(principal.accountId, Number(ref), row.workspaceId))) throw new HttpError(404, "Contact not found");
       const existing = await this.listLinks([row.id], row.workspaceId);
       const duplicate = existing.find((link) => link.kind === data.kind && link.ref === ref);
       if (duplicate) return duplicate;
@@ -651,7 +702,8 @@ export class TaskService {
           } satisfies ManagerDeskAssignee,
         }),
       };
-      const links = (linksByTask.get(row.id) ?? []).map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] }));
+      // docs/57 §2: contact links are manager-private.
+      const links = (linksByTask.get(row.id) ?? []).filter((link) => options.principal.type !== "developer" || link.kind !== "contact").map((link) => ({ id: link.id, kind: link.kind as TaskLink["kind"], ref: link.ref, role: link.role as TaskLink["role"] }));
       const shared: DeveloperTask = {
         id: row.id, taskKey: row.taskKey, title: row.title, details: row.details ?? null, kind: row.kind as DeveloperTask["kind"], status: row.status as TaskStatus,
         ownerType: row.ownerType as TaskOwnerType | null, ownerId: row.ownerId, priority: row.priority as DeveloperTask["priority"],

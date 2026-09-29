@@ -810,9 +810,47 @@ export const TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
 
 export type TaskStatus = "open" | "active" | "blocked" | "done" | "dropped";
 export type TaskOwnerType = "manager" | "developer";
+/**
+ * docs/57 §2 (P3-03): who a task is waiting on — a developer, a manager-private
+ * contact (an external stakeholder), or free text. Manager-private.
+ */
+export type TaskWaitingOnType = "developer" | "contact" | "text";
+export interface TaskWaitingOn {
+  type: TaskWaitingOnType;
+  /** Developer account id or contact id; null for free text. */
+  ref: string | null;
+  /** Display name snapshot (or the free text itself). */
+  label: string;
+  /** When the task started waiting on this party. */
+  since: string | null;
+}
+/** Write shape: the server fills the label for developers/contacts and stamps `since`. */
+export interface TaskWaitingOnInput {
+  type: TaskWaitingOnType;
+  ref?: string | null;
+  label?: string | null;
+}
+
+/** docs/57 §2 (P3-03): an external stakeholder — manager-private, never a login. */
+export interface Contact {
+  id: number;
+  displayName: string;
+  handle: string;
+  note: string | null;
+  createdAt: string;
+}
+export interface ContactListResponse {
+  contacts: Contact[];
+}
+export interface CreateContactRequest {
+  displayName: string;
+  handle?: string;
+  note?: string | null;
+}
+
 export interface TaskLink {
   id: number;
-  kind: "jira" | "person" | "external" | "task";
+  kind: "jira" | "person" | "external" | "task" | "contact";
   ref: string;
   role: "primary" | "related" | null;
 }
@@ -856,6 +894,8 @@ export interface ManagerTask extends DeveloperTask {
   hideUntil?: string | null;
   /** docs/57 §1 (P3-02): captured without a date, owner or later — shown in Inbox until triaged. */
   needsTriage?: boolean;
+  /** docs/57 §2 (P3-03): who this task waits on; check-by is `followUpAt`. */
+  waitingOn?: TaskWaitingOn | null;
 }
 
 /**
@@ -997,9 +1037,11 @@ export interface TaskViewFilters {
   /** docs/49 D1: "today" = plan date (earlier of scheduledOn and the dueAt
    *  date) <= today; "upcoming" = plan date > today (a date is required). */
   horizon?: "today" | "upcoming";
-  /** docs/51 F1: waiting on others — blocked, the kind:waiting label, or a
-   *  follow-up on somebody else's task. My own open work (manager-owned or
-   *  on my linked developer account) and follow-ups I owe are not waiting. */
+  /** docs/57 §4 (P3-03): the Waiting lens — an explicit waiting-on party;
+   *  a developer task I track whose check-by is due or that went quiet
+   *  (TASK_STALE_DAYS); or, for existing data (docs/51 F1), blocked, the
+   *  kind:waiting label, or a follow-up on somebody else's task. Follow-ups
+   *  I owe on my own tasks are not waiting. */
   waiting?: boolean;
   /** docs/49 §2: needs attention — any of the listed signals (OR).
    *  docs/51 F2: "stale" only applies to manager-owned and inbox tasks —
@@ -1007,6 +1049,8 @@ export interface TaskViewFilters {
   attention?: TaskAttentionSignal[];
   /** docs/57 §1: the derived lifecycle lane (see `taskLane`). */
   lane?: TaskLane;
+  /** docs/57 §2: an explicit waiting-on party is set (true) or not (false). */
+  waitingOn?: boolean;
 }
 
 /**
@@ -1142,6 +1186,8 @@ export interface TaskSignals {
   staleDays: number | null;
   drift: boolean;
   followUpDue: boolean;
+  /** docs/57 §4 (P3-03): aging for the Waiting lens — days since `waitingOn.since`, else since the last activity. Null when closed. */
+  waitingDays?: number | null;
 }
 
 export type TaskViewTask = ManagerTask & { signals: TaskSignals };
@@ -1172,8 +1218,10 @@ export interface BulkUpdateTasksResponse {
   tasks: ManagerTask[];
 }
 
-export type TaskViewSort = "scheduled" | "updated" | "created" | "priority";
-export type TaskViewGroup = "owner" | "status" | "label" | "scheduled";
+/** `checkBy` (docs/57 §4): check-by date (`followUpAt`) first, then longest waiting. */
+export type TaskViewSort = "scheduled" | "updated" | "created" | "priority" | "checkBy";
+/** `party` (docs/57 §4): the person waited on, else the owner; "Blocked" last. */
+export type TaskViewGroup = "owner" | "status" | "label" | "scheduled" | "party";
 
 export interface TaskViewDefinition {
   filters?: TaskViewFilters;
@@ -1211,9 +1259,10 @@ export const taskViewDefinitionSchema = z.object({
     waiting: z.boolean().optional(),
     attention: z.array(z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
     lane: z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
+    waitingOn: z.boolean().optional(),
   }).strict().optional(),
-  sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
-  group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
+  sort: z.enum(["scheduled", "updated", "created", "priority", "checkBy"]).optional(),
+  group: z.enum(["owner", "status", "label", "scheduled", "party"]).optional(),
 }).strict();
 
 export interface TaskViewMeta {
@@ -1273,6 +1322,8 @@ export interface CreateTaskRequest {
   parentId?: number | null;
   /** docs/57 §1: resurface date for a Later task (requires `later`). */
   hideUntil?: string | null;
+  /** docs/57 §2 (P3-03): set or clear (null) the waiting-on party. */
+  waitingOn?: TaskWaitingOnInput | null;
 }
 export type UpdateTaskRequest = Partial<CreateTaskRequest> & {
   /** docs/57 §1: `true` marks an Inbox task triaged without other changes ("Keep undated"). */

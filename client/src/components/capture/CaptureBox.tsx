@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CalendarDays, Flag, Hash, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
+import { ArrowRight, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
   parseCapture,
   resolveCapture,
   type CaptureDiagnostic,
+  type CapturePersonCandidate,
   type CaptureTokenKind,
   type ResolvedCapture,
 } from 'shared/capture-grammar';
@@ -13,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/context/ToastContext';
 import { useCapture } from '@/hooks/useCapture';
 import { useDevelopers } from '@/hooks/useDevelopers';
+import { useContacts, useCreateContact } from '@/hooks/useContacts';
 import { useTaskLabels } from '@/hooks/useTaskLabels';
 import { getLocalIsoDate } from '@/lib/utils';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
@@ -29,6 +31,7 @@ const TOKEN_COLORS: Record<CaptureTokenKind, string> = {
   later: 'var(--text-muted)',
   meeting: 'var(--md-accent)',
   followup: 'var(--warning)',
+  waiting: 'var(--warning)',
   label: 'var(--accent)',
 };
 
@@ -43,6 +46,7 @@ const TOKEN_BG: Record<CaptureTokenKind, string> = {
   later: 'var(--bg-tertiary)',
   meeting: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
   followup: 'color-mix(in srgb, var(--warning) 12%, transparent)',
+  waiting: 'color-mix(in srgb, var(--warning) 12%, transparent)',
   label: 'var(--accent-glow)',
 };
 
@@ -96,17 +100,21 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
   if (resolved.owner && !omitOwner) {
     chips.push(<Chip key="owner" icon={<UserRound size={10} />}>{developerNames.get(resolved.owner.accountId) ?? resolved.owner.accountId}</Chip>);
   }
+  if (resolved.waitingOn) {
+    const check = resolved.followUpAt ? ` · check ${format(parseISO(resolved.followUpAt), 'EEE, MMM d')}` : '';
+    chips.push(<Chip key="waiting" icon={<Hourglass size={10} />}>Waiting on {resolved.waitingOn.displayName}{check}</Chip>);
+  }
   if (resolved.meeting) chips.push(<Chip key="meeting" icon={<Users size={10} />}>Meeting</Chip>);
   if (resolved.later) {
     chips.push(<Chip key="later" icon={<Repeat size={10} />}>Later{resolved.hideUntil ? ` · back ${format(parseISO(resolved.hideUntil), 'EEE, MMM d')}` : ''}</Chip>);
-  } else if (resolved.intent === 'create' && !resolved.owner && !omitOwner && !resolved.scheduledOn && !resolved.followUp) {
+  } else if (resolved.intent === 'create' && !resolved.owner && !omitOwner && !resolved.scheduledOn && !resolved.followUp && !resolved.waitingOn) {
     chips.push(<Chip key="inbox" icon={<Inbox size={10} />}>Inbox</Chip>);
   }
   if (resolved.priority === 'high') chips.push(<Chip key="prio" icon={<Flag size={10} />}>High priority</Chip>);
   if (resolved.scheduledOn) {
     chips.push(<Chip key="date" icon={<CalendarDays size={10} />}>{format(parseISO(resolved.scheduledOn), 'EEE, MMM d')}</Chip>);
   }
-  if (resolved.followUp) {
+  if (resolved.followUp && !resolved.waitingOn) {
     chips.push(<Chip key="fu" icon={<CalendarDays size={10} />}>Follow-up{resolved.followUpAt ? ` ${format(parseISO(resolved.followUpAt), 'MMM d')}` : ''}</Chip>);
   }
   for (const label of resolved.labels.filter((l) => l !== 'category:follow_up')) {
@@ -120,7 +128,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
   }
   if (resolved.parentKey) chips.push(<Chip key="parent" icon={<Link2 size={10} />}>child of {resolved.parentKey}</Chip>);
   for (const person of resolved.peopleLinks) {
-    chips.push(<Chip key={`pl-${person.accountId}`} icon={<UserRound size={10} />}>↔ {developerNames.get(person.accountId) ?? person.accountId}</Chip>);
+    chips.push(<Chip key={`pl-${person.kind ?? 'developer'}-${person.accountId}`} icon={<UserRound size={10} />}>↔ {person.displayName || (developerNames.get(person.accountId) ?? person.accountId)}</Chip>);
   }
   return chips;
 }
@@ -134,6 +142,8 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
   const { addToast } = useToast();
   const capture = useCapture();
   const developers = useDevelopers();
+  const contacts = useContacts();
+  const createContact = useCreateContact();
   const labelRegistry = useTaskLabels();
   const [text, setText] = useState(prefill);
   const [caret, setCaret] = useState(prefill.length);
@@ -145,9 +155,13 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
   const highlightRef = useRef<HTMLDivElement>(null);
   const today = useMemo(() => getLocalIsoDate(), []);
 
-  const people = useMemo(
-    () => (developers.data ?? []).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
-    [developers.data],
+  // docs/57 §2: `@handle` also resolves the manager's contacts (external people).
+  const people = useMemo<CapturePersonCandidate[]>(
+    () => [
+      ...(developers.data ?? []).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName, kind: 'developer' as const })),
+      ...(contacts.data ?? []).map((contact) => ({ accountId: contact.handle, displayName: contact.displayName, kind: 'contact' as const, contactId: contact.id })),
+    ],
+    [developers.data, contacts.data],
   );
   const developerNames = useMemo(() => new Map(people.map((p) => [p.accountId, p.displayName])), [people]);
 
@@ -222,6 +236,21 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       highlightRef.current.scrollTop = inputRef.current.scrollTop;
       highlightRef.current.scrollLeft = inputRef.current.scrollLeft;
     }
+  };
+
+  // docs/57 §3: an unknown @name can become an external contact in place; the
+  // refetched contact list then resolves the same text.
+  const addContact = (alias: string) => {
+    createContact.mutate(
+      { displayName: alias, handle: alias.toLowerCase() },
+      {
+        onSuccess: (contact) => {
+          setServerDiagnostics([]);
+          addToast({ type: 'success', title: `Added contact @${contact.handle}` });
+        },
+        onError: (error) => addToast({ type: 'error', title: 'Could not add contact', message: error.message }),
+      },
+    );
   };
 
   const chooseCandidate = (tokenIndex: number | undefined, accountId: string) => {
@@ -436,6 +465,19 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
                       {candidate.displayName}
                     </button>
                   ))}
+                </div>
+              ) : null}
+              {d.code === 'unknown-person' && d.suggestContact ? (
+                <div className="mt-1 pl-4">
+                  <button
+                    type="button"
+                    disabled={createContact.isPending}
+                    onClick={() => addContact(d.suggestContact!)}
+                    className="rounded-md px-2 py-0.5 text-[12px] font-medium"
+                    style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
+                  >
+                    Create contact @{d.suggestContact}
+                  </button>
                 </div>
               ) : null}
             </div>

@@ -48,6 +48,10 @@ vi.mock('@/hooks/useDevelopers', () => ({
   useDevelopers: () => ({ data: [{ accountId: 'dev-1', displayName: 'Dev One' }] }),
 }));
 
+vi.mock('@/hooks/useContacts', () => ({
+  useContacts: () => ({ data: [{ id: 7, displayName: 'Acme Legal', handle: 'acme-legal', note: null, createdAt: '' }] }),
+}));
+
 vi.mock('@/hooks/useTaskLabels', () => ({
   useTaskLabels: () => ({
     data: {
@@ -228,7 +232,7 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Display' }));
     const menu = screen.getByRole('menu', { name: 'Display options' });
     const groups = within(menu).getAllByRole('menuitemradio').map((item) => item.textContent);
-    expect(groups).toEqual(['Schedule', 'Recently updated', 'Recently created', 'Priority', 'None', 'Schedule', 'Owner', 'Status']);
+    expect(groups).toEqual(['Schedule', 'Recently updated', 'Recently created', 'Priority', 'Check-by date', 'None', 'Schedule', 'Owner', 'Status', 'Waiting on']);
   });
 
   it('saves, deletes, and updates saved views', async () => {
@@ -619,6 +623,48 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const more = screen.getByRole('menu', { name: 'More actions' });
     fireEvent.click(within(more).getByRole('menuitem', { name: /Priority/ }));
     expect(screen.getByRole('menu', { name: 'Set priority' })).toBeTruthy();
+  });
+
+  it('w sets who a task waits on — developer, contact, or free text (docs/57 P3-03)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('w');
+    let menu = screen.getByRole('menu', { name: 'Waiting on' });
+    await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: /Acme Legal/ })); });
+    expect(mockApply.mock.calls.at(-1)![0][0].changes).toEqual({ waitingOn: { type: 'contact', ref: '7', label: 'Acme Legal' } });
+    press('w');
+    menu = screen.getByRole('menu', { name: 'Waiting on' });
+    fireEvent.change(within(menu).getByRole('textbox', { name: 'Waiting on' }), { target: { value: 'Finance' } });
+    await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: /Finance/ })); });
+    expect(mockApply.mock.calls.at(-1)![0][0].changes).toEqual({ waitingOn: { type: 'text', label: 'Finance' } });
+  });
+
+  it('c sets a check-by date as a local 9am followUpAt (docs/57 P3-03)', async () => {
+    render(<TasksPage />);
+    press('j');
+    press('c');
+    await act(async () => { press('m'); });
+    expect(mockApply.mock.calls.at(-1)![0][0].changes).toEqual({ followUpAt: new Date('2026-09-27T09:00:00').toISOString() });
+  });
+
+  it('the Waiting view groups by the party waited on and shows aging and check chips (docs/57 §4)', () => {
+    window.history.replaceState(null, '', '/tasks?view=waiting');
+    mockUseTaskViews.mockReturnValue({
+      data: { views: BUILTIN_VIEWS.map((view) => (view.id === 'waiting' ? { ...view, name: 'Waiting', definition: { ...view.definition, sort: 'checkBy', group: 'party' } } : view)) },
+      isLoading: false, isError: false,
+    });
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => (definition?.filters?.closed ? tasksResult([]) : tasksResult([
+      task({ id: 1, taskKey: 'T-1', title: 'NDA', scheduledOn: null, followUpAt: '2026-09-25T09:00:00Z', waitingOn: { type: 'contact', ref: '7', label: 'Acme Legal', since: '2026-09-20T10:00:00Z' }, signals: { ...NO_SIGNALS, waitingDays: 6 } }),
+      task({ id: 2, taskKey: 'T-2', title: 'Rollout', ownerType: 'developer', ownerId: 'dev-1', scheduledOn: null, signals: { ...NO_SIGNALS, stale: true, staleDays: 9, waitingDays: 9 } }),
+      task({ id: 3, taskKey: 'T-3', title: 'Stuck', status: 'blocked', scheduledOn: null, signals: { ...NO_SIGNALS, waitingDays: 1 } }),
+    ])));
+    render(<TasksPage />);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+    expect(headings).toEqual(expect.arrayContaining(['Acme Legal', 'Dev One', 'Blocked']));
+    expect(headings.indexOf('Blocked')).toBeGreaterThan(headings.indexOf('Acme Legal'));
+    expect(within(row('T-1')).getByTestId('waiting-check').textContent).toBe('Check 1d late');
+    expect(within(row('T-1')).getByTestId('waiting-aging').textContent).toBe('Waiting 6d');
+    expect(within(row('T-2')).getByTestId('waiting-aging').textContent).toBe('Waiting 9d');
   });
 
   it('bulk status change clears the selection of removed rows (docs/51 B4)', async () => {

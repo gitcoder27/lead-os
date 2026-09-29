@@ -83,11 +83,11 @@ describe("parseCapture — tokens", () => {
     ]);
   });
 
-  it("/f binds a following !date to followUpAt, not scheduledOn", () => {
+  it("/f binds a following !date to followUpAt, and plans my own reminder that day (docs/57 §3)", () => {
     const parsed = resolved("Check vendor renewal /f !mon");
     expect(parsed.followUp).toBe(true);
     expect(parsed.followUpAt).toBe("2026-09-28"); // next Monday
-    expect(parsed.scheduledOn).toBeNull();
+    expect(parsed.scheduledOn).toBe("2026-09-28");
     expect(parsed.labels).toEqual(["category:follow_up"]);
   });
 
@@ -284,5 +284,76 @@ describe("matchCapturePeople", () => {
     expect(matchCapturePeople("cart", PEOPLE)[0]?.accountId).toBe("sam");
     expect(matchCapturePeople("samcarter", PEOPLE)[0]?.accountId).toBe("sam");
     expect(matchCapturePeople("SAM", PEOPLE)[0]?.accountId).toBe("sam");
+  });
+});
+
+describe("waiting on (docs/57 §3, P3-03)", () => {
+  const CONTACTS = [{ accountId: "acme-legal", displayName: "Acme Legal", kind: "contact" as const, contactId: 7 }];
+  const withContacts = (text: string) => resolveCapture(parseCapture(text, TODAY), { people: [...PEOPLE, ...CONTACTS] });
+
+  it("/w @who !date binds the party and the check-by date, and keeps me as owner", () => {
+    const parsed = resolved("/w @sam !fri Contract review");
+    expect(parsed.blocked).toBe(false);
+    expect(parsed.title).toBe("Contract review");
+    expect(parsed.waitingOn?.accountId).toBe("sam");
+    expect(parsed.owner).toBeNull();
+    expect(parsed.followUpAt).toBe("2026-09-25");
+    expect(parsed.scheduledOn).toBeNull();
+    expect(parsed.labels).not.toContain("category:follow_up");
+  });
+
+  it("binds within the next two words in either order", () => {
+    expect(resolved("Contract /w !fri @sam").waitingOn?.accountId).toBe("sam");
+    expect(resolved("Contract /w !fri @sam").followUpAt).toBe("2026-09-25");
+    // A third word is outside the window: @sam is the owner, not the party.
+    const late = resolved("/w @dev-1 review ready @sam");
+    expect(late.waitingOn?.accountId).toBe("dev-1");
+    expect(late.owner?.accountId).toBe("sam");
+  });
+
+  it("/w needs a person", () => {
+    const parsed = resolved("Contract review /w !fri");
+    expect(parsed.diagnostics.some((d) => d.code === "waiting-needs-person" && d.severity === "error")).toBe(true);
+    expect(parsed.blocked).toBe(true);
+  });
+
+  it("/f @who is the same as /w; /f !date alone is my reminder planned that day", () => {
+    const delegated = resolved("/f @dev-1 !fri Check the rollout");
+    expect(delegated.waitingOn?.accountId).toBe("dev-1");
+    expect(delegated.followUpAt).toBe("2026-09-25");
+    expect(delegated.scheduledOn).toBeNull();
+    expect(delegated.labels).toContain("category:follow_up");
+    const reminder = resolved("Ping design /f !fri");
+    expect(reminder.waitingOn).toBeNull();
+    expect(reminder.followUpAt).toBe("2026-09-25");
+    expect(reminder.scheduledOn).toBe("2026-09-25");
+  });
+
+  it("an owner and a waiting party can coexist", () => {
+    const parsed = resolved("@dev-1 Ship migration /w @sam");
+    expect(parsed.owner?.accountId).toBe("dev-1");
+    expect(parsed.waitingOn?.accountId).toBe("sam");
+  });
+
+  it("contacts can be waited on or linked but never own", () => {
+    expect(withContacts("/w @acme-legal NDA").waitingOn).toMatchObject({ kind: "contact", contactId: 7 });
+    const linked = withContacts("@acme-legal NDA follow-through");
+    expect(linked.owner).toBeNull();
+    expect(linked.peopleLinks).toEqual([expect.objectContaining({ kind: "contact", contactId: 7 })]);
+  });
+
+  it("an unknown person suggests creating a contact", () => {
+    const parsed = resolved("/w @vendorx Renewal quote");
+    const diagnostic = parsed.diagnostics.find((d) => d.code === "unknown-person");
+    expect(diagnostic?.suggestContact).toBe("vendorx");
+    expect(parsed.blocked).toBe(true);
+  });
+
+  it("person refs accept colon ids (Jira account ids)", () => {
+    const people = [{ accountId: "557058:ab-12", displayName: "Jira Person" }];
+    const parsed = resolveCapture(parseCapture("Fix it @557058:ab-12", TODAY), { people });
+    expect(parsed.blocked).toBe(false);
+    expect(parsed.owner?.accountId).toBe("557058:ab-12");
+    expect(parsed.title).toBe("Fix it");
   });
 });

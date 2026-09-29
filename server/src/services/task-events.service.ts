@@ -22,8 +22,8 @@ const eventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("assign"), meta: z.object({ fromType: z.enum(["manager", "developer"]).nullable(), fromId: z.string().nullable(), toType: z.enum(["manager", "developer"]).nullable(), toId: z.string().nullable(), stateReset: z.object({ from: z.string(), to: z.string() }).optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("focus"), meta: z.object({ action: z.enum(["set_current", "unset_current"]), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ...approx }), body: z.null() }),
   z.object({ type: z.literal("title"), meta: z.object({ from: z.string(), to: z.string(), ...approx }), body: z.null() }),
-  z.object({ type: z.literal("schedule"), meta: z.object({ field: z.enum(["day", "follow_up_at", "planned_start_at", "planned_end_at"]), from: z.string().nullable(), to: z.string().nullable(), via: z.enum(["carry_forward", "reschedule", "snooze", "edit", "reassign"]), ...approx }), body: z.null() }),
-  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external", "task"]), ref: z.string(), role: z.enum(["primary", "related"]).optional(), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("schedule"), meta: z.object({ field: z.enum(["day", "follow_up_at", "planned_start_at", "planned_end_at", "waiting_on"]), from: z.string().nullable(), to: z.string().nullable(), via: z.enum(["carry_forward", "reschedule", "snooze", "edit", "reassign"]), ...approx }), body: z.null() }),
+  z.object({ type: z.literal("link"), meta: z.object({ action: z.enum(["added", "removed"]), kind: z.enum(["jira", "person", "external", "task", "contact"]), ref: z.string(), role: z.enum(["primary", "related"]).optional(), ...approx }), body: z.null() }),
   z.object({ type: z.literal("checkin_ref"), meta: z.object({ checkInId: z.number().int().positive(), date: z.string(), developerAccountId: z.string(), excerpt: z.string().max(200) }), body: z.null() }),
   z.object({ type: z.literal("note_ref"), meta: z.object({ noteId: z.number().int().positive(), noteDate: z.string(), relation: z.enum(["mentioned", "created_from", "update_from"]), excerpt: z.string().optional() }), body: z.null() }),
   z.object({ type: z.literal("merged"), meta: z.object({ survivorKey: z.string(), mergedKey: z.string(), decisionRef: z.string() }), body: z.null() }),
@@ -98,7 +98,7 @@ export class TaskEventsService {
       await this.assertDeveloperOwns(input.taskKey, { kind: "developer", accountId: actor.accountId ?? "", workspaceId });
     }
     if (actor.type !== "system" && !backfill && !checkInSideEffect && !(["update", "instruction", "decision", "blocker"] as string[]).includes(input.type)) throw new HttpError(403, "System event only");
-    const visibility: TaskEventVisibility = input.type === "note_ref" || (input.type === "schedule" && input.meta?.field === "follow_up_at") || (input.type === "update" && input.meta?.imported?.field === "desk_context_note") || (input.type === "update" && input.meta?.via === "context_note_field")
+    const visibility: TaskEventVisibility = input.type === "note_ref" || (input.type === "schedule" && (input.meta?.field === "follow_up_at" || input.meta?.field === "waiting_on")) || (input.type === "link" && input.meta?.kind === "contact") || (input.type === "update" && input.meta?.imported?.field === "desk_context_note") || (input.type === "update" && input.meta?.via === "context_note_field")
       ? "private" : actor.type === "developer" || !(["update", "instruction", "decision", "blocker"] as string[]).includes(input.type) ? "shared" : input.visibility ?? "shared";
     const dedupeKey = input.requestId ? `req:${input.requestId}` : input.dedupeKey ?? null;
     return runInTransaction(async () => {

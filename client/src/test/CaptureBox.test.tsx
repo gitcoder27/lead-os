@@ -26,6 +26,12 @@ vi.mock('@/hooks/useDevelopers', () => ({
   }),
 }));
 
+const mockCreateContact = vi.fn();
+vi.mock('@/hooks/useContacts', () => ({
+  useContacts: () => ({ data: [{ id: 7, displayName: 'Acme Legal', handle: 'acme-legal', note: null, createdAt: '' }] }),
+  useCreateContact: () => ({ mutate: mockCreateContact, isPending: false }),
+}));
+
 vi.mock('@/hooks/useTaskLabels', () => ({
   useTaskLabels: () => ({
     data: {
@@ -113,6 +119,23 @@ describe('CaptureBox (P3-D8)', () => {
 
     expect(screen.getByTestId('capture-summary').textContent).toMatch(/Later · back \w{3}, \w{3} \d+/);
     expect(screen.getByRole('button', { name: /capture/i })).not.toBeDisabled();
+  });
+
+  it('/w previews who the task waits on and the check-by date (P3-03)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'NDA review /w @acme-legal !mon' } });
+
+    const summary = screen.getByTestId('capture-summary').textContent ?? '';
+    expect(summary).toMatch(/Waiting on Acme Legal · check Mon, \w{3} \d+/);
+    expect(summary).not.toContain('Inbox');
+  });
+
+  it('offers to create a contact for an unknown @person (P3-03)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Quote /w @vendorx' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create contact @vendorx' }));
+    expect(mockCreateContact.mock.calls.at(-1)?.[0]).toEqual({ displayName: 'vendorx', handle: 'vendorx' });
   });
 
   it('a bare capture previews as Inbox (P3-02)', () => {

@@ -370,6 +370,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   schedule_position     INTEGER,
   hide_until            TEXT,
   needs_triage          INTEGER NOT NULL DEFAULT 0,
+  waiting_on_type       TEXT,
+  waiting_on_ref        TEXT,
+  waiting_on_label      TEXT,
+  waiting_since         TEXT,
   due_at                TEXT,
   follow_up_at          TEXT,
   starts_at             TEXT,
@@ -761,6 +765,15 @@ const alterStatements = [
   "ALTER TABLE tasks ADD COLUMN hide_until TEXT",
   "ALTER TABLE tasks ADD COLUMN needs_triage INTEGER NOT NULL DEFAULT 0",
   "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_triage ON tasks(workspace_id, needs_triage) WHERE needs_triage = 1",
+  // docs/57 §2 (P3-03): waiting-on party (check-by stays follow_up_at) and
+  // manager-private external contacts.
+  "ALTER TABLE tasks ADD COLUMN waiting_on_type TEXT",
+  "ALTER TABLE tasks ADD COLUMN waiting_on_ref TEXT",
+  "ALTER TABLE tasks ADD COLUMN waiting_on_label TEXT",
+  "ALTER TABLE tasks ADD COLUMN waiting_since TEXT",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_waiting ON tasks(workspace_id, waiting_on_type) WHERE waiting_on_type IS NOT NULL",
+  "CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, display_name TEXT NOT NULL, handle TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, archived_at TEXT)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_handle ON contacts(workspace_id, manager_account_id, handle)",
 ];
 
 const constraintRepairStatements = [

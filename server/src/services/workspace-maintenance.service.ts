@@ -19,8 +19,7 @@ import {
   teamTrackerItems,
   teamTrackerSavedViews,
   tasks,
-  developerNotes,
-} from "../db/schema";
+  developerNotes, contacts } from "../db/schema";
 import { BackupService } from "./backup.service";
 import { SettingsService } from "./settings.service";
 import { TaskEventsService } from "./task-events.service";
@@ -79,6 +78,8 @@ export class WorkspaceMaintenanceService {
         const rows = await db.select().from(tasks).where(eq(tasks.workspaceId, normalizedWorkspaceId));
         const selected = rows.filter((row) => target === "workspace" || (target === "team_tracker" ? row.ownerType === "developer" : row.trackedByManagerId === managerAccountId || (row.ownerType === "manager" && row.ownerId === managerAccountId)));
         await new TaskService().purge(selected.map((row) => row.id), normalizedWorkspaceId);
+        // docs/57 §2: contacts are the manager's own Tasks data.
+        if (target !== "team_tracker") await db.delete(contacts).where(and(eq(contacts.workspaceId, normalizedWorkspaceId), eq(contacts.managerAccountId, managerAccountId)));
         if (target === "team_tracker" || target === "workspace") {
           await db.delete(teamTrackerCheckIns).where(eq(teamTrackerCheckIns.workspaceId, normalizedWorkspaceId));
           await db.delete(developerNotes).where(eq(developerNotes.workspaceId, normalizedWorkspaceId));

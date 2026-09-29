@@ -14,6 +14,7 @@ import { runInTransaction } from "../db/transaction";
 import { developers, issues, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { todayIsoDate } from "../utils/date";
+import { ContactsService } from "./contacts.service";
 import { DailyNotesService } from "./daily-notes.service";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
@@ -27,7 +28,7 @@ import type { ManagerTask } from "shared/types";
  * (a follow-up already surfaces on Today).
  */
 export function isUntriaged(resolved: ResolvedCapture): boolean {
-  return !resolved.scheduledOn && !resolved.owner && !resolved.later && !resolved.followUp;
+  return !resolved.scheduledOn && !resolved.owner && !resolved.later && !resolved.followUp && !resolved.waitingOn;
 }
 
 /**
@@ -57,7 +58,7 @@ export class CaptureService {
     }
 
     const parsed = parseCapture(input.text, serverToday);
-    const resolved = await this.resolve(parsed, scope);
+    const resolved = await this.resolve(parsed, scope, principal.accountId);
     const base = { intent: resolved.intent, diagnostics: resolved.diagnostics };
 
     if (resolved.blocked) return { ...base, blocked: true };
@@ -74,7 +75,7 @@ export class CaptureService {
   }
 
   /** Fetch the candidates the shared resolver needs, then resolve synchronously. */
-  private async resolve(parsed: ParsedCapture, workspaceId: string): Promise<ResolvedCapture> {
+  private async resolve(parsed: ParsedCapture, workspaceId: string, managerAccountId: string): Promise<ResolvedCapture> {
     const keys = [
       ...new Set(
         parsed.tokens
@@ -84,10 +85,12 @@ export class CaptureService {
     ];
     const jiraKeys = [...new Set(parsed.tokens.filter((token) => token.kind === "jira" && token.value).map((token) => token.value!))];
 
-    const [peopleRows, jiraRows] = await Promise.all([
+    const [peopleRows, contactRows, jiraRows] = await Promise.all([
       db.select({ accountId: developers.accountId, displayName: developers.displayName })
         .from(developers)
         .where(and(eq(developers.workspaceId, workspaceId), eq(developers.isActive, 1))),
+      // docs/57 §2: this manager's contacts resolve `@handle` too.
+      new ContactsService().list(managerAccountId, workspaceId),
       jiraKeys.length
         ? db.select({ jiraKey: issues.jiraKey }).from(issues)
             .where(and(eq(issues.workspaceId, workspaceId), inArray(issues.jiraKey, jiraKeys), eq(issues.excluded, 0), ne(issues.syncScopeState, "out_of_scope")))
@@ -106,7 +109,10 @@ export class CaptureService {
     const synced = new Set(jiraRows.map((row) => row.jiraKey));
 
     const lookups: CaptureLookups = {
-      people: peopleRows,
+      people: [
+        ...peopleRows.map((row) => ({ ...row, kind: "developer" as const })),
+        ...contactRows.map((contact) => ({ accountId: contact.handle, displayName: contact.displayName, kind: "contact" as const, contactId: contact.id })),
+      ],
       jiraSynced: (key) => synced.has(key),
       taskState: (key) => taskStateByKey.get(key) ?? "unknown",
     };
@@ -175,6 +181,12 @@ export class CaptureService {
           // NULL — the injected `category:follow_up` label carries the follow-up.
           followUpAt: resolved.followUpAt ? new Date(`${resolved.followUpAt}T09:00:00`).toISOString() : null,
           parentId,
+          // docs/57 §3 (P3-03): `/w @who` or `/f @who` — the task waits on them.
+          waitingOn: resolved.waitingOn
+            ? resolved.waitingOn.kind === "contact"
+              ? { type: "contact", ref: String(resolved.waitingOn.contactId) }
+              : { type: "developer", ref: resolved.waitingOn.accountId }
+            : null,
         },
         principal,
         { requestId, source: "capture", untriaged: isUntriaged(resolved) },
@@ -183,7 +195,9 @@ export class CaptureService {
         await this.taskService.addLink(row.taskKey, { kind: "jira", ref: link.key, role: link.primary ? "primary" : "related" }, principal);
       }
       for (const person of resolved.peopleLinks) {
-        await this.taskService.addLink(row.taskKey, { kind: "person", ref: person.accountId }, principal);
+        await this.taskService.addLink(row.taskKey, person.kind === "contact"
+          ? { kind: "contact", ref: String(person.contactId) }
+          : { kind: "person", ref: person.accountId }, principal);
       }
       for (const key of resolved.taskLinks) {
         const target = await this.keys.resolve(scope, key);

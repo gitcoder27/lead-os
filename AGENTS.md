@@ -75,7 +75,7 @@ Frontend conventions:
 
 ## Backend Map
 
-Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups`, `assistant` (manager-only `/api/assistant` Copilot chat/confirm/conversations).
+Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups`, `assistant` (manager-only `/api/assistant` Copilot chat/confirm/conversations), `contacts` (manager-private external people a task can wait on).
 
 Services live in `server/src/services/` and cover issues, workload, alerts, automation suggestions, settings/config, tags, backups, auth, Team Tracker, My Day, Manager Desk, developer availability, workspace maintenance, and board query logic.
 

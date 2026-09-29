@@ -227,6 +227,8 @@ export const TASK_SHORTCUTS: ShortcutGroup[] = [
       ['a', 'Assign'],
       ['l', 'Labels'],
       ['p', 'Priority'],
+      ['w', 'Waiting on…'],
+      ['c', 'Check-by date'],
       ['#', 'Drop'],
       ['n', 'New task in this group'],
       ['z', 'Undo last change'],

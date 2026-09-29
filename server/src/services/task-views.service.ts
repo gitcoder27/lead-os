@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
@@ -41,12 +41,16 @@ function shiftDays(iso: string, days: number): string {
 export function builtinTaskViews(today: string): { id: string; name: string; section: "plan" | "review"; definition: TaskViewDefinition }[] {
   const openish: TaskStatus[] = ["open", "active", "blocked"];
   return [
-    { id: "today", name: "Planned today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today" }, sort: "scheduled", group: "scheduled" } },
+    // docs/57 §1: waiting outranks planned — a task waiting on someone leaves
+    // Planned today; its check-by date brings it back on Today.
+    { id: "today", name: "Planned today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today", waitingOn: false }, sort: "scheduled", group: "scheduled" } },
     // docs/57 §1 (P3-02): Inbox means untriaged — bare captures, unowned rows,
     // and Later tasks whose resurface date arrived — not just "unowned".
     { id: "inbox", name: "Inbox", section: "plan", definition: { filters: { lane: "inbox" }, sort: "created" } },
     { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
-    { id: "waiting", name: "Waiting on others", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "updated", group: "owner" } },
+    // docs/57 §4 (P3-03): replaces /follow-ups — grouped by the party waited on,
+    // oldest check-by first.
+    { id: "waiting", name: "Waiting", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "checkBy", group: "party" } },
     { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
     // §8.1 drift, overdue plan dates, and stale work in one review queue.
     // docs/51 F2: parked work is deliberate, and idle developer-owned tasks
@@ -96,6 +100,7 @@ export function taskRowLane(row: TaskRow, today: string): TaskLane {
     dueDate: isoDatePart(row.dueAt) ?? null,
     ownerType: row.ownerType,
     needsTriage: row.needsTriage === 1,
+    waiting: row.waitingOnType !== null,
   }, today);
 }
 
@@ -114,6 +119,7 @@ export function taskSignals(row: TaskRow, facts: RowFacts, today: string): TaskS
   const idleDays = daysBetween(lastActivity, today);
   const stale = open && idleDays >= TASK_STALE_DAYS;
   const followUpDate = isoDatePart(row.followUpAt);
+  const waitingSince = isoDatePart(row.waitingSince);
   return {
     overdue,
     overdueDays: overdue ? daysBetween(plan.date!, today) : null,
@@ -122,6 +128,8 @@ export function taskSignals(row: TaskRow, facts: RowFacts, today: string): TaskS
     staleDays: stale ? idleDays : null,
     drift: facts.drifted.has(row.id),
     followUpDue: open && Boolean(followUpDate && followUpDate <= today),
+    // docs/57 §4: aging — since the party was set, else since the last activity.
+    waitingDays: open ? Math.max(0, waitingSince ? daysBetween(waitingSince, today) : idleDays) : null,
   };
 }
 
@@ -136,6 +144,25 @@ function followUpMatch(row: TaskRow): boolean {
  */
 function selfOwned(row: TaskRow, principal: TaskPrincipal): boolean {
   return row.ownerId !== null && row.ownerId === principal.accountId;
+}
+
+/**
+ * docs/57 §4 (P3-03): the Waiting lens.
+ * - explicit: a waiting-on party is set (including my own `/w` tasks);
+ * - delegated and quiet: a developer task I track whose check-by is due or
+ *   that has been idle for TASK_STALE_DAYS — docs/51 F2 keeps idle developer
+ *   work out of Needs attention, but in solo mode nobody else touches it, so
+ *   this lens is where it surfaces;
+ * - legacy (docs/51 F1), so existing data keeps showing: blocked, the
+ *   `kind:waiting` label, or a follow-up on somebody else's task.
+ */
+function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSignals): boolean {
+  if (row.waitingOnType !== null) return true;
+  if (row.status === "blocked" || labelsOf(row).includes(WAITING_LABEL)) return true;
+  const othersTask = row.ownerType !== null && !selfOwned(row, principal);
+  if (followUpMatch(row) && othersTask) return true;
+  const delegated = row.ownerType === "developer" && othersTask && row.trackedByManagerId === principal.accountId;
+  return delegated && (signals.followUpDue || signals.stale);
 }
 
 /**
@@ -200,14 +227,8 @@ export function matchesTaskViewFilters(
     if (!plan) return false;
     if (filters.horizon === "today" ? plan > today : plan <= today) return false;
   }
-  if (filters.waiting !== undefined) {
-    // docs/51 F1: waiting = blocked, an explicit kind:waiting label, or a
-    // follow-up on somebody else's task. My own open tasks — including plain
-    // tracked dev work and follow-ups I owe — are not "waiting".
-    const waiting = row.status === "blocked" || labelsOf(row).includes(WAITING_LABEL)
-      || (followUpMatch(row) && row.ownerType !== null && !selfOwned(row, principal));
-    if (waiting !== filters.waiting) return false;
-  }
+  if (filters.waitingOn !== undefined && (row.waitingOnType !== null) !== filters.waitingOn) return false;
+  if (filters.waiting !== undefined && waitingMatch(row, principal, signals) !== filters.waiting) return false;
   if (filters.attention?.length) {
     // docs/51 F2: the stale signal only applies to manager-owned and inbox
     // tasks — idle developer-owned work is the Team page's job.
@@ -232,6 +253,12 @@ function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] 
     planKey(a).localeCompare(planKey(b)) || byPosition(a, b) || (a.startsAt ?? "").localeCompare(b.startsAt ?? "") || a.createdAt.localeCompare(b.createdAt) || a.id - b.id;
   const sorted = [...rows];
   switch (sort ?? "scheduled") {
+    case "checkBy":
+      // docs/57 §4: earliest check-by first (none last), then longest waiting.
+      return sorted.sort((a, b) =>
+        (a.followUpAt ?? "9999").localeCompare(b.followUpAt ?? "9999")
+        || (a.waitingSince ?? a.updatedAt).localeCompare(b.waitingSince ?? b.updatedAt)
+        || a.id - b.id);
     case "updated":
       return sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id - b.id);
     case "created":
@@ -284,6 +311,7 @@ export class TaskViewsService {
     }
     if (filters.status?.length) conditions.push(inArray(tasks.status, filters.status));
     if (filters.kind) conditions.push(eq(tasks.kind, filters.kind));
+    if (filters.waitingOn !== undefined) conditions.push(filters.waitingOn ? isNotNull(tasks.waitingOnType) : isNull(tasks.waitingOnType));
     // `later` is tracking-manager-private like the other private fields — a
     // parked row only reads as later to the manager tracking it.
     if (filters.later !== undefined) {

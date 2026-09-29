@@ -507,6 +507,12 @@ export const tasks = sqliteTable("tasks", {
   // the legacy backfill — is triaged; only a bare capture sets it.
   hideUntil: text("hide_until"),
   needsTriage: integer("needs_triage").notNull().default(0),
+  // docs/57 §2 (P3-03): who the task waits on (manager-private). Check-by is
+  // follow_up_at. type: developer | contact | text; ref: account id or contact id.
+  waitingOnType: text("waiting_on_type"),
+  waitingOnRef: text("waiting_on_ref"),
+  waitingOnLabel: text("waiting_on_label"),
+  waitingSince: text("waiting_since"),
   dueAt: text("due_at"),
   followUpAt: text("follow_up_at"),
   startsAt: text("starts_at"),
@@ -525,6 +531,23 @@ export const tasks = sqliteTable("tasks", {
   index("idx_tasks_workspace_owner_status").on(table.workspaceId, table.ownerType, table.ownerId, table.status),
   index("idx_tasks_workspace_tracked").on(table.workspaceId, table.trackedByManagerId, table.status),
   index("idx_tasks_workspace_closed").on(table.workspaceId, table.closedAt),
+]);
+
+/**
+ * docs/57 §2 (P3-03): external stakeholders a manager waits on. Private to the
+ * owning manager and never a login; `@handle` in capture resolves against them.
+ */
+export const contacts = sqliteTable("contacts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  displayName: text("display_name").notNull(),
+  handle: text("handle").notNull(),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+  archivedAt: text("archived_at"),
+}, (table) => [
+  uniqueIndex("idx_contacts_handle").on(table.workspaceId, table.managerAccountId, table.handle),
 ]);
 
 export const taskLinks = sqliteTable("task_links", {

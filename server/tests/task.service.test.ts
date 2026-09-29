@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers, tasks, teamTrackerItems } from "../src/db/schema";
+import { configTable, contacts, developers, tasks, teamTrackerItems } from "../src/db/schema";
+import { ContactsService } from "../src/services/contacts.service";
 import { TaskService } from "../src/services/task.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
@@ -52,8 +53,10 @@ describe("canonical tasks", () => {
   it("resets canonical tasks and events without relying on legacy rows", async () => {
     await service.create({ title: "Private task", nextAction: "Private" }, manager);
     await service.create({ title: "Developer task" }, developer);
+    await new ContactsService().create(manager.accountId, { displayName: "Acme Legal" }, "default");
     await new WorkspaceMaintenanceService().reset(manager.accountId, "workspace", "default");
     expect(await db.select().from(tasks)).toEqual([]);
+    expect(await db.select().from(contacts)).toEqual([]);
     expect(await events.listRawForWorkspace()).toEqual([]);
   });
 

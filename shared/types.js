@@ -221,9 +221,11 @@ exports.LEGACY_NAV_PAGE_IDS = ["follow-ups", "meetings"];
 exports.NAV_PAGE_IDS = ["work", "team", "desk", "notes"];
 /** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
 exports.NAV_PAGE_IDS_TASKS = ["work", "team", "tasks", "notes"];
+/** docs/57 §5 / docs/56 P2-04: Today | Tasks | Team | Work | Notes (Today is fixed first). */
 exports.DEFAULT_NAV_PREFERENCES = {
-    topNav: ["work", "team", "desk"],
-    moreNav: ["notes"],
+    topNav: ["desk", "team", "work", "notes"],
+    moreNav: [],
+    hidden: [],
 };
 const NAV_PAGE_ID_SET = new Set([...exports.NAV_PAGE_IDS, ...exports.NAV_PAGE_IDS_TASKS]);
 function isNavPageId(value) {
@@ -246,43 +248,39 @@ function normalizeNavPageId(id, tasksNav) {
 function sanitizeNavPreferences(topNav, moreNav, options = {}) {
     const liveIds = liveNavPageIds(options.tasksNav);
     const liveSet = new Set(liveIds);
-    const top = Array.isArray(topNav) ? topNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
-    const more = Array.isArray(moreNav) ? moreNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
+    const lists = [topNav, moreNav, options.hidden].map((list) => Array.isArray(list) ? list.map((id) => normalizeNavPageId(id, options.tasksNav)) : []);
     const seen = new Set();
-    const nextTop = [];
-    const nextMore = [];
-    for (const id of top) {
-        if (liveSet.has(id) && !seen.has(id)) {
-            seen.add(id);
-            nextTop.push(id);
+    const zones = [[], [], []];
+    // First zone wins: a page listed twice (or in both a zone and Hidden) keeps its earliest place.
+    lists.forEach((list, zone) => {
+        for (const id of list) {
+            if (liveSet.has(id) && !seen.has(id)) {
+                seen.add(id);
+                zones[zone].push(id);
+            }
         }
-    }
-    for (const id of more) {
-        if (liveSet.has(id) && !seen.has(id)) {
-            seen.add(id);
-            nextMore.push(id);
-        }
-    }
+    });
+    // Never-seen pages surface in the More menu, so a new page needs no migration.
     for (const id of liveIds) {
         if (!seen.has(id)) {
-            nextMore.push(id);
+            zones[1].push(id);
         }
     }
-    return { topNav: nextTop, moreNav: nextMore };
+    return { topNav: zones[0], moreNav: zones[1], hidden: zones[2] };
 }
-/** Strict check: a complete partition of every page across the two zones. */
+/** Strict check: a complete partition of every page across the three zones. */
 function isCompleteNavPreferences(value, options = {}) {
     if (!value || typeof value !== "object") {
         return false;
     }
     const prefs = value;
-    if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav)) {
+    if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav) || (prefs.hidden !== undefined && !Array.isArray(prefs.hidden))) {
         return false;
     }
     const liveIds = liveNavPageIds(options.tasksNav);
     const liveSet = new Set(liveIds);
     // A stale client may still send the retired pages; they are ignored, not counted.
-    const combined = [...prefs.topNav, ...prefs.moreNav]
+    const combined = [...prefs.topNav, ...prefs.moreNav, ...(prefs.hidden ?? [])]
         .filter((id) => !exports.LEGACY_NAV_PAGE_IDS.includes(id))
         .map((id) => normalizeNavPageId(id, options.tasksNav));
     if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {

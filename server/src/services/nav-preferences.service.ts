@@ -44,8 +44,10 @@ export class NavPreferencesService {
       .limit(1);
 
     const row = rows[0];
-    const stored = row ? { topNav: parseStoredList(row.topNav), moreNav: parseStoredList(row.moreNav) } : DEFAULT_NAV_PREFERENCES;
-    return sanitizeNavPreferences(stored.topNav, stored.moreNav, { tasksNav });
+    const stored = row
+      ? { topNav: parseStoredList(row.topNav), moreNav: parseStoredList(row.moreNav), hidden: parseStoredList(row.hidden ?? "[]") }
+      : DEFAULT_NAV_PREFERENCES;
+    return sanitizeNavPreferences(stored.topNav, stored.moreNav, { tasksNav, hidden: stored.hidden });
   }
 
   async save(
@@ -55,18 +57,23 @@ export class NavPreferencesService {
   ): Promise<NavPreferences> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const tasksNav = await this.keys.phase3Enabled(normalizedWorkspaceId);
-    if (!isCompleteNavPreferences(input, { tasksNav })) {
+    // A client from before P2-04 has no `hidden`: keep what is stored, so its save can't un-hide pages.
+    const withHidden = input.hidden === undefined
+      ? { ...input, hidden: (await this.get(managerAccountId, normalizedWorkspaceId)).hidden.filter((id) => ![...input.topNav, ...input.moreNav].includes(id)) }
+      : input;
+    if (!isCompleteNavPreferences(withHidden, { tasksNav })) {
       throw new HttpError(
         400,
-        "Navigation preferences must place each page in the top navigation or More menu exactly once"
+        "Navigation preferences must place each page in the top navigation, the More menu or Hidden exactly once"
       );
     }
 
     const now = nowIso();
     // Persist the canonical live id so a flag flip never leaves a stale alias.
-    const sanitized = sanitizeNavPreferences(input.topNav, input.moreNav, { tasksNav });
+    const sanitized = sanitizeNavPreferences(withHidden.topNav, withHidden.moreNav, { tasksNav, hidden: withHidden.hidden });
     const topNav = JSON.stringify(sanitized.topNav);
     const moreNav = JSON.stringify(sanitized.moreNav);
+    const hidden = JSON.stringify(sanitized.hidden);
 
     await db
       .insert(userNavPreferences)
@@ -75,12 +82,13 @@ export class NavPreferencesService {
         managerAccountId,
         topNav,
         moreNav,
+        hidden,
         createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [userNavPreferences.workspaceId, userNavPreferences.managerAccountId],
-        set: { topNav, moreNav, updatedAt: now },
+        set: { topNav, moreNav, hidden, updatedAt: now },
       });
 
     return sanitized;

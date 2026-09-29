@@ -8,6 +8,7 @@ const useAuthMock = vi.fn();
 const useSyncStatusMock = vi.fn();
 const useTriggerSyncMock = vi.fn();
 const useNavPreferencesMock = vi.fn();
+const useNavAvailabilityMock = vi.fn();
 
 vi.mock('@/context/ThemeContext', () => ({
   useTheme: () => useThemeMock(),
@@ -28,6 +29,10 @@ vi.mock('@/hooks/useTriggerSync', () => ({
 vi.mock('@/hooks/useNavPreferences', () => ({
   useNavPreferences: () => useNavPreferencesMock(),
   useSaveNavPreferences: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock('@/hooks/useNavAvailability', () => ({
+  useNavAvailability: () => useNavAvailabilityMock(),
 }));
 
 vi.mock('@/components/capture/GlobalCaptureDialog', () => ({
@@ -70,8 +75,9 @@ describe('Header', () => {
       isPending: false,
     });
     useNavPreferencesMock.mockReturnValue({
-      preferences: { topNav: ['work', 'team', 'desk'], moreNav: ['notes'] },
+      preferences: { topNav: ['work', 'team', 'desk'], moreNav: ['notes'], hidden: [] },
     });
+    useNavAvailabilityMock.mockReturnValue({ team: true, work: true });
   });
 
   it('keeps settings out of the main navigation while exposing the top-right gear for managers', () => {
@@ -149,6 +155,86 @@ describe('Header', () => {
     render(<Header activeView="today" onViewChange={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
     expect(screen.getByText('Notes')).toBeInTheDocument();
+  });
+
+  describe('solo defaults and hidden pages (docs/56 P2-04)', () => {
+    const navText = () => screen.getByRole('navigation', { name: 'Workspace navigation' }).textContent ?? '';
+
+    it('a solo manager sees Today, Tasks and Notes: Team and Work are held back until they have something to show', () => {
+      useNavPreferencesMock.mockReturnValue({
+        preferences: { topNav: ['tasks', 'team', 'work', 'notes'], moreNav: [], hidden: [] },
+      });
+      useNavAvailabilityMock.mockReturnValue({ team: false, work: false });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+
+      expect(navText()).toContain('Today');
+      expect(navText()).toContain('Tasks');
+      expect(navText()).toContain('Notes');
+      expect(navText()).not.toContain('Team');
+      expect(navText()).not.toContain('Work');
+      expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
+    });
+
+    it('keeps the final order Today | Tasks | Team | Work | Notes once both exist', () => {
+      useNavPreferencesMock.mockReturnValue({
+        preferences: { topNav: ['tasks', 'team', 'work', 'notes'], moreNav: [], hidden: [] },
+      });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      const text = navText();
+      const positions = ['Today', 'Tasks', 'Team', 'Work', 'Notes'].map((label) => text.indexOf(label));
+      expect(positions.every((position) => position >= 0)).toBe(true);
+      expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    });
+
+    it('holds back Team alone when Jira is connected but nobody is on the roster, and Work alone the other way', () => {
+      useNavPreferencesMock.mockReturnValue({
+        preferences: { topNav: ['tasks', 'team', 'work', 'notes'], moreNav: [], hidden: [] },
+      });
+      useNavAvailabilityMock.mockReturnValue({ team: false, work: true });
+      const { unmount } = render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(navText()).toContain('Work');
+      expect(navText()).not.toContain('Team');
+      unmount();
+
+      useNavAvailabilityMock.mockReturnValue({ team: true, work: false });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(navText()).toContain('Team');
+      expect(navText()).not.toContain('Work');
+    });
+
+    it('a held-back page is also left out of the More menu, and More disappears when nothing is left', () => {
+      useNavPreferencesMock.mockReturnValue({
+        preferences: { topNav: ['tasks'], moreNav: ['team', 'work'], hidden: ['notes'] },
+      });
+      useNavAvailabilityMock.mockReturnValue({ team: false, work: false });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
+    });
+
+    it('leaves hidden pages out of the header entirely', () => {
+      useNavPreferencesMock.mockReturnValue({
+        preferences: { topNav: ['tasks', 'team'], moreNav: ['work'], hidden: ['notes'] },
+      });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(navText()).not.toContain('Notes');
+      fireEvent.click(screen.getByRole('button', { name: /more/i }));
+      expect(screen.getByRole('menuitem', { name: 'Work' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Notes' })).not.toBeInTheDocument();
+    });
+
+    it('a saved layout that predates hidden pages still renders', () => {
+      useNavPreferencesMock.mockReturnValue({ preferences: { topNav: ['work', 'desk'], moreNav: ['team', 'notes'] } });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(navText()).toContain('Work');
+    });
+
+    it('does not affect what a developer sees', () => {
+      useAuthMock.mockReturnValue({ user: { role: 'developer' } });
+      useNavAvailabilityMock.mockReturnValue({ team: false, work: false });
+      render(<Header activeView="today" onViewChange={vi.fn()} />);
+      expect(navText()).toContain('Work');
+      expect(navText()).toContain('Team');
+    });
   });
 
   it('keeps the fixed Work and Team layout for non-manager users', () => {

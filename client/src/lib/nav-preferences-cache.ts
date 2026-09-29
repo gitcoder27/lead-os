@@ -28,7 +28,7 @@ export function readNavPreferencesCache(scope: string, options: NavSanitizeOptio
       return null;
     }
     const candidate = parsed as NavPreferences;
-    return sanitizeNavPreferences(candidate.topNav, candidate.moreNav, options);
+    return sanitizeNavPreferences(candidate.topNav, candidate.moreNav, { ...options, hidden: candidate.hidden });
   } catch {
     try {
       window.localStorage.removeItem(key);

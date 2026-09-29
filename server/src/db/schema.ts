@@ -673,6 +673,8 @@ export const userNavPreferences = sqliteTable("user_nav_preferences", {
   managerAccountId: text("manager_account_id").notNull(),
   topNav: text("top_nav").notNull(),
   moreNav: text("more_nav").notNull(),
+  /** docs/56 P2-04: pages hidden from the header (JSON list); `[]` for rows saved before this existed. */
+  hidden: text("hidden").notNull().default("[]"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [

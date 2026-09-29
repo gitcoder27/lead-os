@@ -10,6 +10,8 @@ const saveNavigationSchema = z.object({
   body: z.object({
     topNav: z.array(navPageIdSchema).max(12),
     moreNav: z.array(navPageIdSchema).max(12),
+    // Absent from a client that predates P2-04: the stored hidden pages are kept.
+    hidden: z.array(navPageIdSchema).max(12).optional(),
   }),
   params: z.any().optional(),
   query: z.any().optional(),

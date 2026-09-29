@@ -279,6 +279,7 @@ CREATE TABLE IF NOT EXISTS user_nav_preferences (
   manager_account_id TEXT NOT NULL,
   top_nav            TEXT NOT NULL,
   more_nav           TEXT NOT NULL,
+  hidden             TEXT NOT NULL DEFAULT '[]',
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL,
   PRIMARY KEY (workspace_id, manager_account_id)
@@ -774,6 +775,8 @@ const alterStatements = [
   "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_waiting ON tasks(workspace_id, waiting_on_type) WHERE waiting_on_type IS NOT NULL",
   "CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, display_name TEXT NOT NULL, handle TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL, archived_at TEXT)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_handle ON contacts(workspace_id, manager_account_id, handle)",
+  // docs/56 P2-04: pages a manager hides from the header. Existing rows read as `[]`.
+  "ALTER TABLE user_nav_preferences ADD COLUMN hidden TEXT NOT NULL DEFAULT '[]'",
 ];
 
 const constraintRepairStatements = [

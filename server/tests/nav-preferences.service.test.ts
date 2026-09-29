@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_NAV_PREFERENCES, NAV_PAGE_IDS } from "shared/types";
 import { db, resetDatabase } from "./helpers/db";
+import { rawDb } from "../src/db/connection";
 import { configTable, userNavPreferences } from "../src/db/schema";
 import { NavPreferencesService } from "../src/services/nav-preferences.service";
 
@@ -16,8 +17,10 @@ describe("NavPreferencesService.get", () => {
   it("returns the default layout when no preference is stored", async () => {
     const prefs = await service.get(MANAGER);
     expect(prefs).toEqual(DEFAULT_NAV_PREFERENCES);
-    expect(prefs.topNav).toEqual(["work", "team", "desk"]);
-    expect(prefs.moreNav).toEqual(["notes"]);
+    // docs/56 P2-04: Today | Tasks | Team | Work | Notes, nothing hidden.
+    expect(prefs.topNav).toEqual(["desk", "team", "work", "notes"]);
+    expect(prefs.moreNav).toEqual([]);
+    expect(prefs.hidden).toEqual([]);
   });
 
   it("returns a defensive copy so callers cannot mutate the shared default", async () => {
@@ -55,8 +58,56 @@ describe("NavPreferencesService.get", () => {
     });
 
     const prefs = await service.get(MANAGER);
-    expect(prefs).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
+    expect(prefs).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"], hidden: [] });
     expect([...prefs.topNav, ...prefs.moreNav].sort()).toEqual([...NAV_PAGE_IDS].sort());
+  });
+
+  it("reads a row saved before P2-04 (hidden defaults to []) exactly as it was (docs/56 P2-04)", async () => {
+    // Insert without a `hidden` value, as the old code did: the column default fills it.
+    rawDb.prepare("INSERT INTO user_nav_preferences (workspace_id, manager_account_id, top_nav, more_nav, created_at, updated_at) VALUES ('default', ?, ?, ?, ?, ?)")
+      .run(MANAGER, JSON.stringify(["work", "team", "desk"]), JSON.stringify(["notes"]), new Date().toISOString(), new Date().toISOString());
+    expect(await service.get(MANAGER)).toEqual({ topNav: ["work", "team", "desk"], moreNav: ["notes"], hidden: [] });
+  });
+
+  it("returns hidden pages in their own zone, and every page still appears exactly once", async () => {
+    await db.insert(userNavPreferences).values({
+      workspaceId: "default",
+      managerAccountId: MANAGER,
+      topNav: JSON.stringify(["desk", "notes"]),
+      moreNav: JSON.stringify(["work"]),
+      hidden: JSON.stringify(["team"]),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const prefs = await service.get(MANAGER);
+    expect(prefs).toEqual({ topNav: ["desk", "notes"], moreNav: ["work"], hidden: ["team"] });
+    expect([...prefs.topNav, ...prefs.moreNav, ...prefs.hidden].sort()).toEqual([...NAV_PAGE_IDS].sort());
+  });
+
+  it("a page stored in both a zone and Hidden keeps its earlier zone; unknown hidden ids are dropped", async () => {
+    await db.insert(userNavPreferences).values({
+      workspaceId: "default",
+      managerAccountId: MANAGER,
+      topNav: JSON.stringify(["desk"]),
+      moreNav: JSON.stringify(["team"]),
+      hidden: JSON.stringify(["desk", "follow-ups", "bogus", "work"]),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    expect(await service.get(MANAGER)).toEqual({ topNav: ["desk"], moreNav: ["team", "notes"], hidden: ["work"] });
+  });
+
+  it("survives corrupt JSON in a stored hidden list", async () => {
+    await db.insert(userNavPreferences).values({
+      workspaceId: "default",
+      managerAccountId: MANAGER,
+      topNav: JSON.stringify(["desk"]),
+      moreNav: JSON.stringify(["team"]),
+      hidden: "{oops",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    expect((await service.get(MANAGER)).hidden).toEqual([]);
   });
 
   it("survives corrupt JSON in stored rows", async () => {
@@ -118,12 +169,45 @@ describe("NavPreferencesService.save", () => {
       topNav: ["work", "follow-ups", "desk"],
       moreNav: ["team", "notes", "meetings"],
     });
-    expect(saved).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
+    expect(saved).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"], hidden: [] });
     expect(await service.get(MANAGER)).toEqual(saved);
     // A layout that is only complete once the retired ids are ignored is still rejected.
     await expect(
       service.save(MANAGER, { topNav: ["work", "follow-ups"], moreNav: ["meetings", "desk", "notes"] })
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("persists hidden pages and reads them back (docs/56 P2-04)", async () => {
+    const saved = await service.save(MANAGER, { topNav: ["desk", "notes"], moreNav: [], hidden: ["work", "team"] });
+    expect(saved).toEqual({ topNav: ["desk", "notes"], moreNav: [], hidden: ["work", "team"] });
+    expect(await service.get(MANAGER)).toEqual(saved);
+    // Restoring them is just another save.
+    expect(await service.save(MANAGER, { topNav: ["desk", "notes", "work", "team"], moreNav: [], hidden: [] })).toMatchObject({ hidden: [] });
+  });
+
+  it("accepts hiding every page", async () => {
+    const saved = await service.save(MANAGER, { topNav: [], moreNav: [], hidden: [...NAV_PAGE_IDS] });
+    expect(saved.hidden).toEqual([...NAV_PAGE_IDS]);
+  });
+
+  it("rejects a page that is both in a zone and hidden, or missing from all three", async () => {
+    await expect(service.save(MANAGER, { topNav: ["desk", "team", "work", "notes"], moreNav: [], hidden: ["work"] })).rejects.toMatchObject({ status: 400 });
+    await expect(service.save(MANAGER, { topNav: ["desk"], moreNav: ["notes"], hidden: ["work"] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("a client from before P2-04 (no hidden field) can save without un-hiding pages", async () => {
+    await service.save(MANAGER, { topNav: ["desk", "notes"], moreNav: [], hidden: ["work", "team"] });
+    // It only knows the two pages it was shown.
+    const saved = await service.save(MANAGER, { topNav: ["notes", "desk"], moreNav: [] });
+    expect(saved).toEqual({ topNav: ["notes", "desk"], moreNav: [], hidden: ["work", "team"] });
+    // And it still needs a complete layout when nothing is hidden.
+    await expect(service.save(OTHER_MANAGER, { topNav: ["desk"], moreNav: [] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("keeps hidden pages per manager and workspace", async () => {
+    await service.save(MANAGER, { topNav: ["desk", "notes"], moreNav: [], hidden: ["work", "team"] });
+    expect((await service.get(OTHER_MANAGER)).hidden).toEqual([]);
+    expect((await service.get(MANAGER, "other-workspace")).hidden).toEqual([]);
   });
 
   it("persists a complete layout and reads it back", async () => {

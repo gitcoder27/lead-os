@@ -12,6 +12,7 @@ const OTHER_SCOPE = 'ws-1:manager-b:manager:';
 const CUSTOM: NavPreferences = {
   topNav: ['notes', 'desk', 'work', 'team'],
   moreNav: [],
+  hidden: [],
 };
 
 function key(scope: string): string {
@@ -54,6 +55,7 @@ describe('nav preferences cache', () => {
     expect(prefs?.topNav).toEqual(['notes']);
     // The retired Meetings page is dropped; unseen pages are appended to More.
     expect(prefs?.moreNav).toEqual(['work', 'team', 'desk']);
+    expect(prefs?.hidden).toEqual([]);
   });
 
   it('discards malformed JSON', () => {
@@ -65,5 +67,24 @@ describe('nav preferences cache', () => {
   it('rejects empty or non-object writes without throwing', () => {
     expect(writeNavPreferencesCache('', CUSTOM)).toBe(false);
     expect(readNavPreferencesCache('')).toBeNull();
+  });
+
+  it('round-trips hidden pages, and drops bad ones from a cached value', () => {
+    const withHidden: NavPreferences = { topNav: ['notes', 'desk'], moreNav: [], hidden: ['work', 'team'] };
+    writeNavPreferencesCache(SCOPE, withHidden);
+    expect(readNavPreferencesCache(SCOPE)).toEqual(withHidden);
+
+    window.localStorage.setItem(key(SCOPE), JSON.stringify({ topNav: ['desk'], moreNav: ['notes'], hidden: ['work', 'bogus', 'meetings', 'desk'] }));
+    expect(readNavPreferencesCache(SCOPE)).toEqual({ topNav: ['desk'], moreNav: ['notes', 'team'], hidden: ['work'] });
+  });
+
+  it('reads a value cached before hidden pages existed', () => {
+    window.localStorage.setItem(key(SCOPE), JSON.stringify({ topNav: ['work', 'team', 'desk'], moreNav: ['notes', 'follow-ups'] }));
+    expect(readNavPreferencesCache(SCOPE)).toEqual({ topNav: ['work', 'team', 'desk'], moreNav: ['notes'], hidden: [] });
+  });
+
+  it('reads the cache under the Phase 3 name for Desk', () => {
+    window.localStorage.setItem(key(SCOPE), JSON.stringify({ topNav: ['desk'], moreNav: [], hidden: ['team'] }));
+    expect(readNavPreferencesCache(SCOPE, { tasksNav: true })).toEqual({ topNav: ['tasks'], moreNav: ['work', 'notes'], hidden: ['team'] });
   });
 });

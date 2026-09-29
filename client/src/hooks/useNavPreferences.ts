@@ -29,7 +29,7 @@ export function useNavPreferences(): { preferences: NavPreferences } {
 
   const preferences =
     (isManager ? query.data ?? cached : null) ??
-    sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3 });
+    sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3, hidden: DEFAULT_NAV_PREFERENCES.hidden });
   return { preferences };
 }
 

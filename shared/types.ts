@@ -2587,22 +2587,31 @@ export const LEGACY_NAV_PAGE_IDS: readonly string[] = ["follow-ups", "meetings"]
 export interface NavPreferences {
   topNav: NavPageId[];
   moreNav: NavPageId[];
+  /**
+   * docs/56 P2-04: pages the manager has hidden from the header altogether (they
+   * stay reachable by URL and the palette). Every page is in exactly one of the
+   * three lists.
+   */
+  hidden: NavPageId[];
 }
 
 export const NAV_PAGE_IDS: readonly NavPageId[] = ["work", "team", "desk", "notes"];
 /** Phase 3 (P3-D1): the same page set with Desk renamed to Tasks. */
 export const NAV_PAGE_IDS_TASKS: readonly NavPageId[] = ["work", "team", "tasks", "notes"];
 
+/** docs/57 §5 / docs/56 P2-04: Today | Tasks | Team | Work | Notes (Today is fixed first). */
 export const DEFAULT_NAV_PREFERENCES: NavPreferences = {
-  topNav: ["work", "team", "desk"],
-  moreNav: ["notes"],
+  topNav: ["desk", "team", "work", "notes"],
+  moreNav: [],
+  hidden: [],
 };
 
 export interface NavPreferencesResponse {
   preferences: NavPreferences;
 }
 
-export type SaveNavPreferencesPayload = NavPreferences;
+/** `hidden` may be absent (a client from before P2-04): the stored hidden pages are kept. */
+export type SaveNavPreferencesPayload = Omit<NavPreferences, "hidden"> & { hidden?: NavPageId[] };
 
 const NAV_PAGE_ID_SET: ReadonlySet<string> = new Set<NavPageId>([...NAV_PAGE_IDS, ...NAV_PAGE_IDS_TASKS]);
 
@@ -2611,6 +2620,8 @@ export function isNavPageId(value: unknown): value is NavPageId {
 }
 
 export interface NavSanitizeOptions {
+  /** The stored or cached hidden list (any shape); unknown ids are dropped. */
+  hidden?: unknown;
   /** Phase 3 (P3-D1): the Desk page is named Tasks. Stored `desk`/`tasks` ids
    * are rewritten to the live id for this workspace's flag state on read. */
   tasksNav?: boolean;
@@ -2635,46 +2646,43 @@ function normalizeNavPageId(id: unknown, tasksNav?: boolean): unknown {
 export function sanitizeNavPreferences(topNav: unknown, moreNav: unknown, options: NavSanitizeOptions = {}): NavPreferences {
   const liveIds = liveNavPageIds(options.tasksNav);
   const liveSet = new Set<NavPageId>(liveIds);
-  const top = Array.isArray(topNav) ? topNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
-  const more = Array.isArray(moreNav) ? moreNav.map((id) => normalizeNavPageId(id, options.tasksNav)) : [];
+  const lists = [topNav, moreNav, options.hidden].map((list) =>
+    Array.isArray(list) ? list.map((id) => normalizeNavPageId(id, options.tasksNav)) : [],
+  );
   const seen = new Set<NavPageId>();
-  const nextTop: NavPageId[] = [];
-  const nextMore: NavPageId[] = [];
-
-  for (const id of top) {
-    if (liveSet.has(id as NavPageId) && !seen.has(id as NavPageId)) {
-      seen.add(id as NavPageId);
-      nextTop.push(id as NavPageId);
+  const zones: NavPageId[][] = [[], [], []];
+  // First zone wins: a page listed twice (or in both a zone and Hidden) keeps its earliest place.
+  lists.forEach((list, zone) => {
+    for (const id of list) {
+      if (liveSet.has(id as NavPageId) && !seen.has(id as NavPageId)) {
+        seen.add(id as NavPageId);
+        zones[zone]!.push(id as NavPageId);
+      }
     }
-  }
-  for (const id of more) {
-    if (liveSet.has(id as NavPageId) && !seen.has(id as NavPageId)) {
-      seen.add(id as NavPageId);
-      nextMore.push(id as NavPageId);
-    }
-  }
+  });
+  // Never-seen pages surface in the More menu, so a new page needs no migration.
   for (const id of liveIds) {
     if (!seen.has(id)) {
-      nextMore.push(id);
+      zones[1]!.push(id);
     }
   }
 
-  return { topNav: nextTop, moreNav: nextMore };
+  return { topNav: zones[0]!, moreNav: zones[1]!, hidden: zones[2]! };
 }
 
-/** Strict check: a complete partition of every page across the two zones. */
-export function isCompleteNavPreferences(value: unknown, options: NavSanitizeOptions = {}): value is NavPreferences {
+/** Strict check: a complete partition of every page across the three zones. */
+export function isCompleteNavPreferences(value: unknown, options: NavSanitizeOptions = {}): value is SaveNavPreferencesPayload {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const prefs = value as NavPreferences;
-  if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav)) {
+  const prefs = value as SaveNavPreferencesPayload;
+  if (!Array.isArray(prefs.topNav) || !Array.isArray(prefs.moreNav) || (prefs.hidden !== undefined && !Array.isArray(prefs.hidden))) {
     return false;
   }
   const liveIds = liveNavPageIds(options.tasksNav);
   const liveSet = new Set<string>(liveIds);
   // A stale client may still send the retired pages; they are ignored, not counted.
-  const combined = [...prefs.topNav, ...prefs.moreNav]
+  const combined = [...prefs.topNav, ...prefs.moreNav, ...(prefs.hidden ?? [])]
     .filter((id) => !LEGACY_NAV_PAGE_IDS.includes(id as string))
     .map((id) => normalizeNavPageId(id, options.tasksNav));
   if (combined.length !== liveIds.length || combined.some((id) => typeof id !== "string" || !liveSet.has(id))) {

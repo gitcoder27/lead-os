@@ -1,6 +1,6 @@
 import { Briefcase, ClipboardList, NotebookPen, Users, type LucideIcon } from 'lucide-react';
 import type { ActiveAppView, AppView } from '@/App';
-import type { NavPageId } from '@/types';
+import type { NavPageId, NavPreferences } from '@/types';
 
 export interface NavPageMeta {
   id: NavPageId;
@@ -61,3 +61,31 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     matches: ['notes'],
   },
 };
+
+/** Which optional pages have something to show yet. */
+export interface NavAvailability {
+  /** The roster has at least one active person. */
+  team: boolean;
+  /** Jira is connected (or its state is not known yet). */
+  work: boolean;
+}
+
+/** Shown next to a page in Settings while it is held back. */
+export const NAV_UNAVAILABLE_HINT: Partial<Record<NavPageId, string>> = {
+  team: 'Appears once you add people.',
+  work: 'Appears once Jira is connected.',
+};
+
+/**
+ * docs/56 P2-04: a solo manager sees Today | Tasks | Notes. Team and Work are
+ * held back (not removed from the saved layout) until there is a roster or a
+ * Jira connection, and their pages stay reachable by URL and the palette.
+ */
+export function applyNavAvailability(preferences: NavPreferences, availability: NavAvailability): NavPreferences {
+  const held = (id: NavPageId) => (id === 'team' && !availability.team) || (id === 'work' && !availability.work);
+  return {
+    topNav: preferences.topNav.filter((id) => !held(id)),
+    moreNav: preferences.moreNav.filter((id) => !held(id)),
+    hidden: preferences.hidden,
+  };
+}

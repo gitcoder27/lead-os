@@ -41,6 +41,8 @@ Canonical routes:
 
 Legacy paths normalize in `App.tsx`: `/dashboard` -> `/work`, `/team-tracker` -> `/team`, `/manager-desk` -> `/desk`, `/today` -> `/`. `/follow-ups` and `/followups` redirect to `/tasks?view=waiting`, `/meetings` and `/meeting` to `/tasks?view=meetings` (`legacyTaskViewRedirect` in `App.tsx`; the rest of the query string is kept). The server still accepts `follow-ups` / `meetings` in action targets, nav preferences and `list_tasks` for one release (docs/57 P7-13); Today rows now target `view: "tasks"` with a `taskView`.
 
+Header nav is Today (always first) | Tasks | Team | Work | Notes by default. Each manager's layout (`GET/PUT /api/preferences/navigation`, edited in Settings → Navigation) places every page in the top bar, the More menu, or Hidden. Team is held back until the roster has someone and Work until Jira is connected (`applyNavAvailability` / `useNavAvailability`; nothing is deleted from the saved layout), so a solo manager sees Today | Tasks | Notes. Hidden and held-back pages still open by URL and from the palette.
+
 Work (`?filter/dev/tag/noTags`), Team (`?q/filter/sort/group/view`), and Desk (`?date`) keep their filter state in the URL (see `client/src/lib/view-params.ts`), so views are shareable; changes sync back with debounced `replaceState`. Ctrl/Cmd+K opens the global command palette (`client/src/components/palette/`), which searches issues, desk items, check-ins, and developers via `/api/search`, and can jump anywhere or run capture/sync.
 
 First-run setup opens the Setup Wizard for manager account creation, Jira connection, manager mapping, team selection, and developer access.

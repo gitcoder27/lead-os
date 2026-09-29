@@ -27,8 +27,9 @@ async function loginCookie(username: string, password = "secret123"): Promise<st
 }
 
 const DEFAULT_LAYOUT = {
-  topNav: ["work", "team", "desk"],
-  moreNav: ["notes"],
+  topNav: ["desk", "team", "work", "notes"],
+  moreNav: [],
+  hidden: [],
 };
 
 beforeEach(async () => {
@@ -93,7 +94,8 @@ describe("preferences routes happy path", () => {
 
     const custom = {
       topNav: ["notes", "desk"],
-      moreNav: ["work", "team"],
+      moreNav: ["work"],
+      hidden: ["team"],
     };
     const saved = await invoke(app, {
       method: "PUT",
@@ -144,9 +146,51 @@ describe("preferences routes happy path", () => {
       headers: { cookie },
     });
     expect(saved.status).toBe(200);
-    expect(saved.body.preferences).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"] });
+    expect(saved.body.preferences).toEqual({ topNav: ["work", "desk"], moreNav: ["team", "notes"], hidden: [] });
     const reloaded = await invoke(app, { method: "GET", url: "/api/preferences/navigation", headers: { cookie } });
     expect(reloaded.body.preferences).toEqual(saved.body.preferences);
+  });
+
+  it("saves hidden pages, and a client that predates them keeps them hidden (docs/56 P2-04)", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+
+    const hide = await invoke(app, {
+      method: "PUT",
+      url: "/api/preferences/navigation",
+      body: { topNav: ["desk", "notes"], moreNav: [], hidden: ["work", "team"] },
+      headers: { cookie },
+    });
+    expect(hide.status).toBe(200);
+    expect(hide.body.preferences.hidden).toEqual(["work", "team"]);
+
+    const stale = await invoke(app, {
+      method: "PUT",
+      url: "/api/preferences/navigation",
+      body: { topNav: ["notes", "desk"], moreNav: [] },
+      headers: { cookie },
+    });
+    expect(stale.status).toBe(200);
+    expect(stale.body.preferences).toEqual({ topNav: ["notes", "desk"], moreNav: [], hidden: ["work", "team"] });
+  });
+
+  it("rejects a page listed both in a zone and in hidden, and unknown hidden ids", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+    const both = await invoke(app, {
+      method: "PUT",
+      url: "/api/preferences/navigation",
+      body: { topNav: ["desk", "team", "work", "notes"], moreNav: [], hidden: ["team"] },
+      headers: { cookie },
+    });
+    expect(both.status).toBe(400);
+    const unknown = await invoke(app, {
+      method: "PUT",
+      url: "/api/preferences/navigation",
+      body: { topNav: ["desk", "team", "work"], moreNav: [], hidden: ["notes", "settings"] },
+      headers: { cookie },
+    });
+    expect(unknown.status).toBe(400);
   });
 
   it("rejects unknown page ids at the schema layer", async () => {

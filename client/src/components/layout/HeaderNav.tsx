@@ -3,7 +3,8 @@ import { ExternalLink, Home, MoreHorizontal, type LucideIcon } from 'lucide-reac
 import type { ActiveAppView, AppView } from '@/App';
 import { WorkspaceNavLink } from '@/components/layout/WorkspaceNavLink';
 import { useNavPreferences } from '@/hooks/useNavPreferences';
-import { NAV_PAGE_META } from '@/lib/nav-pages';
+import { useNavAvailability } from '@/hooks/useNavAvailability';
+import { NAV_PAGE_META, applyNavAvailability } from '@/lib/nav-pages';
 import type { NavPageId } from '@/types';
 
 // Developers keep the fixed lean layout; only managers can customize the nav.
@@ -19,7 +20,9 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement | null>(null);
   const closeMoreTimeoutRef = useRef<number | null>(null);
-  const { preferences } = useNavPreferences();
+  const { preferences: saved } = useNavPreferences();
+  const availability = useNavAvailability();
+  const preferences = applyNavAvailability(saved, availability);
   const topPages = isManager ? preferences.topNav : DEVELOPER_TOP_NAV;
   const morePages = isManager ? preferences.moreNav : [];
   const moreIsActive = morePages.some((id) => Boolean(activeView && NAV_PAGE_META[id].matches.includes(activeView)));

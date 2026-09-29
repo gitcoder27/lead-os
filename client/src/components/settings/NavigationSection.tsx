@@ -1,15 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Home, Loader2, RotateCcw, Save } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Eye, EyeOff, Home, Loader2, RotateCcw, Save } from 'lucide-react';
 import { useNavPreferences, useSaveNavPreferences } from '@/hooks/useNavPreferences';
 import { useToast } from '@/context/ToastContext';
-import { NAV_PAGE_META } from '@/lib/nav-pages';
+import { NAV_PAGE_META, NAV_UNAVAILABLE_HINT, type NavAvailability } from '@/lib/nav-pages';
+import { useNavAvailability } from '@/hooks/useNavAvailability';
 import { DEFAULT_NAV_PREFERENCES, sanitizeNavPreferences, type NavPageId, type NavPreferences } from '@/types';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 
-type NavZone = 'topNav' | 'moreNav';
+type NavZone = 'topNav' | 'moreNav' | 'hidden';
 
 function samePreferences(a: NavPreferences, b: NavPreferences): boolean {
-  return a.topNav.join('\n') === b.topNav.join('\n') && a.moreNav.join('\n') === b.moreNav.join('\n');
+  return a.topNav.join('\n') === b.topNav.join('\n') && a.moreNav.join('\n') === b.moreNav.join('\n') && a.hidden.join('\n') === b.hidden.join('\n');
 }
 
 export function NavigationSection() {
@@ -17,6 +18,7 @@ export function NavigationSection() {
   const saveMutation = useSaveNavPreferences();
   const { addToast } = useToast();
   const tasksPhase3 = useTasksPhase3();
+  const availability = useNavAvailability();
   const [draft, setDraft] = useState<NavPreferences>(preferences);
   const [touched, setTouched] = useState(false);
 
@@ -44,15 +46,14 @@ export function NavigationSection() {
     });
   };
 
-  const moveToZone = (from: NavZone, id: NavPageId) => {
+  /** Move a page to another zone (the end of that zone's list). */
+  const moveToZone = (from: NavZone, to: NavZone, id: NavPageId) => {
     setTouched(true);
     setDraft((current) => {
-      if (!current[from].includes(id)) {
+      if (!current[from].includes(id) || from === to) {
         return current;
       }
-      return from === 'topNav'
-        ? { topNav: current.topNav.filter((page) => page !== id), moreNav: [...current.moreNav, id] }
-        : { topNav: [...current.topNav, id], moreNav: current.moreNav.filter((page) => page !== id) };
+      return { ...current, [from]: current[from].filter((page) => page !== id), [to]: [...current[to], id] };
     });
   };
 
@@ -76,7 +77,7 @@ export function NavigationSection() {
 
   const handleReset = () => {
     setTouched(true);
-    setDraft(sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3 }));
+    setDraft(sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3, hidden: DEFAULT_NAV_PREFERENCES.hidden }));
   };
 
   return (
@@ -117,6 +118,7 @@ export function NavigationSection() {
               index={index}
               count={draft.topNav.length}
               disabled={saving}
+              hint={unavailableHint(id, availability)}
               onMove={moveWithinZone}
               onMoveToZone={moveToZone}
             />
@@ -148,6 +150,40 @@ export function NavigationSection() {
                 index={index}
                 count={draft.moreNav.length}
                 disabled={saving}
+                hint={unavailableHint(id, availability)}
+                onMove={moveWithinZone}
+                onMoveToZone={moveToZone}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      <div>
+        <SettingsGroupLabel>Hidden</SettingsGroupLabel>
+        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Hidden pages are left out of the header. They still open from a link, the command palette or Ctrl/Cmd+K.
+        </p>
+        <div
+          className="mt-2.5 overflow-hidden rounded-xl"
+          style={{ border: 'var(--settings-pane-border)' }}
+          role="list"
+          aria-label="Hidden pages"
+        >
+          {draft.hidden.length === 0 ? (
+            <p className="px-3.5 py-2.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              Nothing is hidden.
+            </p>
+          ) : (
+            draft.hidden.map((id, index) => (
+              <NavPreferenceRow
+                key={id}
+                id={id}
+                zone="hidden"
+                index={index}
+                count={draft.hidden.length}
+                disabled={saving}
+                hint={unavailableHint(id, availability)}
                 onMove={moveWithinZone}
                 onMoveToZone={moveToZone}
               />
@@ -191,22 +227,29 @@ interface NavPreferenceRowProps {
   index: number;
   count: number;
   disabled: boolean;
+  /** Why the page is not in the header yet (Team without people, Work without Jira). */
+  hint?: string;
   onMove: (zone: NavZone, index: number, delta: -1 | 1) => void;
-  onMoveToZone: (from: NavZone, id: NavPageId) => void;
+  onMoveToZone: (from: NavZone, to: NavZone, id: NavPageId) => void;
 }
 
-function NavPreferenceRow({ id, zone, index, count, disabled, onMove, onMoveToZone }: NavPreferenceRowProps) {
+function unavailableHint(id: NavPageId, availability: NavAvailability): string | undefined {
+  return (id === 'team' && !availability.team) || (id === 'work' && !availability.work) ? NAV_UNAVAILABLE_HINT[id] : undefined;
+}
+
+function NavPreferenceRow({ id, zone, index, count, disabled, hint, onMove, onMoveToZone }: NavPreferenceRowProps) {
   const meta = NAV_PAGE_META[id];
   const Icon = meta.icon;
-  const isTop = zone === 'topNav';
-  const zoneTarget = isTop ? 'More menu' : 'top navigation';
+  const isHidden = zone === 'hidden';
+  const swapZone: NavZone = zone === 'topNav' ? 'moreNav' : 'topNav';
+  const swapLabel = zone === 'topNav' ? 'More menu' : 'top navigation';
 
   return (
     <div
       role="listitem"
       className="flex items-center gap-2.5 px-3.5 py-2"
       style={{
-        borderTop: isTop || index > 0 ? 'var(--settings-row-divider)' : 'none',
+        borderTop: zone !== 'moreNav' || index > 0 ? 'var(--settings-row-divider)' : 'none',
         background: index % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)',
       }}
     >
@@ -218,29 +261,34 @@ function NavPreferenceRow({ id, zone, index, count, disabled, onMove, onMoveToZo
       </span>
       <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>
         {meta.label}
+        {hint ? <span className="ml-2 text-[11.5px] font-normal" style={{ color: 'var(--text-muted)' }}>{hint}</span> : null}
       </span>
       <div className="flex shrink-0 items-center gap-1">
-        <RowButton
-          label={`Move ${meta.label} up`}
-          disabled={disabled || index === 0}
-          onClick={() => onMove(zone, index, -1)}
-        >
-          <ArrowUp size={11} />
-        </RowButton>
-        <RowButton
-          label={`Move ${meta.label} down`}
-          disabled={disabled || index === count - 1}
-          onClick={() => onMove(zone, index, 1)}
-        >
-          <ArrowDown size={11} />
-        </RowButton>
-        <RowButton
-          label={`Move ${meta.label} to ${zoneTarget}`}
-          disabled={disabled}
-          onClick={() => onMoveToZone(zone, id)}
-        >
-          {isTop ? <ArrowRight size={11} /> : <ArrowLeft size={11} />}
-        </RowButton>
+        {isHidden ? (
+          <>
+            <RowButton label={`Show ${meta.label} in top navigation`} disabled={disabled} onClick={() => onMoveToZone(zone, 'topNav', id)}>
+              <Eye size={11} />
+            </RowButton>
+            <RowButton label={`Show ${meta.label} in More menu`} disabled={disabled} onClick={() => onMoveToZone(zone, 'moreNav', id)}>
+              <ArrowLeft size={11} />
+            </RowButton>
+          </>
+        ) : (
+          <>
+            <RowButton label={`Move ${meta.label} up`} disabled={disabled || index === 0} onClick={() => onMove(zone, index, -1)}>
+              <ArrowUp size={11} />
+            </RowButton>
+            <RowButton label={`Move ${meta.label} down`} disabled={disabled || index === count - 1} onClick={() => onMove(zone, index, 1)}>
+              <ArrowDown size={11} />
+            </RowButton>
+            <RowButton label={`Move ${meta.label} to ${swapLabel}`} disabled={disabled} onClick={() => onMoveToZone(zone, swapZone, id)}>
+              {zone === 'topNav' ? <ArrowRight size={11} /> : <ArrowLeft size={11} />}
+            </RowButton>
+            <RowButton label={`Hide ${meta.label}`} disabled={disabled} onClick={() => onMoveToZone(zone, 'hidden', id)}>
+              <EyeOff size={11} />
+            </RowButton>
+          </>
+        )}
       </div>
     </div>
   );

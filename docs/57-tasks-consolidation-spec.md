@@ -1,6 +1,6 @@
 # 57 — Tasks consolidation spec (P3-00)
 
-Status: **draft, awaiting sign-off**. No code changes. Date: 2026-09-29.
+Status: **signed off 2026-09-29** (decisions in §9). No code changes.
 Inputs: [docs/55](55-solo-vs-collaborative-review.md) §3 (#8–#10) and §4, [docs/56](56-implementation-plan-solo-first.md) Decisions and P3, [docs/47](47-work-item-model-v2.md), [docs/49](49-tasks-workspace-redesign-spec.md), [docs/51](51-tasks-workspace-review.md).
 Line numbers are from `main` at `aecc8a0`.
 
@@ -176,11 +176,11 @@ The Follow-ups page's `overdue/today/upcoming/unscheduled` lanes (`lib/manager-m
 | 9 | **P3-07** Date parsing and `~repeat` | Date table tests for each form; completing a repeating task creates exactly one successor and a retry doesn't duplicate it |
 | 10 | **P3-08** Weekly review | Each section's query, and a carry/drop/schedule round-trip with undo |
 
-## 9. Decisions needed from you
+## 9. Decisions (signed off 2026-09-29)
 
-1. **Check-by storage.** Should `follow_up_at` be reused as "check by" (recommended: no migration, and the Desk and Copilot contracts keep working), or should a new `check_by` column be added?
-2. **External people.** Should they be a manager-private `contacts` table that `@` resolves (recommended), or only free text on `waitingOn`?
-3. **Delegated tasks in Waiting.** Should developer-owned tasks appear in Waiting only when the check is due or they've been quiet for 5 or more days (recommended), always, or never?
-4. **`@dev` without a date.** Should it keep scheduling today on the developer's day (recommended), or go undated to the developer's backlog?
-5. **P3-00a.** Is it OK to add this item (new workspaces start canonical with Phase 3) and make it a prerequisite for P3-06?
-6. **Old enum aliases.** How long should the server keep accepting `follow-ups` and `meetings`? One release (recommended), or until P7-11?
+1. **Check-by storage:** reuse `follow_up_at`. No new column; the UI label is "Check by" and the API name stays `followUpAt`.
+2. **External people:** a manager-private `contacts` table that `@` resolves, as specified in §2 and §3.
+3. **Delegated tasks in Waiting:** only when the check is due or the task has been quiet for `TASK_STALE_DAYS` (5) or more days.
+4. **`@dev` without a date:** keeps scheduling today on the developer's day, with a focus row.
+5. **P3-00a:** added, and it is a prerequisite for P3-06. It runs first in the P3 order (§8), because P3-02 onward assumes capture works in every workspace.
+6. **Old enum aliases:** `follow-ups` and `meetings` stay accepted for one release after P3-06 ships, then they are removed. The removal is tracked as a P7 cleanup.

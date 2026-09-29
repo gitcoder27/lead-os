@@ -7,6 +7,8 @@ import {
   CirclePlus,
   MessageSquare,
   MessageSquareText,
+  PanelRightClose,
+  PanelRightOpen,
   RefreshCw,
   UserRoundCheck,
 } from 'lucide-react';
@@ -42,6 +44,7 @@ export function StandupFeed({
   onRetry,
   onSelectTask,
   onOpenTask,
+  onCollapse,
 }: {
   data: StandupFeedResponse | undefined;
   isLoading: boolean;
@@ -49,6 +52,8 @@ export function StandupFeed({
   onRetry: () => void;
   onSelectTask: (taskKey: string) => void;
   onOpenTask: (taskKey: string) => void;
+  /** docs/56 P1-07: hides the feed; the page keeps a slim rail to bring it back. */
+  onCollapse?: () => void;
 }) {
   const groups = useMemo(() => groupStandupFeed(data?.entries ?? []), [data]);
   const counts = useMemo(() => feedCounts(data?.entries ?? []), [data]);
@@ -56,11 +61,27 @@ export function StandupFeed({
   return (
     <section className="flex min-h-0 flex-col" aria-label="Since last standup">
       <SectionLabel
-        right={data ? (
-          <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-            {data.anchoredToSession ? `since ${windowLabel(data.windowStart)}` : `${data.windowHours}h window`}
+        right={(
+          <span className="flex items-center gap-1.5">
+            {data ? (
+              <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                {data.anchoredToSession ? `since ${windowLabel(data.windowStart)}` : `${data.windowHours}h window`}
+              </span>
+            ) : null}
+            {onCollapse ? (
+              <button
+                type="button"
+                onClick={onCollapse}
+                aria-label="Hide feed"
+                title="Hide feed"
+                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-[var(--bg-tertiary)]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <PanelRightClose size={13} aria-hidden="true" />
+              </button>
+            ) : null}
           </span>
-        ) : null}
+        )}
       >
         Since last standup
       </SectionLabel>
@@ -211,5 +232,22 @@ function CountChip({ label, color }: { label: string; color?: string }) {
     >
       {label}
     </span>
+  );
+}
+
+/** The feed's collapsed state: one slim button that carries the entry count. */
+export function StandupFeedRail({ count, onExpand }: { count: number | undefined; onExpand: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      aria-label={count ? `Show feed (${count} since last standup)` : 'Show feed'}
+      title="Show feed"
+      className="flex h-9 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg hover:bg-[var(--bg-tertiary)]"
+      style={{ color: 'var(--text-muted)' }}
+    >
+      <PanelRightOpen size={14} aria-hidden="true" />
+      {count ? <span className="text-[10px] font-semibold tabular-nums leading-none">{count}</span> : null}
+    </button>
   );
 }

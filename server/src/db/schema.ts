@@ -243,10 +243,29 @@ export const standupSessions = sqliteTable("standup_sessions", {
   logJson: text("log_json").notNull().default("[]"),
   summary: text("summary").notNull().default(""),
   requestId: text("request_id"),
+  /** docs/56 P1-07: optional one-line reason per flagged account (`{ accountId: reason }`). */
+  flagReasonsJson: text("flag_reasons_json").notNull().default("{}"),
   createdAt: text("created_at").notNull(),
 }, (table) => [
   index("idx_standup_sessions_manager_end").on(table.workspaceId, table.managerAccountId, table.endedAt),
   uniqueIndex("idx_standup_sessions_request").on(table.workspaceId, table.managerAccountId, table.requestId),
+]);
+
+/**
+ * docs/56 P1-07: a person reviewed in standup, recorded as it happens so it is a
+ * manager touch even if the round is never sealed. One row per (manager, person,
+ * day); re-reviewing moves `reviewed_at`.
+ */
+export const standupReviews = sqliteTable("standup_reviews", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  developerAccountId: text("developer_account_id").notNull(),
+  date: text("date").notNull(),
+  reviewedAt: text("reviewed_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_standup_reviews_person_day").on(table.workspaceId, table.managerAccountId, table.developerAccountId, table.date),
+  index("idx_standup_reviews_developer").on(table.workspaceId, table.developerAccountId, table.reviewedAt),
 ]);
 
 /**

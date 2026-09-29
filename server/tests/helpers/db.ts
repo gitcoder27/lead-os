@@ -100,6 +100,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM team_tracker_days;
     DELETE FROM team_tracker_saved_views;
     DELETE FROM standup_sessions;
+    DELETE FROM standup_reviews;
     DELETE FROM today_visits;
     DELETE FROM today_check_in_asks;
     DELETE FROM work_saved_views;
@@ -117,7 +118,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM assistant_memories;
     DELETE FROM sqlite_sequence WHERE name IN ('app_users', 'local_tags', 'sync_log', 'issue_scope_history', 'team_tracker_days', 'developer_availability_periods', 'team_tracker_items', 'team_tracker_checkins', 'team_tracker_saved_views',
     'work_saved_views', 'manager_desk_days', 'manager_desk_items', 'manager_desk_links', 'manager_desk_item_history',
-    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories', 'tasks', 'task_links', 'day_focus', 'task_labels', 'task_saved_views', 'standup_sessions', 'today_check_in_asks');
+    'daily_notes', 'daily_note_captures', 'daily_note_follow_ups', 'task_events', 'assistant_conversations', 'assistant_messages', 'assistant_memories', 'tasks', 'task_links', 'day_focus', 'task_labels', 'task_saved_views', 'standup_sessions', 'standup_reviews', 'today_check_in_asks');
   `);
 }
 

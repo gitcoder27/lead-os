@@ -107,6 +107,8 @@ export interface StandupLogEntry {
 export interface StandupSession {
   reviewed: string[];
   flagged: string[];
+  /** docs/56 P1-07: optional one-line reason per flagged account. */
+  flagReasons?: Record<string, string>;
   log: StandupLogEntry[];
   /** ISO timestamp of the first session action — sent as startedAt on seal. */
   startedAt?: string;
@@ -117,6 +119,8 @@ export const EMPTY_STANDUP_SESSION: StandupSession = { reviewed: [], flagged: []
 export type StandupSessionAction =
   | { type: 'review'; accountId: string; at: string }
   | { type: 'toggle_flag'; accountId: string; at: string }
+  /** Flag with an optional one-line reason (an empty reason clears any earlier one). */
+  | { type: 'flag'; accountId: string; reason?: string; at: string }
   | { type: 'log'; entry: StandupLogEntry }
   | { type: 'reset' };
 
@@ -126,14 +130,30 @@ export function standupSessionReducer(state: StandupSession, action: StandupSess
       return state.reviewed.includes(action.accountId)
         ? state
         : { ...state, startedAt: state.startedAt ?? action.at, reviewed: [...state.reviewed, action.accountId] };
-    case 'toggle_flag':
-      return {
-        ...state,
-        startedAt: state.startedAt ?? action.at,
-        flagged: state.flagged.includes(action.accountId)
-          ? state.flagged.filter((id) => id !== action.accountId)
-          : [...state.flagged, action.accountId],
-      };
+    case 'toggle_flag': {
+      const unflag = state.flagged.includes(action.accountId);
+      return withFlagReasons(
+        {
+          ...state,
+          startedAt: state.startedAt ?? action.at,
+          flagged: unflag ? state.flagged.filter((id) => id !== action.accountId) : [...state.flagged, action.accountId],
+        },
+        // Unflagging drops the reason with it.
+        unflag ? withoutKey(state.flagReasons, action.accountId) : state.flagReasons,
+      );
+    }
+    case 'flag': {
+      const reason = cleanFlagReason(action.reason);
+      const base = state.flagReasons ?? {};
+      return withFlagReasons(
+        {
+          ...state,
+          startedAt: state.startedAt ?? action.at,
+          flagged: state.flagged.includes(action.accountId) ? state.flagged : [...state.flagged, action.accountId],
+        },
+        reason ? { ...base, [action.accountId]: reason } : withoutKey(base, action.accountId),
+      );
+    }
     case 'log': {
       // S2: any successful write for a person also counts as reviewing them.
       const reviewed = state.reviewed.includes(action.entry.accountId) ? state.reviewed : [...state.reviewed, action.entry.accountId];
@@ -144,6 +164,30 @@ export function standupSessionReducer(state: StandupSession, action: StandupSess
     default:
       return state;
   }
+}
+
+export const FLAG_REASON_MAX = 200;
+
+/** One line, trimmed and capped — the same shape the server stores. */
+export function cleanFlagReason(reason: string | undefined): string {
+  return (reason ?? '').replace(/\s+/g, ' ').trim().slice(0, FLAG_REASON_MAX);
+}
+
+/** An empty reasons map is left off the session entirely. */
+function withFlagReasons(state: StandupSession, reasons: Record<string, string> | undefined): StandupSession {
+  const { flagReasons: _previous, ...rest } = state;
+  return reasons && Object.keys(reasons).length > 0 ? { ...rest, flagReasons: reasons } : rest;
+}
+
+function withoutKey(record: Record<string, string> | undefined, key: string): Record<string, string> {
+  const { [key]: _dropped, ...rest } = record ?? {};
+  return rest;
+}
+
+function parseFlagReasons(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '');
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -158,6 +202,7 @@ export function loadStandupSession(key: string): StandupSession {
     return {
       reviewed: isStringArray(parsed.reviewed) ? parsed.reviewed : [],
       flagged: isStringArray(parsed.flagged) ? parsed.flagged : [],
+      ...(parseFlagReasons(parsed.flagReasons) && { flagReasons: parseFlagReasons(parsed.flagReasons) }),
       log: Array.isArray(parsed.log)
         ? parsed.log.filter((entry): entry is StandupLogEntry => Boolean(entry && typeof entry.accountId === 'string' && typeof entry.kind === 'string'))
         : [],
@@ -238,9 +283,9 @@ const PERSON_STATUS_LABELS: Record<TrackerDeveloperStatus, string> = {
  * `usesCheckIn` (docs/56 P1-04): "No check-in today" only makes sense for people
  * who check in; solo and non-participating developers never get it.
  */
-export function followUpReasons(day: TrackerDeveloperDay, date: string, flagged: boolean, usesCheckIn = true): FollowUpReason[] {
+export function followUpReasons(day: TrackerDeveloperDay, date: string, flagged: boolean, usesCheckIn = true, flagReason?: string): FollowUpReason[] {
   const reasons: FollowUpReason[] = [];
-  if (flagged) reasons.push({ code: 'flagged', label: 'Flagged', tone: 'accent' });
+  if (flagged) reasons.push({ code: 'flagged', label: flagReason ? `Flagged: ${flagReason}` : 'Flagged', tone: 'accent' });
   if (day.status === 'blocked' || day.status === 'at_risk' || day.status === 'waiting') {
     reasons.push({ code: 'status', label: PERSON_STATUS_LABELS[day.status], tone: day.status === 'blocked' ? 'danger' : 'warning' });
   }
@@ -425,7 +470,7 @@ export function buildStandupSummary({
     `Logged: ${totals.updates} updates · ${totals.checkins} ${days.some(usesCheckIn) ? 'check-ins' : 'notes'} · ${totals.closed} closed · ${totals.statusChanges} status changes`,
   ];
   const followUps = days
-    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), usesCheckIn(day)) }))
+    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), usesCheckIn(day), session.flagReasons?.[day.developer.accountId]) }))
     .filter(({ reasons }) => needsFollowUp(reasons));
   if (followUps.length) {
     lines.push('', 'Follow up:');

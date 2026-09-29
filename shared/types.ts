@@ -1479,6 +1479,8 @@ export interface RecordStandupSessionRequest {
   startedAt: string;
   reviewed: string[];
   flagged: string[];
+  /** docs/56 P1-07: optional one-line reason per flagged accountId. */
+  flagReasons?: Record<string, string>;
   log: StandupSessionLogEntry[];
   /** Pre-rendered markdown summary shown in the wrap-up. */
   summary: string;
@@ -1493,8 +1495,25 @@ export interface StandupSessionRecord {
   endedAt: string;
   reviewed: string[];
   flagged: string[];
+  /** docs/56 P1-07: absent when no reason was given. */
+  flagReasons?: Record<string, string>;
   summary: string;
   createdAt: string;
+}
+
+/**
+ * `POST /api/team-tracker/standup/reviews` (docs/56 P1-07): people the manager
+ * has reviewed so far. Each counts as a manager touch immediately, so
+ * "last touched" does not depend on sealing the round.
+ */
+export interface RecordStandupReviewsRequest {
+  date: string;
+  accountIds: string[];
+}
+
+export interface RecordStandupReviewsResponse {
+  /** Accounts that were recorded; unknown accounts are skipped. */
+  recorded: string[];
 }
 
 export interface RecordStandupSessionResponse {

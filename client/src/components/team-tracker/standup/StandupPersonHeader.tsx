@@ -29,6 +29,7 @@ export function StandupPersonHeader({
   position,
   total,
   flagged,
+  flagReason,
   onStatusSelect,
   onPrev,
   onNext,
@@ -41,6 +42,8 @@ export function StandupPersonHeader({
   position: number;
   total: number;
   flagged: boolean;
+  /** docs/56 P1-07: the one-line reason given when flagging. */
+  flagReason?: string;
   onStatusSelect: (status: TrackerDeveloperStatus) => void;
   onPrev: () => void;
   onNext: () => void;
@@ -82,7 +85,7 @@ export function StandupPersonHeader({
                 className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
                 style={{ color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)' }}
               >
-                <Bell size={10} /> Follow up
+                <Bell size={10} /> Follow up{flagReason ? <span className="max-w-[220px] truncate font-medium normal-case tracking-normal" title={flagReason}>· {flagReason}</span> : null}
               </span>
             )}
           </div>

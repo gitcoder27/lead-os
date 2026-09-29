@@ -11,6 +11,7 @@ import { useLatestStandupSession, useStandupFeed } from '@/hooks/useTeamTracker'
 import {
   useAddCheckIn,
   useReassignTrackerItem,
+  useRecordStandupReviews,
   useSetCurrentItem,
   useStatusUpdate,
 } from '@/hooks/useTeamTrackerMutations';
@@ -20,6 +21,7 @@ import { useToast } from '@/context/ToastContext';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import {
   buildStandupSummary,
+  cleanFlagReason,
   dayStats,
   doneTodayFor,
   EMPTY_STANDUP_SESSION,
@@ -37,10 +39,10 @@ import { StatusRationaleDialog } from './StatusRationaleDialog';
 import { StandupRail } from './standup/StandupRail';
 import { StandupPersonHeader, STATUS_LABELS } from './standup/StandupPersonHeader';
 import { StandupTaskList } from './standup/StandupTaskList';
-import { StandupFeed } from './standup/StandupFeed';
+import { StandupFeed, StandupFeedRail } from './standup/StandupFeed';
 import { StandupActionBar, type StandupActionGroup } from './standup/StandupActionBar';
 import { StandupWrapUp } from './standup/StandupWrapUp';
-import { CheckInForm, KeyHelpGrid, LayerShell, ReassignList } from './standup/StandupLayers';
+import { CheckInForm, FlagForm, KeyHelpGrid, LayerShell, ReassignList } from './standup/StandupLayers';
 import { StandupHistory } from './standup/StandupHistory';
 import { Kbd } from './standup/StandupPrimitives';
 
@@ -64,10 +66,11 @@ interface StandupModeProps {
   suspended?: boolean;
 }
 
-type StandupLayer = 'none' | 'capture' | 'status' | 'reassign' | 'checkin' | 'help' | 'history';
+type StandupLayer = 'none' | 'capture' | 'status' | 'reassign' | 'checkin' | 'flag' | 'help' | 'history';
 type StandupView = 'person' | 'wrapup';
 
 const DIALOG_STATUSES: TrackerDeveloperStatus[] = ['at_risk', 'blocked', 'waiting'];
+const FEED_COLLAPSED_KEY = 'standup-feed-collapsed';
 
 function formatStandupDate(date: string): string {
   try {
@@ -104,16 +107,60 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const [pendingStatus, setPendingStatus] = useState<TrackerDeveloperStatus | null>(null);
   const [statusPreselect, setStatusPreselect] = useState<string[]>([]);
   const [checkInText, setCheckInText] = useState('');
+  const [flagText, setFlagText] = useState('');
   const [announcement, setAnnouncement] = useState('');
   const [sealing, setSealing] = useState(false);
   // docs/50 v2: whether "End standup" also files the summary under
   // Notes → Standups. Sealing the session itself is unconditional.
   const [saveToNote, setSaveToNote] = useState(true);
   const queryClient = useQueryClient();
+  // Reviews do not refetch mid-round (the order is walked by index); refresh once on the way out.
+  useEffect(() => () => {
+    if (!recordedAnyRef.current) return;
+    for (const key of ['team-tracker', 'today']) void queryClient.invalidateQueries({ queryKey: [key] });
+  }, [queryClient]);
 
   const composerApi = useRef<{ expand: () => void; focus: () => void; togglePrivate: () => void } | null>(null);
   const taskRowRefs = useRef(new Map<string, HTMLButtonElement>());
   const checkInRef = useRef<HTMLTextAreaElement>(null);
+  const flagRef = useRef<HTMLInputElement>(null);
+
+  // docs/56 P1-07: the feed can be tucked away; a per-viewer convenience, so storage is best-effort.
+  const feedStorageKey = useScopedStorageKey(FEED_COLLAPSED_KEY);
+  const [feedCollapsed, setFeedCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem(feedStorageKey) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setFeedHidden = useCallback((hidden: boolean) => {
+    setFeedCollapsed(hidden);
+    try {
+      window.localStorage.setItem(feedStorageKey, hidden ? '1' : '0');
+    } catch {
+      // Storage can be blocked; the choice still holds for this visit.
+    }
+  }, [feedStorageKey]);
+
+  // docs/56 P1-07: reviewing someone is a manager touch on the server as it
+  // happens, so it does not depend on ending (sealing) the round. A restored
+  // round was recorded when it first happened; only new reviews are sent.
+  const { mutate: recordReviews } = useRecordStandupReviews();
+  const recordedReviewsRef = useRef(new Set(session.reviewed));
+  const recordedAnyRef = useRef(false);
+  useEffect(() => {
+    const pending = session.reviewed.filter((id) => !recordedReviewsRef.current.has(id));
+    if (pending.length === 0) return;
+    for (const id of pending) recordedReviewsRef.current.add(id);
+    recordedAnyRef.current = true;
+    // On failure the ids become pending again at the next review; sealing also records them.
+    recordReviews({ date, accountIds: pending }, {
+      onError: () => {
+        for (const id of pending) recordedReviewsRef.current.delete(id);
+      },
+    });
+  }, [session.reviewed, date, recordReviews]);
 
   const foundIndex = ordered.findIndex((entry) => entry.developer.accountId === currentId);
   const devIndex = foundIndex >= 0 ? foundIndex : 0;
@@ -273,6 +320,14 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     );
   }, [addCheckIn, addToast, checkInText, closeLayer, day, pickerTasks, log]);
 
+  const submitFlag = useCallback(() => {
+    if (!day) return;
+    dispatch({ type: 'flag', accountId: day.developer.accountId, reason: cleanFlagReason(flagText), at: new Date().toISOString() });
+    setAnnouncement(`${day.developer.displayName} flagged for follow-up`);
+    setFlagText('');
+    closeLayer();
+  }, [day, flagText, closeLayer]);
+
   const copySummary = useCallback(() => {
     const text = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
     const write = navigator.clipboard?.writeText(text);
@@ -317,6 +372,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         startedAt: session.startedAt ?? new Date().toISOString(),
         reviewed: session.reviewed,
         flagged: session.flagged,
+        ...(session.flagReasons && { flagReasons: session.flagReasons }),
         log: session.log,
         summary,
         requestId: crypto.randomUUID(),
@@ -396,10 +452,17 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     open: () => {
       if (focusedTask) onOpenTask(focusedTask.taskKey);
     },
+    // Flagging asks for an optional one-line reason; unflagging is immediate.
     flag: () => {
       if (!day) return;
-      dispatch({ type: 'toggle_flag', accountId: day.developer.accountId, at: new Date().toISOString() });
-      setAnnouncement(`${day.developer.displayName} ${isFlagged ? 'unflagged' : 'flagged for follow-up'}`);
+      if (isFlagged) {
+        dispatch({ type: 'toggle_flag', accountId: day.developer.accountId, at: new Date().toISOString() });
+        setAnnouncement(`${day.developer.displayName} unflagged`);
+        return;
+      }
+      setFlagText('');
+      setLayer('flag');
+      window.setTimeout(() => flagRef.current?.focus(), 40);
     },
     wrapUp: () => (view === 'wrapup' ? moveDeveloper(-1) : openWrapUp()),
     help: () => setLayer('help'),
@@ -668,7 +731,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+            <div className={`grid grid-cols-1 lg:h-full ${feedCollapsed ? 'lg:grid-cols-[minmax(0,1fr)_auto]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]'}`}>
               <motion.div
                 key={day.developer.accountId}
                 initial={reduceMotion ? false : { opacity: 0, x: 8 }}
@@ -683,6 +746,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                     position={devIndex + 1}
                     total={ordered.length}
                     flagged={isFlagged}
+                    flagReason={accountId ? session.flagReasons?.[accountId] : undefined}
                     onStatusSelect={handleStatusSelect}
                     onPrev={() => moveDeveloper(-1)}
                     onNext={() => moveDeveloper(1)}
@@ -723,17 +787,22 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               </motion.div>
 
               <aside
-                className="min-w-0 border-t px-5 py-5 lg:flex lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0"
+                className={`min-w-0 border-t py-5 lg:flex lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 ${feedCollapsed ? 'px-2' : 'px-5'}`}
                 style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 45%, transparent)' }}
               >
-                <StandupFeed
-                  data={feed.data}
-                  isLoading={feed.isLoading}
-                  isError={feed.isError}
-                  onRetry={() => void feed.refetch()}
-                  onSelectTask={focusTaskByKey}
-                  onOpenTask={onOpenTask}
-                />
+                {feedCollapsed ? (
+                  <StandupFeedRail count={feed.data?.entries.length} onExpand={() => setFeedHidden(false)} />
+                ) : (
+                  <StandupFeed
+                    data={feed.data}
+                    isLoading={feed.isLoading}
+                    isError={feed.isError}
+                    onRetry={() => void feed.refetch()}
+                    onSelectTask={focusTaskByKey}
+                    onOpenTask={onOpenTask}
+                    onCollapse={() => setFeedHidden(true)}
+                  />
+                )}
               </aside>
             </div>
           )}
@@ -765,6 +834,18 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               pending={addCheckIn.isPending}
               onChange={setCheckInText}
               onSubmit={submitCheckIn}
+              onCancel={closeLayer}
+            />
+          </LayerShell>
+        )}
+        {layer === 'flag' && (
+          <LayerShell onClose={closeLayer} label={`Flag ${day.developer.displayName} for follow-up`}>
+            <FlagForm
+              inputRef={flagRef}
+              name={day.developer.displayName}
+              value={flagText}
+              onChange={setFlagText}
+              onSubmit={submitFlag}
               onCancel={closeLayer}
             />
           </LayerShell>

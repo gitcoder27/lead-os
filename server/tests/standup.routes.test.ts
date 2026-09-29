@@ -8,7 +8,8 @@ import { TaskKeysService } from "../src/services/task-keys.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { eq } from "drizzle-orm";
 import { resetDatabase, db } from "./helpers/db";
-import { configTable, developers, standupSessions, tasks, teamTrackerCheckIns, teamTrackerDays } from "../src/db/schema";
+import { enableCollabParticipation } from "./helpers/team-mode";
+import { configTable, developers, standupReviews, standupSessions, taskLinks, tasks, teamTrackerCheckIns, teamTrackerDays } from "../src/db/schema";
 import { todayIsoDate } from "../src/utils/date";
 import type { TaskStatus } from "shared/types";
 
@@ -285,6 +286,146 @@ describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
     await enablePhase3();
     const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ requestId: "nope" }));
     expect(response.status).toBe(400);
+  });
+});
+
+describe("flag reasons and person links on the sealed follow-up (docs/56 P1-07)", () => {
+  function sessionPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      date: todayIsoDate(),
+      startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      reviewed: ["dev-1", "dev-2"],
+      flagged: ["dev-2"],
+      log: [],
+      summary: "Standup",
+      requestId: crypto.randomUUID(),
+      ...overrides,
+    };
+  }
+
+  async function personLinks(taskKey: string) {
+    const [task] = await db.select().from(tasks).where(eq(tasks.taskKey, taskKey));
+    return db.select().from(taskLinks).where(eq(taskLinks.taskId, task!.id));
+  }
+
+  it("links the follow-up to the developer, with or without a reason", async () => {
+    await enablePhase3();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-1", "dev-2"] }));
+    expect(response.status).toBe(201);
+    for (const followUp of response.body.followUps as Array<{ accountId: string; taskKey: string }>) {
+      const links = await personLinks(followUp.taskKey);
+      expect(links.map((link) => [link.kind, link.ref])).toEqual([["person", followUp.accountId]]);
+    }
+    const [row] = await db.select().from(tasks).where(eq(tasks.taskKey, response.body.followUps[0].taskKey));
+    expect(row!.details).toBeNull();
+    expect(response.body.session.flagReasons).toBeUndefined();
+  });
+
+  it("puts the one-line reason on the task and the session record; the title stays stable", async () => {
+    await enablePhase3();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({
+      flagReasons: { "dev-2": "  Waiting on   design\nreview  ", "dev-1": "not flagged, ignored" },
+    }));
+    expect(response.status).toBe(201);
+    expect(response.body.session.flagReasons).toEqual({ "dev-2": "Waiting on design review" });
+    const [row] = await db.select().from(tasks).where(eq(tasks.taskKey, response.body.followUps[0].taskKey));
+    expect(row!.title).toBe("Standup follow-up: Bob Jones");
+    expect(row!.details).toContain("Flagged in standup: Waiting on design review");
+    const latest = await invoke("GET", "/api/team-tracker/standup/session/latest");
+    expect(latest.body.session.flagReasons).toEqual({ "dev-2": "Waiting on design review" });
+  });
+
+  it("caps a reason at 200 characters", async () => {
+    await enablePhase3();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagReasons: { "dev-2": "x".repeat(400) } }));
+    expect(response.status).toBe(201);
+    expect(response.body.session.flagReasons["dev-2"]).toHaveLength(200);
+  });
+
+  it("appends a new reason to the reused same-day follow-up, once", async () => {
+    await enablePhase3();
+    const first = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagReasons: { "dev-2": "Design review" } }));
+    const taskKey = first.body.followUps[0].taskKey;
+    await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagReasons: { "dev-2": "Design review" } }));
+    await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagReasons: { "dev-2": "Still blocked on QA" } }));
+    const [row] = await db.select().from(tasks).where(eq(tasks.taskKey, taskKey));
+    expect(row!.details).toBe("Flagged in standup: Design review\nFlagged in standup: Still blocked on QA");
+    expect(await personLinks(taskKey)).toHaveLength(1);
+  });
+
+  it("adds the missing person link to an open follow-up sealed before links existed", async () => {
+    await enablePhase3();
+    const legacy = await taskService.create(
+      { title: "Standup follow-up: Bob Jones", scheduledOn: todayIsoDate(), labels: ["category:follow_up"] },
+      { type: "manager", accountId: "manager-1", workspaceId: "default" },
+    );
+    expect(await personLinks(legacy.taskKey)).toHaveLength(0);
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload());
+    expect(response.body.followUps).toEqual([{ accountId: "dev-2", taskKey: legacy.taskKey }]);
+    expect((await personLinks(legacy.taskKey)).map((link) => link.ref)).toEqual(["dev-2"]);
+  });
+
+  it("400s on a reason that is not a string", async () => {
+    await enablePhase3();
+    const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagReasons: { "dev-2": 5 } }));
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("POST /api/team-tracker/standup/reviews (docs/56 P1-07)", () => {
+  const body = (overrides: Record<string, unknown> = {}) => ({ date: todayIsoDate(), accountIds: ["dev-1"], ...overrides });
+  const touchOf = async (accountId: string) =>
+    (await trackerService.getBoard(todayIsoDate())).developers.find((day) => day.developer.accountId === accountId)!.signals.freshness;
+
+  it("records the review as a manager touch without sealing the round", async () => {
+    await enablePhase3();
+    const before = await touchOf("dev-1");
+    expect(before.clock).toBe("manager_touch");
+    expect(before.lastManagerTouchAt).toBeUndefined();
+
+    const response = await invoke("POST", "/api/team-tracker/standup/reviews", body({ accountIds: ["dev-1"] }));
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ recorded: ["dev-1"] });
+    expect(await db.select().from(standupSessions)).toHaveLength(0);
+
+    const [row] = await db.select().from(standupReviews);
+    expect(row).toMatchObject({ managerAccountId: "manager-1", developerAccountId: "dev-1", date: todayIsoDate() });
+    const after = await touchOf("dev-1");
+    expect(after.lastManagerTouchAt).toBe(row!.reviewedAt);
+    // Only the reviewed person is touched.
+    expect((await touchOf("dev-2")).lastManagerTouchAt).toBeUndefined();
+  });
+
+  it("is idempotent per person and day, and skips unknown accounts", async () => {
+    await enablePhase3();
+    const first = await invoke("POST", "/api/team-tracker/standup/reviews", body({ accountIds: ["dev-1", "ghost", "dev-1"] }));
+    expect(first.body).toEqual({ recorded: ["dev-1"] });
+    const second = await invoke("POST", "/api/team-tracker/standup/reviews", body());
+    expect(second.status).toBe(201);
+    expect(await db.select().from(standupReviews)).toHaveLength(1);
+    const empty = await invoke("POST", "/api/team-tracker/standup/reviews", body({ accountIds: [] }));
+    expect(empty.body).toEqual({ recorded: [] });
+  });
+
+  it("does not count for a developer who checks in (their clock is the check-in)", async () => {
+    await enablePhase3();
+    await enableCollabParticipation(["dev-1"]);
+    await invoke("POST", "/api/team-tracker/standup/reviews", body());
+    const freshness = await touchOf("dev-1");
+    expect(freshness.clock).toBe("check_in");
+    expect(freshness.lastManagerTouchAt).toBeUndefined();
+  });
+
+  it("404s while the Phase 3 flag is off and 400s on a bad body", async () => {
+    await enableCanonical();
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", body())).status).toBe(404);
+    await db.delete(configTable);
+    await db.insert(configTable).values([
+      { key: "tasks_phase2_stage", value: "2c" },
+      { key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", body({ date: "yesterday" }))).status).toBe(400);
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", { date: todayIsoDate() })).status).toBe(400);
   });
 });
 

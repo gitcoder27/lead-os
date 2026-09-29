@@ -65,7 +65,7 @@ export function StandupHistory({
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {flagged.map((id) => (
               <ToneChip key={id} tone="warning">
-                <Bell size={10} /> {nameFor(id)}
+                <Bell size={10} /> {nameFor(id)}{session.flagReasons?.[id] ? `: ${session.flagReasons[id]}` : ''}
               </ToneChip>
             ))}
           </div>

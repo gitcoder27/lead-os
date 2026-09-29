@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import type { Developer } from '@/types';
 import { Avatar, Kbd } from './StandupPrimitives';
+import { FLAG_REASON_MAX } from '@/lib/standup';
 import { ShortcutList, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
 import { Dialog } from '@/components/ui/Dialog';
 
@@ -33,7 +34,7 @@ export const keyHelp = (note: boolean): ShortcutGroup[] => [
       // The capture layer assigns to the person on screen; `@name` is only needed to hand it to someone else.
       ['n', 'New task for this person'],
       ['y', 'Accept status suggestion'],
-      ['f', 'Flag for follow-up'],
+      ['f', 'Flag for follow-up (optional reason)'],
     ],
   },
   {
@@ -146,6 +147,58 @@ export function ReassignList({
           {dev.displayName}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** docs/56 P1-07: `f` flags someone; the reason is one optional line. */
+export function FlagForm({
+  inputRef,
+  name,
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+}: {
+  inputRef: RefObject<HTMLInputElement>;
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="space-y-2 px-4 py-3">
+      <label htmlFor="standup-flag-reason" className="text-[12.5px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        Why follow up with {name}? <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
+      </label>
+      <input
+        id="standup-flag-reason"
+        ref={inputRef}
+        type="text"
+        value={value}
+        maxLength={FLAG_REASON_MAX}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            onSubmit();
+          }
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            onCancel();
+          }
+        }}
+        placeholder="e.g. waiting on design review"
+        className="w-full rounded-lg px-3 py-2 text-[13px] outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+      />
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <Kbd subtle>↵</Kbd> flag · <Kbd subtle>Esc</Kbd> cancel
+        </span>
+        <button type="button" onClick={onSubmit} className="ui-btn-solid">Flag for follow-up</button>
+      </div>
     </div>
   );
 }

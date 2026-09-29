@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ManagerSurfaceTask, StandupFeedEntry, TrackerDeveloperDay } from '@/types';
 import {
   EMPTY_STANDUP_SESSION,
+  FLAG_REASON_MAX,
   buildStandupSummary,
+  cleanFlagReason,
   dayStats,
   describeFeedEntry,
   doneTodayFor,
@@ -107,6 +109,45 @@ describe('standup session', () => {
     expect(standupSessionReducer(state, { type: 'reset' })).toEqual(EMPTY_STANDUP_SESSION);
   });
 
+  it('flags with an optional one-line reason, and unflagging or clearing drops it (P1-07)', () => {
+    let state = standupSessionReducer(EMPTY_STANDUP_SESSION, { type: 'flag', accountId: 'dev-1', reason: '  Waiting on\n design  ', at: 't1' });
+    expect(state).toMatchObject({ startedAt: 't1', flagged: ['dev-1'], flagReasons: { 'dev-1': 'Waiting on design' } });
+    // Re-flagging with a new reason replaces it and does not duplicate the id.
+    state = standupSessionReducer(state, { type: 'flag', accountId: 'dev-1', reason: 'Blocked on QA', at: 't2' });
+    expect(state.flagged).toEqual(['dev-1']);
+    expect(state.flagReasons).toEqual({ 'dev-1': 'Blocked on QA' });
+    // An empty reason clears it but keeps the flag; the key is left off when nothing remains.
+    state = standupSessionReducer(state, { type: 'flag', accountId: 'dev-1', reason: '   ', at: 't3' });
+    expect(state.flagged).toEqual(['dev-1']);
+    expect(state).not.toHaveProperty('flagReasons');
+    // A flag without a reason never creates the key.
+    expect(standupSessionReducer(EMPTY_STANDUP_SESSION, { type: 'flag', accountId: 'dev-2', at: 't' })).not.toHaveProperty('flagReasons');
+
+    state = standupSessionReducer(EMPTY_STANDUP_SESSION, { type: 'flag', accountId: 'dev-1', reason: 'One', at: 't1' });
+    state = standupSessionReducer(state, { type: 'flag', accountId: 'dev-2', reason: 'Two', at: 't2' });
+    state = standupSessionReducer(state, { type: 'toggle_flag', accountId: 'dev-1', at: 't3' });
+    expect(state.flagged).toEqual(['dev-2']);
+    expect(state.flagReasons).toEqual({ 'dev-2': 'Two' });
+    state = standupSessionReducer(state, { type: 'toggle_flag', accountId: 'dev-2', at: 't4' });
+    expect(state).not.toHaveProperty('flagReasons');
+  });
+
+  it('caps and flattens a reason to one line', () => {
+    expect(cleanFlagReason(undefined)).toBe('');
+    expect(cleanFlagReason('a\n\n b\t c')).toBe('a b c');
+    expect(cleanFlagReason('x'.repeat(FLAG_REASON_MAX + 50))).toHaveLength(FLAG_REASON_MAX);
+  });
+
+  it('keeps reasons through sessionStorage and drops malformed ones', () => {
+    const session: StandupSession = { reviewed: [], flagged: ['dev-1'], flagReasons: { 'dev-1': 'Waiting on QA' }, log: [] };
+    saveStandupSession('k', session);
+    expect(loadStandupSession('k')).toEqual(session);
+    window.sessionStorage.setItem('k', JSON.stringify({ reviewed: [], flagged: ['dev-1'], flagReasons: { 'dev-1': 5, 'dev-2': '  ', 'dev-3': 'ok' }, log: [] }));
+    expect(loadStandupSession('k').flagReasons).toEqual({ 'dev-3': 'ok' });
+    window.sessionStorage.setItem('k', JSON.stringify({ reviewed: [], flagged: [], flagReasons: ['x'], log: [] }));
+    expect(loadStandupSession('k')).not.toHaveProperty('flagReasons');
+  });
+
   it('round-trips through sessionStorage and tolerates corrupt data', () => {
     const session: StandupSession = { reviewed: ['dev-1'], flagged: ['dev-2'], log: [{ accountId: 'dev-1', kind: 'done', taskKey: 'T-1', at: 'x' }] };
     saveStandupSession('k', session);
@@ -202,6 +243,18 @@ describe('follow-ups & summary', () => {
     expect(text).toContain('1 notes');
     expect(text).not.toContain('check-in');
     expect(text).toContain('Alice Smith: Flagged, Blocked');
+  });
+
+  it('puts the flag reason in the flagged label and the summary (P1-07)', () => {
+    expect(followUpReasons(day(), '2026-03-07', true, false, 'Waiting on QA').map((reason) => reason.label)).toEqual(['Flagged: Waiting on QA']);
+    expect(followUpReasons(day(), '2026-03-07', true, false).map((reason) => reason.label)).toEqual(['Flagged']);
+    const text = buildStandupSummary({
+      date: '2026-03-07',
+      days: [day({ status: 'blocked' })],
+      session: { reviewed: ['dev-1'], flagged: ['dev-1'], flagReasons: { 'dev-1': 'Waiting on QA' }, log: [] },
+      usesCheckIn: () => false,
+    });
+    expect(text).toContain('Alice Smith: Flagged: Waiting on QA, Blocked');
   });
 
   it('builds a plain-text summary of coverage, follow-ups, and actions', () => {

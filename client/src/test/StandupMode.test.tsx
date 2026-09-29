@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { TestWrapper } from '@/test/wrapper';
 import type {
   ManagerSurfaceTask,
@@ -15,6 +16,7 @@ const mockSetCurrentMutate = vi.fn((_ref: unknown, options?: { onSuccess?: () =>
 const mockReassignMutate = vi.fn((_params: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
 const mockUpdateTaskMutate = vi.fn((_updates: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
 const mockAddTaskEventMutate = vi.fn();
+const mockRecordReviewsMutate = vi.fn((_body: unknown, _options?: { onError?: () => void }) => undefined);
 const mockAddToast = vi.fn();
 const mockOnClose = vi.fn();
 const mockOnOpenTask = vi.fn();
@@ -71,6 +73,7 @@ vi.mock('@/hooks/useTeamTrackerMutations', () => ({
   useAddCheckIn: () => ({ mutate: mockAddCheckInMutate, isPending: false }),
   useSetCurrentItem: () => ({ mutate: mockSetCurrentMutate, isPending: false }),
   useReassignTrackerItem: () => ({ mutate: mockReassignMutate, isPending: false }),
+  useRecordStandupReviews: () => ({ mutate: mockRecordReviewsMutate, isPending: false }),
 }));
 
 vi.mock('@/hooks/useTaskDetail', () => ({
@@ -229,6 +232,14 @@ function renderStandup(board = buildBoard()) {
   );
 }
 
+/** `f` opens the reason layer; Enter flags with or without a reason. */
+function flagFocusedPerson(reason?: string) {
+  fireEvent.keyDown(document.body, { key: 'f' });
+  const input = screen.getByLabelText(/Why follow up with/);
+  if (reason !== undefined) fireEvent.change(input, { target: { value: reason } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+}
+
 function taskRows() {
   return within(screen.getByRole('listbox', { name: /Alice Smith's tasks|Bob Jones's tasks/ })).getAllByRole('option');
 }
@@ -237,6 +248,7 @@ beforeEach(() => {
   teamModeMock.mode = 'collab';
   vi.clearAllMocks();
   window.sessionStorage.clear();
+  window.localStorage.clear();
 });
 
 describe('StandupMode', () => {
@@ -561,7 +573,7 @@ describe('StandupMode', () => {
 
     it('End standup seals the round with reviewed ids and clears the session', async () => {
       renderStandup();
-      fireEvent.keyDown(document.body, { key: 'f' });        // flag Alice
+      flagFocusedPerson();                                   // flag Alice (no reason)
       fireEvent.keyDown(document.body, { key: 'ArrowRight' });        // review Alice → Bob
       fireEvent.keyDown(document.body, { key: 'w' });        // wrap-up (Bob auto-reviewed on entry)
       fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
@@ -629,7 +641,7 @@ describe('StandupMode', () => {
 
     it('f flags for follow-up and logged actions appear in the wrap-up', () => {
       renderStandup();
-      fireEvent.keyDown(document.body, { key: 'f' });
+      flagFocusedPerson();
       expect(screen.getByText('Follow up')).toBeInTheDocument();
       fireEvent.keyDown(document.body, { key: 'e' });
       fireEvent.keyDown(document.body, { key: 'w' });
@@ -641,6 +653,150 @@ describe('StandupMode', () => {
       // Jumping from "Not reviewed" lands on Bob.
       fireEvent.click(within(wrapUp).getByRole('button', { name: 'Go to Bob Jones' }));
       expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    });
+
+    describe('docs/56 P1-07: manager-owned standup follow-through', () => {
+      it('records a review as a manager touch the moment someone is reviewed, without sealing', () => {
+        renderStandup();
+        expect(mockRecordReviewsMutate).not.toHaveBeenCalled();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });   // leaving Alice reviews her
+        expect(mockRecordReviewsMutate).toHaveBeenCalledTimes(1);
+        expect(mockRecordReviewsMutate).toHaveBeenLastCalledWith({ date: '2026-03-07', accountIds: ['dev-1'] }, expect.anything());
+        fireEvent.keyDown(document.body, { key: 'w' });            // entering wrap-up reviews Bob
+        expect(mockRecordReviewsMutate).toHaveBeenCalledTimes(2);
+        expect(mockRecordReviewsMutate).toHaveBeenLastCalledWith({ date: '2026-03-07', accountIds: ['dev-2'] }, expect.anything());
+        expect(mockApiPost.mock.calls.some(([url]) => String(url) === '/team-tracker/standup/session')).toBe(false);
+      });
+
+      it('a logged write counts as reviewing that person too', () => {
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'e' });            // done on T-1 → logs for Alice
+        expect(mockRecordReviewsMutate).toHaveBeenCalledWith({ date: '2026-03-07', accountIds: ['dev-1'] }, expect.anything());
+      });
+
+      it('does not re-send reviews of a resumed round', () => {
+        const first = renderStandup();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+        first.unmount();
+        mockRecordReviewsMutate.mockClear();
+        renderStandup();
+        expect(mockRecordReviewsMutate).not.toHaveBeenCalled();
+        fireEvent.keyDown(document.body, { key: 'w' });            // Bob is new
+        expect(mockRecordReviewsMutate).toHaveBeenCalledTimes(1);
+        expect(mockRecordReviewsMutate).toHaveBeenCalledWith({ date: '2026-03-07', accountIds: ['dev-2'] }, expect.anything());
+      });
+
+      it('retries a failed review at the next one', () => {
+        mockRecordReviewsMutate.mockImplementationOnce((_body, options) => options?.onError?.());
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });   // Alice: fails
+        fireEvent.keyDown(document.body, { key: 'w' });            // Bob: sends Alice again with him
+        expect(mockRecordReviewsMutate).toHaveBeenLastCalledWith({ date: '2026-03-07', accountIds: ['dev-1', 'dev-2'] }, expect.anything());
+      });
+
+      it('refreshes the board and Today once when standup closes after recording reviews', () => {
+        const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+        const view = renderStandup();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+        expect(invalidate).not.toHaveBeenCalled();                 // never mid-round: the order is walked by index
+        view.unmount();
+        const keys = invalidate.mock.calls.map(([filters]) => (filters as { queryKey: string[] }).queryKey[0]);
+        expect(keys).toEqual(['team-tracker', 'today']);
+        invalidate.mockRestore();
+      });
+
+      it('f asks for an optional one-line reason, and Enter flags with it', () => {
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'f' });
+        expect(screen.getByRole('dialog', { name: 'Flag Alice Smith for follow-up' })).toBeInTheDocument();
+        const input = screen.getByLabelText(/Why follow up with Alice Smith/);
+        expect(input).toHaveAttribute('maxlength', '200');
+        fireEvent.change(input, { target: { value: '  Waiting on   design review ' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(screen.queryByRole('dialog', { name: /Flag Alice Smith/ })).not.toBeInTheDocument();
+        expect(screen.getByText('· Waiting on design review')).toBeInTheDocument();
+
+        fireEvent.keyDown(document.body, { key: 'w' });
+        const wrapUp = screen.getByTestId('standup-wrapup');
+        expect(within(wrapUp).getAllByRole('button', { name: 'Go to Alice Smith' })[0]).toHaveTextContent('Flagged: Waiting on design review');
+      });
+
+      it('Enter on an empty reason flags without one, and Esc cancels the flag', () => {
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'f' });
+        fireEvent.keyDown(screen.getByLabelText(/Why follow up with/), { key: 'Escape' });
+        expect(screen.queryByText('Follow up')).not.toBeInTheDocument();
+
+        flagFocusedPerson();
+        expect(screen.getByText('Follow up')).toBeInTheDocument();
+        expect(screen.getByText('Follow up')).toHaveTextContent(/^Follow up$/);
+      });
+
+      it('f on a flagged person unflags immediately and drops the reason', async () => {
+        renderStandup();
+        flagFocusedPerson('Waiting on QA');
+        fireEvent.keyDown(document.body, { key: 'f' });
+        expect(screen.queryByRole('dialog', { name: /Flag Alice Smith/ })).not.toBeInTheDocument();
+        expect(screen.queryByText('Follow up')).not.toBeInTheDocument();
+
+        fireEvent.keyDown(document.body, { key: 'w' });
+        fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
+        await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+        const body = mockApiPost.mock.calls.find(([url]) => String(url) === '/team-tracker/standup/session')![1] as { flagged: string[]; flagReasons?: unknown };
+        expect(body.flagged).toEqual([]);
+        expect(body.flagReasons).toBeUndefined();
+      });
+
+      it('seals with the reason, and the summary carries it', async () => {
+        renderStandup();
+        flagFocusedPerson('Waiting on design review');
+        fireEvent.keyDown(document.body, { key: 'w' });
+        fireEvent.click(within(screen.getByTestId('standup-wrapup')).getByRole('button', { name: /End standup/ }));
+        await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+        const body = mockApiPost.mock.calls.find(([url]) => String(url) === '/team-tracker/standup/session')![1] as { flagged: string[]; flagReasons: Record<string, string>; summary: string };
+        expect(body.flagged).toEqual(['dev-1']);
+        expect(body.flagReasons).toEqual({ 'dev-1': 'Waiting on design review' });
+        expect(body.summary).toContain('Alice Smith: Flagged: Waiting on design review');
+      });
+
+      it('the previous-round recall shows each flagged person\'s reason', () => {
+        mockLastSession = {
+          id: 3,
+          date: '2026-03-06',
+          startedAt: '2026-03-06T09:00:00Z',
+          endedAt: '2026-03-06T09:20:00Z',
+          reviewed: ['dev-1', 'dev-2'],
+          flagged: ['dev-1'],
+          flagReasons: { 'dev-1': 'Waiting on design review' },
+          summary: 'Standup',
+          createdAt: '2026-03-06T09:20:00Z',
+          log: [],
+        };
+        try {
+          renderStandup();
+          fireEvent.click(screen.getByRole('button', { name: 'Previous standup round' }));
+          expect(within(screen.getByTestId('standup-history')).getByText('Alice Smith: Waiting on design review')).toBeInTheDocument();
+        } finally {
+          mockLastSession = null;
+        }
+      });
+
+      it('the feed collapses to a rail with its count, and the choice is remembered', () => {
+        const first = renderStandup();
+        expect(screen.getByRole('region', { name: 'Since last standup' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide feed' }));
+        expect(screen.queryByRole('region', { name: 'Since last standup' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^Show feed \(\d+ since last standup\)$/ })).toBeInTheDocument();
+        // The tasks stay put.
+        expect(screen.getByRole('listbox', { name: "Alice Smith's tasks" })).toBeInTheDocument();
+
+        first.unmount();
+        renderStandup();
+        expect(screen.queryByRole('region', { name: 'Since last standup' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^Show feed/ }));
+        expect(screen.getByRole('region', { name: 'Since last standup' })).toBeInTheDocument();
+        expect(screen.getByText('Wrapped the retry path')).toBeInTheDocument();
+      });
     });
 
     it('resumes at the first unreviewed developer after reopening', () => {

@@ -39,6 +39,7 @@ import type {
   StandupSessionRecord,
   StandupSessionLogEntry,
   RecordStandupSessionResponse,
+  RecordStandupReviewsResponse,
   LatestStandupSessionResponse,
 } from "shared/types";
 import { db } from "../db/connection";
@@ -54,6 +55,7 @@ import {
   developerNotes,
   dayFocus,
   standupSessions,
+  standupReviews,
   tasks,
   oneOnOneSeries,
   oneOnOneSessions,
@@ -361,6 +363,26 @@ export type TrackerFreshnessClockSignals = Pick<
 function forDeveloperSignals(signals: TrackerDeveloperSignals): TrackerDeveloperSignals {
   const { lastManagerTouchAt: _touchAt, workingDaysSinceTouch: _days, touchStaleWorkingDays: _threshold, untouched: _untouched, ...freshness } = signals.freshness;
   return { ...signals, freshness };
+}
+
+/** One line, trimmed, capped; only for accounts that were actually flagged. */
+function cleanFlagReasons(reasons: Record<string, string> | undefined, flagged: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const accountId of flagged) {
+    const line = reasons?.[accountId]?.replace(/\s+/g, " ").trim().slice(0, 200);
+    if (line) out[accountId] = line;
+  }
+  return out;
+}
+
+function parseFlagReasons(raw: string | null | undefined): Record<string, string> {
+  try {
+    const parsed = JSON.parse(raw ?? "{}") as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
 }
 
 function parseIdList(raw: string): string[] {
@@ -1346,6 +1368,8 @@ export class TeamTrackerService {
       startedAt: string;
       reviewed: string[];
       flagged: string[];
+      /** docs/56 P1-07: optional one-line reason per flagged account. */
+      flagReasons?: Record<string, string>;
       log: { accountId: string; kind: string; taskKey?: string; detail?: string; at: string }[];
       summary: string;
       requestId: string;
@@ -1371,20 +1395,24 @@ export class TeamTrackerService {
         endedAt: now,
         reviewedJson: JSON.stringify(input.reviewed),
         flaggedJson: JSON.stringify(input.flagged),
+        flagReasonsJson: JSON.stringify(cleanFlagReasons(input.flagReasons, input.flagged)),
         logJson: JSON.stringify(input.log),
         summary: input.summary,
         requestId: input.requestId,
         createdAt: now,
       }).returning())[0]!;
       const followUps: RecordStandupSessionResponse["followUps"] = [];
+      const reasons = cleanFlagReasons(input.flagReasons, input.flagged);
       for (const accountId of input.flagged) {
         // A stale/unknown flagged id must not block sealing the round.
         try {
           const dev = await this.getDeveloperByAccountId(accountId, scope);
           const title = `Standup follow-up: ${dev.displayName}`;
+          const reason = reasons[accountId];
+          const reasonLine = reason ? `Flagged in standup: ${reason}` : undefined;
           // docs/51 D6: sealing a second same-day round for the same person
           // reuses the still-open follow-up instead of stacking duplicates.
-          const existing = (await db.select({ taskKey: tasks.taskKey }).from(tasks).where(and(
+          const existing = (await db.select({ taskKey: tasks.taskKey, details: tasks.details }).from(tasks).where(and(
             eq(tasks.workspaceId, scope),
             eq(tasks.trackedByManagerId, managerAccountId),
             eq(tasks.title, title),
@@ -1393,13 +1421,21 @@ export class TeamTrackerService {
             isNull(tasks.deletedAt),
           )).limit(1))[0];
           if (existing) {
+            // A round sealed before follow-ups were linked still gains the link;
+            // a new reason is appended, an unchanged one is not repeated.
+            await this.tasks.addLink(existing.taskKey, { kind: "person", ref: accountId }, principal);
+            if (reasonLine && !(existing.details ?? "").includes(reasonLine)) {
+              await this.tasks.update(existing.taskKey, { details: existing.details ? `${existing.details}\n${reasonLine}` : reasonLine }, principal);
+            }
             followUps.push({ accountId, taskKey: existing.taskKey });
             continue;
           }
           const task = await this.tasks.create(
-            { title, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"] },
+            { title, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"], ...(reasonLine && { details: reasonLine }) },
             principal,
           );
+          // docs/56 P1-07: the follow-up belongs to the person, so it shows in their linked work.
+          await this.tasks.addLink(task.taskKey, { kind: "person", ref: accountId }, principal);
           followUps.push({ accountId, taskKey: task.taskKey });
         } catch (error) {
           if (error instanceof HttpError && error.status === 404) continue;
@@ -1408,6 +1444,42 @@ export class TeamTrackerService {
       }
       return { session: this.toSessionRecord(row), followUps };
     });
+  }
+
+  /**
+   * docs/56 P1-07: record people reviewed in standup as they are reviewed.
+   * Each is a manager touch straight away (see `getFreshnessInputs`), so an
+   * unsealed round still counts. Idempotent per (manager, person, day);
+   * unknown accounts are skipped rather than failing the batch.
+   */
+  async recordStandupReviews(
+    managerAccountId: string,
+    input: { date: string; accountIds: string[] },
+    workspaceId?: string,
+  ): Promise<RecordStandupReviewsResponse> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    await this.taskKeys.assertPhase3Enabled(scope);
+    const wanted = [...new Set(input.accountIds)];
+    if (wanted.length === 0) return { recorded: [] };
+    const known = await db
+      .select({ accountId: developers.accountId })
+      .from(developers)
+      .where(and(eq(developers.workspaceId, scope), inArray(developers.accountId, wanted)));
+    const recorded = known.map((row) => row.accountId);
+    const now = new Date().toISOString();
+    for (const developerAccountId of recorded) {
+      await db.insert(standupReviews).values({
+        workspaceId: scope,
+        managerAccountId,
+        developerAccountId,
+        date: input.date,
+        reviewedAt: now,
+      }).onConflictDoUpdate({
+        target: [standupReviews.workspaceId, standupReviews.managerAccountId, standupReviews.developerAccountId, standupReviews.date],
+        set: { reviewedAt: now },
+      });
+    }
+    return { recorded };
   }
 
   /**
@@ -1441,6 +1513,7 @@ export class TeamTrackerService {
         return [];
       }
     };
+    const flagReasons = parseFlagReasons(row.flagReasonsJson);
     return {
       id: row.id,
       date: row.date,
@@ -1448,6 +1521,7 @@ export class TeamTrackerService {
       endedAt: row.endedAt,
       reviewed: parseIds(row.reviewedJson),
       flagged: parseIds(row.flaggedJson),
+      ...(Object.keys(flagReasons).length > 0 && { flagReasons }),
       summary: row.summary,
       createdAt: row.createdAt,
     };
@@ -3276,7 +3350,7 @@ export class TeamTrackerService {
 
     if (touchIds.length === 0) return inputs;
 
-    const [managerCheckIns, dayStats, taskTouches, oneOnOnes, standups] = await Promise.all([
+    const [managerCheckIns, dayStats, taskTouches, oneOnOnes, standups, reviews] = await Promise.all([
       db
         .select({ developerAccountId: teamTrackerDays.developerAccountId, last: max(teamTrackerCheckIns.createdAt) })
         .from(teamTrackerCheckIns)
@@ -3316,6 +3390,16 @@ export class TeamTrackerService {
         .select({ endedAt: standupSessions.endedAt, reviewedJson: standupSessions.reviewedJson, flaggedJson: standupSessions.flaggedJson })
         .from(standupSessions)
         .where(and(eq(standupSessions.workspaceId, scope), lte(standupSessions.endedAt, asOf))),
+      // docs/56 P1-07: reviews recorded during an unsealed round.
+      db
+        .select({ developerAccountId: standupReviews.developerAccountId, last: max(standupReviews.reviewedAt) })
+        .from(standupReviews)
+        .where(and(
+          eq(standupReviews.workspaceId, scope),
+          inArray(standupReviews.developerAccountId, touchIds),
+          lte(standupReviews.reviewedAt, asOf)
+        ))
+        .groupBy(standupReviews.developerAccountId),
     ]);
 
     for (const row of managerCheckIns) touch(row.developerAccountId, row.last);
@@ -3332,6 +3416,7 @@ export class TeamTrackerService {
         if (wanted.has(accountId)) touch(accountId, row.endedAt);
       }
     }
+    for (const row of reviews) touch(row.developerAccountId, row.last);
     return inputs;
   }
 

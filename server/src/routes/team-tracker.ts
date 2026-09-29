@@ -356,6 +356,8 @@ export function createTeamTrackerRouter(
         startedAt: isoDateTimeSchema,
         reviewed: z.array(z.string().trim().min(1)).max(500),
         flagged: z.array(z.string().trim().min(1)).max(500),
+        // docs/56 P1-07: optional one-line reason per flagged account (trimmed and capped server-side).
+        flagReasons: z.record(z.string().min(1), z.string().max(500)).optional(),
         log: z.array(z.object({
           accountId: z.string().min(1),
           kind: z.enum(["update", "checkin", "status", "current", "done", "blocked", "reassign", "added"]),
@@ -370,6 +372,27 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         res.status(201).json(await trackerService.recordStandupSession(req.auth!.user.accountId, req.body, req.auth!.user.workspaceId));
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  // docs/56 P1-07: people reviewed so far in an open round. Each counts as a
+  // manager touch immediately, so it does not depend on End standup.
+  router.post(
+    "/standup/reviews",
+    validate(z.object({
+      params: z.any().optional(),
+      query: z.any().optional(),
+      body: z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+        accountIds: z.array(z.string().trim().min(1)).max(500),
+      }).strict(),
+    })),
+    async (req, res, next) => {
+      try {
+        res.status(201).json(await trackerService.recordStandupReviews(req.auth!.user.accountId, req.body, req.auth!.user.workspaceId));
       } catch (error) {
         next(error);
       }

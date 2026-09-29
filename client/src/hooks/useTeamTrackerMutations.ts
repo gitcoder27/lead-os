@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { taskRefFor } from '@/lib/surface-tasks';
 import type {
+  RecordStandupReviewsRequest,
+  RecordStandupReviewsResponse,
   TrackerWorkItem,
   TrackerCheckIn,
   TrackerDeveloperStatus,
@@ -244,5 +246,18 @@ export function useCarryForward() {
       qc.invalidateQueries({ queryKey: ['today'] });
       invalidateIssueViews(qc);
     },
+  });
+}
+
+/**
+ * docs/56 P1-07: record people reviewed in an open standup round. Each is a
+ * manager touch on the server straight away. It deliberately does not refetch
+ * the board: standup walks `board.developers` by index and a refetch could
+ * re-sort it mid-round. The caller refreshes once when standup closes.
+ */
+export function useRecordStandupReviews() {
+  return useMutation({
+    mutationFn: (body: RecordStandupReviewsRequest) =>
+      api.post<RecordStandupReviewsResponse>('/team-tracker/standup/reviews', body),
   });
 }

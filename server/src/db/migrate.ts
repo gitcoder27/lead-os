@@ -733,6 +733,12 @@ const alterStatements = [
   "CREATE TABLE IF NOT EXISTS standup_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, date TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT NOT NULL, reviewed_json TEXT NOT NULL DEFAULT '[]', flagged_json TEXT NOT NULL DEFAULT '[]', log_json TEXT NOT NULL DEFAULT '[]', summary TEXT NOT NULL DEFAULT '', request_id TEXT, created_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_standup_sessions_manager_end ON standup_sessions(workspace_id, manager_account_id, ended_at)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_sessions_request ON standup_sessions(workspace_id, manager_account_id, request_id)",
+  // docs/56 P1-07: optional flag reasons on a sealed round, and per-person reviews
+  // recorded as they happen (a manager touch even when the round is never sealed).
+  "ALTER TABLE standup_sessions ADD COLUMN flag_reasons_json TEXT NOT NULL DEFAULT '{}'",
+  "CREATE TABLE IF NOT EXISTS standup_reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, developer_account_id TEXT NOT NULL, date TEXT NOT NULL, reviewed_at TEXT NOT NULL)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_reviews_person_day ON standup_reviews(workspace_id, manager_account_id, developer_account_id, date)",
+  "CREATE INDEX IF NOT EXISTS idx_standup_reviews_developer ON standup_reviews(workspace_id, developer_account_id, reviewed_at)",
   // docs/51 F7: per-day manual ordering for schedule-grouped task views.
   "ALTER TABLE tasks ADD COLUMN schedule_position INTEGER",
   // Standup summaries become their own note kind (docs/50 v2): one scratchpad

@@ -52,7 +52,7 @@ export function StandupWrapUp({
   const complete = reviewedCount === days.length;
 
   const followUps = days
-    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), dayUsesCheckIn(day)) }))
+    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), dayUsesCheckIn(day), session.flagReasons?.[day.developer.accountId]) }))
     .filter(({ reasons }) => needsFollowUp(reasons));
   const unreviewed = days.filter((day) => !reviewed.has(day.developer.accountId));
   const logged = days

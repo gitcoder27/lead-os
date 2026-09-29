@@ -88,7 +88,8 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
   - Client: `useCaptureTask().create({ text, defaults })` is the one-shot path (inline add, child action items, the palette's quick add, the desk-style dialogs through `useCreateDeskTask`, and the notes hooks). A `T-n:` or `/note` text is refused there rather than posted as an update or a note.
   - Today's "Follow up" and a meeting's next action are made through `CaptureService` on the server, with a new `delete_task` restore for undo.
   - Without Phase 3, the legacy Desk create still runs, so nothing changes for a workspace that has not switched.
-  - `useCaptureTypeahead` gives `@person` (developers, then contacts), `#JIRA-KEY` (synced issues, two characters minimum) and `+label`. It is on the capture box and the Tasks inline add; the child action-item input has none yet.
+  - `useCaptureTypeahead` gives `@person` (developers, then contacts), `#JIRA-KEY` (synced issues, two characters minimum) and `+label`. It is on the capture box, the Tasks inline add and the child action-item input.
+  - Note-derived text (the notes hooks) keeps an `@name` nobody matches as plain words and retries once, so it neither assigns guesswork nor blocks a wrap-up batch; an ambiguous name still rejects.
 - **Keep-open mode.** Cmd/Ctrl+Enter submits and keeps the dialog open. Today the dialog always closes (`CaptureBox.tsx:273`).
 
 ## 4. Built-in lenses (`task-views.service.ts:41-57`)

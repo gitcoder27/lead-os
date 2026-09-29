@@ -37,6 +37,15 @@ vi.mock('@/hooks/useTaskLabels', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useContacts', () => ({
+  useContacts: () => ({ data: [] }),
+}));
+
+vi.mock('@/hooks/useGlobalSearch', () => ({
+  GLOBAL_SEARCH_MIN_LENGTH: 2,
+  useGlobalSearch: () => ({ data: undefined }),
+}));
+
 vi.mock('@/hooks/useDevelopers', () => ({
   useDevelopers: () => ({ data: [{ accountId: 'dev-1', displayName: 'Dev One' }] }),
 }));
@@ -198,6 +207,16 @@ describe('TaskDrawer body (P3-D2)', () => {
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })); });
       expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Send summary @dev-1 !fri', defaults: { parentKey: 'T-7' } });
       expect(input.value).toBe('');
+    });
+
+    it('suggests people for @ and inserts on Tab, without adding the item', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Send summary @de');
+      expect(screen.getByRole('listbox', { name: 'Person suggestions' })).toBeTruthy();
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect(input.value).toBe('Send summary @dev-1 ');
+      expect(mockCaptureCreate).not.toHaveBeenCalled();
     });
 
     it('Enter submits the form', async () => {

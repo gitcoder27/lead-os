@@ -3,7 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import type { InfiniteData } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import { createTaskViaCapture, postCapture } from '@/hooks/useCapture';
+import { CaptureRejectedError, createTaskViaCapture, postCapture, type CreateViaCapture } from '@/hooks/useCapture';
 import type {
   AppendDailyNotePayload,
   CreateDailyNoteFollowUpPayload,
@@ -167,6 +167,24 @@ function useMutationScopeGuard(): (scopeAtSend: string) => boolean {
   return (scopeAtSend: string) => activeRef.current && scopeRef.current === scopeAtSend;
 }
 
+/**
+ * Note text is not typed as a command, so an `@name` nobody matches stays as
+ * plain words (retried once without the `@`) instead of blocking the task or a
+ * whole wrap-up batch. Nobody is assigned by guesswork; an ambiguous name still
+ * rejects so the manager chooses.
+ */
+async function createFromNote(input: CreateViaCapture) {
+  try {
+    return await createTaskViaCapture(postCapture, input);
+  } catch (error) {
+    if (!(error instanceof CaptureRejectedError)) throw error;
+    const errors = error.diagnostics.filter((entry) => entry.severity === 'error');
+    if (errors.length === 0 || !errors.every((entry) => entry.code === 'unknown-person' && entry.token)) throw error;
+    const text = errors.reduce((current, entry) => current.replace(entry.token!, entry.token!.replace(/^@/, '')), input.text);
+    return createTaskViaCapture(postCapture, { ...input, text });
+  }
+}
+
 export function useAppendDailyNote() {
   const qc = useQueryClient();
   const authScopeKey = useAuthScopeKey();
@@ -203,7 +221,7 @@ export function useCreateDailyNoteFollowUp(noteDate: string) {
     // through the shared grammar, and the note reference is written with the task.
     mutationFn: async (payload: CreateDailyNoteFollowUpPayload): Promise<DailyNoteFollowUp> => {
       scopeAtSendRef.current = authScopeKey;
-      const { task } = await createTaskViaCapture(postCapture, {
+      const { task } = await createFromNote({
         text: payload.title,
         requestId: payload.requestId,
         defaults: {
@@ -275,7 +293,7 @@ export function useCreateDailyNoteTask(noteDate: string) {
       kind?: DailyNoteKind;
     }): Promise<Pick<TaskResolution, 'taskKey' | 'title'>> => {
       scopeAtSendRef.current = authScopeKey;
-      const { task } = await createTaskViaCapture(postCapture, {
+      const { task } = await createFromNote({
         text: payload.title,
         requestId: payload.requestId,
         defaults: {

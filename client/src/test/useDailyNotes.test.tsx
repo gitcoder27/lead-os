@@ -235,12 +235,25 @@ describe('daily note mutations', () => {
       expect(body.defaults).toEqual({ source: { type: 'note', noteDate: DATE } });
     });
 
-    it('surfaces the server\'s reason when the capture is rejected', async () => {
-      apiMocks.post.mockResolvedValueOnce({ intent: 'create', blocked: true, diagnostics: [{ severity: 'error', code: 'unknown-person', message: 'Nobody matches @ghost' }] });
+    it('keeps an unknown @name as plain words and retries once', async () => {
+      apiMocks.post
+        .mockResolvedValueOnce({ intent: 'create', blocked: true, diagnostics: [{ severity: 'error', code: 'unknown-person', message: 'Nobody matches @ghost', token: '@ghost' }] })
+        .mockResolvedValueOnce(created());
       const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
       await act(async () => {
-        await expect(result.current.mutateAsync({ title: 'Ask @ghost', requestId: 'r6' })).rejects.toThrow('Nobody matches @ghost');
+        await result.current.mutateAsync({ title: 'Ask @ghost about pricing', requestId: 'r6' });
       });
+      expect(apiMocks.post).toHaveBeenCalledTimes(2);
+      expect(apiMocks.post.mock.calls[1]![1]).toMatchObject({ text: 'Ask ghost about pricing', requestId: 'r6' });
+    });
+
+    it('still rejects an ambiguous name, so the manager chooses', async () => {
+      apiMocks.post.mockResolvedValueOnce({ intent: 'create', blocked: true, diagnostics: [{ severity: 'error', code: 'ambiguous-person', message: '@al is ambiguous — pick someone', token: '@al' }] });
+      const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
+      await act(async () => {
+        await expect(result.current.mutateAsync({ title: 'Ask @al', requestId: 'r8' })).rejects.toThrow('ambiguous');
+      });
+      expect(apiMocks.post).toHaveBeenCalledTimes(1);
     });
 
     it('refuses text that would be an update or a note instead of a task', async () => {

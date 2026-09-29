@@ -3,6 +3,8 @@ import { ArrowUpRight, ChevronRight, ExternalLink, Globe, Link2, ListTree, Plus,
 import { useToast } from '@/context/ToastContext';
 import { useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
 import { useCaptureTask } from '@/hooks/useCapture';
+import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
+import { TokenSuggestionList } from '@/components/capture/TokenSuggestionList';
 import type { TaskChildRef, TaskDetailResponse, TaskLink } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskStatusGlyph } from './TaskMenus';
@@ -316,6 +318,9 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   const { addToast } = useToast();
   const createChild = useCaptureTask();
   const [draft, setDraft] = useState('');
+  const [caret, setCaret] = useState(0);
+  const draftRef = useRef<HTMLInputElement>(null);
+  const typeahead = useCaptureTypeahead(draft, caret);
   const isMeeting = task.kind === 'meeting';
   const canAdd = isMeeting && mode === 'manager' && !readOnly;
   const done = task.children.filter((child) => child.status === 'done' || child.status === 'dropped').length;
@@ -330,10 +335,20 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
     try {
       const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey } });
       setDraft('');
+      setCaret(0);
       if (warnings.length) addToast(warnings.map((warning) => warning.message).join(' '), 'warning');
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Could not add the action item', 'error');
     }
+  };
+
+  const applyEdit = (next: { text: string; caret: number }) => {
+    setDraft(next.text);
+    setCaret(next.caret);
+    window.requestAnimationFrame(() => {
+      draftRef.current?.focus();
+      draftRef.current?.setSelectionRange(next.caret, next.caret);
+    });
   };
 
   const total = task.children.length;
@@ -359,19 +374,42 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
       )}
       {canAdd && (
         <form
-          className="flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
+          className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
           onSubmit={(event) => { event.preventDefault(); void submit(); }}
         >
           <Plus size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
           <input
+            ref={draftRef}
             type="text"
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => { setDraft(event.target.value); setCaret(event.target.selectionStart ?? event.target.value.length); }}
+            onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+            onKeyDown={(event) => {
+              const nav = typeahead.handleKey(event);
+              if (typeof nav === 'object') { applyEdit(nav); return; }
+              if (nav) return;
+              if (event.key === 'Enter' && typeahead.open) {
+                const chosen = typeahead.choose();
+                if (chosen) { event.preventDefault(); applyEdit(chosen); }
+              }
+            }}
             placeholder="Add an action item — @dev for owner, !fri for a date…"
             className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             aria-label="New action item"
           />
+          {typeahead.open && typeahead.fragment ? (
+            <TokenSuggestionList
+              trigger={typeahead.fragment.trigger}
+              suggestions={typeahead.suggestions}
+              activeIndex={typeahead.activeIndex}
+              onHover={typeahead.setActiveIndex}
+              onChoose={(suggestion) => {
+                const chosen = typeahead.choose(suggestion);
+                if (chosen) applyEdit(chosen);
+              }}
+            />
+          ) : null}
           {draft.trim() && (
             <button
               type="submit"

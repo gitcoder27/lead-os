@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeftRight, History, Keyboard, ListChecks, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
+import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import { api } from '@/lib/api';
@@ -107,6 +107,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const [pendingStatus, setPendingStatus] = useState<TrackerDeveloperStatus | null>(null);
   const [statusPreselect, setStatusPreselect] = useState<string[]>([]);
   const [checkInText, setCheckInText] = useState('');
+  // P0-S6: who sees a manager check-in; back to shared for each new person.
+  const [checkInVisibility, setCheckInVisibility] = useState<TrackerCheckInVisibility>('shared');
   const [flagText, setFlagText] = useState('');
   const [announcement, setAnnouncement] = useState('');
   const [sealing, setSealing] = useState(false);
@@ -176,6 +178,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   // docs/56 P1-04: solo / non-participating people get "note" wording and no check-in judgement.
   const dayUsesCheckIn = useCallback((entry: TrackerDeveloperDay) => usesCheckIns(teamMode, entry.participates), [teamMode]);
   const noteWording = day ? !dayUsesCheckIn(day) : false;
+  const dayAccountId = day?.developer.accountId;
+  useEffect(() => setCheckInVisibility('shared'), [dayAccountId]);
 
   const feed = useStandupFeed(accountId);
   const latestSession = useLatestStandupSession(layer === 'history');
@@ -307,18 +311,23 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     const summary = checkInText.trim();
     if (!day || !summary) return;
     const target = day.developer.accountId;
+    // Notes (non-participating people) are never developer-facing, so stay shared.
+    const isPrivate = !noteWording && checkInVisibility === 'private';
     addCheckIn.mutate(
-      { accountId: target, summary, taskKeys: taskKeysForSubmit([], summary, pickerTasks) },
+      isPrivate
+        ? { accountId: target, summary, visibility: 'private' }
+        : { accountId: target, summary, taskKeys: taskKeysForSubmit([], summary, pickerTasks) },
       {
         onSuccess: () => {
           log(target, 'checkin');
           setCheckInText('');
+          setCheckInVisibility('shared');
           closeLayer();
         },
         onError: (error) => addToast(error.message, 'error'),
       },
     );
-  }, [addCheckIn, addToast, checkInText, closeLayer, day, pickerTasks, log]);
+  }, [addCheckIn, addToast, checkInText, checkInVisibility, closeLayer, day, noteWording, pickerTasks, log]);
 
   const submitFlag = useCallback(() => {
     if (!day) return;
@@ -830,6 +839,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <CheckInForm
               inputRef={checkInRef}
               note={noteWording}
+              developerName={day.developer.displayName}
+              visibility={checkInVisibility}
+              onVisibilityChange={setCheckInVisibility}
               value={checkInText}
               pending={addCheckIn.isPending}
               onChange={setCheckInText}

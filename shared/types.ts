@@ -621,6 +621,8 @@ export interface ManagerActionCommandRequest {
   preset?: ManagerActionSnoozePreset;
   summary?: string;
   taskKeys?: string[];
+  /** P0-S6: add_check_in — `private` keeps the check-in manager-only (never on My Day). */
+  visibility?: TrackerCheckInVisibility;
   /** docs/53 F5: manager IANA zone for snooze/default times. */
   tz?: string;
   /** docs/53 F14: capture_meeting_outcome — optional follow-up created with the outcome. */

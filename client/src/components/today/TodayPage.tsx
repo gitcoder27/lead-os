@@ -522,9 +522,9 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           isSaving={actions.isPending && actions.pendingKind === 'add_check_in'}
           errorMessage={checkInDraft.error}
           onClose={() => closeDialog(() => setCheckInDraft(null))}
-          onSave={(summary, taskKeys) => {
+          onSave={(summary, taskKeys, visibility) => {
             void actions
-              .runActionAsync(checkInDraft.command, { summary, taskKeys })
+              .runActionAsync(checkInDraft.command, { summary, taskKeys, visibility })
               .then(() => closeDialog(() => setCheckInDraft(null)))
               .catch((error: unknown) => {
                 setCheckInDraft((current) => (current ? { ...current, error: errorMessage(error) } : current));

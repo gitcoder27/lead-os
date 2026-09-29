@@ -576,6 +576,20 @@ describe("my day routes", () => {
     });
   });
 
+  it("GET /api/my-day/issues leaves out issues the manager excluded from Work", async () => {
+    await seedIssue("AM-123", "dev-1", "Alice Smith");
+    await seedIssue("AM-789", "dev-1", "Alice Smith", { excluded: 1 });
+
+    const res = await invoke(createTestApp(), {
+      method: "GET",
+      url: "/api/my-day/issues",
+      headers: { cookie: await loginCookie("alice", "secret123") },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body?.issues.map((issue: { jiraKey: string }) => issue.jiraKey)).toEqual(["AM-123"]);
+  });
+
   describe("GET /api/my-day/issues developer-safe projection", () => {
     // Explicit allowlist: adding a field to DeveloperIssue / getForDeveloper must
     // be a deliberate change to this list, reviewed as a privacy decision.

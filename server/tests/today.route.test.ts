@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ManagerActionCommandRequest } from "shared/types";
 import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
@@ -237,6 +238,37 @@ describe("today routes", () => {
       developerAccountId: "dev-1",
     });
   });
+  it("POST /api/manager-actions/commands add_check_in stores a private check-in and rejects task refs on it (P0-S6)", async () => {
+    await db.insert(configTable).values({ key: "tasks_phase1_enabled", value: "true" });
+    const { cookie } = await managerSession();
+    const item = await trackerService.addItem("dev-1", "2026-03-08", { title: "Standup task" });
+    const command: ManagerActionCommandRequest["command"] = {
+      kind: "add_check_in",
+      label: "Add check-in",
+      target: { type: "developer", view: "team", developerAccountId: "dev-1", date: "2026-03-08" },
+      confirm: true,
+    };
+
+    // Error responses hang this in-process harness on this route, so the
+    // rejection is asserted on the service the route calls.
+    await expect(
+      todayService.executeCommand(
+        "manager-a",
+        { date: "2026-03-08", summary: "x", taskKeys: [item.taskKey!], visibility: "private", command },
+        { type: "manager", accountId: "manager-a" },
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const response = await invoke(createTestApp(), {
+      method: "POST",
+      url: "/api/manager-actions/commands",
+      headers: { cookie },
+      body: { date: "2026-03-08", summary: "Only for me", visibility: "private", command },
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.result).toMatchObject({ summary: "Only for me", visibility: "private" });
+  });
+
   it("GET /api/today accepts tz and returns the zoned stage plus additive contracts (docs/53)", async () => {
     const cookie = await managerCookie();
     const response = await invoke(createTestApp(), {

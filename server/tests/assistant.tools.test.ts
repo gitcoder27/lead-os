@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers, issues } from "../src/db/schema";
+import { configTable, developers, issues, teamTrackerCheckIns } from "../src/db/schema";
 import { HttpError } from "../src/middleware/errorHandler";
 import { AlertService } from "../src/services/alert.service";
 import { AutomationService } from "../src/services/automation.service";
@@ -527,6 +527,30 @@ describe("assistant tools", () => {
     await expect(run("record_status_update", { accountId: "dev-1", status: "blocked" })).rejects.toMatchObject({
       status: 400,
     });
+  });
+
+  it("record_status_update and manager_action add_check_in pass visibility through and say who sees it (P0-S6)", async () => {
+    await run("record_status_update", { accountId: "dev-1", status: "at_risk", rationale: "Private worry", visibility: "private" });
+    await run("manager_action", {
+      kind: "add_check_in",
+      target: { type: "developer", view: "team", developerAccountId: "dev-1" },
+      summary: "Private aside",
+      visibility: "private",
+    });
+    await run("record_status_update", { accountId: "dev-1", status: "on_track", summary: "Shared" });
+    const rows = await db.select().from(teamTrackerCheckIns);
+    expect(rows.map((row) => [row.summary, row.visibility])).toEqual([
+      ["Private worry", "private"],
+      ["Private aside", "private"],
+      ["Shared", "shared"],
+    ]);
+
+    const statusTool = toolByName.get("record_status_update")!;
+    expect(statusTool.summarize({ accountId: "dev-1", status: "blocked" })).toContain("visible to the developer");
+    expect(statusTool.summarize({ accountId: "dev-1", status: "blocked", visibility: "private" })).toContain("private");
+    const actionTool = toolByName.get("manager_action")!;
+    expect(actionTool.summarize({ kind: "add_check_in" })).toContain("visible to the developer");
+    expect(actionTool.summarize({ kind: "mark_done" })).not.toContain("visible");
   });
 
   it("carry_forward moves desk and tracker items to the target date", async () => {

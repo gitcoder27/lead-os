@@ -172,6 +172,11 @@ export function compact(value: unknown, max = MAX_RESULT_CHARS): unknown {
   return { _truncated: true };
 }
 
+/** P0-S6: the confirm card says who will see a manager check-in or status rationale. */
+function checkInVisibilityNote(visibility: unknown): string {
+  return visibility === "private" ? " · private, only you" : " · visible to the developer on My Day";
+}
+
 function dateProperty(description: string): Record<string, unknown> {
   return { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description };
 }
@@ -1009,6 +1014,11 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
           preset: { type: "string", enum: ["later_today", "tomorrow", "next_week"] },
           summary: { type: "string", description: "Check-in text for add_check_in" },
           taskKeys: { type: "array", items: { type: "string" }, description: "Referenced task keys for add_check_in" },
+          visibility: {
+            type: "string",
+            enum: ["shared", "private"],
+            description: "shared (default): the developer sees it on My Day. private: manager-only; cannot reference tasks.",
+          },
           date: dateProperty("YYYY-MM-DD; defaults to today"),
         },
         required: ["kind", "target"],
@@ -1018,7 +1028,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
       invalidate: ["today", "manager-actions", "manager-desk", "team-tracker", "workload"],
       label: (args) => `Running ${String(args.kind ?? "action")}…`,
       summarize: (args) =>
-        `Run ${String(args.kind ?? "action")}${args.title ? ` "${String(args.title)}"` : ""}`,
+        `Run ${String(args.kind ?? "action")}${args.title ? ` "${String(args.title)}"` : ""}${args.kind === "add_check_in" ? checkInVisibilityNote(args.visibility) : ""}`,
       execute: async (rawArgs, ctx) => {
         const args = parseArgs(
           z.object({
@@ -1048,6 +1058,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),
             summary: z.string().optional(),
             taskKeys: z.array(z.string().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
+            visibility: z.enum(["shared", "private"]).optional(),
             date: dateSchema.optional(),
           }),
           rawArgs
@@ -1063,6 +1074,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             preset: args.preset,
             summary: args.summary,
             taskKeys: args.taskKeys,
+            visibility: args.visibility,
           },
           ctx.actor,
           ctx.workspaceId
@@ -1528,6 +1540,11 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
           summary: { type: "string" },
           nextFollowUpAt: { type: ["string", "null"], description: "ISO datetime for the next follow-up" },
           taskKey: { type: "string", description: "Optional task key for a blocker update" },
+          visibility: {
+            type: "string",
+            enum: ["shared", "private"],
+            description: "shared (default): the developer sees it on My Day. private: manager-only; cannot reference tasks.",
+          },
         },
         required: ["accountId", "status"],
         additionalProperties: false,
@@ -1535,7 +1552,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
       confirm: "always",
       invalidate: ["team-tracker", "today", "manager-actions", "alerts"],
       label: (args) => `Recording ${String(args.status ?? "status")} for ${String(args.accountId ?? "developer")}…`,
-      summarize: (args) => `Set ${String(args.accountId ?? "developer")} to ${String(args.status ?? "?")}`,
+      summarize: (args) => `Set ${String(args.accountId ?? "developer")} to ${String(args.status ?? "?")}${checkInVisibilityNote(args.visibility)}`,
       execute: async (rawArgs, ctx) => {
         const args = parseArgs(
           z.object({
@@ -1546,6 +1563,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             summary: z.string().trim().max(2000).optional(),
             nextFollowUpAt: z.string().nullable().optional(),
             taskKey: z.string().regex(/^[Tt]-\d{1,9}$/).optional(),
+            visibility: z.enum(["shared", "private"]).optional(),
           }),
           rawArgs
         );
@@ -1558,6 +1576,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
             summary: args.summary,
             nextFollowUpAt: args.nextFollowUpAt ?? undefined,
             taskKey: args.taskKey,
+            visibility: args.visibility,
           },
           ctx.actor,
           ctx.workspaceId

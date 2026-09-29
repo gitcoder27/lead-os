@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, UserMinus, Users } from 'lucide-react';
-import type { Issue, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
+import type { Issue, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
@@ -27,6 +27,7 @@ import {
 } from './DeveloperDrawerSections';
 import { ManagerFollowUpRow } from './ManagerFollowUpsSection';
 import { OneOnOneAgendaButton } from './OneOnOneAgendaButton';
+import { CheckInVisibilityChoice } from './CheckInVisibilityChoice';
 import { useCreateOneOnOneSeries, useOneOnOneEnabled, useOneOnOneSeriesForDeveloper } from '@/hooks/useOneOnOne';
 import { useToast } from '@/context/ToastContext';
 import type { ManagerDeskItem } from '@/types/manager-desk';
@@ -50,7 +51,7 @@ interface DeveloperTrackerDrawerProps {
   onSetCurrent: (itemId: number) => void;
   onMarkDone: (itemId: number) => void;
   onDropItem: (itemId: number) => void;
-  onAddCheckIn: (params: { accountId: string; summary: string; status?: TrackerDeveloperStatus; taskKeys?: string[] }) => void;
+  onAddCheckIn: (params: { accountId: string; summary: string; status?: TrackerDeveloperStatus; taskKeys?: string[]; visibility?: TrackerCheckInVisibility }) => void;
   onMarkInactive?: (day: TrackerDeveloperDay) => void;
   onOpenManagerDesk?: () => void;
   /** docs/48 §4.3: opens the 1:1 workspace panel for this developer. */
@@ -526,7 +527,8 @@ export function DeveloperTrackerDrawer({
                 tasks={checkInTasks}
                 inputRef={checkInInputRef}
                 shortcutHints={shortcutHints}
-                onSubmit={(summary, taskKeys) => onAddCheckIn({ accountId: day.developer.accountId, summary, taskKeys })}
+                askVisibility={!noteWording}
+                onSubmit={(summary, taskKeys, visibility) => onAddCheckIn({ accountId: day.developer.accountId, summary, taskKeys, visibility })}
               />
             )}
           </motion.div>
@@ -648,6 +650,7 @@ function CheckInComposer({
   tasks,
   inputRef,
   shortcutHints,
+  askVisibility,
   onSubmit,
 }: {
   developerName: string;
@@ -655,18 +658,23 @@ function CheckInComposer({
   tasks: TaskPickerTask[];
   inputRef: RefObject<HTMLInputElement>;
   shortcutHints: [string, string][];
-  onSubmit: (summary: string, taskKeys: string[]) => void;
+  /** P0-S6: the developer can log in, so say who sees the check-in. */
+  askVisibility: boolean;
+  onSubmit: (summary: string, taskKeys: string[], visibility?: 'private') => void;
 }) {
   const [text, setText] = useState('');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [visibility, setVisibility] = useState<TrackerCheckInVisibility>('shared');
   const [focused, setFocused] = useState(false);
   const inputId = useId();
+  const isPrivate = askVisibility && visibility === 'private';
   const engaged = focused || Boolean(text.trim()) || selectedKeys.length > 0;
   const canSubmit = Boolean(text.trim());
 
   const submit = () => {
     if (!canSubmit) return;
-    onSubmit(text.trim(), taskKeysForSubmit(selectedKeys, text, tasks));
+    if (isPrivate) onSubmit(text.trim(), [], 'private');
+    else onSubmit(text.trim(), taskKeysForSubmit(selectedKeys, text, tasks));
     setText('');
     setSelectedKeys([]);
   };
@@ -721,7 +729,16 @@ function CheckInComposer({
             Save
           </button>
         </div>
-        {engaged && tasks.length > 0 && (
+        {engaged && askVisibility && (
+          <div
+            className="border-t px-3 py-2"
+            style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            <CheckInVisibilityChoice developerName={developerName} value={visibility} onChange={setVisibility} />
+          </div>
+        )}
+        {engaged && tasks.length > 0 && !isPrivate && (
           // Keep focus in the input while chips are clicked (Safari does not focus buttons on click).
           <div
             className="border-t px-3 py-2"

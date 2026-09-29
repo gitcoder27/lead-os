@@ -74,6 +74,28 @@ EOF
   return 1
 }
 
+# Production sits behind cloudflared/nginx, so without TRUST_PROXY every login
+# arrives from 127.0.0.1 and the throttle keys on one shared address (docs/23).
+require_trust_proxy() {
+  if [[ -n "${TRUST_PROXY:-}" ]]; then
+    return 0
+  fi
+
+  if [[ -f ".env" ]] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?TRUST_PROXY[[:space:]]*=[[:space:]]*[^[:space:]#]+' .env; then
+    return 0
+  fi
+
+  cat >&2 <<'EOF'
+Missing TRUST_PROXY: production runs behind a reverse proxy, so the login throttle
+needs it to see the real client IP. Add this to the production .env file:
+
+  TRUST_PROXY=loopback
+
+See docs/23 "Client IP And TRUST_PROXY".
+EOF
+  return 1
+}
+
 wait_for_check() {
   local label="$1"
   shift
@@ -175,6 +197,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 require_production_secret
+require_trust_proxy
 
 log "Fetching latest production target"
 run_cmd git fetch origin main

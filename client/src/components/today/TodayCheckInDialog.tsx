@@ -1,5 +1,7 @@
 import { useId, useState } from 'react';
 import { TaskPicker, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
+import { CheckInVisibilityChoice } from '@/components/team-tracker/CheckInVisibilityChoice';
+import type { TrackerCheckInVisibility } from '@/types';
 import { TodayDialog, TodayDialogActions, TodayDialogError } from './TodayDialog';
 
 interface TodayCheckInDialogProps {
@@ -17,7 +19,8 @@ interface TodayCheckInDialogProps {
   /** docs/53 F9: surfaced inline when the save mutation fails. */
   errorMessage?: string;
   onClose: () => void;
-  onSave: (summary: string, taskKeys: string[]) => void;
+  /** P0-S6: `visibility` is set only for a private check-in (never for a note). */
+  onSave: (summary: string, taskKeys: string[], visibility?: 'private') => void;
 }
 
 export function TodayCheckInDialog({
@@ -34,6 +37,9 @@ export function TodayCheckInDialog({
 }: TodayCheckInDialogProps) {
   const [summary, setSummary] = useState(defaultSummary);
   const [taskKeys, setTaskKeys] = useState<string[]>(initialTaskKeys);
+  const [visibility, setVisibility] = useState<TrackerCheckInVisibility>('shared');
+  // A note is for someone who does not log in, so nothing is developer-facing.
+  const isPrivate = !note && visibility === 'private';
   const fieldId = useId();
   // docs/53 F2: pre-selected context tasks may be absent from the day's
   // candidate list (e.g. the item rolled off the plan) — render them anyway so
@@ -43,7 +49,9 @@ export function TodayCheckInDialog({
     : tasks;
   const canSave = summary.trim().length > 0 && !isSaving;
   const save = () => {
-    if (canSave) onSave(summary, taskKeysForSubmit(taskKeys, summary, pickerTasks));
+    if (!canSave) return;
+    if (isPrivate) onSave(summary, [], 'private');
+    else onSave(summary, taskKeysForSubmit(taskKeys, summary, pickerTasks));
   };
 
   return (
@@ -71,7 +79,12 @@ export function TodayCheckInDialog({
         className="ui-field"
         placeholder={placeholder}
       />
-      {pickerTasks.length > 0 && (
+      {!note && (
+        <div className="mt-3">
+          <CheckInVisibilityChoice developerName={developerName} value={visibility} onChange={setVisibility} disabled={isSaving} />
+        </div>
+      )}
+      {pickerTasks.length > 0 && !isPrivate && (
         <div className="mt-3">
           <TaskPicker tasks={pickerTasks} text={summary} selected={taskKeys} onChange={setTaskKeys} />
         </div>

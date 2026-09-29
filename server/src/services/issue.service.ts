@@ -121,7 +121,8 @@ export class IssueService {
    */
   async getForDeveloper(accountId: string, workspaceId?: string): Promise<DeveloperIssue[]> {
     const all = await this.getAll({ assignee: accountId, includeTrackerAssignments: false }, workspaceId);
-    return all.map((issue) => ({
+    // Issues the manager excluded from Work stay out of the developer's picker too.
+    return all.filter((issue) => !issue.excluded).map((issue) => ({
       jiraKey: issue.jiraKey,
       summary: issue.summary,
       priorityName: issue.priorityName,

@@ -6,6 +6,7 @@ import type {
   RecordStandupReviewsResponse,
   TrackerWorkItem,
   TrackerCheckIn,
+  TrackerCheckInVisibility,
   TrackerDeveloperStatus,
   TrackerItemState,
 } from '@/types';
@@ -192,12 +193,15 @@ export function useAddCheckIn(date: string) {
       summary: string;
       status?: TrackerDeveloperStatus;
       taskKeys?: string[];
+      /** P0-S6: `private` keeps the check-in manager-only. */
+      visibility?: TrackerCheckInVisibility;
     }) =>
       api.post<TrackerCheckIn>(`/team-tracker/${params.accountId}/checkins`, {
         date,
         summary: params.summary,
         status: params.status,
         taskKeys: params.taskKeys,
+        visibility: params.visibility,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });

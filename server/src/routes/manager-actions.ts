@@ -110,6 +110,8 @@ const commandSchema = z.object({
     preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),
     summary: z.string().optional(),
     taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
+    /** P0-S6: add_check_in — `private` keeps the check-in manager-only. */
+    visibility: z.enum(["shared", "private"]).optional(),
     tz: z.string().max(64).optional(),
     nextAction: z.string().max(500).optional(),
     nextActionOwnerAccountId: z.string().max(128).optional(),

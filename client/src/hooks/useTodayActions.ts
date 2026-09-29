@@ -25,6 +25,8 @@ type TodayActionVariables = {
   preset?: 'later_today' | 'tomorrow' | 'next_week';
   summary?: string;
   taskKeys?: string[];
+  /** P0-S6: add_check_in — `private` keeps the check-in manager-only. */
+  visibility?: 'private';
   /** docs/53 F14: optional follow-up created with a meeting outcome. */
   nextAction?: string;
   nextActionOwnerAccountId?: string;
@@ -183,7 +185,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     });
 
   const mutation = useMutation({
-    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, nextAction, nextActionOwnerAccountId }: TodayActionVariables) => {
+    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, visibility, nextAction, nextActionOwnerAccountId }: TodayActionVariables) => {
       const { target } = command;
 
       if (command.kind === 'mark_done' && target.managerDeskItemId) {
@@ -198,7 +200,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         if (!summary?.trim()) {
           return { cancelled: true };
         }
-        return postCommand({ command, summary: summary.trim(), taskKeys });
+        return postCommand({ command, summary: summary.trim(), taskKeys, ...(visibility ? { visibility } : {}) });
       }
 
       // docs/53 F15: "Ask for update" is a write — a check-in request task on

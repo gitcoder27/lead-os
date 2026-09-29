@@ -1342,6 +1342,9 @@ export class TeamTrackerService {
           ? {
               ...day,
               managerNotes: undefined,
+              // The row's `lastCheckInAt` counts private manager check-ins too;
+              // recompute it from the check-ins this developer can see.
+              lastCheckInAt: await this.latestSharedCheckInAt(day.id, normalizedWorkspaceId),
               // P0-S6: private manager check-ins, and the manager's follow-up
               // schedule, never reach a developer response.
               nextFollowUpAt: undefined,
@@ -3557,6 +3560,24 @@ export class TeamTrackerService {
         row.jiraKey ? issueContextMap.get(row.jiraKey) : undefined
       ), ...(canonicalTask && { canonicalTask: true, canRename: true }) })
     );
+  }
+
+  /** P0-S6: latest shared (developer-visible) check-in on one day row. */
+  private async latestSharedCheckInAt(dayId: number, workspaceId: string): Promise<string | undefined> {
+    const row = (
+      await db
+        .select({ last: max(teamTrackerCheckIns.createdAt) })
+        .from(teamTrackerCheckIns)
+        .innerJoin(teamTrackerDays, eq(teamTrackerCheckIns.dayId, teamTrackerDays.id))
+        .where(
+          and(
+            eq(teamTrackerCheckIns.dayId, dayId),
+            eq(teamTrackerDays.workspaceId, workspaceId),
+            eq(teamTrackerCheckIns.visibility, "shared")
+          )
+        )
+    )[0];
+    return row?.last ?? undefined;
   }
 
   private async getRecentCheckInsByDeveloper(

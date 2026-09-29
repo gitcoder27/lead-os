@@ -653,7 +653,7 @@ export class TodayService {
         const result = await this.teamTrackerService.addCheckIn(
           developerAccountId,
           date,
-          { summary, taskKeys: request.taskKeys },
+          { summary, taskKeys: request.taskKeys, visibility: request.visibility },
           actor,
           workspaceId,
         );

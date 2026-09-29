@@ -67,6 +67,9 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args["password"] !== undefined) {
+    console.error("Warning: --password is visible in shell history and process listings; prefer --password-stdin.");
+  }
   const password = args["password-stdin"] === "true" ? await readStdin() : args["password"];
   if (!password || password === "true") {
     console.error(usage());

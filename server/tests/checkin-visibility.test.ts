@@ -139,6 +139,30 @@ describe("P0-S6: manager status rationale visibility", () => {
   });
 });
 
+describe("P0-S6: last check-in time", () => {
+  it("does not move the developer's last check-in time for a private check-in", async () => {
+    const shared = await asManager("POST", "/api/team-tracker/dev-1/checkins", { date: today, summary: "Shared note" });
+    expect(shared.status).toBe(201);
+    const before = (await asDeveloper("alice", "GET", `/api/my-day?date=${today}`)).body.lastCheckInAt;
+    expect(before).toBe(shared.body.createdAt);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect((await asManager("POST", "/api/team-tracker/dev-1/checkins", { date: today, summary: "Private note", visibility: "private" })).status).toBe(201);
+
+    expect((await asDeveloper("alice", "GET", `/api/my-day?date=${today}`)).body.lastCheckInAt).toBe(before);
+    // The manager's clock still counts it.
+    const board = await asManager("GET", `/api/team-tracker?date=${today}`);
+    const alice = board.body.developers.find((day: { developer: { accountId: string } }) => day.developer.accountId === "dev-1");
+    expect(alice.lastCheckInAt > before).toBe(true);
+  });
+
+  it("omits the last check-in time when every check-in is private", async () => {
+    expect((await asManager("POST", "/api/team-tracker/dev-1/checkins", { date: today, summary: "Private", visibility: "private" })).status).toBe(201);
+    const mine = await asDeveloper("alice", "GET", `/api/my-day?date=${today}`);
+    expect(mine.body.lastCheckInAt).toBeUndefined();
+  });
+});
+
 describe("P0-S6: role boundaries", () => {
   it("lets a developer write only shared check-ins, and only through /api/my-day", async () => {
     const own = await asDeveloper("alice", "POST", "/api/my-day/checkins", { date: today, summary: "Trying to hide this", visibility: "private" });

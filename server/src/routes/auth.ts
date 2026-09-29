@@ -86,9 +86,9 @@ class AuthAttemptThrottle {
 
   /** Forget every client's failures for one username (used after an admin reset). */
   clearUsername(username: string): void {
-    const suffix = `:${username.trim().toLowerCase()}`;
+    const normalized = normalizeThrottleUsername(username);
     for (const key of this.attempts.keys()) {
-      if (key.endsWith(suffix)) this.attempts.delete(key);
+      if ((JSON.parse(key) as [string, string])[1] === normalized) this.attempts.delete(key);
     }
   }
 
@@ -105,8 +105,13 @@ class AuthAttemptThrottle {
   }
 }
 
+function normalizeThrottleUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+/** `[ip, username]` as JSON: IPv6 addresses and usernames may both contain ":". */
 function throttleKey(req: { ip?: string; socket?: { remoteAddress?: string } }, username: string): string {
-  return `${req.ip ?? req.socket?.remoteAddress ?? "unknown"}:${username.trim().toLowerCase()}`;
+  return JSON.stringify([req.ip ?? req.socket?.remoteAddress ?? "unknown", normalizeThrottleUsername(username)]);
 }
 
 export function createAuthRouter(authService: AuthService): Router {

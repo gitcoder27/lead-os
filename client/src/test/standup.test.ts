@@ -181,6 +181,29 @@ describe('follow-ups & summary', () => {
     expect(followUpReasons(day({ status: 'done_for_today' }), '2026-03-07', false)).toEqual([]);
   });
 
+  it('drops "No check-in today" for people who do not check in (docs/56 P1-04)', () => {
+    expect(followUpReasons(day(), '2026-03-07', false, false)).toEqual([]);
+    // A flag still lists them, without the check-in reason.
+    expect(followUpReasons(day(), '2026-03-07', true, false).map((reason) => reason.code)).toEqual(['flagged']);
+  });
+
+  it('summarises solo sessions as notes and skips the check-in reason', () => {
+    const text = buildStandupSummary({
+      date: '2026-03-07',
+      days: [day({ status: 'blocked' })],
+      session: {
+        startedAt: '2026-03-07T08:30:00Z',
+        reviewed: ['dev-1'],
+        flagged: ['dev-1'],
+        log: [{ accountId: 'dev-1', kind: 'checkin', at: '2026-03-07T08:40:00Z' }],
+      },
+      usesCheckIn: () => false,
+    });
+    expect(text).toContain('1 notes');
+    expect(text).not.toContain('check-in');
+    expect(text).toContain('Alice Smith: Flagged, Blocked');
+  });
+
   it('builds a plain-text summary of coverage, follow-ups, and actions', () => {
     const alice = day();
     const bob = day({ id: 2, developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true }, status: 'at_risk' });

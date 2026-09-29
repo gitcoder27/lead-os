@@ -13,6 +13,8 @@ import { ShortcutLegend } from '@/components/ui/ShortcutSheet';
 import { FOCUS_RING, isEditable } from '@/components/ui/focus';
 import { describePlanDate } from '@/components/tasks/task-detail-format';
 import { getLocalIsoDate } from '@/lib/utils';
+import { usesCheckIns } from '@/lib/participation';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import {
   CheckInTimeline,
   DeveloperHero,
@@ -256,6 +258,10 @@ export function DeveloperTrackerDrawer({
     },
   });
 
+  // docs/56 P1-04: people who do not check in get "notes", not "check-ins".
+  const teamMode = useTeamMode();
+  const noteWording = day ? !usesCheckIns(teamMode, day.participates) : false;
+
   const shortcutHints: [string, string][] = readOnly
     ? [['Esc', 'Close']]
     : [
@@ -263,7 +269,7 @@ export function DeveloperTrackerDrawer({
         ['⇧ s', 'Status'],
         ['n', 'New task'],
         ...(currentComposerId !== undefined ? [['u', 'Update'] as [string, string]] : []),
-        ['c', 'Check-in'],
+        ['c', noteWording ? 'Note' : 'Check-in'],
         ...(localPlannedItems.length > 1 ? [['⌥ ↑ / ⌥ ↓', 'Reorder'] as [string, string]] : []),
         ['Esc', 'Close'],
       ];
@@ -495,11 +501,11 @@ export function DeveloperTrackerDrawer({
 
                 <DrawerSection
                   icon={<MessagesSquare size={14} />}
-                  title="Check-ins"
+                  title={noteWording ? 'Notes' : 'Check-ins'}
                   count={day.checkIns.length + day.recentCheckIns.length}
                 >
                   <div className="pt-1">
-                    <CheckInTimeline checkIns={day.checkIns} recentCheckIns={day.recentCheckIns} readOnly={readOnly} />
+                    <CheckInTimeline checkIns={day.checkIns} recentCheckIns={day.recentCheckIns} readOnly={readOnly} noun={noteWording ? 'notes' : 'check-ins'} />
                   </div>
                 </DrawerSection>
               </div>
@@ -516,6 +522,7 @@ export function DeveloperTrackerDrawer({
               <CheckInComposer
                 key={day.developer.accountId}
                 developerName={day.developer.displayName}
+                noun={noteWording ? 'note' : 'check-in'}
                 tasks={checkInTasks}
                 inputRef={checkInInputRef}
                 shortcutHints={shortcutHints}
@@ -637,12 +644,14 @@ function PlannedReorderItem({
  */
 function CheckInComposer({
   developerName,
+  noun,
   tasks,
   inputRef,
   shortcutHints,
   onSubmit,
 }: {
   developerName: string;
+  noun: 'check-in' | 'note';
   tasks: TaskPickerTask[];
   inputRef: RefObject<HTMLInputElement>;
   shortcutHints: [string, string][];
@@ -681,7 +690,7 @@ function CheckInComposer({
       >
         <div className="flex items-center gap-2 py-1.5 pl-3 pr-1.5">
           <label htmlFor={inputId} className="sr-only">
-            Check-in note for {developerName}
+            {noun === 'note' ? 'Note' : 'Check-in note'} for {developerName}
           </label>
           <input
             id={inputId}
@@ -696,7 +705,7 @@ function CheckInComposer({
               }
             }}
             data-task-shortcut="c"
-            placeholder="Add a check-in note…"
+            placeholder={noun === 'note' ? 'Add a note…' : 'Add a check-in note…'}
             className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
           />
@@ -706,7 +715,7 @@ function CheckInComposer({
             disabled={!canSubmit}
             className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
-            title="Save check-in (Enter)"
+            title={`Save ${noun} (Enter)`}
           >
             <CornerDownLeft size={12} aria-hidden="true" />
             Save

@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useTeamTrackerMutations';
 import { useBoardQueryState } from '@/hooks/useBoardQueryState';
 import { useIssues } from '@/hooks/useIssues';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { useToast } from '@/context/ToastContext';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { TrackerSummaryStrip } from './TrackerSummaryStrip';
@@ -46,6 +47,7 @@ import {
 import type { AppView } from '@/App';
 import type {
   TeamTrackerBoardQuery,
+  TeamMode,
   TeamTrackerBoardResponse,
   TrackerAttentionActionItem,
   TrackerDeveloperDay,
@@ -55,10 +57,11 @@ import type {
 import { UNDO_WINDOW_MS } from '@/lib/undo';
 import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
 
-const TEAM_BOARD_SHORTCUTS: ShortcutGroup[] = [
+/** docs/56 P1-04: solo has no check-ins, so the drawer's `c` is a note. */
+const teamBoardShortcuts = (teamMode: TeamMode): ShortcutGroup[] => [
   { group: 'Board', keys: [['j / k', 'Next / previous person'], ['Enter / o', 'Open their drawer'], ['/', 'Search']] },
   { group: 'Day', keys: [['[ / ]', 'Previous / next day'], ['t', 'Today'], ['?', 'This sheet']] },
-  { group: 'In the drawer', keys: [['⇧ s', 'Status'], ['n', 'New task'], ['u', 'Update'], ['c', 'Check-in'], ['Esc', 'Close']] },
+  { group: 'In the drawer', keys: [['⇧ s', 'Status'], ['n', 'New task'], ['u', 'Update'], ['c', teamMode === 'solo' ? 'Note' : 'Check-in'], ['Esc', 'Close']] },
 ];
 
 interface TeamTrackerPageProps {
@@ -321,6 +324,7 @@ export function TeamTrackerPage({
   const { addToast } = useToast();
   const tasksPhase3 = useTasksPhase3();
   const oneOnOneEnabled = useOneOnOneEnabled();
+  const teamMode = useTeamMode();
   const [date, setDate] = useState(getLocalIsoDate);
   const [activeLens, setActiveLens] = useState<TeamTrackerLens>('team');
 
@@ -560,7 +564,7 @@ export function TeamTrackerPage({
               </button>
             </div>
             {shortcutsAnchor ? (
-              <ShortcutSheet anchor={shortcutsAnchor} groups={TEAM_BOARD_SHORTCUTS} onClose={() => setShortcutsAnchor(null)} />
+              <ShortcutSheet anchor={shortcutsAnchor} groups={teamBoardShortcuts(teamMode)} onClose={() => setShortcutsAnchor(null)} />
             ) : null}
           </div>
 

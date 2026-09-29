@@ -201,11 +201,11 @@ export function sessionTotals(session: StandupSession): SessionTotals {
   };
 }
 
-export function describeLogEntry(entry: StandupLogEntry): string {
+export function describeLogEntry(entry: StandupLogEntry, usesCheckIn = true): string {
   const key = entry.taskKey ? ` ${entry.taskKey}` : '';
   switch (entry.kind) {
     case 'update': return `Logged update on${key}`;
-    case 'checkin': return 'Added a check-in';
+    case 'checkin': return usesCheckIn ? 'Added a check-in' : 'Added a note';
     case 'status': return `Status → ${entry.detail ?? 'changed'}`;
     case 'blocked': return `Marked blocked${entry.taskKey ? ` (${entry.taskKey})` : ''}`;
     case 'current': return `Set${key} as current`;
@@ -234,7 +234,11 @@ const PERSON_STATUS_LABELS: Record<TrackerDeveloperStatus, string> = {
   done_for_today: 'Done for today',
 };
 
-export function followUpReasons(day: TrackerDeveloperDay, date: string, flagged: boolean): FollowUpReason[] {
+/**
+ * `usesCheckIn` (docs/56 P1-04): "No check-in today" only makes sense for people
+ * who check in; solo and non-participating developers never get it.
+ */
+export function followUpReasons(day: TrackerDeveloperDay, date: string, flagged: boolean, usesCheckIn = true): FollowUpReason[] {
   const reasons: FollowUpReason[] = [];
   if (flagged) reasons.push({ code: 'flagged', label: 'Flagged', tone: 'accent' });
   if (day.status === 'blocked' || day.status === 'at_risk' || day.status === 'waiting') {
@@ -243,7 +247,7 @@ export function followUpReasons(day: TrackerDeveloperDay, date: string, flagged:
   if (day.statusSuggestion) {
     reasons.push({ code: 'suggestion', label: `${day.statusSuggestion.reasonTaskKey} blocked`, tone: 'warning' });
   }
-  if (day.status !== 'done_for_today' && checkInsToday(day, date) === 0) {
+  if (usesCheckIn && day.status !== 'done_for_today' && checkInsToday(day, date) === 0) {
     reasons.push({ code: 'no_checkin', label: 'No check-in today', tone: 'muted' });
   }
   if (day.oneOnOne) {
@@ -406,20 +410,22 @@ export function buildStandupSummary({
   date,
   days,
   session,
+  usesCheckIn = () => true,
 }: {
   date: string;
   days: TrackerDeveloperDay[];
   session: StandupSession;
+  usesCheckIn?: (day: TrackerDeveloperDay) => boolean;
 }): string {
   const reviewed = new Set(session.reviewed);
   const flagged = new Set(session.flagged);
   const totals = sessionTotals(session);
   const lines: string[] = [
     `Standup ${date} — ${days.filter((day) => reviewed.has(day.developer.accountId)).length}/${days.length} reviewed`,
-    `Logged: ${totals.updates} updates · ${totals.checkins} check-ins · ${totals.closed} closed · ${totals.statusChanges} status changes`,
+    `Logged: ${totals.updates} updates · ${totals.checkins} ${days.some(usesCheckIn) ? 'check-ins' : 'notes'} · ${totals.closed} closed · ${totals.statusChanges} status changes`,
   ];
   const followUps = days
-    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId)) }))
+    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), usesCheckIn(day)) }))
     .filter(({ reasons }) => needsFollowUp(reasons));
   if (followUps.length) {
     lines.push('', 'Follow up:');
@@ -435,7 +441,9 @@ export function buildStandupSummary({
   if (logged.length) {
     lines.push('', 'Actions:');
     for (const day of logged) {
-      const entries = session.log.filter((entry) => entry.accountId === day.developer.accountId).map(describeLogEntry);
+      const entries = session.log
+        .filter((entry) => entry.accountId === day.developer.accountId)
+        .map((entry) => describeLogEntry(entry, usesCheckIn(day)));
       lines.push(`- ${day.developer.displayName}: ${entries.join('; ')}`);
     }
   }

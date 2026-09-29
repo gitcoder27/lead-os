@@ -7,6 +7,13 @@ import { TodayPage } from '@/components/today/TodayPage';
 import { createTestQueryClient } from '@/test/wrapper';
 import type { TodayActionItem, TodayResponse } from '@/types';
 
+// docs/56 P1-04: these suites describe the collab check-in UI; solo cases flip the mode.
+const teamModeMock = vi.hoisted(() => ({ mode: 'collab' as 'solo' | 'collab' }));
+vi.mock('@/hooks/useTeamMode', () => ({
+  useTeamMode: () => teamModeMock.mode,
+  useSetTeamMode: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 function target(overrides = {}) {
   return { type: 'view', view: 'team', ...overrides } as const;
 }
@@ -77,6 +84,7 @@ function todayResponse(overrides: Partial<TodayResponse> = {}): TodayResponse {
         accountId: 'dev-1',
         displayName: 'Alice Smith',
         initials: 'AS',
+        participates: true,
         status: 'Blocked',
         tone: 'critical',
         detail: 'Blocked',
@@ -133,6 +141,7 @@ function renderToday(response = todayResponse(), onOpenTodayTarget = vi.fn(), op
 describe('TodayPage V2', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    teamModeMock.mode = 'collab';
     window.sessionStorage.clear();
   });
 
@@ -518,6 +527,66 @@ describe('TodayPage V2', () => {
     });
   });
 
+  it('solo: the pulse action and dialog say "note", and the write is still the same command (P1-04)', async () => {
+    teamModeMock.mode = 'solo';
+    const fetchMock = mockFetch(todayResponse());
+    renderToday();
+
+    expect(screen.queryByRole('button', { name: /^Check-in$/i })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /^Note$/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add note' });
+    expect(dialog).toHaveTextContent('Alice Smith');
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'Talked through the migration' } });
+    fireEvent.click(screen.getByRole('button', { name: /save note/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/manager-actions/commands', expect.objectContaining({
+        body: expect.stringContaining('"kind":"add_check_in"'),
+      }));
+    });
+    expect(await screen.findByText('Note added')).toBeInTheDocument();
+  });
+
+  it('collab: a developer without a login gets "note" while a participating one keeps "check-in" (P1-04)', async () => {
+    const devTarget = (id: string) => target({ type: 'developer', view: 'team', developerAccountId: id, date: '2026-03-08' });
+    const pulse = (accountId: string, displayName: string, participates: boolean) => ({
+      accountId,
+      displayName,
+      initials: displayName.slice(0, 2).toUpperCase(),
+      participates,
+      status: 'Blocked',
+      tone: 'critical' as const,
+      detail: 'Blocked',
+      currentWork: 'No current work',
+      lastUpdate: '1d ago',
+      target: devTarget(accountId),
+      primaryAction: command('add_check_in', 'Check-in', devTarget(accountId)),
+      secondaryActions: [],
+    });
+    mockFetch(todayResponse({ teamPulse: [pulse('dev-1', 'Alice Smith', true), pulse('dev-2', 'Bob Jones', false)] }));
+    renderToday();
+
+    expect(await screen.findByRole('button', { name: /^Check-in$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Note$/i })).toBeInTheDocument();
+  });
+
+  it('solo: the wrap-up reaches "Loops closed for today" with no check-in block (P1-04)', async () => {
+    teamModeMock.mode = 'solo';
+    const response = todayResponse({
+      rhythm: { stage: 'wrap_up', label: 'Wrap-up', detail: 'Close loops' },
+      focus: {
+        stage: 'wrap_up',
+        wrapUp: { missingCheckIns: [], openPromises: [], carryCandidates: [], eodNoteTarget: target({ view: 'notes', date: '2026-03-08' }) },
+      },
+    });
+    mockFetch(response);
+    renderToday(response);
+
+    const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
+    expect(within(panel).getByText('Loops closed for today.')).toBeInTheDocument();
+    expect(within(panel).queryByText(/No check-in today/)).not.toBeInTheDocument();
+  });
+
   it('posts a check-in on Enter, like every other check-in composer (docs/54 K3)', async () => {
     const fetchMock = mockFetch(todayResponse());
     renderToday();
@@ -631,6 +700,7 @@ describe('TodayPage V2', () => {
           accountId: 'dev-1',
           displayName: 'Alice Smith',
           initials: 'AS',
+          participates: true,
           status: 'On track',
           tone: 'info',
           detail: 'No current item',

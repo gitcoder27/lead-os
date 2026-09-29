@@ -34,6 +34,7 @@ export function StandupPersonHeader({
   onNext,
   onFocusCurrent,
   onAcceptSuggestion,
+  usesCheckIn = true,
 }: {
   day: TrackerDeveloperDay;
   stats: DayStats;
@@ -45,6 +46,8 @@ export function StandupPersonHeader({
   onNext: () => void;
   onFocusCurrent: () => void;
   onAcceptSuggestion: () => void;
+  /** False in solo / for non-participating developers: show "Last touched", never "None today". */
+  usesCheckIn?: boolean;
 }) {
   const suggestion = day.statusSuggestion;
   const oneOnOne = day.oneOnOne;
@@ -142,23 +145,35 @@ export function StandupPersonHeader({
         <StripCell label="Done today">
           <StripValue color={stats.doneToday > 0 ? 'var(--success)' : undefined}>{stats.doneToday}</StripValue>
         </StripCell>
-        <StripCell label="Check-in">
-          {stats.checkInsToday > 0 ? (
-            <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }} title={stats.lastCheckInAt}>
-              {stats.checkInsToday} today
-              {stats.lastCheckInAt && (
-                <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(stats.lastCheckInAt)}</span>
-              )}
+        {usesCheckIn ? (
+          <StripCell label="Check-in">
+            {stats.checkInsToday > 0 ? (
+              <span className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }} title={stats.lastCheckInAt}>
+                {stats.checkInsToday} today
+                {stats.lastCheckInAt && (
+                  <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(stats.lastCheckInAt)}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[13px] font-medium" style={{ color: 'var(--warning)' }}>
+                None today
+                {stats.lastCheckInAt && (
+                  <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>last {formatRelativeTime(stats.lastCheckInAt)}</span>
+                )}
+              </span>
+            )}
+          </StripCell>
+        ) : (
+          <StripCell label="Last touched">
+            <span
+              className="text-[13px] font-medium"
+              style={{ color: day.signals.freshness.untouched ? 'var(--warning)' : 'var(--text-secondary)' }}
+              title={day.signals.freshness.lastManagerTouchAt}
+            >
+              {day.signals.freshness.lastManagerTouchAt ? formatRelativeTime(day.signals.freshness.lastManagerTouchAt) : 'Not yet'}
             </span>
-          ) : (
-            <span className="text-[13px] font-medium" style={{ color: 'var(--warning)' }}>
-              None today
-              {stats.lastCheckInAt && (
-                <span className="block text-[12px] font-normal" style={{ color: 'var(--text-muted)' }}>last {formatRelativeTime(stats.lastCheckInAt)}</span>
-              )}
-            </span>
-          )}
-        </StripCell>
+          </StripCell>
+        )}
       </div>
 
       {/* P3-D11 hybrid status suggestion */}

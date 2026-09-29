@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTodayKeyboardTriage } from '@/hooks/useTodayKeyboardTriage';
 import { useTodayProgress } from '@/hooks/useTodayProgress';
@@ -17,6 +18,8 @@ import {
   splitPulse,
   standupFocus,
   groupQueueItems,
+  isNotePerson,
+  relabelCheckInCommands,
   splitPanelRows,
   todayPanelOrder,
   withoutWrapUpItems,
@@ -72,6 +75,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     command: TodayActionCommand;
     developerName: string;
     placeholder: string;
+    note: boolean;
     error?: string;
   } | null>(null);
   const [textDraft, setTextDraft] = useState<{
@@ -100,7 +104,12 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const lastRowIndex = useRef(0);
 
   const today = useToday(date);
-  const snapshot = today.data;
+  const teamMode = useTeamMode();
+  // docs/56 P1-04: "Add check-in" reads "Add note" for people who do not check in.
+  const snapshot = useMemo(
+    () => (today.data ? relabelCheckInCommands(today.data, teamMode) : today.data),
+    [today.data, teamMode],
+  );
   // Only fetch the board while a dialog that needs it is open — it provides the
   // developer's tasks for the check-in picker and the outcome owner list.
   const needsBoard = Boolean(checkInDraft) || textDraft?.command.kind === 'capture_meeting_outcome';
@@ -239,6 +248,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         command,
         developerName: developerNameFor(snapshot, command.target.developerAccountId) ?? 'Developer',
         placeholder: checkInPlaceholder(snapshot, command.target.developerAccountId),
+        note: isNotePerson(snapshot, teamMode, command.target.developerAccountId),
       });
       return;
     }
@@ -476,6 +486,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         <TodayCheckInDialog
           developerName={checkInDraft.developerName}
           placeholder={checkInDraft.placeholder}
+          note={checkInDraft.note}
           tasks={checkInTasks}
           initialTaskKeys={checkInDraft.command.target.context?.taskKey ? [checkInDraft.command.target.context.taskKey] : undefined}
           isSaving={actions.isPending && actions.pendingKind === 'add_check_in'}

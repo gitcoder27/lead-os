@@ -144,6 +144,29 @@ export function getRosterCheckIn(day: TrackerDeveloperDay, now = Date.now()): Ro
   };
 }
 
+export interface RosterTouch {
+  label: string;
+  /** No manager touch for the configured working days (never a check-in judgement). */
+  untouched: boolean;
+  title: string;
+}
+
+/**
+ * docs/56 P1-04: the quiet "Last touched" cell for people who do not check in
+ * (solo, or a non-participating developer). The server owns `untouched`.
+ */
+export function getRosterTouch(day: TrackerDeveloperDay, now = Date.now()): RosterTouch {
+  const { lastManagerTouchAt, untouched, touchStaleWorkingDays } = day.signals.freshness;
+  const flagged = Boolean(untouched);
+  const title = flagged
+    ? `Not touched in ${touchStaleWorkingDays ?? 'several'} working days`
+    : 'Last time you noted, reviewed, or updated something for them';
+  if (!lastManagerTouchAt) {
+    return { label: 'Not yet', untouched: flagged, title: flagged ? title : 'Nothing recorded for them yet' };
+  }
+  return { label: formatCompactRelative(lastManagerTouchAt, now), untouched: flagged, title };
+}
+
 /** Current work plus planned tasks — the drawer's "Load". */
 export function getRosterLoad(day: TrackerDeveloperDay): number {
   return (day.currentItem ? 1 : 0) + day.plannedItems.length;

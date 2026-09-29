@@ -61,6 +61,7 @@ const mockDay: (overrides?: Partial<TrackerDeveloperDay>) => TrackerDeveloperDay
   checkIns: [],
   recentCheckIns: [],
   isStale: false,
+  participates: true,
   signals: buildSignals(),
   statusUpdatedAt: '2026-03-07T08:00:00Z',
   createdAt: '2026-03-07T08:00:00Z',
@@ -307,6 +308,13 @@ let mockBoardQueryState = {
   isFetching: false,
 };
 
+// docs/56 P1-04: these suites describe the collab check-in UI; solo cases flip the mode.
+const teamModeMock = vi.hoisted(() => ({ mode: 'collab' as 'solo' | 'collab' }));
+vi.mock('@/hooks/useTeamMode', () => ({
+  useTeamMode: () => teamModeMock.mode,
+  useSetTeamMode: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock('@/hooks/useTeamTracker', () => ({
   useTeamTracker: () => ({
     data: mockBoard,
@@ -444,6 +452,7 @@ function switchTrackerLens(name: RegExp) {
 
 describe('TeamTrackerPage', () => {
   beforeEach(() => {
+    teamModeMock.mode = 'collab';
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T12:00:00.000Z'));
     mockBoard = buildMockBoard();
@@ -834,6 +843,95 @@ describe('TeamTrackerPage', () => {
     expect(screen.getAllByRole('button', { name: /1 overdue jira/i }).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole('button', { name: /over cap/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /1 needs follow-up/i })).toBeInTheDocument();
+  });
+
+  describe('solo and non-participating developers (docs/56 P1-04)', () => {
+    const touchFreshness = (overrides: Partial<TrackerDeveloperDay['signals']['freshness']> = {}) =>
+      buildSignals({
+        freshness: { clock: 'manager_touch', touchStaleWorkingDays: 5, noCurrentTracked: false, ...overrides },
+      });
+
+    function soloBoard() {
+      mockBoard.developers = [
+        mockDay({
+          participates: false,
+          signals: touchFreshness({ lastManagerTouchAt: '2026-03-07T09:00:00Z', untouched: false }),
+        }),
+        mockDay({
+          id: 2,
+          developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
+          participates: false,
+          signals: touchFreshness({ lastManagerTouchAt: '2026-02-26T09:00:00Z', untouched: true }),
+        }),
+      ];
+      mockBoard.summary = { ...mockBoard.summary, stale: 1 };
+      mockBoard.attentionQueue = [];
+    }
+
+    it('solo: no stale chip, and the Check-in column becomes a quiet "Last touched" column', () => {
+      teamModeMock.mode = 'solo';
+      soloBoard();
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+
+      expect(screen.queryByRole('button', { name: /stale/i })).not.toBeInTheDocument();
+      const roster = screen.getByText('Developer').closest('.overflow-hidden') as HTMLElement;
+      const view = within(roster);
+      const header = within(roster.firstElementChild as HTMLElement);
+      expect(header.getByText('Last touched')).toBeInTheDocument();
+      expect(header.queryByText('Check-in')).not.toBeInTheDocument();
+      expect(view.queryByText('No check-in')).not.toBeInTheDocument();
+      // Recent touch reads quiet; the untouched window turns the text amber and adds a screen-reader note.
+      expect(view.getByText('3h ago')).toHaveStyle({ color: 'var(--text-muted)' });
+      expect(view.getByText('9d ago')).toHaveStyle({ color: 'var(--warning)' });
+      expect(view.getByText('Not touched in 5 working days')).toHaveClass('sr-only');
+    });
+
+    it('solo: a developer with nothing recorded says "Not yet", not "No check-in"', () => {
+      teamModeMock.mode = 'solo';
+      soloBoard();
+      mockBoard.developers[0] = mockDay({ participates: false, signals: touchFreshness() });
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+
+      expect(screen.getByText('Not yet')).toBeInTheDocument();
+      expect(screen.queryByText('No check-in')).not.toBeInTheDocument();
+    });
+
+    it('collab: a developer without a login sits beside a check-in row and is labelled "Touched"', () => {
+      soloBoard();
+      mockBoard.developers[0] = mockDay({
+        participates: true,
+        lastCheckInAt: '2026-03-07T09:00:00Z',
+        signals: buildSignals({ freshness: { clock: 'check_in' } }),
+      });
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+
+      const roster = screen.getByText('Developer').closest('.overflow-hidden') as HTMLElement;
+      const view = within(roster);
+      expect(within(roster.firstElementChild as HTMLElement).getByText('Check-in')).toBeInTheDocument();
+      expect(view.getByText('3h ago')).toBeInTheDocument();
+      expect(view.getByText('Touched 9d ago')).toBeInTheDocument();
+    });
+
+    it('solo: the drawer says "Last touched", "Notes" and "Add a note"', () => {
+      teamModeMock.mode = 'solo';
+      soloBoard();
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+      clickDeveloperRow('Alice Smith');
+
+      expect(screen.getByText('Last touched 3h ago')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Add a note…')).toBeInTheDocument();
+      expect(screen.getByText('No notes today.')).toBeInTheDocument();
+      expect(screen.queryByText('No check-ins today.')).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('Add a check-in note…')).not.toBeInTheDocument();
+    });
+
+    it('collab + participating: the drawer keeps check-in wording', () => {
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+      clickDeveloperRow('Alice Smith');
+
+      expect(screen.getByPlaceholderText('Add a check-in note…')).toBeInTheDocument();
+      expect(screen.getByText('No check-ins today.')).toBeInTheDocument();
+    });
   });
 
   it('renders the team roster with attention ranking and concise reason lines', () => {

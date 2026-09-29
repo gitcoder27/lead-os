@@ -58,7 +58,9 @@ export function getSignalBadges(day: TrackerDeveloperDay): SignalBadge[] {
     badges.push({ key: 'needs-follow-up', label: 'Needs follow-up', tone: 'info' });
   }
 
-  if (!day.currentItem && day.status !== 'done_for_today' && !day.signals.freshness.staleWithoutCurrentWork) {
+  // docs/56 P1-03: the server switches "no current" off in solo unless opted in.
+  const noCurrentTracked = day.signals.freshness.noCurrentTracked !== false;
+  if (noCurrentTracked && !day.currentItem && day.status !== 'done_for_today' && !day.signals.freshness.staleWithoutCurrentWork) {
     badges.push({ key: 'no-current', label: 'No current', tone: 'accent' });
   }
 

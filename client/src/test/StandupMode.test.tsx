@@ -54,6 +54,13 @@ let mockFeed: StandupFeedResponse = {
 
 let mockLastSession: import('@/types').StandupSessionDetail | null = null;
 
+// docs/56 P1-04: these suites describe the collab check-in UI; solo cases flip the mode.
+const teamModeMock = vi.hoisted(() => ({ mode: 'collab' as 'solo' | 'collab' }));
+vi.mock('@/hooks/useTeamMode', () => ({
+  useTeamMode: () => teamModeMock.mode,
+  useSetTeamMode: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 vi.mock('@/hooks/useTeamTracker', () => ({
   useStandupFeed: () => ({ data: mockFeed, isLoading: false, isError: false }),
   useLatestStandupSession: () => ({ data: { session: mockLastSession }, isLoading: false, isError: false, refetch: vi.fn() }),
@@ -137,7 +144,7 @@ function surfaceTask(overrides: Partial<ManagerSurfaceTask>): ManagerSurfaceTask
   };
 }
 
-function signals(): TrackerDeveloperDay['signals'] {
+function signals(freshness: Partial<TrackerDeveloperDay['signals']['freshness']> = {}): TrackerDeveloperDay['signals'] {
   return {
     freshness: {
       staleThresholdHours: 4,
@@ -147,6 +154,7 @@ function signals(): TrackerDeveloperDay['signals'] {
       staleWithOpenRisk: false,
       staleWithoutCurrentWork: false,
       statusChangeWithoutFollowUp: false,
+      ...freshness,
     },
     risk: {
       openRisk: false,
@@ -170,6 +178,7 @@ function day(overrides: Partial<TrackerDeveloperDay>): TrackerDeveloperDay {
     checkIns: [],
     recentCheckIns: [],
     isStale: false,
+    participates: true,
     signals: signals(),
     createdAt: '2026-03-07T08:00:00Z',
     updatedAt: '2026-03-07T08:00:00Z',
@@ -212,10 +221,10 @@ function buildBoard(): TeamTrackerBoardResponse {
   };
 }
 
-function renderStandup() {
+function renderStandup(board = buildBoard()) {
   return render(
     <TestWrapper>
-      <StandupMode date="2026-03-07" board={buildBoard()} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
+      <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
     </TestWrapper>,
   );
 }
@@ -225,6 +234,7 @@ function taskRows() {
 }
 
 beforeEach(() => {
+  teamModeMock.mode = 'collab';
   vi.clearAllMocks();
   window.sessionStorage.clear();
 });
@@ -383,6 +393,33 @@ describe('StandupMode', () => {
     );
   });
 
+  it('solo: c opens a note layer that still saves through the check-in mutation (P1-04)', () => {
+    teamModeMock.mode = 'solo';
+    renderStandup();
+    fireEvent.keyDown(document.body, { key: 'c' });
+    expect(screen.getByRole('dialog', { name: 'Note for Alice Smith' })).toBeInTheDocument();
+    const input = screen.getByPlaceholderText(/Add a note/);
+    expect(screen.getByRole('button', { name: 'Save note' })).toBeDisabled();
+    fireEvent.change(input, { target: { value: 'Talked through the migration' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(mockAddCheckInMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'dev-1', summary: 'Talked through the migration' }),
+      expect.anything(),
+    );
+  });
+
+  it('solo: the action bar and the help sheet say "Note", and "New task for this person" (P1-04)', () => {
+    teamModeMock.mode = 'solo';
+    renderStandup();
+    const bar = screen.getByTestId('standup-action-bar');
+    expect(within(bar).getByRole('button', { name: /Note/ })).toBeInTheDocument();
+    expect(within(bar).queryByRole('button', { name: /Check-in/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: '?' });
+    expect(screen.getByText('Add a note')).toBeInTheDocument();
+    expect(screen.getByText('New task for this person')).toBeInTheDocument();
+    expect(screen.queryByText(/@dev/)).not.toBeInTheDocument();
+  });
+
   it('r opens the reassign layer and reassigns the focused task', () => {
     renderStandup();
     fireEvent.keyDown(document.body, { key: 'a' });
@@ -446,6 +483,31 @@ describe('StandupMode', () => {
       expect(within(strip).getByText('T-1')).toBeInTheDocument();
       expect(within(strip).getByText('Blocked').nextSibling).toHaveTextContent('1');
       expect(within(strip).getByText('None today')).toBeInTheDocument();
+    });
+
+    it('solo: the day strip shows "Last touched" instead of "None today" (P1-04)', () => {
+      teamModeMock.mode = 'solo';
+      const board = buildBoard();
+      board.developers[0] = day({
+        ...board.developers[0]!,
+        participates: false,
+        signals: signals({ lastManagerTouchAt: '2026-03-05T09:00:00Z' }),
+      });
+      renderStandup(board);
+      const strip = screen.getByTestId('standup-day-strip');
+      expect(within(strip).getByText('Last touched')).toBeInTheDocument();
+      expect(within(strip).queryByText('Check-in')).not.toBeInTheDocument();
+      expect(within(strip).queryByText('None today')).not.toBeInTheDocument();
+    });
+
+    it('solo: the wrap-up counts notes and never lists "No check-in today" (P1-04)', () => {
+      teamModeMock.mode = 'solo';
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'w' });
+      const wrapUp = screen.getByTestId('standup-wrapup');
+      expect(within(wrapUp).getByText('Notes')).toBeInTheDocument();
+      expect(within(wrapUp).queryByText('Check-ins')).not.toBeInTheDocument();
+      expect(within(wrapUp).queryByText('No check-in today')).not.toBeInTheDocument();
     });
 
     it('marks a developer reviewed on moving past them and tracks progress', () => {

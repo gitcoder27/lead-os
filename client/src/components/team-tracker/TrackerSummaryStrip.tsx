@@ -1,5 +1,6 @@
 import type { TrackerBoardSummary, TrackerBoardSummaryFilter } from '@/types';
 import { FOCUS_RING } from '@/components/ui/focus';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { STATUS_META } from './TrackerStatusPill';
 
 interface TrackerSummaryStripProps {
@@ -59,7 +60,13 @@ function StatusMeter({ summary }: { summary: TrackerBoardSummary }) {
 }
 
 export function TrackerSummaryStrip({ summary, activeFilter, onFilterChange }: TrackerSummaryStripProps) {
-  const visibleChips = chips.filter((chip) => summary[chip.countKey] > 0 || activeFilter === chip.key);
+  // docs/56 P1-04: in solo nobody checks in, so "stale" is not a signal. The
+  // "total" button still clears a leftover `?filter=stale`.
+  const soloMode = useTeamMode() === 'solo';
+  const visibleChips = chips.filter((chip) => {
+    if (soloMode && chip.key === 'stale') return false;
+    return summary[chip.countKey] > 0 || activeFilter === chip.key;
+  });
   const allActive = activeFilter === 'all';
   const meterTitle = statusSegments(summary)
     .map((segment) => `${segment.count} ${STATUS_META[segment.key].label.toLowerCase()}`)

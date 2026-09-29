@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { CircleDashed, Lock, MessageSquarePlus, TriangleAlert, Users } from 'lucide-react';
 import type { Issue, TrackerAttentionItem, TrackerDeveloperDay, TrackerDeveloperGroup, TrackerWorkItem } from '@/types';
 import { formatAbsoluteDateTime } from '@/lib/utils';
+import { usesCheckIns } from '@/lib/participation';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { Avatar } from '@/components/ui/Avatar';
 import { FOCUS_RING } from '@/components/ui/focus';
 import { TrackerStatusMark } from './TrackerStatusPill';
@@ -13,6 +15,7 @@ import {
   getRosterAttention,
   getRosterCheckIn,
   getRosterLoad,
+  getRosterTouch,
   type RosterAttention,
 } from './rosterSignals';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -215,7 +218,29 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
   );
 }
 
-function CheckIn({ day }: { day: TrackerDeveloperDay }) {
+/**
+ * Freshness cell. People who check in show their last check-in; everyone else
+ * (solo, or a developer without a login) shows a quiet "last touched" and only
+ * warms up after the server's untouched window. `mixed` boards prefix the
+ * touch so one column never blurs two meanings.
+ */
+function Freshness({ day, touch, mixed }: { day: TrackerDeveloperDay; touch: boolean; mixed: boolean }) {
+  if (touch) {
+    const touched = getRosterTouch(day);
+    return (
+      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
+        <MobileLabel>Last touched</MobileLabel>
+        <span
+          className="truncate tabular-nums"
+          style={{ color: touched.untouched ? 'var(--warning)' : 'var(--text-muted)' }}
+          title={day.signals.freshness.lastManagerTouchAt ? `${touched.title} · ${formatAbsoluteDateTime(day.signals.freshness.lastManagerTouchAt)}` : touched.title}
+        >
+          {mixed ? `Touched ${touched.label}` : touched.label}
+        </span>
+        {touched.untouched && <span className="sr-only">{touched.title}</span>}
+      </div>
+    );
+  }
   const checkIn = getRosterCheckIn(day);
   return (
     <div className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
@@ -274,6 +299,7 @@ function RosterRow({
   onCaptureFollowUp,
   onAcceptSuggestion,
   readOnly,
+  mixed,
 }: {
   day: TrackerDeveloperDay;
   index: number;
@@ -283,7 +309,10 @@ function RosterRow({
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
   onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
   readOnly?: boolean;
+  /** The board mixes check-in and last-touched rows. */
+  mixed: boolean;
 }) {
+  const mode = useTeamMode();
   const attention = getRosterAttention(day, attentionItem);
   const done = day.status === 'done_for_today';
   const name = day.developer.displayName;
@@ -357,7 +386,7 @@ function RosterRow({
 
       <Load day={day} />
 
-      <CheckIn day={day} />
+      <Freshness day={day} touch={!usesCheckIns(mode, day.participates)} mixed={mixed} />
 
       <div className={`min-w-0 ${MOBILE_SPAN}`}>
         <AttentionFlags attention={attention} />
@@ -387,7 +416,7 @@ function RosterRow({
 
 // ── Board ───────────────────────────────────────────────────────────
 
-function ColumnHeader() {
+function ColumnHeader({ freshnessLabel }: { freshnessLabel: string }) {
   return (
     <div
       className={`hidden gap-3 px-4 py-2 text-[12px] font-medium md:grid ${ROSTER_GRID}`}
@@ -397,7 +426,7 @@ function ColumnHeader() {
       <span>Current work</span>
       <span>Up next</span>
       <span>Load</span>
-      <span>Check-in</span>
+      <span>{freshnessLabel}</span>
       <span>Attention</span>
       <span className="sr-only">Actions</span>
     </div>
@@ -450,6 +479,10 @@ export function TrackerRosterBoard({
     ? groups.filter((group) => group.developers.length > 0).map((group) => ({ group, developers: group.developers }))
     : [{ developers }];
   const visibleCount = sections.reduce((sum, section) => sum + section.developers.length, 0);
+  const mode = useTeamMode();
+  const visible = sections.flatMap((section) => section.developers);
+  const touchRows = visible.filter((day) => !usesCheckIns(mode, day.participates)).length;
+  const mixed = touchRows > 0 && touchRows < visible.length;
 
   if (visibleCount === 0) {
     return (
@@ -465,7 +498,7 @@ export function TrackerRosterBoard({
 
   return (
     <RosterSurface>
-      <ColumnHeader />
+      <ColumnHeader freshnessLabel={touchRows === visible.length ? 'Last touched' : 'Check-in'} />
       {sections.map((section) => {
         const rows = attentionSorted ? sortByAttention(section.developers, ranks) : section.developers;
         const startIndex = offset;
@@ -484,6 +517,7 @@ export function TrackerRosterBoard({
                 onCaptureFollowUp={onCaptureFollowUp}
                 onAcceptSuggestion={onAcceptSuggestion}
                 readOnly={readOnly}
+                mixed={mixed}
               />
             ))}
           </section>

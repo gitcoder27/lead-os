@@ -265,7 +265,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       if (isActionResult(result, 'skipToast')) {
         return;
       }
-      const title = actionToastTitle(variables.command.kind);
+      const title = actionToastTitle(variables.command);
       const undo = (result as ManagerActionCommandResponse).undo;
       if (undo) {
         offerUndo([undo], title);
@@ -394,10 +394,11 @@ function isActionResult(result: unknown, key: 'cancelled' | 'skipToast'): boolea
   return Boolean(result && typeof result === 'object' && key in result);
 }
 
-function actionToastTitle(kind: TodayActionCommand['kind']): string {
+function actionToastTitle({ kind, label }: Pick<TodayActionCommand, 'kind' | 'label'>): string {
   if (kind === 'mark_done') return 'Marked done';
   if (kind === 'snooze') return 'Snoozed';
-  if (kind === 'add_check_in') return 'Check-in added';
+  // docs/56 P1-04: Today relabels the command "Add note" for people who do not check in.
+  if (kind === 'add_check_in') return /note/i.test(label) ? 'Note added' : 'Check-in added';
   if (kind === 'ask_check_in') return 'Asked for an update';
   if (kind === 'capture_follow_up') return 'Follow-up captured';
   if (kind === 'carry_forward') return 'Carried forward';

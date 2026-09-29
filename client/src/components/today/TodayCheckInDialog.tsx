@@ -7,6 +7,8 @@ interface TodayCheckInDialogProps {
   defaultSummary?: string;
   /** docs/53 F15: the row's signal as a hint, never a pre-filled value. */
   placeholder?: string;
+  /** docs/56 P1-04: for someone who does not check in this is a manager note. */
+  note?: boolean;
   /** Tasks that can be tagged on this check-in (developer's current + planned work). */
   tasks?: TaskPickerTask[];
   /** docs/53 F2: task keys pre-selected from the action's target context. */
@@ -22,6 +24,7 @@ export function TodayCheckInDialog({
   developerName,
   defaultSummary = '',
   placeholder = 'What did you hear?',
+  note = false,
   tasks = [],
   initialTaskKeys = [],
   isSaving,
@@ -45,13 +48,13 @@ export function TodayCheckInDialog({
 
   return (
     <TodayDialog
-      title="Add check-in"
+      title={note ? 'Add note' : 'Add check-in'}
       subtitle={developerName}
       onClose={onClose}
       onSubmit={save}
-      footer={<TodayDialogActions saveLabel="Save check-in" submitKey="enter" isSaving={isSaving} canSave={canSave} onCancel={onClose} onSave={save} />}
+      footer={<TodayDialogActions saveLabel={note ? 'Save note' : 'Save check-in'} submitKey="enter" isSaving={isSaving} canSave={canSave} onCancel={onClose} onSave={save} />}
     >
-      <label htmlFor={fieldId} className="ui-field-label">Check-in note</label>
+      <label htmlFor={fieldId} className="ui-field-label">{note ? 'Note' : 'Check-in note'}</label>
       <textarea
         id={fieldId}
         data-autofocus

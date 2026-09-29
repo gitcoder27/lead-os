@@ -4,6 +4,8 @@ import {
   deltaChips,
   formatSince,
   headerMetrics,
+  isNotePerson,
+  relabelCheckInCommands,
   railItems,
   signalChips,
   splitPulse,
@@ -223,5 +225,56 @@ describe('splitPanelRows', () => {
     expect(group).toMatchObject({ kind: 'duplicates', reason: '×2' });
     expect(group.bulk?.label).toBe('Done all');
     expect(out[0]?.primaryAction.label).toBe('Done all');
+  });
+});
+
+describe('check-in vs note wording (docs/56 P1-04)', () => {
+  const noteTarget = dev('dev-1');
+  const checkTarget = dev('dev-2');
+  const add = (label: string, target: TodayActionItem['target']) => ({ kind: 'add_check_in' as const, label, target });
+  const pulse = (accountId: string, participates: boolean, label = 'Check-in') =>
+    ({
+      accountId,
+      displayName: accountId,
+      participates,
+      target: dev(accountId),
+      primaryAction: add(label, dev(accountId)),
+      secondaryActions: [],
+    }) as unknown as TodayTeamPulseItem;
+  const snapshot = (pulseItems: TodayTeamPulseItem[], extra: Partial<TodayResponse> = {}) =>
+    ({ teamPulse: pulseItems, actionItems: [], standupPrompts: [], ...extra }) as unknown as TodayResponse;
+
+  it('solo treats everyone as a note person; collab needs a non-participating developer', () => {
+    const snap = snapshot([pulse('dev-1', false), pulse('dev-2', true)]);
+    expect(isNotePerson(snap, 'solo', 'dev-2')).toBe(true);
+    expect(isNotePerson(snap, 'solo', undefined)).toBe(true);
+    expect(isNotePerson(snap, 'collab', 'dev-1')).toBe(true);
+    expect(isNotePerson(snap, 'collab', 'dev-2')).toBe(false);
+    // Unknown people keep the server's wording in collab.
+    expect(isNotePerson(snap, 'collab', 'dev-9')).toBe(false);
+    expect(isNotePerson(snap, 'collab', undefined)).toBe(false);
+  });
+
+  it('relabels add_check_in everywhere it sits, only for note people, and leaves other commands alone', () => {
+    const snap = snapshot([pulse('dev-1', false), pulse('dev-2', true)], {
+      actionItems: [
+        row('a', { type: 'developer_attention', target: noteTarget, primaryAction: add('Add check-in', noteTarget), secondaryActions: [add('Check-in', noteTarget)] }),
+        row('b', { type: 'developer_attention', target: checkTarget, primaryAction: add('Add check-in', checkTarget) }),
+      ],
+    });
+    const out = relabelCheckInCommands(snap, 'collab');
+    expect(out.teamPulse[0]!.primaryAction.label).toBe('Note');
+    expect(out.teamPulse[1]!.primaryAction.label).toBe('Check-in');
+    expect(out.actionItems[0]!.primaryAction.label).toBe('Add note');
+    expect(out.actionItems[0]!.secondaryActions[0]!.label).toBe('Note');
+    expect(out.actionItems[1]!.primaryAction.label).toBe('Add check-in');
+    // The input is not mutated, and untouched branches keep their identity.
+    expect(snap.teamPulse[0]!.primaryAction.label).toBe('Check-in');
+    expect(out.teamPulse[1]).toBe(snap.teamPulse[1]);
+  });
+
+  it('returns the same object when nothing needs relabelling', () => {
+    const snap = snapshot([pulse('dev-2', true)]);
+    expect(relabelCheckInCommands(snap, 'collab')).toBe(snap);
   });
 });

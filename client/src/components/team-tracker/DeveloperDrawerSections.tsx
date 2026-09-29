@@ -17,6 +17,8 @@ import {
 import type { TrackerCheckIn, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { formatAbsoluteDateTime, formatDate, getLocalIsoDate } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
+import { usesCheckIns } from '@/lib/participation';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { useStatusUpdate } from '@/hooks/useTeamTrackerMutations';
 import type { TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
@@ -197,9 +199,38 @@ interface DeveloperHeroProps {
   titleId: string;
 }
 
-export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: DeveloperHeroProps) {
-  const stale = day.signals.freshness.staleByTime;
+/** Check-in freshness, or a quiet "last touched" for people who do not check in. */
+function FreshnessLine({ day }: { day: TrackerDeveloperDay }) {
+  const mode = useTeamMode();
+  const { lastManagerTouchAt, untouched } = day.signals.freshness;
 
+  if (!usesCheckIns(mode, day.participates)) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[12.5px]"
+        style={{ color: untouched ? 'var(--warning)' : 'var(--text-muted)' }}
+        title={lastManagerTouchAt ? formatAbsoluteDateTime(lastManagerTouchAt) : undefined}
+      >
+        <MessageSquare size={12} />
+        {lastManagerTouchAt ? `Last touched ${formatCompactRelative(lastManagerTouchAt)}` : 'Not touched yet'}
+      </span>
+    );
+  }
+
+  const stale = day.signals.freshness.staleByTime;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-[12.5px]"
+      style={{ color: stale ? 'var(--warning)' : 'var(--text-muted)' }}
+      title={day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : undefined}
+    >
+      <MessageSquare size={12} />
+      {day.lastCheckInAt ? `Checked in ${formatCompactRelative(day.lastCheckInAt)}` : 'No check-in'}
+    </span>
+  );
+}
+
+export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: DeveloperHeroProps) {
   return (
     <header className="space-y-4">
       <div className="flex items-start gap-3.5">
@@ -219,14 +250,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: Dev
               <Counter label="Load" value={load} title="Current work plus planned tasks" />
               <Counter label="Done" value={day.completedItems.length} title="Completed on this day" />
             </dl>
-            <span
-              className="inline-flex items-center gap-1.5 text-[12.5px]"
-              style={{ color: stale ? 'var(--warning)' : 'var(--text-muted)' }}
-              title={day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : undefined}
-            >
-              <MessageSquare size={12} />
-              {day.lastCheckInAt ? `Checked in ${formatCompactRelative(day.lastCheckInAt)}` : 'No check-in'}
-            </span>
+            <FreshnessLine day={day} />
           </div>
         </div>
       </div>
@@ -529,18 +553,18 @@ function checkInAuthor(authorType?: TrackerCheckIn['authorType']) {
   return { label: 'Update', color: 'var(--text-muted)', Icon: MessageSquare };
 }
 
-export function CheckInTimeline({ checkIns, recentCheckIns, readOnly }: { checkIns: TrackerCheckIn[]; recentCheckIns: TrackerCheckIn[]; readOnly: boolean }) {
+export function CheckInTimeline({ checkIns, recentCheckIns, readOnly, noun = 'check-ins' }: { checkIns: TrackerCheckIn[]; recentCheckIns: TrackerCheckIn[]; readOnly: boolean; noun?: 'check-ins' | 'notes' }) {
   const today = [...checkIns].reverse();
 
   if (today.length === 0 && recentCheckIns.length === 0) {
-    return <EmptyLine>{readOnly ? 'No check-ins recorded for this date.' : 'No check-ins today.'}</EmptyLine>;
+    return <EmptyLine>{readOnly ? `No ${noun} recorded for this date.` : `No ${noun} today.`}</EmptyLine>;
   }
 
   return (
     <ol className="relative">
       {today.length === 0 && (
         <li className="pb-3">
-          <EmptyLine>{readOnly ? 'No check-ins recorded for this date.' : 'No check-ins today.'}</EmptyLine>
+          <EmptyLine>{readOnly ? `No ${noun} recorded for this date.` : `No ${noun} today.`}</EmptyLine>
         </li>
       )}
       {today.map((checkIn, index) => (

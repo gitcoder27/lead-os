@@ -9,6 +9,8 @@ import {
   sessionTotals,
   type StandupSession,
 } from '@/lib/standup';
+import { usesCheckIns } from '@/lib/participation';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { TrackerStatusPill } from '../TrackerStatusPill';
 import { Avatar, Kbd, SectionLabel, ToneChip } from './StandupPrimitives';
 
@@ -41,6 +43,8 @@ export function StandupWrapUp({
   onReset: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const teamMode = useTeamMode();
+  const dayUsesCheckIn = (day: TrackerDeveloperDay) => usesCheckIns(teamMode, day.participates);
   const reviewed = useMemo(() => new Set(session.reviewed), [session.reviewed]);
   const flagged = useMemo(() => new Set(session.flagged), [session.flagged]);
   const totals = sessionTotals(session);
@@ -48,7 +52,7 @@ export function StandupWrapUp({
   const complete = reviewedCount === days.length;
 
   const followUps = days
-    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId)) }))
+    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), dayUsesCheckIn(day)) }))
     .filter(({ reasons }) => needsFollowUp(reasons));
   const unreviewed = days.filter((day) => !reviewed.has(day.developer.accountId));
   const logged = days
@@ -58,7 +62,7 @@ export function StandupWrapUp({
   const tiles: Array<[string, number | string, string?]> = [
     ['Reviewed', `${reviewedCount}/${days.length}`, complete ? 'var(--success)' : undefined],
     ['Updates', totals.updates],
-    ['Check-ins', totals.checkins],
+    [days.some(dayUsesCheckIn) ? 'Check-ins' : 'Notes', totals.checkins],
     ['Closed', totals.closed, totals.closed ? 'var(--success)' : undefined],
     ['Status changes', totals.statusChanges],
   ];
@@ -155,7 +159,7 @@ export function StandupWrapUp({
       <section className="mt-6">
         <SectionLabel>Logged this session · {session.log.length}</SectionLabel>
         {logged.length === 0 ? (
-          <EmptyLine>No updates, check-ins, or task changes logged yet.</EmptyLine>
+          <EmptyLine>{days.some(dayUsesCheckIn) ? 'No updates, check-ins, or task changes logged yet.' : 'No updates, notes, or task changes logged yet.'}</EmptyLine>
         ) : (
           <div className="space-y-2">
             {logged.map(({ day, entries }) => (
@@ -166,7 +170,7 @@ export function StandupWrapUp({
                   <ul className="mt-0.5 space-y-0.5">
                     {entries.map((entry, index) => (
                       <li key={`${entry.at}-${index}`} className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                        {describeLogEntry(entry)}
+                        {describeLogEntry(entry, dayUsesCheckIn(day))}
                       </li>
                     ))}
                   </ul>

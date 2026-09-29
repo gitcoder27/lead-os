@@ -3,7 +3,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeftRight, History, Keyboard, ListChecks, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerDeveloperStatus } from '@/types';
+import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
+import { usesCheckIns } from '@/lib/participation';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import { api } from '@/lib/api';
 import { useLatestStandupSession, useStandupFeed } from '@/hooks/useTeamTracker';
 import {
@@ -77,6 +79,7 @@ function formatStandupDate(date: string): string {
 
 export function StandupMode({ date, board, onClose, onOpenTask, suspended = false }: StandupModeProps) {
   const { addToast } = useToast();
+  const teamMode = useTeamMode();
   const reduceMotion = useReducedMotion();
   // P3-D5: standup order follows the board's active sort/saved view.
   const ordered = board.developers;
@@ -123,6 +126,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const suggestion = day?.statusSuggestion;
   const pickerTasks: TaskPickerTask[] = openTasks.map((task) => ({ taskKey: task.taskKey, title: task.title }));
   const isFlagged = accountId ? flagged.has(accountId) : false;
+  // docs/56 P1-04: solo / non-participating people get "note" wording and no check-in judgement.
+  const dayUsesCheckIn = useCallback((entry: TrackerDeveloperDay) => usesCheckIns(teamMode, entry.participates), [teamMode]);
+  const noteWording = day ? !dayUsesCheckIn(day) : false;
 
   const feed = useStandupFeed(accountId);
   const latestSession = useLatestStandupSession(layer === 'history');
@@ -268,7 +274,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   }, [addCheckIn, addToast, checkInText, closeLayer, day, pickerTasks, log]);
 
   const copySummary = useCallback(() => {
-    const text = buildStandupSummary({ date, days: ordered, session });
+    const text = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
     const write = navigator.clipboard?.writeText(text);
     if (!write) {
       addToast('Clipboard is unavailable in this browser.', 'error');
@@ -278,7 +284,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       () => addToast({ type: 'success', title: 'Standup summary copied' }),
       () => addToast('Could not copy the summary.', 'error'),
     );
-  }, [date, ordered, session, addToast]);
+  }, [date, ordered, session, dayUsesCheckIn, addToast]);
 
   const resetSession = useCallback(() => {
     dispatch({ type: 'reset' });
@@ -305,7 +311,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     }
     setSealing(true);
     try {
-      const summary = buildStandupSummary({ date, days: ordered, session });
+      const summary = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
       const result = await api.post<RecordStandupSessionResponse>('/team-tracker/standup/session', {
         date,
         startedAt: session.startedAt ?? new Date().toISOString(),
@@ -345,7 +351,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     } finally {
       setSealing(false);
     }
-  }, [sealing, saveToNote, date, ordered, session, storageKey, queryClient, addToast, onClose]);
+  }, [sealing, saveToNote, date, ordered, session, dayUsesCheckIn, storageKey, queryClient, addToast, onClose]);
 
   // ── Actions: shared by the keymap and the action bar (S7) ──────────────
   const actions = {
@@ -526,7 +532,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           { keys: ['↵'], label: 'Open', onRun: actions.open, disabled: !focusedTask },
         ] },
         { label: 'Person', actions: [
-          { keys: ['c'], label: 'Check-in', onRun: actions.checkIn },
+          { keys: ['c'], label: noteWording ? 'Note' : 'Check-in', onRun: actions.checkIn },
           { keys: ['n'], label: 'New task', onRun: actions.add },
           { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
           ...(suggestion ? [{ keys: ['y'], label: 'Accept suggestion', onRun: actions.accept, emphasis: true }] : []),
@@ -682,6 +688,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                     onNext={() => moveDeveloper(1)}
                     onFocusCurrent={() => stats.current && focusTaskByKey(stats.current.taskKey)}
                     onAcceptSuggestion={actions.accept}
+                    usesCheckIn={!noteWording}
                   />
                   <StandupTaskList
                     ownerName={day.developer.displayName}
@@ -750,9 +757,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           </LayerShell>
         )}
         {layer === 'checkin' && (
-          <LayerShell onClose={closeLayer} label={`Check-in for ${day.developer.displayName}`}>
+          <LayerShell onClose={closeLayer} label={`${noteWording ? 'Note' : 'Check-in'} for ${day.developer.displayName}`}>
             <CheckInForm
               inputRef={checkInRef}
+              note={noteWording}
               value={checkInText}
               pending={addCheckIn.isPending}
               onChange={setCheckInText}
@@ -785,7 +793,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         )}
         {layer === 'help' && (
           <LayerShell onClose={closeLayer} label="Standup keyboard shortcuts">
-            <KeyHelpGrid />
+            <KeyHelpGrid note={noteWording} />
           </LayerShell>
         )}
         {layer === 'history' && (

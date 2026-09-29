@@ -6,7 +6,7 @@ import { Dialog } from '@/components/ui/Dialog';
 
 // docs/54 K1: the shared grammar — e done, a assign, n new, . current;
 // people move on ← →. Same format as every other sheet (ShortcutList).
-export const KEY_HELP: ShortcutGroup[] = [
+export const keyHelp = (note: boolean): ShortcutGroup[] => [
   {
     group: 'Navigate',
     keys: [
@@ -29,8 +29,9 @@ export const KEY_HELP: ShortcutGroup[] = [
   {
     group: 'Person',
     keys: [
-      ['c', 'General remark (check-in)'],
-      ['n', 'New task (@dev)'],
+      ['c', note ? 'Add a note' : 'General remark (check-in)'],
+      // The capture layer assigns to the person on screen; `@name` is only needed to hand it to someone else.
+      ['n', 'New task for this person'],
       ['y', 'Accept status suggestion'],
       ['f', 'Flag for follow-up'],
     ],
@@ -54,16 +55,17 @@ export function LayerShell({ children, onClose, label }: { children: React.React
   );
 }
 
-export function KeyHelpGrid() {
+export function KeyHelpGrid({ note = false }: { note?: boolean }) {
   return (
     <div className="px-3 py-3">
-      <ShortcutList groups={KEY_HELP} />
+      <ShortcutList groups={keyHelp(note)} />
     </div>
   );
 }
 
 export function CheckInForm({
   inputRef,
+  note = false,
   value,
   pending,
   onChange,
@@ -71,6 +73,8 @@ export function CheckInForm({
   onCancel,
 }: {
   inputRef: RefObject<HTMLTextAreaElement>;
+  /** docs/56 P1-04: for people who do not check in, this is a manager note. */
+  note?: boolean;
   value: string;
   pending: boolean;
   onChange: (value: string) => void;
@@ -94,7 +98,7 @@ export function CheckInForm({
           }
         }}
         rows={3}
-        placeholder="General remark — lands as a check-in on today’s record…"
+        placeholder={note ? 'Add a note — saved on today’s record…' : 'General remark — lands as a check-in on today’s record…'}
         className="w-full resize-none rounded-lg px-3 py-2 text-[13px] leading-5 outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
@@ -108,7 +112,7 @@ export function CheckInForm({
           disabled={!value.trim() || pending}
           className="ui-btn-solid"
         >
-          {pending ? 'Saving…' : 'Save check-in'}
+          {pending ? 'Saving…' : note ? 'Save note' : 'Save check-in'}
         </button>
       </div>
     </div>

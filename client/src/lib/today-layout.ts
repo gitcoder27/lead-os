@@ -11,7 +11,9 @@ import type {
   TodayRhythmStage,
   TodayStandupFocus,
   TodayTeamPulseItem,
+  TeamMode,
 } from '@/types';
+import { usesCheckIns } from '@/lib/participation';
 
 /**
  * docs/53 §5/F6: the day drives the page. The queue always owns the left
@@ -452,4 +454,52 @@ export function checkInPlaceholder(snapshot: TodayResponse | undefined, accountI
   const row = snapshot?.actionItems.find((item) => item.target.developerAccountId === accountId && item.type !== 'calm');
   const reason = row ? signalChips(row.signal)[0] : undefined;
   return reason ? `${reason} — what did you hear?` : 'What did you hear?';
+}
+
+// ── Check-in vs note wording (docs/56 P1-04) ──────────────────────────────
+
+/**
+ * True when the person does not check in (solo, or a developer without a
+ * login), so the server's "Add check-in" is really a manager note. Someone the
+ * pulse does not list keeps the server's wording in collab.
+ */
+export function isNotePerson(snapshot: TodayResponse | undefined, mode: TeamMode, accountId: string | undefined): boolean {
+  if (mode === 'solo') return true;
+  if (!accountId) return false;
+  const person = snapshot?.teamPulse.find((entry) => entry.accountId === accountId);
+  return person ? !usesCheckIns(mode, person.participates) : false;
+}
+
+const NOTE_LABELS: Record<string, string> = { 'Add check-in': 'Add note', 'Check-in': 'Note' };
+
+/**
+ * Relabels every `add_check_in` command aimed at a note person, wherever it
+ * sits in the snapshot (queue rows, pulse, menus, wrap-up, standup prompts).
+ * Untouched branches keep their identity, so memoised rows do not re-render.
+ */
+export function relabelCheckInCommands<T>(snapshot: T, mode: TeamMode, source: TodayResponse | undefined = snapshot as unknown as TodayResponse): T {
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      const next = value.map(walk);
+      return next.some((entry, index) => entry !== value[index]) ? next : value;
+    }
+    if (!value || typeof value !== 'object') return value;
+    const record = value as Record<string, unknown>;
+    let changed = false;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(record)) {
+      const next = walk(child);
+      if (next !== child) changed = true;
+      out[key] = next;
+    }
+    if (record.kind === 'add_check_in' && typeof record.label === 'string' && NOTE_LABELS[record.label]) {
+      const target = record.target as { developerAccountId?: string } | undefined;
+      if (isNotePerson(source, mode, target?.developerAccountId)) {
+        out.label = NOTE_LABELS[record.label];
+        changed = true;
+      }
+    }
+    return changed ? out : value;
+  };
+  return walk(snapshot) as T;
 }

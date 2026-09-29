@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { getSignalBadges } from '@/components/team-tracker/TrackerSignalBadges';
 import type { TrackerAttentionItem, TrackerAttentionReason, TrackerDeveloperDay, TrackerWorkItem } from '@/types';
-import { getRosterAttention, getRosterCheckIn, getRosterLoad } from '@/components/team-tracker/rosterSignals';
+import { getRosterAttention, getRosterCheckIn, getRosterLoad, getRosterTouch } from '@/components/team-tracker/rosterSignals';
 
 const NOW = new Date('2026-03-07T12:00:00.000Z');
 
@@ -155,5 +156,35 @@ describe('getRosterLoad', () => {
   it('counts current work plus planned tasks', () => {
     expect(getRosterLoad(day())).toBe(0);
     expect(getRosterLoad(day({ currentItem: item(1, 'Now'), plannedItems: [item(2, 'Next'), item(3, 'Later')] }))).toBe(3);
+  });
+});
+
+describe('getRosterTouch (docs/56 P1-04)', () => {
+  it('reads the last manager touch, quiet until the server marks the person untouched', () => {
+    const recent = getRosterTouch(
+      day({ signals: buildSignals({ freshness: { lastManagerTouchAt: '2026-03-07T10:00:00Z', untouched: false } }) }),
+      NOW.getTime(),
+    );
+    expect(recent).toMatchObject({ label: '2h ago', untouched: false });
+
+    const stale = getRosterTouch(
+      day({ signals: buildSignals({ freshness: { lastManagerTouchAt: '2026-02-27T10:00:00Z', untouched: true, touchStaleWorkingDays: 5 } }) }),
+      NOW.getTime(),
+    );
+    expect(stale).toMatchObject({ label: '8d ago', untouched: true, title: 'Not touched in 5 working days' });
+  });
+
+  it('never calls a missing check-in a problem: "Not yet", and flagged only when the server says so', () => {
+    expect(getRosterTouch(day(), NOW.getTime())).toMatchObject({ label: 'Not yet', untouched: false });
+    expect(getRosterTouch(day({ signals: buildSignals({ freshness: { untouched: true } }) }), NOW.getTime()))
+      .toMatchObject({ label: 'Not yet', untouched: true });
+  });
+});
+
+describe('getSignalBadges no-current (docs/56 P1-03/P1-04)', () => {
+  it('shows "No current" by default and drops it when the server does not track it', () => {
+    expect(getSignalBadges(day()).map((badge) => badge.key)).toContain('no-current');
+    const solo = day({ signals: buildSignals({ freshness: { noCurrentTracked: false } }) });
+    expect(getSignalBadges(solo).map((badge) => badge.key)).not.toContain('no-current');
   });
 });

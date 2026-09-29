@@ -24,7 +24,9 @@ import { useConfig } from '@/hooks/useConfig';
 import { api } from '@/lib/api';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
-import type { AuthUser } from '@/types';
+import { useTeamMode } from '@/hooks/useTeamMode';
+import { MIN_PASSWORD_LENGTH } from '@/lib/password';
+import type { AuthUser, TeamModeUpdateRequest } from '@/types';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 
 interface DiscoveredUser {
@@ -46,6 +48,9 @@ type WizardStep =
   | 'developer-access'
   | 'syncing';
 
+/** docs/56 P2-01: "Just me" only needs the account; "Me and a team" adds the developer-access step. */
+type WorkspaceKind = 'solo' | 'team';
+
 type ConfigQuerySnapshot = {
   data?: {
     jiraApiToken?: string;
@@ -54,6 +59,8 @@ type ConfigQuerySnapshot = {
 
 interface StepContentProps {
   step: WizardStep;
+  workspaceKind: WorkspaceKind;
+  setWorkspaceKind: (value: WorkspaceKind) => void;
   managerUsername: string;
   setManagerUsername: (value: string) => void;
   managerDisplayName: string;
@@ -108,6 +115,7 @@ interface StepContentProps {
 
 interface StepFooterProps {
   step: WizardStep;
+  workspaceKind: WorkspaceKind;
   goToStep: (step: WizardStep) => void;
   creatingManager: boolean;
   handleCreateManager: () => void;
@@ -116,7 +124,7 @@ interface StepFooterProps {
   managerPassword: string;
   savingConnection: boolean;
   handleSaveConnection: () => void;
-  handleSkipJira: () => void;
+  handleSkip: () => void;
   jiraBaseUrl: string;
   jiraEmail: string;
   jiraProjectKey: string;
@@ -129,7 +137,7 @@ interface StepFooterProps {
   triggerSyncPending: boolean;
 }
 
-const STEP_ORDER: Exclude<WizardStep, 'syncing'>[] = [
+const TEAM_STEP_ORDER: Exclude<WizardStep, 'syncing'>[] = [
   'manager-account',
   'jira-connection',
   'manager-mapping',
@@ -137,17 +145,35 @@ const STEP_ORDER: Exclude<WizardStep, 'syncing'>[] = [
   'developer-access',
 ];
 
+/** Solo workspaces have no developer logins, so the last step is left out. */
+const SOLO_STEP_ORDER = TEAM_STEP_ORDER.filter((key) => key !== 'developer-access');
+
+const WORKSPACE_KIND_OPTIONS: Array<{ value: WorkspaceKind; title: string; description: string }> = [
+  {
+    value: 'solo',
+    title: 'Just me',
+    description: 'Your own tasks, notes and follow-ups. You only need an account, and you can add people or Jira later.',
+  },
+  {
+    value: 'team',
+    title: 'Me and a team',
+    description: 'Also plan your team’s days, and optionally give developers a login to their own My Day.',
+  },
+];
+
+const stepOrderFor = (kind: WorkspaceKind) => (kind === 'team' ? TEAM_STEP_ORDER : SOLO_STEP_ORDER);
+
 const STEP_COPY: Record<Exclude<WizardStep, 'syncing'>, { label: string; title: string; description: string; icon: typeof BriefcaseBusiness }> = {
   'manager-account': {
     label: '1',
     title: 'Create manager account',
-    description: 'Start the manager workspace first. Connectors and team setup can come after.',
+    description: 'Start with your account. Jira, team members and developer logins are all optional and can come later.',
     icon: BriefcaseBusiness,
   },
   'jira-connection': {
     label: '2',
     title: 'Connect Jira',
-    description: 'Jira is optional. Start with manual team planning now, or connect Jira for defect sync.',
+    description: 'Jira is optional. Connect it for defect sync, or skip it and start with your own tasks and notes.',
     icon: PlugZap,
   },
   'manager-mapping': {
@@ -176,6 +202,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const { addToast } = useToast();
   const triggerSync = useTriggerSync();
   const configQuery = useConfig({ enabled: isAuthenticated && user?.role === 'manager' });
+
+  const teamMode = useTeamMode();
+  const [workspaceKind, setWorkspaceKind] = useState<WorkspaceKind>(teamMode === 'collab' ? 'team' : 'solo');
+  const stepOrder = stepOrderFor(workspaceKind);
 
   const [step, setStep] = useState<WizardStep>(
     isAuthenticated && user?.role === 'manager' ? 'jira-connection' : 'manager-account'
@@ -299,7 +329,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     [existingDeveloperAccountIds, trackedDevelopers]
   );
 
-  const currentStepIndex = STEP_ORDER.indexOf(step === 'syncing' ? 'developer-access' : step);
+  const currentStepIndex = stepOrder.indexOf(step === 'syncing' ? stepOrder[stepOrder.length - 1]! : step);
 
   const clearError = () => setErrorMessage('');
 
@@ -329,7 +359,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   };
 
   const handleCreateManager = async () => {
-    if (!managerUsername.trim() || !managerDisplayName.trim() || !managerPassword.trim()) {
+    if (!managerUsername.trim() || !managerDisplayName.trim() || managerPassword.length < MIN_PASSWORD_LENGTH) {
       return;
     }
 
@@ -347,7 +377,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       addToast({
         type: 'success',
         title: 'Manager account created',
-        message: 'You are signed in. Connect Jira now or start with a manual workspace.',
+        message: 'You are signed in. Connect Jira now, or skip it and start on Today.',
       });
       goToStep('jira-connection');
     } catch (error) {
@@ -454,7 +484,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         title: 'Tracked developers saved',
         message: `${trackedDevelopers.length} team member${trackedDevelopers.length === 1 ? '' : 's'} will be tracked.`,
       });
-      goToStep('developer-access');
+      if (workspaceKind === 'team') {
+        goToStep('developer-access');
+      } else {
+        void handleFinish();
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to save tracked developers');
     } finally {
@@ -463,7 +497,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   };
 
   const handleCreateDeveloperAccount = async () => {
-    if (!newAccountUsername.trim() || !newAccountDisplayName.trim() || !newAccountPassword.trim() || !newAccountDeveloperId) {
+    if (!newAccountUsername.trim() || !newAccountDisplayName.trim() || newAccountPassword.length < MIN_PASSWORD_LENGTH || !newAccountDeveloperId) {
       return;
     }
 
@@ -488,10 +522,28 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         title: 'Developer access created',
         message: `Created login access for ${response.user.displayName}.`,
       });
+      await switchToCollab();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to create developer access');
     } finally {
       setCreatingDeveloperAccess(false);
+    }
+  };
+
+  /** docs/56 Decisions #1: a developer login makes the workspace collaborative. */
+  const switchToCollab = async () => {
+    if (teamMode === 'collab') {
+      return;
+    }
+    try {
+      await api.put('/config/team-mode', { teamMode: 'collab' } satisfies TeamModeUpdateRequest);
+      await refreshSession();
+    } catch {
+      addToast({
+        type: 'error',
+        title: 'Team mode not switched',
+        message: 'The login was created, but the workspace is still in solo mode. Switch it in Settings → Team Members.',
+      });
     }
   };
 
@@ -503,17 +555,18 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       await triggerSync.mutateAsync();
       await onComplete();
     } catch (error) {
-      setStep('developer-access');
+      setStep(stepOrder[stepOrder.length - 1]!);
       setErrorMessage(error instanceof Error ? error.message : 'Initial Jira sync failed');
     }
   };
 
-  const handleSkipJira = async () => {
+  /** "Skip for now": finish the wizard without a Jira sync. */
+  const handleSkip = async () => {
     setErrorMessage('');
     await onComplete();
   };
 
-  const activeStepKey: Exclude<WizardStep, 'syncing'> = step === 'syncing' ? 'developer-access' : step;
+  const activeStepKey: Exclude<WizardStep, 'syncing'> = step === 'syncing' ? stepOrder[stepOrder.length - 1]! : step;
   const activeStepMeta = STEP_COPY[activeStepKey];
 
   /* ── Syncing overlay ─────────────────────────────── */
@@ -617,7 +670,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           transition={{ delay: 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
           <div className="flex items-center justify-center gap-2">
-            {STEP_ORDER.map((stepKey, index) => {
+            {stepOrder.map((stepKey, index) => {
               const meta = STEP_COPY[stepKey];
               const Icon = meta.icon;
               const isActive = stepKey === activeStepKey;
@@ -649,7 +702,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     {isComplete ? <Check size={11} /> : <Icon size={11} />}
                     <span className="hidden sm:inline">{meta.label}</span>
                   </div>
-                  {index < STEP_ORDER.length - 1 && (
+                  {index < stepOrder.length - 1 && (
                     <div
                       className="h-px w-4 transition-colors duration-300"
                       style={{
@@ -687,7 +740,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
             <div className="text-[12px] font-semibold uppercase tracking-[0.24em]" style={{ color: '#fbbf24' }}>
-              Step {activeStepMeta.label} of {STEP_ORDER.length}
+              Step {activeStepMeta.label} of {stepOrder.length}
             </div>
             <h2 className="mt-2 text-[24px] font-semibold leading-tight tracking-tight md:text-[28px]" style={{ color: 'var(--text-primary)' }}>
               {activeStepMeta.title}
@@ -725,6 +778,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               >
                 <StepContent
                   step={step}
+                  workspaceKind={workspaceKind}
+                  setWorkspaceKind={setWorkspaceKind}
                   managerUsername={managerUsername}
                   setManagerUsername={setManagerUsername}
                   managerDisplayName={managerDisplayName}
@@ -783,6 +838,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Fixed footer with navigation — always visible */}
           <StepFooter
             step={step}
+            workspaceKind={workspaceKind}
             goToStep={goToStep}
             creatingManager={creatingManager}
             handleCreateManager={handleCreateManager}
@@ -791,7 +847,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             managerPassword={managerPassword}
             savingConnection={savingConnection}
             handleSaveConnection={handleSaveConnection}
-            handleSkipJira={handleSkipJira}
+            handleSkip={handleSkip}
             jiraBaseUrl={jiraBaseUrl}
             jiraEmail={jiraEmail}
             jiraProjectKey={jiraProjectKey}
@@ -853,6 +909,37 @@ function StepContent(props: StepContentProps) {
     case 'manager-account':
       return (
         <div className="space-y-5">
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              How will you use LeadOS?
+            </legend>
+            {WORKSPACE_KIND_OPTIONS.map((option) => {
+              const selected = props.workspaceKind === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-start gap-3 rounded-[16px] border p-4 transition-colors"
+                  style={{
+                    borderColor: selected ? 'rgba(251, 191, 36, 0.4)' : 'var(--border)',
+                    background: selected ? 'rgba(251, 191, 36, 0.06)' : 'var(--bg-tertiary)',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="workspace-kind"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => props.setWorkspaceKind(option.value)}
+                    className="mt-0.5 accent-amber-400"
+                  />
+                  <span>
+                    <span className="block text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{option.title}</span>
+                    <span className="mt-1 block text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>{option.description}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
           <Field label="Username">
             <input
               value={props.managerUsername}
@@ -876,7 +963,7 @@ function StepContent(props: StepContentProps) {
             <PasswordInput
               value={props.managerPassword}
               onChange={props.setManagerPassword}
-              placeholder="At least 6 characters"
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
             />
           </Field>
         </div>
@@ -935,7 +1022,7 @@ function StepContent(props: StepContentProps) {
             />
           </Field>
           <div className="rounded-[14px] border px-4 py-3 text-[13px] leading-5" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)', color: 'var(--text-secondary)' }}>
-            Skip this step if you want to start with Team, Desk, Follow-ups, and Meetings first. Jira can be connected later from Settings.
+            Skip this step to start with Today, your tasks and notes. Jira can be connected later from Settings.
           </div>
           <button
             type="button"
@@ -1120,7 +1207,7 @@ function StepContent(props: StepContentProps) {
               <PasswordInput
                 value={props.newAccountPassword}
                 onChange={props.setNewAccountPassword}
-                placeholder="Temporary password"
+                placeholder={`Temporary password (${MIN_PASSWORD_LENGTH}+ characters)`}
               />
             </Field>
             <Field label="Tracked developer">
@@ -1147,7 +1234,7 @@ function StepContent(props: StepContentProps) {
           <button
             type="button"
             onClick={props.handleCreateDeveloperAccount}
-            disabled={!props.newAccountUsername.trim() || !props.newAccountDisplayName.trim() || !props.newAccountPassword.trim() || !props.newAccountDeveloperId || props.creatingDeveloperAccess}
+            disabled={!props.newAccountUsername.trim() || !props.newAccountDisplayName.trim() || props.newAccountPassword.length < MIN_PASSWORD_LENGTH || !props.newAccountDeveloperId || props.creatingDeveloperAccess}
             className={primaryBtnClassName}
             style={primaryBtnStyle}
           >
@@ -1224,7 +1311,7 @@ function StepFooter(props: StepFooterProps) {
     case 'manager-account':
       primaryLabel = props.creatingManager ? 'Creating…' : 'Create Account';
       primaryLoading = props.creatingManager;
-      primaryDisabled = !props.managerUsername.trim() || !props.managerDisplayName.trim() || props.managerPassword.length < 6 || props.creatingManager;
+      primaryDisabled = !props.managerUsername.trim() || !props.managerDisplayName.trim() || props.managerPassword.length < MIN_PASSWORD_LENGTH || props.creatingManager;
       primaryAction = props.handleCreateManager;
       break;
     case 'jira-connection':
@@ -1232,8 +1319,8 @@ function StepFooter(props: StepFooterProps) {
       primaryLoading = props.savingConnection;
       primaryDisabled = !props.jiraBaseUrl || !props.jiraEmail || !props.jiraProjectKey || (!props.jiraApiToken && !props.configQuery.data?.jiraApiToken) || props.savingConnection;
       primaryAction = props.handleSaveConnection;
-      tertiaryLabel = 'Skip Jira for now';
-      tertiaryAction = props.handleSkipJira;
+      tertiaryLabel = 'Skip for now';
+      tertiaryAction = props.handleSkip;
       break;
     case 'manager-mapping':
       backLabel = 'Back';
@@ -1244,7 +1331,7 @@ function StepFooter(props: StepFooterProps) {
     case 'team-members':
       backLabel = 'Back';
       backAction = () => props.goToStep('manager-mapping');
-      primaryLabel = props.savingDevelopers ? 'Saving…' : 'Save Team';
+      primaryLabel = props.savingDevelopers ? 'Saving…' : props.workspaceKind === 'team' ? 'Save Team' : 'Save & Finish';
       primaryLoading = props.savingDevelopers;
       primaryDisabled = props.savingDevelopers;
       primaryAction = props.handleSaveTrackedDevelopers;
@@ -1253,7 +1340,7 @@ function StepFooter(props: StepFooterProps) {
       backLabel = 'Back';
       backAction = () => props.goToStep('team-members');
       tertiaryLabel = 'Skip for now';
-      tertiaryAction = props.handleFinish;
+      tertiaryAction = props.handleSkip;
       primaryLabel = 'Finish & Sync';
       primaryDisabled = props.triggerSyncPending;
       primaryAction = props.handleFinish;

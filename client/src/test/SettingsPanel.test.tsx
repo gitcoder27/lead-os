@@ -731,7 +731,7 @@ describe('SettingsPage', () => {
   });
 
   it('shows the server error inline when a password reset is rejected and keeps the form open', async () => {
-    mockPost.mockRejectedValue(new Error('New password must be at least 6 characters'));
+    mockPost.mockRejectedValue(new Error('New password must be at least 8 characters'));
     render(
       <TestWrapper>
         <SettingsPage />
@@ -740,10 +740,10 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /developer access/i }));
     fireEvent.click(await screen.findByRole('button', { name: /reset password for taylor dev/i }));
-    fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'abcdef' } });
+    fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'abcdefgh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('New password must be at least 6 characters');
+    expect(await screen.findByRole('alert')).toHaveTextContent('New password must be at least 8 characters');
     expect(screen.getByLabelText(/new password for taylor dev/i)).toBeInTheDocument();
   });
 
@@ -759,7 +759,7 @@ describe('SettingsPage', () => {
     fireEvent.change(screen.getByLabelText(/new password for taylor dev/i), { target: { value: 'abc' } });
     fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/at least 6 characters/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/at least 8 characters/i);
     expect(mockPost).not.toHaveBeenCalledWith(expect.stringContaining('reset-password'), expect.anything());
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

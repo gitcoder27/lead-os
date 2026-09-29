@@ -3,7 +3,7 @@ import express from "express";
 import { eq } from "drizzle-orm";
 import { createAuthRouter } from "../src/routes/auth";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
-import { AuthService, SESSION_COOKIE_NAME } from "../src/services/auth.service";
+import { AuthService, PASSWORD_MIN_LENGTH, SESSION_COOKIE_NAME } from "../src/services/auth.service";
 import { appSessions, developers } from "../src/db/schema";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
@@ -483,5 +483,50 @@ describe("auth routes", () => {
     });
 
     expect(me.status).toBe(401);
+  });
+
+  describe("minimum password length (docs/56 P2-01)", () => {
+    const short = "a".repeat(PASSWORD_MIN_LENGTH - 1);
+    const ok = "a".repeat(PASSWORD_MIN_LENGTH);
+
+    it("is more than six characters", () => {
+      expect(PASSWORD_MIN_LENGTH).toBeGreaterThan(6);
+    });
+
+    it("POST /api/auth/register rejects a short password for the bootstrap manager and accepts the minimum", async () => {
+      const app = createTestApp();
+      const body = { username: "manager", displayName: "Manager", role: "manager" };
+
+      const rejected = await invoke(app, { method: "POST", url: "/api/auth/register", body: { ...body, password: short } });
+      expect(rejected.status).toBe(400);
+      expect((await invoke(app, { method: "GET", url: "/api/auth/bootstrap" })).body?.bootstrapOpen).toBe(true);
+
+      const created = await invoke(app, { method: "POST", url: "/api/auth/register", body: { ...body, password: ok } });
+      expect(created.status).toBe(201);
+    });
+
+    it("AuthService.createUser enforces it too, so the CLI cannot create a weak login", async () => {
+      await expect(authService.createUser({ username: "manager", displayName: "Manager", password: short, role: "manager" }))
+        .rejects.toMatchObject({ status: 400, message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` });
+      expect(await authService.getUserCount()).toBe(0);
+      await expect(authService.createUser({ username: "manager", displayName: "Manager", password: ok, role: "manager" })).resolves.toBeTruthy();
+    });
+
+    it("POST /api/auth/change-password rejects a short new password", async () => {
+      const app = createTestApp();
+      await authService.createUser({ username: "manager", displayName: "Manager", password: ok, role: "manager" });
+      const rejected = await invoke(app, {
+        method: "POST",
+        url: "/api/auth/change-password",
+        body: { username: "manager", currentPassword: ok, newPassword: short },
+      });
+      expect(rejected.status).toBe(400);
+      const changed = await invoke(app, {
+        method: "POST",
+        url: "/api/auth/change-password",
+        body: { username: "manager", currentPassword: ok, newPassword: `${ok}!` },
+      });
+      expect(changed.status).toBe(200);
+    });
   });
 });

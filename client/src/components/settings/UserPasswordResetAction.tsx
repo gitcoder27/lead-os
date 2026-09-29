@@ -1,9 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { KeyRound, Loader2 } from 'lucide-react';
 import type { AuthUser } from '@/types';
-
-/** Mirrors the server rule (`PASSWORD_MIN_LENGTH`); the server stays the source of truth. */
-const MIN_PASSWORD_LENGTH = 6;
+import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 
 interface UserPasswordResetActionProps {
   user: AuthUser;

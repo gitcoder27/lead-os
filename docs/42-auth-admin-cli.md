@@ -86,7 +86,7 @@ env PATH=/usr/bin:/bin:$PATH /usr/bin/npm run auth:reset-password --workspace=se
   --password 'new-password-here'
 ```
 
-The command prints `{ reset, username, role, sessionsRevoked }` and never prints the password. The same length rules as account creation apply (6 to 200 characters). Unknown or inactive usernames fail with an error.
+The command prints `{ reset, username, role, sessionsRevoked }` and never prints the password. The same length rules as account creation apply (8 to 200 characters). Unknown or inactive usernames fail with an error.
 
 The in-app path is Settings > Developer access > **Reset password**. It is manager-only and works for developer accounts only; a manager cannot reset another manager's password from the UI, so a lost manager password is recovered with this command on the host. It also clears any login lockout for that username.
 

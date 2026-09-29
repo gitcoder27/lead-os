@@ -41,7 +41,7 @@ const changePasswordSchema = z.object({
   body: z.object({
     username: z.string().min(1).max(100),
     currentPassword: z.string().min(1),
-    newPassword: z.string().min(6).max(200),
+    newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   }),
   params: z.any().optional(),
   query: z.any().optional(),

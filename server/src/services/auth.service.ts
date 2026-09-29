@@ -9,7 +9,8 @@ import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId, WorkspaceService } from "./workspace.service";
 
 /** Password rules shared by account creation (`/register`), reset and the admin CLI. */
-export const PASSWORD_MIN_LENGTH = 6;
+/** docs/56 P2-01: raised from 6. Applies to new passwords only; existing logins are unaffected. */
+export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 200;
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -120,6 +121,14 @@ export class AuthService {
     const username = normalizeUsername(params.username);
     if (!username) {
       throw new HttpError(400, "username is required");
+    }
+
+    // The route validates too; this covers the CLI, which calls the service directly.
+    if (typeof params.password !== "string" || params.password.length < PASSWORD_MIN_LENGTH) {
+      throw new HttpError(400, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    }
+    if (params.password.length > PASSWORD_MAX_LENGTH) {
+      throw new HttpError(400, `Password must be at most ${PASSWORD_MAX_LENGTH} characters`);
     }
 
     const userCount = await this.getUserCount();
@@ -375,8 +384,8 @@ export class AuthService {
     if (!normalizedUsername) {
       throw new HttpError(400, "username is required");
     }
-    if (!newPassword || newPassword.length < 6) {
-      throw new HttpError(400, "New password must be at least 6 characters");
+    if (!newPassword || newPassword.length < PASSWORD_MIN_LENGTH) {
+      throw new HttpError(400, `New password must be at least ${PASSWORD_MIN_LENGTH} characters`);
     }
 
     const rows = await db

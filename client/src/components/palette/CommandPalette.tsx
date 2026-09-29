@@ -25,6 +25,7 @@ import { useToast } from '@/context/ToastContext';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
+import { useCaptureTask } from '@/hooks/useCapture';
 import { getLocalIsoDate } from '@/lib/utils';
 import { GLOBAL_SEARCH_MIN_LENGTH, useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useQuickActions } from '@/context/QuickActionsContext';
@@ -102,6 +103,8 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   // anchored to the day the manager is working in.
   const today = useMemo(() => getLocalIsoDate(), []);
   const createDeskItem = useCreateManagerDeskItem(today);
+  // docs/57 §3 (P3-05): with Phase 3 on, quick add is a capture (the typed text is the grammar).
+  const captureTask = useCaptureTask();
 
   const searchQuery = useGlobalSearch(query);
   const isSearching = searchQuery.isFetching;
@@ -184,7 +187,17 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
       }
       if (item.actionId === 'quick-add-desk') {
         const title = query.trim();
-        if (!title || createDeskItem.isPending) {
+        if (!title || createDeskItem.isPending || captureTask.isPending) {
+          return;
+        }
+        if (tasksPhase3) {
+          captureTask.create({ text: title }).then(
+            () => {
+              onClose();
+              addToast(`Added to ${surfaceLabel}`, 'success');
+            },
+            (error: unknown) => addToast(error instanceof Error ? error.message : 'Could not add the task', 'error'),
+          );
           return;
         }
         createDeskItem.mutate(
@@ -225,7 +238,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         return;
       }
     },
-    [addToast, createDeskItem, onClose, onOpenTarget, onViewChange, openCapture, query, surfaceLabel, today, triggerSync],
+    [addToast, captureTask, createDeskItem, onClose, onOpenTarget, onViewChange, openCapture, query, surfaceLabel, tasksPhase3, today, triggerSync],
   );
 
   const handleInputKeyDown = useCallback(

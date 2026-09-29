@@ -4,7 +4,9 @@ import {
   applyLingering,
   groupShowsDate,
   impliedMeta,
+  captureDefaultsFromTask,
   inlineAddDefaults,
+  inlineCaptureDefaults,
   lingerEntriesFor,
   nextMonday,
   optimisticTask,
@@ -409,5 +411,43 @@ describe('date column reservation (docs/51 D3)', () => {
     expect(groupShowsDate(undefined, { mode: 'scheduled', bucket: 'Next 7 days' }, [task({ scheduledOn: '2026-10-01' })], TODAY)).toBe(true);
     expect(groupShowsDate(undefined, { mode: 'none' }, [task(), task({ scheduledOn: '2026-10-01' })], TODAY)).toBe(true);
     expect(groupShowsDate(undefined, { mode: 'none' }, [task()], TODAY)).toBe(false);
+  });
+});
+
+describe('inline add as capture defaults (docs/57 P3-05)', () => {
+  it('maps a group\'s task fields to the capture defaults shape', () => {
+    expect(captureDefaultsFromTask({})).toEqual({});
+    expect(captureDefaultsFromTask({ later: true })).toEqual({ later: true });
+    expect(captureDefaultsFromTask({ ownerType: null, ownerId: null })).toEqual({ ownerAccountId: null });
+    expect(captureDefaultsFromTask({ ownerType: 'developer', ownerId: '557058:ab-12' })).toEqual({ ownerAccountId: '557058:ab-12' });
+    expect(captureDefaultsFromTask({ scheduledOn: null })).toEqual({ scheduledOn: null });
+    expect(captureDefaultsFromTask({ scheduledOn: TODAY, kind: 'meeting', labels: ['escalation'] })).toEqual({ scheduledOn: TODAY, kind: 'meeting', labels: ['escalation'] });
+    expect(captureDefaultsFromTask({ waitingOn: { type: 'contact', ref: '7' } })).toEqual({ waitingOn: { type: 'contact', ref: '7' } });
+  });
+
+  it('keeps open, active and blocked status groups; a done or dropped group adds an open task', () => {
+    expect(captureDefaultsFromTask({ status: 'blocked' })).toEqual({ status: 'blocked' });
+    expect(captureDefaultsFromTask({ status: 'active' })).toEqual({ status: 'active' });
+    expect(captureDefaultsFromTask({ status: 'open' })).toEqual({ status: 'open' });
+    expect(captureDefaultsFromTask({ status: 'done' })).toEqual({});
+    expect(captureDefaultsFromTask({ status: 'dropped' })).toEqual({});
+  });
+
+  it('a manager-owned group leaves the owner to the server (a bare capture is mine)', () => {
+    expect(captureDefaultsFromTask({ ownerType: 'manager' })).toEqual({});
+  });
+
+  it('follows the same context rules as the old inline add', () => {
+    expect(inlineCaptureDefaults('inbox', { filters: { owner: 'inbox' } }, { mode: 'none' }, TODAY)).toEqual({ ownerAccountId: null });
+    expect(inlineCaptureDefaults('later', { filters: { later: true } }, { mode: 'none' }, TODAY)).toEqual({ later: true });
+    expect(inlineCaptureDefaults('today', { filters: { horizon: 'today' } }, { mode: 'none' }, TODAY)).toEqual({ scheduledOn: TODAY });
+    expect(inlineCaptureDefaults('waiting', {}, { mode: 'party', waitingOn: null }, TODAY)).toEqual({ status: 'blocked' });
+    expect(inlineCaptureDefaults('my-tasks', {}, { mode: 'scheduled', bucket: 'Unscheduled' }, TODAY)).toEqual({ scheduledOn: null });
+    // No context at all: a bare capture, which is Inbox until triaged.
+    expect(inlineCaptureDefaults(undefined, undefined, { mode: 'none' }, TODAY)).toEqual({});
+  });
+
+  it('a Later view never asks for a developer owner or a date together with later', () => {
+    expect(inlineCaptureDefaults('later', { filters: { later: true, owner: ['dev-1'] } }, { mode: 'none' }, TODAY)).toEqual({ ownerAccountId: 'dev-1' });
   });
 });

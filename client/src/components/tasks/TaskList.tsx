@@ -1,9 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { CalendarClock, ChevronDown, ChevronRight, Plus, UserRound } from 'lucide-react';
 import type { TaskViewDefinition } from '@/types';
 import type { TaskGroupContext } from '@/lib/task-views';
 import { groupShowsDate, worstOverdueTone, type RenderGroup } from '@/lib/task-list';
+import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
+import { TokenSuggestionList } from '@/components/capture/TokenSuggestionList';
 import { Avatar } from './TaskDetailPrimitives';
 import { TaskListRow, type RowTask, type TaskRowHandlers } from './TaskListRow';
 
@@ -257,8 +259,6 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }
   onSubmit: (title: string) => Promise<boolean>;
   groupLabel: string;
 }) {
-  const [title, setTitle] = useState('');
-  const [pending, setPending] = useState(false);
   if (!active) {
     return (
       <button
@@ -273,9 +273,32 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }
       </button>
     );
   }
+  return <InlineAddForm onCancel={onCancel} onSubmit={onSubmit} groupLabel={groupLabel} />;
+}
+
+/** The open add row: a capture input, so tokens and the `@` / `#` / `+` typeahead work. */
+function InlineAddForm({ onCancel, onSubmit, groupLabel }: {
+  onCancel: () => void;
+  onSubmit: (title: string) => Promise<boolean>;
+  groupLabel: string;
+}) {
+  const [title, setTitle] = useState('');
+  const [caret, setCaret] = useState(0);
+  const [pending, setPending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const typeahead = useCaptureTypeahead(title, caret);
+  /** Put a typeahead choice into the input and park the caret after it. */
+  const applyEdit = (next: { text: string; caret: number }) => {
+    setTitle(next.text);
+    setCaret(next.caret);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(next.caret, next.caret);
+    });
+  };
   return (
     <form
-      className="flex h-[38px] items-center gap-2 px-2"
+      className="relative flex h-[38px] items-center gap-2 px-2"
       style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)' }}
       onSubmit={async (event) => {
         event.preventDefault();
@@ -284,29 +307,52 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }
         setPending(true);
         const ok = await onSubmit(value);
         setPending(false);
-        if (ok) setTitle('');
+        if (ok) { setTitle(''); setCaret(0); }
       }}
     >
       <span className="flex w-6 shrink-0 justify-center"><Plus size={13} style={{ color: 'var(--accent)' }} /></span>
       <input
+        ref={inputRef}
         autoFocus
         value={title}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => { setTitle(event.target.value); setCaret(event.target.selectionStart ?? event.target.value.length); }}
+        onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
         onKeyDown={(event) => {
+          // docs/57 §3 (P3-05): `@person`, `#JIRA-KEY` and `+label` typeahead.
+          const nav = typeahead.handleKey(event);
+          if (typeof nav === 'object') { applyEdit(nav); return; }
+          if (nav) return;
+          if (event.key === 'Enter' && typeahead.open) {
+            const chosen = typeahead.choose();
+            if (chosen) { event.preventDefault(); applyEdit(chosen); return; }
+          }
           if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
             setTitle('');
+            setCaret(0);
             onCancel();
           }
         }}
         onBlur={() => { if (!title.trim()) onCancel(); }}
-        placeholder={`New task${groupLabel ? ` in ${groupLabel}` : ''} — Enter to add, Esc to close`}
+        placeholder={`New task${groupLabel ? ` in ${groupLabel}` : ''} — @person !date +label · Enter to add, Esc to close`}
         aria-label={groupLabel ? `New task in ${groupLabel}` : 'New task'}
         readOnly={pending}
         className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
         style={{ color: 'var(--text-primary)' }}
       />
+      {typeahead.open && typeahead.fragment ? (
+        <TokenSuggestionList
+          trigger={typeahead.fragment.trigger}
+          suggestions={typeahead.suggestions}
+          activeIndex={typeahead.activeIndex}
+          onHover={typeahead.setActiveIndex}
+          onChoose={(suggestion) => {
+            const chosen = typeahead.choose(suggestion);
+            if (chosen) applyEdit(chosen);
+          }}
+        />
+      ) : null}
     </form>
   );
 }

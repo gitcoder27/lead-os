@@ -53,7 +53,7 @@ vi.mock('@/hooks/useManagerDesk', () => ({
     error: mockDayError,
     refetch: mockRefetch,
   }),
-  useCreateManagerDeskItem: () => ({ mutate: mockCreateMutate, isPending: false }),
+  useCreateDeskTask: () => ({ mutate: mockCreateMutate, isPending: false }),
   useUpdateManagerDeskItem: () => ({ mutate: mockUpdateMutate, isPending: false }),
 }));
 

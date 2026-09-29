@@ -31,7 +31,7 @@ Routing is custom in `client/src/App.tsx` using `window.history.pushState` and `
 
 Canonical routes:
 
-- `/`: Today, the manager daily command view.
+- `/`: Today, the manager daily command view (`focus.plan` is my plan; up to three tasks can be pinned per day with `PUT /api/today/top3` and lead the queue).
 - `/work`: Jira defect and work triage dashboard.
 - `/team`: Team Tracker for day plans, current work, status, check-ins, attention signals, saved views, and carry-forward.
 - `/desk`: Manager Desk for capture, planning, decisions, linked people, and linked Jira issues.
@@ -69,6 +69,7 @@ Frontend conventions:
 
 - Use TanStack Query hooks in `client/src/hooks/` for API data and mutations.
 - Use `client/src/lib/api.ts` for network calls; avoid ad hoc `fetch` calls in components.
+- Creating a task from the UI goes through `POST /api/capture` (the shared grammar in `shared/capture-grammar.ts`): use `useCapture` (the capture box) or `useCaptureTask` (inline add, dialogs, child tasks), and pass structured context as `defaults` (owner, date, parent, links, note source) instead of injecting tokens into the text. `POST /api/tasks` stays for services, Copilot and 1:1s; it is not a UI path. `@`/`#`/`+` typeahead is `useCaptureTypeahead`.
 - App-wide providers live in `client/src/context/` for auth, theme, and toast state.
 - `client/src/types/index.ts` re-exports `shared/types`; `client/src/types/manager-desk.ts` adds UI labels/mappings.
 - Prefer `@/` imports and shared contracts from `shared/types`.

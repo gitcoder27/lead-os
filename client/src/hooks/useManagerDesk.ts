@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { useCaptureTask } from '@/hooks/useCapture';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
+import { deskPayloadToCapture } from '@/lib/capture-defaults';
 import { registerSurfaceTaskIds, surfaceTaskToDeskItem, taskRefFor } from '@/lib/surface-tasks';
 import type {
   ManagerDeskDayResponse,
@@ -112,6 +116,36 @@ export function useCreateManagerDeskItem(date: string) {
       invalidateDeskDependentViews(qc);
     },
   });
+}
+
+/**
+ * docs/57 §3 (P3-05): create a task from a Desk-style payload. With Phase 3 on
+ * it goes through `POST /api/capture` (one grammar, one endpoint); without it,
+ * the legacy Desk create. Same `mutate(payload, { onSuccess, onError })` shape
+ * as `useCreateManagerDeskItem`.
+ */
+export function useCreateDeskTask(date: string) {
+  const phase3 = useTasksPhase3();
+  const legacy = useCreateManagerDeskItem(date);
+  const capture = useCaptureTask();
+  const [pending, setPending] = useState(false);
+
+  const mutate = (
+    payload: ManagerDeskCreateItemPayload,
+    options: { onSuccess?: (result: unknown) => void; onError?: (error: Error) => void } = {},
+  ) => {
+    if (!phase3) {
+      legacy.mutate(payload, options);
+      return;
+    }
+    setPending(true);
+    capture.create(deskPayloadToCapture(payload)).then(
+      (created) => { setPending(false); options.onSuccess?.(created); },
+      (error: unknown) => { setPending(false); options.onError?.(error instanceof Error ? error : new Error('Could not save')); },
+    );
+  };
+
+  return { mutate, isPending: phase3 ? pending : legacy.isPending };
 }
 
 // ── Update item ─────────────────────────────────────────

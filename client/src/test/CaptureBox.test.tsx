@@ -1,4 +1,4 @@
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CaptureResponseBody } from 'shared/capture-grammar';
 import { CaptureBox } from '@/components/capture/CaptureBox';
@@ -41,6 +41,16 @@ vi.mock('@/hooks/useTaskLabels', () => ({
         { name: 'urgent', color: 'red', system: false, createdAt: '' },
       ],
     },
+  }),
+}));
+
+const mockIssues = vi.fn((query: string) => (query.toUpperCase().startsWith('LEA')
+  ? [{ jiraKey: 'LEAD-42', summary: 'Login fails on Safari' }, { jiraKey: 'LEAD-43', summary: 'Logout loops' }]
+  : []));
+vi.mock('@/hooks/useGlobalSearch', () => ({
+  GLOBAL_SEARCH_MIN_LENGTH: 2,
+  useGlobalSearch: (query: string, options?: { enabled?: boolean }) => ({
+    data: options?.enabled && query.trim().length >= 2 ? { issues: mockIssues(query.trim()) } : undefined,
   }),
 }));
 
@@ -307,11 +317,49 @@ describe('CaptureBox (P3-D8)', () => {
     expect(screen.getByTestId('capture-assignee').textContent).toContain('Bob Jones');
   });
 
-  it('injects the assignee @token into the submitted text', () => {
+  it('sends the assignee as structured defaults, never as @id text (P3-05)', () => {
     const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
     fireEvent.change(input, { target: { value: 'Review the deploy' } });
     fireEvent.click(screen.getByRole('button', { name: /capture/i }));
-    expect(lastBody().text).toBe('@dev-2 Review the deploy');
+    expect(lastBody().text).toBe('Review the deploy');
+    expect(lastBody().defaults).toEqual({ ownerAccountId: 'dev-2' });
+  });
+
+  it('carries an account id with a colon untouched (Jira ids)', () => {
+    const { input } = renderBox('', { accountId: '557058:ab-12', displayName: 'Jira Person' });
+    fireEvent.change(input, { target: { value: 'Fix the handoff' } });
+    // The pill names the person and the id never reaches the input or the grammar.
+    expect(screen.getByTestId('capture-assignee').textContent).toContain('Jira Person');
+    expect((input as HTMLTextAreaElement).value).toBe('Fix the handoff');
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+    expect(lastBody().text).toBe('Fix the handoff');
+    expect(lastBody().defaults).toEqual({ ownerAccountId: '557058:ab-12' });
+    expect(String(lastBody().text)).not.toContain('@');
+  });
+
+  it('clears the assignee with the pill control and can bring it back', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    fireEvent.change(input, { target: { value: 'Unowned thought' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear assignee' }));
+
+    expect(screen.getByTestId('capture-assignee').textContent).toContain('Nobody');
+    // With no owner and no date it is an Inbox capture again.
+    expect(screen.getByTestId('capture-summary').textContent).toContain('Inbox');
+    fireEvent.click(screen.getByRole('button', { name: /^capture$/i }));
+    expect(lastBody().defaults).toBeUndefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Assign to Bob Jones' }));
+    expect(screen.getByRole('button', { name: 'Clear assignee' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^capture$/i }));
+    expect(lastBody().defaults).toEqual({ ownerAccountId: 'dev-2' });
+  });
+
+  it('a typed @person has no clear control and sends no default owner', () => {
+    const { input } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+    fireEvent.change(input, { target: { value: '@dev-1 pair on the release' } });
+    expect(screen.queryByRole('button', { name: 'Clear assignee' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^capture$/i }));
+    expect(lastBody().defaults).toBeUndefined();
   });
 
   it('lets a typed @person override the assignee pill', () => {
@@ -323,6 +371,7 @@ describe('CaptureBox (P3-D8)', () => {
     expect(screen.getByTestId('capture-assignee').textContent).toContain('Alice Smith');
     fireEvent.click(screen.getByRole('button', { name: /capture/i }));
     expect(lastBody().text).toBe('@dev-1 pair on the release');
+    expect(lastBody().defaults).toBeUndefined();
   });
 
   it('hides the pill and injects nothing for /later captures', () => {
@@ -331,5 +380,149 @@ describe('CaptureBox (P3-D8)', () => {
     expect(screen.queryByTestId('capture-assignee')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /capture/i }));
     expect(lastBody().text).toBe('/later Park this thought');
+    expect(lastBody().defaults).toBeUndefined();
+  });
+
+  describe('keep-open mode (P3-05)', () => {
+    it('Cmd/Ctrl+Enter captures and stays open, back at the prefill', () => {
+      const onCaptured = vi.fn();
+      const onClose = vi.fn();
+      render(
+        <TestWrapper>
+          <CaptureBox prefill="#PROJ-1 " onClose={onClose} onCaptured={onCaptured} />
+        </TestWrapper>,
+      );
+      const input = screen.getByLabelText('Capture') as HTMLTextAreaElement;
+      fireEvent.change(input, { target: { value: '#PROJ-1 First thing' } });
+      fireEvent.keyDown(input, { key: 'Enter', metaKey: true });
+      expect(mockMutate).toHaveBeenCalledTimes(1);
+      succeed(lastBody());
+
+      expect(onCaptured).toHaveBeenCalledWith({ intent: 'create', taskKey: 'T-5' });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(input.value).toBe('#PROJ-1 ');
+
+      fireEvent.change(input, { target: { value: '#PROJ-1 Second thing' } });
+      fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+      expect(mockMutate).toHaveBeenCalledTimes(2);
+      expect(lastBody().text).toBe('#PROJ-1 Second thing');
+    });
+
+    it('plain Enter still closes after capturing', () => {
+      const { input, onClose } = renderBox();
+      fireEvent.change(input, { target: { value: 'One and done' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      succeed(lastBody());
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('the Add another button keeps the box open and keeps the assignee', () => {
+      const { input, onClose } = renderBox('', { accountId: 'dev-2', displayName: 'Bob Jones' });
+      fireEvent.change(input, { target: { value: 'First' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add another' }));
+      succeed(lastBody());
+      expect(onClose).not.toHaveBeenCalled();
+      expect((input as HTMLTextAreaElement).value).toBe('');
+      expect(screen.getByTestId('capture-assignee').textContent).toContain('Bob Jones');
+      fireEvent.change(input, { target: { value: 'Second' } });
+      fireEvent.click(screen.getByRole('button', { name: /^capture$/i }));
+      expect(lastBody().defaults).toEqual({ ownerAccountId: 'dev-2' });
+    });
+
+    it('does not submit while blocked, even with Cmd+Enter', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Ask @nobodyhere' } });
+      fireEvent.keyDown(input, { key: 'Enter', metaKey: true });
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it('Cmd+Enter submits instead of accepting an open suggestion', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Call the vendor +es' } });
+      expect(screen.getByRole('listbox', { name: 'Label suggestions' })).toBeInTheDocument();
+      fireEvent.keyDown(input, { key: 'Enter', metaKey: true });
+      expect(lastBody().text).toBe('Call the vendor +es');
+    });
+
+    it('mentions the shortcut in the footer', () => {
+      renderBox();
+      expect(screen.getByTestId('capture-keep-open-hint').textContent).toMatch(/Enter/);
+    });
+  });
+
+  describe('@ and # typeahead (P3-05)', () => {
+    it('suggests people for @ and inserts the account id on Tab', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Pair with @al' } });
+      const list = screen.getByRole('listbox', { name: 'Person suggestions' });
+      expect(within(list).getAllByRole('option').map((option) => option.textContent)).toEqual([
+        expect.stringContaining('Alice Smith'),
+        expect.stringContaining('Alice Chen'),
+      ]);
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect((input as HTMLTextAreaElement).value).toBe('Pair with @dev-1 ');
+    });
+
+    it('lists contacts after developers, marked as contacts', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: '/w @' } });
+      const options = within(screen.getByRole('listbox', { name: 'Person suggestions' })).getAllByRole('option');
+      expect(options.at(-1)?.textContent).toContain('Acme Legal');
+      expect(options.at(-1)?.textContent).toContain('Contact');
+      expect(options[0]?.textContent).not.toContain('Contact');
+    });
+
+    it('arrow keys move the highlight; clicking a row inserts it', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Ping @al' } });
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
+      fireEvent.click(screen.getAllByRole('option')[1]!);
+      expect((input as HTMLTextAreaElement).value).toBe('Ping @dev-4 ');
+    });
+
+    it('Enter accepts the highlighted person instead of submitting', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Ask @bo' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect((input as HTMLTextAreaElement).value).toBe('Ask @dev-2 ');
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it('Escape closes the list without touching the text', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Ask @al' } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect((input as HTMLTextAreaElement).value).toBe('Ask @al');
+    });
+
+    it('offers no suggestion once the handle is fully typed', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Ask @dev-2' } });
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('suggests synced Jira issues for # and inserts the key', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Look at #LEA' } });
+      const list = screen.getByRole('listbox', { name: 'Issue suggestions' });
+      expect(within(list).getAllByRole('option')[0]?.textContent).toContain('LEAD-42');
+      expect(within(list).getAllByRole('option')[0]?.textContent).toContain('Login fails on Safari');
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect((input as HTMLTextAreaElement).value).toBe('Look at #LEAD-42 ');
+    });
+
+    it('waits for two characters before searching issues', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'Look at #L' } });
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('does not trigger inside a word', () => {
+      const { input } = renderBox();
+      fireEvent.change(input, { target: { value: 'mail bob@al' } });
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
   });
 });

@@ -4,7 +4,7 @@ import { Bell, CalendarDays, Search } from 'lucide-react';
 import type { AppView } from '@/App';
 import { useToast } from '@/context/ToastContext';
 import {
-  useCreateManagerDeskItem,
+  useCreateDeskTask,
   useManagerDesk,
   useUpdateManagerDeskItem,
 } from '@/hooks/useManagerDesk';
@@ -56,7 +56,7 @@ export function ManagerMemoryPage({ mode, onViewChange, onOpenTarget }: ManagerM
   const canonical = day.data?.taskModel === 'canonical';
   const nativeTasks = useCanonicalMemoryTasks(mode, today, format(subDays(new Date(), 30), 'yyyy-MM-dd'), canonical);
   const nativeMutation = useCanonicalTaskMutation();
-  const createItem = useCreateManagerDeskItem(today);
+  const createItem = useCreateDeskTask(today);
   const updateItem = useUpdateManagerDeskItem(today);
   const copy = pageCopy[mode];
   const Icon = copy.Icon;

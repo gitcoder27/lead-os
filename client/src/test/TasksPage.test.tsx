@@ -31,6 +31,13 @@ vi.mock('@/context/ToastContext', () => ({
 
 vi.mock('@/hooks/useLocalDate', () => ({ useLocalDate: () => '2026-09-26' }));
 
+vi.mock('@/hooks/useGlobalSearch', () => ({
+  GLOBAL_SEARCH_MIN_LENGTH: 2,
+  useGlobalSearch: (query: string, options?: { enabled?: boolean }) => ({
+    data: options?.enabled && query.trim().length >= 2 ? { issues: [{ jiraKey: 'LEAD-42', summary: 'Login fails on Safari' }] } : undefined,
+  }),
+}));
+
 vi.mock('@/hooks/useTaskViews', () => ({
   useTaskViews: (...args: unknown[]) => mockUseTaskViews(...args),
   useTaskViewTasks: (...args: unknown[]) => mockUseTaskViewTasks(...args),
@@ -139,7 +146,7 @@ beforeEach(async () => {
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
   window.history.replaceState(null, '', '/tasks');
   mockApply.mockResolvedValue(true);
-  mockCreate.mockResolvedValue({});
+  mockCreate.mockResolvedValue({ task: { taskKey: 'T-99' }, warnings: [] });
   mockDoneToday = [];
   mockDrawerProps = null;
   mockUseTaskViews.mockReturnValue({ data: { views: BUILTIN_VIEWS }, isLoading: false });
@@ -546,7 +553,66 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const input = screen.getByLabelText('New task in Today');
     fireEvent.change(input, { target: { value: 'Prep 1:1' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
-    expect(mockCreate).toHaveBeenCalledWith({ title: 'Prep 1:1', scheduledOn: TODAY });
+    expect(mockCreate).toHaveBeenCalledWith({ text: 'Prep 1:1', defaults: { scheduledOn: TODAY } });
+  });
+
+  it('inline add sends the title as capture text, so tokens in it work (P3-05)', async () => {
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add task to Today' }));
+    const input = screen.getByLabelText('New task in Today');
+    fireEvent.change(input, { target: { value: 'Draft memo @dev-1 !fri !due:mon' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    expect(mockCreate).toHaveBeenCalledWith({ text: 'Draft memo @dev-1 !fri !due:mon', defaults: { scheduledOn: TODAY } });
+  });
+
+  it('inline add keeps the row open with an error toast when the capture is rejected', async () => {
+    const { CaptureRejectedError } = await import('@/hooks/useCapture');
+    mockCreate.mockRejectedValueOnce(new CaptureRejectedError([
+      { severity: 'error', code: 'unknown-person', message: 'Nobody matches @nobody' },
+    ]));
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add task to Today' }));
+    const input = screen.getByLabelText('New task in Today') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Ask @nobody' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error', title: 'Could not add task', message: 'Nobody matches @nobody' }));
+    // The text stays so it can be fixed.
+    expect((screen.getByLabelText('New task in Today') as HTMLInputElement).value).toBe('Ask @nobody');
+  });
+
+  it('inline add toasts warnings from a successful capture', async () => {
+    mockCreate.mockResolvedValueOnce({ task: { taskKey: 'T-100' }, warnings: [{ severity: 'warning', code: 'jira-not-synced', message: 'LEAD-9 isn\u2019t synced \u2014 kept as text' }] });
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add task to Today' }));
+    const input = screen.getByLabelText('New task in Today');
+    fireEvent.change(input, { target: { value: 'Look at #LEAD-9' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'warning', title: 'Added with warnings' }));
+  });
+
+  it('inline add suggests people, issues and labels as you type (P3-05)', async () => {
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add task to Today' }));
+    const input = screen.getByLabelText('New task in Today') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'Pair with @ac', selectionStart: 13 } });
+    expect(screen.getByRole('listbox', { name: 'Person suggestions' })).toBeTruthy();
+    // Enter accepts the suggestion instead of adding the task.
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(input.value).toBe('Pair with @acme-legal ');
+    expect(mockCreate).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'Look at #LEA' } });
+    expect(screen.getByRole('listbox', { name: 'Issue suggestions' })).toBeTruthy();
+    fireEvent.keyDown(input, { key: 'Tab' });
+    expect(input.value).toBe('Look at #LEAD-42 ');
+
+    fireEvent.change(input, { target: { value: 'Tag it +esc' } });
+    expect(screen.getByRole('listbox', { name: 'Label suggestions' })).toBeTruthy();
+    // Escape closes the suggestions first, and only then the row.
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('listbox', { name: 'Label suggestions' })).toBeNull();
+    expect(screen.getByLabelText('New task in Today')).toBeTruthy();
   });
 
   it('n opens the standalone add row on an empty view (docs/51 F14)', async () => {
@@ -559,7 +625,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     fireEvent.change(input, { target: { value: 'Quick one' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
     // The empty Today view's context still lands the task on today.
-    expect(mockCreate).toHaveBeenCalledWith({ title: 'Quick one', scheduledOn: TODAY });
+    expect(mockCreate).toHaveBeenCalledWith({ text: 'Quick one', defaults: { scheduledOn: TODAY } });
   });
 
   it('n stays dead on an empty view that cannot host adds (docs/51 F14)', () => {

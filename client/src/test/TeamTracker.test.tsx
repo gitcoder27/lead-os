@@ -363,6 +363,7 @@ vi.mock('@/hooks/useManagerDesk', () => ({
     isLoading: false,
   }),
   useCreateManagerDeskItem: () => ({ mutate: mockCreateManagerDeskItemMutate, isPending: false }),
+  useCreateDeskTask: () => ({ mutate: mockCreateManagerDeskItemMutate, isPending: false }),
   useUpdateManagerDeskItem: () => ({ mutate: mockUpdateManagerDeskItemMutate, isPending: false }),
 }));
 

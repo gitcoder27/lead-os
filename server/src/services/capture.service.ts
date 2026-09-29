@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   parseCapture,
   resolveCapture,
+  type CaptureDefaults,
   type CaptureLookups,
   type CaptureRequestBody,
   type CaptureResponseBody,
@@ -25,10 +26,14 @@ import { dueAtForDate, type ManagerTask } from "shared/types";
 /**
  * docs/57 §1 (P3-02): a capture is untriaged — it lands in Inbox — when it
  * carries no triage decision: no date, no owner, not parked, and no `/f`
- * (a follow-up already surfaces on Today).
+ * (a follow-up already surfaces on Today). P3-05: naming any of those in
+ * `defaults` (a group's date, an owner, waiting, later, a status, a check-by
+ * or a deadline) is a decision too.
  */
-export function isUntriaged(resolved: ResolvedCapture): boolean {
-  return !resolved.scheduledOn && !resolved.dueOn && !resolved.owner && !resolved.later && !resolved.followUp && !resolved.waitingOn;
+export function isUntriaged(resolved: ResolvedCapture, defaults: CaptureDefaults = {}): boolean {
+  const decided = defaults.scheduledOn !== undefined || defaults.ownerAccountId !== undefined || defaults.later === true
+    || Boolean(defaults.waitingOn) || defaults.status !== undefined || Boolean(defaults.followUpAt) || Boolean(defaults.dueAt);
+  return !decided && !resolved.scheduledOn && !resolved.dueOn && !resolved.owner && !resolved.later && !resolved.followUp && !resolved.waitingOn;
 }
 
 /**
@@ -70,7 +75,7 @@ export class CaptureService {
       case "note":
         return { ...base, note: await this.notes.append(principal.accountId, serverToday, { text: resolved.title, requestId: input.requestId ?? randomUUID() }, scope) };
       default:
-        return { ...base, task: await this.applyCreate(resolved, principal, input.requestId ?? randomUUID()) };
+        return { ...base, task: await this.applyCreate(resolved, principal, input.requestId ?? randomUUID(), input.defaults ?? {}) };
     }
   }
 
@@ -144,8 +149,12 @@ export class CaptureService {
    * all in one transaction. `requestId` replays to the originally created
    * task (the `created` event carries the `req:` dedupe key), so a transport
    * retry does not duplicate the task.
+   *
+   * `defaults` (P3-05) only fill what the text left open — a token the user
+   * typed always wins: an `@owner`, a `!date`, `/later`, `/w`, `/m`, `!!`,
+   * `^parent`, `!due:` and `/f !date` each beat the matching default.
    */
-  private async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string) {
+  private async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string, defaults: CaptureDefaults) {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const existing = await this.events.getByRequestId(requestId, { kind: "manager", accountId: principal.accountId, workspaceId: scope });
     if (existing?.event.type === "created" && existing.event.taskKey) {
@@ -154,56 +163,96 @@ export class CaptureService {
     }
     return runInTransaction(async () => {
       const today = todayIsoDate();
+      const parentRef = resolved.parentKey ?? defaults.parentKey;
       let parentId: number | null = null;
-      if (resolved.parentKey) {
-        const parentKey = await this.keys.resolve(scope, resolved.parentKey);
+      if (parentRef) {
+        const parentKey = await this.keys.resolve(scope, parentRef);
         const parent = parentKey ? await this.taskService.getByKey(parentKey, scope) : undefined;
         if (!parent || parent.deletedAt) throw new HttpError(400, "Parent task not found");
         parentId = parent.id;
       }
+
+      // Later needs a manager owner: an owner or a date in the text beats a default /later.
+      const later = resolved.later || (defaults.later === true && !resolved.owner && !resolved.scheduledOn);
+      const ownerAccountId = resolved.owner?.accountId ?? (later ? undefined : defaults.ownerAccountId);
+      const unowned = !resolved.owner && !later && defaults.ownerAccountId === null;
+      const followUpAt = resolved.followUpAt
+        // §4.1: `/f` with a date stores a local-time morning timestamp (the
+        // buildSnoozeIso convention); dateless `/f` leaves follow_up_at NULL —
+        // the injected `category:follow_up` label carries the follow-up.
+        ? new Date(`${resolved.followUpAt}T09:00:00`).toISOString()
+        : defaults.followUpAt ?? null;
+      const waitingOn = resolved.waitingOn
+        ? resolved.waitingOn.kind === "contact"
+          ? { type: "contact" as const, ref: String(resolved.waitingOn.contactId) }
+          : { type: "developer" as const, ref: resolved.waitingOn.accountId }
+        : defaults.waitingOn ?? null;
+      const labels = [...new Set([...resolved.labels, ...(defaults.labels ?? [])])];
+      // docs/57 §1/§3 (P3-02): no date means undated. A bare capture goes to
+      // Inbox; `@dev` without a date keeps landing on the developer's day
+      // (signed-off decision 4).
+      const scheduledOn = later
+        ? null
+        : resolved.scheduledOn ?? (defaults.scheduledOn !== undefined ? defaults.scheduledOn : ownerAccountId ? today : null);
+
       const row = await this.taskService.create(
         {
           title: resolved.title,
-          kind: resolved.meeting ? "meeting" : "task",
+          kind: resolved.meeting || defaults.kind === "meeting" ? "meeting" : "task",
           // P3-D7: no @person → the manager owns it (create() defaults to me).
-          ownerType: resolved.owner ? "developer" : undefined,
-          ownerId: resolved.owner?.accountId,
-          priority: resolved.priority,
-          labels: resolved.labels,
-          later: resolved.later,
-          // docs/57 §1/§3 (P3-02): no date means undated. A bare capture goes
-          // to Inbox; `@dev` without a date keeps landing on the developer's
-          // day (signed-off decision 4).
-          scheduledOn: resolved.later ? null : (resolved.scheduledOn ?? (resolved.owner ? today : null)),
-          hideUntil: resolved.later ? resolved.hideUntil : null,
-          // §4.1: `/f` with a date stores a local-time morning timestamp
-          // (the buildSnoozeIso convention); dateless `/f` leaves follow_up_at
-          // NULL — the injected `category:follow_up` label carries the follow-up.
+          ...(unowned ? { ownerType: null, ownerId: null } : ownerAccountId ? { ownerType: "developer" as const, ownerId: ownerAccountId } : {}),
+          priority: resolved.priority === "high" ? "high" : defaults.priority ?? "normal",
+          ...(defaults.status ? { status: defaults.status } : {}),
+          labels,
+          later,
+          scheduledOn,
+          hideUntil: later ? resolved.hideUntil : null,
           // docs/57 §3 (P3-04): `!due:date` is the deadline, kept apart from the plan date.
-          dueAt: resolved.dueOn ? dueAtForDate(resolved.dueOn) : null,
-          followUpAt: resolved.followUpAt ? new Date(`${resolved.followUpAt}T09:00:00`).toISOString() : null,
+          dueAt: resolved.dueOn ? dueAtForDate(resolved.dueOn) : defaults.dueAt ?? null,
+          followUpAt,
+          ...(defaults.startsAt !== undefined ? { startsAt: defaults.startsAt } : {}),
+          ...(defaults.endsAt !== undefined ? { endsAt: defaults.endsAt } : {}),
+          ...(defaults.participants ? { participants: defaults.participants } : {}),
+          ...(defaults.nextAction ? { nextAction: defaults.nextAction } : {}),
           parentId,
           // docs/57 §3 (P3-03): `/w @who` or `/f @who` — the task waits on them.
-          waitingOn: resolved.waitingOn
-            ? resolved.waitingOn.kind === "contact"
-              ? { type: "contact", ref: String(resolved.waitingOn.contactId) }
-              : { type: "developer", ref: resolved.waitingOn.accountId }
-            : null,
+          waitingOn,
         },
         principal,
-        { requestId, source: "capture", untriaged: isUntriaged(resolved) },
+        { requestId, source: "capture", untriaged: isUntriaged(resolved, defaults) },
       );
+      const jiraKeys = new Set(resolved.jiraLinks.map((link) => link.key));
       for (const link of resolved.jiraLinks) {
         await this.taskService.addLink(row.taskKey, { kind: "jira", ref: link.key, role: link.primary ? "primary" : "related" }, principal);
+      }
+      for (const key of defaults.links?.jiraKeys ?? []) {
+        if (jiraKeys.has(key.toUpperCase())) continue;
+        jiraKeys.add(key.toUpperCase());
+        await this.taskService.addLink(row.taskKey, { kind: "jira", ref: key, role: jiraKeys.size === 1 ? "primary" : "related" }, principal);
       }
       for (const person of resolved.peopleLinks) {
         await this.taskService.addLink(row.taskKey, person.kind === "contact"
           ? { kind: "contact", ref: String(person.contactId) }
           : { kind: "person", ref: person.accountId }, principal);
       }
+      for (const accountId of defaults.links?.developerAccountIds ?? []) {
+        // The owner already carries the person link through ownership.
+        if (accountId === ownerAccountId) continue;
+        await this.taskService.addLink(row.taskKey, { kind: "person", ref: accountId }, principal);
+      }
       for (const key of resolved.taskLinks) {
         const target = await this.keys.resolve(scope, key);
         if (target) await this.taskService.addLink(row.taskKey, { kind: "task", ref: target }, principal);
+      }
+      // The old Desk "context note": the task's first update (visibility follows the event service's default, as the Desk did).
+      if (defaults.contextNote?.trim()) {
+        await this.events.append(
+          { workspaceId: scope, taskKey: row.taskKey, type: "update", body: defaults.contextNote.trim(), meta: { via: "context_note_field" } },
+          { type: principal.type, accountId: principal.accountId },
+        );
+      }
+      if (defaults.source?.type === "note") {
+        await this.notes.linkCreatedTask(principal.accountId, defaults.source.noteDate, defaults.source.noteKind ?? "scratchpad", row, requestId, scope);
       }
       // Capture runs under a manager/copilot principal, so the DTO is always the
       // manager projection.

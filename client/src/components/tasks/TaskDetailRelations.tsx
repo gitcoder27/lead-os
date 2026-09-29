@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react';
 import { ArrowUpRight, ChevronRight, ExternalLink, Globe, Link2, ListTree, Plus, Ticket, UserRound, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
-import { useAddTaskDetailLink, useCreateChildTask, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
-import { getLocalIsoDate } from '@/lib/utils';
-import { parseCapture, resolveCapture } from 'shared/capture-grammar';
+import { useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
+import { useCaptureTask } from '@/hooks/useCapture';
 import type { TaskChildRef, TaskDetailResponse, TaskLink } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskStatusGlyph } from './TaskMenus';
@@ -315,7 +314,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   people: TaskPeople;
 }) {
   const { addToast } = useToast();
-  const createChild = useCreateChildTask(task.taskKey);
+  const createChild = useCaptureTask();
   const [draft, setDraft] = useState('');
   const isMeeting = task.kind === 'meeting';
   const canAdd = isMeeting && mode === 'manager' && !readOnly;
@@ -323,32 +322,18 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
 
   if (!task.children.length && !canAdd) return null;
 
-  const submit = () => {
-    if (createChild.isPending) return;
-    // §5.3: action-item owners come from `@person` via the capture grammar.
-    const resolved = resolveCapture(parseCapture(draft, getLocalIsoDate()), { people: people.developers });
-    const blocking = resolved.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
-    if (blocking) {
-      addToast(blocking.message, 'error');
-      return;
+  // docs/57 §3 (P3-05): an action item is a capture with this task as its parent —
+  // `@dev` is the owner, `!fri` the date, and the server reports anything it can't resolve.
+  const submit = async () => {
+    const text = draft.trim();
+    if (!text || createChild.isPending) return;
+    try {
+      const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey } });
+      setDraft('');
+      if (warnings.length) addToast(warnings.map((warning) => warning.message).join(' '), 'warning');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Could not add the action item', 'error');
     }
-    const title = resolved.title.trim();
-    if (!title) return;
-    createChild.mutate(
-      {
-        title,
-        kind: 'task',
-        parentId: task.id,
-        ...(resolved.owner ? { ownerType: 'developer' as const, ownerId: resolved.owner.accountId } : {}),
-        ...(resolved.scheduledOn ? { scheduledOn: resolved.scheduledOn } : {}),
-        ...(resolved.priority === 'high' ? { priority: 'high' as const } : {}),
-        ...(resolved.labels.length ? { labels: resolved.labels } : {}),
-      },
-      {
-        onSuccess: () => setDraft(''),
-        onError: (err) => addToast(err.message, 'error'),
-      },
-    );
   };
 
   const total = task.children.length;
@@ -375,7 +360,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
       {canAdd && (
         <form
           className="flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
-          onSubmit={(event) => { event.preventDefault(); submit(); }}
+          onSubmit={(event) => { event.preventDefault(); void submit(); }}
         >
           <Plus size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
           <input

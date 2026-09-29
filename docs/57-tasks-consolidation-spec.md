@@ -80,6 +80,15 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
   - `MemoryComposer` (deleted in P3-06).
 
   `POST /api/tasks` stays for services, Copilot and 1:1s. It is not a UI path.
+
+  **As built in P3-05:**
+  - `defaults` is broader than the list above: it also carries `dueAt`, `followUpAt` (a timestamp, so a time of day survives), `startsAt`/`endsAt`, `participants`, `nextAction`, `status` (open, active or blocked), `priority`, `labels`, `contextNote` (the task's first private update), `links` (`jiraKeys`, `developerAccountIds`) and `source` (`{ type: "note", noteDate, noteKind }`, which writes the created-from reference the notes list reads).
+  - Naming any triage field in `defaults` (owner, date, waiting, later, status, check-by, deadline) makes the capture triaged, so it skips Inbox. `scheduledOn: null` means "deliberately undated".
+  - Typed tokens win over defaults; a default `later` gives way to a typed `!date` or `@owner`. `ownerAccountId` never applies to a Later task, and `null` leaves the task unowned (the Inbox lens).
+  - Client: `useCaptureTask().create({ text, defaults })` is the one-shot path (inline add, child action items, the palette's quick add, the desk-style dialogs through `useCreateDeskTask`, and the notes hooks). A `T-n:` or `/note` text is refused there rather than posted as an update or a note.
+  - Today's "Follow up" and a meeting's next action are made through `CaptureService` on the server, with a new `delete_task` restore for undo.
+  - Without Phase 3, the legacy Desk create still runs, so nothing changes for a workspace that has not switched.
+  - `useCaptureTypeahead` gives `@person` (developers, then contacts), `#JIRA-KEY` (synced issues, two characters minimum) and `+label`. It is on the capture box and the Tasks inline add; the child action-item input has none yet.
 - **Keep-open mode.** Cmd/Ctrl+Enter submits and keeps the dialog open. Today the dialog always closes (`CaptureBox.tsx:273`).
 
 ## 4. Built-in lenses (`task-views.service.ts:41-57`)

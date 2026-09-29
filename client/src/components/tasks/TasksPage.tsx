@@ -26,7 +26,7 @@ import {
 } from '@/lib/task-views';
 import {
   applyLingering,
-  inlineAddDefaults,
+  inlineCaptureDefaults,
   isOpenStatus,
   lingerEntriesFor,
   lingerHint,
@@ -773,7 +773,13 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
 
   const handleInlineAdd = async (context: TaskGroupContext, title: string): Promise<boolean> => {
     try {
-      await mutations.create.mutateAsync({ title, ...inlineAddDefaults(selectedView?.id, definition, context, today) });
+      // docs/57 §3 (P3-05): inline add is a capture — tokens in the title work,
+      // and the group's context (date, owner, waiting party…) fills the rest.
+      const { warnings } = await mutations.create.mutateAsync({
+        text: title,
+        defaults: inlineCaptureDefaults(selectedView?.id, definition, context, today),
+      });
+      if (warnings.length) addToast({ type: 'warning', title: 'Added with warnings', message: warnings.map((warning) => warning.message).join(' ') });
       return true;
     } catch (error) {
       addToast({ type: 'error', title: 'Could not add task', message: error instanceof Error ? error.message : undefined });

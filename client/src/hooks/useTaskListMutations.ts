@@ -3,8 +3,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/lib/api';
+import { useCaptureTask } from '@/hooks/useCapture';
 import { optimisticTask, undoChanges } from '@/lib/task-list';
-import type { BulkUpdateTasksResponse, CreateTaskRequest, ManagerTask, TaskViewTasksResponse, UpdateTaskRequest } from '@/types';
+import type { BulkUpdateTasksResponse, ManagerTask, TaskViewTasksResponse, UpdateTaskRequest } from '@/types';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
 
 export interface TaskChangeItem {
@@ -112,10 +113,10 @@ export function useTaskListMutations() {
     return true;
   }, []);
 
-  const create = useMutation({
-    mutationFn: (input: CreateTaskRequest) => api.post<ManagerTask>('/tasks', input),
-    onSettled: () => invalidateTaskSurfaces(qc),
-  });
+  // docs/57 §3 (P3-05): inline add is a capture — the title goes through the
+  // shared grammar and the group's context rides as `defaults`.
+  const captureTask = useCaptureTask();
+  const create = { mutateAsync: captureTask.create, isPending: captureTask.isPending };
 
   return { apply, create, undoLast, isPending: bulk.isPending };
 }

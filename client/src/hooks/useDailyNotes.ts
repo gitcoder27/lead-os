@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import type { InfiniteData } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { createTaskViaCapture, postCapture } from '@/hooks/useCapture';
 import type {
   AppendDailyNotePayload,
   CreateDailyNoteFollowUpPayload,
@@ -198,9 +199,21 @@ export function useCreateDailyNoteFollowUp(noteDate: string) {
   const stillCurrent = useMutationScopeGuard();
 
   return useMutation({
-    mutationFn: (payload: CreateDailyNoteFollowUpPayload) => {
+    // docs/57 §3 (P3-05): the follow-up is a capture from this note — the title goes
+    // through the shared grammar, and the note reference is written with the task.
+    mutationFn: async (payload: CreateDailyNoteFollowUpPayload): Promise<DailyNoteFollowUp> => {
       scopeAtSendRef.current = authScopeKey;
-      return api.post<DailyNoteFollowUp>(`/notes/${encodeURIComponent(noteDate)}/follow-ups`, payload);
+      const { task } = await createTaskViaCapture(postCapture, {
+        text: payload.title,
+        requestId: payload.requestId,
+        defaults: {
+          scheduledOn: payload.date,
+          followUpAt: payload.followUpAt,
+          labels: ['category:follow_up'],
+          source: { type: 'note', noteDate, ...(payload.kind ? { noteKind: payload.kind } : {}) },
+        },
+      });
+      return { itemId: task.id, title: task.title, date: payload.date, status: 'planned', followUpAt: task.followUpAt ?? undefined, taskKey: task.taskKey };
     },
     onSuccess: () => {
       if (!stillCurrent(scopeAtSendRef.current)) {
@@ -251,16 +264,28 @@ export function useCreateDailyNoteTask(noteDate: string) {
   const stillCurrent = useMutationScopeGuard();
 
   return useMutation({
-    mutationFn: (payload: {
+    // docs/57 §3 (P3-05): a capture from this note. The title runs through the
+    // shared grammar; the developer, Jira issue and context ride as `defaults`.
+    mutationFn: async (payload: {
       title: string;
       developerAccountId?: string;
       jiraKey?: string;
       context?: string;
       requestId: string;
       kind?: DailyNoteKind;
-    }) => {
+    }): Promise<Pick<TaskResolution, 'taskKey' | 'title'>> => {
       scopeAtSendRef.current = authScopeKey;
-      return api.post<TaskResolution>(`/notes/${encodeURIComponent(noteDate)}/tasks`, payload);
+      const { task } = await createTaskViaCapture(postCapture, {
+        text: payload.title,
+        requestId: payload.requestId,
+        defaults: {
+          ...(payload.developerAccountId ? { ownerAccountId: payload.developerAccountId } : {}),
+          ...(payload.jiraKey ? { links: { jiraKeys: [payload.jiraKey] } } : {}),
+          ...(payload.context ? { contextNote: payload.context } : {}),
+          source: { type: 'note', noteDate, ...(payload.kind ? { noteKind: payload.kind } : {}) },
+        },
+      });
+      return { taskKey: task.taskKey, title: task.title };
     },
     onSuccess: () => {
       if (!stillCurrent(scopeAtSendRef.current)) {

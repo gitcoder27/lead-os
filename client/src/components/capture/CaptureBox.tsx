@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
+import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, X, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
   parseCapture,
   resolveCapture,
+  type CaptureDefaults,
   type CaptureDiagnostic,
-  type CapturePersonCandidate,
   type CaptureTokenKind,
   type ResolvedCapture,
 } from 'shared/capture-grammar';
@@ -13,11 +13,11 @@ import { taskLabelDisplayName } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/context/ToastContext';
 import { useCapture } from '@/hooks/useCapture';
-import { useDevelopers } from '@/hooks/useDevelopers';
-import { useContacts, useCreateContact } from '@/hooks/useContacts';
-import { useTaskLabels } from '@/hooks/useTaskLabels';
+import { useCreateContact } from '@/hooks/useContacts';
+import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
 import { getLocalIsoDate } from '@/lib/utils';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
+import { TokenSuggestionList } from './TokenSuggestionList';
 
 /** Per-kind token highlight colors — the live preview paints these in-place. */
 const TOKEN_COLORS: Record<CaptureTokenKind, string> = {
@@ -57,15 +57,19 @@ interface CaptureBoxProps {
   prefill?: string;
   /**
    * The developer this capture is for (standup "New task", dev-scoped quick
-   * capture). Shown as an assignee pill above the input; the `@accountId`
-   * token is injected at submit so a raw account id never appears in the
-   * text. A `@person` typed in the box overrides it.
+   * capture). Shown as an assignee pill above the input and sent as the
+   * structured `defaults.ownerAccountId`, never as `@id` text — so an account id
+   * with a colon (a Jira id) never has to survive the grammar. A `@person` typed
+   * in the box overrides it, and the pill can be cleared.
    */
   assignee?: { accountId: string; displayName?: string };
   onClose: () => void;
   /** Fires after a successful capture, before close (standup session log, docs/50). */
   onCaptured?: (result: { intent: string; taskKey?: string }) => void;
 }
+
+/** docs/57 §3 (P3-05): Cmd/Ctrl+Enter captures and keeps the box open for the next one. */
+const KEEP_OPEN_HINT = '⌘/Ctrl+Enter captures and keeps this open';
 
 function Chip({ icon, children, tone }: { icon?: React.ReactNode; children: React.ReactNode; tone?: 'error' | 'warning' }) {
   const color = tone === 'error' ? 'var(--danger)' : tone === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
@@ -146,28 +150,20 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
 export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: CaptureBoxProps) {
   const { addToast } = useToast();
   const capture = useCapture();
-  const developers = useDevelopers();
-  const contacts = useContacts();
   const createContact = useCreateContact();
-  const labelRegistry = useTaskLabels();
   const [text, setText] = useState(prefill);
   const [caret, setCaret] = useState(prefill.length);
-  const [suggestDismissed, setSuggestDismissed] = useState(false);
-  const [activeLabelIndex, setActiveLabelIndex] = useState(0);
   const [confirmArmed, setConfirmArmed] = useState(false);
+  const [assigneeCleared, setAssigneeCleared] = useState(false);
   const [serverDiagnostics, setServerDiagnostics] = useState<CaptureDiagnostic[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const today = useMemo(() => getLocalIsoDate(), []);
 
-  // docs/57 §2: `@handle` also resolves the manager's contacts (external people).
-  const people = useMemo<CapturePersonCandidate[]>(
-    () => [
-      ...(developers.data ?? []).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName, kind: 'developer' as const })),
-      ...(contacts.data ?? []).map((contact) => ({ accountId: contact.handle, displayName: contact.displayName, kind: 'contact' as const, contactId: contact.id })),
-    ],
-    [developers.data, contacts.data],
-  );
+  // `@person`, `#JIRA-KEY` and `+label` typeahead; also owns the roster the
+  // preview resolves against (developers and this manager's contacts).
+  const typeahead = useCaptureTypeahead(text, caret);
+  const { people } = typeahead;
   const developerNames = useMemo(() => new Map(people.map((p) => [p.accountId, p.displayName])), [people]);
 
   const resolved = useMemo(() => {
@@ -179,7 +175,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
 
   // While the roster is loading, person tokens can't be resolved yet — hold
   // their diagnostics so users don't see a spurious "nobody matches" flash.
-  const holdPeopleDiagnostics = developers.isPending;
+  const holdPeopleDiagnostics = typeahead.developersPending;
   const allDiagnostics = serverDiagnostics.length ? serverDiagnostics : resolved?.diagnostics ?? [];
   const heldDiagnostics = holdPeopleDiagnostics
     ? allDiagnostics.filter((d) => d.code !== 'unknown-person' && d.code !== 'ambiguous-person')
@@ -192,33 +188,13 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
   });
   const blocked = diagnostics.some((d) => d.severity === 'error');
 
-  // §3.3: `+label` typeahead — the fragment under the caret suggests
-  // registered label names, mirroring the @person ambiguity chooser.
-  const labelFragment = useMemo(() => {
-    const before = text.slice(0, caret);
-    const match = /(?:^|\s)\+([a-zA-Z0-9:_-]*)$/.exec(before);
-    return match ? { start: caret - match[1]!.length - 1, fragment: match[1]! } : null;
-  }, [text, caret]);
-
-  const labelSuggestions = useMemo(() => {
-    if (!labelFragment || suggestDismissed) return [];
-    const fragment = labelFragment.fragment.toLowerCase();
-    const names = (labelRegistry.data?.labels ?? []).map((label) => label.name);
-    const prefix = names.filter((name) => name.startsWith(fragment) && name !== fragment);
-    const contains = names.filter((name) => !prefix.includes(name) && name.includes(fragment));
-    return [...prefix, ...contains].slice(0, 6);
-  }, [labelFragment, labelRegistry.data, suggestDismissed]);
-
-  const applyLabel = (name: string) => {
-    if (!labelFragment) return;
-    const next = `${text.slice(0, labelFragment.start)}+${name} ${text.slice(caret)}`;
-    const nextCaret = labelFragment.start + name.length + 2;
-    setText(next);
-    setCaret(nextCaret);
-    setActiveLabelIndex(0);
+  /** Put a typeahead choice (or any programmatic edit) into the text and caret. */
+  const applyEdit = (next: { text: string; caret: number }) => {
+    setText(next.text);
+    setCaret(next.caret);
     window.requestAnimationFrame(() => {
       inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(nextCaret, nextCaret);
+      inputRef.current?.setSelectionRange(next.caret, next.caret);
     });
   };
 
@@ -227,13 +203,10 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
     return () => window.clearTimeout(timer);
   }, []);
 
-  // New edits clear server diagnostics, the armed confirm, and dismissed
-  // label suggestions.
+  // New edits clear server diagnostics and the armed confirm.
   useEffect(() => {
     setServerDiagnostics([]);
     setConfirmArmed(false);
-    setSuggestDismissed(false);
-    setActiveLabelIndex(0);
   }, [text]);
 
   const syncScroll = () => {
@@ -267,18 +240,23 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
 
   // Assignee pill: shows the effective owner — the prop, or a `@person` the
   // user typed themselves. Irrelevant for update/note intents and forbidden
-  // on /later, so it hides there (and no token is injected for them).
-  const ownerPill = resolved?.owner ?? assignee ?? null;
+  // on /later, so it hides there (and nothing is sent for them). It rides as
+  // `defaults.ownerAccountId`; clearing it sends no owner at all.
+  const activeAssignee = assignee && !assigneeCleared ? assignee : undefined;
+  const ownerPill = resolved?.owner ?? activeAssignee ?? null;
   const ownerPillName = ownerPill
-    ? developerNames.get(ownerPill.accountId) ?? ownerPill.displayName ?? ownerPill.accountId
+    ? developerNames.get(ownerPill.accountId) ?? ('displayName' in ownerPill ? ownerPill.displayName : undefined) ?? ownerPill.accountId
     : '';
+  const assigneeName = assignee ? developerNames.get(assignee.accountId) ?? assignee.displayName ?? assignee.accountId : '';
   const showOwnerPill = !!assignee && (!resolved || (resolved.intent === 'create' && !resolved.later));
 
-  const submit = (confirm = false) => {
+  const submit = (confirm = false, keepOpen = false) => {
     if (!resolved || blocked || capture.isPending) return;
-    const injectOwner = assignee && resolved.intent === 'create' && !resolved.owner && !resolved.later;
+    const defaults: CaptureDefaults | undefined = activeAssignee && resolved.intent === 'create' && !resolved.owner && !resolved.later
+      ? { ownerAccountId: activeAssignee.accountId }
+      : undefined;
     capture.mutate(
-      { text: injectOwner ? `@${assignee.accountId} ${text}` : text, clientToday: today, ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
+      { text, clientToday: today, ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
       {
         onSuccess: (res) => {
           if (res.blocked) {
@@ -307,6 +285,11 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
               title: 'Captured with warnings',
               message: warnings.map((d) => d.message).join(' '),
             });
+          }
+          if (keepOpen) {
+            // Back to the starting text (a `#KEY` or `/note` prefill), ready for the next one.
+            applyEdit({ text: prefill, caret: prefill.length });
+            return;
           }
           onClose();
         },
@@ -342,25 +325,48 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
     return spans;
   };
 
-  const summaryChips = resolved ? summarize(resolved, developerNames, !!assignee) : [];
+  const summaryChips = resolved ? summarize(resolved, developerNames, !!activeAssignee) : [];
 
   return (
     <div className="px-4 py-3 space-y-2.5">
-      {showOwnerPill && ownerPill && (
+      {showOwnerPill && (
         <div className="flex items-center gap-1.5" data-testid="capture-assignee">
           <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
             Assignee
           </span>
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-[12.5px] font-medium"
-            style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 26%, transparent)' }}
-          >
-            <Avatar name={ownerPillName} seed={ownerPill.accountId} size={16} />
-            {ownerPillName}
-          </span>
-          <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
-            type @name to change
-          </span>
+          {ownerPill ? (
+            <>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-[12.5px] font-medium"
+                style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 26%, transparent)' }}
+              >
+                <Avatar name={ownerPillName} seed={ownerPill.accountId} size={16} />
+                {ownerPillName}
+                {/* A typed @person is edited in the text; only the supplied assignee can be cleared. */}
+                {!resolved?.owner ? (
+                  <button
+                    type="button"
+                    aria-label="Clear assignee"
+                    title="Clear assignee"
+                    onClick={() => setAssigneeCleared(true)}
+                    className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_18%,transparent)]"
+                  >
+                    <X size={10} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </span>
+              <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                type @name to change
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Nobody — lands in Inbox</span>
+              <button type="button" className="ui-btn-ghost" onClick={() => setAssigneeCleared(false)}>
+                Assign to {assigneeName}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -387,19 +393,19 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onScroll={syncScroll}
           onKeyDown={(e) => {
-            if (labelSuggestions.length) {
-              if (e.key === 'ArrowDown') { e.preventDefault(); setActiveLabelIndex((i) => (i + 1) % labelSuggestions.length); return; }
-              if (e.key === 'ArrowUp') { e.preventDefault(); setActiveLabelIndex((i) => (i - 1 + labelSuggestions.length) % labelSuggestions.length); return; }
-              if (e.key === 'Tab') { e.preventDefault(); applyLabel(labelSuggestions[activeLabelIndex]!); return; }
-              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setSuggestDismissed(true); return; }
-            }
+            const nav = typeahead.handleKey(e);
+            if (typeof nav === 'object') { applyEdit(nav); return; }
+            if (nav) return;
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              if (labelSuggestions.length) {
-                applyLabel(labelSuggestions[activeLabelIndex]!);
-                return;
+              // Cmd/Ctrl+Enter always captures (and keeps the box open); a plain
+              // Enter first accepts an open suggestion.
+              const keepOpen = e.metaKey || e.ctrlKey;
+              if (typeahead.open && !keepOpen) {
+                const chosen = typeahead.choose();
+                if (chosen) { applyEdit(chosen); return; }
               }
-              submit(confirmArmed);
+              submit(confirmArmed, keepOpen);
             }
           }}
           rows={3}
@@ -414,34 +420,18 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
             border: '1px solid var(--border)',
           }}
         />
-        {labelSuggestions.length > 0 && (
-          <div
-            className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl"
-            role="listbox"
-            aria-label="Label suggestions"
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', boxShadow: '0 12px 32px rgba(0,0,0,0.28)' }}
-          >
-            {labelSuggestions.map((name, index) => (
-              <button
-                key={name}
-                type="button"
-                role="option"
-                aria-selected={index === activeLabelIndex}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applyLabel(name)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors"
-                style={{
-                  background: index === activeLabelIndex ? 'var(--accent-glow)' : 'transparent',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <Tags size={10} style={{ color: 'var(--accent)' }} />
-                <span className="font-mono font-semibold">+{name}</span>
-                <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{taskLabelDisplayName(name)}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {typeahead.open && typeahead.fragment ? (
+          <TokenSuggestionList
+            trigger={typeahead.fragment.trigger}
+            suggestions={typeahead.suggestions}
+            activeIndex={typeahead.activeIndex}
+            onHover={typeahead.setActiveIndex}
+            onChoose={(suggestion) => {
+              const chosen = typeahead.choose(suggestion);
+              if (chosen) applyEdit(chosen);
+            }}
+          />
+        ) : null}
       </div>
 
       {/* Structured summary */}
@@ -498,18 +488,31 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
-        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="min-w-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>
           {resolved?.intent === 'update' ? 'Logs a shared update on the task' : resolved?.intent === 'note' ? 'Appends to today\u2019s daily note' : 'Creates a task'}
+          <span className="hidden sm:inline" data-testid="capture-keep-open-hint"> · {KEEP_OPEN_HINT}</span>
         </span>
-        <button
-          type="button"
-          onClick={() => submit(confirmArmed)}
-          disabled={!text.trim() || blocked || capture.isPending}
-          className="ui-btn-solid"
-        >
-          <Zap size={11} />
-          {capture.isPending ? 'Capturing…' : confirmArmed ? 'Confirm' : 'Capture'}
-        </button>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => submit(confirmArmed, true)}
+            disabled={!text.trim() || blocked || capture.isPending}
+            className="ui-btn"
+            aria-label="Add another"
+            title={KEEP_OPEN_HINT}
+          >
+            + Another
+          </button>
+          <button
+            type="button"
+            onClick={() => submit(confirmArmed)}
+            disabled={!text.trim() || blocked || capture.isPending}
+            className="ui-btn-solid"
+          >
+            <Zap size={11} />
+            {capture.isPending ? 'Capturing…' : confirmArmed ? 'Confirm' : 'Capture'}
+          </button>
+        </span>
       </div>
     </div>
   );

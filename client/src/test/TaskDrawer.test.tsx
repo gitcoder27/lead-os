@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { dueAtForDate } from '@/types';
 import type { TaskDetailResponse } from '@/types';
 
@@ -7,6 +7,7 @@ const mockUseTaskDetail = vi.fn();
 const mockMutate = vi.fn();
 const mockDelete = vi.fn();
 const mockUser = vi.fn();
+const mockToast = vi.fn();
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({ user: mockUser() }),
@@ -14,7 +15,7 @@ vi.mock('@/context/AuthContext', () => ({
 }));
 
 vi.mock('@/context/ToastContext', () => ({
-  useToast: () => ({ addToast: vi.fn() }),
+  useToast: () => ({ addToast: (...args: unknown[]) => mockToast(...args) }),
 }));
 
 vi.mock('@/hooks/useTaskDetail', () => ({
@@ -23,7 +24,11 @@ vi.mock('@/hooks/useTaskDetail', () => ({
   useDeleteTaskDetail: () => ({ mutate: mockDelete, isPending: false }),
   useAddTaskDetailLink: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveTaskDetailLink: () => ({ mutate: vi.fn(), isPending: false }),
-  useCreateChildTask: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+const mockCaptureCreate = vi.fn();
+vi.mock('@/hooks/useCapture', () => ({
+  useCaptureTask: () => ({ create: mockCaptureCreate, isPending: false }),
 }));
 
 vi.mock('@/hooks/useTaskLabels', () => ({
@@ -96,6 +101,9 @@ function queryFor(task: TaskDetailResponse) {
 beforeEach(() => {
   mockMutate.mockReset();
   mockDelete.mockReset();
+  mockToast.mockReset();
+  mockCaptureCreate.mockReset();
+  mockCaptureCreate.mockResolvedValue({ task: { taskKey: 'T-20' }, warnings: [] });
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
 });
 
@@ -173,6 +181,61 @@ describe('TaskDrawer body (P3-D2)', () => {
     // Meetings hide follow-up + later.
     expect(screen.queryByText('Follow-up')).toBeNull();
     expect(screen.queryByText(/parked/)).toBeNull();
+  });
+
+  describe('action items go through capture (docs/57 P3-05)', () => {
+    const meeting = () => managerTask({ kind: 'meeting' });
+    const type = (value: string) => {
+      const input = screen.getByLabelText('New action item') as HTMLInputElement;
+      fireEvent.change(input, { target: { value } });
+      return input;
+    };
+
+    it('posts the text with this task as the parent, and clears the input', async () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Send summary @dev-1 !fri');
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })); });
+      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Send summary @dev-1 !fri', defaults: { parentKey: 'T-7' } });
+      expect(input.value).toBe('');
+    });
+
+    it('Enter submits the form', async () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Book the room');
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Book the room', defaults: { parentKey: 'T-7' } });
+    });
+
+    it('keeps the text and toasts the server\'s reason when the capture is rejected', async () => {
+      const { CaptureRejectedError } = await vi.importActual<typeof import('@/hooks/useCapture')>('@/hooks/useCapture');
+      mockCaptureCreate.mockRejectedValueOnce(new CaptureRejectedError([{ severity: 'error', code: 'unknown-person', message: 'Nobody matches @ghost' }]));
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Call @ghost');
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockToast).toHaveBeenCalledWith('Nobody matches @ghost', 'error');
+      expect(input.value).toBe('Call @ghost');
+    });
+
+    it('toasts warnings from a successful add', async () => {
+      mockCaptureCreate.mockResolvedValueOnce({ task: { taskKey: 'T-21' }, warnings: [{ severity: 'warning', code: 'unparsed-date', message: '"!soon" isn\u2019t a date' }] });
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Follow up !soon');
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('isn\u2019t a date'), 'warning');
+      expect(input.value).toBe('');
+    });
+
+    it('ignores blank input', async () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('   ');
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockCaptureCreate).not.toHaveBeenCalled();
+    });
   });
 
   it('renders a read-only tombstone for deleted tasks', () => {

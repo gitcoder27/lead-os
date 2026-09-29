@@ -1,6 +1,7 @@
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
 import { buildTopThreeActions, TodayPlanService } from "./today-plan.service";
+import { CaptureService } from "./capture.service";
 import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
 import { OneOnOneService } from "./one-on-one.service";
 import { performance } from "node:perf_hooks";
@@ -705,14 +706,17 @@ export class TodayService {
 
       case "capture_follow_up": {
         const title = requireTrimmedText(request.title, "title");
-        const result = await this.managerDeskService.createItem(
+        const followUp = await this.createFollowUpTask(
           managerAccountId,
-          { ...buildFollowUpCreateParams(date, actionTarget, title, request.preset, tz), source: "today", actor: { type: "manager", accountId: managerAccountId } },
+          { ...buildFollowUpCreateParams(date, actionTarget, title, request.preset, tz), source: "today" },
+          undefined,
           workspaceId,
         );
-        return commandResponse(command.kind, actionTarget, result, {
+        return commandResponse(command.kind, actionTarget, followUp.result, {
           label: "Undo",
-          request: restoreRequest(date, actionTarget, { type: "delete_desk_item", managerDeskItemId: result.id }),
+          request: restoreRequest(date, actionTarget, followUp.taskKey
+            ? { type: "delete_task", taskKey: followUp.taskKey }
+            : { type: "delete_desk_item", managerDeskItemId: followUp.deskItemId! }),
         });
       }
 
@@ -746,7 +750,7 @@ export class TodayService {
         const undo = before
           ? deskUndo(date, actionTarget, itemId, { status: before.status, outcome: before.outcome ?? null }, nextAction)
           : undefined;
-        return commandResponse(command.kind, actionTarget, { ...result, ...(nextAction ? { nextActionFollowUp: nextAction } : {}) }, undo);
+        return commandResponse(command.kind, actionTarget, { ...result, ...(nextAction ? { nextActionFollowUp: nextAction.result } : {}) }, undo);
       }
 
       default:
@@ -773,13 +777,13 @@ export class TodayService {
     request: ManagerActionCommandRequest,
     tz: string,
     workspaceId?: string,
-  ): Promise<ManagerDeskItem | undefined> {
+  ): Promise<CreatedFollowUp | undefined> {
     const title = request.nextAction?.trim();
     if (!title) return undefined;
     const meetingTarget = request.command.target;
     const ownerId = request.nextActionOwnerAccountId?.trim() || undefined;
     const canonical = await new TaskKeysService().canonicalEnabled(workspaceId);
-    const followUp = await this.managerDeskService.createItem(
+    const followUp = await this.createFollowUpTask(
       managerAccountId,
       {
         date: request.date,
@@ -793,18 +797,62 @@ export class TodayService {
         ...(!canonical && meetingTarget.managerDeskItemId ? { contextNote: `Next action from meeting #${meetingTarget.managerDeskItemId}` } : {}),
         links: ownerId ? [{ linkType: "developer", developerAccountId: ownerId }] : [],
         source: "today",
-        actor: { type: "manager", accountId: managerAccountId },
       },
+      canonical ? meetingTarget.taskKey : undefined,
       workspaceId,
     );
-    if (canonical && meetingTarget.taskKey && followUp.taskKey) {
-      const tasks = new TaskService();
-      const meeting = await tasks.getByKey(meetingTarget.taskKey, workspaceId);
-      if (meeting) {
-        await tasks.update(followUp.taskKey, { parentId: meeting.id }, { type: "manager", accountId: managerAccountId, workspaceId });
-      }
-    }
     return followUp;
+  }
+
+  /**
+   * docs/57 §3 (P3-05): Today's follow-ups are tasks made through the shared
+   * capture pipeline (one grammar, one create path) once Phase 3 is on — a
+   * title may carry tokens, and the structured context (links, follow-up time,
+   * parent meeting) rides as `defaults`. Without Phase 3 the legacy Desk create
+   * runs as before. Undo needs the task key (capture) or the desk id (legacy).
+   */
+  private async createFollowUpTask(
+    managerAccountId: string,
+    params: FollowUpCreateParams,
+    parentTaskKey: string | undefined,
+    workspaceId?: string,
+  ): Promise<CreatedFollowUp> {
+    const taskKeys = new TaskKeysService();
+    if (await taskKeys.phase3Enabled(workspaceId).catch(() => false)) {
+      const links = params.links ?? [];
+      const jiraKeys = links.flatMap((link) => (link.linkType === "issue" ? [link.issueKey] : []));
+      const developerAccountIds = links.flatMap((link) => (link.linkType === "developer" ? [link.developerAccountId] : []));
+      const res = await new CaptureService().run(
+        {
+          text: params.title,
+          confirm: true,
+          defaults: {
+            scheduledOn: params.date,
+            labels: ["category:follow_up"],
+            followUpAt: params.followUpAt,
+            ...(params.contextNote ? { contextNote: params.contextNote } : {}),
+            ...(parentTaskKey ? { parentKey: parentTaskKey } : {}),
+            ...(jiraKeys.length || developerAccountIds.length ? { links: { jiraKeys, developerAccountIds } } : {}),
+          },
+        },
+        { type: "manager", accountId: managerAccountId, workspaceId },
+      );
+      if (res.blocked || !res.task) {
+        throw new HttpError(400, res.diagnostics.find((entry) => entry.severity === "error")?.message ?? "The follow-up was not created");
+      }
+      return { taskKey: res.task.taskKey, result: res.task };
+    }
+    const item = await this.managerDeskService.createItem(
+      managerAccountId,
+      { ...params, actor: { type: "manager", accountId: managerAccountId } },
+      workspaceId,
+    );
+    if (parentTaskKey && item.taskKey && (await taskKeys.canonicalEnabled(workspaceId))) {
+      const tasks = new TaskService();
+      const parent = await tasks.getByKey(parentTaskKey, workspaceId);
+      if (parent) await tasks.update(item.taskKey, { parentId: parent.id }, { type: "manager", accountId: managerAccountId, workspaceId });
+    }
+    return { deskItemId: item.id, result: item };
   }
 
   /**
@@ -886,6 +934,10 @@ export class TodayService {
         await this.managerDeskService.deleteItem(managerAccountId, restore.managerDeskItemId, workspaceId);
         return commandResponse("restore", command.target, { deleted: restore.managerDeskItemId });
       }
+      case "delete_task": {
+        await this.deleteCreatedTask(managerAccountId, restore.taskKey, workspaceId);
+        return commandResponse("restore", command.target, { deleted: restore.taskKey });
+      }
       case "check_in_ask": {
         const ask = await this.stateService.getCheckInAsk(managerAccountId, restore.askId, workspaceId);
         if (!ask.cancelled) {
@@ -909,13 +961,27 @@ export class TodayService {
   /** A restore carrying `alsoDeleteDeskItemId` removes the follow-up created with the write. */
   private async deleteRestoredFollowUp(managerAccountId: string, request: ManagerActionCommandRequest, workspaceId?: string): Promise<void> {
     const restore = request.restore;
-    const id = restore && (restore.type === "desk_item" || restore.type === "task") ? restore.alsoDeleteDeskItemId : undefined;
+    if (!restore || (restore.type !== "desk_item" && restore.type !== "task")) return;
+    if (restore.alsoDeleteTaskKey) {
+      await this.deleteCreatedTask(managerAccountId, restore.alsoDeleteTaskKey, workspaceId);
+      return;
+    }
+    const id = restore.alsoDeleteDeskItemId;
     if (!id) return;
     try {
       await this.managerDeskService.deleteItem(managerAccountId, id, workspaceId);
     } catch (error) {
       if (!(error instanceof HttpError && error.status === 404)) throw error;
     }
+  }
+
+  /** Undo of a task made through capture: mine to remove, and already gone counts as done. */
+  private async deleteCreatedTask(managerAccountId: string, taskKey: string, workspaceId?: string): Promise<void> {
+    const tasks = new TaskService();
+    const existing = await tasks.getByKey(taskKey, workspaceId);
+    if (!existing || existing.deletedAt) return;
+    if (existing.trackedByManagerId !== managerAccountId) throw new HttpError(404, "Task not found");
+    await tasks.remove(taskKey, { type: "manager", accountId: managerAccountId, workspaceId });
   }
 
   private async getSyncStatus(workspaceId?: string): Promise<SyncStatus | undefined> {
@@ -2314,12 +2380,37 @@ function restoreRequest(date: string, actionTarget: ManagerActionTarget, restore
   };
 }
 
+interface FollowUpCreateParams {
+  date: string;
+  title: string;
+  kind: "action";
+  category: "follow_up";
+  status: "planned";
+  priority: "medium";
+  followUpAt: string;
+  contextNote?: string;
+  links: Array<{ linkType: "developer"; developerAccountId: string } | { linkType: "issue"; issueKey: string }>;
+  source: "today";
+}
+
+/** A follow-up created with a write: a task made through capture, or a legacy desk item. */
+interface CreatedFollowUp {
+  taskKey?: string;
+  deskItemId?: number;
+  result: unknown;
+}
+
+function alsoDelete(created: CreatedFollowUp | undefined): { alsoDeleteTaskKey?: string; alsoDeleteDeskItemId?: number } {
+  if (!created) return {};
+  return created.taskKey ? { alsoDeleteTaskKey: created.taskKey } : created.deskItemId ? { alsoDeleteDeskItemId: created.deskItemId } : {};
+}
+
 function deskUndo(
   date: string,
   actionTarget: ManagerActionTarget,
   managerDeskItemId: number,
   patch: Extract<ManagerActionRestore, { type: "desk_item" }>["patch"],
-  createdFollowUp?: ManagerDeskItem,
+  createdFollowUp?: CreatedFollowUp,
 ): ManagerActionUndo {
   return {
     label: "Undo",
@@ -2327,7 +2418,7 @@ function deskUndo(
       type: "desk_item",
       managerDeskItemId,
       patch,
-      ...(createdFollowUp ? { alsoDeleteDeskItemId: createdFollowUp.id } : {}),
+      ...alsoDelete(createdFollowUp),
     }),
   };
 }
@@ -2340,7 +2431,7 @@ function taskUndo(
   actionTarget: ManagerActionTarget,
   before: { taskKey: string; status: string; followUpAt: string | null; outcome: string | null; scheduledOn: string | null },
   updates: { status?: string; followUpAt?: string; outcome?: string; scheduledOn?: string },
-  createdFollowUp?: ManagerDeskItem,
+  createdFollowUp?: CreatedFollowUp,
 ): ManagerActionUndo {
   const patch: TaskUndoPatch = {};
   if (updates.status !== undefined) patch.status = before.status as TaskUndoPatch["status"];
@@ -2353,7 +2444,7 @@ function taskUndo(
       type: "task",
       taskKey: before.taskKey,
       patch,
-      ...(createdFollowUp ? { alsoDeleteDeskItemId: createdFollowUp.id } : {}),
+      ...alsoDelete(createdFollowUp),
     }),
   };
 }

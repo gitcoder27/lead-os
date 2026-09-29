@@ -350,7 +350,7 @@ describe('TriagePanel', () => {
     // Legacy notes appear as collapsed history preview text
     expect(screen.getByText(/Root cause looks related/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /add to desk/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }));
 
     // The desk dialog receives the raw analysis notes as context
     expect(screen.getByDisplayValue('Root cause looks related to the submit sanitization path.')).toBeInTheDocument();
@@ -393,7 +393,7 @@ describe('TriagePanel', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /add to desk/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }));
 
     expect(screen.queryByPlaceholderText('Quick context so future-you remembers why…')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add a context note/i })).toBeInTheDocument();

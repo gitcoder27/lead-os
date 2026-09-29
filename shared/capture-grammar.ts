@@ -44,7 +44,7 @@
  * with its own and rejects a drift of more than one day.
  */
 
-import type { DailyNoteResponse, ManagerTask, TaskEvent } from "./types";
+import type { DailyNoteKind, DailyNoteResponse, ManagerTask, TaskEvent, TaskWaitingOnInput } from "./types";
 
 export type CaptureIntent = "create" | "update" | "note";
 
@@ -187,8 +187,46 @@ export interface ResolvedCapture {
   priority: "normal" | "high";
 }
 
+/**
+ * docs/57 §3 (P3-05): structured context a UI supplies instead of injecting
+ * tokens into the text (the assignee pill, a group's date, a parent task, a
+ * Jira issue). It only fills what the text left open: a token the user typed
+ * always wins. Naming a triage field (owner, date, waiting, later, status,
+ * check-by or deadline) makes the capture triaged, so it skips Inbox.
+ */
+export interface CaptureDefaults {
+  /** Developer account id that owns the task; `null` leaves it unowned (Inbox). Never applies to a Later task. */
+  ownerAccountId?: string | null;
+  waitingOn?: TaskWaitingOnInput | null;
+  /** Plan date; `null` says "deliberately undated". */
+  scheduledOn?: string | null;
+  /** ISO timestamp — a follow-up time keeps its time of day. */
+  followUpAt?: string | null;
+  /** ISO timestamp of the deadline (use `dueAtForDate`). */
+  dueAt?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  later?: boolean;
+  kind?: "task" | "meeting";
+  status?: "open" | "active" | "blocked";
+  priority?: "normal" | "high";
+  /** Task key of the parent (subtask or meeting action item). */
+  parentKey?: string;
+  /** Added to any `+label` in the text. */
+  labels?: string[];
+  participants?: string;
+  nextAction?: string;
+  /** Saved as the task's first shared update (the old Desk "context note"). */
+  contextNote?: string;
+  links?: { jiraKeys?: string[]; developerAccountIds?: string[] };
+  /** Where the capture came from; a note writes the created-from reference. */
+  source?: { type: "note"; noteDate: string; noteKind?: DailyNoteKind };
+}
+
 export interface CaptureRequestBody {
   text: string;
+  /** Structured context that fills what the text leaves open (P3-05). */
+  defaults?: CaptureDefaults;
   /** The client's local ISO date — rejected when it drifts >1 day (§4.1). */
   clientToday?: string;
   /** Second submit confirming warning diagnostics (e.g. past dates). */

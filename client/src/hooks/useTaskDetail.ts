@@ -4,7 +4,7 @@ import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { getLocalIsoDate } from '@/lib/utils';
 import { prefetchMyDayTaskEvents } from './useTasks';
-import type { CreateTaskRequest, FormerOwnerTaskDetail, ManagerTask, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
+import type { FormerOwnerTaskDetail, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
 
 /**
  * Phase 3 (P3-D2): shared task detail. Managers hit `/api/tasks/:key/detail`;
@@ -117,15 +117,6 @@ export function useRemoveTaskDetailLink(taskKey: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (linkId: number) => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}/links/${linkId}`),
-    onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
-  });
-}
-
-/** Create a task (optionally a child action item via `parentId`). */
-export function useCreateChildTask(taskKey: string | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateTaskRequest) => api.post<ManagerTask>('/tasks', input),
     onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
   });
 }

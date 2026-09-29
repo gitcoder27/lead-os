@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAppendDailyNote, useCreateDailyNoteFollowUp } from '@/hooks/useDailyNotes';
+import { useAppendDailyNote, useCreateDailyNoteFollowUp, useCreateDailyNoteTask } from '@/hooks/useDailyNotes';
 import type { DailyNoteResponse } from '@/types';
 
 const apiMocks = {
@@ -163,9 +163,92 @@ describe('daily note mutations', () => {
 
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
     await act(async () => {
-      release({ itemId: 9, date: DATE, title: 'call back', status: 'planned' });
+      release({ intent: 'create', diagnostics: [], task: { id: 9, taskKey: 'T-9', title: 'call back', followUpAt: null } });
     });
 
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  describe('note task creation goes through capture (docs/57 P3-05)', () => {
+    const created = (overrides: Record<string, unknown> = {}) => ({
+      intent: 'create',
+      diagnostics: [],
+      task: { id: 9, taskKey: 'T-9', title: 'call back', followUpAt: '2026-04-30T09:00:00.000Z', ...overrides },
+    });
+
+    it('a follow-up posts the title as capture text, with the note as its source', async () => {
+      apiMocks.post.mockResolvedValueOnce(created());
+      const { result } = renderHook(() => useCreateDailyNoteFollowUp(DATE), { wrapper: createWrapper(new QueryClient()) });
+
+      let followUp: unknown;
+      await act(async () => {
+        followUp = await result.current.mutateAsync({
+          date: DATE, title: 'call back @dev-1', followUpAt: '2026-04-30T09:00:00.000Z', requestId: 'r3', kind: 'standup',
+        });
+      });
+
+      expect(apiMocks.post).toHaveBeenCalledWith('/capture', {
+        text: 'call back @dev-1',
+        clientToday: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        requestId: 'r3',
+        defaults: {
+          scheduledOn: DATE,
+          followUpAt: '2026-04-30T09:00:00.000Z',
+          labels: ['category:follow_up'],
+          source: { type: 'note', noteDate: DATE, noteKind: 'standup' },
+        },
+      });
+      // The dialogs read the new task key from the same shape as before.
+      expect(followUp).toEqual({ itemId: 9, title: 'call back', date: DATE, status: 'planned', followUpAt: '2026-04-30T09:00:00.000Z', taskKey: 'T-9' });
+    });
+
+    it('a task carries its developer, Jira issue and context as defaults, and privately', async () => {
+      apiMocks.post.mockResolvedValueOnce(created({ followUpAt: null }));
+      const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
+
+      let task: unknown;
+      await act(async () => {
+        task = await result.current.mutateAsync({ title: 'Fix login', developerAccountId: '557058:ab-12', jiraKey: 'LEAD-4', context: 'from standup', requestId: 'r4' });
+      });
+
+      const [, body] = apiMocks.post.mock.calls.at(-1)!;
+      expect(body).toMatchObject({
+        text: 'Fix login',
+        requestId: 'r4',
+        defaults: {
+          ownerAccountId: '557058:ab-12',
+          links: { jiraKeys: ['LEAD-4'] },
+          contextNote: 'from standup',
+          source: { type: 'note', noteDate: DATE },
+        },
+      });
+      expect(task).toEqual({ taskKey: 'T-9', title: 'call back' });
+    });
+
+    it('a bare task sends only the note source, so it lands in Inbox', async () => {
+      apiMocks.post.mockResolvedValueOnce(created());
+      const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
+      await act(async () => {
+        await result.current.mutateAsync({ title: 'A loose end', requestId: 'r5' });
+      });
+      const [, body] = apiMocks.post.mock.calls.at(-1)!;
+      expect(body.defaults).toEqual({ source: { type: 'note', noteDate: DATE } });
+    });
+
+    it('surfaces the server\'s reason when the capture is rejected', async () => {
+      apiMocks.post.mockResolvedValueOnce({ intent: 'create', blocked: true, diagnostics: [{ severity: 'error', code: 'unknown-person', message: 'Nobody matches @ghost' }] });
+      const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
+      await act(async () => {
+        await expect(result.current.mutateAsync({ title: 'Ask @ghost', requestId: 'r6' })).rejects.toThrow('Nobody matches @ghost');
+      });
+    });
+
+    it('refuses text that would be an update or a note instead of a task', async () => {
+      const { result } = renderHook(() => useCreateDailyNoteFollowUp(DATE), { wrapper: createWrapper(new QueryClient()) });
+      await act(async () => {
+        await expect(result.current.mutateAsync({ date: DATE, title: 'T-4: progress', followUpAt: '2026-04-30T09:00:00.000Z', requestId: 'r7' })).rejects.toThrow(/belong in Capture/);
+      });
+      expect(apiMocks.post).not.toHaveBeenCalled();
+    });
   });
 });

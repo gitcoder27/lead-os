@@ -47,7 +47,7 @@ export function TriageDeskSection({ issue, onCapture }: TriageDeskSectionProps) 
             border: '1px solid rgba(217,169,78,0.2)',
           }}
         >
-          Add to Desk
+          Add task
         </button>
       </div>
     </div>

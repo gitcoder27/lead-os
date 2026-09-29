@@ -69,6 +69,8 @@ const actionCommandSchema = z.object({
   toDate: z.string().regex(dateRegex, "toDate must be YYYY-MM-DD").optional(),
 });
 
+const taskKeySchema = z.string().trim().regex(/^[Tt]-\d{1,9}$/);
+
 // Restores echo the stored value back, whatever its legacy shape.
 const isoOrNull = z.string().max(40).nullable();
 
@@ -84,6 +86,7 @@ const restoreSchema = z.discriminatedUnion("type", [
       outcome: z.string().nullable().optional(),
     }).strict(),
     alsoDeleteDeskItemId: z.number().int().positive().optional(),
+    alsoDeleteTaskKey: taskKeySchema.optional(),
   }),
   z.object({
     type: z.literal("task"),
@@ -95,8 +98,10 @@ const restoreSchema = z.discriminatedUnion("type", [
       scheduledOn: z.string().regex(dateRegex).nullable().optional(),
     }).strict(),
     alsoDeleteDeskItemId: z.number().int().positive().optional(),
+    alsoDeleteTaskKey: taskKeySchema.optional(),
   }),
   z.object({ type: z.literal("delete_desk_item"), managerDeskItemId: z.number().int().positive() }),
+  z.object({ type: z.literal("delete_task"), taskKey: taskKeySchema }),
   z.object({ type: z.literal("check_in_ask"), askId: z.number().int().positive() }),
 ]);
 

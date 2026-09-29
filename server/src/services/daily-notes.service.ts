@@ -1199,6 +1199,27 @@ export class DailyNotesService {
     });
   }
 
+  /**
+   * docs/57 §3 (P3-05): a task created by `POST /api/capture` from a note. Writes
+   * the same created-from reference `createTask`/`createFollowUp` do, so the
+   * note's "From this note" list and line markers keep working. Runs inside the
+   * caller's transaction.
+   */
+  async linkCreatedTask(
+    managerAccountId: string,
+    noteDate: string,
+    kind: DailyNoteKind,
+    task: { id: number; taskKey: string; title: string },
+    requestId: string,
+    workspaceId: string,
+  ): Promise<void> {
+    const note = await this.findNote(managerAccountId, noteDate, workspaceId, kind);
+    if (!note) throw new HttpError(404, "Note not found");
+    const payloadHash = hashPayload({ route: "capture", noteId: note.id, noteDate, title: task.title });
+    await db.insert(dailyNoteTaskRefs).values({ workspaceId, managerAccountId, noteId: note.id, taskId: task.id, taskKey: task.taskKey, relation: "created_from", requestId, payloadHash, createdAt: nowIso() });
+    await this.eventsService.append({ workspaceId, taskKey: task.taskKey, type: "note_ref", body: null, meta: { noteId: note.id, noteDate, relation: "created_from" } }, { type: "system", accountId: managerAccountId });
+  }
+
   async createFollowUp(
     managerAccountId: string,
     noteDate: string,

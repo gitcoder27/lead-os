@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/context/ToastContext';
-import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
+import { useCreateDeskTask } from '@/hooks/useManagerDesk';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { getLocalIsoDate } from '@/lib/utils';
 import type {
@@ -64,7 +64,7 @@ function chipAccent(tone: ContextChip['tone']) {
 export function ManagerDeskCaptureDialog({
   onClose,
   onOpenManagerDesk,
-  heading = 'Capture For Desk',
+  heading = 'Capture a task',
   description = 'Save a follow-up for today without losing the screen context you are already in.',
   initialTitle = '',
   initialKind = 'action',
@@ -75,7 +75,7 @@ export function ManagerDeskCaptureDialog({
   date,
 }: ManagerDeskCaptureDialogProps) {
   const captureDate = date ?? getLocalIsoDate();
-  const createItem = useCreateManagerDeskItem(captureDate);
+  const createItem = useCreateDeskTask(captureDate);
   const { addToast } = useToast();
   const titleRef = useRef<HTMLInputElement>(null);
   // Phase 3 (P3-D13): kind/category pickers retire; initial values still apply
@@ -177,7 +177,7 @@ export function ManagerDeskCaptureDialog({
       }
       footer={
         <DialogActions
-          saveLabel={`Add to ${surface}`}
+          saveLabel={phase3 ? 'Add task' : 'Add to Desk'}
           isSaving={createItem.isPending}
           canSave={Boolean(title.trim())}
           onCancel={onClose}

@@ -535,14 +535,19 @@ export type ManagerActionRestore =
       patch: { status?: ManagerDeskItem["status"]; followUpAt?: string | null; outcome?: string | null };
       /** Follow-up created alongside the original write (e.g. F14 next action). */
       alsoDeleteDeskItemId?: number;
+      /** The same, when the follow-up was created as a task through capture (P3-05). */
+      alsoDeleteTaskKey?: string;
     }
   | {
       type: "task";
       taskKey: string;
       patch: { status?: "open" | "active" | "blocked" | "done" | "dropped"; followUpAt?: string | null; outcome?: string | null; scheduledOn?: string | null };
       alsoDeleteDeskItemId?: number;
+      alsoDeleteTaskKey?: string;
     }
   | { type: "delete_desk_item"; managerDeskItemId: number }
+  /** docs/57 §3 (P3-05): undo of a follow-up created as a task through capture. */
+  | { type: "delete_task"; taskKey: string }
   | { type: "check_in_ask"; askId: number };
 
 export interface ManagerActionUndo {

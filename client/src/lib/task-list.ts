@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns';
+import type { CaptureDefaults } from 'shared/capture-grammar';
 import type { CreateTaskRequest, ManagerTask, TaskStatus, TaskViewDefinition, UpdateTaskRequest } from '@/types';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import type { TaskGroupContext, TaskViewGroupBucket } from '@/lib/task-views';
@@ -397,4 +398,34 @@ export function inlineAddDefaults(
   if (defaults.later) delete defaults.scheduledOn;
   if (defaults.ownerType === 'developer') delete defaults.later;
   return defaults;
+}
+
+/**
+ * docs/57 §3 (P3-05): the same context as `inlineAddDefaults`, in the shape
+ * `POST /api/capture` takes. Inline add goes through the shared grammar, so a
+ * title may carry tokens; these only fill what it leaves open. Status groups
+ * other than open/active/blocked (done, dropped) add an ordinary open task,
+ * and a manager-owned group adds a bare capture (mine, in Inbox until triaged).
+ */
+export function captureDefaultsFromTask(defaults: Partial<CreateTaskRequest>): CaptureDefaults {
+  const out: CaptureDefaults = {};
+  if (defaults.later) out.later = true;
+  if (defaults.ownerType === null) out.ownerAccountId = null;
+  else if (defaults.ownerType === 'developer' && defaults.ownerId) out.ownerAccountId = defaults.ownerId;
+  if (defaults.kind === 'meeting') out.kind = 'meeting';
+  if (defaults.scheduledOn !== undefined) out.scheduledOn = defaults.scheduledOn;
+  if (defaults.status === 'open' || defaults.status === 'active' || defaults.status === 'blocked') out.status = defaults.status;
+  if (defaults.labels?.length) out.labels = defaults.labels;
+  if (defaults.waitingOn) out.waitingOn = defaults.waitingOn;
+  return out;
+}
+
+/** Inline add's context as capture defaults. */
+export function inlineCaptureDefaults(
+  viewId: string | undefined,
+  definition: TaskViewDefinition | undefined,
+  context: TaskGroupContext,
+  today: string,
+): CaptureDefaults {
+  return captureDefaultsFromTask(inlineAddDefaults(viewId, definition, context, today));
 }

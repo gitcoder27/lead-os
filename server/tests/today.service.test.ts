@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
+import { configureJira } from "./helpers/jira-config";
 import { configTable, developers, issues, managerDeskDays, teamTrackerDays } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -210,6 +211,7 @@ describe("TodayService", () => {
   });
 
   it("adds sync attention without mutating source data", async () => {
+    await configureJira();
     const response = await todayService({ status: "error", errorMessage: "Token expired" }).getToday("manager-1", "2026-03-08");
 
     expect(response.actionItems[0]).toMatchObject({
@@ -218,6 +220,45 @@ describe("TodayService", () => {
       target: { type: "view", view: "settings" },
     });
     expect(response.syncStatus).toMatchObject({ status: "error", errorMessage: "Token expired" });
+  });
+
+  describe("without a Jira connection (docs/56 P2-03)", () => {
+    it("does not turn a failed or stale sync into a Today signal, and flags the response", async () => {
+      const response = await todayService({ status: "error", errorMessage: "Missing jira_project_key in config" }).getToday("manager-1", "2026-03-08");
+
+      expect(response.actionItems.some((item) => item.id === "today-sync-error")).toBe(false);
+      expect(response.summary.some((metric) => metric.id === "sync")).toBe(false);
+      expect(response.syncStatus).toMatchObject({ status: "error", jiraConfigured: false });
+    });
+
+    it("hides the defect metrics when there is no Jira and nothing synced", async () => {
+      const ids = (await todayService().getToday("manager-1", "2026-03-08")).summary.map((metric) => metric.id);
+      expect(ids).not.toContain("work");
+      expect(ids).not.toContain("due-work");
+    });
+
+    it("keeps the defect metrics for leftover synced defects", async () => {
+      const { service } = cachedTodayService();
+      const snapshot = { issues: [], activeDefects: 4, dueToday: 1, staleThresholdHours: 24 };
+      const withDefects = new TodayService(
+        { getTodaySnapshot: vi.fn(async () => snapshot) } as unknown as IssueService,
+        trackerService,
+        managerDeskService,
+        undefined,
+        { todayCacheTtlMs: 0 },
+      );
+      const ids = (await withDefects.getToday("manager-1", "2026-03-08")).summary.map((metric) => metric.id);
+      expect(ids).toContain("work");
+      void service;
+    });
+
+    it("shows the sync error and defect metrics once Jira is configured, and says so", async () => {
+      await configureJira();
+      const response = await todayService({ status: "error", errorMessage: "Token expired" }).getToday("manager-1", "2026-03-08");
+
+      expect(response.summary.map((metric) => metric.id)).toEqual(expect.arrayContaining(["work", "due-work", "sync"]));
+      expect(response.syncStatus).toMatchObject({ jiraConfigured: true });
+    });
   });
 
   it("returns available sections when one Today source is unavailable", async () => {

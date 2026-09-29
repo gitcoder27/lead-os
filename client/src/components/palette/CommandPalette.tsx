@@ -23,6 +23,7 @@ import type { AppView } from '@/App';
 import type { TodayActionTarget } from '@/types';
 import { useToast } from '@/context/ToastContext';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
+import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
 import { getLocalIsoDate } from '@/lib/utils';
 import { GLOBAL_SEARCH_MIN_LENGTH, useGlobalSearch } from '@/hooks/useGlobalSearch';
@@ -107,7 +108,9 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
 
   const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3 }), [tasksPhase3]);
-  const quickActions = useMemo(() => buildQuickActions({ tasksPhase3 }), [tasksPhase3]);
+  const { data: syncStatus } = useSyncStatus();
+  const jiraConfigured = syncStatus?.jiraConfigured;
+  const quickActions = useMemo(() => buildQuickActions({ tasksPhase3, jiraConfigured }), [tasksPhase3, jiraConfigured]);
   const surfaceLabel = tasksPhase3 ? 'Tasks' : 'Desk';
   const taskViews = useTaskViews(tasksPhase3);
 

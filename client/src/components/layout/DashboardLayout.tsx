@@ -9,6 +9,7 @@ import { WorkFocusStrip } from '@/components/work/WorkFocusStrip';
 import { describeWorkSavedView } from '@/components/work/workSavedViewDescription';
 import { SavedViewsMenu } from '@/components/team-tracker/SavedViewsMenu';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
+import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWorkSavedViewState } from '@/hooks/useWorkSavedViewState';
 import { useToast } from '@/context/ToastContext';
@@ -71,6 +72,7 @@ function useDashboardShortcuts({
   setFocusedIndex,
   openIssue,
   triggerSync,
+  jiraConfigured,
   setFilterState,
   clearIssueHighlight,
   closePanel,
@@ -80,6 +82,8 @@ function useDashboardShortcuts({
   setFocusedIndex: (updater: number | ((previous: number) => number)) => void;
   openIssue: (key: string) => void;
   triggerSync: Pick<ReturnType<typeof useTriggerSync>, 'mutate'>;
+  /** `false` when Jira isn't connected: `r` does nothing, since there is nothing to sync. */
+  jiraConfigured: boolean | undefined;
   setFilterState: (updater: DashboardFilterState | ((prev: DashboardFilterState) => DashboardFilterState)) => void;
   clearIssueHighlight: () => void;
   closePanel: () => void;
@@ -115,7 +119,9 @@ function useDashboardShortcuts({
         }
         case 'r':
           event.preventDefault();
-          triggerSync.mutate();
+          if (jiraConfigured !== false) {
+            triggerSync.mutate();
+          }
           break;
         case '0':
         case '1':
@@ -162,6 +168,7 @@ function useDashboardShortcuts({
     setFilterState,
     setFocusedIndex,
     triggerSync,
+    jiraConfigured,
     visibleIssueKeys,
   ]);
 }
@@ -190,6 +197,7 @@ export function DashboardLayout({
   const clearHighlightTimeoutRef = useRef<number | null>(null);
   const selectedIssueKeyRef = useRef<string | undefined>(selectedIssueKey);
   const triggerSync = useTriggerSync();
+  const { data: syncStatus } = useSyncStatus();
 
   const isCompact = useMediaQuery('(max-width: 1023px)');
   const isControlled = filterState !== undefined && onFilterStateChange !== undefined;
@@ -464,6 +472,7 @@ export function DashboardLayout({
     setFocusedIndex,
     openIssue,
     triggerSync,
+    jiraConfigured: syncStatus?.jiraConfigured,
     setFilterState,
     clearIssueHighlight,
     closePanel,
@@ -534,6 +543,8 @@ export function DashboardLayout({
               noTags={noTagsFilter}
               onClearFilters={handleClearAllFilters}
               onVisibleIssueKeysChange={handleVisibleIssueKeysChange}
+              onConnectJira={onOpenActionTarget ? () => onOpenActionTarget({ type: 'view', view: 'settings', section: 'connection' }) : undefined}
+              onOpenSyncSettings={onOpenActionTarget ? () => onOpenActionTarget({ type: 'view', view: 'settings', section: 'sync' }) : undefined}
             />
 
             {/* Subtle backdrop — click to dismiss */}

@@ -30,6 +30,8 @@ import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { isOverdue, isDueToday, isStale } from '@/lib/utils';
 import type { Issue, FilterType } from '@/types';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { JiraNotConnectedState, NothingSyncedState, ProjectCleanState } from './DefectEmptyStates';
 
 const ASPEN_SEVERITY_ORDER: Record<string, number> = {
   '1 - Critical': 0,
@@ -174,6 +176,10 @@ interface DefectTableProps {
   noTags?: boolean;
   onClearFilters: () => void;
   onVisibleIssueKeysChange?: (keys: string[]) => void;
+  /** docs/56 P2-03: open Settings → Jira from the not-connected empty state. */
+  onConnectJira?: () => void;
+  /** Open Settings → Sync scope from the nothing-synced empty state. */
+  onOpenSyncSettings?: () => void;
 }
 
 export function DefectTable({
@@ -189,11 +195,14 @@ export function DefectTable({
   noTags,
   onClearFilters,
   onVisibleIssueKeysChange,
+  onConnectJira,
+  onOpenSyncSettings,
 }: DefectTableProps) {
   const { theme } = useTheme();
   const { data: issues, isLoading, isError, error, refetch, isFetching } = useIssues(filter, assigneeFilter, tagId, noTags);
   const { data: config } = useConfig();
   const { data: syncStatus } = useSyncStatus();
+  const { openCapture } = useQuickActions();
   const { exclude, restore } = useExcludeIssue();
   const { addToast } = useToast();
   const statusStorageKey = useScopedStorageKey(STATUS_FILTER_STORAGE_KEY);
@@ -266,7 +275,9 @@ export function DefectTable({
 
   // Expose issue keys for parent keyboard nav
   const baseIssues = issues ?? EMPTY_ISSUES;
-  const syncErrorMessage = syncStatus?.status === 'error' ? syncStatus.errorMessage : undefined;
+  // docs/56 P2-03: `false` is a connection that was never made; unknown (still loading) is not.
+  const jiraNotConnected = syncStatus?.jiraConfigured === false;
+  const syncErrorMessage = syncStatus?.status === 'error' && !jiraNotConnected ? syncStatus.errorMessage : undefined;
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const allStatuses = useMemo(() => {
     const statusSet = new Set<string>();
@@ -896,6 +907,10 @@ export function DefectTable({
     </div>
   );
 
+  if (!baseIssues.length && !hasActiveFilters && jiraNotConnected) {
+    return <JiraNotConnectedState onConnectJira={onConnectJira} onAddTask={() => openCapture()} />;
+  }
+
   if (!baseIssues.length && !hasActiveFilters && syncErrorMessage) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-4 text-center">
@@ -918,17 +933,11 @@ export function DefectTable({
   }
 
   if (!baseIssues.length && !hasActiveFilters) {
-    return (
-      <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-4 text-center">
-        <div>
-          <p className="text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-          {filter !== 'all'
-            ? 'No defects match this filter.'
-            : 'No open defects. Your project is clean.'}
-          </p>
-        </div>
-      </div>
-    );
+    // Connected, yet the last sync returned nothing (or none ran): explain, do not claim the project is clean.
+    if (syncStatus?.jiraConfigured && (!syncStatus.lastSyncedAt || !syncStatus.issuesSynced)) {
+      return <NothingSyncedState syncStatus={syncStatus} scopeMode={config?.jiraSyncScopeMode} onOpenSyncSettings={onOpenSyncSettings} />;
+    }
+    return <ProjectCleanState />;
   }
 
   if (!baseIssues.length) {

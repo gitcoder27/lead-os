@@ -192,6 +192,14 @@ describe('palette item builders', () => {
 });
 
 describe('palette commands', () => {
+  it('drops "Start Jira sync" only when Jira is known not to be connected (docs/56 P2-03)', () => {
+    const has = (options?: Parameters<typeof buildQuickActions>[0]) => buildQuickActions(options).some((command) => command.actionId === 'sync');
+    expect(has()).toBe(true);
+    expect(has({ jiraConfigured: true })).toBe(true);
+    expect(has({ jiraConfigured: false })).toBe(false);
+    expect(buildQuickActions({ jiraConfigured: false }).map((command) => command.actionId)).toEqual(['capture', 'capture-note']);
+  });
+
   it('offers navigation for every surface plus quick actions', () => {
     const navigation = buildNavigationCommands();
     const commands = [...navigation, ...buildQuickActions()];

@@ -56,6 +56,7 @@ describe("sync routes", () => {
       getLastSyncLog: vi.fn(async () => undefined),
       getRuntimeStatus: vi.fn(() => ({ status: "idle" as const, errorMessage: undefined })),
       isAutoSyncEnabled: vi.fn(async () => false),
+      isJiraConfigured: vi.fn(async () => true),
     });
 
     const res = await invoke(app, { method: "GET", url: "/api/sync/status" });
@@ -64,6 +65,33 @@ describe("sync routes", () => {
     expect(res.body).toEqual({
       status: "idle",
       autoSyncEnabled: false,
+      jiraConfigured: true,
     });
+  });
+
+  it("reports jiraConfigured: false so the client can hide sync controls (docs/56 P2-03)", async () => {
+    const app = createTestApp({
+      getLastSyncLog: vi.fn(async () => undefined),
+      getRuntimeStatus: vi.fn(() => ({ status: "idle" as const, errorMessage: undefined })),
+      isAutoSyncEnabled: vi.fn(async () => true),
+      isJiraConfigured: vi.fn(async () => false),
+    });
+
+    const res = await invoke(app, { method: "GET", url: "/api/sync/status" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ jiraConfigured: false, status: "idle" });
+  });
+
+  it("returns 202 with jira_not_configured when there is nothing to sync", async () => {
+    const now = "2026-03-07T08:00:00.000Z";
+    const app = createTestApp({
+      syncNow: vi.fn(async () => ({ status: "skipped", reason: "jira_not_configured", issuesSynced: 0, startedAt: now, completedAt: now })),
+    });
+
+    const res = await invoke(app, { method: "POST", url: "/api/sync" });
+
+    expect(res.status).toBe(202);
+    expect(res.body).toMatchObject({ status: "skipped", reason: "jira_not_configured" });
   });
 });

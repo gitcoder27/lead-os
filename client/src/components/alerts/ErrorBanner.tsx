@@ -8,8 +8,9 @@ export function ErrorBanner() {
   const { data: syncStatus } = useSyncStatus();
 
   const isApiDown = !!overviewError;
-  const isSyncError = syncStatus?.status === 'error';
-  const isRateLimited = syncStatus?.errorMessage?.toLowerCase().includes('rate limit');
+  // docs/56 P2-03: a workspace without Jira has nothing to fail; no red banner for it.
+  const isSyncError = syncStatus?.status === 'error' && syncStatus.jiraConfigured !== false;
+  const isRateLimited = syncStatus?.jiraConfigured !== false && syncStatus?.errorMessage?.toLowerCase().includes('rate limit');
 
   const message = isRateLimited
     ? 'Jira rate limit hit. Auto-retrying shortly.'

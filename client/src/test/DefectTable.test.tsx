@@ -4,6 +4,8 @@ import { render, screen, fireEvent, within, waitFor } from '@testing-library/rea
 import { DefectTable } from '@/components/table/DefectTable';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { TestWrapper } from '@/test/wrapper';
+import { QuickActionsProvider } from '@/context/QuickActionsContext';
+import type { SyncStatus } from '@/types';
 import type { Issue } from '@/types';
 
 vi.mock('framer-motion', () => {
@@ -141,7 +143,12 @@ vi.mock('@/hooks/useIssues', () => ({
 }));
 
 vi.mock('@/hooks/useConfig', () => ({
-  useConfig: () => ({ data: { jiraBaseUrl: 'https://test.atlassian.net', isConfigured: true } }),
+  useConfig: () => ({ data: { jiraBaseUrl: 'https://test.atlassian.net', isConfigured: true, jiraSyncScopeMode: 'team_assignees' } }),
+}));
+
+let mockSyncStatus: SyncStatus | undefined;
+vi.mock('@/hooks/useSyncStatus', () => ({
+  useSyncStatus: () => ({ data: mockSyncStatus }),
 }));
 
 vi.mock('@/hooks/useTags', () => ({
@@ -183,6 +190,94 @@ describe('DefectTable', () => {
     mockSetIssueTagsMutate.mockClear();
     mockUpdateIssueMutate.mockClear();
     window.localStorage.clear();
+    mockSyncStatus = undefined;
+  });
+
+  describe('empty states (docs/56 P2-03)', () => {
+    const openCapture = vi.fn();
+    const renderEmpty = (props: Partial<React.ComponentProps<typeof DefectTable>> = {}) => {
+      currentIssues = [];
+      return render(
+        <TestWrapper>
+          <QuickActionsProvider value={{ openCapture, openCommandPalette: vi.fn() }}>
+            <DefectTable {...defaultProps} {...props} />
+          </QuickActionsProvider>
+        </TestWrapper>,
+      );
+    };
+
+    beforeEach(() => openCapture.mockClear());
+
+    it('without a Jira connection: "Connect Jira, or add tasks manually" instead of "Your project is clean"', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: false };
+      const onConnectJira = vi.fn();
+      renderEmpty({ onConnectJira });
+
+      expect(screen.getByText('Connect Jira, or add tasks manually')).toBeInTheDocument();
+      expect(screen.queryByText(/project is clean/i)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Connect Jira' }));
+      expect(onConnectJira).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Add a task' }));
+      expect(openCapture).toHaveBeenCalledTimes(1);
+    });
+
+    it('without a Jira connection there is no red sync-error card, even if an old error is on record', () => {
+      mockSyncStatus = { status: 'error', errorMessage: 'Missing jira_project_key in config', jiraConfigured: false };
+      renderEmpty();
+
+      expect(screen.getByTestId('work-jira-not-connected')).toBeInTheDocument();
+      expect(screen.queryByText(/could not be refreshed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Missing jira_project_key/)).not.toBeInTheDocument();
+    });
+
+    it('connected but never synced: says what was tried instead of "clean"', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: true };
+      const onOpenSyncSettings = vi.fn();
+      renderEmpty({ onOpenSyncSettings });
+
+      const card = screen.getByTestId('work-nothing-synced');
+      expect(within(card).getByText('Jira is connected, but nothing has synced yet')).toBeInTheDocument();
+      expect(within(card).getByText('Never')).toBeInTheDocument();
+      expect(within(card).getByText('Issues synced').nextElementSibling).toHaveTextContent('0');
+      expect(within(card).getByText(/Team assignees/)).toBeInTheDocument();
+      expect(within(card).getByText(/empty roster returns nothing/i)).toBeInTheDocument();
+      expect(screen.queryByText(/project is clean/i)).not.toBeInTheDocument();
+      fireEvent.click(within(card).getByRole('button', { name: 'Open sync settings' }));
+      expect(onOpenSyncSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('connected and the last sync returned nothing: still the diagnostic, with the sync time', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: true, lastSyncedAt: new Date(Date.now() - 5 * 60_000).toISOString(), issuesSynced: 0 };
+      renderEmpty();
+
+      const card = screen.getByTestId('work-nothing-synced');
+      expect(within(card).queryByText('Never')).not.toBeInTheDocument();
+      expect(within(card).getByText('Last sync').nextElementSibling).toHaveTextContent(/5 minutes ago/);
+    });
+
+    it('keeps "Your project is clean" when a sync did return issues and none are open', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: true, lastSyncedAt: '2026-03-05T09:00:00Z', issuesSynced: 12 };
+      renderEmpty();
+
+      expect(screen.getByText('No open defects. Your project is clean.')).toBeInTheDocument();
+      expect(screen.queryByTestId('work-nothing-synced')).not.toBeInTheDocument();
+    });
+
+    it('keeps the old behaviour while the sync status is still loading', () => {
+      mockSyncStatus = undefined;
+      renderEmpty();
+
+      expect(screen.getByText('No open defects. Your project is clean.')).toBeInTheDocument();
+      expect(screen.queryByTestId('work-jira-not-connected')).not.toBeInTheDocument();
+    });
+
+    it('a filter with no matches is still just the filter message, connected or not', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: false };
+      renderEmpty({ filter: 'overdue' });
+
+      expect(screen.getByText('No defects match the current filters.')).toBeInTheDocument();
+      expect(screen.queryByTestId('work-jira-not-connected')).not.toBeInTheDocument();
+    });
   });
 
   it('renders rows from mock data', () => {

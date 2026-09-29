@@ -268,11 +268,10 @@ export class TodayService {
    * docs/56 P2-02: which first-run steps are done. A source that failed to load
    * counts as done, so a hiccup never nags the manager to redo setup.
    */
-  private async buildGettingStarted(workspaceId: string | undefined, hasPeople: boolean | undefined): Promise<TodayGettingStarted | undefined> {
+  private async buildGettingStarted(workspaceId: string | undefined, jira: boolean, hasPeople: boolean | undefined): Promise<TodayGettingStarted | undefined> {
     try {
-      const [tasks, jira, rhythm] = await Promise.all([
+      const [tasks, rhythm] = await Promise.all([
         this.stateService.hasTasks(workspaceId),
-        this.settings.isJiraConfigured(workspaceId),
         this.stateService.hasCustomRhythm(workspaceId),
       ]);
       return { people: hasPeople ?? true, tasks, jira, rhythm };
@@ -384,7 +383,11 @@ export class TodayService {
       : { issues: [], activeDefects: 0, dueToday: 0, staleThresholdHours: 24 };
     const teamBoard = teamResult.status === "fulfilled" ? teamResult.value : emptyTeamBoard(date);
     const deskItems = deskResult.status === "fulfilled" ? deskResult.value : [];
-    const syncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
+    const rawSyncStatus = syncResult.status === "fulfilled" ? syncResult.value : undefined;
+    // docs/56 P2-03: without a Jira connection there is nothing to sync, so a
+    // sync failure is not a Today signal. Unknown counts as configured.
+    const jiraConfigured = await this.settings.isJiraConfigured(workspaceId).catch(() => true);
+    const syncStatus = jiraConfigured ? rawSyncStatus : undefined;
     const jiraDrift = driftResult.status === "fulfilled" ? driftResult.value : [];
     const oneOnOneSignals = oneOnOneResult.status === "fulfilled" ? oneOnOneResult.value : [];
     const state = stateResult.status === "fulfilled" ? stateResult.value : undefined;
@@ -396,7 +399,7 @@ export class TodayService {
     const standup = state?.phase3 && sourceStatus.team === "ready" && teamBoard.summary.total > 0
       ? buildStandupFocus(state.standup, teamBoard, date)
       : undefined;
-    const gettingStarted = await this.buildGettingStarted(workspaceId, sourceStatus.team === "ready" ? teamBoard.summary.total > 0 : undefined);
+    const gettingStarted = await this.buildGettingStarted(workspaceId, jiraConfigured, sourceStatus.team === "ready" ? teamBoard.summary.total > 0 : undefined);
 
     const followUps = getDueFollowUps(deskItems, clock.nowMs);
     const meetings = getMeetingPrompts(deskItems, clock);
@@ -431,7 +434,8 @@ export class TodayService {
         dueToday: issueSnapshot.dueToday,
         followUpsDue: followUps.length,
         syncStatus,
-        issuesAvailable: sourceStatus.issues === "ready",
+        // Defect metrics stay only when there is Jira or leftover synced defects to show.
+        issuesAvailable: sourceStatus.issues === "ready" && (jiraConfigured || issueSnapshot.activeDefects > 0),
         teamAvailable: sourceStatus.team === "ready",
         deskAvailable: sourceStatus.desk === "ready",
       }),
@@ -441,7 +445,7 @@ export class TodayService {
       promises: promiseItems.slice(0, 10),
       standupPrompts: buildStandupPrompts(teamBoard, issues, followUps, clock).slice(0, 8),
       meetingPrompts: meetings.map((item) => buildMeetingPrompt(item)).slice(0, 8),
-      syncStatus,
+      ...(rawSyncStatus ? { syncStatus: { ...rawSyncStatus, jiraConfigured } } : {}),
       isPartial: unavailableSources.length > 0,
       sourceStatus,
       totalCount: actionItems.length,

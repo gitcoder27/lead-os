@@ -12,6 +12,11 @@ const defectTableSpy = vi.fn();
 const filterSidebarSpy = vi.fn();
 const useMediaQueryMock = vi.fn(() => false);
 
+let mockJiraConfigured: boolean | undefined;
+vi.mock('@/hooks/useSyncStatus', () => ({
+  useSyncStatus: () => ({ data: { status: 'idle', jiraConfigured: mockJiraConfigured } }),
+}));
+
 vi.mock('@/hooks/useTriggerSync', () => ({
   useTriggerSync: () => mockTriggerSync,
 }));
@@ -121,6 +126,7 @@ vi.mock('@/components/settings/SettingsPanel', () => ({
 describe('DashboardLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockJiraConfigured = undefined;
     useMediaQueryMock.mockReturnValue(false);
   });
 
@@ -351,6 +357,26 @@ describe('DashboardLayout', () => {
     fireEvent.keyDown(window, { key: 'Enter' });
 
     expect(screen.getByTestId('selected-key')).toHaveTextContent('PROJ-102');
+  });
+
+  it('r starts a sync when Jira is connected or not yet known (docs/56 P2-03)', () => {
+    for (const configured of [true, undefined]) {
+      mockJiraConfigured = configured;
+      mockTriggerSync.mutate.mockClear();
+      const { unmount } = render(<DashboardLayout />, { wrapper: TestWrapper });
+      fireEvent.keyDown(window, { key: 'r' });
+      expect(mockTriggerSync.mutate).toHaveBeenCalledTimes(1);
+      unmount();
+    }
+  });
+
+  it('r is inert when Jira is not connected, and still does not trigger a sync (docs/56 P2-03)', () => {
+    mockJiraConfigured = false;
+    render(<DashboardLayout />, { wrapper: TestWrapper });
+
+    fireEvent.keyDown(window, { key: 'r' });
+
+    expect(mockTriggerSync.mutate).not.toHaveBeenCalled();
   });
 
   it('does not hijack browser shortcuts that use modifier keys', () => {

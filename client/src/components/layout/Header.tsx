@@ -30,8 +30,10 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
   const { user } = useAuth();
   const { openCapture, openCommandPalette } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
-  const showJiraSync = activeView === 'work';
-  const { data: sync } = useSyncStatus({ enabled: showJiraSync });
+  const onWork = activeView === 'work';
+  const { data: sync } = useSyncStatus({ enabled: onWork });
+  // docs/56 P2-03: no Jira connection means no sync chip and no sync button. Unknown (loading) keeps them.
+  const showJiraSync = onWork && sync?.jiraConfigured !== false;
   const triggerSync = useTriggerSync();
   const headerRef = useRef<HTMLElement | null>(null);
   const [, setTimeTick] = useState(0);

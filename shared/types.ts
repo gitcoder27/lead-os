@@ -198,7 +198,7 @@ export interface SyncRunResponse {
   startedAt: string;
   completedAt: string;
   errorMessage?: string;
-  reason?: "already_running";
+  reason?: "already_running" | "jira_not_configured";
 }
 
 export interface SyncStatus {
@@ -207,6 +207,12 @@ export interface SyncStatus {
   issuesSynced?: number;
   errorMessage?: string;
   autoSyncEnabled?: boolean;
+  /**
+   * docs/56 P2-03: a complete Jira connection is saved. `false` means Jira-only
+   * UI (sync controls, sync errors, defect signals) should stay out of the way.
+   * Absent = unknown; treat as configured.
+   */
+  jiraConfigured?: boolean;
 }
 
 // ── Today cockpit types ─────────────────────────────────

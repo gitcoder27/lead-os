@@ -16,7 +16,7 @@ export interface SyncResult {
   startedAt: string;
   completedAt: string;
   errorMessage?: string;
-  reason?: "already_running";
+  reason?: "already_running" | "jira_not_configured";
 }
 
 type TeamScopeState = "in_team" | "out_of_team" | "unassigned";
@@ -81,19 +81,23 @@ export class SyncEngine {
 
     for (const row of rows) {
       const workspaceId = normalizeWorkspaceId(row.id);
-      const [baseUrl, email, project, token] = await Promise.all([
-        this.settings.getJiraBaseUrl(workspaceId),
-        this.settings.getJiraEmail(workspaceId),
-        this.settings.getJiraProjectKey(workspaceId),
-        this.settings.getJiraToken(workspaceId),
-      ]);
-
-      if (baseUrl && email && project && token) {
+      if (await this.isJiraConfigured(workspaceId)) {
         ids.push(workspaceId);
       }
     }
 
     return ids;
+  }
+
+  /** docs/56 P2-03: URL, email, project key and a token are all set. Config only; never calls Jira. */
+  async isJiraConfigured(workspaceId?: string): Promise<boolean> {
+    const [baseUrl, email, project, token] = await Promise.all([
+      this.settings.getJiraBaseUrl(workspaceId),
+      this.settings.getJiraEmail(workspaceId),
+      this.settings.getJiraProjectKey(workspaceId),
+      this.settings.getJiraToken(workspaceId),
+    ]);
+    return Boolean(baseUrl && email && project && token);
   }
 
   async getLastSyncLog(workspaceId?: string): Promise<typeof syncLog.$inferSelect | undefined> {
@@ -109,6 +113,11 @@ export class SyncEngine {
 
   async syncNow(workspaceId?: string): Promise<SyncResult> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    // docs/56 P2-03: no Jira, nothing to sync. That is not a failure, so no error row and no red state.
+    if (!(await this.isJiraConfigured(normalizedWorkspaceId))) {
+      const now = new Date().toISOString();
+      return { status: "skipped", reason: "jira_not_configured", issuesSynced: 0, startedAt: now, completedAt: now };
+    }
     if (this.syncingWorkspaces.has(normalizedWorkspaceId)) {
       const now = new Date().toISOString();
       return { status: "skipped", reason: "already_running", issuesSynced: 0, startedAt: now, completedAt: now };

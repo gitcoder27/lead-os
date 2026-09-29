@@ -77,6 +77,41 @@ describe("SyncEngine", () => {
     expect(results).toHaveLength(1);
   });
 
+  describe("without a Jira connection (docs/56 P2-03)", () => {
+    const settingsWith = (overrides: Record<string, unknown>) => ({
+      getJiraAutoSyncEnabled: vi.fn(async () => true),
+      getJiraBaseUrl: vi.fn(async () => "https://example.atlassian.net"),
+      getJiraEmail: vi.fn(async () => "lead@example.com"),
+      getJiraProjectKey: vi.fn(async () => "AM"),
+      getJiraToken: vi.fn(async () => "token"),
+      createJiraClient: vi.fn(async () => {
+        throw new Error("a sync must not build a Jira client here");
+      }),
+      ...overrides,
+    });
+
+    it("reports whether URL, email, project key and token are all set", async () => {
+      expect(await new SyncEngine(settingsWith({}) as any).isJiraConfigured()).toBe(true);
+      for (const missing of ["getJiraBaseUrl", "getJiraEmail", "getJiraProjectKey", "getJiraToken"]) {
+        const engine = new SyncEngine(settingsWith({ [missing]: vi.fn(async () => undefined) }) as any);
+        expect(await engine.isJiraConfigured()).toBe(false);
+      }
+    });
+
+    it("syncNow skips instead of failing: no client, no sync_log row, no error state", async () => {
+      const settings = settingsWith({ getJiraToken: vi.fn(async () => undefined) });
+      const engine = new SyncEngine(settings as any);
+
+      const result = await engine.syncNow();
+
+      expect(result).toMatchObject({ status: "skipped", reason: "jira_not_configured", issuesSynced: 0 });
+      expect(settings.createJiraClient).not.toHaveBeenCalled();
+      expect(rawDb.prepare("SELECT COUNT(*) AS count FROM sync_log").get()).toEqual({ count: 0 });
+      expect(engine.getRuntimeStatus()).toMatchObject({ status: "idle" });
+      expect(await engine.getLastSyncLog()).toBeUndefined();
+    });
+  });
+
   it("still allows manual syncNow when auto-sync is disabled", async () => {
     const jiraClient = {
       getCurrentUser: vi.fn(async () => ({ accountId: "sync-user", displayName: "Sync User" })),

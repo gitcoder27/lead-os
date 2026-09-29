@@ -278,6 +278,28 @@ describe('Header', () => {
     expect(screen.getByTitle(/Jira authentication failed \(401\)/)).toBeInTheDocument();
   });
 
+  it('hides the sync chip and manual sync when Jira is not connected (docs/56 P2-03)', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { status: 'error', errorMessage: 'Missing jira_project_key in config', autoSyncEnabled: true, jiraConfigured: false },
+    });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+
+    expect(screen.queryByText('Sync issue')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synced|Sync off|Not synced/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /manual sync/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps sync controls when Jira is connected, and while the status is still unknown', () => {
+    useSyncStatusMock.mockReturnValue({ data: { status: 'idle', autoSyncEnabled: true, jiraConfigured: true } });
+    const { unmount } = render(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /manual sync/i })).toBeInTheDocument();
+    unmount();
+
+    useSyncStatusMock.mockReturnValue({ data: undefined });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /manual sync/i })).toBeInTheDocument();
+  });
+
   it('only shows Jira sync status and manual sync on the work view', () => {
     useSyncStatusMock.mockReturnValue({
       data: { status: 'idle', lastSyncedAt: '2026-09-08T09:00:00.000Z', autoSyncEnabled: false },

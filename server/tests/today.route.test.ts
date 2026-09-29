@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
+import { configureJira } from "./helpers/jira-config";
 import { enableCollabParticipation } from "./helpers/team-mode";
 import { checkinTaskRefs, configTable, developers } from "../src/db/schema";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
@@ -85,6 +86,7 @@ describe("today routes", () => {
   });
 
   it("GET /api/today returns a manager-only read model", async () => {
+    await configureJira();
     const cookie = await managerCookie();
     const response = await invoke(createTestApp(), {
       method: "GET",

@@ -85,8 +85,8 @@ export function buildTaskViewCommands(views: TaskViewMeta[]): PaletteItem[] {
   }));
 }
 
-export function buildQuickActions(options?: { tasksPhase3?: boolean }): PaletteItem[] {
-  return [
+export function buildQuickActions(options?: { tasksPhase3?: boolean; jiraConfigured?: boolean }): PaletteItem[] {
+  const actions: PaletteItem[] = [
     {
       id: 'action-capture',
       group: 'actions',
@@ -113,6 +113,8 @@ export function buildQuickActions(options?: { tasksPhase3?: boolean }): PaletteI
       actionId: 'sync',
     },
   ];
+  // docs/56 P2-03: nothing to sync without a Jira connection (unknown keeps it).
+  return options?.jiraConfigured === false ? actions.filter((action) => action.actionId !== 'sync') : actions;
 }
 
 export function filterCommands(commands: PaletteItem[], query: string): PaletteItem[] {

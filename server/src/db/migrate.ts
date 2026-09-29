@@ -368,6 +368,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   labels_json           TEXT,
   scheduled_on          TEXT,
   schedule_position     INTEGER,
+  hide_until            TEXT,
+  needs_triage          INTEGER NOT NULL DEFAULT 0,
   due_at                TEXT,
   follow_up_at          TEXT,
   starts_at             TEXT,
@@ -753,6 +755,12 @@ const alterStatements = [
   "CREATE INDEX IF NOT EXISTS idx_today_check_in_asks_manager_date ON today_check_in_asks(workspace_id, manager_account_id, date)",
   // Shared task description (manager drawer + developer My Day detail).
   "ALTER TABLE tasks ADD COLUMN details TEXT",
+  // docs/57 §1 (P3-02): Later resurface date and the Inbox (untriaged) marker.
+  // DEFAULT 0 = triaged, so existing rows and every non-capture insert path
+  // stay out of Inbox without a backfill.
+  "ALTER TABLE tasks ADD COLUMN hide_until TEXT",
+  "ALTER TABLE tasks ADD COLUMN needs_triage INTEGER NOT NULL DEFAULT 0",
+  "CREATE INDEX IF NOT EXISTS idx_tasks_workspace_triage ON tasks(workspace_id, needs_triage) WHERE needs_triage = 1",
 ];
 
 const constraintRepairStatements = [

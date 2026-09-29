@@ -10,7 +10,7 @@ export function canonicalDeskItem(task: ManagerTask): ManagerDeskItem {
   return {
     id: task.legacyDeskItemId ?? task.id, dayId: 0, taskKey: task.taskKey, canonicalTask: true, title: task.title, originDate: task.scheduledOn ?? task.createdAt.slice(0, 10),
     kind: task.kind === 'meeting' ? 'meeting' : 'action', category: (task.labels.find((label) => label.startsWith('category:'))?.slice(9) ?? 'other') as ManagerDeskItem['category'],
-    status: task.status === 'active' ? 'in_progress' : task.status === 'blocked' ? 'waiting' : task.status === 'done' ? 'done' : task.status === 'dropped' ? 'cancelled' : task.later ? 'backlog' : task.ownerType ? 'planned' : 'inbox',
+    status: task.status === 'active' ? 'in_progress' : task.status === 'blocked' ? 'waiting' : task.status === 'done' ? 'done' : task.status === 'dropped' ? 'cancelled' : task.later ? 'backlog' : task.ownerType && !task.needsTriage ? 'planned' : 'inbox',
     priority: task.priority === 'high' ? 'high' : 'medium', nextAction: task.nextAction ?? undefined, outcome: task.outcome ?? undefined,
     participants: task.participants ?? undefined, followUpAt: task.followUpAt ?? undefined, plannedStartAt: task.startsAt ?? undefined, plannedEndAt: task.endsAt ?? undefined,
     completedAt: task.closedAt ?? undefined, createdAt: task.createdAt, updatedAt: task.updatedAt,

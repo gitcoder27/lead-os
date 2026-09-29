@@ -22,7 +22,8 @@
  *   offset    = "+" digits ("d"|"w")
  *   iso       = yyyy "-" mm "-" dd
  *   priority  = "!!"
- *   later     = "/later" | "/l"
+ *   later     = "/later" | "/l"                    — a !date with /later is the resurface
+ *                                                   date (hideUntil); @people become links
  *   meeting   = "/meeting" | "/m"
  *   followup  = ("/followup" | "/f") [ ws date ]
  *   label     = "+" ident
@@ -149,6 +150,8 @@ export interface ResolvedCapture {
   parentKey?: string;
   labels: string[];
   scheduledOn: string | null;
+  /** docs/57 §3: `/later !date` — the date the parked task resurfaces in Inbox. */
+  hideUntil: string | null;
   followUp: boolean;
   /** `/f` optionally followed by `!date`; null → caller defaults to today. */
   followUpAt: string | null;
@@ -350,9 +353,6 @@ export function parseCapture(text: string, today: string): ParsedCapture {
 
   // ── Structural diagnostics (no lookups needed) ──
   const title = buildTitle(words, tokens);
-  const scheduled = tokens.find((entry) => entry.kind === "date" && !entry.forFollowup)?.value;
-  const hasLater = tokens.some((entry) => entry.kind === "later");
-  const hasPerson = tokens.some((entry) => entry.kind === "person");
 
   if (!title) {
     pushDiagnostic(diagnostics, "error", "empty-title", "Add a title for the task");
@@ -366,12 +366,8 @@ export function parseCapture(text: string, today: string): ParsedCapture {
   for (const extra of dateTokens.slice(1)) {
     pushDiagnostic(diagnostics, "warning", "extra-date", `Only the first !date applies — "${extra.raw}" is ignored`, extra, tokens.indexOf(extra));
   }
-  if (hasLater && scheduled) {
-    pushDiagnostic(diagnostics, "error", "later-with-date", "Later tasks have no date", tokens.find((entry) => entry.kind === "date" && !entry.forFollowup));
-  }
-  if (hasLater && hasPerson) {
-    pushDiagnostic(diagnostics, "error", "later-with-person", "Later stays on manager-owned tasks — remove /later or @person", tokens.find((entry) => entry.kind === "person"));
-  }
+  // docs/57 §3 (P3-02): with /later the date is the resurface date and every
+  // @person is a link — parked work stays mine, so neither is an error.
   for (const entry of tokens) {
     if (entry.kind === "date" && entry.value && entry.value < today) {
       pushDiagnostic(diagnostics, "warning", "past-date", `${entry.value} is in the past`, entry, tokens.indexOf(entry));
@@ -397,6 +393,8 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
 
   // People — first @ owns the task, the rest become person links.
   const personTokens = tokens.filter((token) => token.kind === "person");
+  // docs/57 §3: developer tasks cannot be Later, so /later keeps me as owner.
+  const later = tokens.some((token) => token.kind === "later");
   let owner: CapturePersonCandidate | null = null;
   const peopleLinks: CapturePersonCandidate[] = [];
   for (const token of personTokens) {
@@ -406,7 +404,7 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
       pushDiagnostic(diagnostics, "error", "unknown-person", `Nobody matches @${token.value}`, token, index);
     } else if (matches.length > 1) {
       diagnostics.push({ severity: "error", code: "ambiguous-person", message: `@${token.value} is ambiguous — pick someone`, token: token.raw, tokenIndex: index, candidates: matches });
-    } else if (token === personTokens[0]) {
+    } else if (token === personTokens[0] && !later) {
       owner = matches[0]!;
     } else {
       peopleLinks.push(matches[0]!);
@@ -463,7 +461,9 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
 
   const title = parsed.intent === "create" ? buildTitle(parsed.words, tokens) : parsed.title;
 
-  const scheduledOn = tokens.find((entry) => entry.kind === "date" && !entry.forFollowup)?.value ?? null;
+  const firstDate = tokens.find((entry) => entry.kind === "date" && !entry.forFollowup)?.value ?? null;
+  const scheduledOn = later ? null : firstDate;
+  const hideUntil = later ? firstDate : null;
   const followUpAt = tokens.find((entry) => entry.kind === "date" && entry.forFollowup)?.value ?? null;
   const followUp = tokens.some((entry) => entry.kind === "followup");
   const labels = tokens.filter((entry) => entry.kind === "label").map((entry) => entry.value!);
@@ -487,9 +487,10 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
     parentKey,
     labels,
     scheduledOn,
+    hideUntil,
     followUp,
     followUpAt,
-    later: tokens.some((entry) => entry.kind === "later"),
+    later,
     meeting: tokens.some((entry) => entry.kind === "meeting"),
     priority: tokens.some((entry) => entry.kind === "priority") ? "high" : "normal",
   };

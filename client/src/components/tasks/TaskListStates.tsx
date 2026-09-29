@@ -152,7 +152,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
         Icon: CalendarCheck,
       };
     case 'inbox':
-      return { title: 'Inbox zero', body: 'Everything captured has an owner.', tone: 'success', Icon: CheckCheck };
+      return { title: 'Inbox zero', body: 'Everything captured has been triaged.', tone: 'success', Icon: CheckCheck };
     case 'my-tasks':
       return { title: 'No open tasks', body: 'Add one below or capture with ⌘I.', Icon: CalendarCheck };
     case 'waiting':

@@ -42,8 +42,11 @@ export const taskCreateSchema = z.object({
   startsAt: timestamp.nullable().optional(), endsAt: timestamp.nullable().optional(),
   participants: z.string().max(4000).nullable().optional(), nextAction: z.string().max(4000).nullable().optional(), outcome: z.string().max(4000).nullable().optional(),
   parentId: z.number().int().positive().nullable().optional(),
+  hideUntil: dateOnly.nullable().optional(),
 }).strict();
-export const taskUpdateSchema = taskCreateSchema.partial();
+export const taskUpdateSchema = taskCreateSchema.partial().extend({ triaged: z.boolean().optional() }).strict();
+/** docs/57 §1: a patch touching any of these fields is a triage decision. */
+const TRIAGE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status"] as const;
 export const taskLinkSchema = z.object({ kind: z.enum(["jira", "person", "external", "task"]), ref: z.string().trim().min(1).max(2000), role: z.enum(["primary", "related"]).nullable().optional() }).strict();
 
 function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -93,6 +96,11 @@ export function taskStatusToDeskStatus(status: string, later: number): string {
   }
 }
 
+/** docs/57 §2: resurface date and Inbox marker are tracking-manager-private. */
+function triageFields(row: TaskRow, ownsPrivate: boolean): Pick<ManagerTask, "hideUntil" | "needsTriage"> {
+  return { hideUntil: ownsPrivate ? row.hideUntil : null, needsTriage: ownsPrivate && row.needsTriage === 1 };
+}
+
 function toProjection(row: TaskRow): TaskProjection {
   return {
     taskKey: row.taskKey,
@@ -139,7 +147,8 @@ export class TaskService {
     if (principal.type === "developer") return shared;
     const ownsPrivate = row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
     return { ...shared, legacyDeskItemId: legacyDeskItemId ?? row.id, later: ownsPrivate && row.later === 1, parentId: row.parentId, trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null, schedulePosition: row.schedulePosition,
-      labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
+      labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null,
+      ...triageFields(row, ownsPrivate) };
   }
 
   async toDto(row: TaskRow, principal: TaskPrincipal): Promise<DeveloperTask | ManagerTask> {
@@ -198,9 +207,10 @@ export class TaskService {
     });
   }
 
-  private async validateShape(row: Pick<TaskRow, "ownerType" | "ownerId" | "later" | "startsAt" | "endsAt" | "parentId" | "workspaceId" | "scheduledOn">, id?: number): Promise<void> {
+  private async validateShape(row: Pick<TaskRow, "ownerType" | "ownerId" | "later" | "startsAt" | "endsAt" | "parentId" | "workspaceId" | "scheduledOn" | "hideUntil">, id?: number): Promise<void> {
     if (Boolean(row.ownerType) !== Boolean(row.ownerId)) throw new HttpError(400, "Owner type and ID must be supplied together");
     if (row.later && row.scheduledOn) throw new HttpError(409, "Later tasks have no date");
+    if (row.hideUntil && !row.later) throw new HttpError(409, "A resurface date needs Later");
     if (row.ownerType === "developer") {
       if (row.later) throw new HttpError(409, "Developer tasks cannot be Later");
       const owner = (await db.select().from(developers).where(and(eq(developers.workspaceId, row.workspaceId), eq(developers.accountId, row.ownerId!), eq(developers.isActive, 1))).limit(1))[0];
@@ -243,7 +253,11 @@ export class TaskService {
     }
   }
 
-  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one" } = {}): Promise<TaskRow> {
+  /**
+   * `options.untriaged` (docs/57 §1): only a bare capture — no date, owner or
+   * later — lands in Inbox; every other create path is triaged by default.
+   */
+  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one"; untriaged?: boolean } = {}): Promise<TaskRow> {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);
@@ -256,7 +270,8 @@ export class TaskService {
       const ownerType = principal.type === "developer" ? "developer" : data.ownerType === undefined ? "manager" : data.ownerType;
       const ownerId = principal.type === "developer" ? principal.accountId : data.ownerId === undefined && ownerType === "manager" ? principal.accountId : data.ownerId ?? null;
       const values = { ...data, details: normalizeDetails(data.details) ?? null, labels: undefined, workspaceId: scope, ownerType, ownerId, later: data.later ? 1 : 0, parentId: data.parentId ?? null,
-        startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null,
+        startsAt: data.startsAt ?? null, endsAt: data.endsAt ?? null, hideUntil: data.hideUntil ?? null,
+        needsTriage: options.untriaged && principal.type !== "developer" ? 1 : 0,
         scheduledOn: data.scheduledOn === undefined ? (data.later ? null : todayIsoDate()) : data.scheduledOn,
         taskKey: this.keys.allocate(scope), trackedByManagerId: principal.type === "developer" ? null : principal.accountId,
         labelsJson: data.labels ? JSON.stringify(data.labels) : null, status: data.status ?? "open", createdByType: principal.type, createdById: principal.accountId, createdAt: now, updatedAt: now,
@@ -277,13 +292,13 @@ export class TaskService {
     const data = parseInput(taskUpdateSchema, input);
     return runInTransaction(async () => {
       const before = await this.requireTask(key, principal);
-      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
+      if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later", "hideUntil", "triaged"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
       if (principal.type === "developer") {
         // `details` is shared by design: the owning developer edits it like the manager does.
         if (Object.keys(data).some((field) => !["title", "details", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
       }
-      const { labels, later, ...fields } = data;
+      const { labels, later, triaged, ...fields } = data;
       if (fields.details !== undefined) fields.details = normalizeDetails(fields.details);
       // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
       if (labels && labels.length && await this.keys.phase3Enabled(before.workspaceId)) {
@@ -293,6 +308,13 @@ export class TaskService {
       // "Later ⇒ no date" (§4.2): parking without an explicit date drops the
       // scheduled date; validateShape rejects an explicit later+date pair.
       if (later === true && data.scheduledOn === undefined) next.scheduledOn = null;
+      // docs/57 §1: re-parking without a date clears an old resurface date, and
+      // un-parking always clears it.
+      if (later !== undefined && data.hideUntil === undefined) next.hideUntil = null;
+      // Any triage decision takes the task out of Inbox; an explicit
+      // `triaged` wins (undo restores `triaged: false`).
+      if (triaged !== undefined) next.needsTriage = triaged ? 0 : 1;
+      else if (TRIAGE_FIELDS.some((field) => Object.hasOwn(data, field))) next.needsTriage = 0;
       const reassigned = next.ownerType !== before.ownerType || next.ownerId !== before.ownerId;
       if (reassigned) {
         if (["done", "dropped"].includes(before.status)) throw new HttpError(409, "Reopen closed work before reassigning");
@@ -640,7 +662,8 @@ export class TaskService {
       const ownsPrivate = row.trackedByManagerId === options.principal.accountId || (row.ownerType === "manager" && row.ownerId === options.principal.accountId);
       const managerDto: ManagerTask = { ...shared, legacyDeskItemId: mappedByTaskSource.get(`manager_desk_items:${row.id}`) ?? row.id, later: row.later === 1, parentId: row.parentId, schedulePosition: row.schedulePosition,
         trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
-        labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null };
+        labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null,
+        ...triageFields(row, ownsPrivate) };
       return { ...managerDto, ...extras } satisfies ManagerSurfaceTask;
     });
   }

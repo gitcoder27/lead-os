@@ -111,17 +111,28 @@ describe("parseCapture — tokens", () => {
     expect(parsed.labels).toContain("q3-plan");
   });
 
-  it("later defaults to no scheduledOn error only when a date is present", () => {
+  it("/later !date is a resurface date, not a schedule (P3-02)", () => {
     expect(resolved("Idea /later").blocked).toBe(false);
+    expect(resolved("Idea /later").hideUntil).toBeNull();
     const withDate = resolved("Idea /later !fri");
-    expect(withDate.diagnostics.some((d) => d.code === "later-with-date" && d.severity === "error")).toBe(true);
-    expect(withDate.blocked).toBe(true);
+    expect(withDate.blocked).toBe(false);
+    expect(withDate.scheduledOn).toBeNull();
+    expect(withDate.hideUntil).toBe(resolved("x !fri").scheduledOn);
+    // Order does not matter: the date still resurfaces the parked task.
+    expect(resolved("Idea !fri /later").hideUntil).toBe(withDate.hideUntil);
   });
 
-  it("/later with @person is an error (P3-D14)", () => {
+  it("/later @person links the person and keeps me as owner (P3-02)", () => {
     const parsed = resolved("Idea /later @sam");
-    expect(parsed.diagnostics.some((d) => d.code === "later-with-person")).toBe(true);
-    expect(parsed.blocked).toBe(true);
+    expect(parsed.blocked).toBe(false);
+    expect(parsed.owner).toBeNull();
+    expect(parsed.peopleLinks.map((person) => person.accountId)).toEqual(["sam"]);
+  });
+
+  it("without /later a date schedules and hideUntil stays null", () => {
+    const parsed = resolved("Ship it !fri");
+    expect(parsed.scheduledOn).not.toBeNull();
+    expect(parsed.hideUntil).toBeNull();
   });
 
   it("empty create title is an error", () => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CalendarDays, Flag, Hash, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
+import { ArrowRight, CalendarDays, Flag, Hash, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
   parseCapture,
@@ -97,7 +97,11 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
     chips.push(<Chip key="owner" icon={<UserRound size={10} />}>{developerNames.get(resolved.owner.accountId) ?? resolved.owner.accountId}</Chip>);
   }
   if (resolved.meeting) chips.push(<Chip key="meeting" icon={<Users size={10} />}>Meeting</Chip>);
-  if (resolved.later) chips.push(<Chip key="later" icon={<Repeat size={10} />}>Later</Chip>);
+  if (resolved.later) {
+    chips.push(<Chip key="later" icon={<Repeat size={10} />}>Later{resolved.hideUntil ? ` · back ${format(parseISO(resolved.hideUntil), 'EEE, MMM d')}` : ''}</Chip>);
+  } else if (resolved.intent === 'create' && !resolved.owner && !omitOwner && !resolved.scheduledOn && !resolved.followUp) {
+    chips.push(<Chip key="inbox" icon={<Inbox size={10} />}>Inbox</Chip>);
+  }
   if (resolved.priority === 'high') chips.push(<Chip key="prio" icon={<Flag size={10} />}>High priority</Chip>);
   if (resolved.scheduledOn) {
     chips.push(<Chip key="date" icon={<CalendarDays size={10} />}>{format(parseISO(resolved.scheduledOn), 'EEE, MMM d')}</Chip>);

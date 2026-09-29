@@ -23,6 +23,32 @@ beforeEach(async () => {
 });
 
 describe("canonical tasks", () => {
+  it("P3-02: triage marker and resurface date follow the triage rules and stay private", async () => {
+    const bare = await service.create({ title: "Bare capture", scheduledOn: null }, manager, { untriaged: true });
+    expect(bare.needsTriage).toBe(1);
+    // Other create paths are triaged by default, and developers can never create untriaged work.
+    expect((await service.create({ title: "Desk task" }, manager)).needsTriage).toBe(0);
+    expect((await service.create({ title: "Mine" }, developer, { untriaged: true })).needsTriage).toBe(0);
+    // Editing text is not a triage decision; a status change is.
+    expect((await service.update(bare.taskKey, { title: "Renamed" }, manager)).needsTriage).toBe(1);
+    expect((await service.update(bare.taskKey, { status: "active" }, manager)).needsTriage).toBe(0);
+    expect((await service.update(bare.taskKey, { triaged: false }, manager)).needsTriage).toBe(1);
+
+    const parked = await service.update(bare.taskKey, { status: "open", later: true, hideUntil: "2099-01-05" }, manager);
+    expect(parked).toMatchObject({ later: 1, hideUntil: "2099-01-05", needsTriage: 0 });
+    // Re-parking without a date clears the old one; un-parking always clears it.
+    expect((await service.update(bare.taskKey, { later: true }, manager)).hideUntil).toBeNull();
+    await service.update(bare.taskKey, { hideUntil: "2099-01-05" }, manager);
+    expect((await service.update(bare.taskKey, { later: false }, manager)).hideUntil).toBeNull();
+    await expect(service.update(bare.taskKey, { hideUntil: "2099-01-05" }, manager)).rejects.toMatchObject({ status: 409 });
+
+    const devTask = await service.create({ title: "Dev work", ownerType: "developer", ownerId: "dev-1" }, manager);
+    const devView = await service.toDto(devTask, developer);
+    expect(devView).not.toHaveProperty("hideUntil");
+    expect(devView).not.toHaveProperty("needsTriage");
+    await expect(service.update(devTask.taskKey, { triaged: true } as never, developer)).rejects.toMatchObject({ status: 403 });
+  });
+
   it("resets canonical tasks and events without relying on legacy rows", async () => {
     await service.create({ title: "Private task", nextAction: "Private" }, manager);
     await service.create({ title: "Developer task" }, developer);

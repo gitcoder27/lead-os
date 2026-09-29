@@ -502,6 +502,11 @@ export const tasks = sqliteTable("tasks", {
   // docs/51 F7: manual order within a plan-date bucket. NULL = unpositioned
   // (sorts after positioned rows within the same bucket).
   schedulePosition: integer("schedule_position"),
+  // docs/57 §1 (P3-02): Later resurface date, and the Inbox (untriaged) marker.
+  // `needs_triage` defaults to 0 so every non-capture insert path — including
+  // the legacy backfill — is triaged; only a bare capture sets it.
+  hideUntil: text("hide_until"),
+  needsTriage: integer("needs_triage").notNull().default(0),
   dueAt: text("due_at"),
   followUpAt: text("follow_up_at"),
   startsAt: text("starts_at"),

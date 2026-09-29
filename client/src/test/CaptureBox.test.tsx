@@ -107,12 +107,19 @@ describe('CaptureBox (P3-D8)', () => {
     expect(screen.queryByTestId('capture-diagnostics')).toBeNull();
   });
 
-  it('rejects /later combined with a date', () => {
+  it('/later with a date shows the resurface date (P3-02)', () => {
     const { input } = renderBox();
     fireEvent.change(input, { target: { value: '/later !fri Park this thought' } });
 
-    expect(screen.getByTestId('capture-diagnostics').textContent).toMatch(/later/i);
-    expect(screen.getByRole('button', { name: /capture/i })).toBeDisabled();
+    expect(screen.getByTestId('capture-summary').textContent).toMatch(/Later · back \w{3}, \w{3} \d+/);
+    expect(screen.getByRole('button', { name: /capture/i })).not.toBeDisabled();
+  });
+
+  it('a bare capture previews as Inbox (P3-02)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Think about hiring plan' } });
+
+    expect(screen.getByTestId('capture-summary').textContent).toContain('Inbox');
   });
 
   it('shows the update intent for a task update', () => {

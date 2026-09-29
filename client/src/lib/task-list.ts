@@ -104,7 +104,7 @@ export function impliedMeta(
   today: string,
 ): { showOwner: boolean; showDate: boolean } {
   const owner = definition?.filters?.owner;
-  const showOwner = !(owner === 'me' || owner === 'inbox' || context.mode === 'owner');
+  const showOwner = !(owner === 'me' || owner === 'inbox' || definition?.filters?.lane === 'inbox' || context.mode === 'owner');
   const singleDay = context.mode === 'scheduled' && (context.bucket === 'Today' || context.bucket === 'Tomorrow');
   const tone = relativeTaskDate(task, today)?.tone;
   const showDate = !(singleDay && tone !== 'danger' && tone !== 'warning' && isOpenStatus(task.status));
@@ -275,10 +275,21 @@ export function scheduleChanges(preset: SchedulePreset, today: string): UpdateTa
   }
 }
 
+/** docs/57 §1: a patch touching any of these fields is a triage decision (mirrors the server). */
+const TRIAGE_FIELDS = ['scheduledOn', 'dueAt', 'ownerType', 'ownerId', 'later', 'hideUntil', 'status'] as const;
+
+function isTriagePatch(changes: UpdateTaskRequest): boolean {
+  return TRIAGE_FIELDS.some((field) => Object.hasOwn(changes, field));
+}
+
 /** Server-side side effects mirrored for optimistic patches. */
 export function optimisticTask<T extends ManagerTask>(task: T, changes: UpdateTaskRequest, now = new Date().toISOString()): T {
-  const next: T = { ...task, ...(changes as Partial<ManagerTask>) };
+  const { triaged, ...fields } = changes;
+  const next: T = { ...task, ...(fields as Partial<ManagerTask>) };
   if (changes.later === true && changes.scheduledOn === undefined) next.scheduledOn = null;
+  if (changes.later !== undefined && changes.hideUntil === undefined) next.hideUntil = null;
+  if (triaged !== undefined) next.needsTriage = !triaged;
+  else if (isTriagePatch(changes)) next.needsTriage = false;
   const reassigned = changes.ownerType !== undefined && (changes.ownerType !== task.ownerType || changes.ownerId !== task.ownerId);
   if (reassigned && task.status === 'active' && changes.status === undefined) next.status = 'open';
   next.closedAt = isOpenStatus(next.status) ? null : task.closedAt ?? now;
@@ -299,6 +310,11 @@ export function undoChanges(task: ManagerTask, changes: UpdateTaskRequest): Upda
   for (const field of fields) undo[field] = (task as unknown as Record<string, unknown>)[field];
   // "Later ⇒ no date": restoring a parked task must not also carry a date.
   if (undo.later === true) undo.scheduledOn = null;
+  // docs/57 §1: any `later` patch clears the resurface date server-side, so
+  // restoring a parked task restores its date too.
+  if (undo.later === true && task.hideUntil) undo.hideUntil = task.hideUntil;
+  // Triaging takes a task out of Inbox; undo puts it back.
+  if (task.needsTriage && isTriagePatch(changes)) undo.triaged = false;
   return undo as UpdateTaskRequest;
 }
 

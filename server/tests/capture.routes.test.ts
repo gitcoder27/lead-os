@@ -13,6 +13,17 @@ import { CaptureService } from "../src/services/capture.service";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { todayIsoDate } from "../src/utils/date";
+import { TaskViewsService, builtinTaskViews } from "../src/services/task-views.service";
+import type { TaskPrincipal } from "../src/services/task.service";
+
+function shiftIso(iso: string, days: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+// A manager's account id is their username (AuthService maps it onto the session).
+async function managerPrincipal(): Promise<TaskPrincipal> {
+  return { type: "manager", accountId: "manager-a" };
+}
 
 const auth = new AuthService();
 const keys = new TaskKeysService();
@@ -74,7 +85,7 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     expect((await capture(headers, "hello")).status).toBe(403);
   });
 
-  it("creates a manager-owned task with defaults (me, open, scheduled today)", async () => {
+  it("a bare capture is mine, open, undated and untriaged (docs/57 P3-02)", async () => {
     await enablePhase3();
     const headers = { cookie: await cookie("manager-a") };
     const res = await capture(headers, "Prep board review");
@@ -83,7 +94,54 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     expect(res.body.task.title).toBe("Prep board review");
     expect(res.body.task.ownerType).toBe("manager");
     expect(res.body.task.status).toBe("open");
+    expect(res.body.task.scheduledOn).toBeNull();
+    expect(res.body.task.needsTriage).toBe(true);
+  });
+
+  it("lands a bare capture in Inbox, never Overdue, until it is triaged (P3-02)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const key = (await capture(headers, "Untriaged thought")).body.task.taskKey as string;
+    const dated = (await capture(headers, "Planned thing !tomorrow")).body.task;
+    expect(dated.needsTriage).toBe(false);
+    expect(dated.scheduledOn).not.toBeNull();
+
+    const views = new TaskViewsService();
+    const manager = await managerPrincipal();
+    const today = todayIsoDate();
+    const inbox = () => views.run(manager, builtinTaskViews(today).find((view) => view.id === "inbox")!.definition, today);
+    expect((await inbox()).map((task) => task.taskKey)).toEqual([key]);
+    const attention = await views.run(manager, builtinTaskViews(today).find((view) => view.id === "attention")!.definition, today);
+    expect(attention.map((task) => task.taskKey)).not.toContain(key);
+    // Keeping it undated is a triage decision: it leaves Inbox.
+    const patched = await invoke(app, { method: "PATCH", url: `/api/tasks/${key}`, headers, body: { scheduledOn: null } });
+    expect(patched.status).toBe(200);
+    expect(await inbox()).toEqual([]);
+    // Undo can put it back.
+    await invoke(app, { method: "PATCH", url: `/api/tasks/${key}`, headers, body: { triaged: false } });
+    expect((await inbox()).map((task) => task.taskKey)).toEqual([key]);
+    const counts = await views.counts(manager, today);
+    expect(counts.inbox!.count).toBe(1);
+  });
+
+  it("unowned tasks stay in Inbox even when dated (legacy Desk inbox rows)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const created = await invoke(app, { method: "POST", url: "/api/tasks", headers, body: { title: "Unowned", ownerType: null, ownerId: null } });
+    expect(created.status).toBe(201);
+    expect(created.body.scheduledOn).toBe(todayIsoDate());
+    const today = todayIsoDate();
+    const inbox = await new TaskViewsService().run(await managerPrincipal(), builtinTaskViews(today).find((view) => view.id === "inbox")!.definition, today);
+    expect(inbox.map((task) => task.taskKey)).toEqual([created.body.taskKey]);
+  });
+
+  it("@dev without a date keeps landing on the developer's day (decision 4)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await capture(headers, "Fix the flaky test @dev-1");
+    expect(res.body.task.ownerType).toBe("developer");
     expect(res.body.task.scheduledOn).toBe(todayIsoDate());
+    expect(res.body.task.needsTriage).toBe(false);
   });
 
   it("@person makes a developer the owner; !date, !!, +label, /m and /f apply", async () => {
@@ -205,11 +263,48 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     expect(res.body.diagnostics.some((d: { code: string }) => d.code === "bad-update-target")).toBe(true);
   });
 
-  it("/later with a date or @person is blocked", async () => {
+  it("/later !date stores a resurface date and /later @person links, not owns (P3-02)", async () => {
     await enablePhase3();
     const headers = { cookie: await cookie("manager-a") };
-    expect((await capture(headers, "Idea /later !fri")).body.blocked).toBe(true);
-    expect((await capture(headers, "Idea /later @dev-1")).body.blocked).toBe(true);
+    const dated = await capture(headers, "Idea /later !+3d");
+    expect(dated.status).toBe(200);
+    expect(dated.body.task.later).toBe(true);
+    expect(dated.body.task.scheduledOn).toBeNull();
+    expect(dated.body.task.hideUntil).toBe(shiftIso(todayIsoDate(), 3));
+    const linked = await capture(headers, "Idea /later @dev-1");
+    expect(linked.status).toBe(200);
+    expect(linked.body.task.ownerType).toBe("manager");
+    expect(linked.body.task.later).toBe(true);
+    expect(linked.body.task.links).toEqual([expect.objectContaining({ kind: "person", ref: "dev-1" })]);
+  });
+
+  it("a parked task resurfaces in Inbox on its hideUntil date (P3-02)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const key = (await capture(headers, "Revisit vendor /later !+3d")).body.task.taskKey as string;
+    const views = new TaskViewsService();
+    const manager = await managerPrincipal();
+    const run = (id: string, today: string) => views.run(manager, builtinTaskViews(today).find((view) => view.id === id)!.definition, today);
+    const today = todayIsoDate();
+    const resurface = shiftIso(today, 3);
+    expect((await run("later", today)).map((task) => task.taskKey)).toEqual([key]);
+    expect(await run("inbox", today)).toEqual([]);
+    expect(await run("later", resurface)).toEqual([]);
+    expect((await run("inbox", resurface)).map((task) => task.taskKey)).toEqual([key]);
+    expect((await run("my-tasks", resurface)).map((task) => task.taskKey)).toContain(key);
+    // Scheduling it triages it and clears the parked state and resurface date.
+    const res = await invoke(app, { method: "PATCH", url: `/api/tasks/${key}`, headers, body: { scheduledOn: resurface, later: false } });
+    expect(res.status).toBe(200);
+    expect(res.body.hideUntil).toBeNull();
+    expect(await run("inbox", resurface)).toEqual([]);
+  });
+
+  it("rejects a resurface date without Later", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const key = (await capture(headers, "Plain task !tomorrow")).body.task.taskKey as string;
+    const res = await invoke(app, { method: "PATCH", url: `/api/tasks/${key}`, headers, body: { hideUntil: "2030-01-01" } });
+    expect(res.status).toBe(409);
   });
 
   it("/later stores scheduled_on as NULL (G2)", async () => {

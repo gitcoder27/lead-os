@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, isNull, lte, ne, sql, type SQL } from "drizzle-orm";
-import { TASK_STALE_DAYS, taskViewDefinitionSchema, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
+import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
@@ -42,7 +42,9 @@ export function builtinTaskViews(today: string): { id: string; name: string; sec
   const openish: TaskStatus[] = ["open", "active", "blocked"];
   return [
     { id: "today", name: "Planned today", section: "plan", definition: { filters: { owner: "me", status: openish, later: false, horizon: "today" }, sort: "scheduled", group: "scheduled" } },
-    { id: "inbox", name: "Inbox", section: "plan", definition: { filters: { owner: "inbox", status: ["open"] }, sort: "created" } },
+    // docs/57 §1 (P3-02): Inbox means untriaged — bare captures, unowned rows,
+    // and Later tasks whose resurface date arrived — not just "unowned".
+    { id: "inbox", name: "Inbox", section: "plan", definition: { filters: { lane: "inbox" }, sort: "created" } },
     { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
     { id: "waiting", name: "Waiting on others", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "updated", group: "owner" } },
     { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
@@ -82,6 +84,19 @@ export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">): { dat
   if (due && (!scheduled || due <= scheduled)) return { date: due, source: "due" };
   if (scheduled) return { date: scheduled, source: "scheduled" };
   return { date: null, source: null };
+}
+
+/** docs/57 §1: the row's lifecycle lane (the shared `taskLane` rule). */
+export function taskRowLane(row: TaskRow, today: string): TaskLane {
+  return taskLane({
+    status: row.status,
+    later: row.later === 1,
+    hideUntil: row.hideUntil,
+    scheduledOn: row.scheduledOn,
+    dueDate: isoDatePart(row.dueAt) ?? null,
+    ownerType: row.ownerType,
+    needsTriage: row.needsTriage === 1,
+  }, today);
 }
 
 /** Batched per-row facts the matcher and signals need beyond the row itself. */
@@ -147,7 +162,8 @@ export function matchesTaskViewFilters(
   if (filters.status?.length && !filters.status.includes(row.status as TaskStatus)) return false;
   if (filters.kind && row.kind !== filters.kind) return false;
   if (filters.later !== undefined) {
-    const parked = row.later === 1 && row.trackedByManagerId === principal.accountId;
+    // docs/57 §1: a Later task past its resurface date is no longer parked.
+    const parked = isTaskHidden({ later: row.later === 1, hideUntil: row.hideUntil }, today) && row.trackedByManagerId === principal.accountId;
     if (parked !== filters.later) return false;
   }
   if (filters.scheduled) {
@@ -178,6 +194,7 @@ export function matchesTaskViewFilters(
     const lastActivity = (facts.lastActivity.get(row.id) ?? row.updatedAt).slice(0, 10);
     if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
   }
+  if (filters.lane && taskRowLane(row, today) !== filters.lane) return false;
   if (filters.horizon) {
     const plan = taskPlanDate(row).date;
     if (!plan) return false;
@@ -250,7 +267,7 @@ export class TaskViewsService {
       : sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL)`;
   }
 
-  private async candidateRows(principal: TaskPrincipal, filters: TaskViewFilters): Promise<TaskRow[]> {
+  private async candidateRows(principal: TaskPrincipal, filters: TaskViewFilters, today: string): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const conditions: SQL[] = [eq(tasks.workspaceId, scope), isNull(tasks.deletedAt), this.scopePredicate(principal)];
 
@@ -270,9 +287,9 @@ export class TaskViewsService {
     // `later` is tracking-manager-private like the other private fields — a
     // parked row only reads as later to the manager tracking it.
     if (filters.later !== undefined) {
-      conditions.push(filters.later
-        ? and(eq(tasks.later, 1), eq(tasks.trackedByManagerId, principal.accountId))!
-        : sql`NOT (${tasks.later} = 1 AND ${tasks.trackedByManagerId} = ${principal.accountId})`);
+      // docs/57 §1: parked = later and not yet at its resurface date.
+      const parked = sql`(${tasks.later} = 1 AND ${tasks.trackedByManagerId} = ${principal.accountId} AND (${tasks.hideUntil} IS NULL OR ${tasks.hideUntil} > ${today}))`;
+      conditions.push(filters.later ? parked : sql`NOT ${parked}`);
     }
     if (filters.scheduled) {
       if (filters.scheduled.from) conditions.push(gte(tasks.scheduledOn, filters.scheduled.from));
@@ -330,7 +347,7 @@ export class TaskViewsService {
   }
 
   private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string) {
-    const rows = await this.candidateRows(principal, definition.filters ?? {});
+    const rows = await this.candidateRows(principal, definition.filters ?? {}, today);
     const facts = await this.facts(principal, rows, today, needsJiraLinks([definition]));
     return this.matching(principal, rows, definition, facts, today);
   }

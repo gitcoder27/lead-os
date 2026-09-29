@@ -852,6 +852,10 @@ export interface ManagerTask extends DeveloperTask {
   /** docs/51 F7: manual rank inside the task's plan-date bucket. Null means
    *  never ordered — the row sorts after positioned rows via the view sort. */
   schedulePosition: number | null;
+  /** docs/57 §1 (P3-02): `/later !date` — the parked task resurfaces in Inbox on this date. */
+  hideUntil?: string | null;
+  /** docs/57 §1 (P3-02): captured without a date, owner or later — shown in Inbox until triaged. */
+  needsTriage?: boolean;
 }
 
 /**
@@ -1001,6 +1005,48 @@ export interface TaskViewFilters {
    *  docs/51 F2: "stale" only applies to manager-owned and inbox tasks —
    *  idle developer-owned work belongs to the Team page. */
   attention?: TaskAttentionSignal[];
+  /** docs/57 §1: the derived lifecycle lane (see `taskLane`). */
+  lane?: TaskLane;
+}
+
+/**
+ * docs/57 §1: every open task sits in exactly one lane, derived from its
+ * fields and never stored. First match wins: done, later (hidden), waiting,
+ * unowned (inbox — it still needs an owner, dated or not), planned (has a plan
+ * date), inbox (untriaged, or a Later task whose resurface date arrived),
+ * otherwise unscheduled.
+ */
+export type TaskLane = "inbox" | "planned" | "waiting" | "later" | "unscheduled" | "done";
+export const TASK_LANES: readonly TaskLane[] = ["inbox", "planned", "waiting", "later", "unscheduled", "done"];
+
+export interface TaskLaneInput {
+  status: string;
+  later: boolean;
+  hideUntil: string | null;
+  scheduledOn: string | null;
+  /** The local ISO date of `dueAt` (callers convert with their local-date helper). */
+  dueDate: string | null;
+  ownerType: string | null;
+  needsTriage: boolean;
+  /** Waiting on someone (P3-03). */
+  waiting?: boolean;
+}
+
+/** A Later task is hidden until its resurface date (inclusive) arrives. */
+export function isTaskHidden(input: Pick<TaskLaneInput, "later" | "hideUntil">, today: string): boolean {
+  return input.later && !(input.hideUntil && input.hideUntil <= today);
+}
+
+export function taskLane(input: TaskLaneInput, today: string): TaskLane {
+  if (input.status === "done" || input.status === "dropped") return "done";
+  if (isTaskHidden(input, today)) return "later";
+  if (input.waiting) return "waiting";
+  // Legacy Desk inbox rows and Inbox inline-adds are unowned but dated (the
+  // Desk day); they stay in Inbox until someone owns them.
+  if (input.ownerType === null) return "inbox";
+  if (input.scheduledOn || input.dueDate) return "planned";
+  if (input.needsTriage || input.later) return "inbox";
+  return "unscheduled";
 }
 
 export type TaskAttentionSignal = "overdue" | "stale" | "drift";
@@ -1164,6 +1210,7 @@ export const taskViewDefinitionSchema = z.object({
     horizon: z.enum(["today", "upcoming"]).optional(),
     waiting: z.boolean().optional(),
     attention: z.array(z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
+    lane: z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
   }).strict().optional(),
   sort: z.enum(["scheduled", "updated", "created", "priority"]).optional(),
   group: z.enum(["owner", "status", "label", "scheduled"]).optional(),
@@ -1224,8 +1271,13 @@ export interface CreateTaskRequest {
   nextAction?: string | null;
   outcome?: string | null;
   parentId?: number | null;
+  /** docs/57 §1: resurface date for a Later task (requires `later`). */
+  hideUntil?: string | null;
 }
-export type UpdateTaskRequest = Partial<CreateTaskRequest>;
+export type UpdateTaskRequest = Partial<CreateTaskRequest> & {
+  /** docs/57 §1: `true` marks an Inbox task triaged without other changes ("Keep undated"). */
+  triaged?: boolean;
+};
 export const TASK_EVENT_TYPES = [
   "created", "update", "instruction", "decision", "blocker", "status", "assign",
   "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",

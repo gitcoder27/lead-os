@@ -22,6 +22,15 @@ import { normalizeWorkspaceId } from "./workspace.service";
 import type { ManagerTask } from "shared/types";
 
 /**
+ * docs/57 §1 (P3-02): a capture is untriaged — it lands in Inbox — when it
+ * carries no triage decision: no date, no owner, not parked, and no `/f`
+ * (a follow-up already surfaces on Today).
+ */
+export function isUntriaged(resolved: ResolvedCapture): boolean {
+  return !resolved.scheduledOn && !resolved.owner && !resolved.later && !resolved.followUp;
+}
+
+/**
  * Phase 3 (P3-D7/D8, §4.3): `POST /api/capture` — the single capture box.
  * Re-parses the text server-side (the client preview is never trusted),
  * resolves tokens against workspace data, then dispatches to task creation,
@@ -156,7 +165,11 @@ export class CaptureService {
           priority: resolved.priority,
           labels: resolved.labels,
           later: resolved.later,
-          scheduledOn: resolved.later ? null : (resolved.scheduledOn ?? today),
+          // docs/57 §1/§3 (P3-02): no date means undated. A bare capture goes
+          // to Inbox; `@dev` without a date keeps landing on the developer's
+          // day (signed-off decision 4).
+          scheduledOn: resolved.later ? null : (resolved.scheduledOn ?? (resolved.owner ? today : null)),
+          hideUntil: resolved.later ? resolved.hideUntil : null,
           // §4.1: `/f` with a date stores a local-time morning timestamp
           // (the buildSnoozeIso convention); dateless `/f` leaves follow_up_at
           // NULL — the injected `category:follow_up` label carries the follow-up.
@@ -164,7 +177,7 @@ export class CaptureService {
           parentId,
         },
         principal,
-        { requestId, source: "capture" },
+        { requestId, source: "capture", untriaged: isUntriaged(resolved) },
       );
       for (const link of resolved.jiraLinks) {
         await this.taskService.addLink(row.taskKey, { kind: "jira", ref: link.key, role: link.primary ? "primary" : "related" }, principal);

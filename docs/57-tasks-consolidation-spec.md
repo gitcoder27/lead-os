@@ -16,12 +16,14 @@ A task has one **lane**, derived from its fields and never stored. It is compute
 | **Later** | open, `later = 1`, and (`hide_until` is null or `hide_until > today`) | `/later`, `/later !mon`, `s l` |
 | **Waiting** | open and `waiting_on_*` is set | `/w @who !date`, `/f @who`, drawer "Waiting on" |
 | **Planned** | open and has a plan date (docs/49 D1: the earlier of `scheduled_on` and `due_at`) | `!date`, `!due:date`, `s t/m/w`, the date picker |
-| **Inbox** | open, and `triaged_at IS NULL` or `owner_type IS NULL`, or a Later task whose `hide_until` has arrived | capture with no date, no owner and no `/w` |
+| **Inbox** | open, and `needs_triage = 1` or `owner_type IS NULL`, or a Later task whose `hide_until` has arrived. Unowned tasks are Inbox **before** the Planned rule (P3-02 deviation, below). | capture with no date, no owner and no `/w` |
 | *(Unscheduled)* | open, triaged, no date, not waiting | "Keep undated" in triage, and all existing undated tasks |
 
 - **Later resurfaces on its own.** Once `hide_until` has passed, a Later task simply matches Inbox. No job runs and nothing is written. Triaging it clears `later` and `hide_until`.
 - **Inbox means "untriaged", not "unowned".** Today, Inbox is `owner = inbox` (`task-views.service.ts:45,143`), and capture schedules every task for today (`capture.service.ts:159`, `task.service.ts:260`). That second rule is why undone captures become Overdue.
-- **Why store `triaged_at`?** An inferred rule ("mine, no date") would pull hundreds of existing undated tasks into Inbox. That includes the manager-owned, undated 1:1 topics created by P0-S5. Any triage write sets `triaged_at`: a date, an owner, waiting, later, done or drop, or an explicit "Keep undated".
+- **Why store a triage marker?** An inferred rule ("mine, no date") would pull hundreds of existing undated tasks into Inbox. That includes the manager-owned, undated 1:1 topics created by P0-S5. Any triage write clears it: a date, an owner, waiting, later, a status change, or an explicit "Keep undated" (the list's "clear date", or `triaged: true`). `triaged: false` puts a task back, which is what undo uses.
+- **Deviation (P3-02): the marker is `needs_triage INTEGER NOT NULL DEFAULT 0`, not `triaged_at`.** With `triaged_at`, a NULL default would mark every row inserted outside capture as untriaged. That includes the legacy Phase 2 backfill, which can still run for a workspace that is not cut over (P3-00a). An opt-in flag that defaults to "triaged" needs no backfill and can't flood Inbox. Only a bare capture sets it (`TaskService.create(…, { untriaged: true })`).
+- **Deviation (P3-02): an unowned task is Inbox even when it is dated.** Legacy Desk inbox rows and Inbox inline-adds are unowned but carry the Desk day as `scheduled_on`. All 4 open unowned tasks in a prod copy were dated, so strict Planned-before-Inbox ordering would have emptied the real Inbox.
 - **Waiting outranks Planned.** A waiting task leaves "Planned today". Its check-by date brings it back on Today (§6).
 
 ## 2. Schema and migrations
@@ -39,7 +41,7 @@ Stage `2c` is on in prod and dev, and no workspace is at `2d` (docs/56 P0-V3). S
 | `waitingOn` | new `waiting_on_type` (`developer`\|`contact`\|`text`), `waiting_on_ref` (accountId or contact id), `waiting_on_label` (display snapshot or free text), `waiting_since` (ISO timestamp) | P3-03 | Setting it emits a `schedule`-style event (`field: "waiting_on"`). Clearing it keeps history. A partial index on `(workspace_id, waiting_on_type)` covers rows where it is not null. |
 | External people | new table `contacts` (`id`, `workspace_id`, `manager_account_id`, `display_name`, `handle`, `note`, `created_at`, `archived_at`); unique on `(workspace_id, manager_account_id, handle)` | P3-03 | Manager-private and never a login. `task_links.kind` gains `contact` (`task.service.ts:47`). |
 | `hideUntil` | new `tasks.hide_until` (date) | P3-02 | Only meaningful when `later = 1`. `validateShape` (`task.service.ts:203`) still forbids `later` together with `scheduled_on`. |
-| Triage marker | new `tasks.triaged_at` | P3-02 | One-shot backfill `tasks_triage_v1`, recorded in `data_migrations` like `team_mode_v1`: `triaged_at = created_at` for every existing row, so nothing floods Inbox. |
+| Triage marker | new `tasks.needs_triage` (0/1, default 0), plus a partial index where it is 1 | P3-02 | No backfill: the default means triaged (see the §1 deviation). Verified on copies of the dev sandbox DB and the prod DB: every existing row stays `0`. |
 | Recurrence | new `tasks.repeat_rule` (for example `weekly:mon`, `monthly:15`, `weekdays`) | P3-07 | Specified in §6. |
 
 **Privacy.** `waiting_on_*`, contacts, `hide_until`, `triaged_at` and `repeat_rule` are manager-private. Each gets:
@@ -156,7 +158,7 @@ The Follow-ups page's `overdue/today/upcoming/unscheduled` lanes (`lib/manager-m
 ## 7. Risks
 
 1. **New workspaces are not canonical.** No code sets `tasks_phase2_stage` for a fresh workspace; only the cutover CLI does (`task-cutover.service.ts:85`). So a new solo user gets the legacy Desk model, and capture refuses to run (`capture.service.ts:40`). Removing the pages without fixing this breaks new installs. The plan: a new item, **P3-00a**, starts empty workspaces at `2c` with Phase 3 on (there is nothing to backfill). It must land before P3-06.
-2. **Inbox flood.** Covered by the `triaged_at` backfill. Test it against a copy of the prod DB.
+2. **Inbox flood.** Avoided by the opt-in `needs_triage` flag (§1). The migration was checked against copies of the dev and prod DBs.
 3. **Adding delegated tasks back to Waiting** could bring back the noise docs/51 F1 removed. The mitigation is that a delegated task only qualifies when its check is due or it has been quiet for 5 or more days, and never simply because a developer owns it.
 4. **Two names for one field** (`followUpAt` vs "Check by"). This is accepted to keep the Desk, Copilot and Today contracts stable. It can be renamed after `2d`.
 5. **Today and the Waiting lens use different rules.** Both must go through `taskLane`, or they will disagree again (docs/55 P1, "Follow-ups … disagree with the Tasks Waiting view").

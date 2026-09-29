@@ -28,8 +28,33 @@ import {
   taskViewParamsFromState,
   taskViewStateFromParams,
 } from '@/lib/task-views';
+import { taskLane, type TaskLaneInput } from 'shared/types';
 
 const TODAY = '2026-09-26'; // Saturday
+
+describe('taskLane (docs/57 §1)', () => {
+  const lane = (overrides: Partial<TaskLaneInput>) => taskLane({
+    status: 'open', later: false, hideUntil: null, scheduledOn: null, dueDate: null, ownerType: 'manager', needsTriage: false, ...overrides,
+  }, TODAY);
+
+  it('derives one lane per task, first match wins', () => {
+    expect(lane({ status: 'done', later: true })).toBe('done');
+    expect(lane({ status: 'dropped' })).toBe('done');
+    expect(lane({ later: true })).toBe('later');
+    expect(lane({ later: true, hideUntil: '2026-09-27' })).toBe('later');
+    expect(lane({ later: true, hideUntil: TODAY })).toBe('inbox');
+    expect(lane({ waiting: true, scheduledOn: TODAY })).toBe('waiting');
+    expect(lane({ scheduledOn: '2026-09-30' })).toBe('planned');
+    expect(lane({ dueDate: '2026-09-20' })).toBe('planned');
+    expect(lane({ needsTriage: true })).toBe('inbox');
+    expect(lane({})).toBe('unscheduled');
+  });
+
+  it('keeps unowned tasks in Inbox even when dated (legacy Desk inbox rows)', () => {
+    expect(lane({ ownerType: null, scheduledOn: TODAY })).toBe('inbox');
+    expect(lane({ ownerType: null })).toBe('inbox');
+  });
+});
 
 function task(overrides: Partial<ManagerTask> = {}): ManagerTask {
   return {
@@ -242,6 +267,23 @@ describe('actions and undo (docs/49 §6)', () => {
     expect(undoChanges(task({ later: true }), { scheduledOn: TODAY, later: false })).toEqual({ later: true, scheduledOn: null });
     expect(undoChanges(task({ status: 'active' }), { ownerType: 'developer', ownerId: 'd' })).toEqual({ ownerType: 'manager', ownerId: 'm', status: 'active' });
     expect(undoChanges(task({ labels: ['a'] }), { labels: ['a', 'b'] })).toEqual({ labels: ['a'] });
+  });
+
+  it('P3-02: undo restores the resurface date and puts a triaged task back in Inbox', () => {
+    expect(undoChanges(task({ later: true, hideUntil: '2026-10-01' }), { scheduledOn: TODAY, later: false }))
+      .toEqual({ later: true, scheduledOn: null, hideUntil: '2026-10-01' });
+    expect(undoChanges(task({ needsTriage: true, scheduledOn: null }), { scheduledOn: TODAY, later: false }))
+      .toEqual({ later: false, scheduledOn: null, triaged: false });
+    // Non-triage edits leave Inbox membership alone.
+    expect(undoChanges(task({ needsTriage: true }), { labels: ['x'] })).toEqual({ labels: [] });
+  });
+
+  it('P3-02: optimistic patches mirror the triage and resurface side effects', () => {
+    expect(optimisticTask(task({ needsTriage: true }), { scheduledOn: null }).needsTriage).toBe(false);
+    expect(optimisticTask(task({ needsTriage: true }), { title: 'x' }).needsTriage).toBe(true);
+    expect(optimisticTask(task({ needsTriage: false }), { triaged: false }).needsTriage).toBe(true);
+    expect(optimisticTask(task({ later: true, hideUntil: '2026-10-01' }), { later: false })).toMatchObject({ later: false, hideUntil: null });
+    expect(optimisticTask(task({}), { triaged: true })).not.toHaveProperty('triaged');
   });
 });
 

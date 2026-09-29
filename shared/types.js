@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
+exports.isTaskHidden = isTaskHidden;
+exports.taskLane = taskLane;
 exports.validateAttentionRules = validateAttentionRules;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
@@ -35,6 +37,28 @@ function isSystemTaskLabel(name) {
 function taskLabelDisplayName(name) {
     const stripped = name.replace(/^(category|kind|priority):/, "");
     return stripped.replace(/_/g, " ");
+}
+exports.TASK_LANES = ["inbox", "planned", "waiting", "later", "unscheduled", "done"];
+/** A Later task is hidden until its resurface date (inclusive) arrives. */
+function isTaskHidden(input, today) {
+    return input.later && !(input.hideUntil && input.hideUntil <= today);
+}
+function taskLane(input, today) {
+    if (input.status === "done" || input.status === "dropped")
+        return "done";
+    if (isTaskHidden(input, today))
+        return "later";
+    if (input.waiting)
+        return "waiting";
+    // Legacy Desk inbox rows and Inbox inline-adds are unowned but dated (the
+    // Desk day); they stay in Inbox until someone owns them.
+    if (input.ownerType === null)
+        return "inbox";
+    if (input.scheduledOn || input.dueDate)
+        return "planned";
+    if (input.needsTriage || input.later)
+        return "inbox";
+    return "unscheduled";
 }
 /** docs/49 D9: days without activity before an open task reads as stale. */
 exports.TASK_STALE_DAYS = 5;
@@ -104,6 +128,7 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
         horizon: zod_1.z.enum(["today", "upcoming"]).optional(),
         waiting: zod_1.z.boolean().optional(),
         attention: zod_1.z.array(zod_1.z.enum(["overdue", "stale", "drift"])).min(1).max(3).optional(),
+        lane: zod_1.z.enum(["inbox", "planned", "waiting", "later", "unscheduled", "done"]).optional(),
     }).strict().optional(),
     sort: zod_1.z.enum(["scheduled", "updated", "created", "priority"]).optional(),
     group: zod_1.z.enum(["owner", "status", "label", "scheduled"]).optional(),

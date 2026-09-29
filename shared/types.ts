@@ -1151,6 +1151,16 @@ export function taskLane(input: TaskLaneInput, today: string): TaskLane {
   return "unscheduled";
 }
 
+/**
+ * docs/57 §3 (P3-04): the `dueAt` stored for a due date — the last moment of
+ * that day in local time, so any local-date reader (`isoDatePart`, the client's
+ * `localDateOf`) sees the same day. It is a deadline, not a plan date.
+ */
+export function dueAtForDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year!, month! - 1, day!, 23, 59, 59, 999).toISOString();
+}
+
 export type TaskAttentionSignal = "overdue" | "stale" | "drift";
 
 /** docs/49 D9: days without activity before an open task reads as stale. */

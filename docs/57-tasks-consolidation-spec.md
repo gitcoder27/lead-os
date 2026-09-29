@@ -36,7 +36,7 @@ Stage `2c` is on in prod and dev, and no workspace is at `2d` (docs/56 P0-V3). S
 
 | Field | Storage | Item | Notes |
 |---|---|---|---|
-| `due` | **existing** `tasks.due_at` (`schema.ts:505`) | P3-04 | No migration. It already drives the plan date and overdue tone (docs/49 D1/D2). It is only read-only in the drawer today (`TaskDetailFields.tsx:203`). `!due:fri` stores the local end of day, like `dayEnd` (`task.service.ts:55`). |
+| `due` | **existing** `tasks.due_at` (`schema.ts:505`) | P3-04 | No migration. It already drives the plan date and overdue tone (docs/49 D1/D2). It is only read-only in the drawer today (`TaskDetailFields.tsx:203`). `!due:fri` stores 23:59:59.999 local (`dueAtForDate`); `dayEnd` (`task.service.ts:55`) is next-day midnight and would read a day late. |
 | `checkBy` | **existing** `tasks.follow_up_at` (`schema.ts:506`) | P3-03 | No migration. The column is already "when to chase", with an index and events (`task.service.ts:314`). The UI label becomes "Check by", and the API name stays `followUpAt` so the Desk and Copilot contracts keep working. |
 | `waitingOn` | new `waiting_on_type` (`developer`\|`contact`\|`text`), `waiting_on_ref` (accountId or contact id), `waiting_on_label` (display snapshot or free text), `waiting_since` (ISO timestamp) | P3-03 | Setting it emits a `schedule`-style event (`field: "waiting_on"`). Clearing it keeps history. A partial index on `(workspace_id, waiting_on_type)` covers rows where it is not null. |
 | External people | new table `contacts` (`id`, `workspace_id`, `manager_account_id`, `display_name`, `handle`, `note`, `created_at`, `archived_at`); unique on `(workspace_id, manager_account_id, handle)` | P3-03 | Manager-private and never a login. `task_links.kind` gains `contact` (`task.service.ts:47`). |
@@ -59,7 +59,7 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
 | `/w @who [!date]` | Waiting on `who`, a developer or a contact. The optional date is check-by. The owner stays **me**. | new |
 | `/f [@who] [!date]` | With `@who`, the same as `/w`. Without it, a task of mine with a check-by date that is also scheduled on that date. Keeps `category:follow_up` for legacy predicates. | `/f [!date]` only (`:337`, `:470`) |
 | `/later [!date] [@who]` | Park it. A date becomes `hide_until`, and `@who` becomes a person link, never the owner (developer tasks cannot be Later, `task.service.ts:205`). | date and person are errors (`:369-374`) |
-| `!due:<date>` | Deadline (`due_at`), separate from the plan date | new |
+| `!due:<date>` | Deadline (`due_at`), separate from the plan date. Built in P3-04: stored as the local end of day; it does not use up a `/w` or `/f` binding slot. | built |
 | `~daily`, `~weekdays`, `~weekly`, `~biweekly`, `~monthly`, `~mon`…`~sun` | Recurrence (P3-07) | new |
 | `@who` | Resolves against developers **and** contacts. An unknown name offers "Create contact 'who'" in the chooser, instead of only failing with `unknown-person` (`:406`). | developers only (`capture.service.ts:79-81`) |
 | person ident | `PERSON_REF` also allows `:`, so Jira account ids like `557058:ab-12` parse. | fails (`:220`) |

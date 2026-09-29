@@ -19,8 +19,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
-import { isOpenStatus, scheduleChanges, type SchedulePreset } from '@/lib/task-list';
+import { isOpenStatus, localDateOf, scheduleChanges, type SchedulePreset } from '@/lib/task-list';
 import { getLocalIsoDate } from '@/lib/utils';
+import { dueAtForDate } from '@/types';
 import type { TaskDetailResponse, TaskStatus, UpdateTaskRequest } from '@/types';
 import { AssignMenu, StatusMenu, TASK_STATUS_META, TaskStatusGlyph, type AssignTarget } from './TaskMenus';
 import { MenuItem, TaskPopover } from '@/components/ui/Popover';
@@ -38,6 +39,7 @@ import {
   type DatePreset,
 } from './TaskDetailPrimitives';
 import {
+  describeDueDate,
   describeMoment,
   describePlanDate,
   followUpPresets,
@@ -199,8 +201,8 @@ export function TaskProperties({ task, mode, readOnly, onPatch, people }: TaskPr
           onCommit={(v) => onPatch({ followUpAt: v })}
         />
       )}
-      {!isMeeting && task.dueAt && (
-        <MomentRow label="Due" icon={<CalendarClock size={14} />} value={task.dueAt} status={task.status} editable={false} onCommit={() => undefined} />
+      {!isMeeting && (editable || task.dueAt) && (
+        <DueRow task={task} editable={editable} onPatch={onPatch} />
       )}
       {/* Priority is shared data; only managers change it. */}
       {(manager || task.priority === 'high') && <PriorityRow task={task} editable={editable} onPatch={onPatch} />}
@@ -359,6 +361,53 @@ function ScheduleRow({ task, editable, canLater, onPatch }: { task: TaskDetailRe
             return Boolean(preset);
           }}
           onCommit={(value) => apply(value ? { scheduledOn: value, later: false } : { scheduledOn: null })}
+          onClose={() => setAnchor(null)}
+        />
+      )}
+    </PropertyRow>
+  );
+}
+
+/**
+ * docs/57 §3 (P3-04): the deadline. Its own field — setting it never moves the
+ * plan date — stored as the end of that local day (`dueAtForDate`).
+ */
+function DueRow({ task, editable, onPatch }: { task: TaskDetailResponse; editable: boolean; onPatch: Patch }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const today = getLocalIsoDate();
+  const current = localDateOf(task.dueAt) ?? '';
+  const display = describeDueDate(task.dueAt, task.status, today);
+  const commit = (date: string | null) => {
+    setAnchor(null);
+    if ((date ?? '') === current) return;
+    onPatch({ dueAt: date ? dueAtForDate(date) : null });
+  };
+  const presets: DatePreset[] = SCHEDULE_PRESETS.map(({ preset, label, Icon }) => ({
+    key: preset,
+    label,
+    icon: <Icon size={13} />,
+    onSelect: () => commit(scheduleChanges(preset, today).scheduledOn ?? null),
+  }));
+  return (
+    <PropertyRow icon={<CalendarClock size={14} />} label="Due">
+      <PropertyButton
+        disabled={!editable}
+        ariaLabel={`Due: ${display?.label ?? 'Not set'}`}
+        title="Deadline — separate from the scheduled day"
+        expanded={Boolean(anchor)}
+        onClick={(el) => setAnchor(anchor ? null : el)}
+      >
+        <DateValue display={display} empty="No deadline" />
+      </PropertyButton>
+      {anchor && (
+        <DatePickerPopover
+          anchor={anchor}
+          label="Due"
+          kind="date"
+          value={current}
+          presets={presets}
+          clearLabel="Clear deadline"
+          onCommit={commit}
           onClose={() => setAnchor(null)}
         />
       )}

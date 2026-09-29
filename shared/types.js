@@ -5,6 +5,7 @@ exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isTaskHidden = isTaskHidden;
 exports.taskLane = taskLane;
+exports.dueAtForDate = dueAtForDate;
 exports.validateAttentionRules = validateAttentionRules;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
@@ -61,6 +62,15 @@ function taskLane(input, today) {
     if (input.needsTriage || input.later)
         return "inbox";
     return "unscheduled";
+}
+/**
+ * docs/57 §3 (P3-04): the `dueAt` stored for a due date — the last moment of
+ * that day in local time, so any local-date reader (`isoDatePart`, the client's
+ * `localDateOf`) sees the same day. It is a deadline, not a plan date.
+ */
+function dueAtForDate(date) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
 }
 /** docs/49 D9: days without activity before an open task reads as stale. */
 exports.TASK_STALE_DAYS = 5;

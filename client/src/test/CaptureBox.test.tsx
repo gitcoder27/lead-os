@@ -78,6 +78,19 @@ describe('CaptureBox (P3-D8)', () => {
     vi.clearAllMocks();
   });
 
+  it('previews a !due: deadline as its own chip, and it is not an Inbox capture (docs/57 P3-04)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Send contract !due:fri' } });
+
+    const summary = screen.getByTestId('capture-summary');
+    expect(summary.textContent).toMatch(/Due \w{3}, \w{3} \d+/);
+    expect(summary.textContent).not.toContain('Inbox');
+    // The plan date is not set by a deadline.
+    fireEvent.change(input, { target: { value: 'Send contract !due:fri !tomorrow' } });
+    expect(screen.getByTestId('capture-summary').textContent).toMatch(/Due \w{3}, \w{3} \d+/);
+    expect(screen.getByTestId('capture-summary').textContent?.match(/\w{3}, \w{3} \d+/g)).toHaveLength(2);
+  });
+
   it('renders a live summary of parsed tokens', () => {
     const { input } = renderBox('@dev-1 !fri +urgent Ship the login fix');
     fireEvent.change(input, { target: { value: '@dev-1 !fri +urgent Ship the login fix' } });

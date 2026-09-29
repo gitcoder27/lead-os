@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { dueAtForDate } from '@/types';
 import type { TaskDetailResponse } from '@/types';
 
 const mockUseTaskDetail = vi.fn();
@@ -127,7 +128,7 @@ describe('TaskDrawer body (P3-D2)', () => {
     const { container } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
     expect(screen.getByDisplayValue('Manager task')).toBeTruthy();
     const terms = within(container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent);
-    expect(terms).toEqual(['Owner', 'Tracked by', 'Scheduled', 'Follow-up', 'Priority', 'Labels']);
+    expect(terms).toEqual(['Owner', 'Tracked by', 'Scheduled', 'Follow-up', 'Due', 'Priority', 'Labels']);
     expect(screen.getByRole('heading', { name: 'Links' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Activity' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Owner: You' })).toBeTruthy();
@@ -257,6 +258,83 @@ describe('TaskDrawer interactions', () => {
     expect(mockMutate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Apply schedule' }));
     expect(mockMutate).toHaveBeenCalledWith({ scheduledOn: '2026-10-02', later: false }, expect.anything());
+  });
+
+  describe('Due (docs/57 P3-04)', () => {
+    const dueButton = () => screen.getByRole('button', { name: /^Due:/ });
+    const endOfDay = (date: string) => dueAtForDate(date);
+
+    it('is an editable field separate from Scheduled, empty by default', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      expect(dueButton()).toHaveAccessibleName('Due: Not set');
+      expect(dueButton()).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /^Scheduled:/ })).toBeInTheDocument();
+    });
+
+    it('sets the deadline from a preset without touching the plan date', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      fireEvent.click(dueButton());
+      fireEvent.click(screen.getByRole('menuitem', { name: /tomorrow/i }));
+      expect(mockMutate).toHaveBeenLastCalledWith({ dueAt: endOfDay(shiftLocalIsoDate(getLocalIsoDate(), 1)) }, expect.anything());
+      expect(mockMutate.mock.calls[0]![0]).not.toHaveProperty('scheduledOn');
+    });
+
+    it('commits an exact date only on Set, as the end of that local day', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      fireEvent.click(dueButton());
+      fireEvent.change(screen.getByLabelText('Pick a date'), { target: { value: '2026-10-09' } });
+      expect(mockMutate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Apply due' }));
+      expect(mockMutate).toHaveBeenCalledWith({ dueAt: endOfDay('2026-10-09') }, expect.anything());
+      // The stored moment reads back as the same local day.
+      expect(getLocalIsoDate(new Date(endOfDay('2026-10-09')))).toBe('2026-10-09');
+    });
+
+    it('shows the stored day and clears it', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ dueAt: endOfDay(shiftLocalIsoDate(getLocalIsoDate(), 3)) })));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      expect(dueButton().getAttribute('aria-label')).not.toBe('Due: Not set');
+      fireEvent.click(dueButton());
+      fireEvent.click(screen.getByRole('menuitem', { name: /clear deadline/i }));
+      expect(mockMutate).toHaveBeenLastCalledWith({ dueAt: null }, expect.anything());
+    });
+
+    it('does nothing when the same day is picked again', () => {
+      const day = shiftLocalIsoDate(getLocalIsoDate(), 2);
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ dueAt: endOfDay(day) })));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      fireEvent.click(dueButton());
+      fireEvent.change(screen.getByLabelText('Pick a date'), { target: { value: shiftLocalIsoDate(day, 1) } });
+      fireEvent.change(screen.getByLabelText('Pick a date'), { target: { value: day } });
+      expect(screen.getByRole('button', { name: 'Apply due' })).toBeDisabled();
+      expect(mockMutate).not.toHaveBeenCalled();
+    });
+
+    it('a missed deadline on open work reads as overdue, in red', () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ dueAt: endOfDay(shiftLocalIsoDate(getLocalIsoDate(), -2)) })));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      expect(dueButton()).toHaveTextContent('2d overdue');
+      expect(within(dueButton()).getByText('2d overdue')).toHaveStyle({ color: 'var(--danger)' });
+    });
+
+    it('a developer sees a deadline read-only, and no Due row without one', () => {
+      mockUser.mockReturnValue({ accountId: 'u-dev', role: 'developer', developerAccountId: 'dev-1' });
+      const withDue = { ...managerTask({ dueAt: endOfDay(shiftLocalIsoDate(getLocalIsoDate(), 4)) }), ownerType: 'developer' as const, ownerId: 'dev-1' } as TaskDetailResponse;
+      mockUseTaskDetail.mockReturnValue(queryFor(withDue));
+      const { container, unmount } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const terms = () => within(container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent);
+      // Shown, but as plain text: nothing to press.
+      expect(terms()).toContain('Due');
+      expect(screen.queryByRole('button', { name: /^Due:/ })).toBeNull();
+      unmount();
+
+      mockUseTaskDetail.mockReturnValue(queryFor({ ...withDue, dueAt: null } as TaskDetailResponse));
+      const second = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      expect(within(second.container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent)).not.toContain('Due');
+    });
   });
 
   it('shows Later as the schedule value and unparks from the picker', () => {

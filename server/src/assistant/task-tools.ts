@@ -52,7 +52,7 @@ export function canonicalTaskTools({ phase3 = true }: { phase3?: boolean } = {})
     ...(phase3 ? [{
       name: "capture",
       description:
-        "Capture text through the shared grammar: 'T-n: …' logs an update, '/note …' appends to today's daily note, and anything else creates a task. Tokens: @person (owner), #JIRA-KEY, ^T-n (parent), T-n (link), !today/!tomorrow/!weekday/!+Nd/!+Nw/!YYYY-MM-DD, !! (high priority), /later, /meeting, /f [date] (follow-up), +label.",
+        "Capture text through the shared grammar: 'T-n: …' logs an update, '/note …' appends to today's daily note, and anything else creates a task. Tokens: @person (owner), #JIRA-KEY, ^T-n (parent), T-n (link), !today/!tomorrow/!weekday/!+Nd/!+Nw/!YYYY-MM-DD, !! (high priority), /later, /meeting, /f [date] (follow-up), !due:<date> (deadline, separate from the plan date), +label.",
       parameters: {
         type: "object",
         properties: { text: { type: "string" } },

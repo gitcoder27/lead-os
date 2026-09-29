@@ -20,7 +20,7 @@ import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService, type TaskPrincipal } from "./task.service";
 import { normalizeWorkspaceId } from "./workspace.service";
-import type { ManagerTask } from "shared/types";
+import { dueAtForDate, type ManagerTask } from "shared/types";
 
 /**
  * docs/57 §1 (P3-02): a capture is untriaged — it lands in Inbox — when it
@@ -28,7 +28,7 @@ import type { ManagerTask } from "shared/types";
  * (a follow-up already surfaces on Today).
  */
 export function isUntriaged(resolved: ResolvedCapture): boolean {
-  return !resolved.scheduledOn && !resolved.owner && !resolved.later && !resolved.followUp && !resolved.waitingOn;
+  return !resolved.scheduledOn && !resolved.dueOn && !resolved.owner && !resolved.later && !resolved.followUp && !resolved.waitingOn;
 }
 
 /**
@@ -179,6 +179,8 @@ export class CaptureService {
           // §4.1: `/f` with a date stores a local-time morning timestamp
           // (the buildSnoozeIso convention); dateless `/f` leaves follow_up_at
           // NULL — the injected `category:follow_up` label carries the follow-up.
+          // docs/57 §3 (P3-04): `!due:date` is the deadline, kept apart from the plan date.
+          dueAt: resolved.dueOn ? dueAtForDate(resolved.dueOn) : null,
           followUpAt: resolved.followUpAt ? new Date(`${resolved.followUpAt}T09:00:00`).toISOString() : null,
           parentId,
           // docs/57 §3 (P3-03): `/w @who` or `/f @who` — the task waits on them.

@@ -1,6 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO, setHours, setMinutes, startOfDay } from 'date-fns';
 import type { TaskStatus } from '@/types';
-import { isOpenStatus, nextMonday } from '@/lib/task-list';
+import { isOpenStatus, localDateOf, nextMonday } from '@/lib/task-list';
 import { getLocalIsoDate } from '@/lib/utils';
 
 export type DateTone = 'default' | 'accent' | 'warning' | 'danger' | 'muted';
@@ -39,6 +39,19 @@ export function describePlanDate(value: string | null, status: TaskStatus, today
   // docs/51 D1: a slipped plan date is amber at any age — red is reserved for missed `dueAt` deadlines.
   if (diff < 0) return { label: dayName(date, now), hint: `${-diff}d ago`, tone: 'warning' };
   return { label: dayName(date, now), tone: 'default' };
+}
+
+/**
+ * docs/57 §3 (P3-04): a deadline (`dueAt`) shown as its local day. A missed
+ * deadline on open work is red at any age (docs/51 D1), unlike a slipped plan date.
+ */
+export function describeDueDate(dueAt: string | null, status: TaskStatus, today = getLocalIsoDate()): DateDisplay | null {
+  const day = localDateOf(dueAt);
+  if (!day) return null;
+  const display = describePlanDate(day, status, today);
+  if (!display || display.tone !== 'warning') return display;
+  const late = differenceInCalendarDays(parseISO(today), parseISO(day));
+  return { label: display.label, hint: `${late}d overdue`, tone: 'danger' };
 }
 
 /** A moment (ISO datetime) as "Tomorrow, 09:00"; past follow-ups on open work read as due. */

@@ -12,7 +12,7 @@
  *   update    = taskref ":" ws text                 — "T-142: said X" → event
  *   note      = "/note" ws text                     — today's daily note
  *   create    = { token | word }
- *   token     = person | jira | parent | taskref | date | priority | later
+ *   token     = person | jira | parent | taskref | date | due | priority | later
  *             | meeting | followup | waiting | label
  *   person    = "@" ident                           — first @ owns; later @s link;
  *                                                   ident may contain ":" (Jira ids)
@@ -25,6 +25,8 @@
  *   weekday   = "mon".."sun"                        — next occurrence incl. today
  *   offset    = "+" digits ("d"|"w")
  *   iso       = yyyy "-" mm "-" dd
+ *   due       = "!due:" (same idents as date)      — the deadline (dueAt), separate from the
+ *                                                   plan date: `!due:fri` never schedules
  *   priority  = "!!"
  *   later     = "/later" | "/l"                    — a !date with /later is the resurface
  *                                                   date (hideUntil); @people become links
@@ -36,7 +38,7 @@
  *   label     = "+" ident
  *
  *   `/w` and `/f` bind the first @person and first !date within the next two
- *   words, in either order (docs/57 §3).
+ *   words, in either order (docs/57 §3). A `!due:` word does not count.
  *
  * Dates are resolved against a caller-supplied `today` (todayIsoDate
  * semantics, D29); the client passes its local today, the server re-resolves
@@ -188,6 +190,13 @@ function parseCapture(text, today) {
         else if (word.raw === "!!") {
             token = { ...base, kind: "priority" };
         }
+        else if (/^!due:/i.test(word.raw)) {
+            const due = resolveDateIdent(word.raw.slice(5), today);
+            if (due)
+                token = { ...base, kind: "due", value: due };
+            else
+                pushDiagnostic(diagnostics, "warning", "unparsed-date", `"${word.raw}" isn't a date — kept as text`, undefined);
+        }
         else if (word.raw.startsWith("!")) {
             const date = resolveDateIdent(word.raw.slice(1), today);
             if (date) {
@@ -225,7 +234,8 @@ function parseCapture(text, today) {
             bindPerson = true;
             bindDate = true;
         }
-        else if (bindWindow > 0) {
+        else if (bindWindow > 0 && token?.kind !== "due") {
+            // A `!due:` deadline is transparent to /w and /f: it never uses up a slot.
             bindWindow -= 1;
         }
     }
@@ -243,6 +253,11 @@ function parseCapture(text, today) {
     for (const extra of dateTokens.slice(1)) {
         pushDiagnostic(diagnostics, "warning", "extra-date", `Only the first !date applies — "${extra.raw}" is ignored`, extra, tokens.indexOf(extra));
     }
+    // Likewise only the first !due:date is the deadline.
+    const dueTokens = tokens.filter((entry) => entry.kind === "due");
+    for (const extra of dueTokens.slice(1)) {
+        pushDiagnostic(diagnostics, "warning", "extra-date", `Only the first !due applies — "${extra.raw}" is ignored`, extra, tokens.indexOf(extra));
+    }
     // docs/57 §3 (P3-02): with /later the date is the resurface date and every
     // @person is a link — parked work stays mine, so neither is an error.
     const waitingToken = tokens.find((entry) => entry.kind === "waiting");
@@ -250,7 +265,7 @@ function parseCapture(text, today) {
         pushDiagnostic(diagnostics, "error", "waiting-needs-person", "Add @who right after /w", waitingToken, tokens.indexOf(waitingToken));
     }
     for (const entry of tokens) {
-        if (entry.kind === "date" && entry.value && entry.value < today) {
+        if ((entry.kind === "date" || entry.kind === "due") && entry.value && entry.value < today) {
             pushDiagnostic(diagnostics, "warning", "past-date", `${entry.value} is in the past`, entry, tokens.indexOf(entry));
         }
     }
@@ -356,6 +371,7 @@ function resolveCapture(parsed, lookups = {}) {
     // also planned on that date.
     const scheduledOn = later ? null : firstDate ?? (followUp && !waitingOn && followUpAt ? followUpAt : null);
     const hideUntil = later ? firstDate : null;
+    const dueOn = tokens.find((entry) => entry.kind === "due")?.value ?? null;
     const labels = tokens.filter((entry) => entry.kind === "label").map((entry) => entry.value);
     if (followUp)
         labels.unshift("category:follow_up");
@@ -377,6 +393,7 @@ function resolveCapture(parsed, lookups = {}) {
         parentKey,
         labels,
         scheduledOn,
+        dueOn,
         hideUntil,
         followUp,
         followUpAt,

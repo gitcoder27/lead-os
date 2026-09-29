@@ -357,3 +357,81 @@ describe("waiting on (docs/57 §3, P3-03)", () => {
     expect(parsed.title).toBe("Fix it");
   });
 });
+
+describe("!due: — the deadline, separate from the plan date (docs/57 P3-04)", () => {
+  it("!due:fri sets dueOn and never schedules", () => {
+    const parsed = resolved("Send the contract !due:fri");
+    expect(parsed.dueOn).toBe("2026-09-25");
+    expect(parsed.scheduledOn).toBeNull();
+    expect(parsed.title).toBe("Send the contract");
+    expect(parsed.tokens.find((token) => token.kind === "due")).toMatchObject({ raw: "!due:fri", value: "2026-09-25" });
+    expect(parsed.blocked).toBe(false);
+  });
+
+  it.each([
+    ["!due:today", "2026-09-24"],
+    ["!due:tomorrow", "2026-09-25"],
+    ["!due:mon", "2026-09-28"],
+    ["!due:+2w", "2026-10-08"],
+    ["!due:+3d", "2026-09-27"],
+    ["!due:2026-12-01", "2026-12-01"],
+    ["!DUE:Fri", "2026-09-25"],
+  ])("%s → %s", (token, date) => {
+    expect(resolved(`Task ${token}`).dueOn).toBe(date);
+  });
+
+  it("a plan date and a deadline are independent, in either order", () => {
+    for (const text of ["Draft !mon !due:fri", "Draft !due:fri !mon"]) {
+      const parsed = resolved(text);
+      expect(parsed.scheduledOn).toBe("2026-09-28");
+      expect(parsed.dueOn).toBe("2026-09-25");
+      expect(parsed.title).toBe("Draft");
+    }
+  });
+
+  it("does not steal the date bound to /f or /w", () => {
+    const parsed = resolved("/w @sam !due:fri !mon Contract");
+    expect(parsed.followUpAt).toBe("2026-09-28");
+    expect(parsed.dueOn).toBe("2026-09-25");
+    expect(parsed.scheduledOn).toBeNull();
+  });
+
+  it("works with /later (parked work can still have a deadline)", () => {
+    const parsed = resolved("Renew licence /later !due:2026-12-01");
+    expect(parsed.later).toBe(true);
+    expect(parsed.dueOn).toBe("2026-12-01");
+    expect(parsed.hideUntil).toBeNull();
+    expect(parsed.blocked).toBe(false);
+  });
+
+  it("an unparseable value stays in the title with a warning", () => {
+    const parsed = resolved("Ship !due:soon");
+    expect(parsed.dueOn).toBeNull();
+    expect(parsed.title).toBe("Ship !due:soon");
+    expect(parsed.diagnostics.map((d) => d.code)).toContain("unparsed-date");
+    expect(parsed.blocked).toBe(false);
+  });
+
+  it("a bare !due is just a word, not a date", () => {
+    const parsed = resolved("Pay !due");
+    expect(parsed.dueOn).toBeNull();
+    expect(parsed.title).toBe("Pay !due");
+  });
+
+  it("only the first !due applies", () => {
+    const parsed = resolved("Ship !due:fri !due:mon");
+    expect(parsed.dueOn).toBe("2026-09-25");
+    expect(parsed.diagnostics.find((d) => d.code === "extra-date")?.message).toContain("!due");
+  });
+
+  it("a past deadline warns and needs a confirm, like a past date", () => {
+    const parsed = resolved("Late !due:2026-09-01");
+    expect(parsed.diagnostics.find((d) => d.code === "past-date")).toBeDefined();
+    expect(parsed.confirmRequired).toBe(true);
+    expect(parsed.blocked).toBe(false);
+  });
+
+  it("is not parsed inside an update or a note body", () => {
+    expect(parseCapture("T-1: slipped !due:fri", TODAY).tokens).toHaveLength(1);
+  });
+});

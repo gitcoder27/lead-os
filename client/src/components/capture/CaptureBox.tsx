@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
+import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
   parseCapture,
@@ -27,6 +27,7 @@ const TOKEN_COLORS: Record<CaptureTokenKind, string> = {
   parent: 'var(--success)',
   taskref: 'var(--success)',
   date: 'var(--warning)',
+  due: 'var(--danger)',
   priority: 'var(--danger)',
   later: 'var(--text-muted)',
   meeting: 'var(--md-accent)',
@@ -42,6 +43,7 @@ const TOKEN_BG: Record<CaptureTokenKind, string> = {
   parent: 'color-mix(in srgb, var(--success) 12%, transparent)',
   taskref: 'color-mix(in srgb, var(--success) 12%, transparent)',
   date: 'color-mix(in srgb, var(--warning) 14%, transparent)',
+  due: 'color-mix(in srgb, var(--danger) 12%, transparent)',
   priority: 'color-mix(in srgb, var(--danger) 12%, transparent)',
   later: 'var(--bg-tertiary)',
   meeting: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
@@ -107,12 +109,15 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
   if (resolved.meeting) chips.push(<Chip key="meeting" icon={<Users size={10} />}>Meeting</Chip>);
   if (resolved.later) {
     chips.push(<Chip key="later" icon={<Repeat size={10} />}>Later{resolved.hideUntil ? ` · back ${format(parseISO(resolved.hideUntil), 'EEE, MMM d')}` : ''}</Chip>);
-  } else if (resolved.intent === 'create' && !resolved.owner && !omitOwner && !resolved.scheduledOn && !resolved.followUp && !resolved.waitingOn) {
+  } else if (resolved.intent === 'create' && !resolved.owner && !omitOwner && !resolved.scheduledOn && !resolved.dueOn && !resolved.followUp && !resolved.waitingOn) {
     chips.push(<Chip key="inbox" icon={<Inbox size={10} />}>Inbox</Chip>);
   }
   if (resolved.priority === 'high') chips.push(<Chip key="prio" icon={<Flag size={10} />}>High priority</Chip>);
   if (resolved.scheduledOn) {
     chips.push(<Chip key="date" icon={<CalendarDays size={10} />}>{format(parseISO(resolved.scheduledOn), 'EEE, MMM d')}</Chip>);
+  }
+  if (resolved.dueOn) {
+    chips.push(<Chip key="due" icon={<CalendarClock size={10} />}>Due {format(parseISO(resolved.dueOn), 'EEE, MMM d')}</Chip>);
   }
   if (resolved.followUp && !resolved.waitingOn) {
     chips.push(<Chip key="fu" icon={<CalendarDays size={10} />}>Follow-up{resolved.followUpAt ? ` ${format(parseISO(resolved.followUpAt), 'MMM d')}` : ''}</Chip>);
@@ -399,7 +404,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
           }}
           rows={3}
           spellCheck={false}
-          placeholder='Capture… @person !date #JIRA-1 ^T-9 +label /f /later /meeting — "T-5: text" updates, "/note" journals'
+          placeholder='Capture… @person !date #JIRA-1 ^T-9 +label !due:fri /f /later /meeting — "T-5: text" updates, "/note" journals'
           aria-label="Capture"
           className="relative w-full resize-none rounded-xl px-3 py-2 text-[13px] leading-relaxed outline-none"
           style={{

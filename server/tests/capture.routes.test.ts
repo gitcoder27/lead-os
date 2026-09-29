@@ -12,7 +12,8 @@ import { AuthService, serializeSessionCookie } from "../src/services/auth.servic
 import { CaptureService } from "../src/services/capture.service";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
-import { todayIsoDate } from "../src/utils/date";
+import { isoDatePart, todayIsoDate } from "../src/utils/date";
+import { dueAtForDate } from "shared/types";
 import { TaskViewsService, builtinTaskViews } from "../src/services/task-views.service";
 import type { TaskPrincipal } from "../src/services/task.service";
 
@@ -133,6 +134,42 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     const today = todayIsoDate();
     const inbox = await new TaskViewsService().run(await managerPrincipal(), builtinTaskViews(today).find((view) => view.id === "inbox")!.definition, today);
     expect(inbox.map((task) => task.taskKey)).toEqual([created.body.taskKey]);
+  });
+
+  it("!due: stores the deadline as the end of that day and leaves the plan date alone (P3-04)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const due = todayIsoDate(new Date(Date.now() + 3 * 86_400_000));
+    const both = (await capture(headers, `Send contract !${todayIsoDate()} !due:${due}`)).body.task;
+    expect(both.scheduledOn).toBe(todayIsoDate());
+    // Local end of day: every local-date reader agrees on the day.
+    expect(both.dueAt).toBeTruthy();
+    expect(isoDatePart(both.dueAt)).toBe(due);
+    expect(new Date(both.dueAt).getHours()).toBe(23);
+    expect(both.needsTriage).toBe(false);
+
+    const dueOnly = (await capture(headers, `Renew licence !due:${due}`)).body.task;
+    expect(dueOnly.scheduledOn).toBeNull();
+    expect(isoDatePart(dueOnly.dueAt)).toBe(due);
+    // A deadline is a triage decision: it does not sit in Inbox.
+    expect(dueOnly.needsTriage).toBe(false);
+
+    const none = (await capture(headers, "No deadline here")).body.task;
+    expect(none.dueAt).toBeNull();
+  });
+
+  it("the drawer's PATCH can set and clear the deadline without touching the plan date (P3-04)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const created = (await capture(headers, `Draft plan !${todayIsoDate()}`)).body.task;
+    const due = todayIsoDate(new Date(Date.now() + 5 * 86_400_000));
+    const set = await invoke(app, { method: "PATCH", url: `/api/tasks/${created.taskKey}`, headers, body: { dueAt: dueAtForDate(due) } });
+    expect(set.status).toBe(200);
+    expect(isoDatePart(set.body.dueAt)).toBe(due);
+    expect(set.body.scheduledOn).toBe(todayIsoDate());
+    const cleared = await invoke(app, { method: "PATCH", url: `/api/tasks/${created.taskKey}`, headers, body: { dueAt: null } });
+    expect(cleared.body.dueAt).toBeNull();
+    expect(cleared.body.scheduledOn).toBe(todayIsoDate());
   });
 
   it("@dev without a date keeps landing on the developer's day (decision 4)", async () => {

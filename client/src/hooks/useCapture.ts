@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { parseCapture, type CaptureDefaults, type CaptureDiagnostic, type CaptureRequestBody, type CaptureResponseBody } from 'shared/capture-grammar';
 import type { ManagerTask } from '@/types';
-import { getLocalIsoDate } from '@/lib/utils';
+import { getLocalIsoDate, getLocalTimeZone } from '@/lib/utils';
 import { api } from '@/lib/api';
 
 /**
@@ -61,7 +61,8 @@ export async function createTaskViaCapture(
   if (parseCapture(text, today).intent !== 'create') {
     throw new Error('Start with a task title — "T-n:" updates and "/note" belong in Capture.');
   }
-  const body: CaptureRequestBody = { text, clientToday: today, requestId, ...(defaults ? { defaults } : {}) };
+  const tz = getLocalTimeZone();
+  const body: CaptureRequestBody = { text, clientToday: today, ...(tz && { tz }), requestId, ...(defaults ? { defaults } : {}) };
   let res = await post(body);
   if (res.confirmRequired) res = await post({ ...body, confirm: true });
   if (res.blocked) throw new CaptureRejectedError(res.diagnostics);

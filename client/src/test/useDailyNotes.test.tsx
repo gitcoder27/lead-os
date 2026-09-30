@@ -190,6 +190,7 @@ describe('daily note mutations', () => {
       expect(apiMocks.post).toHaveBeenCalledWith('/capture', {
         text: 'call back @dev-1',
         clientToday: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        tz: expect.any(String),
         requestId: 'r3',
         defaults: {
           scheduledOn: DATE,

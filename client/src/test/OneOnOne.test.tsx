@@ -389,12 +389,14 @@ describe('OneOnOneWorkspace — agenda guidance and suggestions', () => {
   });
 
   it('agenda rows show live task state and reorder keeps closed links in the permutation', () => {
-    const past = format(addDays(new Date(), -3), 'yyyy-MM-dd');
+    // A deadline is the end of its local day (docs/57 §3), so build it the way the app stores it.
+    const pastDay = addDays(new Date(), -3);
+    const pastDeadline = new Date(pastDay.getFullYear(), pastDay.getMonth(), pastDay.getDate(), 23, 59, 59, 999).toISOString();
     mockDetail = {
       data: detail({
         agenda: [
           agendaItem(101, agendaTask({ taskId: 1, taskKey: 'T-1', title: 'Review queue', status: 'blocked', priority: 'high' })),
-          agendaItem(102, agendaTask({ taskId: 2, taskKey: 'T-2', title: 'Career goals', dueAt: `${past}T12:00:00Z` })),
+          agendaItem(102, agendaTask({ taskId: 2, taskKey: 'T-2', title: 'Career goals', dueAt: pastDeadline })),
           agendaItem(103, agendaTask({ taskId: 3, taskKey: 'T-3', title: 'Shipped the fix', status: 'done', closedAt: '2026-03-04T10:00:00Z' })),
         ],
       }),

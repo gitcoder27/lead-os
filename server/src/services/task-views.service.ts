@@ -85,8 +85,8 @@ function daysBetween(from: string, to: string): number {
  * docs/49 D1: the plan date is the earlier of `scheduledOn` and the local
  * date of `dueAt`. A tie counts as the deadline so it drives the overdue tone.
  */
-export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">): { date: string | null; source: "due" | "scheduled" | null } {
-  const due = isoDatePart(row.dueAt) ?? null;
+export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">, timeZone?: string): { date: string | null; source: "due" | "scheduled" | null } {
+  const due = isoDatePart(row.dueAt, timeZone) ?? null;
   const scheduled = row.scheduledOn;
   if (due && (!scheduled || due <= scheduled)) return { date: due, source: "due" };
   if (scheduled) return { date: scheduled, source: "scheduled" };

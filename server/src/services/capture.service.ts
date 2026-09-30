@@ -15,13 +15,14 @@ import { runInTransaction } from "../db/transaction";
 import { developers, issues, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { todayIsoDate } from "../utils/date";
+import { endOfZonedDay, isValidTimeZone, resolveTimeZone, zonedTimeToUtc } from "./today-clock";
 import { ContactsService } from "./contacts.service";
 import { DailyNotesService } from "./daily-notes.service";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService, type TaskPrincipal } from "./task.service";
 import { normalizeWorkspaceId } from "./workspace.service";
-import { dueAtForDate, type ManagerTask } from "shared/types";
+import type { ManagerTask } from "shared/types";
 
 /**
  * docs/57 §1 (P3-02): a capture is untriaged — it lands in Inbox — when it
@@ -54,15 +55,18 @@ export class CaptureService {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     await this.keys.assertPhase3Enabled(scope);
 
-    const serverToday = todayIsoDate();
+    // The manager's day and zone, not the server's. Without a `tz` (an old client) the server clock
+    // is the reference; a client-sent date is only accepted when it is within a day of it.
+    const tz = resolveTimeZone(input.tz);
+    const referenceToday = isValidTimeZone(input.tz) ? todayIsoDate(new Date(), tz) : todayIsoDate();
     if (input.clientToday) {
-      const drift = Math.abs(Date.parse(`${serverToday}T00:00:00Z`) - Date.parse(`${input.clientToday}T00:00:00Z`));
+      const drift = Math.abs(Date.parse(`${referenceToday}T00:00:00Z`) - Date.parse(`${input.clientToday}T00:00:00Z`));
       if (Number.isNaN(drift) || drift > 86_400_000) {
-        throw new HttpError(400, `Client today (${input.clientToday}) is out of sync with server today (${serverToday})`);
+        throw new HttpError(400, `Client today (${input.clientToday}) is out of sync with server today (${referenceToday})`);
       }
     }
-
-    const parsed = parseCapture(input.text, serverToday);
+    const today = input.clientToday ?? referenceToday;
+    const parsed = parseCapture(input.text, today);
     const resolved = await this.resolve(parsed, scope, principal.accountId);
     const base = { intent: resolved.intent, diagnostics: resolved.diagnostics };
 
@@ -73,9 +77,9 @@ export class CaptureService {
       case "update":
         return { ...base, event: await this.applyUpdate(resolved, input.requestId ?? randomUUID(), principal) };
       case "note":
-        return { ...base, note: await this.notes.append(principal.accountId, serverToday, { text: resolved.title, requestId: input.requestId ?? randomUUID() }, scope) };
+        return { ...base, note: await this.notes.append(principal.accountId, today, { text: resolved.title, requestId: input.requestId ?? randomUUID() }, scope) };
       default:
-        return { ...base, task: await this.applyCreate(resolved, principal, input.requestId ?? randomUUID(), input.defaults ?? {}) };
+        return { ...base, task: await this.applyCreate(resolved, principal, input.requestId ?? randomUUID(), input.defaults ?? {}, { today, tz }) };
     }
   }
 
@@ -154,7 +158,7 @@ export class CaptureService {
    * typed always wins: an `@owner`, a `!date`, `/later`, `/w`, `/m`, `!!`,
    * `^parent`, `!due:` and `/f !date` each beat the matching default.
    */
-  private async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string, defaults: CaptureDefaults) {
+  private async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string, defaults: CaptureDefaults, clock: { today: string; tz: string }) {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const existing = await this.events.getByRequestId(requestId, { kind: "manager", accountId: principal.accountId, workspaceId: scope });
     if (existing?.event.type === "created" && existing.event.taskKey) {
@@ -162,7 +166,7 @@ export class CaptureService {
       if (replayed && !replayed.deletedAt) return (await this.taskService.toDto(replayed, principal)) as ManagerTask;
     }
     return runInTransaction(async () => {
-      const today = todayIsoDate();
+      const { today, tz } = clock;
       const parentRef = resolved.parentKey ?? defaults.parentKey;
       let parentId: number | null = null;
       if (parentRef) {
@@ -180,7 +184,7 @@ export class CaptureService {
         // §4.1: `/f` with a date stores a local-time morning timestamp (the
         // buildSnoozeIso convention); dateless `/f` leaves follow_up_at NULL —
         // the injected `category:follow_up` label carries the follow-up.
-        ? new Date(`${resolved.followUpAt}T09:00:00`).toISOString()
+        ? zonedTimeToUtc(resolved.followUpAt, 9, 0, tz).toISOString()
         : defaults.followUpAt ?? null;
       const waitingOn = resolved.waitingOn
         ? resolved.waitingOn.kind === "contact"
@@ -208,7 +212,7 @@ export class CaptureService {
           scheduledOn,
           hideUntil: later ? resolved.hideUntil : null,
           // docs/57 §3 (P3-04): `!due:date` is the deadline, kept apart from the plan date.
-          dueAt: resolved.dueOn ? dueAtForDate(resolved.dueOn) : defaults.dueAt ?? null,
+          dueAt: resolved.dueOn ? endOfZonedDay(resolved.dueOn, tz).toISOString() : defaults.dueAt ?? null,
           followUpAt,
           ...(defaults.startsAt !== undefined ? { startsAt: defaults.startsAt } : {}),
           ...(defaults.endsAt !== undefined ? { endsAt: defaults.endsAt } : {}),

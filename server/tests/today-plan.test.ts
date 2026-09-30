@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, dayFocus, tasks } from "../src/db/schema";
+import { configTable, dayFocus, developers, tasks } from "../src/db/schema";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
@@ -47,8 +47,8 @@ let manager: TaskPrincipal;
 let cookie: string;
 let testApp: ReturnType<typeof createTestApp>;
 
-async function getToday(app = testApp) {
-  const response = await invoke(app, { method: "GET", url: `/api/today?date=${DATE}&tz=UTC`, headers: { cookie } });
+async function getToday(app = testApp, tz = "UTC") {
+  const response = await invoke(app, { method: "GET", url: `/api/today?date=${DATE}&tz=${encodeURIComponent(tz)}`, headers: { cookie } });
   expect(response.status).toBe(200);
   return response.body;
 }
@@ -86,7 +86,7 @@ describe("Today plan (P3-01)", () => {
   it("lists my open planned and active tasks, never waiting, later, future or someone else's", async () => {
     await add("Due today", { scheduledOn: DATE });
     await add("Slipped", { scheduledOn: "2026-03-05" });
-    const active = await add("In progress", { status: "active" });
+    const active = await add("In progress", { status: "active", scheduledOn: null });
     await add("Future", { scheduledOn: "2026-03-20" });
     await add("Parked", { later: true });
     await add("Waiting on legal", { scheduledOn: DATE, waitingOn: { type: "text", label: "Legal" } });
@@ -235,6 +235,54 @@ describe("Today plan (P3-01)", () => {
     const today = await getToday();
     expect(today.actionItems.some((item: { type: string }) => item.type === "top_three")).toBe(false);
     expect(today.focus.plan.doneToday.count).toBe(1);
+  });
+
+  it("judges 'done today' on the manager's calendar day, whatever zone the server runs in", async () => {
+    const early = await add("Just after midnight", { scheduledOn: DATE });
+    const late = await add("Just before midnight", { scheduledOn: DATE });
+    for (const key of [early, late]) await taskService.update(key, { status: "done" }, manager);
+    // Tokyo is UTC+9 all year: 2026-03-08 runs from 15:00Z on the 7th to 15:00Z on the 8th.
+    await db.update(tasks).set({ closedAt: "2026-03-07T15:30:00.000Z" }).where(eqTaskKey(early));
+    await db.update(tasks).set({ closedAt: "2026-03-07T14:30:00.000Z" }).where(eqTaskKey(late));
+
+    const tokyo = (await getToday(testApp, "Asia/Tokyo")).focus.plan.doneToday;
+    expect(tokyo.items.map((item: { taskKey: string }) => item.taskKey)).toEqual([early]);
+    // The same instants fall on the 7th and the 8th for a UTC manager.
+    const utc = (await getToday(testApp, "UTC")).focus.plan.doneToday;
+    expect(utc.items.map((item: { taskKey: string }) => item.taskKey)).toEqual([]);
+  });
+
+  it("flags overdue on the manager's day when the deadline falls on the other side of midnight", async () => {
+    // 2026-03-07T16:00Z is 01:00 on the 8th in Tokyo but still 06:00 on the 7th in Honolulu.
+    const key = await add("Deadline", { scheduledOn: null, dueAt: "2026-03-07T16:00:00.000Z" });
+    await taskService.update(key, { status: "active" }, manager);
+    const tokyo = (await getToday(testApp, "Asia/Tokyo")).focus.plan.items.find((item: { taskKey: string }) => item.taskKey === key);
+    expect(tokyo).toMatchObject({ overdue: false });
+    const honolulu = (await getToday(testApp, "Pacific/Honolulu")).focus.plan.items.find((item: { taskKey: string }) => item.taskKey === key);
+    expect(honolulu).toMatchObject({ overdue: true });
+  });
+
+  it("drops a pin once the task is delegated, parked or waiting, and brings it back when it is mine again", async () => {
+    await db.insert(developers).values({ accountId: "dev-1", displayName: "Dev One", isActive: 1 });
+    const delegated = await add("Hand off", { scheduledOn: DATE });
+    const parked = await add("Park it", { scheduledOn: DATE });
+    const waiting = await add("Wait on legal", { scheduledOn: DATE });
+    const kept = await add("Keep", { scheduledOn: DATE });
+    await put({ date: DATE, taskKeys: [delegated, parked, waiting] });
+    expect((await put({ date: TOMORROW, taskKeys: [delegated, waiting, kept] })).status).toBe(200);
+
+    await taskService.update(delegated, { ownerType: "developer", ownerId: "dev-1" } as never, manager);
+    await taskService.update(parked, { later: true }, manager);
+    await taskService.update(waiting, { waitingOn: { type: "text", label: "Legal" } } as never, manager);
+
+    const plan = (await getToday()).focus.plan;
+    expect(plan.top3).toEqual([]);
+    expect(plan.items.map((item: { taskKey: string }) => item.taskKey)).toEqual([kept]);
+    expect(plan.tomorrowTop3.items.map((item: { taskKey: string }) => item.taskKey)).toEqual([kept]);
+
+    // The pin row is untouched, so handing the task back restores it.
+    await taskService.update(parked, { later: false, scheduledOn: DATE }, manager);
+    expect((await getToday()).focus.plan.top3).toEqual([parked]);
   });
 
   it("has no plan without the canonical task model", async () => {

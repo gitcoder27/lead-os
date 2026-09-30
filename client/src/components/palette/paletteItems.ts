@@ -188,7 +188,7 @@ export function buildQuickAddItem(query: string, options?: { tasksPhase3?: boole
     id: 'quick-add-desk',
     group: 'actions',
     title: options?.tasksPhase3 ? 'Add to Tasks' : 'Add to Desk',
-    description: `"${trimmed}" · today's inbox`,
+    description: options?.tasksPhase3 ? `"${trimmed}" · Inbox, unless it names a date or person` : `"${trimmed}" · today's inbox`,
     actionId: 'quick-add-desk',
   };
 }

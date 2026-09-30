@@ -90,6 +90,11 @@ export function zonedTimeToUtc(isoDay: string, hour: number, minute: number, tim
   return new Date(guess);
 }
 
+/** The last millisecond of `isoDay` in `timeZone` (a deadline's stored instant). */
+export function endOfZonedDay(isoDay: string, timeZone: string): Date {
+  return new Date(zonedTimeToUtc(addDaysToIsoDay(isoDay, 1), 0, 0, timeZone).getTime() - 1);
+}
+
 export function addDaysToIsoDay(isoDay: string, days: number): string {
   const [year, month, day] = isoDay.split("-").map(Number) as [number, number, number];
   const next = new Date(Date.UTC(year, month - 1, day + days));

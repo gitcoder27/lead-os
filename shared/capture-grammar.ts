@@ -229,6 +229,11 @@ export interface CaptureRequestBody {
   defaults?: CaptureDefaults;
   /** The client's local ISO date — rejected when it drifts >1 day (§4.1). */
   clientToday?: string;
+  /**
+   * The client's IANA time zone. Dates resolve on the client's day and the clock times the server
+   * stores (`/f` 09:00, end of a `!due:` day) are local to it; without it the server zone is used.
+   */
+  tz?: string;
   /** Second submit confirming warning diagnostics (e.g. past dates). */
   confirm?: boolean;
   requestId?: string;

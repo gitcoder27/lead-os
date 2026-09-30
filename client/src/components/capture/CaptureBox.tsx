@@ -15,7 +15,7 @@ import { useToast } from '@/context/ToastContext';
 import { useCapture } from '@/hooks/useCapture';
 import { useCreateContact } from '@/hooks/useContacts';
 import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
-import { getLocalIsoDate } from '@/lib/utils';
+import { getLocalIsoDate, getLocalTimeZone } from '@/lib/utils';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 import { TokenSuggestionList } from './TokenSuggestionList';
 
@@ -158,7 +158,12 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
   const [serverDiagnostics, setServerDiagnostics] = useState<CaptureDiagnostic[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
-  const today = useMemo(() => getLocalIsoDate(), []);
+  // The local day, refreshed while the box stays open (keep-open sessions can cross midnight).
+  const [today, setToday] = useState(getLocalIsoDate);
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday(getLocalIsoDate()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // `@person`, `#JIRA-KEY` and `+label` typeahead; also owns the roster the
   // preview resolves against (developers and this manager's contacts).
@@ -255,8 +260,9 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
     const defaults: CaptureDefaults | undefined = activeAssignee && resolved.intent === 'create' && !resolved.owner && !resolved.later
       ? { ownerAccountId: activeAssignee.accountId }
       : undefined;
+    const tz = getLocalTimeZone();
     capture.mutate(
-      { text, clientToday: today, ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
+      { text, clientToday: getLocalIsoDate(), ...(tz && { tz }), ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
       {
         onSuccess: (res) => {
           if (res.blocked) {
@@ -442,46 +448,50 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       )}
 
       {/* Diagnostics + ambiguity chooser */}
-      {diagnostics.length > 0 && (
-        <div className="space-y-1" role="alert" data-testid="capture-diagnostics">
-          {diagnostics.map((d, i) => (
-            <div key={`${d.code}-${i}`}>
-              <DiagnosticRow diagnostic={d} />
-              {d.code === 'ambiguous-person' && d.candidates?.length ? (
-                <div className="mt-1 flex flex-wrap gap-1.5 pl-4">
-                  {d.candidates.map((candidate) => (
+      {/* A live region that exists before its content does, so changes are announced; polite, because
+          diagnostics update as you type and an assertive alert would interrupt on every keystroke. */}
+      <div role="status" aria-live="polite" className="empty:hidden">
+        {diagnostics.length > 0 && (
+          <div className="space-y-1" data-testid="capture-diagnostics">
+            {diagnostics.map((d, i) => (
+              <div key={`${d.code}-${i}`}>
+                <DiagnosticRow diagnostic={d} />
+                {d.code === 'ambiguous-person' && d.candidates?.length ? (
+                  <div className="mt-1 flex flex-wrap gap-1.5 pl-4">
+                    {d.candidates.map((candidate) => (
+                      <button
+                        key={candidate.accountId}
+                        type="button"
+                        onClick={() => chooseCandidate(d.tokenIndex, candidate.accountId)}
+                        className="rounded-md px-2 py-0.5 text-[12px] font-medium"
+                        style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
+                      >
+                        {candidate.displayName}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {d.code === 'unknown-person' && d.suggestContact ? (
+                  <div className="mt-1 pl-4">
                     <button
-                      key={candidate.accountId}
                       type="button"
-                      onClick={() => chooseCandidate(d.tokenIndex, candidate.accountId)}
+                      disabled={createContact.isPending}
+                      onClick={() => addContact(d.suggestContact!)}
                       className="rounded-md px-2 py-0.5 text-[12px] font-medium"
                       style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
                     >
-                      {candidate.displayName}
+                      Create contact @{d.suggestContact}
                     </button>
-                  ))}
-                </div>
-              ) : null}
-              {d.code === 'unknown-person' && d.suggestContact ? (
-                <div className="mt-1 pl-4">
-                  <button
-                    type="button"
-                    disabled={createContact.isPending}
-                    onClick={() => addContact(d.suggestContact!)}
-                    className="rounded-md px-2 py-0.5 text-[12px] font-medium"
-                    style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
-                  >
-                    Create contact @{d.suggestContact}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {confirmArmed && (
-        <div className="text-[12px]" style={{ color: 'var(--warning)' }}>
+        <div className="text-[12px]" role="status" style={{ color: 'var(--warning)' }}>
           Past date — press Enter or Capture again to confirm.
         </div>
       )}

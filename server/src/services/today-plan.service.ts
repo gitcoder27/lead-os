@@ -8,6 +8,7 @@ import type {
   TaskStatus,
 } from "shared/types";
 import { builtinTaskViews, TaskViewsService, taskPlanDate } from "./task-views.service";
+import { serverTimeZone, toZonedIsoDay } from "./today-clock";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
 
 const OPEN: TaskStatus[] = ["open", "active", "blocked"];
@@ -18,6 +19,18 @@ export function addDaysToDate(iso: string, days: number): string {
   return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+/**
+ * A pin outlives later edits, so it is re-checked on every read: only my own open task that is not
+ * parked or waiting on someone belongs on my plan. (Un-pinned it is just gone; the pin row stays.)
+ */
+function stillMine(row: TaskRow, principal: TaskPrincipal): boolean {
+  return OPEN.includes(row.status as TaskStatus)
+    && row.ownerType === "manager"
+    && row.ownerId === principal.accountId
+    && row.later !== 1
+    && row.waitingOnType === null;
+}
+
 function taskTarget(taskKey: string, date: string): TodayActionTarget {
   return { type: "view", view: "tasks", taskKey, date };
 }
@@ -26,8 +39,8 @@ function markDone(taskKey: string, date: string): TodayActionCommand {
   return { kind: "mark_done", label: "Done", target: taskTarget(taskKey, date), confirm: false, undoable: true };
 }
 
-function planItem(row: Pick<TaskRow, "taskKey" | "title" | "status" | "priority" | "scheduledOn" | "dueAt">, date: string, pinned: boolean): TodayPlanItem {
-  const plan = taskPlanDate(row);
+function planItem(row: Pick<TaskRow, "taskKey" | "title" | "status" | "priority" | "scheduledOn" | "dueAt">, date: string, pinned: boolean, tz: string): TodayPlanItem {
+  const plan = taskPlanDate(row, tz);
   return {
     taskKey: row.taskKey,
     title: row.title,
@@ -53,7 +66,8 @@ export class TodayPlanService {
     private readonly taskService = new TaskService(),
   ) {}
 
-  async build(principal: TaskPrincipal, date: string): Promise<TodayPlanFocus> {
+  /** `tz` is the manager's zone: "overdue" and "done today" are judged on their calendar day, not the server's. */
+  async build(principal: TaskPrincipal, date: string, tz: string = serverTimeZone()): Promise<TodayPlanFocus> {
     const tomorrow = addDaysToDate(date, 1);
     const planDefinition = builtinTaskViews(date).find((view) => view.id === "today")!.definition;
     // "Active" work belongs on the plan even without a date.
@@ -62,7 +76,8 @@ export class TodayPlanService {
       sort: "scheduled",
     };
     const doneDefinition: TaskViewDefinition = {
-      filters: { owner: "me", status: ["done"], closed: { from: date, to: date } },
+      // Widened a day each side: the view buckets `closedAt` in the server zone; the exact day is cut below.
+      filters: { owner: "me", status: ["done"], closed: { from: addDaysToDate(date, -1), to: tomorrow } },
       sort: "updated",
     };
     const inboxDefinition: TaskViewDefinition = { filters: { lane: "inbox" }, sort: "created" };
@@ -76,7 +91,7 @@ export class TodayPlanService {
       this.taskService.top3Rows(principal.accountId, tomorrow, principal.workspaceId),
     ]);
 
-    const pinnedOpen = pinnedRows.filter((row) => OPEN.includes(row.status as TaskStatus));
+    const pinnedOpen = pinnedRows.filter((row) => stillMine(row, principal));
     const pinnedKeys = pinnedOpen.map((row) => row.taskKey);
     const pinnedSet = new Set(pinnedKeys);
     const seen = new Set<string>();
@@ -84,7 +99,7 @@ export class TodayPlanService {
     for (const task of [...planned, ...active]) {
       if (seen.has(task.taskKey) || pinnedSet.has(task.taskKey)) continue;
       seen.add(task.taskKey);
-      rest.push(planItem(task, date, false));
+      rest.push(planItem(task, date, false, tz));
     }
     // Overdue first, then by plan date — stable for equal dates.
     rest.sort((left, right) => Number(right.overdue) - Number(left.overdue));
@@ -92,12 +107,12 @@ export class TodayPlanService {
     // The closed range keeps only tasks whose `closedAt` falls on `date`; a task
     // reopened later has no `closedAt` and drops out.
     const doneItems = done
-      .filter((task) => task.closedAt)
+      .filter((task) => task.closedAt && toZonedIsoDay(task.closedAt, tz) === date)
       .sort((left, right) => right.closedAt!.localeCompare(left.closedAt!));
 
     return {
       date,
-      items: [...pinnedOpen.map((row) => planItem(row, date, true)), ...rest],
+      items: [...pinnedOpen.map((row) => planItem(row, date, true, tz)), ...rest],
       top3: pinnedKeys,
       inboxCount,
       doneToday: {
@@ -111,7 +126,7 @@ export class TodayPlanService {
       },
       tomorrowTop3: {
         date: tomorrow,
-        items: tomorrowRows.filter((row) => OPEN.includes(row.status as TaskStatus)).map((row) => planItem(row, date, true)),
+        items: tomorrowRows.filter((row) => stillMine(row, principal)).map((row) => planItem(row, date, true, tz)),
       },
     };
   }

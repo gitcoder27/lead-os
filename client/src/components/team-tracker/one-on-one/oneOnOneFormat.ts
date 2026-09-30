@@ -7,6 +7,7 @@ import type {
   TaskStatus,
 } from '@/types';
 import type { DateTone } from '@/components/tasks/task-detail-format';
+import { localDateOf } from '@/lib/task-list';
 
 export const OPEN_STATUSES: ReadonlySet<TaskStatus> = new Set(['open', 'active', 'blocked']);
 
@@ -77,7 +78,8 @@ export function describeAgendaTask(
             ? { label: 'Dropped', tone: 'muted' as const }
             : undefined;
   if (!OPEN_STATUSES.has(task.status)) return { status };
-  const due = task.dueAt ? task.dueAt.slice(0, 10) : null;
+  // The deadline's local day: `dueAt` is an instant (end of the local day), so a UTC slice can read a day off.
+  const due = localDateOf(task.dueAt);
   if (due) {
     const diff = differenceInCalendarDays(parseDay(due) ?? new Date(), parseDay(today) ?? new Date());
     if (diff < 0) return { status, date: { label: `Due ${formatShortDay(due, today)} · ${-diff}d late`, tone: 'danger' } };

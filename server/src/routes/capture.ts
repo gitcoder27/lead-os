@@ -44,6 +44,7 @@ const bodySchema = z.object({
   text: z.string().min(1).max(4000),
   defaults: defaultsSchema.optional(),
   clientToday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  tz: z.string().max(64).optional(),
   confirm: z.boolean().optional(),
   requestId: z.string().min(1).max(100).optional(),
 }).strict();

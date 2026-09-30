@@ -339,7 +339,7 @@ export class TodayService {
     // docs/57 §6 (P3-01): the manager's own plan. Additive — a failure only drops it.
     const planPromise: Promise<TodayPlanFocus | undefined> = canonicalPromise
       .then((enabled) => (enabled
-        ? new TodayPlanService().build({ type: "manager", accountId: managerAccountId, workspaceId }, date)
+        ? new TodayPlanService().build({ type: "manager", accountId: managerAccountId, workspaceId }, date, context.tz)
         : undefined))
       .catch((error: unknown) => {
         logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), date, err: error }, "Today plan unavailable");

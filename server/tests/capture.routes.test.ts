@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
@@ -134,6 +134,32 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     const today = todayIsoDate();
     const inbox = await new TaskViewsService().run(await managerPrincipal(), builtinTaskViews(today).find((view) => view.id === "inbox")!.definition, today);
     expect(inbox.map((task) => task.taskKey)).toEqual([created.body.taskKey]);
+  });
+
+  it("resolves dates and stored clock times in the client's zone, not the server's (docs/56 review)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    // Only Date is faked: faking timers stalls Express once an error reaches its handler.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // 20:30Z on the 7th is already 09:30 on the 8th in Auckland (UTC+13 in March).
+      vi.setSystemTime(new Date("2026-03-07T20:30:00.000Z"));
+      const tz = "Pacific/Auckland";
+      const due = (await capture(headers, "Ship it !today !due:2026-03-10", { tz, clientToday: undefined })).body.task;
+      expect(due.scheduledOn).toBe("2026-03-08");
+      // End of the 10th in Auckland.
+      expect(due.dueAt).toBe("2026-03-10T10:59:59.999Z");
+
+      const chase = (await capture(headers, "Chase vendor /f !2026-03-09", { tz, clientToday: undefined })).body.task;
+      // 09:00 on the 9th in Auckland.
+      expect(chase.followUpAt).toBe("2026-03-08T20:00:00.000Z");
+
+      // The same text in Honolulu (UTC-10): still the 7th.
+      const honolulu = (await capture(headers, "Ship it too !today", { tz: "Pacific/Honolulu", clientToday: undefined })).body.task;
+      expect(honolulu.scheduledOn).toBe("2026-03-07");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("!due: stores the deadline as the end of that day and leaves the plan date alone (P3-04)", async () => {

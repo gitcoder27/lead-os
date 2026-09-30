@@ -111,6 +111,18 @@ describe('CaptureBox (P3-D8)', () => {
     expect(summary.textContent).toMatch(/\w{3}, \w{3} \d+/); // formatted date chip
   });
 
+  it('announces diagnostics politely through a standing live region, not an assertive alert per keystroke', () => {
+    const { input } = renderBox();
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toBeEmptyDOMElement();
+
+    fireEvent.change(input, { target: { value: '@nobody check this' } });
+
+    expect(within(region).getByTestId('capture-diagnostics')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('blocks submit on an unknown person token', () => {
     const { input } = renderBox();
     fireEvent.change(input, { target: { value: '@nobody check this' } });
@@ -193,6 +205,7 @@ describe('CaptureBox (P3-D8)', () => {
     const body = lastBody();
     expect(body.text).toBe('Ship the release @dev-1');
     expect(body.clientToday).toBe(getLocalIsoDate());
+    expect(body.tz).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(String(body.requestId)).toMatch(/^[0-9a-f-]{36}$/);
 
     succeed(body);

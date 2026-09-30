@@ -96,8 +96,10 @@ interface SettingsPageProps {
 export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const DISCOVER_PAGE_SIZE = 50;
   const DISCOVER_SEARCH_DEBOUNCE_MS = 350;
-  const { user, logout } = useAuth();
+  const { user, logout, features } = useAuth();
   const tasksPhase3 = useTasksPhase3();
+  // docs/56 P6-01 review: backups are install-wide, so only a default-workspace manager sees them.
+  const canManageBackups = features?.backups ?? false;
   const { data: config, refetch: refetchConfig } = useConfig();
   const { data: assistantConfig } = useAssistantConfig();
   const { data: syncStatus } = useSyncStatus();
@@ -844,7 +846,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
     ...(tasksPhase3 ? [{ id: 'labels' as const, icon: <Tags size={13} />, label: 'Task Labels', status: null, sv: 'muted' as const }] : []),
-    { id: 'data', icon: <Database size={13} />, label: 'Data & Backups', status: null, sv: 'muted' },
+    ...(canManageBackups ? [{ id: 'data' as const, icon: <Database size={13} />, label: 'Data & Backups', status: null, sv: 'muted' as const }] : []),
     { id: 'maintenance', icon: <TriangleAlert size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
     { id: 'access', icon: <Shield size={13} />, label: 'Developer Access', status: !loadingUsers ? `${appUsers.length} user${appUsers.length !== 1 ? 's' : ''}` : null, sv: 'muted' },
   ];
@@ -1844,7 +1846,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               ) : null}
 
               {/* ── DATA MAINTENANCE ────── */}
-              {activeSection === 'data' ? (
+              {activeSection === 'data' && canManageBackups ? (
                 <SettingsDataSection active={activeSection === 'data'} />
               ) : null}
 

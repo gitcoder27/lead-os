@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { AuthBootstrapResponse, AuthSessionResponse, AuthUser } from "shared/types";
 import { validate } from "../middleware/validate";
-import { requireAuth, requireManager } from "../middleware/auth";
+import { canManageInstall, requireAuth, requireManager } from "../middleware/auth";
 import {
   AuthService,
   clearSessionCookie,
@@ -126,7 +126,7 @@ export function createAuthRouter(authService: AuthService): Router {
     features: {
       tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId),
       teamMode: await settings.getTeamMode(user.workspaceId),
-      ...(user.role === "manager" ? { oneOnOne: await oneOnOnes.enabled(user.workspaceId) } : {}),
+      ...(user.role === "manager" ? { oneOnOne: await oneOnOnes.enabled(user.workspaceId), backups: canManageInstall(user) } : {}),
     },
   });
 

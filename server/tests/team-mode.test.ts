@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { appUsers, configTable, developers } from "../src/db/schema";
+import { appUsers, configTable, developers, workspaces } from "../src/db/schema";
 import { backfillTeamMode, migrate, TEAM_MODE_MIGRATION } from "../src/db/migrate";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
@@ -202,6 +202,20 @@ describe("team mode routes", () => {
     const devMe = await invoke(app, { method: "GET", url: "/api/auth/me", headers: devHeaders });
     expect(devMe.body.features.teamMode).toBe("collab");
     expect(devMe.body.features).not.toHaveProperty("oneOnOne");
+  });
+
+  // docs/56 P6-01 review: backups are install-wide; the flag is manager-only and default-workspace-only.
+  it("delivers features.backups to default-workspace managers only", async () => {
+    const managerMe = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: await cookie("manager-a") } });
+    expect(managerMe.body.features.backups).toBe(true);
+    const devMe = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: await cookie("dev-user") } });
+    expect(devMe.body.features).not.toHaveProperty("backups");
+
+    const now = new Date().toISOString();
+    await db.insert(workspaces).values({ id: "workspace_other", name: "Other", createdAt: now, updatedAt: now });
+    await auth.createUser({ username: "manager-other", displayName: "Other", password: "secret123", role: "manager", workspaceId: "workspace_other" });
+    const otherMe = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: await cookie("manager-other") } });
+    expect(otherMe.body.features.backups).toBe(false);
   });
 
   it("returns participates on the team roster", async () => {

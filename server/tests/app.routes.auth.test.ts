@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { serializeSessionCookie } from "../src/services/auth.service";
 import { AuthService } from "../src/services/auth.service";
-import { developers } from "../src/db/schema";
+import { developers, workspaces } from "../src/db/schema";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
 
@@ -55,7 +55,7 @@ function createTestApp(authService: AuthService) {
         running: false,
         directory: "/tmp/lead-os-test-backups",
       }),
-      createManualBackup: async (reason = "manual") => ({
+      createRequestedBackup: async (reason = "manual") => ({
         name: "lead-os-manual-test.db",
         path: "/tmp/lead-os-test-backups/lead-os-manual-test.db",
         sizeBytes: 1024,
@@ -197,6 +197,28 @@ describe("app route authorization", () => {
       name: "lead-os-manual-test.db",
       reason: "manual",
     });
+    // docs/56 P6-01 review: responses never carry the server path.
+    expect(run.body?.backup).not.toHaveProperty("path");
+  });
+
+  // docs/56 P6-01 review: a snapshot is the whole install, so another workspace's manager is refused.
+  it.each([
+    { method: "GET", url: "/api/backups" },
+    { method: "POST", url: "/api/backups/run" },
+    { method: "GET", url: "/api/backups/dashboard.backup-20260308-000000000-manual.db/download" },
+  ])("$method $url rejects a manager of another workspace", async ({ method, url }) => {
+    await authService.createUser({ username: "owner", displayName: "Owner", password: "secret123", role: "manager" });
+    const now = new Date().toISOString();
+    await db.insert(workspaces).values({ id: "workspace_other", name: "Other", createdAt: now, updatedAt: now });
+    const other = await authService.createUser({ username: "other", displayName: "Other", password: "secret123", role: "manager", workspaceId: "workspace_other" });
+    expect(other.workspaceId).toBe("workspace_other");
+    const session = await authService.authenticate("other", "secret123");
+    const app = createTestApp(authService);
+
+    const response = await invoke(app, { method, url, headers: { cookie: serializeSessionCookie(session.sessionId) } });
+
+    expect(response.status).toBe(403);
+    expect(response.body?.error).toBe("Only a manager of the default workspace can manage backups");
   });
 
   it("GET /api/my-day rejects manager access", async () => {

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AuthService, SESSION_COOKIE_NAME } from "../services/auth.service";
+import { DEFAULT_WORKSPACE_ID } from "../services/workspace.service";
 import { HttpError } from "./errorHandler";
 
 function parseCookies(header?: string): Record<string, string> {
@@ -79,6 +80,35 @@ export function requireManager(authService: AuthService) {
       }
       if (req.auth.user.role !== "manager") {
         throw new HttpError(403, "Manager access required");
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+/**
+ * docs/56 P6-01 review: install-wide operations (backups hold every workspace, password hashes
+ * and the backup schedule, which is read from the default workspace) belong to the install owner:
+ * a manager in the default workspace. Managers of other workspaces get 403.
+ */
+export function canManageInstall(user: { role: string; workspaceId: string }): boolean {
+  return user.role === "manager" && user.workspaceId === DEFAULT_WORKSPACE_ID;
+}
+
+export function requireInstallManager(authService: AuthService) {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await loadRequestAuth(req, authService);
+      if (!req.auth) {
+        throw new HttpError(401, "Authentication required");
+      }
+      if (req.auth.user.role !== "manager") {
+        throw new HttpError(403, "Manager access required");
+      }
+      if (!canManageInstall(req.auth.user)) {
+        throw new HttpError(403, "Only a manager of the default workspace can manage backups");
       }
       next();
     } catch (error) {

@@ -765,12 +765,16 @@ export interface WorkspaceMaintenancePreviewResponse {
 }
 
 /** docs/56 P6-01: one SQLite snapshot in the backup directory. */
-export interface BackupRecord {
+/** A snapshot as the API shows it: no server path. */
+export interface BackupSummary {
   name: string;
-  path: string;
   sizeBytes: number;
   createdAt: string;
   reason: string;
+}
+
+export interface BackupRecord extends BackupSummary {
+  path: string;
 }
 
 export interface BackupRuntimeStatus {
@@ -783,14 +787,14 @@ export interface BackupRuntimeStatus {
 
 /** `GET /api/backups`. */
 export interface BackupListResponse {
-  backups: BackupRecord[];
+  backups: BackupSummary[];
   runtime: BackupRuntimeStatus;
 }
 
 /** `POST /api/backups/run`. */
 export interface BackupRunResponse {
   success: true;
-  backup: BackupRecord;
+  backup: BackupSummary;
 }
 
 export interface WorkspaceMaintenanceBackupSummary {
@@ -889,6 +893,9 @@ export interface SessionFeatures {
   /** 48 §0: `one_on_one_enabled`. Only ever true for manager principals —
    *  developer sessions omit the field entirely (OO-D6). */
   oneOnOne?: boolean;
+  /** docs/56 P6-01 review: Settings → Data & Backups. Manager sessions only; true for
+   *  managers of the default workspace, the only ones `/api/backups` serves. */
+  backups?: boolean;
 }
 
 export interface AuthSessionResponse {

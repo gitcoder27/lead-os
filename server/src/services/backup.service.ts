@@ -1,7 +1,8 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { BackupRecord, BackupRuntimeStatus } from "shared/types";
+import type { BackupRecord, BackupRuntimeStatus, BackupSummary } from "shared/types";
 import { rawDb } from "../db/connection";
 import { getDbPath, getDefaultBackupDirectory, resolveWorkspacePath } from "../db/paths";
 import {
@@ -12,6 +13,7 @@ import {
   DEFAULT_BACKUP_STARTUP_MAX_AGE_HOURS,
   DEFAULT_BACKUP_BEFORE_RESET,
 } from "./settings.service";
+import { HttpError } from "../middleware/errorHandler";
 import { logger } from "../utils/logger";
 import { SettingsService } from "./settings.service";
 
@@ -21,13 +23,30 @@ interface CreateBackupOptions {
   prune?: boolean;
 }
 
-export type { BackupRecord, BackupRuntimeStatus };
+export type { BackupRecord, BackupRuntimeStatus, BackupSummary };
+
+/** docs/56 P6-01 review: "Back up now" from the UI is limited to one per minute. */
+export const MANUAL_BACKUP_MIN_INTERVAL_MS = 60_000;
+
+/** A snapshot without its server path, for API responses. */
+export function toBackupSummary(backup: BackupRecord): BackupSummary {
+  return { name: backup.name, sizeBytes: backup.sizeBytes, createdAt: backup.createdAt, reason: backup.reason };
+}
+
+export interface BackupDownload {
+  name: string;
+  path: string;
+  sizeBytes: number;
+  /** Removes the temporary copy; call once the response is done. */
+  cleanup: () => Promise<void>;
+}
 
 export class BackupService {
   private task?: NodeJS.Timeout;
   private running = false;
   private nextRunAt?: string;
   private lastError?: string;
+  private lastRequestedAt = 0;
 
   constructor(
     private readonly settings = new SettingsService(),
@@ -76,6 +95,19 @@ export class BackupService {
     return this.createBackup({ reason, prune: true });
   }
 
+  /**
+   * docs/56 P6-01 review: a backup asked for over HTTP. Throttled (429) so repeated clicks
+   * or a script cannot fill the disk; CLI callers use `createManualBackup` directly.
+   */
+  async createRequestedBackup(reason = "manual", now = Date.now()): Promise<BackupRecord> {
+    const waitMs = this.lastRequestedAt + MANUAL_BACKUP_MIN_INTERVAL_MS - now;
+    if (waitMs > 0) {
+      throw new HttpError(429, `A backup was just taken. Try again in ${Math.ceil(waitMs / 1000)} s.`);
+    }
+    this.lastRequestedAt = now;
+    return this.createManualBackup(reason);
+  }
+
   async createPreResetBackup(workspaceId?: string): Promise<BackupRecord | null> {
     const enabled = await this.settings.getBackupBeforeReset(workspaceId);
     if (!enabled) {
@@ -118,6 +150,42 @@ export class BackupService {
    */
   async findBackup(name: string): Promise<BackupRecord | undefined> {
     return (await this.listBackups()).find((backup) => backup.name === name);
+  }
+
+  /**
+   * docs/56 P6-01 review: the file a download serves. A temporary copy of the snapshot with
+   * `app_sessions` emptied and the file vacuumed, so a downloaded backup never carries live
+   * session ids (they are the cookie values). Restoring it signs everyone out; nothing else
+   * changes. Undefined when no snapshot has this name.
+   */
+  async createDownloadCopy(name: string): Promise<BackupDownload | undefined> {
+    const backup = await this.findBackup(name);
+    if (!backup) {
+      return undefined;
+    }
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "lead-os-backup-download-"));
+    const cleanup = () => fs.promises.rm(directory, { recursive: true, force: true });
+    try {
+      const copyPath = path.join(directory, backup.name);
+      await fs.promises.copyFile(backup.path, copyPath);
+      const copy = new Database(copyPath, { fileMustExist: true });
+      try {
+        copy.pragma("journal_mode = DELETE");
+        const hasSessions = copy.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_sessions'").get();
+        if (hasSessions) {
+          copy.exec("DELETE FROM app_sessions");
+        }
+        // VACUUM rewrites the file so deleted session rows do not linger in free pages.
+        copy.exec("VACUUM");
+      } finally {
+        copy.close();
+      }
+      const stats = await fs.promises.stat(copyPath);
+      return { name: backup.name, path: copyPath, sizeBytes: stats.size, cleanup };
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
   }
 
   async getRuntimeStatus(): Promise<BackupRuntimeStatus> {

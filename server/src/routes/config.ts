@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/connection";
 import { appUsers, configTable, developers as developersTable, issues, syncLog, componentMap, issueScopeHistory, issueTags, localTags } from "../db/schema";
+import { canManageInstall } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { JiraClient } from "../jira/client";
 import { normalizeConfiguredJqlForMode } from "../jira/jql";
@@ -464,6 +465,10 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       managerJiraAccountId: z.string().trim().optional(),
       jiraApiToken: z.string().trim().optional(),
       jiraAutoSyncEnabled: z.boolean().optional(),
+      // docs/56 P6-01 review: the Data & Backups card saves its schedule here.
+      backupEnabled: z.boolean().optional(),
+      backupIntervalMinutes: z.number().int().positive().optional(),
+      backupRetentionDays: z.number().int().positive().optional(),
     }),
     params: z.any().optional(),
     query: z.any().optional(),
@@ -474,6 +479,20 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const workspaceId = req.auth!.user.workspaceId;
       let shouldResync = false;
       let shouldRestartScheduler = false;
+      const backupFields = [
+        ["backupEnabled", "backup_enabled"],
+        ["backupIntervalMinutes", "backup_interval_minutes"],
+        ["backupRetentionDays", "backup_retention_days"],
+      ] as const;
+      const backupChanges = backupFields.filter(([field]) => req.body[field] !== undefined);
+      // The schedule is install-wide and read from the default workspace, so only its managers
+      // may change it (the same rule as /api/backups); checked before anything is written.
+      if (backupChanges.length > 0 && !canManageInstall(req.auth!.user)) {
+        throw new HttpError(403, "Only a manager of the default workspace can change the backup schedule");
+      }
+      for (const [field, key] of backupChanges) {
+        await upsertConfig(workspaceId, key, String(req.body[field]));
+      }
       const jiraBaseUrl = req.body.jiraBaseUrl?.trim();
       const jiraEmail = req.body.jiraEmail?.trim();
       const jiraProjectKey = req.body.jiraProjectKey?.trim();
@@ -526,6 +545,9 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       if (req.body.jiraAutoSyncEnabled !== undefined) {
         await upsertConfig(workspaceId, "jira_auto_sync_enabled", String(req.body.jiraAutoSyncEnabled));
         shouldRestartScheduler = true;
+      }
+      if (backupService && backupChanges.length > 0) {
+        await backupService.start();
       }
       if (syncEngine && (shouldResync || shouldRestartScheduler)) {
         await syncEngine.start();

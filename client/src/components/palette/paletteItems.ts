@@ -48,7 +48,7 @@ const NAVIGATION_COMMANDS: Array<{ view: AppView; title: string; keywords?: stri
   { view: 'settings', title: 'Go to Settings', keywords: 'config jira users backups', targetView: 'settings' },
 ];
 
-export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): PaletteItem[] {
+export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backups?: boolean }): PaletteItem[] {
   const commands: PaletteItem[] = NAVIGATION_COMMANDS.map((command) => ({
     id: `nav-${command.view}`,
     group: 'actions' as const,
@@ -58,14 +58,17 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): Pa
     view: command.view,
     target: command.targetView ? { type: 'view' as const, view: command.targetView } : undefined,
   }));
-  commands.push({
-    id: 'nav-backups',
-    group: 'actions',
-    title: 'Open backups',
-    description: 'Settings · Data & Backups',
-    keywords: 'backup snapshot download restore data database',
-    target: { type: 'view', view: 'settings', section: 'data' },
-  });
+  // docs/56 P6-01 review: only for a default-workspace manager (`features.backups`).
+  if (options?.backups) {
+    commands.push({
+      id: 'nav-backups',
+      group: 'actions',
+      title: 'Open backups',
+      description: 'Settings · Data & Backups',
+      keywords: 'backup snapshot download restore data database',
+      target: { type: 'view', view: 'settings', section: 'data' },
+    });
+  }
   if (options?.tasksPhase3) {
     // docs/57 §5 (P3-06): Follow-ups and Meetings are Tasks views now.
     commands.push(

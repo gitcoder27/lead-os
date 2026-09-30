@@ -694,9 +694,9 @@ If you use two hostnames, remember:
 
 ## Backups and restore
 
-LeadOS snapshots the whole SQLite database into the backup directory (default: a `backups/` folder under the repo-root `data/`). Managers manage this in **Settings → Data & Backups**: turn the schedule on or off, set the frequency and retention, press **Back up now**, and download a snapshot. The routes behind it (`GET /api/backups`, `POST /api/backups/run`, `GET /api/backups/:name/download`) are manager-only.
+LeadOS snapshots the whole SQLite database into the backup directory (default: a `backups/` folder under the repo-root `data/`). Managers manage this in **Settings → Data & Backups**: turn the schedule on or off, set the frequency and retention, press **Back up now**, and download a snapshot. The routes behind it (`GET /api/backups`, `POST /api/backups/run`, `GET /api/backups/:name/download`) serve only managers of the `default` workspace (the install owner), because a snapshot holds every workspace; other managers get 403 and do not see the card. **Back up now** is limited to one per minute, and listings never show server paths.
 
-A backup contains every table, including password hashes, session ids and encrypted secrets. Treat a downloaded file like the database itself.
+A snapshot on disk contains every table, including password hashes, session ids and encrypted secrets. A **download** is a copy with the login sessions removed (restoring it signs everyone out); it still holds password hashes and encrypted secrets, so treat it like the database itself.
 
 ### Restore is CLI-only
 

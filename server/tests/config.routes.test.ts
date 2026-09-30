@@ -85,7 +85,7 @@ beforeEach(async () => {
   });
 });
 
-function createTestApp() {
+function createTestApp(workspaceId = testWorkspaceId) {
   const app = express();
   const backupService = new BackupService(new SettingsService(), rawDb);
   app.use((req, _res, next) => {
@@ -96,7 +96,7 @@ function createTestApp() {
         accountId: "manager-1",
         displayName: "Manager One",
         role: "manager",
-        workspaceId: testWorkspaceId,
+        workspaceId,
       },
     };
     next();
@@ -345,6 +345,33 @@ ORDER BY updated DESC`);
       const rows = await db.select().from(configTable);
       expect(Object.fromEntries(rows.map((r) => [r.key, r.value]))["jira_sync_scope_mode"]).toBe(mode);
     }
+  });
+
+  // docs/56 P6-01 review: the Data & Backups card saves its schedule through this route.
+  it("PUT /api/config/settings saves the backup schedule", async () => {
+    const app = createTestApp();
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/settings",
+      body: { backupEnabled: false, backupIntervalMinutes: 120, backupRetentionDays: 3 },
+    });
+    expect(res.status).toBe(200);
+
+    const config = await invoke(app, { method: "GET", url: "/api/config" });
+    expect(config.body).toMatchObject({ backupEnabled: false, backupIntervalMinutes: 120, backupRetentionDays: 3 });
+  });
+
+  it("PUT /api/config/settings refuses backup fields from another workspace's manager and writes nothing", async () => {
+    const app = createTestApp("workspace_other");
+    const res = await invoke(app, {
+      method: "PUT",
+      url: "/api/config/settings",
+      body: { backupEnabled: false, jiraDevDueDateField: "customfield_1" },
+    });
+    expect(res.status).toBe(403);
+
+    const rows = await db.select().from(configTable);
+    expect(rows.filter((row) => row.workspaceId === "workspace_other")).toEqual([]);
   });
 
   it("PUT /api/config/settings stores raw JQL in base-query mode", async () => {

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { AppView } from '@/App';
 import type { TodayActionTarget } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
@@ -110,7 +111,8 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const isSearching = searchQuery.isFetching;
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
 
-  const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3 }), [tasksPhase3]);
+  const backups = useAuth().features?.backups ?? false;
+  const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3, backups }), [tasksPhase3, backups]);
   const { data: syncStatus } = useSyncStatus();
   const jiraConfigured = syncStatus?.jiraConfigured;
   const quickActions = useMemo(() => buildQuickActions({ tasksPhase3, jiraConfigured }), [tasksPhase3, jiraConfigured]);

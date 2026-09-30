@@ -202,7 +202,7 @@ describe('palette commands', () => {
   });
 
   it('offers navigation for every surface plus quick actions', () => {
-    const navigation = buildNavigationCommands();
+    const navigation = buildNavigationCommands({ backups: true });
     const commands = [...navigation, ...buildQuickActions()];
 
     expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(6);
@@ -221,10 +221,15 @@ describe('palette commands', () => {
   });
 
   it('has a command that opens Settings → Data & Backups (docs/56 P6-01)', () => {
-    const backups = buildNavigationCommands().find((command) => command.id === 'nav-backups');
+    const backups = buildNavigationCommands({ backups: true }).find((command) => command.id === 'nav-backups');
 
     expect(backups?.target).toEqual({ type: 'view', view: 'settings', section: 'data' });
-    expect(filterCommands(buildNavigationCommands(), 'snapshot').map((command) => command.id)).toEqual(['nav-backups']);
+    expect(filterCommands(buildNavigationCommands({ backups: true }), 'snapshot').map((command) => command.id)).toEqual(['nav-backups']);
+  });
+
+  it('leaves the backups command out unless the session may manage backups (P6-01 review)', () => {
+    expect(buildNavigationCommands().some((command) => command.id === 'nav-backups')).toBe(false);
+    expect(buildNavigationCommands({ backups: false }).some((command) => command.id === 'nav-backups')).toBe(false);
   });
 
   it('filters commands across title and keywords', () => {

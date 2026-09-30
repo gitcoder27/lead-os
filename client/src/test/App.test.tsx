@@ -83,6 +83,21 @@ vi.mock('@/components/today/TodayPage', () => ({
   },
 }));
 
+const weeklyReviewPropsSpy = vi.fn();
+
+vi.mock('@/components/review/WeeklyReviewMode', () => ({
+  WeeklyReviewMode: (props: { week?: string; onExit: () => void; onWeekChange: (week?: string) => void }) => {
+    weeklyReviewPropsSpy(props);
+    return (
+      <div>
+        <div>Review loaded {props.week ?? 'auto'}</div>
+        <button onClick={props.onExit}>Exit review</button>
+        <button onClick={() => props.onWeekChange('2026-10-05')}>Switch week</button>
+      </div>
+    );
+  },
+}));
+
 vi.mock('@/components/team-tracker/TeamTrackerPage', () => ({
   TeamTrackerPage: (props: { initialDeveloperAccountId?: string; initialTaskKey?: string }) => {
     teamTrackerPropsSpy(props);
@@ -636,6 +651,57 @@ describe('App', () => {
     expect(teamTrackerPropsSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({ initialDeveloperAccountId: 'dev-1', initialTaskKey: undefined }),
     );
+  });
+
+  describe('weekly review (docs/59 §5.1)', () => {
+    const manager = (tasksPhase3 = true) => useAuthMock.mockReturnValue({
+      user: { role: 'manager' },
+      features: { tasksPhase3 },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+
+    it('opens the review from /?mode=review in place of Today, and leaves it for /', async () => {
+      window.history.pushState(null, '', '/?mode=review');
+      manager();
+      render(<App />);
+      expect(await screen.findByText('Review loaded auto')).toBeInTheDocument();
+      expect(screen.queryByText('Today loaded')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Exit review'));
+      expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
+      expect(window.location.search).toBe('');
+    });
+
+    it('keeps the week in the URL and switches it in place', async () => {
+      window.history.pushState(null, '', '/?mode=review&week=2026-09-28');
+      manager();
+      render(<App />);
+      expect(await screen.findByText('Review loaded 2026-09-28')).toBeInTheDocument();
+      const historyLength = window.history.length;
+
+      fireEvent.click(screen.getByText('Switch week'));
+      expect(await screen.findByText('Review loaded 2026-10-05')).toBeInTheDocument();
+      expect(window.location.search).toContain('week=2026-10-05');
+      expect(window.history.length).toBe(historyLength);
+    });
+
+    it('ignores an invalid week and stays on Today without the Tasks workspace', async () => {
+      window.history.pushState(null, '', '/?mode=review&week=soon');
+      manager();
+      const { unmount } = render(<App />);
+      expect(await screen.findByText('Review loaded auto')).toBeInTheDocument();
+      unmount();
+
+      window.history.pushState(null, '', '/?mode=review');
+      manager(false);
+      render(<App />);
+      expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    });
   });
 
   it('opens Standup Mode from a Start standup target (docs/53 F7)', async () => {

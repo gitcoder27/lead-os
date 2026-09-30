@@ -3053,8 +3053,15 @@ interface WeeklyReviewSectionBase {
   status: WeeklyReviewSourceStatus;
 }
 
+export type WeeklyReviewTaskSectionId = "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek";
+
+/** One task section per id (distributed, so `Extract<WeeklyReviewSection, { id: "closed" }>` works). */
+type WeeklyReviewTaskSection<Id extends WeeklyReviewTaskSectionId = WeeklyReviewTaskSectionId> = Id extends WeeklyReviewTaskSectionId
+  ? WeeklyReviewSectionBase & { id: Id; rows: WeeklyReviewTaskRow[] }
+  : never;
+
 export type WeeklyReviewSection =
-  | (WeeklyReviewSectionBase & { id: "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek"; rows: WeeklyReviewTaskRow[] })
+  | WeeklyReviewTaskSection
   | (WeeklyReviewSectionBase & { id: "oneOnOnes"; rows: WeeklyReviewOneOnOneRow[] })
   | (WeeklyReviewSectionBase & { id: "people"; rows: WeeklyReviewPersonRow[] })
   | (WeeklyReviewSectionBase & { id: "checkIns"; rows: WeeklyReviewCheckInRow[] });

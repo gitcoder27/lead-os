@@ -133,6 +133,18 @@ export function teamModeFromParams(params: URLSearchParams): 'standup' | undefin
   return firstParam(params, 'mode') === 'standup' ? 'standup' : undefined;
 }
 
+/** docs/59 §5.1: `/?mode=review[&week=YYYY-MM-DD]` opens the weekly review inside Today. */
+export interface ReviewModeState {
+  /** Any day in the week to review; absent lets the server pick. */
+  week?: string;
+}
+
+export function reviewModeFromParams(params: URLSearchParams): ReviewModeState | undefined {
+  if (firstParam(params, 'mode') !== 'review') return undefined;
+  const week = firstParam(params, 'week');
+  return { week: week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : undefined };
+}
+
 export type TeamPanel = 'one-on-one' | 'one-on-ones';
 
 const TEAM_PANELS: readonly string[] = ['one-on-one', 'one-on-ones'];

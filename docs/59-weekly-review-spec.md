@@ -188,6 +188,8 @@ Short bullets for the manager's boss, pasted into Teams or Outlook. Three sectio
 - **Next week:** Monday's top 3, then high-priority tasks planned next week (up to 5 lines in total).
 - **Blocked & risks:** blocked tasks; waiting items whose check-by passed ("Waiting on Legal · 9 days"); people marked blocked or at risk, with their status note when there is one (**unticked by default**, see below); open critical defects. 1:1 tasks never appear (§4).
 
+**Defaults and what is saved.** Done tasks start in the update; dropped tasks and meetings start out (a meeting is attendance, not an outcome). `excluded` stores only what the manager changed: `T-12` for a line unticked, `+T-12` for a default-out line ticked in, so a task that closes after the first save still gets its own default (`isLineIncluded` in `client/src/lib/weekly-review.ts`, shared with the report builder).
+
 **People-related lines default to unticked.** Any "Blocked & risks" line about a named person and their status note ("Search re-index at risk — Priya (capacity…)") starts **unticked** in step 6, with a visible hint "Names a person" beside its checkbox, because a status note about a colleague is the most likely thing a manager does not want their boss to read by accident. The manager ticks it in on purpose. Tasks delegated to a person ("— Priya" in Shipped) are ordinary work and stay ticked (they name an owner, not a status). Because the copy contains only ticked lines, an untouched review never sends a person-status line.
 
 Delegated rows name the owner ("— Priya"). Task keys are left out (they mean nothing to the boss). Private notes and update bodies are never included; only titles, names, counts and dates.
@@ -294,7 +296,7 @@ All migrations are additive (new tables, one nullable column), added to `server/
 
 | Table / column | Columns | Item |
 |---|---|---|
-| `weekly_reviews` | `id`, `workspace_id`, `manager_account_id`, `week_start` (Monday, manager zone), `step`, `decisions_json` (`{ taskKey: action }`), `excluded_json` (report lines unticked), `report_markdown`, `started_at`, `completed_at`, `dismissed_at`, `updated_at`; unique `(workspace_id, manager_account_id, week_start)` | WR-02 |
+| `weekly_reviews` | `id`, `workspace_id`, `manager_account_id`, `week_start` (Monday, manager zone), `step`, `decisions_json` (`{ taskKey: action }`), `excluded_json` (report lines the manager changed: `T-12` unticked, `+T-12` ticked in although it starts out; see §6), `report_markdown`, `started_at`, `completed_at`, `dismissed_at`, `updated_at`; unique `(workspace_id, manager_account_id, week_start)` | WR-02 |
 | config `weekly_review_day` (0–6, default 5), `weekly_review_in_wrapup` (default 1) | workspace keys through `SettingsService` | WR-06 |
 | `issues.resolved_at` | from Jira `resolutiondate` (added to the sync field list, `sync/engine.ts:157-171`); also set when a sync sees a row move into the `done` category | WR-09 |
 | `notification_prefs` | PK `(workspace_id, manager_account_id)`; `digest_enabled` (0), `digest_time` ("08:30"), `weekdays_only` (1), `skip_empty` (1), `teams_webhook_enc`, `teams_detail` (`titles`\|`counts`), `app_url`, `updated_at` | WR-12 (webhook: WR-13) |

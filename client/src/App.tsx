@@ -18,12 +18,14 @@ import {
   isValidIsoDate,
   notesDateFromParams,
   notesKindFromParams,
+  reviewModeFromParams,
   taskKeyFromParams,
   teamBoardQueryFromParams,
   teamBoardQueryToParams,
   teamModeFromParams,
   teamPanelDevFromParams,
   teamPanelFromParams,
+  type ReviewModeState,
   type TeamPanel,
 } from '@/lib/view-params';
 import {
@@ -56,6 +58,7 @@ const loadTasksPage = () => import('@/components/tasks/TasksPage');
 const loadTaskPage = () => import('@/components/tasks/TaskPage');
 const loadNotesPage = () => import('@/components/notes/NotesPage');
 const loadSettingsPage = () => import('@/components/settings/SettingsPanel');
+const loadWeeklyReview = () => import('@/components/review/WeeklyReviewMode');
 const loadAssistantDock = () => import('@/components/assistant/AssistantDock');
 
 const TeamTrackerPage = lazy(async () => {
@@ -101,6 +104,11 @@ const TaskPage = lazy(async () => {
 const NotesPage = lazy(async () => {
   const module = await loadNotesPage();
   return { default: module.NotesPage };
+});
+
+const WeeklyReviewMode = lazy(async () => {
+  const module = await loadWeeklyReview();
+  return { default: module.WeeklyReviewMode };
 });
 
 const SettingsPage = lazy(async () => {
@@ -464,6 +472,17 @@ function AppContent() {
       ? teamModeFromParams(new URLSearchParams(window.location.search))
       : undefined,
   );
+  // docs/59 §5.1: `/?mode=review[&week=]`, the weekly review inside Today.
+  const [reviewMode, setReviewModeState] = useState<ReviewModeState | undefined>(() =>
+    pathToView(window.location.pathname) === 'today'
+      ? reviewModeFromParams(new URLSearchParams(window.location.search))
+      : undefined,
+  );
+  const reviewModeRef = useRef(reviewMode);
+  const setReviewMode = useCallback((next: ReviewModeState | undefined) => {
+    reviewModeRef.current = next;
+    setReviewModeState(next);
+  }, []);
   // docs/48 (OO-D7): `/team?panel=one-on-ones` overview / `?dev=<id>&panel=one-on-one` workspace.
   const [teamPanel, setTeamPanel] = useState<TeamPanel | undefined>(() =>
     pathToView(window.location.pathname) === 'team'
@@ -833,6 +852,7 @@ function AppContent() {
       if (nextView === 'work') {
         setDashboardFilterState(dashboardFilterStateFromParams(params));
       }
+      setReviewMode(nextView === 'today' ? reviewModeFromParams(params) : undefined);
       if (nextView === 'team') {
         setTeamBoardQuery(teamBoardQueryFromParams(params));
         setTeamBoardQueryNonce((nonce) => nonce + 1);
@@ -866,7 +886,7 @@ function AppContent() {
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [setReviewMode]);
 
   const handleTeamBoardQueryChange = useCallback((query: TeamTrackerBoardQuery) => {
     setTeamBoardQuery(query);
@@ -885,6 +905,27 @@ function AppContent() {
       else window.history.replaceState(null, '', target);
     }
   }, []);
+
+  // docs/59 §5.1: the review is URL state like standup: opening pushes history (Back leaves it),
+  // closing or switching weeks rewrites the URL in place.
+  const handleReviewModeChange = useCallback((next: ReviewModeState | undefined, options: { replace?: boolean } = {}) => {
+    setReviewMode(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next) {
+      params.set('mode', 'review');
+      if (next.week) params.set('week', next.week);
+      else params.delete('week');
+    } else {
+      params.delete('mode');
+      params.delete('week');
+    }
+    const search = params.toString();
+    const target = `${window.location.pathname}${search ? `?${search}` : ''}`;
+    if (!sameLocation(target)) {
+      if (next && !options.replace && !reviewModeRef.current) window.history.pushState(null, '', target);
+      else window.history.replaceState(null, '', target);
+    }
+  }, [setReviewMode]);
 
   // docs/48 (OO-D7): the 1:1 panels are URL state — open pushes history so
   // back exits, close rewrites the URL without the params.
@@ -1228,11 +1269,21 @@ function AppContent() {
   if (activeView === 'today') {
     return (
       <WorkspaceShell activeView={activeView} onViewChange={handleViewChange} onOpenActionTarget={handleOpenTodayTarget}>
+        {reviewMode && features?.tasksPhase3 ? (
+          <Suspense fallback={<PanelLoading />}>
+            <WeeklyReviewMode
+              week={reviewMode.week}
+              onWeekChange={(week) => handleReviewModeChange({ week }, { replace: true })}
+              onExit={() => handleReviewModeChange(undefined)}
+            />
+          </Suspense>
+        ) : (
         <TodayPage
           onViewChange={handleViewChange}
           onSelectWorkFilter={handleTodayWorkFilter}
           onOpenTodayTarget={handleOpenTodayTarget}
         />
+        )}
       </WorkspaceShell>
     );
   }

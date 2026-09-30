@@ -1,0 +1,487 @@
+/*
+ * docs/59 §5 (WR-03): the weekly review, on Today's visual system and global tokens only: hairline
+ * rows, one accent, tone for meaning. The step rail is the one designed moment: a quiet vertical
+ * thread that fills in as steps are left behind.
+ */
+
+.review-mode {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+.review-header {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.review-header-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+}
+
+@media (min-width: 768px) {
+  .review-header-row { padding: 0 20px 0 24px; gap: 16px; }
+}
+
+.review-header-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.review-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.review-title-range { font-weight: 500; color: var(--text-secondary); }
+
+.review-week-switch { flex-shrink: 0; }
+
+@media (max-width: 639px) {
+  .review-week-switch { display: none; }
+}
+
+.review-progress-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 767px) {
+  .review-progress-wrap { display: none; }
+}
+
+.review-progress {
+  height: 4px;
+  width: 100%;
+  max-width: 240px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+}
+
+.review-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 240ms var(--ease-out), background-color 240ms ease;
+}
+
+.review-progress-fill[data-last='true'] { background: var(--success); }
+
+.review-step-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.review-header-end {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Phone: the step label becomes a one-line switcher under the title. */
+.review-phone-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 10px 16px;
+}
+
+.review-phone-steps .review-progress { flex: 1; max-width: none; }
+
+@media (min-width: 768px) {
+  .review-phone-steps { display: none; }
+}
+
+.review-phone-step-btn {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.review-phone-step-btn:focus-visible { outline: 2px solid var(--border-active); outline-offset: 1px; }
+
+/* ── Frame: rail + main ──────────────────────────────────────────────── */
+
+.review-frame {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.review-rail {
+  display: flex;
+  width: 232px;
+  flex-shrink: 0;
+  flex-direction: column;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 16px 10px;
+}
+
+@media (max-width: 767px) {
+  .review-rail { display: none; }
+}
+
+.review-steps { list-style: none; }
+
+.review-steps > li { position: relative; }
+
+/* The thread between step marks: it turns to success as steps are left behind. */
+.review-steps > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 34px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--border);
+  transition: background-color 240ms ease;
+}
+
+.review-steps > li[data-left='true']:not(:last-child)::after {
+  background: color-mix(in srgb, var(--success) 55%, var(--border));
+}
+
+.review-step {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 6px 8px 6px 10px;
+  text-align: left;
+  color: var(--text-secondary);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.review-step:hover { background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent); color: var(--text-primary); }
+.review-step:focus-visible { outline: 2px solid var(--border-active); outline-offset: -1px; }
+
+.review-step[aria-current='step'] {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-tertiary) 85%, transparent);
+}
+
+.review-step-mark {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+  transition: background-color 200ms ease, box-shadow 200ms ease, color 200ms ease;
+}
+
+.review-step[aria-current='step'] .review-step-mark {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.review-step[data-left='true'] .review-step-mark {
+  color: var(--on-success);
+  background: var(--success);
+  box-shadow: none;
+}
+
+.review-step-label { min-width: 0; flex: 1; font-size: 13px; font-weight: 550; }
+
+.review-step-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.review-main {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.review-step-pane {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px 16px 24px;
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .review-step-pane { padding: 28px 32px 32px; }
+}
+
+.review-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 14px;
+}
+
+.review-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.review-heading h2:focus { outline: none; }
+
+.review-summary {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+/* ── Footer: back / next ─────────────────────────────────────────────── */
+
+.review-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  backdrop-filter: blur(8px);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .review-footer { padding: 12px 32px; }
+}
+
+.review-footer-inner {
+  display: flex;
+  width: 100%;
+  max-width: 736px;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── Look back rows ──────────────────────────────────────────────────── */
+
+.review-groups { display: flex; flex-direction: column; gap: 18px; }
+
+.review-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-right: 4px;
+}
+
+.review-subhead { flex: 1; padding: 8px 8px 6px 10px; }
+
+.review-group-tally {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.review-group-toggle { height: 24px; font-size: 11.5px; padding: 0 8px; }
+
+.review-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 7px 8px 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  outline: none;
+  transition: background-color 120ms ease;
+}
+
+.review-row:hover { background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent); }
+.review-row:focus-visible,
+.review-row[data-focused='true']:focus { box-shadow: inset 0 0 0 2px var(--border-active); }
+
+.review-check {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.review-check::after {
+  content: '';
+  position: absolute;
+  left: 5.5px;
+  top: 3.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--on-accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 120ms var(--ease-out);
+}
+
+.review-check:checked { background: var(--accent-solid); box-shadow: none; }
+.review-check:checked::after { transform: rotate(45deg) scale(1); }
+.review-check:focus-visible { outline: 2px solid var(--border-active); outline-offset: 2px; }
+
+.review-row-body { display: block; min-width: 0; }
+
+.review-row-title-btn {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.review-row-title-btn:focus-visible { outline: 2px solid var(--border-active); outline-offset: 1px; }
+
+.review-row-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: color 120ms ease;
+}
+
+.review-row-title-btn:hover .review-row-title { text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+
+.review-row-meta {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
+}
+
+.review-row-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.review-row-title-line { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.review-row-flag { display: inline-flex; flex-shrink: 0; color: var(--text-primary); }
+
+.review-row-state { min-width: 44px; text-align: right; }
+
+/* A line left out of the update steps back, it does not disappear. */
+.review-row[data-included='false'] .review-row-title { color: var(--text-muted); }
+
+/* ── States ──────────────────────────────────────────────────────────── */
+
+.review-skeleton { display: flex; flex-direction: column; }
+
+.review-skeleton-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.review-bone {
+  display: block;
+  border-radius: 5px;
+  background: var(--bg-tertiary);
+  animation: review-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes review-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .review-step-pane,
+  .review-progress-fill,
+  .review-check::after,
+  .review-bone { animation: none; transition: none; }
+}
+
+/* Phones: the dimmed row and the empty box already say "left out"; the words would squeeze the title. */
+@media (max-width: 639px) {
+  .review-row-state { display: none; }
+}
+
+.review-source-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px;
+  font-size: 12.5px;
+  color: var(--warning);
+}
+
+.review-source-note > span { color: var(--text-secondary); }

@@ -12,8 +12,7 @@ Phase 5 hardens the LeadOS pivot so the product feels coherent after the broad w
   - `/manager-desk` -> `/desk`
   - `/dashboard` -> `/work`
   - `/today` -> `/`
-  - `/followups` -> `/follow-ups`
-  - `/meeting` -> `/meetings`
+  - `/followups` -> `/follow-ups`, `/meeting` -> `/meetings` (as of P3-06 both pages are Tasks views: `/tasks?view=waiting` and `/tasks?view=meetings`)
 - Follow-ups and Meetings have focused empty, loading, and error states.
 - Today follow-up signals open the focused Follow-ups workflow.
 - Manager-only surfaces remain behind manager auth; developer users continue to land on My Day.

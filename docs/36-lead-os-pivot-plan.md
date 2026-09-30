@@ -271,8 +271,8 @@ Recommended route direction:
 | `/work` | Work dashboard, including Jira defects |
 | `/team` | Team view |
 | `/desk` | Manager Desk |
-| `/follow-ups` | Follow-ups |
-| `/meetings` | Meetings |
+| `/follow-ups` | Follow-ups (retired in P3-06: redirects to `/tasks?view=waiting`) |
+| `/meetings` | Meetings (retired in P3-06: redirects to `/tasks?view=meetings`) |
 | `/my-day` | Developer workspace |
 | `/settings` | Settings |
 

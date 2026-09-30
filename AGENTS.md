@@ -14,7 +14,7 @@ TypeScript monorepo with three npm workspaces:
 
 - `client/`: React + Vite SPA. Entry points: `src/main.tsx`, `src/App.tsx`.
 - `server/`: Express + SQLite backend. Runtime entry: `src/index.ts`; app factory: `src/app.ts`.
-- `shared/`: cross-layer contracts in `shared/types.ts`. The committed `shared/types.js` is a CommonJS build artifact the server and its tests resolve at runtime — if runtime exports (constants, functions) are added to `types.ts`, regenerate it with `npx tsc shared/types.ts --outDir shared --module commonjs --target es2022 --strict --skipLibCheck --esModuleInterop --noUncheckedIndexedAccess`. The client aliases `shared/types` to the `.ts` source in `vite.config.ts`/`vitest.config.ts`, so it always sees live exports; type-only additions need no regeneration.
+- `shared/`: cross-layer contracts in `shared/types.ts`. The committed `shared/types.js` is a CommonJS build artifact the server and its tests resolve at runtime — if runtime exports (constants, functions) are added to `types.ts`, regenerate it with `npx tsc shared/types.ts --outDir shared --module commonjs --target es2022 --strict --skipLibCheck --esModuleInterop --noUncheckedIndexedAccess`. The client aliases `shared/types` to the `.ts` source in `vite.config.ts`/`vitest.config.ts`, so it always sees live exports; type-only additions need no regeneration. `shared/capture-grammar.js` is the same kind of committed artifact for `capture-grammar.ts` (same flags, `npx tsc shared/capture-grammar.ts --outDir shared ...`); regenerate it when the grammar's runtime code changes.
 
 Supporting folders:
 
@@ -22,7 +22,7 @@ Supporting folders:
 - `server/data/`: server-only test/config fixtures, not the runtime DB.
 - `docs/`: product, architecture, workflow, deployment, and handoff docs. Current work is tracked in `docs/56-implementation-plan-solo-first.md` (plan, run rules, progress log) and specified in `docs/57-tasks-consolidation-spec.md`; production deploy and backup/restore steps are in `docs/23`.
 - `agent/`: repo-local prompts and skills.
-- `.github/instructions/`: backend/frontend guidance for GitHub Copilot-style agents.
+- `agent/.github/instructions/`: backend/frontend guidance for GitHub Copilot-style agents.
 - `scripts/`: deploy, `check-db-artifacts.sh` (`npm run guard:data`, fails if runtime DB files are tracked), and legacy worktree scripts.
 
 ## App Surfaces and Routing
@@ -55,7 +55,7 @@ Feature folders under `client/src/components/`:
 - `ui/`: shared primitives: `Dialog` (the one modal shell, focus-trapped, portal), `Popover`, `Kbd`, `ShortcutSheet`, `EmptyState`.
 - `actions/`: manager action inbox (header).
 - `today/`: manager daily command view.
-- `work/`, `overview/`, `filters/`, `table/`, `triage/`, `alerts/`, `workload/`: Work dashboard and defect triage.
+- `work/`, `filters/`, `table/`, `triage/`, `alerts/`, `workload/`: Work dashboard and defect triage.
 - `team-tracker/`: manager team board and developer day tracking.
 - `my-day/`: developer workspace and shared login screen.
 - `manager-desk/`: Desk workspace, item drawer, rhythm lists, carry-forward, linked issue/developer workflows.
@@ -71,7 +71,7 @@ Frontend conventions:
 
 - Use TanStack Query hooks in `client/src/hooks/` for API data and mutations.
 - Use `client/src/lib/api.ts` for network calls; avoid ad hoc `fetch` calls in components.
-- Creating a task from the UI goes through `POST /api/capture` (the shared grammar in `shared/capture-grammar.ts`): use `useCapture` (the capture box) or `useCaptureTask` (inline add, dialogs, child tasks), and pass structured context as `defaults` (owner, date, parent, links, note source) instead of injecting tokens into the text. `POST /api/tasks` stays for services, Copilot and 1:1s; it is not a UI path. `@`/`#`/`+` typeahead is `useCaptureTypeahead`.
+- Creating a task from the UI goes through `POST /api/capture` (the shared grammar in `shared/capture-grammar.ts`): use `useCapture` (the capture box) or `useCaptureTask` (inline add, dialogs, child tasks), and pass structured context as `defaults` (owner, date, parent, links, note source) instead of injecting tokens into the text. `POST /api/tasks` stays for services, Copilot and 1:1s; it is not a UI path. The one deliberate exception is assigning work to a developer's day (Team board add, Jira triage "Add to tracker", `useAddTrackerItem` → `POST /api/team-tracker/:id/items`): it enforces availability, takes a description and returns the board item, so it keeps its own endpoint and never runs the title through the grammar. Capture resolves dates and stored clock times in the client's zone (`clientToday` and `tz` on the request); send both from any new caller. `@`/`#`/`+` typeahead is `useCaptureTypeahead`.
 - App-wide providers live in `client/src/context/` for auth, theme, and toast state.
 - `client/src/types/index.ts` re-exports `shared/types`; `client/src/types/manager-desk.ts` adds UI labels/mappings.
 - Prefer `@/` imports and shared contracts from `shared/types`.

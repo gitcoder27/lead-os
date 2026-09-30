@@ -17,7 +17,7 @@ vi.mock('@/lib/api', () => ({
     put: (url: string, body: unknown) => apiPut(url, body),
   },
 }));
-vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'scope' }));
+vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'scope', useAuth: () => ({ user: { accountId: 'me' } }) }));
 vi.mock('@/hooks/useDevelopers', () => ({
   useDevelopers: () => ({ data: [{ accountId: 'dev-1', displayName: 'Priya Nair' }] }),
 }));

@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns';
+import type { DecisionChoice } from '@/lib/weekly-review-decisions';
 import type {
   WeeklyReviewResponse,
   WeeklyReviewSavedState,
@@ -65,6 +66,13 @@ export function blankSavedState(weekStart: string): WeeklyReviewSavedState {
   return { weekStart, step: 'look_back', decisions: {}, excluded: [], reportMarkdown: null, startedAt: now, completedAt: null, dismissedAt: null, updatedAt: now };
 }
 
+/** A decision made in this session: what was written and how to take it back. */
+export interface ReviewDecision {
+  taskKey: string;
+  row: WeeklyReviewTaskRow;
+  choice: DecisionChoice;
+}
+
 export interface ReviewStepContext {
   review: WeeklyReviewResponse;
   saved: WeeklyReviewSavedState;
@@ -75,6 +83,14 @@ export interface ReviewStepContext {
   openTask: (taskKey: string) => void;
   /** A person's display name from their account id ("Someone" until the roster loads). */
   personName: (accountId: string | null) => string;
+  /** Decisions made this session by task key (kept across steps: the snapshot still lists those rows). */
+  decisions: ReadonlyMap<string, ReviewDecision>;
+  /** Write a decision now: the row collapses at once and goes back to undecided if the write fails. */
+  decide: (row: WeeklyReviewTaskRow, choice: DecisionChoice) => void;
+  /** Take one back (the inverse write), leaving the row undecided again. */
+  undoDecision: (taskKey: string) => void;
+  /** The signed-in manager's account id (their own tasks group under "Me"). */
+  selfAccountId?: string;
   /** Fetch the week again (the inline "Couldn't load · Retry" note). */
   retry: () => void;
   /** One polite live-region sentence ("Left out of the update."). */
@@ -91,6 +107,8 @@ export interface ReviewStepDef {
   summary: (ctx: ReviewStepContext) => string;
   /** Rail badge; null shows none. */
   count: (ctx: ReviewStepContext) => number | null;
+  /** True once nothing is left to decide in the step (its summary turns to success). */
+  done?: (ctx: ReviewStepContext) => boolean;
   /** Steps that do not apply (People with an empty roster) drop out of the rail and the count. */
   visible?: (review: WeeklyReviewResponse) => boolean;
   /** Step-specific keys for the shortcut sheet, written as pressed. */

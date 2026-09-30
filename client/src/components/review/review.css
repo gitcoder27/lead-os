@@ -485,3 +485,84 @@
 }
 
 .review-source-note > span { color: var(--text-secondary); }
+
+/* ── Decision rows (Waiting, Loose ends) ─────────────────────────────── */
+
+.review-summary[data-done='true'] { color: var(--success); font-weight: 550; }
+
+.review-decision-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+
+.review-row-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.review-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; white-space: normal; }
+
+.review-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Secondary actions read quietly until the row is hovered or has focus. */
+.review-decision-row .review-row-actions .ui-btn-ghost { color: var(--text-secondary); }
+
+.review-decided-mark {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  animation: review-pop 180ms var(--ease-out);
+}
+
+.review-decision-row[data-decided='success'] .review-decided-mark { color: var(--on-success); background: var(--success); }
+
+.review-decision-row[data-decided] .review-row-title { color: var(--text-muted); }
+
+.review-decided-label {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-secondary);
+}
+
+.review-decision-row[data-decided='success'] .review-decided-label { color: var(--success); }
+
+/* One soft wash as a decision lands, then rest. */
+.review-decision-row[data-decided] { animation: review-decided 700ms ease-out; }
+
+@keyframes review-decided {
+  from { background: color-mix(in srgb, var(--success) 12%, transparent); }
+  to { background: transparent; }
+}
+
+@keyframes review-pop {
+  from { transform: scale(0.6); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Phone: actions drop under the title so the buttons stay a comfortable size. */
+@media (max-width: 639px) {
+  .review-decision-row { grid-template-columns: 20px minmax(0, 1fr); row-gap: 6px; padding-bottom: 8px; }
+  .review-decision-row .review-row-actions { grid-column: 2; }
+  .review-decision-row .review-row-end { grid-column: 2; justify-content: space-between; }
+  .review-decision-row .ui-btn,
+  .review-decision-row .ui-btn-ghost { height: 32px; }
+  .review-decision-row .ui-icon-btn { width: 32px; height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-decision-row[data-decided],
+  .review-decided-mark { animation: none; }
+}
+
+/* Today's phone rule hides every second `.ui-chip`; here the second chip is the reason the row is in the list. */
+.review-row-meta .ui-chip + .ui-chip { display: inline-flex; }

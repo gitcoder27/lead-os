@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, CircleAlert } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TaskPopover } from '@/components/ui/Popover';
 import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
 import { useReviewProgress, useWeeklyReview } from '@/hooks/useWeeklyReview';
@@ -18,6 +19,7 @@ import {
 import type { WeeklyReviewResponse } from '@/types';
 import { ReviewHeader } from './ReviewHeader';
 import { ReviewStepsRail } from './ReviewStepsRail';
+import { useReviewDecisions } from './useReviewDecisions';
 import { REVIEW_STEPS, type ReviewStepEntry } from './review-steps';
 import './review.css';
 
@@ -148,6 +150,7 @@ function ReviewSession({
   const { openTask: openTaskDrawer } = useQuickActions();
   const openTask = useCallback((taskKey: string) => openTaskDrawer?.(taskKey), [openTaskDrawer]);
   const developers = useDevelopers();
+  const { user } = useAuth();
   const { saved, patch, flush } = useReviewProgress(review.range.start, review.saved);
 
   const visible = useMemo(() => steps.filter((step) => !step.visible || step.visible(review)), [steps, review]);
@@ -167,6 +170,8 @@ function ReviewSession({
     [developers.data],
   );
 
+  const { decisions, decide, undoDecision, undoLast } = useReviewDecisions({ patch, announce });
+
   const ctx = useMemo<ReviewStepContext>(() => ({
     review,
     saved,
@@ -179,9 +184,13 @@ function ReviewSession({
     },
     openTask,
     personName,
+    decisions,
+    decide,
+    undoDecision,
+    selfAccountId: user?.accountId,
     retry,
     announce,
-  }), [review, saved, patch, openTask, personName, retry, announce]);
+  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, user?.accountId, retry, announce]);
 
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= visible.length || next === index) return;
@@ -203,6 +212,7 @@ function ReviewSession({
       case ']': goTo(index + 1); break;
       case '[': goTo(index - 1); break;
       case '?': setSheet({ kind: 'keys', anchor: document.querySelector<HTMLElement>('[aria-label="Keyboard shortcuts"]') ?? document.body }); break;
+      case 'z': if (!undoLast()) return; break;
       case 'Escape': exit(); break;
       default:
         if (/^[1-9]$/.test(event.key) && Number(event.key) <= visible.length) goTo(Number(event.key) - 1);
@@ -219,6 +229,7 @@ function ReviewSession({
   const railSteps = visible.map((entry) => ({ id: entry.id, label: entry.label, count: entry.count(ctx) }));
   const heading = typeof step.heading === 'function' ? step.heading(review) : step.heading;
   const summary = step.summary(ctx);
+  const summaryDone = Boolean(summary) && Boolean(step.done?.(ctx));
   const previous = visible[index - 1];
   const next = visible[index + 1];
   const thisWeek = mondayOfLocal(review.today);
@@ -255,7 +266,7 @@ function ReviewSession({
             >
               <div className="review-heading">
                 <StepHeading id="review-step-heading">{heading}</StepHeading>
-                {summary ? <span className="review-summary">{summary}</span> : null}
+                {summary ? <span className="review-summary" data-done={summaryDone || undefined}>{summary}</span> : null}
               </div>
               <step.Component ctx={ctx} />
             </motion.div>

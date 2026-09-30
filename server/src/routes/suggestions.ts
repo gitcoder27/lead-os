@@ -5,8 +5,11 @@ import { AutomationService } from "../services/automation.service";
 import { IssueService } from "../services/issue.service";
 import { HttpError } from "../middleware/errorHandler";
 
+/** Jira project keys may contain digits and underscores after the first letter (e.g. `AB2-12`). */
+const issueKeyRegex = /^[A-Z][A-Z0-9_]*-\d+$/;
+
 const keySchema = z.object({
-  params: z.object({ key: z.string().regex(/^[A-Z]+-\d+$/) }),
+  params: z.object({ key: z.string().regex(issueKeyRegex) }),
   query: z.any().optional(),
   body: z.any().optional(),
 });
@@ -14,7 +17,7 @@ const keySchema = z.object({
 const prioritySchema = z.object({
   params: z.object({ priority: z.enum(["Highest", "High", "Medium", "Low", "Lowest"]) }),
   // docs/56 P5-02: with an issue key the target counts from that issue's creation, not from now.
-  query: z.object({ issue: z.string().regex(/^[A-Z]+-\d+$/).optional() }).passthrough().optional(),
+  query: z.object({ issue: z.string().regex(issueKeyRegex).optional() }).passthrough().optional(),
   body: z.any().optional(),
 });
 

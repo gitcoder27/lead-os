@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useSuggestions } from '@/hooks/useSuggestions';
 import { useUpdateIssue } from '@/hooks/useUpdateIssue';
-import { buildSuggestionRows, mergeRowUpdates, type SuggestionRow } from '@/lib/suggestion-diff';
+import { useToast } from '@/context/ToastContext';
+import { applyAllRows, buildSuggestionRows, buildUndoUpdate, mergeRowUpdates, type SuggestionRow } from '@/lib/suggestion-diff';
 import { workloadAssignedLabel } from '@/lib/utils';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import type { Issue, AssignmentSuggestion } from '@/types';
+import type { Issue, IssueUpdate, AssignmentSuggestion } from '@/types';
 
 interface SuggestionBarProps {
   issue: Issue;
@@ -63,29 +64,57 @@ function AssigneeMetrics({ suggestion }: { suggestion: AssignmentSuggestion }) {
 }
 
 export function SuggestionBar({ issue }: SuggestionBarProps) {
-  const { prioritySuggestion, dueDateSuggestion, assigneeSuggestion } = useSuggestions(
+  const { prioritySuggestion, dueDateSuggestion, assigneeSuggestion, dueDatePriority } = useSuggestions(
     issue.jiraKey,
     issue.priorityName
   );
   const updateIssue = useUpdateIssue();
+  const { addToast } = useToast();
   const [error, setError] = useState<string | null>(null);
 
   const topAssignee = assigneeSuggestion.data?.[0];
   const rows = buildSuggestionRows(issue, {
     priority: prioritySuggestion.data,
     dueDate: dueDateSuggestion.data,
+    dueDatePriority,
     assignee: topAssignee,
   });
+  const allRows = applyAllRows(rows);
 
   if (rows.length === 0) return null;
 
+  const errorMessage = (err: unknown) => (err instanceof Error && err.message ? err.message : 'The update could not be applied.');
+
+  const undo = (update: IssueUpdate) => {
+    updateIssue.mutate(
+      { key: issue.jiraKey, update },
+      {
+        onSuccess: () => addToast({ type: 'success', title: `Restored ${issue.jiraKey} in Jira` }),
+        onError: (err) => addToast({ type: 'error', title: `Could not undo on ${issue.jiraKey}`, message: errorMessage(err) }),
+      }
+    );
+  };
+
   const apply = (selected: SuggestionRow[]) => {
     setError(null);
+    const update = mergeRowUpdates(selected);
+    // docs/56 P5-02 review: capture what the issue had before the write, so it can be put back.
+    const previous = buildUndoUpdate(issue, update);
     updateIssue.mutate(
-      { key: issue.jiraKey, update: mergeRowUpdates(selected) },
+      { key: issue.jiraKey, update },
       {
+        onSuccess: () => {
+          const canUndo = Object.keys(previous.update).length > 0;
+          addToast({
+            type: 'success',
+            title: `Updated ${issue.jiraKey} in Jira`,
+            message: previous.complete ? undefined : 'Fields that were empty before cannot be cleared from here.',
+            action: canUndo ? { label: 'Undo', onClick: () => undo(previous.update) } : undefined,
+            duration: canUndo ? 10_000 : undefined,
+          });
+        },
         onError: (err) => {
-          setError(err instanceof Error && err.message ? err.message : 'The update could not be applied.');
+          setError(errorMessage(err));
         },
       }
     );
@@ -103,16 +132,17 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
           <span className="triage-section-label" style={{ color: 'var(--accent)' }}>
             <Sparkles size={11} /> Suggestions
           </span>
-          {rows.length > 1 && (
+          {allRows.length > 1 && (
             <button
               type="button"
-              onClick={() => apply(rows)}
+              onClick={() => apply(allRows)}
               disabled={applying}
-              aria-label={`Apply all ${rows.length} suggestions`}
+              aria-label={`Apply all ${allRows.length} suggestions`}
+              title={allRows.length < rows.length ? 'Changes that replace a value already set are applied one at a time.' : undefined}
               className="px-2.5 py-1 rounded-md text-[12px] font-semibold transition-all duration-150 active:scale-[0.97]"
               style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)', opacity: applying ? 0.6 : 1 }}
             >
-              {applying ? 'Applying…' : `Apply all (${rows.length})`}
+              {applying ? 'Applying…' : `Apply all (${allRows.length})`}
             </button>
           )}
         </div>
@@ -143,6 +173,11 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
               ) : null}
               {row.warning ? (
                 <p className="pl-[76px] text-[11.5px]" style={{ color: 'var(--warning)' }}>{row.warning}</p>
+              ) : null}
+              {row.overwrites && allRows.length > 1 ? (
+                <p className="pl-[76px] text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                  Replaces the current value, so it is not part of Apply all.
+                </p>
               ) : null}
               {row.field === 'assignee' && topAssignee ? (
                 <div className="pl-[76px]"><AssigneeMetrics suggestion={topAssignee} /></div>

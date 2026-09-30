@@ -62,6 +62,13 @@ describe("suggestions routes (docs/56 P5-02)", () => {
     expect((await invoke(app, { method: "GET", url: "/api/suggestions/duedate/High?issue=AM-9" })).status).toBe(404);
   });
 
+  it("accepts project keys with digits and underscores (P5-02 review)", async () => {
+    const { app, getById } = createTestApp({ jiraKey: "AB2_X-12", labels: [], createdAt: "2026-03-01T10:00:00.000Z" });
+
+    expect((await invoke(app, { method: "GET", url: "/api/suggestions/duedate/High?issue=AB2_X-12" })).status).toBe(200);
+    expect(getById).toHaveBeenCalledWith("AB2_X-12", undefined, "default");
+  });
+
   it("400s for a malformed issue key", async () => {
     const { app } = createTestApp(undefined);
 

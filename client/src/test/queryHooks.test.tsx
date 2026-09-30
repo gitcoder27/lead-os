@@ -243,4 +243,18 @@ describe('query hook wrappers', () => {
     await waitFor(() => expect(hook.result.current.dueDateSuggestion.isSuccess).toBe(true));
     expect(hook.result.current.dueDateSuggestion.data).toEqual({ suggested: '2026-03-04', reason: 'r' });
   });
+
+  it('asks for no due date when the issue has a tenant-specific priority and no real suggestion (P5-02 review)', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/suggestions/priority/PROJ-101') return Promise.resolve({ suggested: 'Medium', reason: 'r', isDefault: true });
+      if (url === '/suggestions/assignee/PROJ-101') return Promise.resolve({ issueKey: 'PROJ-101', suggestions: [] });
+      return Promise.reject(new Error(`Unexpected URL ${url}`));
+    });
+
+    const hook = renderHook(() => useSuggestions('PROJ-101', 'P1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(hook.result.current.prioritySuggestion.isSuccess).toBe(true));
+    expect(hook.result.current.dueDatePriority).toBeUndefined();
+    expect(hook.result.current.dueDateSuggestion.fetchStatus).toBe('idle');
+    expect(mockGet).not.toHaveBeenCalledWith(expect.stringContaining('/suggestions/duedate/'));
+  });
 });

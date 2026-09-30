@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { SuggestionBar } from '@/components/triage/SuggestionBar';
-import { buildSuggestionRows } from '@/lib/suggestion-diff';
+import { buildSuggestionRows, buildUndoUpdate } from '@/lib/suggestion-diff';
 import { TestWrapper } from '@/test/wrapper';
 import type { AssignmentSuggestion, Developer, DeveloperWorkload, Issue } from '@/types';
 
@@ -12,11 +12,14 @@ interface MockSuggestions {
   prioritySuggestion: { data: { suggested: string; reason: string; isDefault?: boolean } | null };
   dueDateSuggestion: { data: { suggested: string; reason: string } | null };
   assigneeSuggestion: { data: AssignmentSuggestion[] | null };
+  dueDatePriority?: string;
 }
 let mockSuggestions: MockSuggestions;
 
 vi.mock('@/hooks/useSuggestions', () => ({ useSuggestions: () => mockSuggestions }));
 vi.mock('@/hooks/useUpdateIssue', () => ({ useUpdateIssue: () => ({ mutate: mockMutate, isPending: mockPending }) }));
+const mockAddToast = vi.fn();
+vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast: mockAddToast }) }));
 
 const bob: Developer = { accountId: 'bob-2', jiraAccountId: 'jira-bob', displayName: 'Bob', isActive: true, participates: false };
 
@@ -59,8 +62,12 @@ function renderBar(i: Issue = issue()) {
   );
 }
 
+/** Nothing set by hand yet, so every suggestion fills a blank and Apply all covers them all. */
+const blankIssue = () => issue({ dueDate: undefined, assigneeId: undefined, assigneeName: undefined });
+
 beforeEach(() => {
   mockMutate.mockReset();
+  mockAddToast.mockReset();
   mockPending = false;
   mockSuggestions = {
     prioritySuggestion: { data: { suggested: 'Highest', reason: 'Production-impacting label detected.' } },
@@ -92,7 +99,7 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
   });
 
   it('Apply all writes every shown field in one update, using the Jira account id for the assignee', () => {
-    renderBar();
+    renderBar(blankIssue());
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply all 3 suggestions' }));
 
@@ -105,7 +112,7 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
 
   it('never offers the default-only priority, so Apply all cannot overwrite a real priority with the fallback', () => {
     mockSuggestions.prioritySuggestion = { data: { suggested: 'Medium', reason: 'Default suggestion for general defects.', isDefault: true } };
-    renderBar();
+    renderBar(blankIssue());
 
     expect(screen.queryByTestId('suggestion-priority')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Apply all 2 suggestions' }));
@@ -156,10 +163,56 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
 
   it('disables the buttons while an update is in flight', () => {
     mockPending = true;
-    renderBar();
+    renderBar(blankIssue());
 
     expect(screen.getByRole('button', { name: 'Apply priority' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Apply all 3 suggestions' })).toBeDisabled();
+  });
+
+  it('leaves changes that replace a value set by hand out of Apply all (P5-02 review)', () => {
+    mockSuggestions.dueDateSuggestion = { data: { suggested: '2026-03-02', reason: 'SLA' } };
+    // The due date is already set by hand; priority and the (blank) assignee go in Apply all.
+    renderBar(issue({ assigneeId: undefined, assigneeName: undefined }));
+
+    expect(screen.getByRole('button', { name: 'Apply all 2 suggestions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply all 2 suggestions' }));
+    expect(mockMutate.mock.calls[0]?.[0].update).toEqual({ priorityName: 'Highest', assigneeId: 'jira-bob' });
+    expect(within(screen.getByTestId('suggestion-dueDate')).getByText(/not part of Apply all/)).toBeInTheDocument();
+  });
+
+  it('a due date counted for the suggested priority also sets that priority when applied alone', () => {
+    mockSuggestions.dueDatePriority = 'Highest';
+    renderBar(blankIssue());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply due date' }));
+
+    expect(mockMutate.mock.calls[0]?.[0].update).toEqual({ dueDate: '2026-03-02', priorityName: 'Highest' });
+    expect(screen.getByText(/Counted for Highest priority/)).toBeInTheDocument();
+  });
+
+  it('offers Undo after a Jira write, restoring the previous values', () => {
+    mockMutate.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
+    renderBar();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply assignee' }));
+    const toast = mockAddToast.mock.calls[0]?.[0];
+    expect(toast).toMatchObject({ type: 'success', title: 'Updated PROJ-101 in Jira', action: { label: 'Undo' } });
+    expect(toast.message).toBeUndefined();
+
+    toast.action.onClick();
+    expect(mockMutate.mock.calls[1]?.[0]).toEqual({ key: 'PROJ-101', update: { assigneeId: 'alice-1' } });
+    expect(mockAddToast.mock.calls[1]?.[0]).toMatchObject({ type: 'success', title: 'Restored PROJ-101 in Jira' });
+  });
+
+  it('says when a field that was empty cannot be put back', () => {
+    mockMutate.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
+    renderBar(blankIssue());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply assignee' }));
+
+    const toast = mockAddToast.mock.calls[0]?.[0];
+    expect(toast.action).toBeUndefined();
+    expect(toast.message).toMatch(/cannot be cleared/);
   });
 
   it('warns when the suggested due date is already past', () => {
@@ -168,6 +221,19 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
     renderBar();
 
     expect(screen.getByText(/already in the past/i)).toBeInTheDocument();
+  });
+});
+
+describe('buildUndoUpdate', () => {
+  it('restores standard priorities, dates and assignees, and flags fields it cannot clear', () => {
+    expect(buildUndoUpdate(issue(), { priorityName: 'Highest', dueDate: '2026-03-02', assigneeId: 'jira-bob' })).toEqual({
+      update: { priorityName: 'High', dueDate: '2026-03-10', assigneeId: 'alice-1' },
+      complete: true,
+    });
+    expect(buildUndoUpdate(issue({ priorityName: 'P1', dueDate: undefined }), { priorityName: 'High', dueDate: '2026-03-02' })).toEqual({
+      update: {},
+      complete: false,
+    });
   });
 });
 

@@ -99,6 +99,26 @@ describe("/api/contacts (docs/57 §2)", () => {
     expect(list.body.contacts.map((contact: { handle: string }) => contact.handle)).toEqual(["acme-legal", "acme-legal-2"]);
   });
 
+  // docs/56 P3-03 review: an archived contact frees its handle; a create race is a 409, never a 500.
+  it("reuses an archived contact's handle and answers concurrent creates cleanly", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const first = await createContact(headers, { displayName: "Acme Legal", handle: "acme" });
+    expect((await invoke(app, { method: "DELETE", url: `/api/contacts/${first.body.id}`, headers })).status).toBe(200);
+    const again = await createContact(headers, { displayName: "Acme Legal (new)", handle: "acme" });
+    expect(again.status).toBe(201);
+    expect(again.body.handle).toBe("acme");
+
+    const explicit = await Promise.all([
+      createContact(headers, { displayName: "Vendor", handle: "vendor" }),
+      createContact(headers, { displayName: "Vendor", handle: "vendor" }),
+    ]);
+    expect(explicit.map((res) => res.status).sort()).toEqual([201, 409]);
+
+    const derived = await Promise.all([createContact(headers, { displayName: "Board" }), createContact(headers, { displayName: "Board" })]);
+    expect(derived.map((res) => res.status)).toEqual([201, 201]);
+    expect(derived.map((res) => res.body.handle).sort()).toEqual(["board", "board-2"]);
+  });
+
   it("is private to the owning manager and manager-only", async () => {
     const a = { cookie: await cookie("manager-a") };
     const b = { cookie: await cookie("manager-b") };
@@ -203,6 +223,26 @@ describe("Waiting lens (docs/57 §4)", () => {
     expect(titles(await runView(headers, "today"))).toEqual(["Planned"]);
     const lane = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { lane: "waiting" } })}&today=${today}`, headers });
     expect(titles(lane.body.tasks)).toEqual(["Planned but waiting"]);
+  });
+
+  // docs/56 P3-03 review: unowned rows are visible to every manager, but the party stays private.
+  it("another manager never sees my unowned task as waiting", async () => {
+    const a = { cookie: await cookie("manager-a") };
+    const b = { cookie: await cookie("manager-b") };
+    const task = await createTask(a, { title: "Unowned wait", waitingOn: { type: "text", label: "Legal" } });
+    await db.update(tasks).set({ ownerType: null, ownerId: null }).where(eq(tasks.id, task.id));
+
+    expect(titles(await runView(a, "waiting"))).toEqual(["Unowned wait"]);
+    expect(titles(await runView(b, "waiting"))).toEqual([]);
+    const byFilter = async (headers: Headers, filters: Record<string, unknown>) =>
+      titles((await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters })}&today=${today}`, headers })).body.tasks);
+    expect(await byFilter(b, { waitingOn: true })).toEqual([]);
+    expect(await byFilter(b, { waitingOn: false })).toEqual(["Unowned wait"]);
+    expect(await byFilter(b, { lane: "waiting" })).toEqual([]);
+    expect(await byFilter(a, { waitingOn: true })).toEqual(["Unowned wait"]);
+    expect(await byFilter(a, { lane: "waiting" })).toEqual(["Unowned wait"]);
+    const counts = await invoke(app, { method: "GET", url: `/api/tasks/view-counts?today=${today}`, headers: b });
+    expect(counts.body.counts.waiting.count).toBe(0);
   });
 
   it("counts match the list for the Waiting view", async () => {

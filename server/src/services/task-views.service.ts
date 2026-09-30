@@ -93,8 +93,24 @@ export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">): { dat
   return { date: null, source: null };
 }
 
-/** docs/57 §1: the row's lifecycle lane (the shared `taskLane` rule). */
-export function taskRowLane(row: TaskRow, today: string): TaskLane {
+/**
+ * docs/57 §2: the waiting-on party is private to the tracking manager (or the manager who owns the
+ * task), like the DTO's `waitingOn`. Unowned rows are visible to every manager in the workspace, so
+ * membership in the Waiting lens, the lane and the `waitingOn` filter must use this, not the column.
+ */
+function ownsPrivateFields(row: TaskRow, principal: TaskPrincipal): boolean {
+  return row.trackedByManagerId === principal.accountId || (row.ownerType === "manager" && row.ownerId === principal.accountId);
+}
+
+function hasVisibleWaitingOn(row: TaskRow, principal?: TaskPrincipal): boolean {
+  return row.waitingOnType !== null && (!principal || ownsPrivateFields(row, principal));
+}
+
+/**
+ * docs/57 §1: the row's lifecycle lane (the shared `taskLane` rule). With a principal, a waiting-on
+ * party that is not theirs to see does not make the row "waiting".
+ */
+export function taskRowLane(row: TaskRow, today: string, principal?: TaskPrincipal): TaskLane {
   return taskLane({
     status: row.status,
     later: row.later === 1,
@@ -103,7 +119,7 @@ export function taskRowLane(row: TaskRow, today: string): TaskLane {
     dueDate: isoDatePart(row.dueAt) ?? null,
     ownerType: row.ownerType,
     needsTriage: row.needsTriage === 1,
-    waiting: row.waitingOnType !== null,
+    waiting: hasVisibleWaitingOn(row, principal),
   }, today);
 }
 
@@ -160,7 +176,7 @@ function selfOwned(row: TaskRow, principal: TaskPrincipal): boolean {
  *   `kind:waiting` label, or a follow-up on somebody else's task.
  */
 function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSignals): boolean {
-  if (row.waitingOnType !== null) return true;
+  if (hasVisibleWaitingOn(row, principal)) return true;
   if (row.status === "blocked" || labelsOf(row).includes(WAITING_LABEL)) return true;
   const othersTask = row.ownerType !== null && !selfOwned(row, principal);
   if (followUpMatch(row) && othersTask) return true;
@@ -229,13 +245,13 @@ export function matchesTaskViewFilters(
     const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt)!;
     if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
   }
-  if (filters.lane && taskRowLane(row, today) !== filters.lane) return false;
+  if (filters.lane && taskRowLane(row, today, principal) !== filters.lane) return false;
   if (filters.horizon) {
     const plan = taskPlanDate(row).date;
     if (!plan) return false;
     if (filters.horizon === "today" ? plan > today : plan <= today) return false;
   }
-  if (filters.waitingOn !== undefined && (row.waitingOnType !== null) !== filters.waitingOn) return false;
+  if (filters.waitingOn !== undefined && hasVisibleWaitingOn(row, principal) !== filters.waitingOn) return false;
   if (filters.waiting !== undefined && waitingMatch(row, principal, signals) !== filters.waiting) return false;
   if (filters.attention?.length) {
     // docs/51 F2: the stale signal only applies to manager-owned and inbox
@@ -319,7 +335,12 @@ export class TaskViewsService {
     }
     if (filters.status?.length) conditions.push(inArray(tasks.status, filters.status));
     if (filters.kind) conditions.push(eq(tasks.kind, filters.kind));
-    if (filters.waitingOn !== undefined) conditions.push(filters.waitingOn ? isNotNull(tasks.waitingOnType) : isNull(tasks.waitingOnType));
+    if (filters.waitingOn !== undefined) {
+      // Same privacy rule as `hasVisibleWaitingOn`: another manager's party does not count. `IS` is
+      // null-safe, so the NOT below never turns a NULL tracker into an unknown that drops the row.
+      const visible = sql`(${tasks.waitingOnType} IS NOT NULL AND (${tasks.trackedByManagerId} IS ${principal.accountId} OR (${tasks.ownerType} IS 'manager' AND ${tasks.ownerId} IS ${principal.accountId})))`;
+      conditions.push(filters.waitingOn ? visible : sql`NOT ${visible}`);
+    }
     // `later` is tracking-manager-private like the other private fields — a
     // parked row only reads as later to the manager tracking it.
     if (filters.later !== undefined) {

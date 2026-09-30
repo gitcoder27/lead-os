@@ -23,6 +23,14 @@ export function contactHandleFrom(displayName: string): string {
   return slug || "contact";
 }
 
+/** The SQLite unique-index error, raw or wrapped by the query builder (as `cause`). */
+function isUniqueViolation(error: unknown): boolean {
+  for (let current = error; typeof current === "object" && current !== null; current = (current as { cause?: unknown }).cause) {
+    if ((current as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") return true;
+  }
+  return false;
+}
+
 function toContact(row: ContactRow): Contact {
   return { id: row.id, displayName: row.displayName, handle: row.handle, note: row.note, createdAt: row.createdAt };
 }
@@ -54,38 +62,52 @@ export class ContactsService {
 
   /**
    * An explicit handle must be free (409); a derived one gets a numeric suffix
-   * until it is unique for this manager.
+   * until it is unique for this manager. If another create takes the same handle
+   * first, the unique index answers: 409 for an explicit handle, the next suffix
+   * for a derived one (never a 500).
    */
   async create(managerAccountId: string, input: CreateContactRequest, workspaceId?: string): Promise<Contact> {
     const parsed = createContactSchema.safeParse(input);
     if (!parsed.success) throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join(", "));
     const scope = normalizeWorkspaceId(workspaceId);
-    const taken = new Set((await db.select({ handle: contacts.handle }).from(contacts).where(and(
-      eq(contacts.workspaceId, scope),
-      eq(contacts.managerAccountId, managerAccountId),
-    ))).map((row) => row.handle));
-    let handle = parsed.data.handle;
-    if (handle) {
-      if (taken.has(handle)) throw new HttpError(409, `A contact with handle @${handle} already exists`);
-    } else {
-      const base = contactHandleFrom(parsed.data.displayName);
-      handle = base;
-      for (let suffix = 2; taken.has(handle); suffix += 1) handle = `${base}-${suffix}`;
+    const explicit = parsed.data.handle;
+    const base = explicit ?? contactHandleFrom(parsed.data.displayName);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const taken = new Set((await db.select({ handle: contacts.handle }).from(contacts).where(and(
+        eq(contacts.workspaceId, scope),
+        eq(contacts.managerAccountId, managerAccountId),
+      ))).map((row) => row.handle));
+      let handle = base;
+      if (explicit) {
+        if (taken.has(handle)) throw new HttpError(409, `A contact with handle @${handle} already exists`);
+      } else {
+        for (let suffix = 2; taken.has(handle); suffix += 1) handle = `${base}-${suffix}`;
+      }
+      try {
+        const [row] = await db.insert(contacts).values({
+          workspaceId: scope,
+          managerAccountId,
+          displayName: parsed.data.displayName,
+          handle,
+          note: parsed.data.note ?? null,
+          createdAt: new Date().toISOString(),
+        }).returning();
+        return toContact(row!);
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        if (explicit) throw new HttpError(409, `A contact with handle @${handle} already exists`);
+      }
     }
-    const [row] = await db.insert(contacts).values({
-      workspaceId: scope,
-      managerAccountId,
-      displayName: parsed.data.displayName,
-      handle,
-      note: parsed.data.note ?? null,
-      createdAt: new Date().toISOString(),
-    }).returning();
-    return toContact(row!);
+    throw new HttpError(409, `Could not find a free handle for ${parsed.data.displayName}; pick one`);
   }
 
+  /**
+   * Archiving frees the handle for a new contact: the row keeps a `~<id>` suffix, which no valid
+   * handle can contain, so capture never resolves it and the unique index stays satisfied.
+   */
   async archive(managerAccountId: string, id: number, workspaceId?: string): Promise<void> {
     const existing = await this.get(managerAccountId, id, workspaceId);
     if (!existing) throw new HttpError(404, "Contact not found");
-    await db.update(contacts).set({ archivedAt: new Date().toISOString() }).where(eq(contacts.id, id));
+    await db.update(contacts).set({ archivedAt: new Date().toISOString(), handle: `${existing.handle}~${id}` }).where(eq(contacts.id, id));
   }
 }

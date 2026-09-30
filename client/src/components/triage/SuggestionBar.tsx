@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useSuggestions } from '@/hooks/useSuggestions';
 import { useUpdateIssue } from '@/hooks/useUpdateIssue';
+import { buildSuggestionRows, mergeRowUpdates, type SuggestionRow } from '@/lib/suggestion-diff';
 import { workloadAssignedLabel } from '@/lib/utils';
-import { Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import type { Issue, AssignmentSuggestion } from '@/types';
 
 interface SuggestionBarProps {
@@ -66,25 +68,30 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
     issue.priorityName
   );
   const updateIssue = useUpdateIssue();
-
-  const hasSuggestions =
-    prioritySuggestion.data || dueDateSuggestion.data || (assigneeSuggestion.data && assigneeSuggestion.data.length > 0);
-
-  if (!hasSuggestions) return null;
+  const [error, setError] = useState<string | null>(null);
 
   const topAssignee = assigneeSuggestion.data?.[0];
+  const rows = buildSuggestionRows(issue, {
+    priority: prioritySuggestion.data,
+    dueDate: dueDateSuggestion.data,
+    assignee: topAssignee,
+  });
 
-  const handleApplyAll = () => {
-    const updates: Record<string, string> = {};
-    if (prioritySuggestion.data?.suggested) updates.priorityName = prioritySuggestion.data.suggested;
-    if (dueDateSuggestion.data?.suggested) updates.dueDate = dueDateSuggestion.data.suggested;
-    const jiraAccountId = topAssignee?.developer.jiraAccountId ?? topAssignee?.developer.accountId;
-    if (jiraAccountId) updates.assigneeId = jiraAccountId;
+  if (rows.length === 0) return null;
 
-    if (Object.keys(updates).length > 0) {
-      updateIssue.mutate({ key: issue.jiraKey, update: updates });
-    }
+  const apply = (selected: SuggestionRow[]) => {
+    setError(null);
+    updateIssue.mutate(
+      { key: issue.jiraKey, update: mergeRowUpdates(selected) },
+      {
+        onError: (err) => {
+          setError(err instanceof Error && err.message ? err.message : 'The update could not be applied.');
+        },
+      }
+    );
   };
+
+  const applying = updateIssue.isPending;
 
   return (
     <div className="triage-section">
@@ -96,31 +103,59 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
           <span className="triage-section-label" style={{ color: 'var(--accent)' }}>
             <Sparkles size={11} /> Suggestions
           </span>
-          <button
-            onClick={handleApplyAll}
-            disabled={updateIssue.isPending}
-            className="px-2.5 py-1 rounded-md text-[12px] font-semibold transition-all duration-150 active:scale-[0.97]"
-            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)', opacity: updateIssue.isPending ? 0.6 : 1 }}
-          >
-            {updateIssue.isPending ? 'Applying…' : 'Apply All'}
-          </button>
+          {rows.length > 1 && (
+            <button
+              type="button"
+              onClick={() => apply(rows)}
+              disabled={applying}
+              aria-label={`Apply all ${rows.length} suggestions`}
+              className="px-2.5 py-1 rounded-md text-[12px] font-semibold transition-all duration-150 active:scale-[0.97]"
+              style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)', opacity: applying ? 0.6 : 1 }}
+            >
+              {applying ? 'Applying…' : `Apply all (${rows.length})`}
+            </button>
+          )}
         </div>
 
-        <div className="flex flex-wrap gap-2 text-[12.5px]">
-          {prioritySuggestion.data && (
-            <span className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-              📌 <strong style={{ color: 'var(--text-primary)' }}>{prioritySuggestion.data.suggested}</strong>
-            </span>
-          )}
-          {dueDateSuggestion.data && (
-            <span className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-              📅 <strong style={{ color: 'var(--text-primary)' }}>{dueDateSuggestion.data.suggested}</strong>
-            </span>
-          )}
-          {topAssignee && (
-            <AssigneeMetrics suggestion={topAssignee} />
-          )}
-        </div>
+        <ul className="flex flex-col gap-2 text-[12.5px]" aria-label="Suggested changes">
+          {rows.map((row) => (
+            <li key={row.field} className="flex flex-col gap-1" data-testid={`suggestion-${row.field}`}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="w-[68px] shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{row.label}</span>
+                <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
+                  <span data-testid={`suggestion-${row.field}-current`} style={{ textDecoration: 'line-through' }}>{row.current}</span>
+                  <ArrowRight size={11} aria-hidden="true" />
+                  <strong data-testid={`suggestion-${row.field}-suggested`} style={{ color: 'var(--text-primary)' }}>{row.suggested}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => apply([row])}
+                  disabled={applying}
+                  aria-label={`Apply ${row.label.toLowerCase()}`}
+                  className="px-2 py-0.5 rounded-md text-[12px] font-semibold transition-all duration-150 active:scale-[0.97]"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)', opacity: applying ? 0.6 : 1 }}
+                >
+                  Apply
+                </button>
+              </div>
+              {row.reason ? (
+                <p className="pl-[76px] text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{row.reason}</p>
+              ) : null}
+              {row.warning ? (
+                <p className="pl-[76px] text-[11.5px]" style={{ color: 'var(--warning)' }}>{row.warning}</p>
+              ) : null}
+              {row.field === 'assignee' && topAssignee ? (
+                <div className="pl-[76px]"><AssigneeMetrics suggestion={topAssignee} /></div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+
+        {error ? (
+          <p role="alert" className="text-[12px]" style={{ color: 'var(--danger)' }}>
+            Could not apply: {error}
+          </p>
+        ) : null}
       </div>
     </div>
   );

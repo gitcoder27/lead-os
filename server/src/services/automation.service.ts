@@ -14,7 +14,7 @@ export class AutomationService {
     if (normalized.includes("customer") || normalized.includes("client")) {
       return { suggested: "High", reason: "Customer-impacting label detected." };
     }
-    return { suggested: "Medium", reason: "Default suggestion for general defects." };
+    return { suggested: "Medium", reason: "Default suggestion for general defects.", isDefault: true };
   }
 
   suggestDueDate(priorityName: string, createdAt: string): DueDateSuggestion {

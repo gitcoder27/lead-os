@@ -20,4 +20,11 @@ describe("AutomationService", () => {
     expect(service.suggestDueDate("Low", createdAt).suggested).toBe("2026-03-15");
     expect(service.suggestDueDate("Lowest", createdAt).suggested).toBe("2026-03-15");
   });
+
+  it("flags the fallback priority so callers never offer it as a change (docs/56 P5-02)", () => {
+    expect(service.suggestPriority(["misc"])).toMatchObject({ suggested: "Medium", isDefault: true });
+    expect(service.suggestPriority([])).toMatchObject({ isDefault: true });
+    expect(service.suggestPriority(["production"]).isDefault).toBeUndefined();
+    expect(service.suggestPriority(["Customer"]).isDefault).toBeUndefined();
+  });
 });

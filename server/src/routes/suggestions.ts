@@ -13,7 +13,8 @@ const keySchema = z.object({
 
 const prioritySchema = z.object({
   params: z.object({ priority: z.enum(["Highest", "High", "Medium", "Low", "Lowest"]) }),
-  query: z.any().optional(),
+  // docs/56 P5-02: with an issue key the target counts from that issue's creation, not from now.
+  query: z.object({ issue: z.string().regex(/^[A-Z]+-\d+$/).optional() }).passthrough().optional(),
   body: z.any().optional(),
 });
 
@@ -50,8 +51,16 @@ export function createSuggestionsRouter(automationService: AutomationService, is
   router.get("/duedate/:priority", validate(prioritySchema), async (req, res, next) => {
     try {
       const priority = req.params.priority as string;
-      const suggestion = automationService.suggestDueDate(priority, new Date().toISOString());
-      res.json(suggestion);
+      const issueKey = typeof req.query.issue === "string" ? req.query.issue : undefined;
+      let createdAt = new Date().toISOString();
+      if (issueKey) {
+        const issue = await issueService.getById(issueKey, undefined, req.auth!.user.workspaceId);
+        if (!issue) {
+          throw new HttpError(404, "Issue not found");
+        }
+        createdAt = issue.createdAt;
+      }
+      res.json(automationService.suggestDueDate(priority, createdAt));
     } catch (error) {
       next(error);
     }

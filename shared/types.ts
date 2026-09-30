@@ -800,6 +800,11 @@ export interface IssueListOptions {
 export interface PrioritySuggestion {
   suggested: string;
   reason: string;
+  /**
+   * docs/56 P5-02: true when nothing about the issue supported the suggestion (it is just the
+   * fallback), so it must not be offered as a change. Absent = a real, label-based suggestion.
+   */
+  isDefault?: boolean;
 }
 
 export interface DueDateSuggestion {

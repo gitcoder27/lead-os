@@ -196,7 +196,7 @@ describe('query hook wrappers', () => {
 
     mockGet.mockImplementation((url: string) => {
       if (url === '/suggestions/priority/PROJ-101') return Promise.resolve({ priority: 'High' });
-      if (url === '/suggestions/duedate/Highest') return Promise.resolve({ dueDate: '2026-03-14' });
+      if (url === '/suggestions/duedate/Highest?issue=PROJ-101') return Promise.resolve({ dueDate: '2026-03-14' });
       if (url === '/suggestions/assignee/PROJ-101') {
         return Promise.resolve({ issueKey: 'PROJ-101', suggestions: [{ accountId: 'alice-1', score: 0.91 }] });
       }
@@ -216,5 +216,31 @@ describe('query hook wrappers', () => {
     expect(enabled.result.current.prioritySuggestion.data).toEqual({ priority: 'High' });
     expect(enabled.result.current.dueDateSuggestion.data).toEqual({ dueDate: '2026-03-14' });
     expect(enabled.result.current.assigneeSuggestion.data).toEqual([{ accountId: 'alice-1', score: 0.91 }]);
+  });
+
+  it('asks for the due-date target of the suggested priority, counted from the issue (docs/56 P5-02)', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/suggestions/priority/PROJ-101') return Promise.resolve({ suggested: 'Highest', reason: 'r' });
+      if (url === '/suggestions/duedate/Highest?issue=PROJ-101') return Promise.resolve({ suggested: '2026-03-02', reason: 'r' });
+      if (url === '/suggestions/assignee/PROJ-101') return Promise.resolve({ issueKey: 'PROJ-101', suggestions: [] });
+      return Promise.reject(new Error(`Unexpected URL ${url}`));
+    });
+
+    const hook = renderHook(() => useSuggestions('PROJ-101', 'Medium'), { wrapper: createWrapper() });
+    await waitFor(() => expect(hook.result.current.dueDateSuggestion.isSuccess).toBe(true));
+    expect(hook.result.current.dueDateSuggestion.data).toEqual({ suggested: '2026-03-02', reason: 'r' });
+  });
+
+  it('keeps the current priority for the due-date target when the priority suggestion is only the default', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/suggestions/priority/PROJ-101') return Promise.resolve({ suggested: 'Medium', reason: 'r', isDefault: true });
+      if (url === '/suggestions/duedate/High?issue=PROJ-101') return Promise.resolve({ suggested: '2026-03-04', reason: 'r' });
+      if (url === '/suggestions/assignee/PROJ-101') return Promise.resolve({ issueKey: 'PROJ-101', suggestions: [] });
+      return Promise.reject(new Error(`Unexpected URL ${url}`));
+    });
+
+    const hook = renderHook(() => useSuggestions('PROJ-101', 'High'), { wrapper: createWrapper() });
+    await waitFor(() => expect(hook.result.current.dueDateSuggestion.isSuccess).toBe(true));
+    expect(hook.result.current.dueDateSuggestion.data).toEqual({ suggested: '2026-03-04', reason: 'r' });
   });
 });

@@ -816,6 +816,13 @@ function AppContent() {
     navigateToView(nextView, { replace: true });
   }, []);
 
+  // The first render runs before `/api/auth/me` answers, when the feature flags still read as off, so a
+  // `/tasks` (or redirected `/follow-ups`) URL was canonicalised to `/desk`. Once the session is known,
+  // put the flag-scoped path back (same query, replaceState: no history entry).
+  useEffect(() => {
+    if (!authLoading) replaceLegacyPathIfNeeded();
+  }, [authLoading, features?.tasksPhase3]);
+
   useEffect(() => {
     replaceLegacyPathIfNeeded();
 

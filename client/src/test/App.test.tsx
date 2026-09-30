@@ -354,6 +354,21 @@ describe('App', () => {
       expect(new URLSearchParams(window.location.search).get('view')).toBe(view);
     });
 
+    it.each([
+      ['/follow-ups', '/tasks?view=waiting'],
+      ['/meetings', '/tasks?view=meetings'],
+      ['/tasks?view=waiting', '/tasks?view=waiting'],
+    ])('a cold load of %s lands on %s once the session (and its Phase 3 flag) arrives', async (path, expected) => {
+      const booting = { user: null, features: { tasksPhase3: false }, isLoading: true, isAuthenticated: false, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() };
+      useAuthMock.mockReturnValue(booting);
+      window.history.pushState(null, '', path);
+      const { rerender } = render(<App />);
+      asManager();
+      rerender(<App />);
+      expect(await screen.findByText('Tasks loaded')).toBeInTheDocument();
+      await waitFor(() => expect(window.location.pathname + window.location.search).toBe(expected));
+    });
+
     it('keeps the rest of the query string and replaces history instead of adding to it', async () => {
       asManager();
       window.history.pushState(null, '', '/follow-ups?q=vendor&view=stale');

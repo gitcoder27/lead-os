@@ -94,7 +94,6 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
                     type="button"
                     className="ui-btn-ghost"
                     aria-label={item.pinned ? `Unpin ${item.title} from top ${TODAY_TOP_LIMIT}` : `Pin ${item.title} to top ${TODAY_TOP_LIMIT}`}
-                    aria-pressed={item.pinned}
                     title={atLimit ? `Top ${TODAY_TOP_LIMIT} is full — unpin one first` : undefined}
                     disabled={pinning || atLimit}
                     onClick={() => onTogglePin(item.taskKey)}

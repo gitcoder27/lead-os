@@ -27,7 +27,7 @@ describe('ResetConfigurationDialog (docs/56 P6-06)', () => {
     expect(within(lost).getByText(/Backup schedule, day rhythm, attention rules, team mode/)).toBeInTheDocument();
     expect(within(lost).getByText(/synced Jira issues/)).toBeInTheDocument();
     expect(within(lost).getByText(/Tracked team members/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/your tasks, notes, Desk items/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/your tasks \(and the task-model setup they live in\), notes, Desk items/)).toBeInTheDocument();
   });
 
   it('keeps the destructive button disabled until the phrase is typed (case-insensitive, trimmed)', () => {
@@ -73,5 +73,10 @@ describe('ResetConfigurationDialog (docs/56 P6-06)', () => {
     expect(screen.getByLabelText('Confirmation text')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Resetting…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  });
+
+  it('keeps the visible instruction as the field\'s description, not just its name', () => {
+    renderDialog();
+    expect(screen.getByLabelText('Confirmation text')).toHaveAccessibleDescription(`Type ${RESET_CONFIGURATION_TEXT} to confirm`);
   });
 });

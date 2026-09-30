@@ -205,4 +205,45 @@ describe('ToastProvider (docs/56 P7-01)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('FYI')).not.toBeInTheDocument();
   });
+
+  it('keeps a warning that carries a message, but times a bare one-line warning', () => {
+    renderProvider();
+    act(() => {
+      api.addToast({ type: 'warning', title: 'Captured with warnings', message: '#ABC-1 is not synced; kept as text.' });
+      api.addToast({ type: 'warning', title: 'This day is read-only' });
+    });
+
+    advance(6000);
+    expect(screen.getByText('Captured with warnings')).toBeInTheDocument();
+    expect(screen.queryByText('This day is read-only')).not.toBeInTheDocument();
+  });
+
+  it('offers Dismiss all once two toasts are waiting to be dismissed, and leaves timed ones alone', () => {
+    renderProvider();
+    act(() => api.addToast({ type: 'error', title: 'First failure' }));
+    expect(screen.queryByRole('button', { name: /Dismiss all/ })).not.toBeInTheDocument();
+
+    act(() => {
+      api.addToast({ type: 'error', title: 'Second failure' });
+      api.addToast({ type: 'success', title: 'Saved' });
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss all (2)' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+  });
+
+  it('puts the labelled Notifications region ahead of the page, so Tab reaches a toast first', () => {
+    render(
+      <ToastProvider>
+        <Harness />
+        <button type="button">Page button</button>
+      </ToastProvider>
+    );
+    act(() => api.addToast({ type: 'error', title: 'Broken' }));
+
+    const region = screen.getByRole('region', { name: 'Notifications' });
+    const pageButton = screen.getByRole('button', { name: 'Page button' });
+    expect(region.compareDocumentPosition(pageButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

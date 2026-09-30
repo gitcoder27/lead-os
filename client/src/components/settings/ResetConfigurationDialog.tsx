@@ -65,7 +65,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
         </div>
         <p>
           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Kept:</span>{' '}
-          your tasks, notes, Desk items, team tracker history and app accounts.
+          your tasks (and the task-model setup they live in), notes, Desk items, team tracker history and app accounts.
         </p>
         <p style={{ color: backupBeforeReset ? 'var(--success)' : 'var(--warning)' }}>
           {backupBeforeReset
@@ -74,7 +74,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
         </p>
         <label className="block">
           <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            Type <strong style={{ color: 'var(--text-primary)' }}>{RESET_CONFIGURATION_TEXT}</strong> to confirm
+            <span id="reset-configuration-instruction">Type <strong style={{ color: 'var(--text-primary)' }}>{RESET_CONFIGURATION_TEXT}</strong> to confirm</span>
           </span>
           <input
             data-autofocus
@@ -84,6 +84,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
             autoComplete="off"
             spellCheck={false}
             aria-label="Confirmation text"
+            aria-describedby="reset-configuration-instruction"
             disabled={isResetting}
           />
         </label>

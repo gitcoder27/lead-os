@@ -10,7 +10,7 @@ interface Toast {
   title: string;
   message?: string;
   action?: { label: string; onClick: () => void };
-  /** Milliseconds before it dismisses itself; `0` keeps it until dismissed. Default: 5s, and errors persist. */
+  /** Milliseconds before it dismisses itself; `0` keeps it until dismissed. Default: 5s; errors, and warnings that carry a message, persist. */
   duration?: number;
 }
 
@@ -41,10 +41,13 @@ const DEFAULT_DURATION_MS = 5000;
 /**
  * docs/56 P7-01: a timed toast is a poor way to report a failure (it can vanish before it is
  * read or reached by keyboard), so errors stay until dismissed unless a caller says otherwise.
+ * A warning with a message carries detail worth reading ("Captured with warnings"), so it stays too;
+ * a bare one-line warning is timed like any notice.
  */
-function resolveDuration(toast: Pick<Toast, 'type' | 'duration'>): number {
+function resolveDuration(toast: Pick<Toast, 'type' | 'duration' | 'message'>): number {
   if (toast.duration !== undefined) return toast.duration;
-  return toast.type === 'error' ? 0 : DEFAULT_DURATION_MS;
+  if (toast.type === 'error' || (toast.type === 'warning' && toast.message)) return 0;
+  return DEFAULT_DURATION_MS;
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -56,6 +59,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const clearToasts = useCallback(() => {
     setToasts([]);
+  }, []);
+
+  const dismissPersistent = useCallback(() => {
+    setToasts((prev) => prev.filter((t) => resolveDuration(t) !== 0));
   }, []);
 
   const addToast = useCallback(
@@ -78,11 +85,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // polite live region.
   const alerts = toasts.filter((toast) => toast.type === 'error');
   const notices = toasts.filter((toast) => toast.type !== 'error');
+  const persistent = toasts.filter((toast) => resolveDuration(toast) === 0).length;
 
   return (
     <ToastContext.Provider value={{ addToast, removeToast, clearToasts }}>
-      {children}
-      <div className="fixed top-4 right-4 z-toast flex flex-col gap-2 max-w-sm">
+      {/* First in the DOM so a keyboard user reaches a toast (and can pause its timer) before the page;
+          it is fixed-position, so the visual layout is unaffected. */}
+      <section aria-label="Notifications" className="fixed top-4 right-4 z-toast flex flex-col gap-2 max-w-sm">
+        {persistent > 1 ? (
+          <button type="button" className="ui-btn ui-btn-sm self-end" onClick={dismissPersistent}>
+            Dismiss all ({persistent})
+          </button>
+        ) : null}
         <div className="flex flex-col gap-2" data-testid="toast-alerts">
           <AnimatePresence>
             {alerts.map((toast) => (
@@ -97,7 +111,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ))}
           </AnimatePresence>
         </div>
-      </div>
+      </section>
+      {children}
     </ToastContext.Provider>
   );
 }

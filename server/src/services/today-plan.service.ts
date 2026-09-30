@@ -23,7 +23,7 @@ export function addDaysToDate(iso: string, days: number): string {
  * A pin outlives later edits, so it is re-checked on every read: only my own open task that is not
  * parked or waiting on someone belongs on my plan. (Un-pinned it is just gone; the pin row stays.)
  */
-function stillMine(row: TaskRow, principal: TaskPrincipal): boolean {
+export function stillMine(row: TaskRow, principal: TaskPrincipal): boolean {
   return OPEN.includes(row.status as TaskStatus)
     && row.ownerType === "manager"
     && row.ownerId === principal.accountId

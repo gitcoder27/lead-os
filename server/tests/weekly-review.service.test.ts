@@ -91,7 +91,7 @@ describe("week range and default (§4)", () => {
     expect(response.today).toBe("2026-10-02");
     expect(response.nextWorkday).toBe("2026-10-05");
     expect(response.defaultedToLastWeek).toBe(false);
-    expect(response.sections.map((entry) => entry.id)).toEqual(["closed", "quiet", "slipped", "inbox", "undated", "laterNextWeek", "oneOnOnes", "people"]);
+    expect(response.sections.map((entry) => entry.id)).toEqual(["closed", "quiet", "slipped", "inbox", "undated", "laterNextWeek", "plannedNextWeek", "oneOnOnes", "people"]);
   });
 
   it("puts a Sunday evening in Auckland into the new week, and a Monday morning in Honolulu into the old one", async () => {
@@ -293,6 +293,72 @@ describe("loose ends", () => {
     await add("Later, no date", { later: true });
     const response = await build(FRIDAY);
     expect(titles(response, "laterNextWeek")).toEqual(["Back Monday", "Back Tuesday"]);
+  });
+});
+
+describe("next week: planned tasks and Monday's pins", () => {
+  it("lists my open planned tasks for next week, by plan date, and nothing else", async () => {
+    await add("Planned Wednesday", { scheduledOn: "2026-10-07" });
+    await add("Planned Monday", { scheduledOn: "2026-10-05" });
+    await add("Due next Thursday", { scheduledOn: null, dueAt: "2026-10-08T17:00:00.000Z" });
+    await add("Planned this week", { scheduledOn: "2026-10-02" });
+    await add("Planned in three weeks", { scheduledOn: "2026-10-23" });
+    await add("Waiting next week", { scheduledOn: "2026-10-06", waitingOn: { type: "text", label: "Legal" } });
+    await add("Parked", { later: true, hideUntil: "2026-10-06" });
+    await add("Priya's task", { scheduledOn: "2026-10-06", ownerType: "developer", ownerId: "dev-1" });
+    const done = await add("Done already", { scheduledOn: "2026-10-06" });
+    await close(done.taskKey, "2026-10-01T10:00:00.000Z");
+    const response = await build(FRIDAY);
+    expect(titles(response, "plannedNextWeek")).toEqual(["Planned Monday", "Planned Wednesday", "Due next Thursday"]);
+  });
+
+  it("starts at the next workday, so a mid-week review still offers what is left of this week", async () => {
+    await add("Planned Wednesday", { scheduledOn: "2026-09-30" });
+    await add("Planned Thursday", { scheduledOn: "2026-10-01" });
+    await add("Planned next Tuesday", { scheduledOn: "2026-10-06" });
+    const response = await build("2026-09-30T10:00:00.000Z");
+    expect(response.nextWorkday).toBe("2026-10-01");
+    expect(titles(response, "plannedNextWeek")).toEqual(["Planned Thursday", "Planned next Tuesday"]);
+  });
+
+  it("never lists a 1:1 topic or session action item planned next week", async () => {
+    await db.insert(configTable).values({ key: "one_on_one_enabled", value: "true" });
+    const detail = await oneOnOne.createSeries({ developerAccountId: "dev-1", cadence: "weekly" }, "default");
+    const action = (await oneOnOne.createSessionAction(detail.series.id, detail.upcoming!.id, { title: "Draft the promo case", scheduledOn: "2026-10-06" }, manager)).item.task;
+    const attached = await add("Existing task on the agenda", { scheduledOn: "2026-10-06" });
+    await oneOnOne.attachAgenda(detail.series.id, { taskId: attached.id }, manager);
+    await add("Ordinary planned task", { scheduledOn: "2026-10-06" });
+    const response = await build(FRIDAY);
+    expect(titles(response, "plannedNextWeek")).toEqual(["Ordinary planned task"]);
+    expect(action.taskId).toBeGreaterThan(0);
+  });
+
+  it("returns what is pinned for the next workday, in pin order, dropping tasks that closed or were reassigned", async () => {
+    const first = await add("Q4 roadmap draft");
+    const gone = await add("Finished before Monday");
+    const reassigned = await add("Handed to Priya");
+    const second = await add("Calibration prep");
+    await taskService.setTop3(manager, "2026-10-05", [first.taskKey, gone.taskKey, reassigned.taskKey]);
+    await taskService.setTop3(manager, "2026-10-06", [second.taskKey]);
+    await close(gone.taskKey, "2026-10-01T10:00:00.000Z");
+    await db.update(tasks).set({ ownerType: "developer", ownerId: "dev-1" }).where(eq(tasks.taskKey, reassigned.taskKey));
+    const response = await build(FRIDAY);
+    expect(response.nextWorkdayTop3).toEqual([{ taskKey: first.taskKey, title: "Q4 roadmap draft" }]);
+    // Pins for another day are not returned.
+    expect((await build("2026-10-05T10:00:00.000Z", { week: "2026-10-05" })).nextWorkdayTop3).toEqual([{ taskKey: second.taskKey, title: "Calibration prep" }]);
+  });
+
+  it("keeps a pinned 1:1 task in the list but flags it, so it is never reported", async () => {
+    await db.insert(configTable).values({ key: "one_on_one_enabled", value: "true" });
+    const detail = await oneOnOne.createSeries({ developerAccountId: "dev-1", cadence: "weekly" }, "default");
+    const topic = (await oneOnOne.attachAgenda(detail.series.id, { title: "Career growth chat" }, manager)).task;
+    const plain = await add("Calibration prep");
+    await taskService.setTop3(manager, "2026-10-05", [topic.taskKey, plain.taskKey]);
+    const response = await build(FRIDAY);
+    expect(response.nextWorkdayTop3).toEqual([
+      { taskKey: topic.taskKey, title: "Career growth chat", oneOnOne: true },
+      { taskKey: plain.taskKey, title: "Calibration prep" },
+    ]);
   });
 });
 

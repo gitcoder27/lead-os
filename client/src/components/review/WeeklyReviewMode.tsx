@@ -16,10 +16,12 @@ import {
   withLineIncluded,
   type ReviewStepContext,
 } from '@/lib/weekly-review';
-import type { WeeklyReviewResponse } from '@/types';
+import type { TodayActionTarget, WeeklyReviewResponse } from '@/types';
 import { ReviewHeader } from './ReviewHeader';
 import { ReviewStepsRail } from './ReviewStepsRail';
 import { useReviewDecisions } from './useReviewDecisions';
+import { useReviewPins } from './useReviewPins';
+import { useReviewSessions } from './useReviewSessions';
 import { REVIEW_STEPS, type ReviewStepEntry } from './review-steps';
 import './review.css';
 
@@ -28,6 +30,8 @@ export interface WeeklyReviewModeProps {
   week?: string;
   onWeekChange: (week: string | undefined) => void;
   onExit: () => void;
+  /** Open a person or a 1:1 on the Team page (App's target handler); Back returns to the review. */
+  onOpenTarget?: (target: TodayActionTarget) => void;
   /** The steps to offer; defaults to the shipped ones (tests inject their own). */
   steps?: ReviewStepEntry[];
 }
@@ -44,7 +48,7 @@ const GENERAL_KEYS: ShortcutGroup['keys'] = [
  * rail draw at once; the body loads. The read model is a snapshot, so rows never reshuffle while a
  * step is open.
  */
-export function WeeklyReviewMode({ week, onWeekChange, onExit, steps = REVIEW_STEPS }: WeeklyReviewModeProps) {
+export function WeeklyReviewMode({ week, onWeekChange, onExit, onOpenTarget, steps = REVIEW_STEPS }: WeeklyReviewModeProps) {
   const query = useWeeklyReview(week);
 
   if (query.data) {
@@ -56,6 +60,7 @@ export function WeeklyReviewMode({ week, onWeekChange, onExit, steps = REVIEW_ST
         steps={steps}
         onWeekChange={onWeekChange}
         onExit={onExit}
+        onOpenTarget={onOpenTarget}
       />
     );
   }
@@ -139,15 +144,17 @@ function ReviewSession({
   steps,
   onWeekChange,
   onExit,
+  onOpenTarget,
 }: {
   review: WeeklyReviewResponse;
   retry: () => void;
   steps: ReviewStepEntry[];
   onWeekChange: (week: string | undefined) => void;
   onExit: () => void;
+  onOpenTarget?: (target: TodayActionTarget) => void;
 }) {
   const reduceMotion = useReducedMotion();
-  const { openTask: openTaskDrawer } = useQuickActions();
+  const { openTask: openTaskDrawer, openCapture } = useQuickActions();
   const openTask = useCallback((taskKey: string) => openTaskDrawer?.(taskKey), [openTaskDrawer]);
   const developers = useDevelopers();
   const { user } = useAuth();
@@ -171,6 +178,13 @@ function ReviewSession({
   );
 
   const { decisions, decide, undoDecision, undoLast } = useReviewDecisions({ patch, announce });
+  const { pins, pin, unpin } = useReviewPins(review, announce);
+  const { skippedSessions, skipSession } = useReviewSessions(announce);
+  const openTarget = useCallback((target: TodayActionTarget) => {
+    flush();
+    onOpenTarget?.(target);
+  }, [flush, onOpenTarget]);
+  const capture = useCallback(() => openCapture(), [openCapture]);
 
   const ctx = useMemo<ReviewStepContext>(() => ({
     review,
@@ -187,10 +201,17 @@ function ReviewSession({
     decisions,
     decide,
     undoDecision,
+    pins,
+    pin,
+    unpin,
+    skippedSessions,
+    skipSession,
+    openTarget,
+    capture,
     selfAccountId: user?.accountId,
     retry,
     announce,
-  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, user?.accountId, retry, announce]);
+  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, pins, pin, unpin, skippedSessions, skipSession, openTarget, capture, user?.accountId, retry, announce]);
 
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= visible.length || next === index) return;

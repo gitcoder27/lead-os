@@ -7,6 +7,7 @@ import type {
   WeeklyReviewCheckInRow,
   WeeklyReviewOneOnOneRow,
   WeeklyReviewPastWeek,
+  WeeklyReviewPin,
   WeeklyReviewPersonRow,
   WeeklyReviewRange,
   WeeklyReviewResponse,
@@ -25,8 +26,9 @@ import { oneOnOneTaskIds } from "./one-on-one-tasks";
 import { getParticipatingDeveloperIds } from "./developer-participation.service";
 import { SettingsService } from "./settings.service";
 import { TaskEventsService } from "./task-events.service";
-import { TaskViewsService } from "./task-views.service";
-import type { TaskPrincipal } from "./task.service";
+import { TaskViewsService, taskPlanDate } from "./task-views.service";
+import { stillMine } from "./today-plan.service";
+import { TaskService, type TaskPrincipal } from "./task.service";
 import { addDaysToIsoDay, isValidTimeZone, toZonedIsoDay } from "./today-clock";
 import { workingDaysBetween } from "./tracker-freshness";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -79,6 +81,7 @@ export class WeeklyReviewService {
     private readonly events = new TaskEventsService(),
     private readonly settings = new SettingsService(),
     private readonly oneOnOne = new OneOnOneService(),
+    private readonly taskService = new TaskService(),
   ) {}
 
   async build(principal: TaskPrincipal, query: WeeklyReviewQuery = {}): Promise<WeeklyReviewResponse> {
@@ -110,13 +113,15 @@ export class WeeklyReviewService {
     ]);
 
     const ctx: SectionContext = { principal, workspaceId, timeZone, today, range, excluded, managerTouchDays: rules.managerTouchDays };
-    const [closed, quiet, slipped, inbox, undated, laterNextWeek] = await Promise.all([
+    const [closed, quiet, slipped, inbox, undated, laterNextWeek, plannedNextWeek, nextWorkdayTop3] = await Promise.all([
       this.closed(ctx),
       this.quiet(ctx),
       this.slipped(ctx),
       this.inbox(ctx),
       this.undated(ctx),
       this.laterNextWeek(ctx),
+      this.plannedNextWeek(ctx, nextWorkdayAfter(today)),
+      this.nextWorkdayPins(ctx, nextWorkdayAfter(today)),
     ]);
     // Lanes are exclusive, but the Waiting lens also catches blocked and legacy rows: a quiet row is
     // decided once, in step 2.
@@ -130,6 +135,7 @@ export class WeeklyReviewService {
       { id: "inbox", status: "ready", rows: notQuiet(inbox) },
       { id: "undated", status: "ready", rows: notQuiet(undated) },
       { id: "laterNextWeek", status: "ready", rows: laterNextWeek },
+      { id: "plannedNextWeek", status: "ready", rows: plannedNextWeek },
       await this.oneOnOnesSection(ctx, oneOnOneEnabled),
       roster.ok ? await this.peopleSection(ctx, roster.rows) : { id: "people", status: "unavailable", rows: [] },
     ];
@@ -147,6 +153,7 @@ export class WeeklyReviewService {
       rosterSize: roster.rows.length,
       oneOnOneEnabled,
       sections,
+      nextWorkdayTop3,
       saved: await this.getSaved(principal, range.start),
     };
   }
@@ -299,6 +306,30 @@ export class WeeklyReviewService {
     return rows
       .filter((row) => row.hideUntil && row.hideUntil >= ctx.range.nextStart && row.hideUntil <= ctx.range.nextEnd)
       .sort((a, b) => (a.hideUntil ?? "").localeCompare(b.hideUntil ?? "") || a.id - b.id);
+  }
+
+  /**
+   * My open planned tasks from the next workday to the end of the week after the one under review.
+   * On a Friday that is exactly next week; reviewing mid-week (or last week on a Monday) it starts
+   * at the next workday, so the candidates match the day the top 3 is for.
+   */
+  private async plannedNextWeek(ctx: SectionContext, from: string): Promise<WeeklyReviewTaskRow[]> {
+    const rows = await this.tasks(ctx, { filters: { owner: "me", lane: "planned", horizon: "upcoming" }, sort: "scheduled" });
+    return rows.filter((row) => {
+      const plan = taskPlanDate(row, ctx.timeZone).date;
+      return plan !== null && plan >= from && plan <= ctx.range.nextEnd;
+    });
+  }
+
+  /**
+   * What is already pinned for the next workday. A pinned 1:1 task is kept (dropping it would lose
+   * the manager's pin when the step saves the list) but flagged so nothing reports it.
+   */
+  private async nextWorkdayPins(ctx: SectionContext, day: string): Promise<WeeklyReviewPin[]> {
+    const rows = await this.taskService.top3Rows(ctx.principal.accountId, day, ctx.workspaceId);
+    return rows
+      .filter((row) => stillMine(row, ctx.principal))
+      .map((row) => ({ taskKey: row.taskKey, title: row.title, ...(ctx.excluded.has(row.id) && { oneOnOne: true as const }) }));
   }
 
   // ── People sources: a failure marks the section, never the response ──

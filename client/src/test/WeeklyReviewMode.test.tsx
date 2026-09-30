@@ -73,6 +73,7 @@ function makeReview(overrides: Partial<WeeklyReviewResponse> = {}, closed: Weekl
       { id: 'closed', status: 'ready', rows: closed },
       { id: 'slipped', status: 'ready', rows: [row(9, 'Slipped one', { status: 'open', closedAt: null })] },
     ],
+    nextWorkdayTop3: [],
     saved: null,
     ...overrides,
   };

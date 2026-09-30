@@ -165,3 +165,13 @@ export function useCreateOneOnOneSessionAction(seriesId: number | undefined) {
     onSuccess: invalidate,
   });
 }
+
+/** Weekly review: skip one scheduled session (`PATCH …/sessions/:id` with `status: "skipped"`), whichever series it is in. */
+export function useSkipOneOnOneSession() {
+  const invalidate = useInvalidateOneOnOnes();
+  return useMutation({
+    mutationFn: ({ seriesId, sessionId }: { seriesId: number; sessionId: number }) =>
+      api.patch<OneOnOneSeriesDetail>(`/one-on-ones/${seriesId}/sessions/${sessionId}`, { status: 'skipped' } satisfies OneOnOneSessionUpdateRequest),
+    onSuccess: invalidate,
+  });
+}

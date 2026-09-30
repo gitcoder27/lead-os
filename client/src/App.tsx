@@ -1275,6 +1275,7 @@ function AppContent() {
               week={reviewMode.week}
               onWeekChange={(week) => handleReviewModeChange({ week }, { replace: true })}
               onExit={() => handleReviewModeChange(undefined)}
+              onOpenTarget={handleOpenTodayTarget}
             />
           </Suspense>
         ) : (

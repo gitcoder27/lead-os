@@ -1,6 +1,9 @@
 import { format, parseISO } from 'date-fns';
 import type { DecisionChoice } from '@/lib/weekly-review-decisions';
 import type {
+  TodayActionTarget,
+  WeeklyReviewOneOnOneRow,
+  WeeklyReviewPin,
   WeeklyReviewResponse,
   WeeklyReviewSavedState,
   WeeklyReviewSection,
@@ -89,6 +92,18 @@ export interface ReviewStepContext {
   decide: (row: WeeklyReviewTaskRow, choice: DecisionChoice) => void;
   /** Take one back (the inverse write), leaving the row undecided again. */
   undoDecision: (taskKey: string) => void;
+  /** The next workday's top 3 (held for the session; changes are written at once). */
+  pins: WeeklyReviewPin[];
+  /** Pin a task; false (and a spoken reason) when the top 3 is full. */
+  pin: (taskKey: string, title: string) => boolean;
+  unpin: (taskKey: string) => void;
+  /** 1:1 sessions skipped in this review (the snapshot still lists them as scheduled). */
+  skippedSessions: ReadonlySet<number>;
+  skipSession: (session: WeeklyReviewOneOnOneRow) => void;
+  /** Open a person, a 1:1 or another surface (leaving the review; Back returns to it). */
+  openTarget: (target: TodayActionTarget) => void;
+  /** Open the global capture dialog. */
+  capture: () => void;
   /** The signed-in manager's account id (their own tasks group under "Me"). */
   selfAccountId?: string;
   /** Fetch the week again (the inline "Couldn't load · Retry" note). */

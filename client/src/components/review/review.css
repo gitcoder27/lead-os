@@ -566,3 +566,78 @@
 
 /* Today's phone rule hides every second `.ui-chip`; here the second chip is the reason the row is in the list. */
 .review-row-meta .ui-chip + .ui-chip { display: inline-flex; }
+
+/* ── People and Next week ────────────────────────────────────────────── */
+
+.review-people-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.review-row-avatar { align-self: center; margin-top: 0; }
+
+.review-slot {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  min-height: 46px;
+}
+
+.review-slot-mark {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+
+.review-slot[data-filled='true'] .review-slot-mark {
+  color: var(--on-accent);
+  background: var(--accent-solid);
+  box-shadow: none;
+  animation: review-pop 180ms var(--ease-out);
+}
+
+/* An empty slot is a quiet placeholder line, not another row of copy. */
+.review-slot-empty {
+  display: block;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px);
+  opacity: 0.7;
+}
+
+.review-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+  padding: 12px 10px 4px;
+  list-style: none;
+}
+
+.review-day {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+}
+
+.review-day-name { font-size: 11.5px; font-weight: 550; color: var(--text-muted); }
+
+.review-day-count {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.review-day[data-empty='true'] .review-day-count { color: var(--text-disabled); font-weight: 500; }
+
+.review-later-row .review-row-end { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .review-slot[data-filled='true'] .review-slot-mark { animation: none; }
+}

@@ -308,7 +308,7 @@ API (all manager-only, Zod-validated, thin routes; services hold the logic; cont
 
 | Route | Purpose |
 |---|---|
-| `GET /api/review/week?week=&tz=` | `WeeklyReviewResponse`: range, sections with rows and `TaskSignals`, `sourceStatus`, saved state |
+| `GET /api/review/week?week=&tz=` | `WeeklyReviewResponse`: range, sections with rows and `TaskSignals` (each with its own `status`), `nextWorkday`, `nextWorkdayTop3` (what is pinned for that day), saved state. `plannedNextWeek` lists my open planned tasks from the next workday to the end of next week (1:1 tasks excluded) |
 | `PUT /api/review/week/:weekStart` | save `step`, merge `decisions`, set `excluded`, `reportMarkdown`, `completed`, `dismissed` |
 | `GET /api/review/weeks?limit=12` | completed weeks with `report_markdown` (Past updates) |
 | `GET/PUT /api/notifications/settings` | prefs; the webhook URL is write-only (`hasTeamsWebhook`, `teamsHost` returned) |

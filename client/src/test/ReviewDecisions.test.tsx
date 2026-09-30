@@ -75,6 +75,7 @@ function makeReview(sections?: WeeklyReviewResponse['sections'], saved: WeeklyRe
       { id: 'inbox', status: 'ready', rows: [inbox] },
       { id: 'undated', status: 'ready', rows: [undated] },
     ],
+    nextWorkdayTop3: [],
     saved,
   };
 }

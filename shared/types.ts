@@ -2998,6 +2998,7 @@ export type WeeklyReviewSectionId =
   | "inbox"
   | "undated"
   | "laterNextWeek"
+  | "plannedNextWeek"
   | "oneOnOnes"
   | "people"
   | "checkIns";
@@ -3053,7 +3054,7 @@ interface WeeklyReviewSectionBase {
   status: WeeklyReviewSourceStatus;
 }
 
-export type WeeklyReviewTaskSectionId = "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek";
+export type WeeklyReviewTaskSectionId = "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek" | "plannedNextWeek";
 
 /** One task section per id (distributed, so `Extract<WeeklyReviewSection, { id: "closed" }>` works). */
 type WeeklyReviewTaskSection<Id extends WeeklyReviewTaskSectionId = WeeklyReviewTaskSectionId> = Id extends WeeklyReviewTaskSectionId
@@ -3076,6 +3077,14 @@ export interface WeeklyReviewRange {
   nextEnd: string;
 }
 
+/** A task pinned to the next workday's top 3. */
+export interface WeeklyReviewPin {
+  taskKey: string;
+  title: string;
+  /** A 1:1 topic or action (docs/59 §4): shown to the manager who pinned it, never reported. */
+  oneOnOne?: true;
+}
+
 export interface WeeklyReviewResponse {
   /** The manager's local day the review was built for. */
   today: string;
@@ -3093,6 +3102,8 @@ export interface WeeklyReviewResponse {
   oneOnOneEnabled: boolean;
   /** One entry per section, in step order; `checkIns` is present only in collab mode. */
   sections: WeeklyReviewSection[];
+  /** The tasks already pinned for `nextWorkday` (still open and mine), in pin order. */
+  nextWorkdayTop3: WeeklyReviewPin[];
   /** The manager's saved progress for this week (docs/59 §9); null until something was saved. */
   saved: WeeklyReviewSavedState | null;
 }

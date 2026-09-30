@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Lock, MessageSquarePlus, Send } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAddMyDayTaskEvent, useAddTaskEvent } from '@/hooks/useTasks';
+import { useScopedStorageKey } from '@/lib/scoped-storage';
 
 type ComposerMode = 'manager' | 'developer';
 type ManagerEventType = 'update' | 'instruction' | 'decision' | 'blocker';
@@ -21,6 +22,7 @@ const DEVELOPER_TYPES: Array<{ value: DeveloperEventType; label: string }> = [
 
 interface TaskUpdateComposerProps {
   taskKey: string;
+  person?: { accountId: string; name: string };
   mode: ComposerMode;
   /** Manager events only — recorded in event meta. */
   via?: 'standup' | 'task_drawer';
@@ -38,11 +40,56 @@ interface TaskUpdateComposerProps {
   registerComposer?: (api: { expand: () => void; focus: () => void; togglePrivate: () => void } | null) => void;
   autoFocus?: boolean;
   /** Fires after an event posts successfully (standup session log, docs/50). */
-  onPosted?: (event: { type: ManagerEventType | DeveloperEventType; private: boolean }) => void;
+  onPosted?: (event: { type: ManagerEventType | DeveloperEventType; private: boolean; accountId?: string }) => void;
+  onEscape?: () => void;
 }
 
-export function TaskUpdateComposer({
+export function TaskUpdateComposer(props: TaskUpdateComposerProps) {
+  const storageKey = useScopedStorageKey(`task-update:${props.mode}:${props.via ?? 'default'}:${props.taskKey}`);
+  return <OwnedTaskUpdateComposer key={storageKey} {...props} storageKey={storageKey} />;
+}
+
+interface UpdateDraft {
+  date?: string;
+  person?: { accountId: string; name: string };
+  body: string;
+  type: ManagerEventType | DeveloperEventType;
+  blockerAction: 'raised' | 'cleared';
+  private: boolean;
+  requestId: string;
+  submitted: boolean;
+}
+
+const volatileDrafts = new Map<string, UpdateDraft>();
+
+export function taskUpdateDrafts(prefix: string): Array<{ taskKey: string; person?: UpdateDraft['person'] }> {
+  try {
+    return Object.keys(sessionStorage).filter((key) => key.startsWith(prefix)).flatMap((key) => {
+      const draft = readDraft(key);
+      return draft.body.trim() ? [{ taskKey: key.slice(prefix.length), person: draft.person }] : [];
+    });
+  } catch {
+    return [...volatileDrafts].filter(([key, draft]) => key.startsWith(prefix) && draft.body.trim()).map(([key, draft]) => ({ taskKey: key.slice(prefix.length), person: draft.person }));
+  }
+}
+
+function newDraft(): UpdateDraft {
+  return { body: '', type: 'update', blockerAction: 'raised', private: false, requestId: crypto.randomUUID(), submitted: false };
+}
+
+function readDraft(key: string): UpdateDraft {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(key) ?? 'null') as UpdateDraft | null;
+    if (value && typeof value.body === 'string' && typeof value.requestId === 'string'
+      && MANAGER_TYPES.some((option) => option.value === value.type)
+      && ['raised', 'cleared'].includes(value.blockerAction)) return value;
+  } catch { return volatileDrafts.get(key) ?? newDraft(); }
+  return newDraft();
+}
+
+function OwnedTaskUpdateComposer({
   taskKey,
+  person,
   mode,
   via,
   date,
@@ -54,18 +101,50 @@ export function TaskUpdateComposer({
   registerComposer,
   autoFocus,
   onPosted,
-}: TaskUpdateComposerProps) {
+  onEscape,
+  storageKey,
+}: TaskUpdateComposerProps & { storageKey: string }) {
   const { addToast } = useToast();
-  const [draft, setDraft] = useState('');
-  const [type, setType] = useState<ManagerEventType | DeveloperEventType>('update');
-  const [blockerAction, setBlockerAction] = useState<'raised' | 'cleared'>('raised');
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [expanded, setExpanded] = useState(!collapsed);
-  const requestIdRef = useRef<string>(crypto.randomUUID());
+  const [value, setValue] = useState<UpdateDraft>(() => {
+    const stored = readDraft(storageKey);
+    return { ...stored, person: stored.person ?? person, date: stored.date ?? date };
+  });
+  const valueRef = useRef(value);
+  const { body: draft, type, blockerAction, private: isPrivate } = value;
+  const [expanded, setExpanded] = useState(!collapsed || !!value.body);
+  const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState(value.submitted);
+  const submitting = useRef(false);
+  const [storageFailed, setStorageFailed] = useState(false);
+  const change = useCallback((updates: Partial<UpdateDraft>) => {
+    const next = { ...valueRef.current, ...updates };
+    valueRef.current = next;
+    setValue(next);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(next)); }
+    catch { volatileDrafts.set(storageKey, next); setStorageFailed(true); }
+    window.dispatchEvent(new Event('task-update-drafts-changed'));
+  }, [storageKey]);
+  const setDraft = (body: string) => change({ body });
+  const setType = (next: UpdateDraft['type']) => change({ type: next });
+  const setBlockerAction = (next: UpdateDraft['blockerAction']) => change({ blockerAction: next });
+  const togglePrivate = useCallback(() => change({ private: !valueRef.current.private }), [change]);
   const localRef = useRef<HTMLTextAreaElement | null>(null);
   const addManagerEvent = useAddTaskEvent(taskKey);
   const addMyDayEvent = useAddMyDayTaskEvent(taskKey);
-  const pending = addManagerEvent.isPending || addMyDayEvent.isPending;
+  const pending = sending || addManagerEvent.isPending || addMyDayEvent.isPending;
+
+  useEffect(() => {
+    const saved = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== storageKey) return;
+      const next = { ...readDraft(storageKey), person: valueRef.current.person ?? person };
+      valueRef.current = next;
+      setValue(next);
+      setFailed(false);
+      if (collapsed) setExpanded(false);
+    };
+    window.addEventListener('task-update-saved', saved);
+    return () => window.removeEventListener('task-update-saved', saved);
+  }, [storageKey, collapsed, person]);
 
   const setRefs = (el: HTMLTextAreaElement | null) => {
     localRef.current = el;
@@ -83,55 +162,63 @@ export function TaskUpdateComposer({
       focus: () => localRef.current?.focus(),
       togglePrivate: () => {
         setExpanded(true);
-        setIsPrivate((value) => !value);
+        if (!valueRef.current.submitted) togglePrivate();
       },
     });
     return () => registerComposer?.(null);
-  }, [registerComposer]);
+  }, [registerComposer, togglePrivate]);
 
-  const submit = () => {
+  const submit = async () => {
     const body = draft.trim();
-    if (!body || pending) {
+    if (!body || pending || submitting.current || (mode === 'developer' && !date)) {
       return;
     }
-    const requestId = requestIdRef.current;
-    const onError = (err: Error) => addToast(err.message, 'error');
-    const posted = { type, private: isPrivate };
-    const onSuccess = () => {
-      onPosted?.(posted);
-      setDraft('');
-      setType('update');
-      setBlockerAction('raised');
-      setIsPrivate(false);
-      requestIdRef.current = crypto.randomUUID();
-      if (collapsed) {
-        setExpanded(false);
-      }
-    };
-    if (mode === 'developer') {
-      if (!date) {
-        return;
-      }
-      addMyDayEvent.mutate(
-        { date, type: type as DeveloperEventType, body, blockerAction: type === 'blocker' ? blockerAction : undefined, requestId },
-        { onSuccess, onError },
-      );
-      return;
-    }
-    addManagerEvent.mutate(
-      {
+    const requestId = value.requestId;
+    submitting.current = true;
+    setSending(true);
+    setFailed(false);
+    change({ submitted: true });
+    const posted = { type, private: isPrivate, accountId: value.person?.accountId };
+    try {
+      if (mode === 'developer') {
+        await addMyDayEvent.mutateAsync({ date: value.date ?? date!, type: type as DeveloperEventType, body, blockerAction: type === 'blocker' ? blockerAction : undefined, requestId });
+      } else {
+        await addManagerEvent.mutateAsync({
         type: type as ManagerEventType,
         body,
         visibility: isPrivate ? 'private' : undefined,
         blockerAction: type === 'blocker' ? blockerAction : undefined,
         via,
         requestId,
-      },
-      { onSuccess, onError },
-    );
+        });
+      }
+      try { sessionStorage.removeItem(storageKey); } catch { setStorageFailed(true); }
+      volatileDrafts.delete(storageKey);
+      const next = { ...newDraft(), person: value.person, date };
+      valueRef.current = next;
+      setValue(next);
+      window.dispatchEvent(new CustomEvent('task-update-saved', { detail: storageKey }));
+      window.dispatchEvent(new Event('task-update-drafts-changed'));
+      onPosted?.(posted);
+    } catch (error) {
+      setFailed(true);
+      addToast(error instanceof Error ? error.message : 'Update was not acknowledged. Retry to confirm it.', 'error');
+    } finally {
+      submitting.current = false;
+      setSending(false);
+    }
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.blur();
+      if (collapsed) setExpanded(false);
+      onEscape?.();
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       submit();
@@ -181,9 +268,11 @@ export function TaskUpdateComposer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
+      {value.person && <p className="mb-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{taskKey} · {value.person.name}</p>}
       <textarea
         ref={setRefs}
         value={draft}
+        readOnly={value.submitted}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
         onClick={(event) => event.stopPropagation()}
@@ -200,6 +289,7 @@ export function TaskUpdateComposer({
             <button
               key={option.value}
               type="button"
+              disabled={value.submitted}
               onClick={() => setType(option.value)}
               className="rounded-md px-2 py-0.5 text-[12px] font-semibold transition-colors"
               style={{
@@ -218,6 +308,7 @@ export function TaskUpdateComposer({
               <button
                 key={action}
                 type="button"
+                disabled={value.submitted}
                 onClick={() => setBlockerAction(action)}
                 className="rounded-md px-2 py-0.5 text-[12px] font-semibold capitalize transition-colors"
                 style={{
@@ -234,7 +325,8 @@ export function TaskUpdateComposer({
         {mode === 'manager' && (
           <button
             type="button"
-            onClick={() => setIsPrivate((value) => !value)}
+            disabled={value.submitted}
+            onClick={togglePrivate}
             className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[12px] font-semibold transition-colors"
             style={{
               background: isPrivate ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'var(--bg-tertiary)',
@@ -255,9 +347,11 @@ export function TaskUpdateComposer({
           style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
         >
           <Send size={11} />
-          {pending ? 'Saving…' : 'Post'}
+          {pending ? 'Saving…' : failed ? 'Retry post' : 'Post'}
         </button>
       </div>
+      {failed && <p role="alert" className="mt-1 text-xs">Not acknowledged. Retry the original update to confirm it was saved.</p>}
+      {storageFailed && <p role="alert" className="mt-1 text-xs">Draft recovery is unavailable. Keep this page open until the update is saved.</p>}
     </div>
   );
 }

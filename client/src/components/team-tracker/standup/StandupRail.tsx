@@ -1,6 +1,5 @@
 import { TriangleAlert, Bell, Check, ListChecks } from 'lucide-react';
 import type { TrackerDeveloperDay } from '@/types';
-import { openTasksFor } from '@/lib/standup';
 import { TrackerStatusPill } from '../TrackerStatusPill';
 import { Avatar, Kbd } from './StandupPrimitives';
 
@@ -12,6 +11,7 @@ export function StandupRail({
   days,
   currentId,
   reviewed,
+  acknowledged,
   flagged,
   wrapUpActive,
   onSelect,
@@ -20,6 +20,7 @@ export function StandupRail({
   days: TrackerDeveloperDay[];
   currentId: string | null;
   reviewed: Set<string>;
+  acknowledged: Set<string>;
   flagged: Set<string>;
   wrapUpActive: boolean;
   onSelect: (accountId: string) => void;
@@ -49,14 +50,15 @@ export function StandupRail({
           const active = !wrapUpActive && id === currentId;
           const isReviewed = reviewed.has(id);
           const isFlagged = flagged.has(id);
-          const openCount = openTasksFor(day).length;
           return (
             <button
               key={id}
               type="button"
               role="option"
               aria-selected={active}
-              aria-label={`${day.developer.displayName}${isReviewed ? ', reviewed' : ''}${isFlagged ? ', flagged' : ''}`}
+              aria-label={`${day.developer.displayName}${isReviewed ? ', visited' : ''}${isReviewed && !acknowledged.has(id) ? ', not saved' : ''}${isFlagged ? ', flagged' : ''}`}
+              tabIndex={active ? 0 : -1}
+              title={day.developer.displayName}
               onClick={() => onSelect(id)}
               className="relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:shadow-[inset_0_0_0_2px_var(--accent)]"
               style={{ background: active ? 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' : undefined }}
@@ -66,10 +68,10 @@ export function StandupRail({
               )}
               <span className="relative">
                 <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={30} ring={active} />
-                {isReviewed && (
+                {isReviewed && acknowledged.has(id) && (
                   <span
                     className="absolute -bottom-1 -right-1 flex h-[14px] w-[14px] items-center justify-center rounded-full"
-                    style={{ background: 'var(--success)', color: 'var(--bg-secondary)', border: '2px solid var(--bg-secondary)' }}
+                    style={{ background: 'var(--text-muted)', color: 'var(--bg-secondary)', border: '2px solid var(--bg-secondary)' }}
                     aria-hidden="true"
                   >
                     <Check size={8} strokeWidth={4} />
@@ -84,10 +86,7 @@ export function StandupRail({
                   {day.developer.displayName}
                 </span>
                 <span className="mt-1 flex items-center gap-1.5">
-                  <TrackerStatusPill status={day.status} />
-                  <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                    {openCount} open
-                  </span>
+                  {day.status !== 'on_track' && <TrackerStatusPill status={day.status} />}
                 </span>
               </span>
               <span className="hidden shrink-0 flex-col items-end gap-1 md:flex">
@@ -102,7 +101,7 @@ export function StandupRail({
       <div className="border-t p-2" style={{ borderColor: 'var(--border)' }}>
         {allReviewed && !wrapUpActive && (
           <div className="mb-2 hidden rounded-md px-2 py-1.5 text-[12px] font-medium md:block" style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' }}>
-            Everyone reviewed — wrap up when ready.
+            All people visited
           </div>
         )}
         <button

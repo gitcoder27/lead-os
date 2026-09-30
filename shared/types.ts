@@ -1045,6 +1045,7 @@ export interface ManagerTask extends DeveloperTask {
  * synthesized legacy rows.
  */
 export interface SurfaceTaskFields {
+  checkInRequest?: boolean;
   position: number;
   originDate: string;
   itemType: TrackerItemType;
@@ -1846,6 +1847,7 @@ export interface StandupFeedEntry {
   type?: TaskEventType;
   body?: string | null;
   authorType?: TaskEvent["author"]["type"];
+  authorId?: string;
   /** Check-in summary text (kind === "checkin"). */
   summary?: string;
   /** docs/50 S6: task-status transition for `status` events. */
@@ -1864,6 +1866,8 @@ export interface StandupFeedResponse {
   windowHours: number;
   /** True when windowStart is a real sealed standup, not the rolling fallback. */
   anchoredToSession?: boolean;
+  windowEnd?: string;
+  truncated?: boolean;
 }
 
 // ── Sealed standup sessions (docs/50 v2) ──────────────────────────────────
@@ -1894,6 +1898,7 @@ export interface RecordStandupSessionRequest {
   /** ISO timestamp of the first session action (≈ session start). */
   startedAt: string;
   reviewed: string[];
+  feedSeenThrough?: Record<string, string>;
   flagged: string[];
   /** docs/56 P1-07: optional one-line reason per flagged accountId. */
   flagReasons?: Record<string, string>;
@@ -1925,6 +1930,7 @@ export interface StandupSessionRecord {
 export interface RecordStandupReviewsRequest {
   date: string;
   accountIds: string[];
+  reviewedAt?: Record<string, string>;
 }
 
 export interface RecordStandupReviewsResponse {

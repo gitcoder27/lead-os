@@ -45,8 +45,8 @@ export function TodayStandupCard({ standup, row, completedOnly = false, onOpenTa
         <div className="min-w-0 flex-1">
           <h2 className="today-section-title">Standup{endedAt ? ` ✓ ${endedAt}` : ' ✓'}</h2>
           <p className="today-standup-meta">
-            {standup.reviewedCount} reviewed
-            {standup.flaggedCount > 0 ? ` · ${standup.flaggedCount} flagged` : ''}
+            {standup.reviewedCount} visited in today's rounds
+            {standup.flaggedCount > 0 ? ` · ${standup.flaggedCount} flagged in those rounds` : ''}
           </p>
           {standup.flagged.length > 0 ? (
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">

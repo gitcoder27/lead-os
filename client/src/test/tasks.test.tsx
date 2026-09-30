@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import type { TaskEvent } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
@@ -37,8 +37,8 @@ vi.mock('@/hooks/useTasks', () => ({
     fetchNextPage: vi.fn(),
     refetch: vi.fn(),
   }),
-  useAddTaskEvent: () => ({ mutate: mockAddTaskEventMutate, isPending: false }),
-  useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, isPending: false }),
+  useAddTaskEvent: () => ({ mutateAsync: mockAddTaskEventMutate, isPending: false }),
+  useAddMyDayTaskEvent: () => ({ mutateAsync: mockAddMyDayTaskEventMutate, isPending: false }),
   useUpdateTaskEventVisibility: () => ({ mutate: mockUpdateVisibilityMutate, isPending: false }),
   useRedactTaskEvent: () => ({ mutate: mockRedactMutate, isPending: false }),
 }));
@@ -155,8 +155,39 @@ describe('TaskPicker', () => {
 
 describe('TaskUpdateComposer', () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     mockAddTaskEventMutate.mockReset();
     mockAddMyDayTaskEventMutate.mockReset();
+  });
+
+  it('keeps drafts and delayed success bound to the submitted task', async () => {
+    let success!: () => void;
+    mockAddTaskEventMutate.mockImplementation(() => new Promise<void>((resolve) => { success = resolve; }));
+    const { rerender } = render(<TaskUpdateComposer taskKey="T-5" mode="manager" via="standup" />, { wrapper: Wrapper });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'First task draft' } });
+    fireEvent.click(screen.getByRole('button', { name: /private/i }));
+    fireEvent.click(screen.getByRole('button', { name: /post/i }));
+    rerender(<TaskUpdateComposer taskKey="T-6" mode="manager" via="standup" />);
+    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(screen.getByRole('button', { name: /private/i })).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Second task draft' } });
+    await act(async () => success());
+    expect(screen.getByRole('textbox')).toHaveValue('Second task draft');
+    rerender(<TaskUpdateComposer taskKey="T-5" mode="manager" via="standup" />);
+    expect(screen.getByRole('textbox')).toHaveValue('');
+  });
+
+  it('recovers a failed draft and its request identity after remount', async () => {
+    mockAddTaskEventMutate.mockRejectedValue(new Error('Offline'));
+    const first = render(<TaskUpdateComposer taskKey="T-5" mode="manager" via="standup" />, { wrapper: Wrapper });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Recover me' } });
+    await act(async () => fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' }));
+    const [request] = mockAddTaskEventMutate.mock.calls[0]!;
+    first.unmount();
+    render(<TaskUpdateComposer taskKey="T-5" mode="manager" via="standup" />, { wrapper: Wrapper });
+    expect(screen.getByRole('textbox')).toHaveValue('Recover me');
+    await act(async () => fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' }));
+    expect(mockAddTaskEventMutate.mock.calls[1]![0]).toEqual(request);
   });
 
   it('expands from the collapsed affordance and submits on Enter', () => {
@@ -169,7 +200,6 @@ describe('TaskUpdateComposer', () => {
 
     expect(mockAddTaskEventMutate).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'update', body: 'Made progress', via: 'standup', requestId: expect.any(String) }),
-      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
     expect(mockAddMyDayTaskEventMutate).not.toHaveBeenCalled();
   });
@@ -184,7 +214,6 @@ describe('TaskUpdateComposer', () => {
 
     expect(mockAddTaskEventMutate).toHaveBeenCalledWith(
       expect.objectContaining({ visibility: 'private', via: 'task_drawer' }),
-      expect.any(Object),
     );
   });
 
@@ -197,9 +226,20 @@ describe('TaskUpdateComposer', () => {
 
     expect(mockAddMyDayTaskEventMutate).toHaveBeenCalledWith(
       expect.objectContaining({ date: '2026-03-10', type: 'update', body: 'Dev update' }),
-      expect.any(Object),
     );
     expect(mockAddTaskEventMutate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the original developer date when retrying after midnight', async () => {
+    mockAddMyDayTaskEventMutate.mockRejectedValue(new Error('Offline'));
+    const first = render(<TaskUpdateComposer taskKey="T-5" mode="developer" date="2026-03-10" />, { wrapper: Wrapper });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Late update' } });
+    await act(async () => fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' }));
+    const request = mockAddMyDayTaskEventMutate.mock.calls[0]![0];
+    first.unmount();
+    render(<TaskUpdateComposer taskKey="T-5" mode="developer" date="2026-03-11" />, { wrapper: Wrapper });
+    await act(async () => fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' }));
+    expect(mockAddMyDayTaskEventMutate.mock.calls[1]![0]).toEqual(request);
   });
 
   it('moves between stacked composers on arrow keys at the boundaries', () => {

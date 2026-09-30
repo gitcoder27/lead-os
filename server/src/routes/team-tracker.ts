@@ -7,8 +7,10 @@ import { ManagerDeskService } from "../services/manager-desk.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { TASK_DETAILS_MAX, TaskService } from "../services/task.service";
 import { TeamTrackerService } from "../services/team-tracker.service";
+import { isValidTimeZone } from "../services/today-clock";
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
+const timeZoneSchema = z.string().refine(isValidTimeZone, "Invalid timezone").optional();
 const trackerStatusSchema = z.enum([
   "on_track",
   "at_risk",
@@ -42,6 +44,7 @@ const trackerGroupBySchema = z.enum([
 
 const dateQuerySchema = z.object({
   query: z.object({
+    tz: timeZoneSchema,
     date: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
@@ -206,7 +209,8 @@ const addCheckInSchema = z.object({
     accountId: z.string().regex(/^[A-Za-z0-9:_-]+$/, "Invalid account id"),
   }),
   body: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    date: z.string().date(),
+    requestId: z.string().uuid().optional(),
     summary: z.string().trim().min(1).max(2000),
     status: trackerStatusSchema.optional(),
     taskKeys: z.array(z.string().trim().regex(/^[Tt]-\d{1,9}$/)).max(10).optional(),
@@ -267,6 +271,7 @@ export function createTeamTrackerRouter(
     try {
       const date = req.query.date as string;
       const board = await trackerService.getBoard(date, {
+        timeZone: req.query.tz as string | undefined,
         workspaceId: req.auth!.user.workspaceId,
         managerAccountId: req.auth?.user.accountId,
         query: {
@@ -329,13 +334,14 @@ export function createTeamTrackerRouter(
   // to the manager's last sealed session when one exists.
   router.get(
     "/standup/feed",
-    validate(z.object({ query: z.object({ accountId: z.string().min(1) }) })),
+    validate(z.object({ query: z.object({ accountId: z.string().min(1), tz: timeZoneSchema }) })),
     async (req, res, next) => {
       try {
         const feed = await trackerService.getStandupFeed(
           req.query.accountId as string,
           req.auth!.user.accountId,
-          req.auth!.user.workspaceId
+          req.auth!.user.workspaceId,
+          req.query.tz as string | undefined,
         );
         res.json(feed);
       } catch (error) {
@@ -352,9 +358,10 @@ export function createTeamTrackerRouter(
       params: z.any().optional(),
       query: z.any().optional(),
       body: z.object({
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+        date: z.string().date(),
         startedAt: isoDateTimeSchema,
         reviewed: z.array(z.string().trim().min(1)).max(500),
+        feedSeenThrough: z.record(z.string().min(1), isoDateTimeSchema).optional(),
         flagged: z.array(z.string().trim().min(1)).max(500),
         // docs/56 P1-07: optional one-line reason per flagged account (trimmed and capped server-side).
         flagReasons: z.record(z.string().min(1), z.string().max(500)).optional(),
@@ -367,7 +374,7 @@ export function createTeamTrackerRouter(
         }).strict()).max(2000),
         summary: z.string().max(20000),
         requestId: z.string().uuid(),
-      }).strict(),
+      }).strict().refine((value) => value.reviewed.length + value.flagged.length + value.log.length > 0, "An empty round cannot be saved"),
     })),
     async (req, res, next) => {
       try {
@@ -386,8 +393,9 @@ export function createTeamTrackerRouter(
       params: z.any().optional(),
       query: z.any().optional(),
       body: z.object({
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+        date: z.string().date(),
         accountIds: z.array(z.string().trim().min(1)).max(500),
+        reviewedAt: z.record(z.string().min(1), isoDateTimeSchema).optional(),
       }).strict(),
     })),
     async (req, res, next) => {
@@ -591,12 +599,13 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, summary, status, taskKeys, visibility } = req.body;
+        const { date, summary, status, taskKeys, visibility, requestId } = req.body;
         const checkIn = await trackerService.addCheckIn(accountId, date, {
           summary,
           status,
           taskKeys,
           visibility,
+          requestId,
         }, {
           type: req.auth?.user.role ?? "manager",
           accountId: req.auth?.user.accountId,

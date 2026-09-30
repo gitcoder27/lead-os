@@ -73,6 +73,7 @@ export function CheckInForm({
   onVisibilityChange,
   value,
   pending,
+  submitted,
   onChange,
   onSubmit,
   onCancel,
@@ -86,6 +87,7 @@ export function CheckInForm({
   onVisibilityChange: (value: TrackerCheckInVisibility) => void;
   value: string;
   pending: boolean;
+  submitted?: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -95,9 +97,12 @@ export function CheckInForm({
       <textarea
         ref={inputRef}
         value={value}
+        readOnly={submitted}
+        aria-label={`Note for ${developerName}`}
+        maxLength={2000}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && !pending) {
             event.preventDefault();
             onSubmit();
           }
@@ -112,7 +117,7 @@ export function CheckInForm({
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {!note && (
-        <CheckInVisibilityChoice developerName={developerName} value={visibility} onChange={onVisibilityChange} disabled={pending} />
+        <CheckInVisibilityChoice developerName={developerName} value={visibility} onChange={onVisibilityChange} disabled={pending || submitted} />
       )}
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
@@ -124,9 +129,10 @@ export function CheckInForm({
           disabled={!value.trim() || pending}
           className="ui-btn-solid"
         >
-          {pending ? 'Saving…' : note ? 'Save note' : 'Save check-in'}
+          {pending ? 'Saving…' : submitted ? 'Retry note' : note ? 'Save note' : 'Save check-in'}
         </button>
       </div>
+      {submitted && !pending && <p role="alert" className="text-xs">Not acknowledged. Retry this note to confirm it was saved.</p>}
     </div>
   );
 }

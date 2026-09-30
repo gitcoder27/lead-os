@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeftRight, History, Keyboard, ListChecks, X } from 'lucide-react';
@@ -6,6 +7,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
+import { useStandupRound } from '@/hooks/useStandupRound';
+import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
+import './standup/standup.css';
 import { api } from '@/lib/api';
 import { useLatestStandupSession, useStandupFeed } from '@/hooks/useTeamTracker';
 import {
@@ -21,18 +25,13 @@ import { useToast } from '@/context/ToastContext';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import {
   buildStandupSummary,
-  cleanFlagReason,
   dayStats,
   doneTodayFor,
-  EMPTY_STANDUP_SESSION,
   feedActiveTaskKeys,
-  loadStandupSession,
   openTasksFor,
-  saveStandupSession,
-  standupSessionReducer,
   type StandupLogKind,
 } from '@/lib/standup';
-import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
+import { TaskUpdateComposer, taskUpdateDrafts } from '@/components/tasks/TaskUpdateComposer';
 import { taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { CaptureBox } from '@/components/capture/CaptureBox';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
@@ -42,7 +41,7 @@ import { StandupTaskList } from './standup/StandupTaskList';
 import { StandupFeed, StandupFeedRail } from './standup/StandupFeed';
 import { StandupActionBar, type StandupActionGroup } from './standup/StandupActionBar';
 import { StandupWrapUp } from './standup/StandupWrapUp';
-import { CheckInForm, FlagForm, KeyHelpGrid, LayerShell, ReassignList } from './standup/StandupLayers';
+import { CheckInForm, KeyHelpGrid, LayerShell, ReassignList } from './standup/StandupLayers';
 import { StandupHistory } from './standup/StandupHistory';
 import { Kbd } from './standup/StandupPrimitives';
 
@@ -66,7 +65,7 @@ interface StandupModeProps {
   suspended?: boolean;
 }
 
-type StandupLayer = 'none' | 'capture' | 'status' | 'reassign' | 'checkin' | 'flag' | 'help' | 'history';
+type StandupLayer = 'none' | 'capture' | 'status' | 'reassign' | 'checkin' | 'taskdraft' | 'help' | 'history';
 type StandupView = 'person' | 'wrapup';
 
 const DIALOG_STATUSES: TrackerDeveloperStatus[] = ['at_risk', 'blocked', 'waiting'];
@@ -84,37 +83,66 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const { addToast } = useToast();
   const teamMode = useTeamMode();
   const reduceMotion = useReducedMotion();
+  const rootRef = useModalFocus<HTMLDivElement>();
+  useEffect(() => {
+    document.body.classList.add('standup-open');
+    return () => document.body.classList.remove('standup-open');
+  }, []);
+  useEffect(() => { rootRef.current?.focus(); }, [rootRef]);
   // P3-D5: standup order follows the board's active sort/saved view.
-  const ordered = board.developers;
-
-  // docs/50 S1: session survives accidental exits for the same date.
   const storageKey = useScopedStorageKey(`standup-session:${date}`);
-  const [session, dispatch] = useReducer(standupSessionReducer, storageKey, loadStandupSession);
-  useEffect(() => saveStandupSession(storageKey, session), [storageKey, session]);
+  const draftPrefix = useScopedStorageKey('task-update:manager:standup:');
+  const [taskDrafts, setTaskDrafts] = useState(() => taskUpdateDrafts(draftPrefix));
+  const [recoverTaskKey, setRecoverTaskKey] = useState<string>();
+  useEffect(() => {
+    const update = () => setTaskDrafts(taskUpdateDrafts(draftPrefix));
+    window.addEventListener('task-update-drafts-changed', update);
+    return () => window.removeEventListener('task-update-drafts-changed', update);
+  }, [draftPrefix]);
+  const initialOrder = useMemo(() => board.developers.map((entry) => entry.developer.accountId), [board.developers]);
+  const { session, dispatch, storageFailed, ownsRound, clear } = useStandupRound(storageKey, initialOrder);
+  const ordered = useMemo(() => (session.order ?? initialOrder).flatMap((id) => {
+    const entry = board.developers.find((person) => person.developer.accountId === id);
+    return entry ? [entry] : [];
+  }), [session.order, initialOrder, board.developers]);
   const reviewed = useMemo(() => new Set(session.reviewed), [session.reviewed]);
   const flagged = useMemo(() => new Set(session.flagged), [session.flagged]);
 
   // Track the person by id, not index: a status change can re-sort the board.
   const [currentId, setCurrentId] = useState<string | null>(() => {
     const resume = ordered.find((entry) => !session.reviewed.includes(entry.developer.accountId)) ?? ordered[0];
-    return resume?.developer.accountId ?? null;
+    return session.currentId ?? resume?.developer.accountId ?? null;
   });
   const [view, setView] = useState<StandupView>(() =>
-    ordered.length > 0 && ordered.every((entry) => session.reviewed.includes(entry.developer.accountId)) ? 'wrapup' : 'person',
+    session.request ? 'wrapup' : session.view ?? (ordered.length > 0 && ordered.every((entry) => session.reviewed.includes(entry.developer.accountId)) ? 'wrapup' : 'person'),
   );
-  const [taskIndex, setTaskIndex] = useState(0);
+  const [selectedTaskKey, setSelectedTaskKey] = useState(session.taskKey);
+  const displayedRound = useRef(session.roundId);
+  useEffect(() => {
+    if (displayedRound.current === session.roundId) return;
+    displayedRound.current = session.roundId;
+    setCurrentId(session.currentId ?? ordered[0]?.developer.accountId ?? null);
+    setSelectedTaskKey(session.taskKey);
+    setView(session.request ? 'wrapup' : session.view ?? 'person');
+  }, [session.roundId, session.currentId, session.taskKey, session.request, session.view, ordered]);
+  useEffect(() => {
+    const focus = window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>('[data-standup-person]')?.focus(), 0);
+    return () => window.clearTimeout(focus);
+  }, [rootRef, currentId, view]);
   const [layer, setLayer] = useState<StandupLayer>('none');
   const [pendingStatus, setPendingStatus] = useState<TrackerDeveloperStatus | null>(null);
   const [statusPreselect, setStatusPreselect] = useState<string[]>([]);
-  const [checkInText, setCheckInText] = useState('');
-  // P0-S6: who sees a manager check-in; back to shared for each new person.
-  const [checkInVisibility, setCheckInVisibility] = useState<TrackerCheckInVisibility>('shared');
-  const [flagText, setFlagText] = useState('');
   const [announcement, setAnnouncement] = useState('');
   const [sealing, setSealing] = useState(false);
+  const [saveToNote, setSaveToNote] = useState(true);
+  const sealingRef = useRef(false);
+  const [finishError, setFinishError] = useState('');
+  const [notePending, setNotePending] = useState<string | null>(null);
+  const notePendingRef = useRef(new Set<string>());
+  const liveContext = useRef({ currentId, layer });
+  liveContext.current = { currentId, layer };
   // docs/50 v2: whether "End standup" also files the summary under
   // Notes → Standups. Sealing the session itself is unconditional.
-  const [saveToNote, setSaveToNote] = useState(true);
   const queryClient = useQueryClient();
   // Reviews do not refetch mid-round (the order is walked by index); refresh once on the way out.
   useEffect(() => () => {
@@ -125,7 +153,6 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const composerApi = useRef<{ expand: () => void; focus: () => void; togglePrivate: () => void } | null>(null);
   const taskRowRefs = useRef(new Map<string, HTMLButtonElement>());
   const checkInRef = useRef<HTMLTextAreaElement>(null);
-  const flagRef = useRef<HTMLInputElement>(null);
 
   // docs/56 P1-07: the feed can be tucked away; a per-viewer convenience, so storage is best-effort.
   const feedStorageKey = useScopedStorageKey(FEED_COLLAPSED_KEY);
@@ -148,21 +175,28 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   // docs/56 P1-07: reviewing someone is a manager touch on the server as it
   // happens, so it does not depend on ending (sealing) the round. A restored
   // round was recorded when it first happened; only new reviews are sent.
-  const { mutate: recordReviews } = useRecordStandupReviews();
-  const recordedReviewsRef = useRef(new Set(session.reviewed));
+  const { mutateAsync: recordReviews } = useRecordStandupReviews();
+  const reviewInFlight = useRef(false);
+  const [reviewError, setReviewError] = useState(false);
+  const [retryReviews, setRetryReviews] = useState(0);
   const recordedAnyRef = useRef(false);
   useEffect(() => {
-    const pending = session.reviewed.filter((id) => !recordedReviewsRef.current.has(id));
-    if (pending.length === 0) return;
-    for (const id of pending) recordedReviewsRef.current.add(id);
+    const pending = session.reviewed.filter((id) => !session.acknowledged?.includes(id));
+    if (!ownsRound || reviewInFlight.current || reviewError || pending.length === 0) return;
+    reviewInFlight.current = true;
     recordedAnyRef.current = true;
-    // On failure the ids become pending again at the next review; sealing also records them.
-    recordReviews({ date, accountIds: pending }, {
-      onError: () => {
-        for (const id of pending) recordedReviewsRef.current.delete(id);
-      },
-    });
-  }, [session.reviewed, date, recordReviews]);
+    const reviewedAt = Object.fromEntries(pending.map((id) => [id, session.reviewTimes?.[id] ?? session.startedAt]));
+    void recordReviews({ date, accountIds: pending, reviewedAt }).then((result) => {
+      reviewInFlight.current = false;
+      dispatch({ type: 'acknowledge', ids: result.recorded });
+      if (result.recorded.length !== pending.length) setReviewError(true);
+    }, () => { reviewInFlight.current = false; setReviewError(true); });
+  }, [session.reviewed, session.acknowledged, session.reviewTimes, session.startedAt, date, recordReviews, ownsRound, reviewError, retryReviews, dispatch]);
+  const retryReviewWrites = useCallback(() => { setReviewError(false); setRetryReviews((value) => value + 1); }, []);
+  useEffect(() => {
+    window.addEventListener('online', retryReviewWrites);
+    return () => window.removeEventListener('online', retryReviewWrites);
+  }, [retryReviewWrites]);
 
   const foundIndex = ordered.findIndex((entry) => entry.developer.accountId === currentId);
   const devIndex = foundIndex >= 0 ? foundIndex : 0;
@@ -171,17 +205,37 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const openTasks = useMemo(() => openTasksFor(day), [day]);
   const doneToday = useMemo(() => doneTodayFor(day), [day]);
   const stats = useMemo(() => (day ? dayStats(day, date) : null), [day, date]);
-  const focusedTask = openTasks[Math.min(taskIndex, Math.max(openTasks.length - 1, 0))];
+  const taskIndex = Math.max(0, openTasks.findIndex((task) => task.taskKey === selectedTaskKey));
+  const focusedTask = openTasks[taskIndex];
+  const setTaskIndex = (index: number) => {
+    const taskKey = openTasks[index]?.taskKey;
+    setSelectedTaskKey(taskKey);
+    dispatch({ type: 'patch', patch: { taskKey } });
+  };
   const suggestion = day?.statusSuggestion;
   const pickerTasks: TaskPickerTask[] = openTasks.map((task) => ({ taskKey: task.taskKey, title: task.title }));
   const isFlagged = accountId ? flagged.has(accountId) : false;
   // docs/56 P1-04: solo / non-participating people get "note" wording and no check-in judgement.
   const dayUsesCheckIn = useCallback((entry: TrackerDeveloperDay) => usesCheckIns(teamMode, entry.participates), [teamMode]);
   const noteWording = day ? !dayUsesCheckIn(day) : false;
-  const dayAccountId = day?.developer.accountId;
-  useEffect(() => setCheckInVisibility('shared'), [dayAccountId]);
+  const noteDraft = accountId ? session.noteDrafts?.[accountId] : undefined;
+  const checkInText = noteDraft?.text ?? '';
+  const checkInVisibility = noteDraft?.visibility ?? 'shared';
+  const changeNote = (updates: { text?: string; visibility?: TrackerCheckInVisibility }) => {
+    if (!accountId || noteDraft?.submitted) return;
+    dispatch({ type: 'note_draft', accountId, draft: { text: '', visibility: 'shared', requestId: crypto.randomUUID(), ...noteDraft, ...updates } });
+  };
+  const setCheckInText = (text: string) => changeNote({ text });
+  const setCheckInVisibility = (visibility: TrackerCheckInVisibility) => changeNote({ visibility });
 
   const feed = useStandupFeed(accountId);
+  const [feedForcedOpen, setFeedForcedOpen] = useState<string | null>(null);
+  const feedHidden = feedCollapsed || (feedForcedOpen !== accountId && feed.data?.entries.length === 0);
+  useEffect(() => {
+    if (!ownsRound || !accountId || view !== 'person' || suspended || layer !== 'none' || !feed.data?.windowEnd || feed.data.truncated || feed.isError || feed.data.entries.length > 0) return;
+    if (session.feedSeenThrough?.[accountId]) return;
+    dispatch({ type: 'patch', patch: { feedSeenThrough: { ...session.feedSeenThrough, [accountId]: feed.data.windowEnd } } });
+  }, [ownsRound, accountId, view, suspended, layer, feed.data, feed.isError, session.feedSeenThrough, dispatch]);
   const latestSession = useLatestStandupSession(layer === 'history');
   const activeKeys = useMemo(() => feedActiveTaskKeys(feed.data?.entries ?? []), [feed.data]);
   const statusUpdate = useStatusUpdate(date);
@@ -203,11 +257,12 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
 
   const log = useCallback((target: string, kind: StandupLogKind, taskKey?: string, detail?: string) => {
     dispatch({ type: 'log', entry: { accountId: target, kind, taskKey, detail, at: new Date().toISOString() } });
-  }, []);
+  }, [dispatch]);
 
   const focusRow = useCallback((taskKey?: string) => {
     window.setTimeout(() => {
       if (taskKey) taskRowRefs.current.get(taskKey)?.focus();
+      if (taskKey) taskRowRefs.current.get(taskKey)?.scrollIntoView?.({ block: 'nearest' });
     }, 30);
   }, []);
 
@@ -219,33 +274,39 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
 
   const goToDeveloper = useCallback(
     (id: string) => {
+      if (session.request || !ownsRound) return;
       const target = ordered.find((entry) => entry.developer.accountId === id);
       if (!target) return;
       // docs/50 S2: leaving someone counts as reviewing them; jumps don't mark the skipped.
       if (view === 'person' && accountId && id !== accountId) dispatch({ type: 'review', accountId, at: new Date().toISOString() });
       setCurrentId(id);
-      setTaskIndex(0);
+      setSelectedTaskKey(undefined);
       setView('person');
+      dispatch({ type: 'patch', patch: { currentId: id, taskKey: undefined, view: 'person' } });
       setAnnouncement(
         `${target.developer.displayName} — ${openTasksFor(target).length} open tasks, status ${STATUS_LABELS[target.status]}`,
       );
     },
-    [ordered, view, accountId],
+    [ordered, view, accountId, dispatch, session.request, ownsRound],
   );
 
   const openWrapUp = useCallback(() => {
+    if (session.request) { setView('wrapup'); return; }
     if (view === 'person' && accountId) dispatch({ type: 'review', accountId, at: new Date().toISOString() });
     setView('wrapup');
+    dispatch({ type: 'patch', patch: { currentId: accountId, view: 'wrapup' } });
     setLayer('none');
     setAnnouncement('Standup wrap-up');
-  }, [view, accountId]);
+  }, [view, accountId, dispatch, session.request]);
 
   const moveDeveloper = useCallback(
     (delta: number) => {
       if (!ordered.length) return;
       if (view === 'wrapup') {
+        if (session.request) return;
         if (delta < 0) {
           setView('person');
+          dispatch({ type: 'patch', patch: { view: 'person' } });
           if (day) setAnnouncement(day.developer.displayName);
         }
         return;
@@ -258,15 +319,18 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       }
       goToDeveloper(ordered[next]!.developer.accountId);
     },
-    [ordered, view, day, devIndex, openWrapUp, goToDeveloper],
+    [ordered, view, day, devIndex, openWrapUp, goToDeveloper, session.request, dispatch],
   );
 
   const moveTask = useCallback(
     (delta: number) => {
       if (!openTasks.length) return;
-      setTaskIndex((index) => Math.min(Math.max(index + delta, 0), openTasks.length - 1));
+      const taskKey = openTasks[Math.min(Math.max(taskIndex + delta, 0), openTasks.length - 1)]?.taskKey;
+      setSelectedTaskKey(taskKey);
+      dispatch({ type: 'patch', patch: { taskKey } });
+      focusRow(taskKey);
     },
-    [openTasks.length],
+    [openTasks, taskIndex, dispatch, focusRow],
   );
 
   const focusTaskByKey = useCallback(
@@ -276,10 +340,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         onOpenTask(taskKey);
         return;
       }
-      setTaskIndex(index);
+      setSelectedTaskKey(taskKey);
+      dispatch({ type: 'patch', patch: { taskKey } });
       focusRow(taskKey);
     },
-    [openTasks, onOpenTask, focusRow],
+    [openTasks, onOpenTask, focusRow, dispatch],
   );
 
   const openStatusDialog = useCallback((status: TrackerDeveloperStatus, preselect: string[] = []) => {
@@ -307,35 +372,29 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     [day, focusedTask, openStatusDialog, statusUpdate, log, addToast],
   );
 
-  const submitCheckIn = useCallback(() => {
+  const submitCheckIn = async () => {
     const summary = checkInText.trim();
-    if (!day || !summary) return;
+    if (!day || !summary || !noteDraft || notePendingRef.current.has(day.developer.accountId)) return;
     const target = day.developer.accountId;
     // Notes (non-participating people) are never developer-facing, so stay shared.
-    const isPrivate = !noteWording && checkInVisibility === 'private';
-    addCheckIn.mutate(
-      isPrivate
-        ? { accountId: target, summary, visibility: 'private' }
-        : { accountId: target, summary, taskKeys: taskKeysForSubmit([], summary, pickerTasks) },
-      {
-        onSuccess: () => {
-          log(target, 'checkin');
-          setCheckInText('');
-          setCheckInVisibility('shared');
-          closeLayer();
-        },
-        onError: (error) => addToast(error.message, 'error'),
-      },
-    );
-  }, [addCheckIn, addToast, checkInText, checkInVisibility, closeLayer, day, noteWording, pickerTasks, log]);
-
-  const submitFlag = useCallback(() => {
-    if (!day) return;
-    dispatch({ type: 'flag', accountId: day.developer.accountId, reason: cleanFlagReason(flagText), at: new Date().toISOString() });
-    setAnnouncement(`${day.developer.displayName} flagged for follow-up`);
-    setFlagText('');
-    closeLayer();
-  }, [day, flagText, closeLayer]);
+    const isPrivate = (noteDraft.submitted || !noteWording) && checkInVisibility === 'private';
+    const taskKeys = noteDraft.taskKeys ?? taskKeysForSubmit([], summary, pickerTasks);
+    const snapshot = { ...noteDraft, submitted: true, taskKeys, visibility: isPrivate ? 'private' as const : 'shared' as const };
+    dispatch({ type: 'note_draft', accountId: target, draft: snapshot });
+    notePendingRef.current.add(target);
+    setNotePending(target);
+    try {
+      await addCheckIn.mutateAsync({ accountId: target, summary, requestId: snapshot.requestId, ...(isPrivate ? { visibility: 'private' as const } : { taskKeys }) });
+      dispatch({ type: 'note_saved', accountId: target, requestId: snapshot.requestId });
+      log(target, 'checkin');
+      if (liveContext.current.currentId === target && liveContext.current.layer === 'checkin') closeLayer();
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Note not acknowledged. Retry to confirm it.', 'error');
+    } finally {
+      notePendingRef.current.delete(target);
+      setNotePending(null);
+    }
+  };
 
   const copySummary = useCallback(() => {
     const text = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
@@ -350,13 +409,6 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     );
   }, [date, ordered, session, dayUsesCheckIn, addToast]);
 
-  const resetSession = useCallback(() => {
-    dispatch({ type: 'reset' });
-    setCurrentId(ordered[0]?.developer.accountId ?? null);
-    setTaskIndex(0);
-    setView('person');
-  }, [ordered]);
-
   /**
    * docs/50 v2: "End standup" seals the round — one durable session record
    * (which also anchors the next "since last standup" feed), a follow-up task
@@ -366,7 +418,15 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
    * the next standup starts fresh; Esc/Exit still leaves without sealing.
    */
   const endStandup = useCallback(async () => {
-    if (sealing) return;
+    if (sealingRef.current || !ownsRound) return;
+    if (session.reviewed.some((id) => !session.acknowledged?.includes(id))) {
+      setFinishError('Visits are not yet saved. Retry the pending review writes before finishing.');
+      return;
+    }
+    if (Object.values(session.noteDrafts ?? {}).some((draft) => draft.text.trim()) || taskDrafts.length) {
+      setFinishError('There is unsent work. Save or clear the drafts before finishing.');
+      return;
+    }
     // Ending an untouched session is just exit — an empty seal would anchor
     // everyone's feed to a meaningless timestamp.
     if (!session.reviewed.length && !session.flagged.length && !session.log.length) {
@@ -374,34 +434,40 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       return;
     }
     setSealing(true);
+    sealingRef.current = true;
+    setFinishError('');
     try {
       const summary = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
-      const result = await api.post<RecordStandupSessionResponse>('/team-tracker/standup/session', {
+      const request = session.request ?? {
         date,
         startedAt: session.startedAt ?? new Date().toISOString(),
         reviewed: session.reviewed,
+        feedSeenThrough: session.feedSeenThrough,
         flagged: session.flagged,
         ...(session.flagReasons && { flagReasons: session.flagReasons }),
         log: session.log,
         summary,
-        requestId: crypto.randomUUID(),
-      });
+        requestId: session.roundId,
+      };
+      dispatch({ type: 'patch', patch: { request } });
+      const result = session.receipt ?? await api.post<RecordStandupSessionResponse>('/team-tracker/standup/session', request);
+      dispatch({ type: 'patch', patch: { receipt: result } });
       if (saveToNote) {
         try {
           await api.post(`/notes/${encodeURIComponent(date)}/append`, {
-            text: summary,
-            requestId: crypto.randomUUID(),
+            text: request.summary,
+            requestId: session.roundId,
             kind: 'standup',
           });
         } catch {
-          addToast('Standup recorded, but the summary could not be saved to notes.', 'error');
+          setFinishError('Round saved. The Notes archive was not acknowledged. Retry the archive, or untick "Add summary to Notes" to finish without it; the round and follow-ups will not be saved again.');
+          return;
         }
       }
       // Clear storage synchronously before unmounting — a dispatch alone races
       // with onClose(): the save effect may never run for the empty session,
       // leaving the sealed round resumable on the next entry.
-      saveStandupSession(storageKey, EMPTY_STANDUP_SESSION);
-      dispatch({ type: 'reset' });
+      clear();
       for (const key of ['team-tracker', 'tasks', 'daily-notes', 'today']) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
@@ -412,11 +478,13 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       );
       onClose();
     } catch (error) {
+      setFinishError('Finish was not acknowledged. Retry the same round to confirm it was saved.');
       addToast(error instanceof Error ? error.message : 'Could not end standup', 'error');
     } finally {
       setSealing(false);
+      sealingRef.current = false;
     }
-  }, [sealing, saveToNote, date, ordered, session, dayUsesCheckIn, storageKey, queryClient, addToast, onClose]);
+  }, [ownsRound, saveToNote, date, ordered, session, taskDrafts.length, dayUsesCheckIn, clear, dispatch, queryClient, addToast, onClose]);
 
   // ── Actions: shared by the keymap and the action bar (S7) ──────────────
   const actions = {
@@ -469,9 +537,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         setAnnouncement(`${day.developer.displayName} unflagged`);
         return;
       }
-      setFlagText('');
-      setLayer('flag');
-      window.setTimeout(() => flagRef.current?.focus(), 40);
+      dispatch({ type: 'flag', accountId: day.developer.accountId, at: new Date().toISOString() });
+      setAnnouncement(`${day.developer.displayName} flagged. Follow-up will be saved at finish.`);
     },
     wrapUp: () => (view === 'wrapup' ? moveDeveloper(-1) : openWrapUp()),
     help: () => setLayer('help'),
@@ -484,7 +551,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   useLayoutEffect(() => {
     keyHandlerRef.current = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || suspended || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.defaultPrevented || suspended || !ownsRound || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+      if (isCoveredByLaterLayer(rootRef.current) || document.querySelector('[aria-label="LeadOS Copilot"]')) return;
       const target = event.target as HTMLElement | null;
       const inField =
         target instanceof HTMLElement &&
@@ -522,6 +590,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             return;
         }
       }
+
+      if (event.key === 'Enter' && target?.closest('button, a')) return;
+      if (session.request) return;
 
       // docs/54 K1: letters mean what they mean on Tasks and in the drawer —
       // e done, a assign, n new; people move on arrows only.
@@ -582,59 +653,36 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const progress = ordered.length ? reviewedCount / ordered.length : 0;
   const allReviewed = ordered.length > 0 && reviewedCount === ordered.length;
 
-  const actionGroups: StandupActionGroup[] = view === 'wrapup'
-    ? [
-        { label: 'Session', actions: [
-          { keys: ['←'], label: 'Back to review', onRun: () => moveDeveloper(-1) },
-          { keys: ['↵'], label: 'End standup', onRun: () => void endStandup(), emphasis: true },
-          { keys: ['?'], label: 'Keys', onRun: actions.help },
-        ] },
-      ]
-    : [
-        { label: 'Move', actions: [
-          { keys: ['j', 'k'], label: 'Task', onRun: () => moveTask(1), disabled: openTasks.length < 2 },
-          { keys: ['←', '→'], label: 'Person', onRun: () => moveDeveloper(1) },
-        ] },
-        { label: 'Task', actions: [
-          { keys: ['u'], label: 'Update', onRun: actions.update, disabled: !focusedTask },
-          { keys: ['.'], label: 'Current', onRun: actions.setCurrent, disabled: !focusedTask || focusedTask.status === 'active' },
-          { keys: ['e'], label: 'Done', onRun: actions.done, disabled: !focusedTask },
-          { keys: ['b'], label: 'Blocked', onRun: actions.blocked },
-          { keys: ['a'], label: 'Reassign', onRun: actions.reassign, disabled: !focusedTask },
-          { keys: ['↵'], label: 'Open', onRun: actions.open, disabled: !focusedTask },
-        ] },
-        { label: 'Person', actions: [
-          { keys: ['c'], label: noteWording ? 'Note' : 'Check-in', onRun: actions.checkIn },
-          { keys: ['n'], label: 'New task', onRun: actions.add },
-          { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
-          ...(suggestion ? [{ keys: ['y'], label: 'Accept suggestion', onRun: actions.accept, emphasis: true }] : []),
-        ] },
-        { label: 'Session', actions: [
-          { keys: ['w'], label: 'Wrap-up', onRun: actions.wrapUp, emphasis: allReviewed },
-          { keys: ['?'], label: 'Keys', onRun: actions.help },
-        ] },
-      ];
+  const actionGroups: StandupActionGroup[] = [{ label: 'Standup', actions: [
+    { keys: ['←'], label: 'Previous', onRun: () => moveDeveloper(-1), disabled: devIndex === 0 },
+    { keys: ['→'], label: 'Next', onRun: () => moveDeveloper(1) },
+    { keys: ['u'], label: 'Update', onRun: actions.update, disabled: !focusedTask },
+    { keys: ['c'], label: 'Note', onRun: actions.checkIn },
+    { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
+  ] }];
 
-  if (!day || !stats) {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: 'var(--bg-primary)' }} role="dialog" aria-modal="true" aria-label="Standup mode" data-testid="standup-mode">
-        <div className="max-w-sm rounded-2xl px-6 py-8 text-center" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+  if (!day || !stats || !ownsRound) {
+    return createPortal(
+      <div ref={rootRef} tabIndex={-1} className="standup-shell fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg-primary)' }} role="dialog" aria-modal="true" aria-label="Standup mode" data-testid="standup-mode">
+        <div className="max-w-sm px-6 py-8 text-center">
           <h1 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Standup</h1>
-          <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>No one on the board for this view. Add developers or loosen the board filters.</p>
+          <p className="mt-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>{!ownsRound ? 'Standup is open in another tab. Close it there to continue here.' : 'No people in this view.'}</p>
           <button type="button" onClick={onClose} className="mt-4 rounded-lg px-3 py-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
             Exit
           </button>
         </div>
-      </div>
+      </div>, document.body,
     );
   }
 
-  return (
+  return createPortal(
     <motion.div
+      ref={rootRef}
+      tabIndex={-1}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex flex-col"
+      className="standup-shell fixed inset-0 flex flex-col outline-none"
       style={{ background: 'var(--bg-primary)' }}
       role="dialog"
       aria-modal="true"
@@ -669,7 +717,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             className="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full"
             style={{ background: 'var(--bg-tertiary)' }}
             role="progressbar"
-            aria-label="Developers reviewed"
+            aria-label="People visited"
             aria-valuemin={0}
             aria-valuemax={ordered.length}
             aria-valuenow={reviewedCount}
@@ -677,13 +725,13 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <motion.div
               className="h-full rounded-full"
               initial={false}
-              animate={{ width: `${progress * 100}%` }}
+              animate={{ scaleX: progress }}
               transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 220, damping: 30 }}
-              style={{ background: allReviewed ? 'var(--success)' : 'var(--accent)' }}
+              style={{ background: 'var(--accent)', transformOrigin: 'left' }}
             />
           </div>
           <span className="shrink-0 text-[12px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-            <span className="font-semibold" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-primary)' }}>{reviewedCount}</span> of {ordered.length} reviewed
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{reviewedCount}</span> of {ordered.length} visited
             {session.flagged.length > 0 && (
               <span style={{ color: 'var(--text-muted)' }}> · {session.flagged.length} flagged</span>
             )}
@@ -695,9 +743,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <History size={13} />
             <span className="hidden sm:inline">Last round</span>
           </TopButton>
-          <TopButton onClick={actions.wrapUp} label="Wrap-up" pressed={view === 'wrapup'} accent={allReviewed && view !== 'wrapup'}>
+          <TopButton onClick={actions.wrapUp} label="Review and finish" pressed={view === 'wrapup'} accent={allReviewed && view !== 'wrapup'}>
             <ListChecks size={13} />
-            <span className="hidden sm:inline">Wrap-up</span>
+            <span>Finish</span>
           </TopButton>
           <TopButton onClick={actions.help} label="Standup keyboard shortcuts">
             <Keyboard size={13} />
@@ -711,11 +759,22 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         </div>
       </header>
 
+      {storageFailed && <p role="alert" className="px-4 py-2 text-sm">Browser recovery is unavailable. Keep this page open until your work is saved.</p>}
+      {!ownsRound && <div role="alert" className="px-4 py-2 text-sm">Standup is open in another tab. Close it there to continue here.</div>}
+      {session.reviewed.some((id) => !session.acknowledged?.includes(id)) && (
+        <div role="status" className="flex items-center gap-3 px-4 py-2 text-xs">
+          {reviewError ? 'Visits not saved. Your progress is kept in this tab.' : 'Saving visits…'}
+          {reviewError && <button type="button" className="ui-btn" onClick={retryReviewWrites}>Retry</button>}
+        </div>
+      )}
+      {finishError && <p role="alert" className="px-4 py-2 text-sm">{finishError}</p>}
+
       <div className="flex min-h-0 flex-1">
         <StandupRail
           days={ordered}
           currentId={accountId ?? null}
           reviewed={reviewed}
+          acknowledged={new Set(session.acknowledged ?? [])}
           flagged={flagged}
           wrapUpActive={view === 'wrapup'}
           onSelect={goToDeveloper}
@@ -726,9 +785,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           {view === 'wrapup' ? (
             <div className="h-full overflow-y-auto">
               <StandupWrapUp
-                date={date}
                 days={ordered}
                 session={session}
+                taskDrafts={taskDrafts}
+                onRecoverTask={(taskKey) => { setRecoverTaskKey(taskKey); setLayer('taskdraft'); }}
+                onRecoverNote={(id) => { goToDeveloper(id); setLayer('checkin'); }}
                 sealing={sealing}
                 saveToNote={saveToNote}
                 onSaveToNoteChange={setSaveToNote}
@@ -736,11 +797,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                 onBack={() => moveDeveloper(-1)}
                 onEnd={() => void endStandup()}
                 onCopy={copySummary}
-                onReset={resetSession}
               />
             </div>
           ) : (
-            <div className={`grid grid-cols-1 lg:h-full ${feedCollapsed ? 'lg:grid-cols-[minmax(0,1fr)_auto]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]'}`}>
+            <div className={`grid grid-cols-1 lg:h-full ${feedHidden ? 'lg:grid-cols-[minmax(0,1fr)_auto]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]'}`}>
               <motion.div
                 key={day.developer.accountId}
                 initial={reduceMotion ? false : { opacity: 0, x: 8 }}
@@ -756,6 +816,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                     total={ordered.length}
                     flagged={isFlagged}
                     flagReason={accountId ? session.flagReasons?.[accountId] : undefined}
+                    onFlagReasonChange={(reason) => dispatch({ type: 'patch', patch: { flagReasons: { ...session.flagReasons, [day.developer.accountId]: reason } } })}
                     onStatusSelect={handleStatusSelect}
                     onPrev={() => moveDeveloper(-1)}
                     onNext={() => moveDeveloper(1)}
@@ -780,14 +841,15 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                       focusedTask ? (
                         <TaskUpdateComposer
                           taskKey={focusedTask.taskKey}
+                          person={{ accountId: day.developer.accountId, name: day.developer.displayName }}
                           mode="manager"
                           via="standup"
                           collapsed
-                          placeholder={`Update ${focusedTask.taskKey}… (u)`}
+                          placeholder={`Update ${focusedTask.taskKey} for ${day.developer.displayName}`}
                           registerComposer={(api) => {
                             composerApi.current = api;
                           }}
-                          onPosted={() => log(day.developer.accountId, 'update', focusedTask.taskKey)}
+                          onPosted={(event) => log(event.accountId ?? day.developer.accountId, 'update', focusedTask.taskKey)}
                         />
                       ) : null
                     }
@@ -796,13 +858,18 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               </motion.div>
 
               <aside
-                className={`min-w-0 border-t py-5 lg:flex lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 ${feedCollapsed ? 'px-2' : 'px-5'}`}
+                className={`min-w-0 border-t py-5 lg:flex lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 ${feedHidden ? 'px-2' : 'px-5'}`}
                 style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 45%, transparent)' }}
               >
-                {feedCollapsed ? (
-                  <StandupFeedRail count={feed.data?.entries.length} onExpand={() => setFeedHidden(false)} />
+                {feedHidden ? (
+                  <StandupFeedRail count={feed.data?.entries.length} onExpand={() => { setFeedHidden(false); setFeedForcedOpen(accountId ?? null); }} />
                 ) : (
                   <StandupFeed
+                    note={noteWording}
+                    onReadThrough={() => {
+                      if (!accountId || !feed.data?.windowEnd || session.feedSeenThrough?.[accountId] || suspended || layer !== 'none') return;
+                      dispatch({ type: 'patch', patch: { feedSeenThrough: { ...session.feedSeenThrough, [accountId]: feed.data.windowEnd } } });
+                    }}
                     data={feed.data}
                     isLoading={feed.isLoading}
                     isError={feed.isError}
@@ -818,10 +885,16 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         </main>
       </div>
 
-      <StandupActionBar groups={actionGroups} />
+      {view === 'person' && <StandupActionBar groups={actionGroups} />}
 
       {/* Layers */}
       <AnimatePresence>
+        {layer === 'taskdraft' && recoverTaskKey && <LayerShell onClose={closeLayer} label={`Draft for ${recoverTaskKey}`}>
+          <div className="p-4"><TaskUpdateComposer taskKey={recoverTaskKey} mode="manager" via="standup" autoFocus onPosted={(event) => {
+            if (event.accountId) log(event.accountId, 'update', recoverTaskKey);
+            closeLayer();
+          }} /></div>
+        </LayerShell>}
         {layer === 'capture' && (
           <LayerShell onClose={closeLayer} label={`Add a task for ${day.developer.displayName}`}>
             <CaptureBox
@@ -843,21 +916,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               visibility={checkInVisibility}
               onVisibilityChange={setCheckInVisibility}
               value={checkInText}
-              pending={addCheckIn.isPending}
+              pending={notePending === accountId}
+              submitted={noteDraft?.submitted}
               onChange={setCheckInText}
               onSubmit={submitCheckIn}
-              onCancel={closeLayer}
-            />
-          </LayerShell>
-        )}
-        {layer === 'flag' && (
-          <LayerShell onClose={closeLayer} label={`Flag ${day.developer.displayName} for follow-up`}>
-            <FlagForm
-              inputRef={flagRef}
-              name={day.developer.displayName}
-              value={flagText}
-              onChange={setFlagText}
-              onSubmit={submitFlag}
               onCancel={closeLayer}
             />
           </LayerShell>
@@ -933,7 +995,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           }}
         />
       )}
-    </motion.div>
+    </motion.div>, document.body,
   );
 }
 

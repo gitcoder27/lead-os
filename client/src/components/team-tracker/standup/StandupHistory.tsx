@@ -55,13 +55,13 @@ export function StandupHistory({
   return (
     <div className="max-h-[60vh] overflow-y-auto px-4 py-3.5" data-testid="standup-history">
       <p className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-        Ended {formatRelativeTime(session.endedAt)} · {session.reviewed.length} reviewed
+        Ended {formatRelativeTime(session.endedAt)} · {session.reviewed.length} visited
         {flagged.length > 0 ? ` · ${flagged.length} flagged` : ''}
       </p>
 
       {flagged.length > 0 && (
         <section className="mt-3.5">
-          <SectionLabel>Flagged for follow-up</SectionLabel>
+          <SectionLabel>Flagged in this round</SectionLabel>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {flagged.map((id) => (
               <ToneChip key={id} tone="warning">
@@ -82,7 +82,7 @@ export function StandupHistory({
                 <ul className="mt-0.5 space-y-0.5">
                   {entries.map((entry, index) => (
                     <li key={index} className="flex items-baseline gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="min-w-0 flex-1">{describeLogEntry(entry)}</span>
+                      <span className="min-w-0 flex-1">{entry.kind === 'checkin' ? 'Added a person note' : describeLogEntry(entry)}</span>
                       <span className="shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(entry.at)}</span>
                     </li>
                   ))}

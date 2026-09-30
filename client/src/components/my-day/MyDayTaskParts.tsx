@@ -427,7 +427,7 @@ export function RowComposer({ taskKey, viewDate, onClose }: { taskKey: string; v
       }}
     >
       <div className="min-w-0 flex-1">
-        <TaskUpdateComposer taskKey={taskKey} mode="developer" date={viewDate} autoFocus onPosted={onClose} />
+        <TaskUpdateComposer taskKey={taskKey} mode="developer" date={viewDate} autoFocus onPosted={onClose} onEscape={onClose} />
       </div>
       <button
         type="button"

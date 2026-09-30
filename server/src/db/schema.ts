@@ -208,8 +208,11 @@ export const teamTrackerCheckIns = sqliteTable("team_tracker_checkins", {
   authorAccountId: text("author_account_id"),
   /** P0-S6: `private` check-ins are manager-only and never returned to developers. */
   visibility: text("visibility").notNull().default("shared"),
+  requestId: text("request_id"),
   createdAt: text("created_at").notNull(),
-});
+}, (table) => [
+  uniqueIndex("idx_checkins_request").on(table.workspaceId, table.authorType, table.authorAccountId, table.requestId),
+]);
 
 export const teamTrackerSavedViews = sqliteTable("team_tracker_saved_views", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -245,6 +248,8 @@ export const standupSessions = sqliteTable("standup_sessions", {
   requestId: text("request_id"),
   /** docs/56 P1-07: optional one-line reason per flagged account (`{ accountId: reason }`). */
   flagReasonsJson: text("flag_reasons_json").notNull().default("{}"),
+  followUpsJson: text("follow_ups_json").notNull().default("[]"),
+  feedSeenJson: text("feed_seen_json").notNull().default("{}"),
   createdAt: text("created_at").notNull(),
 }, (table) => [
   index("idx_standup_sessions_manager_end").on(table.workspaceId, table.managerAccountId, table.endedAt),

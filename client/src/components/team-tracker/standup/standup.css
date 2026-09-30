@@ -1,0 +1,50 @@
+body.standup-open {
+  --z-drawer: 360;
+  --z-drawer-stacked: 370;
+}
+
+.standup-shell {
+  z-index: 320;
+  color: var(--text-primary);
+  --accent: #0e7490;
+  --success: #047857;
+  --warning: #92400e;
+  --danger: #b91c1c;
+  --info: #526175;
+  --text-disabled: var(--text-muted);
+}
+
+.dark .standup-shell {
+  --accent: #22d3ee;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #9aa3b4;
+}
+
+.standup-shell :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.standup-shell [role='option']:focus-visible {
+  outline-offset: -3px;
+}
+
+.standup-shell button, .standup-shell select { min-height: 36px; }
+.standup-shell input, .standup-shell textarea { max-width: 100%; }
+.standup-shell p, .standup-shell h2 { overflow-wrap: anywhere; }
+.standup-shell * { letter-spacing: 0; }
+
+@media (max-width: 639px) {
+  .standup-shell > header { gap: 8px; padding: 8px; }
+  .standup-shell > header button { padding: 6px; }
+  .standup-shell main > div > div { padding-left: 12px; padding-right: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .standup-shell *, .standup-shell *::before, .standup-shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

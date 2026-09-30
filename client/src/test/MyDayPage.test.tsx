@@ -76,7 +76,7 @@ vi.mock('@/hooks/useMyDay', () => ({
 
 vi.mock('@/hooks/useTasks', () => ({
   useTaskResolution: () => ({ data: undefined, isError: false, isLoading: false }),
-  useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, isPending: false }),
+  useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, mutateAsync: async (body: unknown) => mockAddMyDayTaskEventMutate(body, {}), isPending: false }),
   useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
   useMyDayTaskEvents: () => ({ data: { pages: [{ events: [{ id: 1, taskKey: 'T-1', type: 'update', body: 'Earlier shared progress', visibility: 'shared', author: { type: 'developer', id: 'dev-1' }, occurredAt: new Date().toISOString(), approximateTime: false }], nextCursor: null }] } }),
   useTaskEvents: () => ({ data: undefined }),
@@ -393,10 +393,7 @@ describe('MyDayPage', () => {
         body: 'Updated handoff note',
         requestId: expect.any(String),
       }),
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      })
+      expect.anything()
     );
   });
 

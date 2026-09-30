@@ -1134,7 +1134,7 @@ describe('TodayPage V2', () => {
 
       const line = await screen.findByRole('region', { name: 'Standup' });
       expect(line).toHaveTextContent('Standup ✓ 09:40');
-      expect(line).toHaveTextContent('5 reviewed · 1 flagged');
+      expect(line).toHaveTextContent("5 visited in today's rounds · 1 flagged in those rounds");
       fireEvent.click(within(line).getByRole('button', { name: 'Deepak' }));
       expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ developerAccountId: 'dev-2' }));
     });

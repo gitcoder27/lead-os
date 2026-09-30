@@ -421,6 +421,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
+| 2026-09-30 | P1-07 follow-up: docs/62 | main (uncommitted) | Copilot | Trust and simplification update: owned drafts, acknowledged visits, immutable seal/archive retries, stable follow-up identity, per-person feed bounds, manager timezone, accessible shell and reduced bookkeeping. Tests cover recovery and role boundaries; implementation decisions and manual-validation limits are in [docs/50](50-standup-mode-redesign-spec.md#2026-09-30-trust-and-simplification-update). Browser checks left to the user; no runtime/Jira/production changes. |
 | 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
 | 2026-09-29 | P0-S4 | task/p0-s4-error-boundary | Sonnet | Root error boundary, guarded reload on `vite:preloadError` and lazy-chunk errors (30s sessionStorage guard). |
 | 2026-09-29 | P0-S1 | task/p0-s1-my-day-issues-projection | Sonnet | `DeveloperIssue` allowlist projection for `GET /api/my-day/issues` (`IssueService.getForDeveloper`), route tests incl. exact-key allowlist. Needs Opus review (developer-visible data). |

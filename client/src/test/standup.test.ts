@@ -61,7 +61,7 @@ describe('standup tasks & day stats', () => {
       task({ id: 4, taskKey: 'T-4', status: 'done', position: 3, title: 'Closed today' }),
       task({ id: 5, taskKey: 'T-5', status: 'dropped', position: 4 }),
     ],
-    checkIns: [{ id: 1, dayId: 1, summary: 'hi', createdAt: '2026-03-07T09:00:00Z', taskKeys: [] }],
+    checkIns: [{ id: 1, dayId: 1, summary: 'hi', authorType: 'developer', createdAt: '2026-03-07T09:00:00Z', taskKeys: [] }],
     lastCheckInAt: '2026-03-07T09:00:00Z',
   });
 
@@ -88,6 +88,7 @@ describe('standup tasks & day stats', () => {
       checkInsToday: 1,
     });
     expect(dayStats(day(), '2026-03-07')).toMatchObject({ current: undefined, open: 0, checkInsToday: 0 });
+    expect(dayStats(day({ checkIns: [{ ...alice.checkIns[0]!, authorType: 'manager' }] }), '2026-03-07').checkInsToday).toBe(0);
   });
 });
 
@@ -214,7 +215,7 @@ describe('follow-ups & summary', () => {
       status: 'blocked',
       statusSuggestion: { status: 'blocked', reasonTaskKey: 'T-2' },
       oneOnOne: { seriesId: 1, scheduledFor: '2026-03-04', overdueDays: 3 },
-      checkIns: [{ id: 1, dayId: 1, summary: 'x', createdAt: '2026-03-07T09:00:00Z', taskKeys: [] }],
+      checkIns: [{ id: 1, dayId: 1, summary: 'x', authorType: 'developer', createdAt: '2026-03-07T09:00:00Z', taskKeys: [] }],
     });
     const reasons = followUpReasons(busy, '2026-03-07', true);
     expect(reasons.map((reason) => reason.label)).toEqual(['Flagged', 'Blocked', 'T-2 blocked', '1:1 overdue 3d']);
@@ -240,9 +241,10 @@ describe('follow-ups & summary', () => {
       },
       usesCheckIn: () => false,
     });
-    expect(text).toContain('1 notes');
+    expect(text).toContain('Added a note');
     expect(text).not.toContain('check-in');
-    expect(text).toContain('Alice Smith: Flagged, Blocked');
+    expect(text).toContain('Alice Smith: Flagged');
+    expect(text).not.toContain('Blocked');
   });
 
   it('puts the flag reason in the flagged label and the summary (P1-07)', () => {
@@ -254,7 +256,7 @@ describe('follow-ups & summary', () => {
       session: { reviewed: ['dev-1'], flagged: ['dev-1'], flagReasons: { 'dev-1': 'Waiting on QA' }, log: [] },
       usesCheckIn: () => false,
     });
-    expect(text).toContain('Alice Smith: Flagged: Waiting on QA, Blocked');
+    expect(text).toContain('Alice Smith: Flagged: Waiting on QA');
   });
 
   it('builds a plain-text summary of coverage, follow-ups, and actions', () => {
@@ -269,10 +271,11 @@ describe('follow-ups & summary', () => {
         log: [{ accountId: 'dev-1', kind: 'update', taskKey: 'T-1', at: 'x' }, { accountId: 'dev-1', kind: 'reassign', taskKey: 'T-2', detail: 'Bob Jones', at: 'y' }],
       },
     });
-    expect(text).toContain('Standup 2026-03-07 — 1/2 reviewed');
-    expect(text).toContain('- Alice Smith: Flagged, No check-in today');
-    expect(text).toContain('- Bob Jones: At risk, No check-in today');
-    expect(text).toContain('Not reviewed: Bob Jones');
+    expect(text).toContain('Standup 2026-03-07 — 1/2 visited');
+    expect(text).toContain('- Alice Smith: Flagged');
+    expect(text).not.toContain('At risk');
+    expect(text).not.toContain('No check-in');
+    expect(text).toContain('Not visited: Bob Jones');
     expect(text).toContain('- Alice Smith: Logged update on T-1; Reassigned T-2 to Bob Jones');
   });
 });

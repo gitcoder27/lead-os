@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   Activity,
   TriangleAlert,
@@ -13,7 +13,8 @@ import {
   UserRoundCheck,
 } from 'lucide-react';
 import type { StandupFeedEntry, StandupFeedResponse } from '@/types';
-import { describeFeedEntry, feedCounts, groupStandupFeed, type FeedGroup } from '@/lib/standup';
+import { describeFeedEntry, groupStandupFeed, type FeedGroup } from '@/lib/standup';
+import { useAuth } from '@/context/AuthContext';
 import { formatRelativeTime } from '@/lib/utils';
 import { SectionLabel, TONE_COLORS } from './StandupPrimitives';
 
@@ -45,6 +46,8 @@ export function StandupFeed({
   onSelectTask,
   onOpenTask,
   onCollapse,
+  note = false,
+  onReadThrough,
 }: {
   data: StandupFeedResponse | undefined;
   isLoading: boolean;
@@ -54,9 +57,15 @@ export function StandupFeed({
   onOpenTask: (taskKey: string) => void;
   /** docs/56 P1-07: hides the feed; the page keeps a slim rail to bring it back. */
   onCollapse?: () => void;
+  note?: boolean;
+  onReadThrough?: () => void;
 }) {
   const groups = useMemo(() => groupStandupFeed(data?.entries ?? []), [data]);
-  const counts = useMemo(() => feedCounts(data?.entries ?? []), [data]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (element && element.clientHeight > 0 && element.scrollHeight <= element.clientHeight && !data?.truncated && !isError && !isLoading) onReadThrough?.();
+  }, [data, isError, isLoading, onReadThrough]);
 
   return (
     <section className="flex min-h-0 flex-col" aria-label="Since last standup">
@@ -83,19 +92,15 @@ export function StandupFeed({
           </span>
         )}
       >
-        Since last standup
+        Changes
       </SectionLabel>
 
-      {data && groups.length > 0 && (
-        <div className="mb-2.5 flex flex-wrap gap-1.5">
-          {counts.blockers > 0 && <CountChip color={TONE_COLORS.danger} label={`${counts.blockers} blocker${counts.blockers === 1 ? '' : 's'}`} />}
-          {counts.statusChanges > 0 && <CountChip label={`${counts.statusChanges} status`} />}
-          {counts.updates > 0 && <CountChip label={`${counts.updates} update${counts.updates === 1 ? '' : 's'}`} />}
-          {counts.checkins > 0 && <CountChip color={TONE_COLORS.info} label={`${counts.checkins} check-in${counts.checkins === 1 ? '' : 's'}`} />}
-        </div>
-      )}
+      {data?.truncated && <p role="status" className="mb-3 text-xs">Showing the latest 120 events and 120 notes. Earlier changes remain in task history; this feed boundary will not advance.</p>}
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-0.5" onScroll={(event) => {
+        const element = event.currentTarget;
+        if (element.clientHeight > 0 && element.scrollTop + element.clientHeight >= element.scrollHeight - 4 && !data?.truncated && !isError && !isLoading) onReadThrough?.();
+      }}>
         {isLoading ? (
           <div className="space-y-2" aria-busy="true" aria-label="Loading feed">
             {[70, 55, 62].map((width) => (
@@ -119,16 +124,14 @@ export function StandupFeed({
           </div>
         ) : groups.length === 0 ? (
           <div
-            className="rounded-xl px-4 py-8 text-center"
-            style={{ background: 'var(--bg-secondary)', border: '1px dashed var(--border-strong)' }}
+            className="py-3"
           >
-            <p className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>Quiet since {data ? windowLabel(data.windowStart) : 'the last standup'}</p>
-            <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>No updates, status changes, or check-ins in the window.</p>
+            <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>No changes in this window.</p>
           </div>
         ) : (
           <div className="space-y-2">
             {groups.map((group) => (
-              <FeedGroupCard key={group.id} group={group} onSelectTask={onSelectTask} onOpenTask={onOpenTask} />
+              <FeedGroupCard key={group.id} group={group} onSelectTask={onSelectTask} onOpenTask={onOpenTask} note={note} />
             ))}
           </div>
         )}
@@ -141,18 +144,20 @@ function FeedGroupCard({
   group,
   onSelectTask,
   onOpenTask,
+  note,
 }: {
   group: FeedGroup;
   onSelectTask: (taskKey: string) => void;
   onOpenTask: (taskKey: string) => void;
+  note: boolean;
 }) {
+  const { user } = useAuth();
   const urgent = group.importance >= 3;
   return (
     <div
-      className="overflow-hidden rounded-xl"
+      className="overflow-hidden border-b py-2"
       style={{
-        background: 'var(--bg-secondary)',
-        border: `1px solid ${urgent ? 'color-mix(in srgb, var(--danger) 34%, var(--border))' : 'var(--border)'}`,
+        borderColor: urgent ? 'var(--danger)' : 'var(--border)',
       }}
     >
       <div className="flex items-center gap-2 px-3 pb-1 pt-2.5">
@@ -165,12 +170,12 @@ function FeedGroupCard({
               title={`Focus ${group.taskKey}`}
             >
               <span className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
-              <span className="truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
+              <span className="break-words text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenTask(group.taskKey!)}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded transition-colors hover:bg-[var(--bg-tertiary)]"
               style={{ color: 'var(--text-muted)' }}
               aria-label={`Open ${group.taskKey}`}
               title="Open task"
@@ -179,7 +184,7 @@ function FeedGroupCard({
             </button>
           </>
         ) : (
-          <span className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--info)' }}>{group.title}</span>
+          <span className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{note ? 'Notes' : 'Notes and check-ins'}</span>
         )}
       </div>
       <ol className="px-3 pb-2.5">
@@ -197,17 +202,17 @@ function FeedGroupCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-[12px] font-semibold" style={{ color: view.tone === 'muted' ? 'var(--text-secondary)' : color }}>
-                    {view.label}
+                    {entry.kind === 'checkin' && (note || entry.authorType === 'manager') ? 'Note' : view.label}
                   </span>
                   {entry.authorType === 'manager' && (
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· you</span>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· {entry.authorId === user?.accountId ? 'you' : 'manager'}</span>
                   )}
-                  <span className="ml-auto shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
+                    <span className="ml-auto text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
                     {formatRelativeTime(entry.occurredAt)}
                   </span>
                 </div>
                 {view.text && (
-                  <p className="line-clamp-3 whitespace-pre-line text-[12.5px] leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="whitespace-pre-line break-words text-[12.5px] leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
                     {view.text}
                   </p>
                 )}
@@ -217,21 +222,6 @@ function FeedGroupCard({
         })}
       </ol>
     </div>
-  );
-}
-
-function CountChip({ label, color }: { label: string; color?: string }) {
-  return (
-    <span
-      className="rounded-md px-1.5 py-px text-[11px] font-semibold tabular-nums"
-      style={{
-        color: color ?? 'var(--text-secondary)',
-        background: color ? `color-mix(in srgb, ${color} 11%, transparent)` : 'var(--bg-tertiary)',
-        border: `1px solid ${color ? `color-mix(in srgb, ${color} 22%, transparent)` : 'var(--border)'}`,
-      }}
-    >
-      {label}
-    </span>
   );
 }
 

@@ -358,7 +358,7 @@ export class TodayService {
       });
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult, stateResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
-      measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId })),
+      measureSource(() => this.teamTrackerService.getAttentionSnapshot(date, { managerAccountId, workspaceId, timeZone: context.tz })),
       // Due follow-ups are re-filtered against now below; the horizon feeds midday "due soon".
       measureSource(() => this.managerDeskService.getTodayItems(managerAccountId, date, workspaceId, { followUpHorizonMs: DUE_SOON_MS })),
       measureSource(() => this.getSyncStatus(workspaceId)),

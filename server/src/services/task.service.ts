@@ -13,6 +13,7 @@ import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { ContactsService } from "./contacts.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { isoDatePart, todayIsoDate } from "../utils/date";
+import { addDaysToIsoDay, resolveTimeZone, zonedTimeToUtc } from "./today-clock";
 
 export type TaskRow = typeof tasks.$inferSelect;
 export type TaskLinkRow = typeof taskLinks.$inferSelect;
@@ -806,13 +807,13 @@ export class TaskService {
     return (await this.developerBoardRows([ownerId], date, workspaceId)).map(toProjection);
   }
 
-  async developerBoardRows(ownerIds: string[], date: string, workspaceId?: string): Promise<TaskRow[]> {
+  async developerBoardRows(ownerIds: string[], date: string, workspaceId?: string, timeZone?: string): Promise<TaskRow[]> {
     if (!ownerIds.length) return [];
     const scope = normalizeWorkspaceId(workspaceId);
     parseInput(dateOnly, date);
-    const [year, month, day] = date.split("-").map(Number);
-    const start = new Date(year!, month! - 1, day!).toISOString();
-    const end = dayEnd(date);
+    const zone = resolveTimeZone(timeZone);
+    const start = zonedTimeToUtc(date, 0, 0, zone).toISOString();
+    const end = zonedTimeToUtc(addDaysToIsoDay(date, 1), 0, 0, zone).toISOString();
     const rows = await db.select().from(tasks)
       .where(and(
         eq(tasks.workspaceId, scope),
@@ -828,7 +829,7 @@ export class TaskService {
    * Developer history projection: the tasks present on that date, i.e. the
    * day_focus rows for the day. Mirrors buildHistoricalDeveloperDay.
    */
-  async projectDeveloperHistoryDay(ownerId: string, date: string, workspaceId?: string): Promise<TaskProjection[]> {
+  async projectDeveloperHistoryDay(ownerId: string, date: string, workspaceId?: string, timeZone?: string): Promise<TaskProjection[]> {
     const scope = normalizeWorkspaceId(workspaceId);
     const rows = await db.select({ task: tasks }).from(dayFocus)
       .innerJoin(tasks, eq(tasks.id, dayFocus.taskId))
@@ -840,7 +841,7 @@ export class TaskService {
       ))
       .orderBy(dayFocus.position, dayFocus.id);
     const history = await this.events.historyForTasks(rows.map((row) => row.task.id), scope);
-    const end = dayEnd(date);
+    const end = zonedTimeToUtc(addDaysToIsoDay(date, 1), 0, 0, resolveTimeZone(timeZone)).toISOString();
     return rows.flatMap(({ task }) => {
       if (task.createdAt >= end || (task.deletedAt && task.deletedAt < end)) return [];
       const projected = { ...task };

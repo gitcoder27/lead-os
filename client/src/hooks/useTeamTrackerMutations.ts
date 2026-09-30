@@ -191,6 +191,7 @@ export function useAddCheckIn(date: string) {
     mutationFn: (params: {
       accountId: string;
       summary: string;
+      requestId?: string;
       status?: TrackerDeveloperStatus;
       taskKeys?: string[];
       /** P0-S6: `private` keeps the check-in manager-only. */
@@ -199,6 +200,7 @@ export function useAddCheckIn(date: string) {
       api.post<TrackerCheckIn>(`/team-tracker/${params.accountId}/checkins`, {
         date,
         summary: params.summary,
+        requestId: params.requestId,
         status: params.status,
         taskKeys: params.taskKeys,
         visibility: params.visibility,

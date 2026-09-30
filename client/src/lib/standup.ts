@@ -1,4 +1,6 @@
 import type {
+  RecordStandupSessionRequest,
+  RecordStandupSessionResponse,
   StandupFeedEntry,
   SurfaceTask,
   TaskEventSummary,
@@ -34,7 +36,7 @@ export function openTasksFor(day: TrackerDeveloperDay | undefined): StandupTask[
   if (!day) return [];
   if (day.tasks?.length) {
     return day.tasks
-      .filter((task): task is SurfaceTask => OPENISH.has(task.status))
+      .filter((task): task is SurfaceTask => OPENISH.has(task.status) && !task.checkInRequest)
       .sort((left, right) => left.position - right.position)
       .map((task) => ({
         taskKey: task.taskKey,
@@ -58,7 +60,7 @@ export function openTasksFor(day: TrackerDeveloperDay | undefined): StandupTask[
 export function doneTodayFor(day: TrackerDeveloperDay | undefined): Array<{ taskKey: string; title: string }> {
   if (!day) return [];
   if (day.tasks?.length) {
-    return day.tasks.filter((task) => task.status === 'done').map((task) => ({ taskKey: task.taskKey, title: task.title }));
+    return day.tasks.filter((task) => task.status === 'done' && !task.checkInRequest).map((task) => ({ taskKey: task.taskKey, title: task.title }));
   }
   return day.completedItems.flatMap((item) => (item.taskKey ? [{ taskKey: item.taskKey, title: item.title }] : []));
 }
@@ -73,10 +75,7 @@ export interface DayStats {
 }
 
 export function checkInsToday(day: TrackerDeveloperDay, date: string): number {
-  if (day.checkIns.length) return day.checkIns.length;
-  // Fallback when the exact-day record isn't loaded: the effective day's
-  // last check-in still counts if it happened on the standup date.
-  return day.lastCheckInAt && getLocalIsoDate(new Date(day.lastCheckInAt)) === date ? 1 : 0;
+  return day.checkIns.filter((entry) => entry.authorType === 'developer' && getLocalIsoDate(new Date(entry.createdAt)) === date).length;
 }
 
 export function dayStats(day: TrackerDeveloperDay, date: string): DayStats {
@@ -87,7 +86,7 @@ export function dayStats(day: TrackerDeveloperDay, date: string): DayStats {
     blocked: open.filter((task) => task.status === 'blocked').length,
     doneToday: doneTodayFor(day).length,
     checkInsToday: checkInsToday(day, date),
-    lastCheckInAt: day.lastCheckInAt,
+    lastCheckInAt: day.checkIns.filter((entry) => entry.authorType === 'developer').map((entry) => entry.createdAt).sort().at(-1),
   };
 }
 
@@ -105,6 +104,17 @@ export interface StandupLogEntry {
 }
 
 export interface StandupSession {
+  roundId?: string;
+  order?: string[];
+  currentId?: string;
+  taskKey?: string;
+  view?: 'person' | 'wrapup';
+  acknowledged?: string[];
+  reviewTimes?: Record<string, string>;
+  feedSeenThrough?: Record<string, string>;
+  noteDrafts?: Record<string, { text: string; visibility: 'shared' | 'private'; requestId: string; submitted?: boolean; taskKeys?: string[] }>;
+  request?: RecordStandupSessionRequest;
+  receipt?: RecordStandupSessionResponse;
   reviewed: string[];
   flagged: string[];
   /** docs/56 P1-07: optional one-line reason per flagged account. */
@@ -117,6 +127,10 @@ export interface StandupSession {
 export const EMPTY_STANDUP_SESSION: StandupSession = { reviewed: [], flagged: [], log: [] };
 
 export type StandupSessionAction =
+  | { type: 'patch'; patch: Partial<StandupSession> }
+  | { type: 'acknowledge'; ids: string[] }
+  | { type: 'note_draft'; accountId: string; draft: NonNullable<StandupSession['noteDrafts']>[string] }
+  | { type: 'note_saved'; accountId: string; requestId: string }
   | { type: 'review'; accountId: string; at: string }
   | { type: 'toggle_flag'; accountId: string; at: string }
   /** Flag with an optional one-line reason (an empty reason clears any earlier one). */
@@ -126,10 +140,22 @@ export type StandupSessionAction =
 
 export function standupSessionReducer(state: StandupSession, action: StandupSessionAction): StandupSession {
   switch (action.type) {
+    case 'patch':
+      return { ...state, ...action.patch };
+    case 'acknowledge':
+      return { ...state, acknowledged: [...new Set([...(state.acknowledged ?? []), ...action.ids])] };
+    case 'note_draft':
+      return { ...state, noteDrafts: { ...state.noteDrafts, [action.accountId]: action.draft } };
+    case 'note_saved': {
+      if (state.noteDrafts?.[action.accountId]?.requestId !== action.requestId) return state;
+      const drafts = { ...state.noteDrafts };
+      delete drafts[action.accountId];
+      return { ...state, noteDrafts: drafts };
+    }
     case 'review':
       return state.reviewed.includes(action.accountId)
         ? state
-        : { ...state, startedAt: state.startedAt ?? action.at, reviewed: [...state.reviewed, action.accountId] };
+        : { ...state, startedAt: state.startedAt ?? action.at, reviewed: [...state.reviewed, action.accountId], reviewTimes: { ...state.reviewTimes, [action.accountId]: action.at } };
     case 'toggle_flag': {
       const unflag = state.flagged.includes(action.accountId);
       return withFlagReasons(
@@ -157,7 +183,7 @@ export function standupSessionReducer(state: StandupSession, action: StandupSess
     case 'log': {
       // S2: any successful write for a person also counts as reviewing them.
       const reviewed = state.reviewed.includes(action.entry.accountId) ? state.reviewed : [...state.reviewed, action.entry.accountId];
-      return { ...state, startedAt: state.startedAt ?? action.entry.at, reviewed, log: [...state.log, action.entry] };
+      return { ...state, startedAt: state.startedAt ?? action.entry.at, reviewed, reviewTimes: { ...state.reviewTimes, [action.entry.accountId]: state.reviewTimes?.[action.entry.accountId] ?? action.entry.at }, log: [...state.log, action.entry] };
     }
     case 'reset':
       return EMPTY_STANDUP_SESSION;
@@ -200,6 +226,17 @@ export function loadStandupSession(key: string): StandupSession {
     if (!raw) return EMPTY_STANDUP_SESSION;
     const parsed = JSON.parse(raw) as Partial<StandupSession>;
     return {
+      ...(typeof parsed.roundId === 'string' && { roundId: parsed.roundId }),
+      ...(isStringArray(parsed.order) && { order: parsed.order }),
+      ...(typeof parsed.currentId === 'string' && { currentId: parsed.currentId }),
+      ...(typeof parsed.taskKey === 'string' && { taskKey: parsed.taskKey }),
+      ...(parsed.view === 'person' || parsed.view === 'wrapup' ? { view: parsed.view } : {}),
+      ...(isStringArray(parsed.acknowledged) && { acknowledged: parsed.acknowledged }),
+      ...(parseFlagReasons(parsed.reviewTimes) && { reviewTimes: parseFlagReasons(parsed.reviewTimes) }),
+      ...(parseFlagReasons(parsed.feedSeenThrough) && { feedSeenThrough: parseFlagReasons(parsed.feedSeenThrough) }),
+      ...(parsed.noteDrafts && typeof parsed.noteDrafts === 'object' && { noteDrafts: Object.fromEntries(Object.entries(parsed.noteDrafts).filter(([, draft]) => draft && typeof draft.text === 'string' && typeof draft.requestId === 'string')) }),
+      ...(parsed.request?.requestId === parsed.roundId && parsed.request && { request: parsed.request }),
+      ...(parsed.receipt?.session?.id && { receipt: parsed.receipt }),
       reviewed: isStringArray(parsed.reviewed) ? parsed.reviewed : [],
       flagged: isStringArray(parsed.flagged) ? parsed.flagged : [],
       ...(parseFlagReasons(parsed.flagReasons) && { flagReasons: parseFlagReasons(parsed.flagReasons) }),
@@ -213,15 +250,16 @@ export function loadStandupSession(key: string): StandupSession {
   }
 }
 
-export function saveStandupSession(key: string, session: StandupSession): void {
+export function saveStandupSession(key: string, session: StandupSession): boolean {
   try {
-    if (session === EMPTY_STANDUP_SESSION || (!session.reviewed.length && !session.flagged.length && !session.log.length)) {
+    if (session === EMPTY_STANDUP_SESSION || (!session.roundId && !session.reviewed.length && !session.flagged.length && !session.log.length)) {
       window.sessionStorage.removeItem(key);
     } else {
       window.sessionStorage.setItem(key, JSON.stringify(session));
     }
+    return true;
   } catch {
-    // Storage can be unavailable (private mode, quota); the session still works in memory.
+    return false;
   }
 }
 
@@ -464,23 +502,21 @@ export function buildStandupSummary({
 }): string {
   const reviewed = new Set(session.reviewed);
   const flagged = new Set(session.flagged);
-  const totals = sessionTotals(session);
   const lines: string[] = [
-    `Standup ${date} — ${days.filter((day) => reviewed.has(day.developer.accountId)).length}/${days.length} reviewed`,
-    `Logged: ${totals.updates} updates · ${totals.checkins} ${days.some(usesCheckIn) ? 'check-ins' : 'notes'} · ${totals.closed} closed · ${totals.statusChanges} status changes`,
+    `Standup ${date} — ${days.filter((day) => reviewed.has(day.developer.accountId)).length}/${days.length} visited`,
   ];
   const followUps = days
-    .map((day) => ({ day, reasons: followUpReasons(day, date, flagged.has(day.developer.accountId), usesCheckIn(day), session.flagReasons?.[day.developer.accountId]) }))
-    .filter(({ reasons }) => needsFollowUp(reasons));
+    .filter((day) => flagged.has(day.developer.accountId))
+    .map((day) => ({ day, reason: cleanFlagReason(session.flagReasons?.[day.developer.accountId]) }));
   if (followUps.length) {
     lines.push('', 'Follow up:');
-    for (const { day, reasons } of followUps) {
-      lines.push(`- ${day.developer.displayName}: ${reasons.map((reason) => reason.label).join(', ')}`);
+    for (const { day, reason } of followUps) {
+      lines.push(`- ${day.developer.displayName}: Flagged${reason ? `: ${reason}` : ''}`);
     }
   }
   const unreviewed = days.filter((day) => !reviewed.has(day.developer.accountId));
   if (unreviewed.length) {
-    lines.push('', `Not reviewed: ${unreviewed.map((day) => day.developer.displayName).join(', ')}`);
+    lines.push('', `Not visited: ${unreviewed.map((day) => day.developer.displayName).join(', ')}`);
   }
   const logged = days.filter((day) => session.log.some((entry) => entry.accountId === day.developer.accountId));
   if (logged.length) {

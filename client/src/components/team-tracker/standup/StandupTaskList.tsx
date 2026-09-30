@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, CirclePlus, Flag } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, CirclePlus, Flag } from 'lucide-react';
 import type { StandupTask } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
 import { TaskStatusGlyph } from '@/components/tasks/TaskMenus';
@@ -37,30 +37,19 @@ export function StandupTaskList({
   /** Update composer for the focused task, rendered directly under the list. */
   composer?: ReactNode;
 }) {
-  const [showDone, setShowDone] = useState(true);
+  const [showDone, setShowDone] = useState(false);
 
   return (
     <section>
-      <SectionLabel
-        right={
-          tasks.length > 0 ? (
-            <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <Kbd subtle>j</Kbd>
-              <Kbd subtle>k</Kbd>
-              to move
-            </span>
-          ) : null
-        }
-      >
-        Open tasks · {tasks.length}
+      <SectionLabel right={<button type="button" className="ui-icon-btn" onClick={onAdd} aria-label={`Add task for ${ownerName}`} title="Add task"><CirclePlus size={16} /></button>}>
+        Work
       </SectionLabel>
 
       {tasks.length === 0 ? (
-        <div className="rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+        <div>
           <EmptyState
             compact
             title="No open tasks"
-            body={`Nothing planned for ${ownerName.split(' ')[0]} — add what they said they're picking up.`}
             action={
               <button type="button" onClick={onAdd} className="ui-btn">
                 <CirclePlus size={13} /> Add task <Kbd subtle>n</Kbd>
@@ -70,7 +59,7 @@ export function StandupTaskList({
         </div>
       ) : (
         <div
-          className="overflow-hidden rounded-xl"
+          className="overflow-hidden rounded-lg"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
           role="listbox"
           aria-label={`${ownerName}'s tasks`}
@@ -89,6 +78,9 @@ export function StandupTaskList({
                 ref={(el) => registerRow(task.taskKey, el)}
                 onClick={() => onFocusIndex(index)}
                 onDoubleClick={() => onOpen(task.taskKey)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); onOpen(task.taskKey); }
+                }}
                 // docs/54 D3: the list-row idiom from /tasks — focus is a tint plus a
                 // keyboard ring; the left accent bar is reserved for "featured".
                 // j/k moves the focus state without moving DOM focus, so the ring
@@ -97,15 +89,14 @@ export function StandupTaskList({
                 style={{
                   borderColor: 'var(--border)',
                   background: focused ? 'color-mix(in srgb, var(--bg-tertiary) 85%, transparent)' : undefined,
-                  boxShadow: focused ? 'inset 0 0 0 1.5px var(--border-active)' : undefined,
                 }}
               >
                 <span className="flex min-h-[38px] items-center gap-2.5">
                   <TaskStatusGlyph status={task.status} />
-                  <span className="w-12 shrink-0 font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-disabled)' }}>
+                  <span className="shrink-0 font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {task.taskKey}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <span className="min-w-0 flex-1 break-words py-2 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
                     {task.title}
                   </span>
                   {isNew && (
@@ -124,7 +115,7 @@ export function StandupTaskList({
                   {task.status === 'blocked' && <StatusTag color="var(--danger)">Blocked</StatusTag>}
                 </span>
                 {latest && (
-                  <span className="-mt-1.5 flex items-center gap-1.5 pb-2 pl-[83px] text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="flex flex-wrap items-center gap-1.5 pb-2 pl-6 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                     <span className="min-w-0 truncate">↳ {latest.excerpt}</span>
                     <span className="shrink-0 tabular-nums">· {formatRelativeTime(latest.occurredAt)}</span>
                   </span>
@@ -135,7 +126,13 @@ export function StandupTaskList({
         </div>
       )}
 
-      {composer && <div className="mt-2">{composer}</div>}
+      {composer && tasks[focusedIndex] && <div className="mt-3 border-l-2 pl-3" style={{ borderColor: 'var(--accent)' }}>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="min-w-0 flex-1 break-words" style={{ color: 'var(--text-secondary)' }}>{tasks[focusedIndex]!.taskKey} · {tasks[focusedIndex]!.title}</span>
+          <button type="button" className="ui-icon-btn shrink-0" aria-label={`Open ${tasks[focusedIndex]!.taskKey}`} title="Open task details" onClick={() => onOpen(tasks[focusedIndex]!.taskKey)}><ArrowUpRight size={16} /></button>
+        </div>
+        {composer}
+      </div>}
 
       {doneToday.length > 0 && (
         <div className="mt-4">

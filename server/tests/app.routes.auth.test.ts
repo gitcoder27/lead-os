@@ -17,6 +17,10 @@ const managerOnlyCases = [
   { method: "GET", url: "/api/config" },
   { method: "GET", url: "/api/tags" },
   { method: "GET", url: "/api/team-tracker?date=2026-03-08" },
+  { method: "GET", url: "/api/team-tracker/standup/feed?accountId=dev-1" },
+  { method: "GET", url: "/api/team-tracker/standup/session/latest" },
+  { method: "POST", url: "/api/team-tracker/standup/session", body: {} },
+  { method: "POST", url: "/api/team-tracker/standup/reviews", body: {} },
   { method: "GET", url: "/api/today?date=2026-03-08" },
   { method: "GET", url: "/api/manager-actions?date=2026-03-08" },
   {

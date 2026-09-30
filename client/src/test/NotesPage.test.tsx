@@ -551,7 +551,7 @@ describe('NotesPage', () => {
     renderPage({ onOpenTarget });
 
     const toggle = screen.getByRole('button', {
-      name: /Standup done, 2 flagged\s*3 carried in\s*2 follow-ups due\s*1:1 with Deepak/,
+      name: /Standup saved, 2 flagged in that round\s*3 carried in\s*2 follow-ups due\s*1:1 with Deepak/,
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
@@ -565,7 +565,7 @@ describe('NotesPage', () => {
       developerAccountId: 'dev-deepak',
       panel: 'one-on-one',
     });
-    expect(screen.getByRole('button', { name: /Standup done at .* · 5 reviewed · 2 flagged/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Standup saved at .* · 5 visited · 2 flagged in that round/ })).toBeInTheDocument();
     expect(editorEl().value).not.toContain('Standup');
   });
 

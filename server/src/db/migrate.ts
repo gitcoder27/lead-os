@@ -716,6 +716,8 @@ const alterStatements = [
   "ALTER TABLE team_tracker_checkins ADD COLUMN author_type TEXT NOT NULL DEFAULT 'manager'",
   "ALTER TABLE team_tracker_checkins ADD COLUMN author_account_id TEXT",
   "ALTER TABLE team_tracker_checkins ADD COLUMN visibility TEXT NOT NULL DEFAULT 'shared'",
+  "ALTER TABLE team_tracker_checkins ADD COLUMN request_id TEXT",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_request ON team_tracker_checkins(workspace_id, author_type, author_account_id, request_id)",
   "CREATE TABLE IF NOT EXISTS team_tracker_saved_views (id INTEGER PRIMARY KEY AUTOINCREMENT, manager_account_id TEXT NOT NULL, name TEXT NOT NULL, search_query TEXT, summary_filter TEXT NOT NULL DEFAULT 'all', sort_by TEXT NOT NULL DEFAULT 'name', group_by TEXT NOT NULL DEFAULT 'none', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_tracker_saved_views_manager ON team_tracker_saved_views(manager_account_id)",
   "CREATE INDEX IF NOT EXISTS idx_tracker_days_workspace_developer_date ON team_tracker_days(workspace_id, developer_account_id, date DESC)",
@@ -761,6 +763,8 @@ const alterStatements = [
   // docs/56 P1-07: optional flag reasons on a sealed round, and per-person reviews
   // recorded as they happen (a manager touch even when the round is never sealed).
   "ALTER TABLE standup_sessions ADD COLUMN flag_reasons_json TEXT NOT NULL DEFAULT '{}'",
+  "ALTER TABLE standup_sessions ADD COLUMN follow_ups_json TEXT NOT NULL DEFAULT '[]'",
+  "ALTER TABLE standup_sessions ADD COLUMN feed_seen_json TEXT NOT NULL DEFAULT '{}'",
   "CREATE TABLE IF NOT EXISTS standup_reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL DEFAULT 'default', manager_account_id TEXT NOT NULL, developer_account_id TEXT NOT NULL, date TEXT NOT NULL, reviewed_at TEXT NOT NULL)",
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_standup_reviews_person_day ON standup_reviews(workspace_id, manager_account_id, developer_account_id, date)",
   "CREATE INDEX IF NOT EXISTS idx_standup_reviews_developer ON standup_reviews(workspace_id, developer_account_id, reviewed_at)",

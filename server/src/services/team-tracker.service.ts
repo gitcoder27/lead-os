@@ -39,6 +39,7 @@ import type {
   StandupSessionRecord,
   StandupSessionLogEntry,
   RecordStandupSessionResponse,
+  RecordStandupSessionRequest,
   RecordStandupReviewsResponse,
   LatestStandupSessionResponse,
 } from "shared/types";
@@ -56,6 +57,8 @@ import {
   dayFocus,
   standupSessions,
   standupReviews,
+  taskLinks,
+  todayCheckInAsks,
   tasks,
   oneOnOneSeries,
   oneOnOneSessions,
@@ -80,7 +83,9 @@ import { TaskEventsService, type TaskEventActor, type TaskEventInput } from "./t
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
 import { surfaceTaskToWorkItem } from "./task-view-models";
 import { TASK_KEY_PATTERN } from "shared/types";
+import { resolveTimeZone } from "./today-clock";
 import type { SurfaceTask, TaskStatus } from "shared/types";
+const standupWrites = new Map<string, Promise<unknown>>();
 
 interface CarryForwardSourceItem {
   developerAccountId: string;
@@ -301,8 +306,8 @@ function endOfIsoDate(date: string): Date {
   return new Date(`${date}T23:59:59.999`);
 }
 
-function getTrackerViewMode(date: string): TeamTrackerViewMode {
-  return date < localTodayIso() ? "history" : "live";
+function getTrackerViewMode(date: string, timeZone?: string): TeamTrackerViewMode {
+  return date < todayIsoDate(new Date(), resolveTimeZone(timeZone)) ? "history" : "live";
 }
 
 function getMyDayViewMode(date: string): MyDayViewMode {
@@ -992,6 +997,7 @@ export class TeamTrackerService {
   private async loadBoardDays(
     date: string,
     options?: {
+      timeZone?: string;
       workspaceId?: string;
       managerAccountId?: string;
       query?: TeamTrackerBoardQuery;
@@ -1010,7 +1016,7 @@ export class TeamTrackerService {
       options?.query,
       workspaceId
     );
-    const viewMode = getTrackerViewMode(date);
+    const viewMode = getTrackerViewMode(date, options?.timeZone);
     const signalConfig = await this.getSignalConfig(workspaceId);
     const devRows = await db
       .select()
@@ -1043,10 +1049,12 @@ export class TeamTrackerService {
     const devDays = viewMode === "history"
       ? await Promise.all(
           activeDevelopers.map((developer) =>
-            this.buildHistoricalDeveloperDay(date, developer, signalConfig, workspaceId, viewer)
+            canonical
+              ? this.buildCanonicalDeveloperDay(date, developer, signalConfig, workspaceId, true, viewer, options?.timeZone)
+              : this.buildHistoricalDeveloperDay(date, developer, signalConfig, workspaceId, viewer)
           )
         )
-      : await this.buildLiveDeveloperDays(date, activeDevelopers, signalConfig, workspaceId, viewer);
+      : await this.buildLiveDeveloperDays(date, activeDevelopers, signalConfig, workspaceId, viewer, options?.timeZone);
 
     return { workspaceId, query, viewMode, devDays, inactiveDevelopers, canonical };
   }
@@ -1069,6 +1077,7 @@ export class TeamTrackerService {
   async getBoard(
     date: string,
     options?: {
+      timeZone?: string;
       workspaceId?: string;
       managerAccountId?: string;
       query?: TeamTrackerBoardQuery;
@@ -1077,6 +1086,11 @@ export class TeamTrackerService {
     const { workspaceId, query, viewMode, devDays, inactiveDevelopers, canonical } =
       await this.loadBoardDays(date, options);
     await this.decorateDayEvents(devDays, { kind: "manager", accountId: options?.managerAccountId ?? "", workspaceId });
+    const asks = await db.select({ taskKey: todayCheckInAsks.taskKey }).from(todayCheckInAsks).where(eq(todayCheckInAsks.workspaceId, workspaceId));
+    const askKeys = new Set(asks.map((ask) => ask.taskKey));
+    for (const day of devDays) for (const task of day.tasks ?? []) {
+      if (askKeys.has(task.taskKey)) task.checkInRequest = true;
+    }
 
     const summary = this.computeSummary(devDays);
     const visibleDevelopers = this.filterVisibleDeveloperDays(devDays, query);
@@ -1110,6 +1124,7 @@ export class TeamTrackerService {
   async getAttentionSnapshot(
     date: string,
     options?: {
+      timeZone?: string;
       workspaceId?: string;
       managerAccountId?: string;
       query?: TeamTrackerBoardQuery;
@@ -1370,10 +1385,24 @@ export class TeamTrackerService {
    */
   async recordStandupSession(
     managerAccountId: string,
+    input: RecordStandupSessionRequest,
+    workspaceId?: string,
+  ): Promise<RecordStandupSessionResponse> {
+    const key = JSON.stringify([normalizeWorkspaceId(workspaceId), managerAccountId]);
+    const previous = standupWrites.get(key) ?? Promise.resolve();
+    const pending = previous.catch(() => undefined).then(() => this.sealStandupSession(managerAccountId, input, workspaceId));
+    standupWrites.set(key, pending);
+    try { return await pending; }
+    finally { if (standupWrites.get(key) === pending) standupWrites.delete(key); }
+  }
+
+  private async sealStandupSession(
+    managerAccountId: string,
     input: {
       date: string;
       startedAt: string;
       reviewed: string[];
+      feedSeenThrough?: Record<string, string>;
       flagged: string[];
       /** docs/56 P1-07: optional one-line reason per flagged account. */
       flagReasons?: Record<string, string>;
@@ -1390,8 +1419,16 @@ export class TeamTrackerService {
       eq(standupSessions.managerAccountId, managerAccountId),
       eq(standupSessions.requestId, input.requestId),
     )).limit(1))[0];
-    if (existing) return { session: this.toSessionRecord(existing), followUps: [] };
+    if (existing) return { session: this.toSessionRecord(existing), followUps: JSON.parse(existing.followUpsJson) };
     const now = new Date().toISOString();
+    const wanted = [...new Set([...input.reviewed, ...input.flagged, ...input.log.map((entry) => entry.accountId)])];
+    const known = wanted.length ? await db.select({ id: developers.accountId }).from(developers)
+      .where(and(eq(developers.workspaceId, scope), inArray(developers.accountId, wanted))) : [];
+    if (!wanted.length || known.length !== wanted.length) throw new HttpError(400, "Round contains no people or an unknown person");
+    if (Date.parse(input.startedAt) > Date.parse(now)) throw new HttpError(400, "Round cannot start in the future");
+    const feedSeen = Object.fromEntries(Object.entries(input.feedSeenThrough ?? {}).filter(([id, time]) =>
+      input.reviewed.includes(id) && Number.isFinite(Date.parse(time)) && Date.parse(time) <= Date.parse(now))
+      .map(([id, time]) => [id, new Date(Math.min(Date.parse(time), Date.parse(input.startedAt))).toISOString()]));
     const principal: TaskPrincipal = { type: "manager", accountId: managerAccountId, workspaceId: scope };
     return runInTransaction(async () => {
       const row = (await db.insert(standupSessions).values({
@@ -1406,11 +1443,12 @@ export class TeamTrackerService {
         logJson: JSON.stringify(input.log),
         summary: input.summary,
         requestId: input.requestId,
+        feedSeenJson: JSON.stringify(feedSeen),
         createdAt: now,
       }).returning())[0]!;
       const followUps: RecordStandupSessionResponse["followUps"] = [];
       const reasons = cleanFlagReasons(input.flagReasons, input.flagged);
-      for (const accountId of input.flagged) {
+      for (const accountId of new Set(input.flagged)) {
         // A stale/unknown flagged id must not block sealing the round.
         try {
           const dev = await this.getDeveloperByAccountId(accountId, scope);
@@ -1419,10 +1457,19 @@ export class TeamTrackerService {
           const reasonLine = reason ? `Flagged in standup: ${reason}` : undefined;
           // docs/51 D6: sealing a second same-day round for the same person
           // reuses the still-open follow-up instead of stacking duplicates.
-          const existing = (await db.select({ taskKey: tasks.taskKey, details: tasks.details }).from(tasks).where(and(
+          const existing = (await db.select({ taskKey: tasks.taskKey, details: tasks.details }).from(tasks)
+            .innerJoin(taskLinks, and(eq(taskLinks.workspaceId, scope), eq(taskLinks.taskId, tasks.id)))
+            .where(and(
             eq(tasks.workspaceId, scope),
             eq(tasks.trackedByManagerId, managerAccountId),
-            eq(tasks.title, title),
+            eq(tasks.ownerType, "manager"),
+            eq(tasks.ownerId, managerAccountId),
+            eq(taskLinks.kind, "person"),
+            eq(taskLinks.ref, accountId),
+            sql`EXISTS (SELECT 1 FROM standup_sessions previous, json_each(previous.follow_ups_json) receipt
+              WHERE previous.workspace_id = ${scope} AND previous.manager_account_id = ${managerAccountId} AND previous.date = ${input.date}
+              AND json_extract(receipt.value, '$.accountId') = ${accountId} AND json_extract(receipt.value, '$.taskKey') = ${tasks.taskKey})`,
+            sql`EXISTS (SELECT 1 FROM json_each(${tasks.labelsJson}) WHERE value = 'category:follow_up')`,
             eq(tasks.scheduledOn, input.date),
             inArray(tasks.status, ["open", "active", "blocked"]),
             isNull(tasks.deletedAt),
@@ -1449,6 +1496,7 @@ export class TeamTrackerService {
           throw error;
         }
       }
+      await db.update(standupSessions).set({ followUpsJson: JSON.stringify(followUps) }).where(eq(standupSessions.id, row.id));
       return { session: this.toSessionRecord(row), followUps };
     });
   }
@@ -1461,7 +1509,7 @@ export class TeamTrackerService {
    */
   async recordStandupReviews(
     managerAccountId: string,
-    input: { date: string; accountIds: string[] },
+    input: { date: string; accountIds: string[]; reviewedAt?: Record<string, string> },
     workspaceId?: string,
   ): Promise<RecordStandupReviewsResponse> {
     const scope = normalizeWorkspaceId(workspaceId);
@@ -1475,15 +1523,17 @@ export class TeamTrackerService {
     const recorded = known.map((row) => row.accountId);
     const now = new Date().toISOString();
     for (const developerAccountId of recorded) {
+      const reviewedAt = input.reviewedAt?.[developerAccountId] ?? now;
+      if (!Number.isFinite(Date.parse(reviewedAt)) || Date.parse(reviewedAt) > Date.parse(now)) throw new HttpError(400, "Invalid review time");
       await db.insert(standupReviews).values({
         workspaceId: scope,
         managerAccountId,
         developerAccountId,
         date: input.date,
-        reviewedAt: now,
+        reviewedAt,
       }).onConflictDoUpdate({
         target: [standupReviews.workspaceId, standupReviews.managerAccountId, standupReviews.developerAccountId, standupReviews.date],
-        set: { reviewedAt: now },
+        set: { reviewedAt: sql`MAX(${standupReviews.reviewedAt}, ${reviewedAt})` },
       });
     }
     return { recorded };
@@ -1535,14 +1585,13 @@ export class TeamTrackerService {
   }
 
   /** Latest sealed standup for this manager — anchors the feed window (docs/50 v2). */
-  private async latestEndedStandupSessionAt(managerAccountId: string, scope: string): Promise<string | null> {
+  private async latestSeenStandupAt(developerAccountId: string, managerAccountId: string, scope: string): Promise<string | null> {
     const row = (await db
-      .select({ endedAt: standupSessions.endedAt })
+      .select({ seenAt: sql<string | null>`MAX((SELECT value FROM json_each(${standupSessions.feedSeenJson}) WHERE key = ${developerAccountId}))` })
       .from(standupSessions)
       .where(and(eq(standupSessions.workspaceId, scope), eq(standupSessions.managerAccountId, managerAccountId)))
-      .orderBy(desc(standupSessions.endedAt), desc(standupSessions.id))
       .limit(1))[0];
-    return row?.endedAt ?? null;
+    return row?.seenAt ?? null;
   }
 
   /**
@@ -1551,20 +1600,24 @@ export class TeamTrackerService {
    * Window: the manager's last sealed standup when one exists; otherwise a
    * rolling 24h fallback (72h when today is Monday, covering the weekend).
    */
-  async getStandupFeed(developerAccountId: string, managerAccountId: string, workspaceId?: string): Promise<StandupFeedResponse> {
+  async getStandupFeed(developerAccountId: string, managerAccountId: string, workspaceId?: string, timeZone?: string): Promise<StandupFeedResponse> {
     const scope = normalizeWorkspaceId(workspaceId);
     await this.taskKeys.assertPhase3Enabled(scope);
     await this.getDeveloperByAccountId(developerAccountId, scope);
-    const lastEnd = await this.latestEndedStandupSessionAt(managerAccountId, scope);
+    const lastEnd = await this.latestSeenStandupAt(developerAccountId, managerAccountId, scope);
     const anchored = lastEnd && !Number.isNaN(Date.parse(lastEnd)) ? new Date(lastEnd) : null;
-    const isMonday = new Date(`${todayIsoDate()}T12:00:00`).getDay() === 1;
-    const fallbackStart = new Date(Date.now() - (isMonday ? 72 : 24) * 60 * 60 * 1000);
+    const isMonday = new Date(`${todayIsoDate(new Date(), resolveTimeZone(timeZone))}T12:00:00Z`).getUTCDay() === 1;
+    const firstRound = (await db.select({ start: min(standupSessions.startedAt) }).from(standupSessions)
+      .where(and(eq(standupSessions.workspaceId, scope), eq(standupSessions.managerAccountId, managerAccountId))))[0]?.start;
+    const rollingStart = Date.now() - (isMonday ? 72 : 24) * 60 * 60 * 1000;
+    const fallbackStart = new Date(firstRound ? Math.min(rollingStart, Date.parse(firstRound) - 72 * 60 * 60 * 1000) : rollingStart);
     // A future-dated seal (clock skew) falls back rather than emptying the feed.
     const start = anchored && anchored.getTime() <= Date.now() ? anchored : fallbackStart;
     const windowStart = start.toISOString();
+    const windowEnd = new Date().toISOString();
     const windowHours = Math.max(1, Math.round((Date.now() - start.getTime()) / (60 * 60 * 1000)));
     const [eventRows, checkInRows] = await Promise.all([
-      this.eventsService.feedForOwner(developerAccountId, windowStart, scope),
+      this.eventsService.feedForOwner(developerAccountId, windowStart, scope, 121, windowEnd),
       db.select({ checkIn: teamTrackerCheckIns })
         .from(teamTrackerCheckIns)
         .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerCheckIns.dayId))
@@ -1572,11 +1625,13 @@ export class TeamTrackerService {
           eq(teamTrackerCheckIns.workspaceId, scope),
           eq(teamTrackerDays.developerAccountId, developerAccountId),
           gte(teamTrackerCheckIns.createdAt, windowStart),
+          lte(teamTrackerCheckIns.createdAt, windowEnd),
+          or(eq(teamTrackerCheckIns.visibility, "shared"), eq(teamTrackerCheckIns.authorAccountId, managerAccountId)),
         ))
-        .orderBy(desc(teamTrackerCheckIns.createdAt)),
+        .orderBy(desc(teamTrackerCheckIns.createdAt)).limit(121),
     ]);
     const entries: StandupFeedEntry[] = [
-      ...eventRows.map((row): StandupFeedEntry => ({
+      ...eventRows.slice(0, 120).map((row): StandupFeedEntry => ({
         id: `event:${row.id}`,
         kind: "event",
         occurredAt: row.occurredAt,
@@ -1585,16 +1640,19 @@ export class TeamTrackerService {
         type: row.type as StandupFeedEntry["type"],
         body: row.body,
         authorType: row.authorType as StandupFeedEntry["authorType"],
+        authorId: row.authorId ?? undefined,
         ...standupFeedMetaFields(row.type, row.metaJson),
       })),
-      ...checkInRows.map((row): StandupFeedEntry => ({
+      ...checkInRows.slice(0, 120).map((row): StandupFeedEntry => ({
         id: `checkin:${row.checkIn.id}`,
         kind: "checkin",
         occurredAt: row.checkIn.createdAt,
         summary: row.checkIn.summary,
+        authorType: row.checkIn.authorType as StandupFeedEntry["authorType"],
+        authorId: row.checkIn.authorAccountId ?? undefined,
       })),
     ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
-    return { entries, windowStart, windowHours, anchoredToSession: Boolean(anchored) };
+    return { entries, windowStart, windowEnd, windowHours, truncated: eventRows.length > 120 || checkInRows.length > 120, anchoredToSession: start === anchored };
   }
 
   async updateAvailability(
@@ -2152,6 +2210,7 @@ export class TeamTrackerService {
     date: string,
     params: {
       summary: string;
+      requestId?: string;
       status?: TrackerDeveloperStatus;
       rationale?: string;
       nextFollowUpAt?: string | null;
@@ -2167,6 +2226,18 @@ export class TeamTrackerService {
   ): Promise<TrackerCheckIn> {
     return runInTransaction(async () => {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    if (params.requestId && actor?.accountId) {
+      const existing = (await db.select({ checkIn: teamTrackerCheckIns, day: teamTrackerDays }).from(teamTrackerCheckIns)
+        .innerJoin(teamTrackerDays, eq(teamTrackerDays.id, teamTrackerCheckIns.dayId))
+        .where(and(eq(teamTrackerCheckIns.workspaceId, normalizedWorkspaceId), eq(teamTrackerCheckIns.authorType, actor.type),
+          eq(teamTrackerCheckIns.authorAccountId, actor.accountId), eq(teamTrackerCheckIns.requestId, params.requestId))).limit(1))[0];
+      if (existing) {
+        if (existing.day.developerAccountId !== accountId || existing.day.date !== date || existing.checkIn.summary !== params.summary.trim()
+          || existing.checkIn.visibility !== (params.visibility ?? "shared")) throw new HttpError(409, "This request already saved a different note");
+        const refs = await db.select({ taskKey: checkinTaskRefs.taskKey }).from(checkinTaskRefs).where(eq(checkinTaskRefs.checkinId, existing.checkIn.id));
+        return { ...mapCheckIn(existing.checkIn), taskKeys: refs.map((ref) => ref.taskKey) };
+      }
+    }
     await this.availability.assertAvailableForDate(accountId, date, normalizedWorkspaceId);
     const day = await this.ensureDay(date, accountId, normalizedWorkspaceId);
     const now = nowIso();
@@ -2197,6 +2268,7 @@ export class TeamTrackerService {
         authorType: actor?.type ?? "manager",
         authorAccountId: actor?.accountId ?? null,
         visibility: isPrivate ? "private" : "shared",
+        requestId: params.requestId,
         createdAt: now,
       })
       .returning();
@@ -3014,9 +3086,10 @@ export class TeamTrackerService {
     developerList: Developer[],
     signalConfig: TrackerSignalConfig,
     workspaceId?: string,
-    viewer?: TaskPrincipal
+    viewer?: TaskPrincipal,
+    timeZone?: string,
   ): Promise<TrackerDeveloperDay[]> {
-    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.buildCanonicalDeveloperDays(date, developerList, signalConfig, workspaceId, viewer);
+    if (await this.taskKeys.canonicalEnabled(workspaceId)) return this.buildCanonicalDeveloperDays(date, developerList, signalConfig, workspaceId, viewer, timeZone);
     if (developerList.length === 0) {
       return [];
     }
@@ -3189,15 +3262,15 @@ export class TeamTrackerService {
     });
   }
 
-  private async buildCanonicalDeveloperDay(date: string, developer: Developer, config: TrackerSignalConfig, workspaceId: string | undefined, history: boolean, viewer?: TaskPrincipal): Promise<TrackerDeveloperDay> {
+  private async buildCanonicalDeveloperDay(date: string, developer: Developer, config: TrackerSignalConfig, workspaceId: string | undefined, history: boolean, viewer?: TaskPrincipal, timeZone?: string): Promise<TrackerDeveloperDay> {
     const principal = viewer ?? { type: "manager" as const, accountId: "", workspaceId };
-    if (!history) return (await this.buildCanonicalDeveloperDays(date, [developer], config, workspaceId, principal))[0]!;
+    if (!history) return (await this.buildCanonicalDeveloperDays(date, [developer], config, workspaceId, principal, timeZone))[0]!;
     const scope = normalizeWorkspaceId(workspaceId);
     const dayRows = await db.select().from(teamTrackerDays).where(and(eq(teamTrackerDays.workspaceId, scope), eq(teamTrackerDays.developerAccountId, developer.accountId), lte(teamTrackerDays.date, date))).orderBy(desc(teamTrackerDays.date)).limit(1);
     const day = dayRows[0];
     const exact = day?.date === date ? day : undefined;
     const projected = history
-      ? await this.tasks.projectDeveloperHistoryDay(developer.accountId, date, scope)
+      ? await this.tasks.projectDeveloperHistoryDay(developer.accountId, date, scope, timeZone)
       : await this.tasks.projectDeveloperBoardDay(developer.accountId, date, scope);
     const taskRows = (await Promise.all(projected.map(async (projection) => {
       const task = await this.tasks.getByKey(projection.taskKey, scope);
@@ -3221,13 +3294,13 @@ export class TeamTrackerService {
       signals, isStale: signals.freshness.staleByTime, participates: developer.participates, statusUpdatedAt: effective?.statusUpdatedAt ?? undefined, createdAt: effective?.createdAt ?? `${date}T00:00:00Z`, updatedAt: effective?.updatedAt ?? `${date}T00:00:00Z` };
   }
 
-  private async buildCanonicalDeveloperDays(date: string, developerList: Developer[], config: TrackerSignalConfig, workspaceId?: string, viewer?: TaskPrincipal): Promise<TrackerDeveloperDay[]> {
+  private async buildCanonicalDeveloperDays(date: string, developerList: Developer[], config: TrackerSignalConfig, workspaceId?: string, viewer?: TaskPrincipal, timeZone?: string): Promise<TrackerDeveloperDay[]> {
     if (!developerList.length) return [];
     const scope = normalizeWorkspaceId(workspaceId);
     const principal = viewer ?? { type: "manager" as const, accountId: "", workspaceId: scope };
     const ownerIds = developerList.map((developer) => developer.accountId);
     const [taskRows, days, notes, recent] = await Promise.all([
-      this.tasks.developerBoardRows(ownerIds, date, scope),
+      this.tasks.developerBoardRows(ownerIds, date, scope, timeZone),
       db.select().from(teamTrackerDays).where(and(eq(teamTrackerDays.workspaceId, scope), inArray(teamTrackerDays.developerAccountId, ownerIds), lte(teamTrackerDays.date, date))).orderBy(desc(teamTrackerDays.date)),
       db.select().from(developerNotes).where(and(eq(developerNotes.workspaceId, scope), inArray(developerNotes.developerAccountId, ownerIds))),
       this.getRecentCheckInsByDeveloper(ownerIds, date, scope),

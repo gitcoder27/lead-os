@@ -17,7 +17,7 @@ interface TrackerIssueAssignmentsResponse {
 }
 
 function buildBoardUrl(date: string, query?: TeamTrackerBoardQuery): string {
-  const params = new URLSearchParams({ date });
+  const params = new URLSearchParams({ date, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
   if (query?.q) params.set('q', query.q);
   if (query?.summaryFilter && query.summaryFilter !== 'all') params.set('summaryFilter', query.summaryFilter);
   if (query?.sortBy) params.set('sortBy', query.sortBy);
@@ -61,7 +61,8 @@ export function useStandupFeed(accountId: string | undefined, enabled = true) {
   const authScopeKey = useAuthScopeKey();
   return useQuery<StandupFeedResponse>({
     queryKey: ['team-tracker', 'standup-feed', accountId, authScopeKey],
-    queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?accountId=${encodeURIComponent(accountId!)}`),
+    queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?${new URLSearchParams({ accountId: accountId!, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}`),
+    refetchInterval: enabled ? 30_000 : false,
     enabled: enabled && Boolean(accountId),
   });
 }

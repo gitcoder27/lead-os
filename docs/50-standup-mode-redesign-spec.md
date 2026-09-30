@@ -2,6 +2,9 @@
 
 Status: implemented. Surface: `/team?mode=standup` (`StandupMode`, P3-D5/D6).
 
+The **2026-09-30 trust and simplification update** below supersedes conflicting
+S1-S8 and v2 behavior. The original design is retained here as history.
+
 ## 0. The job
 
 A manager runs a **~10-minute daily review**: walk each developer in board
@@ -212,3 +215,70 @@ feed's "24h window" never matched the actual gap). v2 decisions:
 - Task rows open the drawer on single click (matching `/tasks`); double-click
   is gone.
 - Keys, layout, feed grouping and all S1–S8 decisions are unchanged.
+
+## 2026-09-30 trust and simplification update
+
+Based on [the critical review](62-standup-mode-review.md). The live review loop
+remains the priority; no attendance system, reporting, timers, or new work model.
+
+- Coverage is **visited**, not proof of attention or a developer check-in.
+  Leaving a person or logging a write retains the existing manager-touch rule.
+  Unsaved visits show a pending/error state; acknowledgements and original
+  timestamps survive refresh, with explicit retry and online recovery.
+- Roster order is fixed for the round. Person and task selection, flags, optional
+  reasons, person notes, and task update drafts survive same-tab navigation and
+  refresh. Task drafts retain task identity, privacy, event type, retry ID and
+  original person context. Finish exposes unsent drafts, including removed tasks.
+  Browser storage failures are disclosed; reload recovery is then unavailable.
+- Each round has one immutable seal request and one archive identity. A lost
+  response retries that request; successful seals retain a receipt. Archive
+  failure leaves **Round saved / Retry Notes archive** without resealing or
+  recreating follow-ups. Exit/Back preserve work. Reset and the archive checkbox
+  are removed. Successful archive completion clears the round.
+- Supporting browsers use Web Locks to permit one active tab per viewer/day.
+  Other tabs wait; a completed-round marker prevents a cloned tab from resuming
+  an already finished round. Without Web Locks, tabs remain independent;
+  server request IDs and serialized same-manager seals still protect retries.
+- Follow-up reuse uses manager, day and stable person link, plus a prior
+  Standup receipt. Same names and renames cannot merge or duplicate a known
+  follow-up. Unidentifiable legacy tasks are retained, not guessed at or renamed.
+  Follow-ups remain canonical manager-owned tasks; they are not automatically
+  Waiting / Delegated. Today, Notes and recall label recorded flags as history,
+  not unresolved task counts. Closing a task does not rewrite past rounds.
+- Team's live/history decision and canonical completion-day boundaries accept
+  the manager timezone, also passed by Today. Feed fallback uses the manager's
+  weekday. Feed bounds are UTC instants, per manager and person, capped at round
+  start so mid-round updates remain available next time. Only complete exposed
+  feeds advance; hidden/truncated feeds do not. Never-reviewed people retain a
+  conservative fallback based on the first saved round, so older changes may
+  repeat. Instructions, decisions and reassigned-work history are included.
+  Both event and note sources are bounded at 120 and disclose truncation.
+- The outer shell uses shared modal focus management and sits above the global
+  header but below task drawers/dialogs. Task navigation moves real focus;
+  Enter retains native button behavior. Global palette/Copilot/capture shortcuts
+  do not open from Standup. Existing higher layers own their keys.
+- One status control replaces repeated metrics and status pills. The footer
+  retains person navigation, update, note and flag; Finish/help stay in the
+  header. Flags are immediate, with an optional inline reason. Finish shows
+  coverage and explicit follow-ups only. Empty feeds collapse automatically;
+  completed work is collapsed initially. Generated check-in asks are excluded
+  by ask metadata, never title. Ordinary identically named tasks remain.
+  1:1 reminders are not Standup outcomes. Solo/non-participating people use
+  touch/note wording; only developer-authored check-ins satisfy participation.
+
+### Validation and limits
+
+Automated coverage includes task/person switching, reordered polling results,
+delayed success, draft recovery, lost seal and archive responses across refresh,
+repeat rounds, focus/Enter/Escape, same-named people, renames, concurrent seals,
+unrelated follow-ups, invalid dates/people, partial/mid-round feeds, truncation,
+instruction/decision events, reassignment, privacy, generated asks, UTC-midnight
+and Monday behavior, and real manager-only middleware. Shared composer tests
+also cover My Day and original-date retries. Backend tests use isolated databases.
+
+Browser validation was explicitly left to the user; the frontend-only preview
+was stopped. Actual two-tab lock transfer, browser Back, screen-reader behavior,
+light/dark contrast, narrow viewports, DST transitions and visual clipping remain
+manual checks. No runtime data, Jira sync/write, production deployment, new branch
+or commit was performed. Repository formatting is blocked by the unrelated local
+`.claude/settings.local.json`; it was not changed.

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { createTeamTrackerRouter } from "../src/routes/team-tracker";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
@@ -9,7 +9,7 @@ import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { eq } from "drizzle-orm";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
-import { configTable, developers, standupReviews, standupSessions, taskLinks, tasks, teamTrackerCheckIns, teamTrackerDays } from "../src/db/schema";
+import { configTable, developers, standupReviews, standupSessions, taskLinks, tasks, teamTrackerCheckIns, teamTrackerDays, todayCheckInAsks } from "../src/db/schema";
 import { todayIsoDate } from "../src/utils/date";
 import type { TaskStatus } from "shared/types";
 
@@ -39,6 +39,32 @@ function createTestApp() {
 }
 
 const app = createTestApp();
+afterEach(() => vi.useRealTimers());
+
+describe("Standup manager clock", () => {
+  it("keeps a manager's local today live across UTC midnight", async () => {
+    await enablePhase3();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-29T01:00:00Z"));
+    const response = await invoke("GET", "/api/team-tracker?date=2026-09-28&tz=America%2FLos_Angeles");
+    expect(response.body.viewMode).toBe("live");
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1", "default", "America/Los_Angeles");
+    expect(feed.windowHours).toBe(72);
+  });
+});
+
+describe("Standup person note retries", () => {
+  it("returns the same note and rejects a retry for another person", async () => {
+    await enablePhase3();
+    const body = { date: todayIsoDate(), summary: "Manager context", requestId: crypto.randomUUID() };
+    const first = await invoke("POST", "/api/team-tracker/dev-1/checkins", body);
+    const second = await invoke("POST", "/api/team-tracker/dev-1/checkins", body);
+    expect(first.status).toBe(201);
+    expect(second.body.id).toBe(first.body.id);
+    expect(await db.select().from(teamTrackerCheckIns)).toHaveLength(1);
+    expect((await invoke("POST", "/api/team-tracker/dev-2/checkins", body)).status).toBe(409);
+  });
+});
 
 async function invoke(method: string, url: string, body?: unknown) {
   const { invoke: call } = await import("./helpers/http");
@@ -73,6 +99,51 @@ beforeEach(async () => {
 });
 
 describe("GET /api/team-tracker/standup/feed (P3-D5/D6)", () => {
+  it("includes instructions and decisions and discloses truncation", async () => {
+    await enablePhase3();
+    const task = await createDevTask("active");
+    for (let index = 0; index < 121; index += 1) {
+      await eventsService.append({ workspaceId: "default", taskKey: task.taskKey, type: index % 2 ? "instruction" : "decision", meta: null, body: `Message ${index}` }, { type: "manager", accountId: "manager-1" });
+    }
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1");
+    expect(feed.truncated).toBe(true);
+    expect(feed.entries).toHaveLength(120);
+    expect(feed.entries.some((entry) => entry.type === "instruction")).toBe(true);
+    expect(feed.entries.some((entry) => entry.type === "decision")).toBe(true);
+    expect(feed.windowEnd).toBeTruthy();
+    expect(feed.entries.every((entry) => entry.authorId === "manager-1")).toBe(true);
+  });
+
+  it("retains shared changes when a task is reassigned away", async () => {
+    await enablePhase3();
+    const task = await createDevTask("open");
+    await eventsService.append({ workspaceId: "default", taskKey: task.taskKey, type: "update", body: "Before handoff", meta: null }, { type: "developer", accountId: "dev-1" });
+    await taskService.update(task.taskKey, { ownerType: "developer", ownerId: "dev-2" }, { type: "manager", accountId: "manager-1" });
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1");
+    expect(feed.entries.some((entry) => entry.body === "Before handoff")).toBe(true);
+    expect(feed.entries.some((entry) => entry.type === "assign")).toBe(true);
+  });
+
+  it("excludes generated check-in administration by metadata, not title", async () => {
+    await enablePhase3();
+    const generated = await createDevTask("open", "Send a check-in");
+    const ordinary = await createDevTask("open", "Send a check-in");
+    await db.insert(todayCheckInAsks).values({ managerAccountId: "manager-1", developerAccountId: "dev-1", date: todayIsoDate(), askedAt: new Date().toISOString(), title: generated.title, taskKey: generated.taskKey });
+    const board = await trackerService.getBoard(todayIsoDate());
+    const person = board.developers.find((entry) => entry.developer.accountId === "dev-1")!;
+    expect(person.tasks?.find((task) => task.taskKey === generated.taskKey)?.checkInRequest).toBe(true);
+    expect(person.tasks?.find((task) => task.taskKey === ordinary.taskKey)?.checkInRequest).toBeUndefined();
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1");
+    expect(feed.entries.some((entry) => entry.taskKey === generated.taskKey)).toBe(false);
+    expect(feed.entries.some((entry) => entry.taskKey === ordinary.taskKey)).toBe(true);
+  });
+
+  it("does not expose another manager's private person note", async () => {
+    await enablePhase3();
+    await trackerService.addCheckIn("dev-1", todayIsoDate(), { summary: "Private context", visibility: "private" }, { type: "manager", accountId: "manager-2" });
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1");
+    expect(feed.entries.some((entry) => entry.summary === "Private context")).toBe(false);
+  });
   it("404s while the Phase 3 flag is off", async () => {
     await enableCanonical();
     const response = await invoke("GET", "/api/team-tracker/standup/feed?accountId=dev-1");
@@ -212,9 +283,59 @@ describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
     const second = await invoke("POST", "/api/team-tracker/standup/session", payload);
     expect(second.status).toBe(201);
     expect(second.body.session.id).toBe(first.body.session.id);
-    expect(second.body.followUps).toEqual([]);
+    expect(second.body.followUps).toEqual(first.body.followUps);
     const sessions = await db.select().from(standupSessions);
     expect(sessions).toHaveLength(1);
+  });
+
+  it("serializes concurrent retries and same-day rounds without duplicate follow-ups", async () => {
+    await enablePhase3();
+    const payload = sessionPayload();
+    const [first, retry] = await Promise.all([
+      trackerService.recordStandupSession("manager-1", payload),
+      trackerService.recordStandupSession("manager-1", payload),
+    ]);
+    expect(retry).toEqual(first);
+    const [second, third] = await Promise.all([
+      trackerService.recordStandupSession("manager-1", sessionPayload()),
+      trackerService.recordStandupSession("manager-1", sessionPayload()),
+    ]);
+    expect(second.followUps).toEqual(first.followUps);
+    expect(third.followUps).toEqual(first.followUps);
+    expect(await db.select().from(standupSessions)).toHaveLength(3);
+    expect(await db.select().from(tasks)).toHaveLength(1);
+  });
+
+  it("does not reuse unrelated manager follow-ups linked to the same person", async () => {
+    await enablePhase3();
+    const principal = { type: "manager" as const, accountId: "manager-1" };
+    const ordinary = await taskService.create({ title: "Discuss next quarter", scheduledOn: todayIsoDate(), labels: ["category:follow_up"] }, principal);
+    await taskService.addLink(ordinary.taskKey, { kind: "person", ref: "dev-1" }, principal);
+    const result = await trackerService.recordStandupSession("manager-1", sessionPayload());
+    expect(result.followUps[0]?.taskKey).not.toBe(ordinary.taskKey);
+  });
+
+  it.each([
+    { date: "2026-02-30" },
+    { reviewed: [], flagged: [], log: [] },
+    { reviewed: ["unknown"] },
+    { startedAt: "2999-01-01T00:00:00Z" },
+  ])("rejects invalid or empty session input %j", async (overrides) => {
+    await enablePhase3();
+    expect((await invoke("POST", "/api/team-tracker/standup/session", sessionPayload(overrides))).status).toBe(400);
+    expect(await db.select().from(standupSessions)).toHaveLength(0);
+  });
+
+  it("keeps mid-round changes and a skipped person's earlier changes in the next feed", async () => {
+    await enablePhase3();
+    const startedAt = new Date(Date.now() - 3600000).toISOString();
+    const task = await createDevTask("open");
+    await eventsService.append({ workspaceId: "default", taskKey: task.taskKey, type: "update", body: "Arrived during round", meta: null, occurredAt: new Date(Date.now() - 1800000).toISOString() }, { type: "developer", accountId: "dev-1" });
+    await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ startedAt, reviewed: ["dev-1"], flagged: [], feedSeenThrough: { "dev-1": new Date().toISOString() } }));
+    const feed = await trackerService.getStandupFeed("dev-1", "manager-1");
+    expect(feed.entries.some((entry) => entry.body === "Arrived during round")).toBe(true);
+    const skipped = await trackerService.getStandupFeed("dev-2", "manager-1");
+    expect(Date.parse(skipped.windowStart)).toBeLessThanOrEqual(Date.parse(startedAt) - 72 * 3600000);
   });
 
   it("reuses the open follow-up when the same person is flagged again the same day (docs/51 D6)", async () => {
@@ -243,14 +364,14 @@ describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
     expect(all).toHaveLength(2);
   });
 
-  it("anchors the next standup feed to the sealed session end", async () => {
+  it("anchors only a seen person's feed conservatively to the round start", async () => {
     await enablePhase3();
     const task = await createDevTask("active", "Migration");
     await eventsService.append(
       { workspaceId: "default", taskKey: task.taskKey, type: "update", meta: null, body: "before seal", occurredAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
       { type: "developer", accountId: "dev-1" },
     );
-    const seal = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: [] }));
+    const seal = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ reviewed: ["dev-1"], flagged: [], feedSeenThrough: { "dev-1": new Date().toISOString() } }));
     expect(seal.status).toBe(201);
     await eventsService.append(
       { workspaceId: "default", taskKey: task.taskKey, type: "update", meta: null, body: "after seal" },
@@ -261,10 +382,12 @@ describe("POST /api/team-tracker/standup/session (docs/50 v2)", () => {
     expect(response.status).toBe(200);
     const feed = response.body;
     expect(feed.anchoredToSession).toBe(true);
-    expect(feed.windowStart).toBe(seal.body.session.endedAt);
+    expect(feed.windowStart).toBe(seal.body.session.startedAt);
     const bodies = feed.entries.map((entry: { body?: string | null }) => entry.body);
     expect(bodies).toContain("after seal");
     expect(bodies).not.toContain("before seal");
+    const skipped = await trackerService.getStandupFeed("dev-2", "manager-1");
+    expect(skipped.anchoredToSession).toBe(false);
   });
 
   it("does not anchor another manager's feed window", async () => {
@@ -353,7 +476,7 @@ describe("flag reasons and person links on the sealed follow-up (docs/56 P1-07)"
     expect(await personLinks(taskKey)).toHaveLength(1);
   });
 
-  it("adds the missing person link to an open follow-up sealed before links existed", async () => {
+  it("does not guess person identity from an unlinked legacy title", async () => {
     await enablePhase3();
     const legacy = await taskService.create(
       { title: "Standup follow-up: Bob Jones", scheduledOn: todayIsoDate(), labels: ["category:follow_up"] },
@@ -361,8 +484,19 @@ describe("flag reasons and person links on the sealed follow-up (docs/56 P1-07)"
     );
     expect(await personLinks(legacy.taskKey)).toHaveLength(0);
     const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload());
-    expect(response.body.followUps).toEqual([{ accountId: "dev-2", taskKey: legacy.taskKey }]);
-    expect((await personLinks(legacy.taskKey)).map((link) => link.ref)).toEqual(["dev-2"]);
+    expect(response.body.followUps[0].taskKey).not.toBe(legacy.taskKey);
+    expect(await personLinks(legacy.taskKey)).toHaveLength(0);
+  });
+
+  it("keeps same-named people separate and reuses links after people or tasks are renamed", async () => {
+    await enablePhase3();
+    await db.update(developers).set({ displayName: "Same Name" });
+    const first = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-1", "dev-2"] }));
+    expect(new Set(first.body.followUps.map((entry: { taskKey: string }) => entry.taskKey)).size).toBe(2);
+    await db.update(developers).set({ displayName: "Renamed Person" }).where(eq(developers.accountId, "dev-2"));
+    await db.update(tasks).set({ title: "Renamed follow-up" });
+    const second = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-1", "dev-2"] }));
+    expect(second.body.followUps).toEqual(first.body.followUps);
   });
 
   it("400s on a reason that is not a string", async () => {

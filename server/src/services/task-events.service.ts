@@ -310,7 +310,7 @@ export class TaskEventsService {
    * tasks for the standup feed. Shared visibility only — manager-private
    * events never surface here. Caller supplies the window start.
    */
-  async feedForOwner(ownerId: string, since: string, workspaceId?: string, limit = 120): Promise<(EventRow & { taskTitle: string })[]> {
+  async feedForOwner(ownerId: string, since: string, workspaceId?: string, limit = 120, until = new Date().toISOString()): Promise<(EventRow & { taskTitle: string })[]> {
     const scope = normalizeWorkspaceId(workspaceId);
     return db
       .select({ event: taskEvents, taskTitle: tasks.title })
@@ -318,12 +318,17 @@ export class TaskEventsService {
       .innerJoin(tasks, eq(tasks.id, taskEvents.taskId))
       .where(and(
         eq(taskEvents.workspaceId, scope),
-        eq(tasks.ownerType, "developer"),
-        eq(tasks.ownerId, ownerId),
+        or(and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, ownerId)),
+          sql`EXISTS (SELECT 1 FROM task_events assignment WHERE assignment.workspace_id = ${scope}
+            AND assignment.task_id = ${tasks.id} AND assignment.type = 'assign' AND assignment.occurred_at >= ${since}
+            AND ((json_extract(assignment.meta_json, '$.fromType') = 'developer' AND json_extract(assignment.meta_json, '$.fromId') = ${ownerId})
+              OR (json_extract(assignment.meta_json, '$.toType') = 'developer' AND json_extract(assignment.meta_json, '$.toId') = ${ownerId})))`),
         eq(taskEvents.visibility, "shared"),
+        sql`NOT EXISTS (SELECT 1 FROM today_check_in_asks ask WHERE ask.workspace_id = ${scope} AND ask.task_key = ${tasks.taskKey})`,
         isNull(taskEvents.redactedAt),
-        inArray(taskEvents.type, ["status", "blocker", "update", "assign", "created"]),
+        inArray(taskEvents.type, ["status", "blocker", "update", "instruction", "decision", "assign", "created"]),
         sql`${taskEvents.occurredAt} >= ${since}`,
+        sql`${taskEvents.occurredAt} <= ${until}`,
       ))
       .orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id))
       .limit(limit)

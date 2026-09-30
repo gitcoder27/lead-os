@@ -54,8 +54,8 @@ export function buildContextChips(
     chips.push({
       key: 'standup',
       icon: MessagesSquare,
-      label: `Standup done${time} · ${context.standup.reviewed} reviewed${flagged ? ` · ${flagged} flagged` : ''}`,
-      summary: flagged ? `Standup done, ${flagged} flagged` : 'Standup done',
+      label: `Standup saved${time} · ${context.standup.reviewed} visited${flagged ? ` · ${flagged} flagged in that round` : ''}`,
+      summary: flagged ? `Standup saved, ${flagged} flagged in that round` : 'Standup saved',
       tone: flagged > 0 ? 'warning' : undefined,
       onOpen: () => onOpenTarget({ type: 'view', view: 'team' }),
       openLabel: 'Open Team',

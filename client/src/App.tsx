@@ -1064,6 +1064,7 @@ function AppContent() {
       return;
     }
     const handler = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || document.querySelector('[data-testid="standup-mode"]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);

@@ -4,7 +4,7 @@ import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskEventsService } from "../services/task-events.service";
 import { TaskKeysService } from "../services/task-keys.service";
-import { TaskService, taskCreateSchema, taskUpdateSchema, taskLinkSchema, type TaskPrincipal } from "../services/task.service";
+import { TaskService, taskCreateSchema, taskExpectedSchema, taskUpdateSchema, taskLinkSchema, type TaskPrincipal } from "../services/task.service";
 import { TaskViewsService, decodeTaskViewDefinition } from "../services/task-views.service";
 import { todayIsoDate } from "../utils/date";
 import type { Request } from "express";
@@ -12,7 +12,7 @@ import type { Request } from "express";
 const key = z.string().trim().regex(/^[Tt]-\d{1,9}$/);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const bulkBody = z.object({
-  items: z.array(z.object({ key, changes: taskUpdateSchema.refine((changes) => Object.keys(changes).length > 0, "changes must not be empty") }).strict()).min(1).max(200),
+  items: z.array(z.object({ key, changes: taskUpdateSchema.refine((changes) => Object.keys(changes).length > 0, "changes must not be empty"), expected: taskExpectedSchema.optional() }).strict()).min(1).max(200),
 }).strict();
 const params = z.object({ key });
 const eventParams = params.extend({ eventId: z.string().regex(/^\d+$/) });

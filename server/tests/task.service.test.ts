@@ -10,6 +10,7 @@ import { SearchService } from "../src/services/search.service";
 import { WorkloadService } from "../src/services/workload.service";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { WorkspaceMaintenanceService } from "../src/services/workspace-maintenance.service";
+import { taskGuardFields, type ManagerTask, type TaskExpectedState, type TaskGuardField, type UpdateTaskRequest } from "shared/types";
 
 const service = new TaskService();
 const events = new TaskEventsService();
@@ -180,5 +181,93 @@ describe("canonical tasks", () => {
     await expect(service.create({ title: "Missing owner", ownerType: "developer" }, manager)).rejects.toMatchObject({ status: 400 });
     await expect(service.create({ title: "Inactive owner", ownerType: "developer", ownerId: "missing" }, manager)).rejects.toThrow();
     expect(await db.select().from(tasks)).toHaveLength(1);
+  });
+});
+/** docs/61 TS-01 (D1): the optional `expected` guard on bulk writes. */
+describe("bulk write guard", () => {
+  const dto = async (key: string) => (await service.toDto((await service.getByKey(key))!, manager)) as ManagerTask;
+  const pick = (task: ManagerTask, fields: TaskGuardField[]): TaskExpectedState => {
+    const state: Record<string, unknown> = {};
+    for (const field of fields) state[field] = field === "triaged" ? !task.needsTriage : field === "waitingOn" ? (task.waitingOn ? { type: task.waitingOn.type, ref: task.waitingOn.ref, label: task.waitingOn.label } : null) : task[field];
+    return state as TaskExpectedState;
+  };
+  const guarded = async (key: string, changes: UpdateTaskRequest) => ({ key, changes, expected: pick(await dto(key), taskGuardFields(changes)) });
+
+  it("refuses the whole undo when a later schedule change moved the same fields", async () => {
+    const task = await service.create({ title: "Plan", scheduledOn: "2099-01-01" }, manager);
+    await service.bulkUpdate([await guarded(task.taskKey, { scheduledOn: "2099-01-02", later: false })], manager);
+    const postA = pick(await dto(task.taskKey), ["later", "scheduledOn", "hideUntil", "triaged"]);
+    await service.bulkUpdate([await guarded(task.taskKey, { scheduledOn: "2099-01-03", later: false })], manager);
+
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { later: false, scheduledOn: "2099-01-01" }, expected: postA }], manager)).rejects.toMatchObject({ status: 409 });
+    expect((await service.getByKey(task.taskKey))!.scheduledOn).toBe("2099-01-03");
+  });
+
+  it("ignores an unrelated edit, and treats a value changed away and back as unchanged", async () => {
+    const task = await service.create({ title: "Plan", scheduledOn: "2099-01-01" }, manager);
+    await service.bulkUpdate([await guarded(task.taskKey, { scheduledOn: "2099-01-02", later: false })], manager);
+    const postA = pick(await dto(task.taskKey), ["later", "scheduledOn", "hideUntil", "triaged"]);
+    await service.update(task.taskKey, { title: "Renamed", priority: "high" }, manager);
+    await service.update(task.taskKey, { scheduledOn: "2099-01-09" }, manager);
+    await service.update(task.taskKey, { scheduledOn: "2099-01-02" }, manager);
+
+    const [row] = await service.bulkUpdate([{ key: task.taskKey, changes: { later: false, scheduledOn: "2099-01-01" }, expected: postA }], manager);
+    expect(row).toMatchObject({ scheduledOn: "2099-01-01", title: "Renamed" });
+  });
+
+  it("changes neither task when one of two conflicts, with no events or labels left behind", async () => {
+    const a = await service.create({ title: "A", scheduledOn: "2099-01-01" }, manager);
+    const b = await service.create({ title: "B", scheduledOn: "2099-01-01" }, manager);
+    const items = [await guarded(a.taskKey, { status: "done", labels: ["fresh-label"] }), await guarded(b.taskKey, { status: "done" })];
+    await service.update(b.taskKey, { status: "active" }, manager);
+    const eventsBefore = (await events.listRawForWorkspace()).length;
+
+    await expect(service.bulkUpdate(items, manager)).rejects.toMatchObject({ status: 409, message: `${b.taskKey}: Task changed since this action` });
+    expect((await service.getByKey(a.taskKey))).toMatchObject({ status: "open", labelsJson: null });
+    expect((await service.getByKey(b.taskKey))!.status).toBe("active");
+    expect((await events.listRawForWorkspace()).length).toBe(eventsBefore);
+  });
+
+  it("guards coupled fields: Later restores the resurface date and the Inbox marker", async () => {
+    const task = await service.create({ title: "Parked", later: true, hideUntil: "2099-02-01", scheduledOn: null }, manager);
+    await service.update(task.taskKey, { triaged: false }, manager);
+    const before = await dto(task.taskKey);
+    const forward: UpdateTaskRequest = { later: false, scheduledOn: "2099-01-05" };
+    await service.bulkUpdate([await guarded(task.taskKey, forward)], manager);
+    const post = pick(await dto(task.taskKey), taskGuardFields({ later: true, scheduledOn: null, hideUntil: "2099-02-01", triaged: false }));
+    const [row] = await service.bulkUpdate([{ key: task.taskKey, changes: { later: true, scheduledOn: null, hideUntil: before.hideUntil, triaged: false }, expected: post }], manager);
+    expect(row).toMatchObject({ later: 1, scheduledOn: null, hideUntil: "2099-02-01", needsTriage: 1 });
+  });
+
+  it("refuses a changed Inbox marker or waiting party, and accepts an unchanged party", async () => {
+    const task = await service.create({ title: "Chase", scheduledOn: null }, manager, { untriaged: true });
+    await service.update(task.taskKey, { waitingOn: { type: "text", label: "Legal" } }, manager);
+    const expected = pick(await dto(task.taskKey), taskGuardFields({ waitingOn: null }));
+    await service.bulkUpdate([{ key: task.taskKey, changes: { waitingOn: null }, expected }], manager);
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { waitingOn: null }, expected }], manager)).rejects.toMatchObject({ status: 409 });
+
+    await service.update(task.taskKey, { waitingOn: { type: "text", label: "Legal" } }, manager);
+    const party = { ...expected, waitingOn: { type: "text" as const, label: "Finance" } };
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { waitingOn: null }, expected: party }], manager)).rejects.toMatchObject({ status: 409 });
+    const inboxNow = { ...expected, waitingOn: { type: "text" as const, label: "Legal" }, triaged: false };
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { waitingOn: null }, expected: inboxNow }], manager)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("rejects a guard that omits a coupled field, and stays compatible without one", async () => {
+    const task = await service.create({ title: "Plan", scheduledOn: "2099-01-01" }, manager);
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { later: true }, expected: { later: false } }], manager)).rejects.toMatchObject({ status: 400 });
+    await expect(service.bulkUpdate([{ key: task.taskKey, changes: { status: "done" }, expected: { status: "open", bogus: 1 } as never }], manager)).rejects.toMatchObject({ status: 400 });
+    expect(taskGuardFields({ ownerType: "developer", ownerId: "dev-1" }).sort()).toEqual(["ownerId", "ownerType", "status", "triaged"]);
+    const [row] = await service.bulkUpdate([{ key: task.taskKey, changes: { status: "done" } }], manager);
+    expect(row!.status).toBe("done");
+  });
+
+  it("does not reveal another manager's private values through the guard", async () => {
+    const other = { type: "manager" as const, accountId: "manager-b", workspaceId: "default" };
+    const task = await service.create({ title: "Dev work", ownerType: "developer", ownerId: "dev-1" }, manager);
+    // The viewer sees `later: false` on a task they do not track; a stale-looking guard must not probe the real value.
+    const expected = { later: false, scheduledOn: task.scheduledOn, hideUntil: null, triaged: true };
+    const [row] = await service.bulkUpdate([{ key: task.taskKey, changes: { scheduledOn: "2099-01-04" }, expected }], other);
+    expect(row!.scheduledOn).toBe("2099-01-04");
   });
 });

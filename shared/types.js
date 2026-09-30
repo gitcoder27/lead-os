@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_WEEKLY_REVIEW_DAY = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.TASK_GUARD_FIELDS = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_WEEKLY_REVIEW_DAY = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isTaskHidden = isTaskHidden;
 exports.taskLane = taskLane;
 exports.dueAtForDate = dueAtForDate;
 exports.validateAttentionRules = validateAttentionRules;
+exports.taskGuardFields = taskGuardFields;
 exports.isNavPageId = isNavPageId;
 exports.sanitizeNavPreferences = sanitizeNavPreferences;
 exports.isCompleteNavPreferences = isCompleteNavPreferences;
@@ -149,6 +150,32 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
     sort: zod_1.z.enum(["scheduled", "updated", "created", "priority", "checkBy"]).optional(),
     group: zod_1.z.enum(["owner", "status", "label", "scheduled", "party", "meeting"]).optional(),
 }).strict();
+/** docs/61 TS-01 (D1): every field a bulk write can guard; the keys of `UpdateTaskRequest`. */
+exports.TASK_GUARD_FIELDS = [
+    "title", "details", "kind", "status", "ownerType", "ownerId", "later", "priority", "labels", "scheduledOn", "schedulePosition",
+    "dueAt", "followUpAt", "startsAt", "endsAt", "participants", "nextAction", "outcome", "parentId", "hideUntil", "waitingOn", "triaged",
+];
+/** Patch fields whose write also moves the triage marker (mirrors the server). */
+const TRIAGE_WRITE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status", "waitingOn"];
+/**
+ * docs/61 TS-01 (D1): the fields a patch overwrites, coupled ones included —
+ * schedule/Later/resurface move together, an owner change may reset status, and
+ * a triage decision moves the Inbox marker. A guarded item must expect all of
+ * them; the client builds the guard and the server rejects an incomplete one.
+ */
+function taskGuardFields(changes) {
+    const touches = (field) => Object.hasOwn(changes, field);
+    const fields = new Set(exports.TASK_GUARD_FIELDS.filter(touches));
+    if (touches("later") || touches("scheduledOn") || touches("hideUntil"))
+        for (const field of ["later", "scheduledOn", "hideUntil"])
+            fields.add(field);
+    if (touches("ownerType") || touches("ownerId"))
+        for (const field of ["ownerType", "ownerId", "status"])
+            fields.add(field);
+    if (TRIAGE_WRITE_FIELDS.some(touches))
+        fields.add("triaged");
+    return exports.TASK_GUARD_FIELDS.filter((field) => fields.has(field));
+}
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
     "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",

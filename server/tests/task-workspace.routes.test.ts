@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers, issues, taskEvents, tasks } from "../src/db/schema";
+import { configTable, developers, issues, taskEvents, tasks, workspaces } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { createTasksRouter } from "../src/routes/tasks";
@@ -372,5 +372,58 @@ describe("POST /api/tasks/bulk (docs/49 §10, D8)", () => {
 
   it("requires a manager session", async () => {
     expect((await invoke(app, { method: "POST", url: "/api/tasks/bulk", body: { items: [] } })).status).toBe(401);
+  });
+
+  describe("expected-state guard (docs/61 TS-01)", () => {
+    const bulk = (headers: Headers, items: unknown[]) => invoke(app, { method: "POST", url: "/api/tasks/bulk", headers, body: { items } });
+
+    it("applies a matching guard and refuses a stale one with 409 and no writes", async () => {
+      const headers = { cookie: await cookie("manager-a") };
+      const a = await createTask(headers, { title: "A", scheduledOn: shift(-3) });
+      const b = await createTask(headers, { title: "B", scheduledOn: shift(-1) });
+      const move = { later: false, scheduledOn: today };
+      const ok = await bulk(headers, [{ key: a.taskKey, changes: move, expected: { later: false, scheduledOn: shift(-3), hideUntil: null, triaged: true } }]);
+      expect(ok.status).toBe(200);
+      expect(ok.body.tasks[0].scheduledOn).toBe(today);
+
+      const stale = await bulk(headers, [
+        { key: b.taskKey, changes: move, expected: { later: false, scheduledOn: shift(-1), hideUntil: null, triaged: true } },
+        { key: a.taskKey, changes: move, expected: { later: false, scheduledOn: shift(-3), hideUntil: null, triaged: true } },
+      ]);
+      expect(stale.status).toBe(409);
+      expect(stale.body).toEqual({ error: `${a.taskKey}: Task changed since this action`, status: 409 });
+      expect((await db.select().from(tasks).where(eq(tasks.id, b.id)))[0]!.scheduledOn).toBe(shift(-1));
+    });
+
+    it("validates the guard shape", async () => {
+      const headers = { cookie: await cookie("manager-a") };
+      const task = await createTask(headers, { title: "One" });
+      const changes = { status: "done" };
+      for (const expected of [{}, { status: "finished" }, { status: "open", stray: 1 }, { later: false }, "open"]) {
+        expect((await bulk(headers, [{ key: task.taskKey, changes, expected }])).status).toBe(400);
+      }
+      expect((await bulk(headers, [{ key: task.taskKey, changes, expected: { status: "open" }, extra: true }])).status).toBe(400);
+      expect((await db.select().from(tasks).where(eq(tasks.id, task.id)))[0]!.status).toBe("open");
+    });
+
+    it("stays behind manager access, workspace isolation and private-field ownership", async () => {
+      const headersA = { cookie: await cookie("manager-a") };
+      const task = await createTask(headersA, { title: "A's", ownerType: "developer", ownerId: "dev-1" });
+      await auth.createUser({ username: "dev-user", displayName: "D", password: "secret123", role: "developer", developerAccountId: "dev-1" });
+      const now = new Date().toISOString();
+      await db.insert(workspaces).values({ id: "other", name: "Other", createdAt: now, updatedAt: now });
+      await db.insert(configTable).values([{ workspaceId: "other", key: "tasks_phase1_enabled", value: "true" }, { workspaceId: "other", key: "tasks_phase2_stage", value: "2c" }]);
+      await auth.createUser({ username: "elsewhere", displayName: "E", password: "secret123", role: "manager", workspaceId: "other" });
+      const guarded = [{ key: task.taskKey, changes: { status: "done" }, expected: { status: "open" } }];
+
+      expect((await bulk({ cookie: await cookie("dev-user") }, guarded)).status).toBe(403);
+      expect((await bulk({ cookie: await cookie("elsewhere") }, guarded)).status).toBe(404);
+      // Another manager gets the same generic refusal a stale guard gets: no stored values are echoed.
+      const headersB = { cookie: await cookie("manager-b") };
+      const probe = await bulk(headersB, [{ key: task.taskKey, changes: { labels: ["x"] }, expected: { labels: ["secret"], triaged: true } }]);
+      expect(probe.status).toBe(403);
+      expect(JSON.stringify(probe.body)).not.toContain("secret");
+      expect((await db.select().from(tasks).where(eq(tasks.id, task.id)))[0]!.status).toBe("open");
+    });
   });
 });

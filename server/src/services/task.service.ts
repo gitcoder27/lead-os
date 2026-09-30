@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { TODAY_TOP_LIMIT, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
+import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
 import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
@@ -56,6 +56,39 @@ export const taskCreateSchema = z.object({
   }).strict().nullable().optional(),
 }).strict();
 export const taskUpdateSchema = taskCreateSchema.partial().extend({ triaged: z.boolean().optional() }).strict();
+const guardText = z.string().max(TASK_DETAILS_MAX).nullable();
+/**
+ * docs/61 TS-01 (D1): the expected-state guard on a bulk item. Strict allowlist
+ * (the keys of `taskUpdateSchema` plus `triaged`); values are only compared, so
+ * they are typed loosely enough that a stored legacy value never fails validation.
+ */
+export const taskExpectedSchema = z.object({
+  title: z.string().max(500), details: guardText, kind: z.enum(["task", "meeting"]), status: z.enum(["open", "active", "blocked", "done", "dropped"]),
+  ownerType: z.enum(["manager", "developer"]).nullable(), ownerId: z.string().max(200).nullable(), later: z.boolean(), priority: z.enum(["normal", "high"]),
+  labels: z.array(z.string().max(100)).max(50), scheduledOn: z.string().max(64).nullable(), schedulePosition: z.number().int().min(0).nullable(),
+  dueAt: z.string().max(64).nullable(), followUpAt: z.string().max(64).nullable(), startsAt: z.string().max(64).nullable(), endsAt: z.string().max(64).nullable(),
+  participants: guardText, nextAction: guardText, outcome: guardText, parentId: z.number().int().positive().nullable(), hideUntil: z.string().max(64).nullable(),
+  waitingOn: z.object({ type: z.enum(["developer", "contact", "text"]), ref: z.string().max(128).nullable().optional(), label: z.string().max(200).nullable().optional() }).strict().nullable(),
+  triaged: z.boolean(),
+}).partial().strict() satisfies z.ZodType<TaskExpectedState>;
+
+/** Waiting party as compared by a guard: identity, not the display snapshot (free text is its label). */
+function guardParty(type: string | null | undefined, ref: string | null | undefined, label: string | null | undefined): { type: string; ref: string | null; label: string | null } | null {
+  return type ? { type, ref: ref ?? null, label: type === "text" ? label ?? null : null } : null;
+}
+
+/** A task's value for a guarded field, as the acting manager sees it: private fields of a task they do not track read as the DTO shows them. */
+function guardValue(row: TaskRow, field: TaskGuardField, ownsPrivate: boolean): unknown {
+  switch (field) {
+    case "later": return ownsPrivate && row.later === 1;
+    case "triaged": return !(ownsPrivate && row.needsTriage === 1);
+    case "labels": return ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [];
+    case "hideUntil": case "nextAction": case "followUpAt": return ownsPrivate ? row[field] ?? null : null;
+    case "waitingOn": return ownsPrivate ? guardParty(row.waitingOnType, row.waitingOnRef, row.waitingOnLabel) : null;
+    default: return row[field] ?? null;
+  }
+}
+
 /** docs/57 §1: a patch touching any of these fields is a triage decision. */
 const TRIAGE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status", "waitingOn"] as const;
 export const taskLinkSchema = z.object({ kind: z.enum(["jira", "person", "external", "task", "contact"]), ref: z.string().trim().min(1).max(2000), role: z.enum(["primary", "related"]).nullable().optional() }).strict();
@@ -335,8 +368,27 @@ export class TaskService {
     });
   }
 
-  async update(key: string, input: UpdateTaskRequest, principal: TaskPrincipal): Promise<TaskRow> {
+  /**
+   * docs/61 TS-01 (D1): refuse the write unless every field it would overwrite
+   * (coupled ones included) still holds the caller's expected value. Runs inside the
+   * write transaction, after access checks; the error never carries task values.
+   */
+  private assertExpected(before: TaskRow, data: UpdateTaskRequest, expected: TaskExpectedState, principal: TaskPrincipal): void {
+    const missing = taskGuardFields(data).filter((field) => !Object.hasOwn(expected, field));
+    if (missing.length) throw new HttpError(400, `expected must include: ${missing.join(", ")}`);
+    const ownsPrivate = before.trackedByManagerId === principal.accountId || (before.ownerType === "manager" && before.ownerId === principal.accountId);
+    const changed = TASK_GUARD_FIELDS.some((field) => {
+      if (!Object.hasOwn(expected, field)) return false;
+      const value = expected[field];
+      const wanted = field === "waitingOn" ? (value ? guardParty(expected.waitingOn?.type, expected.waitingOn?.ref, expected.waitingOn?.label) : null) : value ?? null;
+      return JSON.stringify(guardValue(before, field, ownsPrivate)) !== JSON.stringify(wanted);
+    });
+    if (changed) throw new HttpError(409, "Task changed since this action");
+  }
+
+  async update(key: string, input: UpdateTaskRequest, principal: TaskPrincipal, expected?: TaskExpectedState): Promise<TaskRow> {
     const data = parseInput(taskUpdateSchema, input);
+    const guard = expected === undefined ? undefined : parseInput(taskExpectedSchema, expected);
     return runInTransaction(async () => {
       const before = await this.requireTask(key, principal);
       if (principal.type !== "developer" && before.trackedByManagerId !== principal.accountId && !(before.ownerType === "manager" && before.ownerId === principal.accountId) && ["nextAction", "followUpAt", "labels", "later", "hideUntil", "triaged", "waitingOn"].some((field) => Object.hasOwn(data, field))) throw new HttpError(403, "Only the tracking manager can change private task fields");
@@ -345,6 +397,7 @@ export class TaskService {
         if (Object.keys(data).some((field) => !["title", "details", "status"].includes(field))) throw new HttpError(403, "Developer update fields are restricted");
         if (data.title !== undefined && (before.createdByType !== "developer" || before.createdById !== principal.accountId)) throw new HttpError(403, "Only the creator can rename this task");
       }
+      if (guard) this.assertExpected(before, data, guard, principal);
       const { labels, later, triaged, waitingOn, ...fields } = data;
       if (fields.details !== undefined) fields.details = normalizeDetails(fields.details);
       // Phase 3 (P3-D13): assigning a not-yet-registered label registers it.
@@ -396,16 +449,17 @@ export class TaskService {
   /**
    * docs/49 §10 (D8): atomic multi-task patch. Every item runs through
    * `update` inside one transaction — any failure rolls back the whole batch
-   * and the error names the offending key.
+   * and the error names the offending key. An item's optional `expected` guard
+   * (docs/61 TS-01) makes a stale write fail that same way with 409.
    */
-  async bulkUpdate(items: { key: string; changes: UpdateTaskRequest }[], principal: TaskPrincipal): Promise<TaskRow[]> {
+  async bulkUpdate(items: { key: string; changes: UpdateTaskRequest; expected?: TaskExpectedState }[], principal: TaskPrincipal): Promise<TaskRow[]> {
     const keys = items.map((item) => item.key.toUpperCase());
     if (new Set(keys).size !== keys.length) throw new HttpError(400, "Duplicate task keys in bulk update");
     return runInTransaction(async () => {
       const rows: TaskRow[] = [];
       for (const item of items) {
         try {
-          rows.push(await this.update(item.key, item.changes, principal));
+          rows.push(await this.update(item.key, item.changes, principal, item.expected));
         } catch (error) {
           if (error instanceof HttpError) throw new HttpError(error.status, `${item.key}: ${error.message}`);
           throw error;

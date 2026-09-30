@@ -1364,7 +1364,11 @@ export interface TaskViewCountsResponse {
 
 /** `POST /api/tasks/bulk` (docs/49 §10, D8): atomic per-task patches. */
 export interface BulkUpdateTasksRequest {
-  items: { key: string; changes: UpdateTaskRequest }[];
+  /**
+   * `expected` (docs/61 TS-01): optional guard. When present the server refuses the
+   * whole batch with 409 unless every listed field still holds that value.
+   */
+  items: { key: string; changes: UpdateTaskRequest; expected?: TaskExpectedState }[];
 }
 
 export interface BulkUpdateTasksResponse {
@@ -1483,6 +1487,61 @@ export type UpdateTaskRequest = Partial<CreateTaskRequest> & {
   /** docs/57 §1: `true` marks an Inbox task triaged without other changes ("Keep undated"). */
   triaged?: boolean;
 };
+
+/** docs/61 TS-01 (D1): every field a bulk write can guard; the keys of `UpdateTaskRequest`. */
+export const TASK_GUARD_FIELDS = [
+  "title", "details", "kind", "status", "ownerType", "ownerId", "later", "priority", "labels", "scheduledOn", "schedulePosition",
+  "dueAt", "followUpAt", "startsAt", "endsAt", "participants", "nextAction", "outcome", "parentId", "hideUntil", "waitingOn", "triaged",
+] as const;
+export type TaskGuardField = (typeof TASK_GUARD_FIELDS)[number];
+
+/**
+ * docs/61 TS-01 (D1): the values a bulk item expects its task to hold right now,
+ * compared by value inside the server transaction. `triaged` is the inverse of
+ * `needsTriage`; `waitingOn` compares the party (type, ref, and label for free text).
+ */
+export interface TaskExpectedState {
+  title?: string;
+  details?: string | null;
+  kind?: "task" | "meeting";
+  status?: TaskStatus;
+  ownerType?: TaskOwnerType | null;
+  ownerId?: string | null;
+  later?: boolean;
+  priority?: "normal" | "high";
+  labels?: string[];
+  scheduledOn?: string | null;
+  schedulePosition?: number | null;
+  dueAt?: string | null;
+  followUpAt?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  participants?: string | null;
+  nextAction?: string | null;
+  outcome?: string | null;
+  parentId?: number | null;
+  hideUntil?: string | null;
+  waitingOn?: TaskWaitingOnInput | null;
+  triaged?: boolean;
+}
+
+/** Patch fields whose write also moves the triage marker (mirrors the server). */
+const TRIAGE_WRITE_FIELDS = ["scheduledOn", "dueAt", "ownerType", "ownerId", "later", "hideUntil", "status", "waitingOn"] as const;
+
+/**
+ * docs/61 TS-01 (D1): the fields a patch overwrites, coupled ones included —
+ * schedule/Later/resurface move together, an owner change may reset status, and
+ * a triage decision moves the Inbox marker. A guarded item must expect all of
+ * them; the client builds the guard and the server rejects an incomplete one.
+ */
+export function taskGuardFields(changes: UpdateTaskRequest): TaskGuardField[] {
+  const touches = (field: string) => Object.hasOwn(changes, field);
+  const fields = new Set<TaskGuardField>(TASK_GUARD_FIELDS.filter(touches));
+  if (touches("later") || touches("scheduledOn") || touches("hideUntil")) for (const field of ["later", "scheduledOn", "hideUntil"] as const) fields.add(field);
+  if (touches("ownerType") || touches("ownerId")) for (const field of ["ownerType", "ownerId", "status"] as const) fields.add(field);
+  if (TRIAGE_WRITE_FIELDS.some(touches)) fields.add("triaged");
+  return TASK_GUARD_FIELDS.filter((field) => fields.has(field));
+}
 export const TASK_EVENT_TYPES = [
   "created", "update", "instruction", "decision", "blocker", "status", "assign",
   "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",

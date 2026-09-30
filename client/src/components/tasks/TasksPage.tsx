@@ -414,11 +414,28 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     } else if (pointerPins.current) {
       for (const key of entries.keys()) pointerPins.current.keys.delete(key);
     }
-    await mutations.apply(items, {
+    const applied = await mutations.apply(items, {
       label: `${label(items.length)}${skipped ? ` · skipped ${skipped}` : ''}`,
       undoable: options.undoable,
       onUndo: clearLingering,
     });
+    // docs/61 TS-01: a refused or failed action leaves nothing pinned or selected on its behalf.
+    if (applied === false) {
+      const failed = new Set(items.map((item) => item.task.taskKey));
+      setLingering((current) => {
+        if (![...failed].some((key) => current.has(key))) return current;
+        const next = new Map(current);
+        for (const key of failed) next.delete(key);
+        return next;
+      });
+      setSelected((current) => {
+        if (![...failed].some((key) => current.has(key))) return current;
+        const next = new Set(current);
+        for (const key of failed) next.delete(key);
+        return next;
+      });
+      for (const key of failed) pointerPins.current?.keys.delete(key);
+    }
   }, [clearLingering, releasePointerPins, groups, mutations, today, ownerName, doneTodayKeys]);
 
   const toggleDone = useCallback((targets: ManagerTask[]) => {

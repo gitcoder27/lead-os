@@ -2,9 +2,10 @@ import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { patchCachedTasks, taskWrites, type CacheShape, type CachedTaskRow } from '@/lib/task-writes';
 import { getLocalIsoDate } from '@/lib/utils';
 import { prefetchMyDayTaskEvents } from './useTasks';
-import type { FormerOwnerTaskDetail, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
+import type { FormerOwnerTaskDetail, ManagerTask, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
 
 /**
  * Phase 3 (P3-D2): shared task detail. Managers hit `/api/tasks/:key/detail`;
@@ -68,31 +69,47 @@ function invalidateTaskDetailSurfaces(qc: ReturnType<typeof useQueryClient>, tas
 /** Plain text fields with no server-side side effects — safe to show before the PATCH lands. */
 const OPTIMISTIC_FIELDS = ['title', 'details', 'outcome', 'participants'] as const;
 
-/** Update a task. Developer principals are limited to title/details/status server-side. */
+/** A cached detail is the task itself; the former-owner projection has no fields to patch. */
+const detailShape: CacheShape<TaskDetailResponse | FormerOwnerTaskDetail> = {
+  rows: (data) => ('access' in data ? [] : [data as unknown as CachedTaskRow]),
+  map: (data, update) => ('access' in data ? data : (update(data as unknown as CachedTaskRow) as unknown as TaskDetailResponse)),
+};
+
+/**
+ * Update a task. Developer principals are limited to title/details/status server-side.
+ *
+ * docs/61 TS-01 (D1): the write shares its lifecycle with list writes on the same task
+ * (one at a time, in order), and a failure gives back only the text fields it patched,
+ * only where they still read as it wrote them.
+ */
 export function useUpdateTaskDetail(taskKey: string | undefined) {
   const { user } = useAuth();
+  const scope = useAuthScopeKey();
   const qc = useQueryClient();
   const isDeveloper = user?.role === 'developer';
-  const matchesTask = { queryKey: ['task-detail'], predicate: (query: { queryKey: readonly unknown[] }) => query.queryKey[3] === taskKey };
   return useMutation({
     mutationFn: (updates: UpdateTaskRequest) =>
-      isDeveloper
-        ? api.patch<TaskDetailResponse>(`/my-day/tasks/${encodeURIComponent(taskKey!)}`, { date: getLocalIsoDate(), ...updates })
-        : api.patch<TaskDetailResponse>(`/tasks/${encodeURIComponent(taskKey!)}`, updates),
-    onMutate: async (updates) => {
-      const text = Object.fromEntries(OPTIMISTIC_FIELDS.filter((field) => field in updates).map((field) => [field, updates[field]]));
-      if (!Object.keys(text).length) return undefined;
-      await qc.cancelQueries(matchesTask);
-      const previous = qc.getQueriesData<TaskDetailResponse | FormerOwnerTaskDetail>(matchesTask);
-      qc.setQueriesData<TaskDetailResponse | FormerOwnerTaskDetail>(matchesTask, (task) =>
-        task && !('access' in task) ? { ...task, ...text } : task,
-      );
-      return { previous };
-    },
-    onError: (_error, _updates, context) => {
-      for (const [queryKey, task] of context?.previous ?? []) qc.setQueryData(queryKey, task);
-    },
-    onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
+      taskWrites(qc, scope).run(taskKey ? [taskKey] : [], async () => {
+        const text = Object.fromEntries(OPTIMISTIC_FIELDS.filter((field) => field in updates).map((field) => [field, updates[field]]));
+        let rollback = () => {};
+        if (taskKey && Object.keys(text).length) {
+          const filter = { queryKey: ['task-detail'], predicate: (query: { queryKey: readonly unknown[] }) => query.queryKey[1] === scope && query.queryKey[3] === taskKey };
+          await qc.cancelQueries(filter);
+          rollback = patchCachedTasks(qc, filter, detailShape, new Map([[taskKey, (row) => ({ ...row, ...text })]]));
+        }
+        try {
+          const saved = isDeveloper
+            ? await api.patch<TaskDetailResponse>(`/my-day/tasks/${encodeURIComponent(taskKey!)}`, { date: getLocalIsoDate(), ...updates })
+            : await api.patch<TaskDetailResponse>(`/tasks/${encodeURIComponent(taskKey!)}`, updates);
+          // Writes queued behind this one act on what the server now holds.
+          if (!isDeveloper && saved && 'taskKey' in saved) taskWrites(qc, scope).acknowledge([saved as unknown as ManagerTask]);
+          return saved;
+        } catch (error) {
+          rollback();
+          throw error;
+        }
+      }),
+    onSettled: () => invalidateTaskDetailSurfaces(qc, taskKey),
   });
 }
 

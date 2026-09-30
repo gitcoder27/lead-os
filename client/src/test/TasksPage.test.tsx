@@ -836,6 +836,26 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(row('T-2').style.opacity).toBe('');
   });
 
+  it('a failed action releases its lingering row and selection, and leaves the rest alone (docs/61 TS-01)', async () => {
+    let fail!: (ok: boolean) => void;
+    mockApply.mockReturnValueOnce(new Promise<boolean>((resolve) => { fail = resolve; }));
+    const { rerender } = render(<TasksPage />);
+    press('j');
+    press('x');
+    await act(async () => { press('#'); });
+    // The optimistic view no longer returns T-2: it lingers with what the action did.
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult([task()]),
+    );
+    rerender(<TasksPage />);
+    expect(row('T-2')).toBeTruthy();
+
+    await act(async () => { fail(false); });
+    await waitFor(() => expect(row('T-2')).toBeNull());
+    expect(row('T-1')).toBeTruthy();
+    expect(screen.queryByRole('toolbar', { name: 'Bulk actions' })).toBeNull();
+  });
+
   it('opens the drawer with the visible list order for j/k stepping (docs/51 F19)', async () => {
     render(<TasksPage />);
     press('j');

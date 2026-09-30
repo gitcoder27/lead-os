@@ -58,6 +58,8 @@ const slipped = row(20, 'Draft Q4 roadmap', {
 const inbox = row(21, 'Look into on-call fatigue', { ownerType: null, ownerId: null, needsTriage: true, createdAt: '2026-10-01T09:00:00.000Z' });
 const undated = row(22, 'Rework onboarding checklist', { createdAt: '2026-09-10T09:00:00.000Z' });
 
+const TASKS_BY_KEY: Record<string, WeeklyReviewTaskRow> = { 'T-10': legal, 'T-11': reindex, 'T-20': slipped, 'T-21': inbox, 'T-22': undated };
+
 function makeReview(sections?: WeeklyReviewResponse['sections'], saved: WeeklyReviewSavedState | null = null): WeeklyReviewResponse {
   return {
     today: FRIDAY,
@@ -96,7 +98,7 @@ function renderReview() {
   return render(<WeeklyReviewMode onExit={vi.fn()} onWeekChange={vi.fn()} />, { wrapper });
 }
 
-type Bulk = { items: { key: string; changes: Record<string, unknown> }[] };
+type Bulk = { items: { key: string; changes: Record<string, unknown>; expected?: Record<string, unknown> }[] };
 /** The nth `POST /tasks/bulk` (the write goes out after the optimistic patch settles). */
 async function bulkCall(n: number): Promise<Bulk> {
   await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(n));
@@ -123,7 +125,13 @@ beforeEach(() => {
   apiPut.mockReset();
   apiPost.mockReset();
   apiPut.mockResolvedValue({ saved: saved('waiting') });
-  apiPost.mockResolvedValue({ tasks: [] });
+  // The server's answer: the row as it was, with the write applied.
+  apiPost.mockImplementation(async (_url: string, body: Bulk) => ({
+    tasks: body.items.map(({ key, changes }) => {
+      const { triaged, ...fields } = changes;
+      return { ...TASKS_BY_KEY[key], ...fields, ...(triaged === undefined ? {} : { needsTriage: !triaged }) };
+    }),
+  }));
 });
 
 describe('Waiting step (docs/59 §5.3 step 2)', () => {
@@ -148,7 +156,7 @@ describe('Waiting step (docs/59 §5.3 step 2)', () => {
     const before = [...document.querySelectorAll('[data-review-row]')].map((el) => el.getAttribute('data-review-row'));
     fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' }));
 
-    expect(await bulkCall(1)).toEqual({ items: [{ key: 'T-10', changes: { followUpAt: atNine(MONDAY) } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key: 'T-10', changes: { followUpAt: atNine(MONDAY) } }] });
     // The row stays where it was, now one line with Undo; nothing else moved.
     expect([...document.querySelectorAll('[data-review-row]')].map((el) => el.getAttribute('data-review-row'))).toEqual(before);
     expect(within(rowEl('T-10')).getByText('→ Check Mon')).toBeInTheDocument();
@@ -165,10 +173,54 @@ describe('Waiting step (docs/59 §5.3 step 2)', () => {
     fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' }));
     await bulkCall(1);
     fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Undo' }));
-    expect(await bulkCall(2)).toEqual({ items: [{ key: 'T-10', changes: { followUpAt: '2026-09-30T09:00:00.000Z' } }] });
+    expect(await bulkCall(2)).toMatchObject({ items: [{ key: 'T-10', changes: { followUpAt: '2026-09-30T09:00:00.000Z' } }] });
     expect(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' })).toBeInTheDocument();
     expect(announcement()).toBe('Undone.');
     await waitFor(() => expect(apiPut).toHaveBeenLastCalledWith('/review/week/2026-09-28', { decisions: { 'T-10': null } }));
+  });
+
+  it('sends what the row held as its guard, and Undo expects what the server acknowledged', async () => {
+    await openWaiting();
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' }));
+    expect((await bulkCall(1)).items[0]!.expected).toEqual({ followUpAt: '2026-09-30T09:00:00.000Z' });
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Undo' }));
+    expect((await bulkCall(2)).items[0]!.expected).toEqual({ followUpAt: atNine(MONDAY) });
+  });
+
+  it('keeps the decision, and says nothing was undone, when the task changed since', async () => {
+    await openWaiting();
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' }));
+    await bulkCall(1);
+    await waitFor(() => expect(within(rowEl('T-10')).getByRole('button', { name: 'Undo' })).toBeInTheDocument());
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('T-10: Task changed since this action'), { status: 409 }));
+    apiPut.mockClear();
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Undo' }));
+    await bulkCall(2);
+
+    expect(await screen.findByText('Could not undo: a task changed since this action. Nothing was undone.')).toBeInTheDocument();
+    await waitFor(() => expect(announcement()).toBe("Couldn't undo: the task changed since this decision. Nothing was undone."));
+    // The decision and its saved record are untouched, and the row can still be undone once things settle.
+    expect(within(rowEl('T-10')).getByText('→ Check Mon')).toBeInTheDocument();
+    expect(within(rowEl('T-10')).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(apiPut).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain('Undone.');
+  });
+
+  it('keeps the decision when the inverse fails on the network, and a retry can succeed', async () => {
+    await openWaiting();
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' }));
+    await bulkCall(1);
+    await waitFor(() => expect(within(rowEl('T-10')).getByRole('button', { name: 'Undo' })).toBeInTheDocument());
+    apiPost.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Undo' }));
+    await bulkCall(2);
+    await waitFor(() => expect(announcement()).toBe("Couldn't undo. The decision stands. Try again."));
+    expect(within(rowEl('T-10')).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: 'Undo' }));
+    await bulkCall(3);
+    await waitFor(() => expect(within(rowEl('T-10')).getByRole('button', { name: 'Check Mon' })).toBeInTheDocument());
+    expect(announcement()).toBe('Undone.');
   });
 
   it('m, e and # decide the focused row from the keyboard without moving focus; z takes back the latest', async () => {
@@ -178,7 +230,7 @@ describe('Waiting step (docs/59 §5.3 step 2)', () => {
     const key = first.getAttribute('data-review-row')!;
     expect(first).toHaveFocus();
     fireEvent.keyDown(first, { key: 'e' });
-    expect(await bulkCall(1)).toEqual({ items: [{ key, changes: { status: 'done' } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key, changes: { status: 'done' } }] });
     await waitFor(() => expect(first).toHaveFocus());
     expect(within(first).getByText('Got it')).toBeInTheDocument();
     // A decided row ignores further action keys.
@@ -204,12 +256,12 @@ describe('Waiting step (docs/59 §5.3 step 2)', () => {
     await openWaiting();
     fireEvent.click(within(rowEl('T-10')).getByRole('button', { name: /More actions/ }));
     fireEvent.click(await screen.findByRole('menuitem', { name: /Still waiting/ }));
-    expect(await bulkCall(1)).toEqual({ items: [{ key: 'T-10', changes: { followUpAt: atNine('2026-10-09') } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key: 'T-10', changes: { followUpAt: atNine('2026-10-09') } }] });
     expect(within(rowEl('T-10')).getByText('→ Check Oct 9')).toBeInTheDocument();
 
     fireEvent.click(within(rowEl('T-11')).getByRole('button', { name: /More actions/ }));
     fireEvent.click(await screen.findByRole('menuitem', { name: /Stop waiting/ }));
-    expect(await bulkCall(2)).toEqual({ items: [{ key: 'T-11', changes: { waitingOn: null } }] });
+    expect(await bulkCall(2)).toMatchObject({ items: [{ key: 'T-11', changes: { waitingOn: null } }] });
     expect(within(rowEl('T-11')).getByText('No longer waiting')).toBeInTheDocument();
     expect(announcement()).toBe('Stopped waiting. Press z to undo.');
   });
@@ -260,7 +312,7 @@ describe('Loose ends step (docs/59 §5.3 step 3)', () => {
   it('Monday plans it for the next workday and takes it off Later', async () => {
     await openLooseEnds();
     fireEvent.click(within(rowEl('T-20')).getByRole('button', { name: 'Monday' }));
-    expect(await bulkCall(1)).toEqual({ items: [{ key: 'T-20', changes: { scheduledOn: MONDAY, later: false } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key: 'T-20', changes: { scheduledOn: MONDAY, later: false } }] });
     expect(within(rowEl('T-20')).getByText('→ Mon')).toBeInTheDocument();
     expect(announcement()).toBe('Moved to Mon. Press z to undo.');
     await waitFor(() => expect(apiPut).toHaveBeenCalledWith('/review/week/2026-09-28', { decisions: { 'T-20': 'monday' } }));
@@ -272,7 +324,7 @@ describe('Loose ends step (docs/59 §5.3 step 3)', () => {
   it('Done and Drop write the status, and s opens the schedule menu with Later', async () => {
     await openLooseEnds();
     fireEvent.click(within(rowEl('T-21')).getByRole('button', { name: 'Done' }));
-    expect(await bulkCall(1)).toEqual({ items: [{ key: 'T-21', changes: { status: 'done' } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key: 'T-21', changes: { status: 'done' } }] });
     expect(within(rowEl('T-21')).getByText('Done')).toBeInTheDocument();
 
     fireEvent.keyDown(document.body, { key: 'j' });
@@ -287,14 +339,14 @@ describe('Loose ends step (docs/59 §5.3 step 3)', () => {
     expect(first).toBe(rowEl('T-22'));
     fireEvent.click(within(rowEl('T-20')).getByRole('button', { name: /More actions/ }));
     fireEvent.click(await screen.findByRole('menuitem', { name: /Drop/ }));
-    expect(await bulkCall(3)).toEqual({ items: [{ key: 'T-20', changes: { status: 'dropped' } }] });
+    expect(await bulkCall(3)).toMatchObject({ items: [{ key: 'T-20', changes: { status: 'dropped' } }] });
   });
 
   it('Keep undated triages an Inbox task without giving it a date', async () => {
     await openLooseEnds();
     fireEvent.click(within(rowEl('T-21')).getByRole('button', { name: /More actions/ }));
     fireEvent.click(await screen.findByRole('menuitem', { name: /Keep undated/ }));
-    expect(await bulkCall(1)).toEqual({ items: [{ key: 'T-21', changes: { triaged: true } }] });
+    expect(await bulkCall(1)).toMatchObject({ items: [{ key: 'T-21', changes: { triaged: true } }] });
   });
 
   it('keeps decisions when moving between steps, and shows a success empty state with no loose ends', async () => {

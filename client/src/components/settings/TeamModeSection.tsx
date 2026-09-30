@@ -79,7 +79,7 @@ export function TeamModeSection() {
                   className="flex h-7 w-7 items-center justify-center rounded-lg"
                   style={{
                     background: selected ? 'var(--accent)' : 'var(--bg-tertiary)',
-                    color: selected ? '#fff' : 'var(--text-secondary)',
+                    color: selected ? 'var(--on-accent)' : 'var(--text-secondary)',
                   }}
                 >
                   {option.icon}

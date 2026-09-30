@@ -62,7 +62,7 @@ export function AssistantDock() {
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
         border: '1px solid var(--border-strong)',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.45), 0 0 0 1px var(--accent-glow)',
+        boxShadow: 'var(--overlay-shadow), 0 0 0 1px var(--accent-glow)',
       }}
     >
       <AssistantHeader

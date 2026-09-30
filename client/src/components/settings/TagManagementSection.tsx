@@ -79,7 +79,7 @@ export function TagManagementSection() {
             {unusedCount > 0 ? (
               <span
                 className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
-                style={{ background: unusedOnly ? 'var(--accent)' : 'var(--settings-neutral-chip-bg)', color: unusedOnly ? '#fff' : 'var(--text-muted)', border: unusedOnly ? 'none' : '1px solid var(--border-strong)' }}
+                style={{ background: unusedOnly ? 'var(--accent)' : 'var(--settings-neutral-chip-bg)', color: unusedOnly ? 'var(--on-accent)' : 'var(--text-muted)', border: unusedOnly ? 'none' : '1px solid var(--border-strong)' }}
               >
                 {unusedCount}
               </span>

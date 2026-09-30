@@ -1324,7 +1324,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                             left: autoSyncEnabled ? 'calc(100% - 21px)' : '3px',
                             width: '18px',
                             height: '18px',
-                            background: autoSyncEnabled ? '#fff' : 'var(--text-secondary)',
+                            background: autoSyncEnabled ? 'var(--on-accent)' : 'var(--text-secondary)',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                           }}
                         />
@@ -1381,7 +1381,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 className="flex h-7 w-7 items-center justify-center rounded-lg"
                                 style={{
                                   background: selected ? 'var(--accent)' : 'var(--bg-tertiary)',
-                                  color: selected ? '#fff' : 'var(--text-secondary)',
+                                  color: selected ? 'var(--on-accent)' : 'var(--text-secondary)',
                                 }}
                               >
                                 {option.icon}
@@ -2610,7 +2610,7 @@ function ToggleChip({
         style={{
           background: checked ? 'var(--accent)' : 'transparent',
           border: checked ? 'none' : '1.5px solid var(--border-strong)',
-          color: checked ? '#fff' : 'transparent',
+          color: checked ? 'var(--on-accent)' : 'transparent',
         }}
       >
         {checked ? '✓' : ''}

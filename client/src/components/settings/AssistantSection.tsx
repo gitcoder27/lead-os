@@ -91,7 +91,7 @@ function ToggleRow({
             left: checked ? 'calc(100% - 21px)' : '3px',
             width: '18px',
             height: '18px',
-            background: checked ? '#fff' : 'var(--text-secondary)',
+            background: checked ? 'var(--on-accent)' : 'var(--text-secondary)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
           }}
         />

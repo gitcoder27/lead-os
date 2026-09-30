@@ -396,7 +396,7 @@ function NotFoundState({ onGoToday }: { onGoToday: () => void }) {
           type="button"
           onClick={onGoToday}
           className="mt-6 rounded-lg px-4 py-2.5 text-[13px] font-semibold"
-          style={{ background: 'var(--accent)', color: '#fff' }}
+          style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
         >
           Go to Today
         </button>

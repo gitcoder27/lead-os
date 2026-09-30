@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, max, min, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, max, min, sql } from "drizzle-orm";
 import {
   ONE_ON_ONE_NO_CHECK_IN_DAYS,
   ONE_ON_ONE_SUGGESTION_LIMIT,
@@ -16,6 +16,7 @@ import {
   type OneOnOneSeriesUpdateRequest,
   type OneOnOneSession,
   type OneOnOneSessionActionRequest,
+  type WeeklyReviewOneOnOneRow,
   type OneOnOneSessionCreateRequest,
   type OneOnOneSessionUpdateRequest,
   type OneOnOneSuggestionReason,
@@ -731,6 +732,76 @@ export class OneOnOneService {
       });
     }
     return [...byDeveloper.values()];
+  }
+
+  /**
+   * docs/59 §4 (weekly review, read-only): sessions due in the coming week, and sessions the manager
+   * missed in the week under review (skipped, or still scheduled although their day has passed).
+   * Days are the manager's local days; the caller passes them.
+   */
+  async reviewSessions(
+    range: { start: string; end: string; nextStart: string; nextEnd: string; today: string },
+    workspaceId?: string,
+  ): Promise<WeeklyReviewOneOnOneRow[]> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const rows = await db
+      .select({
+        sessionId: oneOnOneSessions.id,
+        scheduledFor: oneOnOneSessions.scheduledFor,
+        status: oneOnOneSessions.status,
+        seriesId: oneOnOneSeries.id,
+        developerAccountId: oneOnOneSeries.developerAccountId,
+        developerName: developers.displayName,
+      })
+      .from(oneOnOneSessions)
+      .innerJoin(
+        oneOnOneSeries,
+        and(
+          eq(oneOnOneSeries.id, oneOnOneSessions.seriesId),
+          eq(oneOnOneSeries.workspaceId, scope),
+          eq(oneOnOneSeries.active, 1),
+        ),
+      )
+      .innerJoin(
+        developers,
+        and(
+          eq(developers.workspaceId, scope),
+          eq(developers.accountId, oneOnOneSeries.developerAccountId),
+          eq(developers.isActive, 1),
+        ),
+      )
+      .where(
+        and(
+          eq(oneOnOneSessions.workspaceId, scope),
+          inArray(oneOnOneSessions.status, ["scheduled", "skipped"]),
+          gte(oneOnOneSessions.scheduledFor, range.start),
+          lte(oneOnOneSessions.scheduledFor, range.nextEnd),
+        ),
+      )
+      .orderBy(asc(oneOnOneSessions.scheduledFor), asc(oneOnOneSessions.id));
+
+    const result: WeeklyReviewOneOnOneRow[] = [];
+    const dueSeen = new Set<string>();
+    for (const row of rows) {
+      const status = row.status as WeeklyReviewOneOnOneRow["status"];
+      const base = {
+        seriesId: row.seriesId,
+        sessionId: row.sessionId,
+        developerAccountId: row.developerAccountId,
+        developerName: row.developerName,
+        scheduledFor: row.scheduledFor,
+        status,
+      };
+      if (row.scheduledFor >= range.nextStart) {
+        // Only the earliest upcoming session per person; a skipped one is not "due".
+        if (status !== "scheduled" || dueSeen.has(row.developerAccountId)) continue;
+        dueSeen.add(row.developerAccountId);
+        result.push({ ...base, kind: "due_next_week" });
+      } else if (status === "skipped" || row.scheduledFor < range.today) {
+        result.push({ ...base, kind: "missed" });
+      }
+    }
+    return result;
   }
 
   // ── Internals ──

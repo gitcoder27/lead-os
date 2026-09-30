@@ -48,6 +48,8 @@ import { CaptureService } from "./services/capture.service";
 import { createCaptureRouter } from "./routes/capture";
 import { createContactsRouter } from "./routes/contacts";
 import { createTaskViewsRouter } from "./routes/task-views";
+import { createReviewRouter } from "./routes/review";
+import { WeeklyReviewService } from "./services/weekly-review.service";
 import { WorkSavedViewsService } from "./services/work-saved-views.service";
 import { TagService } from "./services/tag.service";
 import { OneOnOneService } from "./services/one-on-one.service";
@@ -218,6 +220,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
   app.use("/api/capture", requireManager(services.authService), clearTodayCacheOnWrite, createCaptureRouter(new CaptureService()));
   app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));
+  app.use("/api/review", requireManager(services.authService), createReviewRouter(taskKeysService, new WeeklyReviewService(undefined, undefined, undefined, services.oneOnOneService)));
   app.use("/api/contacts", requireManager(services.authService), createContactsRouter());
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(

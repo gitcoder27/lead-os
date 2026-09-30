@@ -2988,3 +2988,102 @@ export interface TestAiAssistantConfigResponse {
   model: string;
   latencyMs: number;
 }
+
+// ── Weekly review (docs/59) ─────────────────────────────
+
+export type WeeklyReviewSectionId =
+  | "closed"
+  | "quiet"
+  | "slipped"
+  | "inbox"
+  | "undated"
+  | "laterNextWeek"
+  | "oneOnOnes"
+  | "people"
+  | "checkIns";
+
+/** A section whose source failed comes back `unavailable` with no rows; the rest still loads. */
+export type WeeklyReviewSourceStatus = "ready" | "unavailable";
+
+/** Why a waiting or delegated row is in the review: its check-by passed, or nobody touched it. */
+export interface WeeklyReviewQuiet {
+  /** Local check-by day when it has passed (or is today). */
+  checkByPassed: string | null;
+  /** Working days since the last activity. */
+  idleWorkingDays: number;
+}
+
+/** A task row in the review: the Tasks view row (with `TaskSignals`) plus review-only facts. */
+export type WeeklyReviewTaskRow = TaskViewTask & {
+  /** Set on `quiet` rows only. */
+  quiet?: WeeklyReviewQuiet;
+  /** Manager-local day the task closed; set on `closed` rows only. */
+  closedDay?: string;
+};
+
+export interface WeeklyReviewOneOnOneRow {
+  seriesId: number;
+  sessionId: number;
+  developerAccountId: string;
+  developerName: string;
+  /** Local ISO day of the session. */
+  scheduledFor: string;
+  kind: "due_next_week" | "missed";
+  status: OneOnOneSessionStatus;
+}
+
+export interface WeeklyReviewPersonRow {
+  developerAccountId: string;
+  developerName: string;
+  status: Extract<TrackerDeveloperStatus, "blocked" | "at_risk">;
+  /** The manager's note on that day's status, when there is one. */
+  note: string | null;
+  statusUpdatedAt: string | null;
+}
+
+/** Collab only: check-ins a participating developer made this week, in working days. */
+export interface WeeklyReviewCheckInRow {
+  developerAccountId: string;
+  developerName: string;
+  daysWithCheckIn: number;
+  workingDays: number;
+}
+
+interface WeeklyReviewSectionBase {
+  status: WeeklyReviewSourceStatus;
+}
+
+export type WeeklyReviewSection =
+  | (WeeklyReviewSectionBase & { id: "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek"; rows: WeeklyReviewTaskRow[] })
+  | (WeeklyReviewSectionBase & { id: "oneOnOnes"; rows: WeeklyReviewOneOnOneRow[] })
+  | (WeeklyReviewSectionBase & { id: "people"; rows: WeeklyReviewPersonRow[] })
+  | (WeeklyReviewSectionBase & { id: "checkIns"; rows: WeeklyReviewCheckInRow[] });
+
+export interface WeeklyReviewRange {
+  /** Monday, manager zone. */
+  start: string;
+  /** Sunday, manager zone. */
+  end: string;
+  /** The week after: Monday and Sunday. */
+  nextStart: string;
+  nextEnd: string;
+}
+
+export interface WeeklyReviewResponse {
+  /** The manager's local day the review was built for. */
+  today: string;
+  /** The zone every date here is in. */
+  timeZone: string;
+  range: WeeklyReviewRange;
+  /** Monday or Tuesday, last week not yet reviewed: the review opened on last week. */
+  defaultedToLastWeek: boolean;
+  /** Where "Monday" decisions land: the first Mon–Fri day after `today`, in the manager's zone. */
+  nextWorkday: string;
+  teamMode: TeamMode;
+  /** Active people on the roster; step 4 is hidden at 0. */
+  rosterSize: number;
+  /** Whether the manager-private 1:1 workspace is on. */
+  oneOnOneEnabled: boolean;
+  /** One entry per section, in step order; `checkIns` is present only in collab mode. */
+  sections: WeeklyReviewSection[];
+}

@@ -82,7 +82,7 @@ The visual rules are docs/40's: list rows and dividers, not cards; one primary a
 
 ### 5.1 Where it lives
 
-Weekly review is a **mode of Today**, not a new page (docs/58 guardrail: no new top-level pages). URL: `/?mode=review` (optional `&week=2026-09-29`), following the Standup precedent `/team?mode=standup` (`App.tsx:461`, `:879`). Entry points:
+Weekly review is a **mode of Today**, not a new page (docs/58 guardrail: no new top-level pages). URL: `/?mode=review` (optional `&week=2026-09-28`), following the Standup precedent `/team?mode=standup` (`App.tsx:461`, `:879`). Entry points:
 
 - Today's wrap-up on the review day (default Friday): the first row of the wrap-up panel (`TodayWrapUp.tsx:51`).
 - Today on Monday and Tuesday when last week is not reviewed: a row in the morning panel.
@@ -103,7 +103,7 @@ Monday catch-up: `◎  Review last week · ~10 min   [ Start ]  [ Not this week 
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ Weekly review · 29 Sep – 3 Oct                  Step 2 of 6    [ Exit  Esc ]│
+│ Weekly review · 28 Sep – 2 Oct                  Step 2 of 6    [ Exit  Esc ]│
 │ ━━━━━━━━━━━━━━━━━━━━━━━━──────────────────────────────────────────────────  │
 ├──────────────────┬─────────────────────────────────────────────────────────┤
 │ ✓ Look back   12 │  Waiting & delegated                        4 went quiet │
@@ -194,10 +194,10 @@ Delegated rows name the owner ("— Priya"). Task keys are left out (they mean n
 
 **Copy for Teams** writes both `text/html` (headings as bold paragraphs, `<ul>` bullets, every value HTML-escaped) and `text/plain` (the Markdown) through `ClipboardItem`, so Teams and Outlook paste formatted bullets. Where `ClipboardItem` is missing it falls back to Markdown through `writeText`, and the toast says "Copied as text".
 
-Example (Friday 3 October 2026):
+Example (Friday 2 October 2026):
 
 ```markdown
-**Weekly update · 29 Sep – 3 Oct**
+**Weekly update · 28 Sep – 2 Oct**
 
 **Shipped**
 - Payments retry flow signed off with Product
@@ -242,7 +242,7 @@ The text shown in step 6 is saved on the week's review record when it is copied 
 ```json
 { "type": "message", "attachments": [{ "contentType": "application/vnd.microsoft.card.adaptive",
   "content": { "type": "AdaptiveCard", "version": "1.4", "body": [
-    { "type": "TextBlock", "text": "LeadOS · Mon 6 Oct", "weight": "Bolder", "size": "Medium" },
+    { "type": "TextBlock", "text": "LeadOS · Mon 5 Oct", "weight": "Bolder", "size": "Medium" },
     { "type": "TextBlock", "text": "Top 3 · from Friday's review", "weight": "Bolder", "spacing": "Medium" },
     { "type": "TextBlock", "text": "1. Q4 roadmap draft to Product\n2. …", "wrap": true },
     { "type": "FactSet", "facts": [{ "title": "Due today", "value": "4" }, { "title": "Overdue", "value": "1" }] } ],
@@ -251,7 +251,7 @@ The text shown in step 6 is saved on the week's review record when it is copied 
 
 Detail level (decided): **titles, capped, with links**. A **Counts only** switch sends the numbers and buttons with no titles.
 
-**Browser push (Web Push).** Per device, opt-in from Settings. One notification a day: title "LeadOS · Mon 6 Oct", body "Top 3 set · 4 due · 1 overdue · 2 check-bys", click opens Today. The payload is encrypted to the device (RFC 8291); the push service only relays ciphertext. It works while the browser runs. On iPhone it needs the app added to the Home Screen (a minimal web manifest is added). The service worker only handles `push` and `notificationclick`; it caches nothing, so it cannot serve stale builds (P0-S4's chunk-reload logic is unaffected).
+**Browser push (Web Push).** Per device, opt-in from Settings. One notification a day: title "LeadOS · Mon 5 Oct", body "Top 3 set · 4 due · 1 overdue · 2 check-bys", click opens Today. The payload is encrypted to the device (RFC 8291); the push service only relays ciphertext. It works while the browser runs. On iPhone it needs the app added to the Home Screen (a minimal web manifest is added). The service worker only handles `push` and `notificationclick`; it caches nothing, so it cannot serve stale builds (P0-S4's chunk-reload logic is unaffected).
 
 ### 7.3 Settings → Notifications (new section `?section=notifications`)
 

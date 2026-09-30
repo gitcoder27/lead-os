@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db } from "../db/connection";
+import { startCanonicalTasksIfEmpty } from "../db/canonical-start";
+import { db, rawDb } from "../db/connection";
 import { workspaces } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 
@@ -47,6 +48,8 @@ export class WorkspaceService {
       createdAt: now,
       updatedAt: now,
     });
+    // docs/56 P3-00a: a brand-new workspace has nothing to backfill, so it starts canonical.
+    startCanonicalTasksIfEmpty(rawDb, id);
     return id;
   }
 

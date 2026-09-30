@@ -1,5 +1,6 @@
 import BetterSqlite3 from "better-sqlite3";
 import { encryptSecretIfNeeded, isEncryptedSecret } from "../services/secret-crypto";
+import { startCanonicalTasksForEmptyWorkspaces } from "./canonical-start";
 
 const DEFAULT_WORKSPACE_ID = "default";
 
@@ -1446,6 +1447,9 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   migrateSecretConfigValues(sqlite);
   backfillTeamMode(sqlite);
   pinLegacyJiraSyncScope(sqlite);
+  // docs/56 P3-00a: a workspace with no stage and nothing to backfill (a fresh install) starts
+  // canonical. Every run, so a workspace created while the server was down is covered too.
+  startCanonicalTasksForEmptyWorkspaces(sqlite);
 }
 
 export const JIRA_SCOPE_PIN_MIGRATION = "jira_sync_scope_pin_v1";

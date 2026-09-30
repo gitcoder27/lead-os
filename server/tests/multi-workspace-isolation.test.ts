@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import { createApp } from "../src/app";
 import {
   appUsers,
@@ -107,6 +107,15 @@ async function cookieFor(authService: AuthService, username: string) {
   return serializeSessionCookie(session.sessionId, authService.sessionMaxAgeSeconds);
 }
 
+
+/**
+ * These tests cover the legacy (pre-cutover) task surfaces in both workspaces. Since docs/56 P3-00a a
+ * brand-new workspace starts canonical, so put manager B's new workspace back on the legacy model.
+ */
+async function useLegacyTaskModel(workspaceId: string): Promise<void> {
+  await db.delete(configTable).where(and(eq(configTable.workspaceId, workspaceId), like(configTable.key, "tasks%")));
+}
+
 describe("multi-workspace API isolation", () => {
   beforeEach(async () => {
     await resetDatabase();
@@ -128,6 +137,7 @@ describe("multi-workspace API isolation", () => {
       password: "secret123",
       role: "manager",
     });
+    await useLegacyTaskModel(managerB.workspaceId);
 
     await seedDeveloper(managerA.workspaceId, "dev-1", "Alice A");
     await seedDeveloper(managerB.workspaceId, "dev-1", "Alice B");
@@ -293,6 +303,7 @@ describe("multi-workspace API isolation", () => {
       password: "secret123",
       role: "manager",
     });
+    await useLegacyTaskModel(managerB.workspaceId);
     await seedDeveloper(managerA.workspaceId, "dev-1", "Alice A");
     await seedDeveloper(managerB.workspaceId, "dev-1", "Alice B");
     await db.insert(configTable).values([

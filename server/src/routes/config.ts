@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/connection";
 import { appUsers, configTable, developers as developersTable, issues, syncLog, componentMap, issueScopeHistory, issueTags, localTags } from "../db/schema";
@@ -743,7 +743,10 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         await db.delete(issues).where(eq(issues.workspaceId, workspaceId));
         await db.delete(developersTable).where(eq(developersTable.workspaceId, workspaceId));
         await db.delete(syncLog).where(eq(syncLog.workspaceId, workspaceId));
-        await db.delete(configTable).where(eq(configTable.workspaceId, workspaceId));
+        // docs/56 P3-00a: the task-model keys (`tasks_*`: stage, Phase 3, id seed) describe where the
+        // workspace's tasks live, not Jira configuration. Dropping them sent a cut-over workspace back
+        // to the legacy model while its data is in `tasks`, so the reset keeps them.
+        await db.delete(configTable).where(and(eq(configTable.workspaceId, workspaceId), sql`${configTable.key} NOT LIKE 'tasks!_%' ESCAPE '!'`));
       });
 
       clearJiraApiToken(workspaceId);

@@ -764,6 +764,35 @@ export interface WorkspaceMaintenancePreviewResponse {
   teamTracker: TeamTrackerMaintenancePreview;
 }
 
+/** docs/56 P6-01: one SQLite snapshot in the backup directory. */
+export interface BackupRecord {
+  name: string;
+  path: string;
+  sizeBytes: number;
+  createdAt: string;
+  reason: string;
+}
+
+export interface BackupRuntimeStatus {
+  enabled: boolean;
+  running: boolean;
+  directory: string;
+  nextRunAt?: string;
+  lastError?: string;
+}
+
+/** `GET /api/backups`. */
+export interface BackupListResponse {
+  backups: BackupRecord[];
+  runtime: BackupRuntimeStatus;
+}
+
+/** `POST /api/backups/run`. */
+export interface BackupRunResponse {
+  success: true;
+  backup: BackupRecord;
+}
+
 export interface WorkspaceMaintenanceBackupSummary {
   name: string;
   createdAt: string;

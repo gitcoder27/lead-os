@@ -140,6 +140,9 @@ export function useSaveSettingsConfig() {
       managerJiraAccountId?: string;
       jiraApiToken?: string;
       jiraAutoSyncEnabled?: boolean;
+      backupEnabled?: boolean;
+      backupIntervalMinutes?: number;
+      backupRetentionDays?: number;
     }) => api.put('/config/settings', payload),
   });
 }

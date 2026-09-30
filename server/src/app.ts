@@ -28,7 +28,7 @@ import { createPreferencesRouter } from "./routes/preferences";
 import { createWorkSavedViewsRouter } from "./routes/work";
 import { createAssistantRouter } from "./routes/assistant";
 import type { AssistantService } from "./assistant/service";
-import { requireAdmin, requireManager } from "./middleware/auth";
+import { requireManager } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { AlertService } from "./services/alert.service";
 import { AutomationService } from "./services/automation.service";
@@ -186,7 +186,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     clearTodayCacheOnWrite,
     createConfigRouter(services.syncEngine, services.backupService)
   );
-  app.use("/api/backups", requireAdmin(services.authService), createBackupsRouter(services.backupService));
+  app.use("/api/backups", requireManager(services.authService), createBackupsRouter(services.backupService));
   app.use(
     "/api/tags",
     requireManager(services.authService),

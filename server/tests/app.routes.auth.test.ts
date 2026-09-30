@@ -32,11 +32,10 @@ const managerOnlyCases = [
     },
   },
   { method: "GET", url: "/api/manager-desk?date=2026-03-08" },
-] as const;
-
-const adminOnlyCases = [
+  // docs/56 P6-01: backups belong to the manager, not to an admin role nobody has.
   { method: "GET", url: "/api/backups" },
   { method: "POST", url: "/api/backups/run" },
+  { method: "GET", url: "/api/backups/dashboard.backup-20260308-000000000-manual.db/download" },
 ] as const;
 
 function createTestApp(authService: AuthService) {
@@ -160,73 +159,30 @@ describe("app route authorization", () => {
     expect(response.body?.error).toBe("Manager access required");
   });
 
-  it.each(adminOnlyCases)("$method $url rejects unauthenticated access", async ({ method, url }) => {
-    const app = createTestApp(authService);
-    const response = await invoke(app, { method, url });
-
-    expect(response.status).toBe(401);
-    expect(response.body?.error).toBe("Authentication required");
-  });
-
-  it.each(["manager", "developer"] as const)("GET /api/backups rejects %s access", async (role) => {
-    await authService.createUser({
-      username: "manager",
-      displayName: "Manager",
-      password: "secret123",
-      role: "manager",
-    });
-    if (role === "developer") {
-      await seedDeveloper("dev-1");
-      await authService.createUser({
-        username: "dev",
-        displayName: "Developer",
-        password: "secret123",
-        role: "developer",
-        developerAccountId: "dev-1",
-      });
-    }
-    const session = await authService.authenticate(role === "manager" ? "manager" : "dev", "secret123");
+  it.each(["/api/backups", "/api/backups/run"])("%s rejects an admin-role user: it is manager-only now", async (url) => {
+    await authService.createUser({ username: "manager", displayName: "Manager", password: "secret123", role: "manager" });
+    await authService.createUser({ username: "admin", displayName: "Admin", password: "secret123", role: "admin" });
+    const session = await authService.authenticate("admin", "secret123");
     const app = createTestApp(authService);
 
     const response = await invoke(app, {
-      method: "GET",
-      url: "/api/backups",
-      headers: {
-        cookie: serializeSessionCookie(session.sessionId),
-      },
+      method: url.endsWith("/run") ? "POST" : "GET",
+      url,
+      headers: { cookie: serializeSessionCookie(session.sessionId) },
     });
 
     expect(response.status).toBe(403);
-    expect(response.body?.error).toBe("Admin access required");
+    expect(response.body?.error).toBe("Manager access required");
   });
 
-  it("allows admin users to list and run backups", async () => {
-    await authService.createUser({
-      username: "manager",
-      displayName: "Manager",
-      password: "secret123",
-      role: "manager",
-    });
-    await authService.createUser({
-      username: "admin",
-      displayName: "Admin",
-      password: "secret123",
-      role: "admin",
-    });
-    const session = await authService.authenticate("admin", "secret123");
+  it("allows managers to list, run and download backups", async () => {
+    await authService.createUser({ username: "manager", displayName: "Manager", password: "secret123", role: "manager" });
+    const session = await authService.authenticate("manager", "secret123");
     const app = createTestApp(authService);
     const headers = { cookie: serializeSessionCookie(session.sessionId) };
 
-    const list = await invoke(app, {
-      method: "GET",
-      url: "/api/backups",
-      headers,
-    });
-    const run = await invoke(app, {
-      method: "POST",
-      url: "/api/backups/run",
-      headers,
-    });
+    const list = await invoke(app, { method: "GET", url: "/api/backups", headers });
+    const run = await invoke(app, { method: "POST", url: "/api/backups/run", headers });
 
     expect(list.status).toBe(200);
     expect(list.body).toMatchObject({

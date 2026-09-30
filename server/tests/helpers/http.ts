@@ -92,6 +92,11 @@ export async function invoke(
       if (chunk !== undefined) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
       }
+      // Binary downloads (docs/56 P6-01) come back as a Buffer, untouched.
+      if ((headers["content-type"] ?? "").includes("application/octet-stream")) {
+        resolve({ status: res.statusCode, body: Buffer.concat(chunks), headers });
+        return res;
+      }
       const rawBody = Buffer.concat(chunks).toString("utf8");
       const isNdjson = (headers["content-type"] ?? "").includes("application/x-ndjson");
       resolve({

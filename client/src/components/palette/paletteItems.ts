@@ -58,6 +58,14 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean }): Pa
     view: command.view,
     target: command.targetView ? { type: 'view' as const, view: command.targetView } : undefined,
   }));
+  commands.push({
+    id: 'nav-backups',
+    group: 'actions',
+    title: 'Open backups',
+    description: 'Settings · Data & Backups',
+    keywords: 'backup snapshot download restore data database',
+    target: { type: 'view', view: 'settings', section: 'data' },
+  });
   if (options?.tasksPhase3) {
     // docs/57 §5 (P3-06): Follow-ups and Meetings are Tasks views now.
     commands.push(

@@ -638,7 +638,7 @@ Use this exact order:
 2. Keep VPS SSH locked down with keys if possible.
 3. Keep only ports `22`, `80`, and `443` open publicly.
 4. Keep the app behind `nginx`; do not expose port `3001` to the internet.
-5. Keep regular backups of the SQLite database.
+5. Keep regular backups of the SQLite database, and copy them off the VPS (see [Backups and restore](#backups-and-restore)).
 
 ### Important Repo-Specific Follow-Up
 
@@ -691,6 +691,38 @@ If you use two hostnames, remember:
 - a hostname is not a role boundary
 - manager vs developer access is still controlled by the app user role
 - session sharing across subdomains is not configured today
+
+## Backups and restore
+
+LeadOS snapshots the whole SQLite database into the backup directory (default: a `backups/` folder under the repo-root `data/`). Managers manage this in **Settings → Data & Backups**: turn the schedule on or off, set the frequency and retention, press **Back up now**, and download a snapshot. The routes behind it (`GET /api/backups`, `POST /api/backups/run`, `GET /api/backups/:name/download`) are manager-only.
+
+A backup contains every table, including password hashes, session ids and encrypted secrets. Treat a downloaded file like the database itself.
+
+### Restore is CLI-only
+
+Restore replaces the live database, so it is deliberately not an endpoint or a button. On the machine that hosts LeadOS, stop the server, then run from the checkout that owns that database:
+
+```bash
+npm run backup:restore -- <path-to-backup-db>
+```
+
+The script verifies the file, moves the current database files into `backups/restore-archive/`, and copies the backup into place. Start the server afterwards.
+
+### Copy backups off the box
+
+Snapshots live on the same disk as the database, so they do not survive losing the VPS. LeadOS has no built-in off-box upload; copy the folder with a scheduled job instead. For example, an hourly `rsync` from the production checkout to another host (adjust the paths and host):
+
+```bash
+0 * * * * rsync -a --ignore-existing /home/ubuntu/apps/lead-os-prod/data/backups/ backup-user@backup-host:/srv/lead-os-backups/
+```
+
+Or, with an S3-compatible bucket and the AWS CLI:
+
+```bash
+0 * * * * aws s3 sync /home/ubuntu/apps/lead-os-prod/data/backups/ s3://your-bucket/lead-os-backups/ --only-show-errors
+```
+
+Test a restore from an off-box copy now and then, and never run these against the development checkout's data.
 
 ## Troubleshooting
 

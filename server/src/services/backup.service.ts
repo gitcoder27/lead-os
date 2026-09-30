@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
+import type { BackupRecord, BackupRuntimeStatus } from "shared/types";
 import { rawDb } from "../db/connection";
 import { getDbPath, getDefaultBackupDirectory, resolveWorkspacePath } from "../db/paths";
 import {
@@ -14,27 +15,13 @@ import {
 import { logger } from "../utils/logger";
 import { SettingsService } from "./settings.service";
 
-export interface BackupRecord {
-  name: string;
-  path: string;
-  sizeBytes: number;
-  createdAt: string;
-  reason: string;
-}
-
-export interface BackupRuntimeStatus {
-  enabled: boolean;
-  running: boolean;
-  directory: string;
-  nextRunAt?: string;
-  lastError?: string;
-}
-
 interface CreateBackupOptions {
   reason: string;
   skipIfRunning?: boolean;
   prune?: boolean;
 }
+
+export type { BackupRecord, BackupRuntimeStatus };
 
 export class BackupService {
   private task?: NodeJS.Timeout;
@@ -122,6 +109,15 @@ export class BackupService {
 
     backups.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
     return backups;
+  }
+
+  /**
+   * The snapshot with exactly this file name, or undefined. Matching against the directory
+   * listing (not joining the name onto a path) is what keeps a download from leaving the
+   * backup directory.
+   */
+  async findBackup(name: string): Promise<BackupRecord | undefined> {
+    return (await this.listBackups()).find((backup) => backup.name === name);
   }
 
   async getRuntimeStatus(): Promise<BackupRuntimeStatus> {

@@ -206,11 +206,11 @@ describe('palette commands', () => {
     const commands = [...navigation, ...buildQuickActions()];
 
     expect(commands.filter((command) => command.target || command.view).length).toBeGreaterThanOrEqual(6);
-    expect(navigation.filter((command) => command.target).length).toBe(5);
+    expect(navigation.filter((command) => command.target).length).toBe(6);
     expect(commands.some((command) => command.actionId === 'capture')).toBe(true);
     expect(commands.some((command) => command.actionId === 'capture-note')).toBe(true);
     expect(commands.some((command) => command.actionId === 'sync')).toBe(true);
-    expect(navigation.map((command) => command.view)).toEqual([
+    expect(navigation.map((command) => command.view).filter(Boolean)).toEqual([
       'today',
       'work',
       'team',
@@ -218,6 +218,13 @@ describe('palette commands', () => {
       'notes',
       'settings',
     ]);
+  });
+
+  it('has a command that opens Settings → Data & Backups (docs/56 P6-01)', () => {
+    const backups = buildNavigationCommands().find((command) => command.id === 'nav-backups');
+
+    expect(backups?.target).toEqual({ type: 'view', view: 'settings', section: 'data' });
+    expect(filterCommands(buildNavigationCommands(), 'snapshot').map((command) => command.id)).toEqual(['nav-backups']);
   });
 
   it('filters commands across title and keywords', () => {

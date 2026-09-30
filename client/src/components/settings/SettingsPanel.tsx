@@ -26,6 +26,7 @@ import {
   Pencil,
   PanelTop,
   Clock3,
+  Database,
   Gauge,
   Sparkles,
   X,
@@ -57,6 +58,7 @@ import {
 import { TagManagementSection } from '@/components/settings/TagManagementSection';
 import { LabelsSection } from '@/components/settings/LabelsSection';
 import { UserPasswordResetAction } from '@/components/settings/UserPasswordResetAction';
+import { SettingsDataSection } from '@/components/settings/SettingsDataSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
@@ -69,11 +71,11 @@ import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
 import { SYNC_SCOPE_SHORT_LABELS, SYNC_SCOPE_SUMMARIES } from '@/lib/sync-scope';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
-type SectionId = 'navigation' | 'rhythm' | 'attention' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'maintenance' | 'access';
+type SectionId = 'navigation' | 'rhythm' | 'attention' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'data' | 'maintenance' | 'access';
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
 const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_and_unassigned';
 
-const SECTION_IDS: readonly SectionId[] = ['navigation', 'rhythm', 'attention', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'maintenance', 'access'];
+const SECTION_IDS: readonly SectionId[] = ['navigation', 'rhythm', 'attention', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'data', 'maintenance', 'access'];
 
 function isSectionId(value: string | null | undefined): value is SectionId {
   return value !== null && value !== undefined && (SECTION_IDS as readonly string[]).includes(value);
@@ -820,6 +822,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     team: { title: 'Team Members', description: 'Manage tracked developers for workload, routing, and sync scope.' },
     tags: { title: 'Defect Tags', description: 'Review the shared tag library and safely remove labels.' },
     labels: { title: 'Task Labels', description: 'Manage the shared task label library — add, rename, recolor, or remove labels.' },
+    data: { title: 'Data & Backups', description: 'Back up the database on a schedule, take a backup now, and download snapshots.' },
     maintenance: { title: 'Data Maintenance', description: 'Preview and run rare cleanup resets for Manager Desk and Team Tracker.' },
     access: { title: 'Developer Access', description: 'Create developer accounts and manage app user access.' },
   };
@@ -834,6 +837,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
     ...(tasksPhase3 ? [{ id: 'labels' as const, icon: <Tags size={13} />, label: 'Task Labels', status: null, sv: 'muted' as const }] : []),
+    { id: 'data', icon: <Database size={13} />, label: 'Data & Backups', status: null, sv: 'muted' },
     { id: 'maintenance', icon: <TriangleAlert size={13} />, label: 'Data Maintenance', status: 'Danger zone', sv: 'warning' },
     { id: 'access', icon: <Shield size={13} />, label: 'Developer Access', status: !loadingUsers ? `${appUsers.length} user${appUsers.length !== 1 ? 's' : ''}` : null, sv: 'muted' },
   ];
@@ -1833,6 +1837,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               ) : null}
 
               {/* ── DATA MAINTENANCE ────── */}
+              {activeSection === 'data' ? (
+                <SettingsDataSection active={activeSection === 'data'} />
+              ) : null}
+
               {activeSection === 'maintenance' ? (
                 <SettingsMaintenanceSection active={activeSection === 'maintenance'} />
               ) : null}

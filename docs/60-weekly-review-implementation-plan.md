@@ -17,8 +17,9 @@ Same as docs/56 "Working rules (single checkout)":
 
 ## Ownership
 
-**Opus** takes design-sensitive, data-model and security-sensitive items: WR-01, WR-02, WR-03, WR-09, WR-11, WR-12, WR-13, WR-15.
-**Sonnet** takes the well-specified, mechanical items: WR-04, WR-05, WR-06, WR-07, WR-08, WR-10, WR-14, WR-16.
+Default split (from the plan): **Opus** takes the design-sensitive, data-model and security-sensitive items (WR-01, 02, 03, 09, 11, 12, 13, 15); **Sonnet** the mechanical ones (WR-04, 05, 06, 07, 08, 10, 14, 16).
+
+**Override for this build (user's instruction, 2026-09-30):** Phase A, **WR-01..WR-06, is implemented by Sonnet**. **Opus reviews WR-01..WR-06 at checkpoint R1**; the Sonnet review of Opus items is dropped for those. WR-07 onward keeps the default split.
 
 Review rules (as docs/56): Sonnet reviews Opus items for test coverage, role boundaries and AGENTS.md conventions; Opus reviews Sonnet items that touch migrations, outbound data, or the review/report design. Reviews happen at the checkpoints below, before any push or deploy.
 
@@ -34,7 +35,7 @@ Each step is one agent session: implement, verify, commit, stop. Trigger them on
 | 4 | Sonnet | WR-04 Waiting and Loose ends decisions | WR-03 | "Implement WR-04 from docs/60." |
 | 5 | Sonnet | WR-05 People and Next week | WR-03 | "Implement WR-05 from docs/60." |
 | 6 | Sonnet | WR-06 Entry points and review day | WR-03 | "Implement WR-06 from docs/60." |
-| **R1** | Review | Opus reviews WR-04..06; Sonnet reviews WR-01..03 | 1–6 | "Run checkpoint R1 from docs/60." Then **you** run one review on dev data. |
+| **R1** | Review | Opus reviews WR-01..06 (all of Phase A, implemented by Sonnet) | 1–6 | "Run checkpoint R1 from docs/60." Then **you** run one review on dev data. |
 | 7 | Sonnet | WR-07 Report builder | R1 | "Implement WR-07 from docs/60." |
 | 8 | Sonnet | WR-08 Send update step and Past updates | WR-07 | "Implement WR-08 from docs/60." |
 | 9 | Opus | WR-09 Jira `resolved_at` and the Jira line | WR-07 | "Implement WR-09 from docs/60." |
@@ -67,8 +68,9 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
     - **Quiet** = check-by passed, or `workingDaysBetween(lastActivity, today) >= rules.managerTouchDays`, applied to rows the Waiting lens matches (`waitingMatch`, `:178`).
     - Closed rows are cut to the manager's calendar days with `toZonedIsoDay` (as `today-plan.service.ts:108-111`). **Undated** = lane `unscheduled` or `inbox`, created 14+ days ago.
     - A failing source (1:1s, team) marks its section `unavailable`; the rest still returns.
+    - **1:1 tasks never appear (docs/59 §4, §10).** Every section drops each task whose id is in `one_on_one_agenda_items` for the workspace (topics, session action items and tasks attached with "Add to agenda…"; one id set read per request, and the same helper is exported for WR-11 and WR-10). This is a join, not a `meta.source` check.
     - No schema change.
-  - Tests: `server/tests/weekly-review.service.test.ts` (week edges in `Pacific/Auckland` and `Pacific/Honolulu`; Monday default to last week; quiet across a weekend is 5 working days, not 5 calendar days; passed check-by; delegated developer task; another manager's private waiting-on is not "waiting" for me; closed cut per zone; collab-only `checkIns`); `server/tests/review.routes.test.ts` (developer 403, bad `week` 400, bad `tz` falls back).
+  - Tests: `server/tests/weekly-review.service.test.ts` (a done 1:1 topic, a done session action item and an open topic appear in no section (`closed`, `quiet`, `slipped`, `inbox`, `undated`, `laterNextWeek`) while a normal task with the same shape does; the exclusion is per workspace; week edges in `Pacific/Auckland` and `Pacific/Honolulu`; Monday default to last week; quiet across a weekend is 5 working days, not 5 calendar days; passed check-by; delegated developer task; another manager's private waiting-on is not "waiting" for me; closed cut per zone; collab-only `checkIns`); `server/tests/review.routes.test.ts` (developer 403, bad `week` 400, bad `tz` falls back).
 
 - [ ] **WR-02** `weekly_reviews` table and save API. (Opus)
   - Files: `server/src/db/schema.ts`, `server/src/db/migrate.ts` (new table, `CREATE TABLE IF NOT EXISTS`), `weekly-review.service.ts`, `routes/review.ts`, `shared/types.ts`.
@@ -115,26 +117,26 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
   - Tests: people step in solo vs collab (check-in line absent in solo), hidden with an empty roster, 1:1 rows hidden without the feature; pins sent with Monday's date on a Friday, limit 3 enforced.
 
 - [ ] **WR-06** Entry points and review day. (Sonnet)
-  - Files: `server/src/services/settings.service.ts` (`weekly_review_day`, default 5; `weekly_review_in_wrapup`, default on), `routes/today.ts` and `today.service.ts` (`/api/today/settings` accepts both as optional fields; `TodayResponse.weeklyReview: { due, completedAt?, catchUp? }`), `TodayWrapUp.tsx` (first row), the morning panel (`today-layout.ts:35-48`, `TodayPage.tsx`), `SettingsPanel.tsx` Day Rhythm, `components/palette/paletteItems.ts` (Weekly review, Copy weekly update → opens step 6), `TaskViewRail.tsx` (Review section link).
-  - Accept: the wrap-up row shows only on the review day; the done state reads "Weekly review done · 15:42"; the Monday/Tuesday catch-up row with **Not this week** (sets `dismissed`); the palette entries; the rail link; Settings saves the day. The Today cache is cleared on settings writes.
-  - Tests: `today-stage.test.ts` (row on the review day only, catch-up on Monday, not after completion or dismissal), `TodayWrapUp` test, palette test, settings route test (validation 0–6).
+  - Files: `server/src/services/settings.service.ts` (`weekly_review_day`, default 5; `weekly_review_in_wrapup`, default on), `routes/today.ts` and `today.service.ts` (`/api/today/settings` accepts both as optional fields; `TodayResponse.weeklyReview: { due, completedAt?, catchUp? }`), `TodayWrapUp.tsx` (first row), the morning panel (`today-layout.ts:35-48`, `TodayPage.tsx`), `SettingsPanel.tsx` Day Rhythm, `components/palette/paletteItems.ts` (**Weekly review** only; **Copy weekly update** is added in WR-08, because step 6 does not exist until then), `TaskViewRail.tsx` (Review section link).
+  - Accept: the wrap-up row shows only on the review day; the done state reads "Weekly review done · 15:42"; the Monday/Tuesday catch-up row with **Not this week** (sets `dismissed`); the palette entry **Weekly review**; the rail link; Settings saves the day. The Today cache is cleared on settings writes.
+  - Tests: `today-stage.test.ts` (row on the review day only, catch-up on Monday, not after completion or dismissal), `TodayWrapUp` test, palette test (Weekly review), settings route test (validation 0–6).
 
 ### Checkpoint R1
 
-- Opus reviews WR-04..06; Sonnet reviews WR-01..03 (coverage, role boundaries, AGENTS.md conventions). Fix findings in their own commits.
+- Opus reviews WR-01..06 (coverage, role boundaries, AGENTS.md conventions, the 1:1 exclusion, design). Fix findings in their own commits.
 - **You:** run one review on the dev sandbox (never prod data) and note anything that took too long or felt like a chore.
 
 ## Phase B: Update and export
 
 - [ ] **WR-07** Report builder. (Sonnet)
   - Files: new `client/src/lib/weekly-report.ts` (`buildWeeklyReport(review, state) → WeeklyReportModel`, `toMarkdown`, `toHtml`).
-  - Accept: sections and order, line caps and omissions exactly as docs/59 §6; delegated rows end "— Name"; no task keys; only titles, names, counts, dates and status notes; Markdown special characters in titles are escaped; every value is HTML-escaped in `toHtml`; the Jira line appears only when the review carries Jira data (WR-09).
-  - Tests: `client/src/test/weekly-report.test.ts` (the docs/59 §6 example reproduced byte for byte from a fixture; `<script>` and `&` in a title; `*`/`_` in a title; empty sections left out; "Nothing to report" never copied; dropped rows excluded by default).
+  - Accept: sections and order, line caps and omissions exactly as docs/59 §6; delegated rows end "— Name"; no task keys; only titles, names, counts, dates and status notes; Markdown special characters in titles are escaped; every value is HTML-escaped in `toHtml`; the Jira line appears only when the review carries Jira data (WR-09). **People-related "Blocked & risks" lines** (a named person's status, with the note) are built with `namesPerson: true` and **default to excluded** (docs/59 §6); the model exposes it so step 6 can show the hint. The builder never sees 1:1 tasks (the server drops them, WR-01).
+  - Tests: `client/src/test/weekly-report.test.ts` (a person-status line is excluded by default and included once ticked; a fixture with a 1:1 topic id in `closed` is impossible by contract, so a test asserts the builder output for a review whose server payload omitted it; the docs/59 §6 example reproduced byte for byte from a fixture; `<script>` and `&` in a title; `*`/`_` in a title; empty sections left out; "Nothing to report" never copied; dropped rows excluded by default).
 
 - [ ] **WR-08** Step 6 Send update and Past updates. (Sonnet; Opus design review at R2)
   - Files: `client/src/components/review/ReviewSendStep.tsx`, `ReviewPastUpdates.tsx`, new `client/src/lib/clipboard.ts`.
-  - Accept: preview with per-line checkboxes (`x`); **Edit text** textarea (edits are kept in `reportMarkdown`); **Copy for Teams** writes `text/html` and `text/plain` through `ClipboardItem`, falling back to `writeText` with the toast "Copied as text"; **Copy Markdown**; `y` copies; **Finish review** saves `reportMarkdown` and `completed`, toasts "Review done · Monday is planned", and returns to Today; Past updates lists completed weeks with **Copy** and **Copy last 4 weeks**; the palette's **Copy weekly update** builds from defaults without completing the review.
-  - Tests: clipboard payload types and fallback; finish saves and navigates; past updates copy order (newest first); palette command.
+  - Accept: preview with per-line checkboxes (`x`); lines that name a person start unticked with the visible hint "Names a person" (the checkbox's accessible description too); **Edit text** textarea (edits are kept in `reportMarkdown`); **Copy for Teams** writes `text/html` and `text/plain` through `ClipboardItem`, falling back to `writeText` with the toast "Copied as text"; **Copy Markdown**; `y` copies; **Finish review** saves `reportMarkdown` and `completed`, toasts "Review done · Monday is planned", and returns to Today; Past updates lists completed weeks with **Copy** and **Copy last 4 weeks**; the palette command **Copy weekly update** (moved here from WR-06) builds from defaults without completing the review and opens step 6.
+  - Tests: clipboard payload types and fallback; finish saves and navigates; past updates copy order (newest first); palette command **Copy weekly update**; person-status lines unticked by default with the hint, tick-in includes the line in both Markdown and HTML, and Copy for Teams on an untouched review carries none.
 
 - [ ] **WR-09** Jira `resolved_at` and the Jira line. (Opus)
   - Files: `server/src/db/schema.ts` and `migrate.ts` (`ALTER TABLE issues ADD COLUMN resolved_at TEXT`, in the ALTER list at `migrate.ts:670-686`), `server/src/sync/engine.ts` (add `resolutiondate` to the field list at `:157-171`, map it near `:260-283`; if Jira sends none, set it when a row moves into the `done` category), `weekly-review.service.ts` (`jira` section: resolved, opened, critical open, top resolved, using `isVisibleWorkIssue`, `issue-rules.ts:29`), `shared/types.ts`, step 1 Jira group, and the report line in `weekly-report.ts`.
@@ -142,9 +144,9 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
   - Tests: `sync.engine.test.ts` with a **mocked** Jira client (mapping, done-transition fallback, not overwritten once set); review Jira section tests; `db.migrate.test.ts`; migration on copies of the dev and prod DBs. No real sync.
 
 - [ ] **WR-10** CSV export. (Sonnet)
-  - Files: new `client/src/lib/csv.ts`; `client/src/components/tasks/TaskToolbar.tsx` (**Export CSV** in the toolbar's overflow); the Work dashboard toolbar (export the filtered rows `DefectTable.tsx` renders); review step 6 **Download CSV** (closed this week).
-  - Accept: Tasks columns Key, Title, Status, Lane, Owner, Waiting on, Plan date, Deadline, Check by, Priority, Labels, Jira, Created, Closed; Work columns Key, Summary, Status, Priority, Assignee, Due, Dev due, Tags, Updated; exports exactly the rows of the current view and filters; formula-injection guard, UTF-8 BOM, CRLF; filename `leados-{tasks|work}-{view}-{YYYY-MM-DD}.csv` with the local date.
-  - Tests: `client/src/test/csv.test.ts` (quotes, commas, newlines, `=`/`+`/`-`/`@` prefixing, BOM); Tasks toolbar export uses the current view's rows.
+  - Files: **create** `client/src/lib/csv.ts` (it does not exist yet); the Tasks list response marks agenda-linked rows (`oneOnOne: true` on the task row DTO, set by `TaskViewsService` from `one_on_one_agenda_items`); `client/src/components/tasks/TaskToolbar.tsx` (**Export CSV** in the toolbar's overflow); the Work dashboard toolbar (export the filtered rows `DefectTable.tsx` renders); review step 6 **Download CSV** (closed this week).
+  - Accept: Tasks columns Key, Title, Status, Lane, Owner, Waiting on, Plan date, Deadline, Check by, Priority, Labels, Jira, Created, Closed; Work columns Key, Summary, Status, Priority, Assignee, Due, Dev due, Tags, Updated; exports exactly the rows of the current view and filters; formula-injection guard, UTF-8 BOM, CRLF; filename `leados-{tasks|work}-{view}-{YYYY-MM-DD}.csv` with the local date. **1:1 tasks are left out** of the Tasks export (rows with `oneOnOne: true`; docs/59 §4), and the review's closed-this-week CSV is built from review rows, which the server already filtered.
+  - Tests: `client/src/test/csv.test.ts` (quotes, commas, newlines, `=`/`+`/`-`/`@` prefixing, BOM); Tasks toolbar export uses the current view's rows and omits rows marked `oneOnOne`; a server test that the Tasks list marks agenda-linked tasks (topic, session action) and only those.
 
 ### Checkpoint R2
 
@@ -155,8 +157,8 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
 
 - [ ] **WR-11** Digest model and preview. (Opus)
   - Files: new `server/src/services/digest.service.ts` (pure `build(principal, localDate, tz) → DigestModel`), new `server/src/routes/notifications.ts` (`GET /api/notifications/digest/preview?tz=`), `shared/types.ts` (`DigestModel`, `DigestSection`), `today-plan.service.ts` (`returnedFromLaterCount`: Later tasks whose `hide_until` is today), `TodayPlanPanel.tsx` ("· 2 back from Later" on the Inbox row).
-  - Accept: sections, order, caps ("+3 more") and the review/catch-up lines exactly as docs/59 §7.1, reusing `TodayPlanService` and the task views rather than new queries; `isEmpty` when every section is empty and it is neither the review day nor catch-up.
-  - Tests: `server/tests/digest.service.test.ts` (each section; caps; Monday "from Friday's review" header; review-day and catch-up lines; empty; zone edges); preview route (developer 403).
+  - Accept: sections, order, caps ("+3 more") and the review/catch-up lines exactly as docs/59 §7.1, reusing `TodayPlanService` and the task views rather than new queries; `isEmpty` when every section is empty and it is neither the review day nor catch-up. Tasks in `one_on_one_agenda_items` never appear in any section (the WR-01 helper), so a 1:1 topic due today is not in "Due today", but the "1:1s today" line (sessions, not tasks) still is.
+  - Tests: `server/tests/digest.service.test.ts` (a 1:1 topic and a session action item planned today, overdue or back from Later appear in no section, while the session itself still shows under "1:1s today"; each section; caps; Monday "from Friday's review" header; review-day and catch-up lines; empty; zone edges); preview route (developer 403).
 
 - [ ] **WR-12** Prefs, deliveries and scheduler. (Opus)
   - Files: `schema.ts`, `migrate.ts` (`notification_prefs`, `notification_deliveries` with the partial unique index), new `server/src/services/notification-settings.service.ts`, new `server/src/notifications/scheduler.ts`, `server/src/index.ts` (start after `backupService.initialize()`), routes `GET/PUT /api/notifications/settings`, `GET /api/notifications/deliveries`.
@@ -169,8 +171,8 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
 
 - [ ] **WR-13** Teams channel and outbound guard. (Opus, security)
   - Files: new `server/src/notifications/teams.ts` (Adaptive Card 1.4 builder, titles and counts-only variants), new `server/src/notifications/outbound-guard.ts`, `notification-settings.service.ts` (encrypt with `secret-crypto`; GET returns only `hasTeamsWebhook` and `teamsHost`), `utils/logger.ts` (add the webhook fields to `redact`), `POST /api/notifications/test` (throttled, one per 30 s), `today.service.ts` (`digestFailing` when the latest digest delivery failed), a quiet Today row "Teams digest failed · Fix in Settings".
-  - Accept: the guard rules in docs/59 §10 (HTTPS, 443, host suffix allowlist `.logic.azure.com` / `.powerplatform.com` plus `NOTIFY_WEBHOOK_EXTRA_HOSTS`, resolved address not private/loopback/link-local, no redirects, 10 s timeout); errors are stored as ≤ 200 redacted characters; the card matches docs/59 §7.2; counts-only carries no titles.
-  - Tests: card snapshots (titles and counts-only); guard (http URL, other host, IP literal, host resolving to `127.0.0.1` and `10.x`, redirect refused, timeout); the URL never appears in GET responses or captured logs; `fetch` mocked, no network.
+  - Accept: the guard rules in docs/59 §10 (HTTPS, 443, host suffix allowlist `.logic.azure.com` / `.powerplatform.com` plus `NOTIFY_WEBHOOK_EXTRA_HOSTS`, resolved address not private/loopback/link-local, **connecting to the validated address** (resolve once, check every returned address, pin the IP through a custom `lookup`/agent so SNI, `Host` and certificate verification keep the hostname; there is no second lookup, so DNS rebinding between check and connect cannot reach a private address), no redirects, 10 s timeout); errors are stored as ≤ 200 redacted characters; the card matches docs/59 §7.2; counts-only carries no titles.
+  - Tests: card snapshots (titles and counts-only); guard (http URL, other host, IP literal, host resolving to `127.0.0.1` and `10.x`, **a host whose resolver answers public on the first lookup and private on the second is refused or still connects only to the first (public) address, never the private one**, redirect refused, timeout); the URL never appears in GET responses or captured logs; `fetch` mocked, no network.
 
 - [ ] **WR-14** Settings → Notifications. (Sonnet)
   - Files: `SettingsPanel.tsx` (section list at `:840-851`, id `notifications`), new `client/src/components/settings/NotificationsSection.tsx`, new `client/src/hooks/useNotificationSettings.ts`, `client/src/lib/api.ts`.
@@ -198,3 +200,4 @@ Prompts-needed steps: every row is a separate trigger. The three checkpoints nee
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
 | 2026-09-30 | WR-00 | main (single commit) | Opus | Spec docs/59 and this plan. Decisions from the user are in docs/59 §11: Teams (Power Automate) + browser push + in-app; boss update = Shipped · Next week · Blocked & risks; Friday ~10 min; quiet one-digest reminders; quiet = 5 working days or check-by passed; titles to Teams (capped, counts-only switch); Jira line with `resolved_at`; order review → report → digest; numbered 59/60 because docs/58 exists. |
+| 2026-09-30 | WR-00 (fixes) | main (single commit) | Sonnet | Pre-implementation review fixes: (1) 1:1 agenda tasks (topics, session action items) are excluded from every section, the report, the CSV and the digest via `one_on_one_agenda_items` (docs/59 §4/§9/§10; tests in WR-01, 07, 10, 11); (2) person-status lines in the update default unticked with a visible hint (§5.3, §6; WR-07/08); (3) WR-13 outbound guard pins the validated IP (§10; rebinding test); (4) palette "Copy weekly update" moved from WR-06 to WR-08; (5) `client/src/lib/csv.ts` does not exist yet, WR-10 creates it. Ownership overridden for this build: Sonnet implements WR-01..06, Opus reviews them at R1. |

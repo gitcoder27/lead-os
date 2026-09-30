@@ -28,7 +28,7 @@ Three moments, and what each one needs:
 - **The review is exception-based, not a per-item chore.** Closed items need no decision. A row you skip is simply kept. Only the items that went quiet or slipped ask for a decision, and every decision is one key or one click with Undo.
 - **The report is a by-product of the review.** Its last step writes the update from what you just reviewed. "Copy weekly update" also works on its own (palette) for weeks you skip the review.
 - **The digest does not duplicate Today.** It is a pointer plus the handful of things you would otherwise forget. Opening Today still shows the full picture.
-- **CSV everywhere adds little.** CSV comes from Tasks (any view, so also "Closed · last 7 days") and from Work. Team is not exported.
+- **CSV everywhere adds little.** CSV (a new `client/src/lib/csv.ts`, created by WR-10) comes from Tasks (any view, so also "Closed · last 7 days") and from Work. Team is not exported.
 
 ## 2. Non-goals
 
@@ -68,6 +68,11 @@ Three moments, and what each one needs:
 | Manager's time zone (server side) | `AttentionRules.timeZone` (`shared/types.ts:1230`, `settings.service.ts:167`); the client sends `tz` for interactive reads as Today does (`routes/today.ts:13`) |
 | Scheduler | the `setInterval` service pattern of `BackupService.start` (`backup.service.ts:57-73`) and `SyncEngine.start` (`sync/engine.ts:33-44`), started from `index.ts` |
 | Secrets at rest | `secret-crypto.ts` (`enc:v1:` prefix), as the Copilot key and Jira token use |
+| 1:1 exclusion | `one_on_one_agenda_items.task_id` (`schema.ts:715`), scoped by `workspace_id` (see "1:1 tasks are never in the review" below) |
+
+**1:1 tasks are never in the review.** Since P0-S5, 1:1 agenda topics are ordinary manager-owned, undated tasks. The only marker on the task itself is `meta.source = "one_on_one"` on its creation event, which is not a reliable filter (it is an event, and tasks attached later carry no such marker). The reliable join is `one_on_one_agenda_items.task_id`. **Every section of the review, the report builder, the CSV export and the digest exclude every task referenced by `one_on_one_agenda_items` for the workspace.** Why: a done topic such as "discuss performance concerns with Sam" would otherwise land under **Shipped** in the boss update, and an open one under Loose ends or Next week. The exclusion is one shared helper (a set of task ids, read once per request) applied in `WeeklyReviewService` and `DigestService`; the client-side report builder only sees the review rows the server returned, so it adds no filter of its own. The Tasks CSV exports the rows the Tasks list holds, so the Tasks list response marks agenda-linked rows (`oneOnOne: true`, from the same helper) and WR-10's export drops them (§9).
+
+**Session action items** (`OneOnOneService.createSessionAction`) are manager-owned normal tasks (or developer-assigned when the manager chose that) that are attached to the same agenda through `attachTask`, so they are in `one_on_one_agenda_items` too and are covered by the same exclusion. Decision: they are **excluded everywhere the agenda topics are** (review, report, CSV, digest), not shown-but-unticked. Justification: their titles are as sensitive as topics ("Put Sam on a PIP timeline"), the data cannot tell a topic from an action item (both are agenda rows), and a "default off" that still lists them in the review invites one stray tick to leak them. They stay fully visible on Tasks, Today and in the 1:1 workspace. Known trade-off: an ordinary task the manager attached to a 1:1 with "Add to agenda…" is hidden from the review as well; the manager can still report it by editing the update text. This is deliberately conservative and can be relaxed later by adding an explicit marker.
 
 **Week.** Monday to Sunday in the manager's zone. "This week" in the review means Monday to now. On Monday and Tuesday, if last week has no completed review, the review opens on **last week** (with a "This week" switch). Dates always come from the local-date helpers (`toZonedIsoDay`, `getLocalIsoDate`), never `toISOString().slice(0, 10)`.
 
@@ -81,7 +86,7 @@ Weekly review is a **mode of Today**, not a new page (docs/58 guardrail: no new 
 
 - Today's wrap-up on the review day (default Friday): the first row of the wrap-up panel (`TodayWrapUp.tsx:51`).
 - Today on Monday and Tuesday when last week is not reviewed: a row in the morning panel.
-- Palette: **Weekly review**, **Copy weekly update**.
+- Palette: **Weekly review** (Phase A), **Copy weekly update** (added with step 6).
 - Tasks rail, Review section: **Weekly review** under "Closed · last 7 days".
 - The Friday digest line (Phase C).
 
@@ -130,7 +135,7 @@ Monday catch-up: `◎  Review last week · ~10 min   [ Start ]  [ Not this week 
 | 3 | Loose ends | "Loose ends" · "7 to decide" | Groups **Slipped** (my planned tasks whose plan date passed), **Inbox**, **Undated for 2+ weeks**. Primary **Monday** (plan date → next workday). | `s` schedule menu (includes Later, `s l`) · `e` done · `#` drop | "No loose ends" (success) |
 | 4 | People | "People" · "2 need you" | **1:1s**: "Due next week" and "Missed this week" rows, primary **Open 1:1**. **Status**: people marked blocked or at risk, primary **Open**. Collab only: **Check-ins this week**, a read-only line per participating developer ("3 of 5 days"). | Skip session · open person | "Nothing needs you here" (success). Hidden when the roster is empty. |
 | 5 | Next week | "Monday's top 3" · "1 of 3" | Candidates: tasks moved to Monday in steps 2–3, then high priority tasks planned next week, then other planned tasks. Primary **Pick**; picked rows show a pin and **Remove**. Below: "Planned next week", a compact count per day (Mon 4 · Tue 2 …), and "Back from Later next week · 2". | `p` pick/unpick | "Nothing planned next week" with **Capture a task** |
-| 6 | Send update | "Update for your manager" | Preview (§6) with per-line checkboxes; **Edit text** switches to a textarea. Primary **Copy for Teams**; secondary **Copy Markdown**, **Download CSV** (closed this week). Then **Finish review**. | `y` copy for Teams · `x` toggle a line | never empty: sections with nothing say "Nothing to report" and are left out of the copy |
+| 6 | Send update | "Update for your manager" | Preview (§6) with per-line checkboxes (lines that name a person are unticked by default and carry the hint "Names a person"); **Edit text** switches to a textarea. Primary **Copy for Teams**; secondary **Copy Markdown**, **Download CSV** (closed this week). Then **Finish review**. | `y` copy for Teams · `x` toggle a line | never empty: sections with nothing say "Nothing to report" and are left out of the copy |
 
 Finishing shows the toast "Review done · Monday is planned" and returns to Today. The step-6 disclosure **Past updates** lists earlier weeks (date, first line) with **Copy** each and **Copy last 4 weeks**.
 
@@ -181,7 +186,9 @@ Short bullets for the manager's boss, pasted into Teams or Outlook. Three sectio
 
 - **Shipped:** checked closed tasks (mine and delegated, done only), then one Jira line when connected: "Defects: 7 resolved, 3 opened · 1 critical open (PAY-412)", then up to 3 resolved high-priority issues.
 - **Next week:** Monday's top 3, then high-priority tasks planned next week (up to 5 lines in total).
-- **Blocked & risks:** blocked tasks; waiting items whose check-by passed ("Waiting on Legal · 9 days"); people marked blocked or at risk, with their status note when there is one; open critical defects.
+- **Blocked & risks:** blocked tasks; waiting items whose check-by passed ("Waiting on Legal · 9 days"); people marked blocked or at risk, with their status note when there is one (**unticked by default**, see below); open critical defects. 1:1 tasks never appear (§4).
+
+**People-related lines default to unticked.** Any "Blocked & risks" line about a named person and their status note ("Search re-index at risk — Priya (capacity…)") starts **unticked** in step 6, with a visible hint "Names a person" beside its checkbox, because a status note about a colleague is the most likely thing a manager does not want their boss to read by accident. The manager ticks it in on purpose. Tasks delegated to a person ("— Priya" in Shipped) are ordinary work and stay ticked (they name an owner, not a status). Because the copy contains only ticked lines, an untouched review never sends a person-status line.
 
 Delegated rows name the owner ("— Priya"). Task keys are left out (they mean nothing to the boss). Private notes and update bodies are never included; only titles, names, counts and dates.
 
@@ -308,16 +315,19 @@ API (all manager-only, Zod-validated, thin routes; services hold the logic; cont
 | `GET /api/notifications/deliveries?limit=7` | recent deliveries |
 | `GET /api/notifications/push/key`, `POST` / `DELETE /api/notifications/push/subscriptions` | Web Push |
 
-`GET /api/today` gains `focus.plan.returnedFromLaterCount`, `weeklyReview?: { due: boolean; completedAt?: string; catchUp?: boolean }` and `digestFailing?: boolean`. CSV needs no route: Tasks and Work export the rows they already hold (`client/src/lib/csv.ts`).
+The Tasks list rows gain `oneOnOne?: true` (set from `one_on_one_agenda_items`; used only by the CSV export to leave 1:1 tasks out, WR-10).
+
+`GET /api/today` gains `focus.plan.returnedFromLaterCount`, `weeklyReview?: { due: boolean; completedAt?: string; catchUp?: boolean }` and `digestFailing?: boolean`. CSV needs no route: Tasks and Work export the rows they already hold, through a new `client/src/lib/csv.ts` that WR-10 creates (it does not exist yet).
 
 Server layout: `services/weekly-review.service.ts`, `services/digest.service.ts` (pure build), `services/notification-settings.service.ts`, and `server/src/notifications/` (`scheduler.ts`, `teams.ts`, `push.ts`, `outbound-guard.ts`), mirroring `sync/`. The scheduler ticks every 5 minutes and starts from `index.ts` after `backupService.initialize()`.
 
 ## 10. Privacy and security
 
 - **Manager-private end to end.** Every new route sits behind `requireManager`; developers get 403 (route tests). Nothing is added to `DeveloperTask`, My Day or developer DTOs. Rows are scoped by `workspace_id` and `manager_account_id`; the review reads through `TaskViewsService`, so the private waiting-on rule (`ownsPrivateFields`, `task-views.service.ts:101`) still applies.
+- **1:1 tasks stay out of everything that leaves the review.** The review, the report, the CSV export and the digest exclude every task in `one_on_one_agenda_items` for the workspace (§4), so a 1:1 topic or session action item is never in a Teams message, push, clipboard update or downloaded file. People-status lines in the update default to unticked (§6).
 - **Leaving the box.** Teams receives titles, names and counts (the manager's decision; **Counts only** is available). No update bodies, notes, Jira descriptions or check-in text are ever sent. Push payloads are end-to-end encrypted.
 - **Webhook URL is a secret** (it carries a `sig=`): encrypted at rest with `secret-crypto`, never returned or logged (added to the pino `redact` list, `utils/logger.ts:6`); the UI only shows the host.
-- **Outbound guard (SSRF):** HTTPS on port 443 only; host must end in `.logic.azure.com` or `.powerplatform.com` (Teams workflow hosts; an env allowlist can extend it); the resolved address must not be private, loopback or link-local; no redirects; 10 s timeout; response bodies are not stored beyond a 200-character redacted error.
+- **Outbound guard (SSRF):** HTTPS on port 443 only; host must end in `.logic.azure.com` or `.powerplatform.com` (Teams workflow hosts; an env allowlist can extend it); the resolved address must not be private, loopback, link-local or otherwise non-public (IPv4-mapped IPv6 included); **the connection is made to the address that was validated**: the hostname is resolved once, every returned address is checked, and the request connects to that pinned IP (a custom `lookup` on the `https.Agent`/`undici` dispatcher, so TLS SNI and the `Host` header keep the original hostname and the certificate is still verified against it). There is no second DNS lookup between check and connect, so DNS rebinding cannot swap in a private address; no redirects; 10 s timeout; response bodies are not stored beyond a 200-character redacted error.
 - **Links** use `app_url`, taken from the saving browser's origin (HTTPS, or `http://localhost` in development) or `APP_PUBLIC_URL` when set.
 - **CSV:** cells starting with `=`, `+`, `-`, `@`, tab or CR are prefixed with `'` (formula injection); UTF-8 with BOM for Excel; the file is built in the browser from data the manager can already see.
 - **Clipboard HTML** is built from escaped text only; no user text is ever inserted as markup.

@@ -337,6 +337,16 @@ ORDER BY updated DESC`);
     expect(getJiraApiToken()).toBe("new-token-from-settings");
   });
 
+  it("PUT /api/config/settings accepts every sync scope mode, including the team + unassigned default", async () => {
+    const app = createTestApp();
+    for (const mode of ["team_and_unassigned", "team_assignees", "base_query"]) {
+      const res = await invoke(app, { method: "PUT", url: "/api/config/settings", body: { jiraSyncScopeMode: mode, jiraSyncJql: "" } });
+      expect(res.status).toBe(200);
+      const rows = await db.select().from(configTable);
+      expect(Object.fromEntries(rows.map((r) => [r.key, r.value]))["jira_sync_scope_mode"]).toBe(mode);
+    }
+  });
+
   it("PUT /api/config/settings stores raw JQL in base-query mode", async () => {
     await db.insert(configTable).values([
       { key: "jira_base_url", value: "https://tenant.atlassian.net" },

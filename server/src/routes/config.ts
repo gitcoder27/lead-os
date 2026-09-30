@@ -25,8 +25,12 @@ import {
   TEAM_MODES,
   validateAttentionRules,
   type AttentionRulesResponse,
+  type JiraSyncScopeMode,
   type TeamModeResponse,
 } from "shared/types";
+
+// One list for both write schemas, so a new scope mode cannot be accepted by one and rejected by the other.
+const jiraSyncScopeModeSchema = z.enum(["team_assignees", "team_and_unassigned", "base_query"] satisfies [JiraSyncScopeMode, ...JiraSyncScopeMode[]]);
 
 const configSchema = z.object({
   body: z.object({
@@ -46,7 +50,7 @@ const configSchema = z.object({
     backupOnStartup: z.boolean().optional(),
     backupStartupMaxAgeHours: z.number().int().positive().optional(),
     backupBeforeReset: z.boolean().optional(),
-    jiraSyncScopeMode: z.enum(["team_assignees", "team_and_unassigned", "base_query"]).optional(),
+    jiraSyncScopeMode: jiraSyncScopeModeSchema.optional(),
     jiraSyncJql: z.string().optional(),
     jiraDevDueDateField: z.string().optional(),
     jiraAspenSeverityField: z.string().optional(),
@@ -453,7 +457,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       jiraBaseUrl: z.string().trim().optional(),
       jiraEmail: z.string().trim().optional(),
       jiraProjectKey: z.string().trim().optional(),
-      jiraSyncScopeMode: z.enum(["team_assignees", "base_query"]).optional(),
+      jiraSyncScopeMode: jiraSyncScopeModeSchema.optional(),
       jiraSyncJql: z.string().optional(),
       jiraDevDueDateField: z.string().optional(),
       jiraAspenSeverityField: z.string().optional(),

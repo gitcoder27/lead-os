@@ -99,6 +99,13 @@ ORDER BY updated DESC`;
       expect(buildScopedJql("AM", scoped, ["lead-1", "dev-1"], "team_and_unassigned")).toBe(scoped);
     });
 
+    it("keeps a hand-written clause that only looks like the managed one", () => {
+      const query = 'project = AM AND (assignee IN ("x") OR priority = High OR assignee IS EMPTY)';
+      expect(normalizeConfiguredJqlForMode(query, "team_and_unassigned")).toBe(query);
+      const unquoted = "project = AM AND (assignee IN (currentUser()) OR assignee IS EMPTY)";
+      expect(normalizeConfiguredJqlForMode(unquoted, "team_and_unassigned")).toBe(unquoted);
+    });
+
     it("does not strip a user's own parenthesised assignee logic in base-query mode", () => {
       const query = 'project = AM AND (assignee IN ("x") OR assignee IS EMPTY)';
       expect(normalizeConfiguredJqlForMode(query, "base_query")).toBe(query);

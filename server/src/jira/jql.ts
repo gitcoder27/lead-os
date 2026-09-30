@@ -130,8 +130,16 @@ function joinClauses(clauses: string[], multiline: boolean): string {
   return clauses.join(multiline ? "\nAND " : " AND ").trim();
 }
 
-/** The parenthesised clause the team-and-unassigned scope appends. */
-const MANAGED_TEAM_OR_UNASSIGNED = /^\(\s*assignee\s+IN\s*\(.*\)\s+OR\s+assignee\s+IS\s+EMPTY\s*\)$/is;
+/**
+ * The parenthesised clause the team-and-unassigned scope appends: an IN list of quoted
+ * account ids (as `quoteAccountId` writes them) OR assignee IS EMPTY, and nothing else, so a
+ * hand-written clause with extra conditions is never stripped as if it were managed.
+ */
+const QUOTED_ID = String.raw`"(?:[^"\\]|\\.)*"`;
+const MANAGED_TEAM_OR_UNASSIGNED = new RegExp(
+  String.raw`^\(\s*assignee\s+IN\s*\(\s*${QUOTED_ID}(?:\s*,\s*${QUOTED_ID})*\s*\)\s+OR\s+assignee\s+IS\s+EMPTY\s*\)$`,
+  "i"
+);
 
 function isAssigneeClause(clause: string): boolean {
   const trimmed = clause.trim();

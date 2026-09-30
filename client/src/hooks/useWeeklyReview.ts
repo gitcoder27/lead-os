@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/lib/api';
@@ -97,4 +97,17 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
   useEffect(() => () => flush(), [flush]);
 
   return { saved, patch, flush };
+}
+
+/** "Not this week": records a dismissal for that week only, and Today drops the catch-up row. */
+export function useDismissReviewWeek() {
+  const queryClient = useQueryClient();
+  const { addToast } = useToast();
+  return useMutation({
+    mutationFn: (weekStart: string) => api.put<SaveWeeklyReviewResponse>(`/review/week/${weekStart}`, { dismissed: true }),
+    onError: (error: Error) => addToast({ type: 'error', title: "Couldn't dismiss the review", message: error.message }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['today'] });
+    },
+  });
 }

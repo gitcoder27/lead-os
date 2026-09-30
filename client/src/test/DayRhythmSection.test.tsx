@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DayRhythmSection, validateRhythm } from '@/components/settings/DayRhythmSection';
 import { TestWrapper } from '@/test/wrapper';
@@ -125,5 +125,44 @@ describe('validateRhythm', () => {
     expect(validateRhythm({ ...DEFAULTS, middayStart: '10:00' })).toMatch(/order/);
     expect(validateRhythm({ standupStart: '16:00', middayStart: '12:00', wrapUpStart: '10:00' })).toMatch(/order/);
     expect(validateRhythm({ ...DEFAULTS, wrapUpStart: '24:00' })).toMatch(/HH:MM/);
+  });
+
+  describe('weekly review (docs/59 §5.1)', () => {
+    beforeEach(() => {
+      mockGet.mockResolvedValue({ boundaries: DEFAULTS, weeklyReviewDay: 5, weeklyReviewInWrapUp: true });
+      mockPut.mockImplementation(async (_path: string, body: Record<string, unknown>) => ({ boundaries: DEFAULTS, weeklyReviewDay: 5, weeklyReviewInWrapUp: true, ...body }));
+    });
+
+    it('shows Friday and the wrap-up row as on by default, and saves a new day on its own', async () => {
+      renderCard();
+      const day = await screen.findByLabelText('Weekly review day');
+      await waitFor(() => expect(day).toBeEnabled());
+      expect(day).toHaveValue('5');
+      expect(screen.getByLabelText(/Show it in wrap-up/)).toBeChecked();
+      expect(within(day).getAllByRole('option').map((option) => option.textContent)).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
+
+      fireEvent.change(day, { target: { value: '4' } });
+      await waitFor(() => expect(mockPut).toHaveBeenCalledWith('/today/settings', { weeklyReviewDay: 4 }));
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success', title: 'Weekly review saved' }));
+    });
+
+    it('turns the wrap-up row off without touching the stage times', async () => {
+      renderCard();
+      const toggle = await screen.findByLabelText(/Show it in wrap-up/);
+      await waitFor(() => expect(toggle).toBeEnabled());
+      fireEvent.click(toggle);
+      await waitFor(() => expect(mockPut).toHaveBeenCalledWith('/today/settings', { weeklyReviewInWrapUp: false }));
+    });
+
+    it('keeps a saved weekend day selectable, and reports a failed save', async () => {
+      mockGet.mockResolvedValue({ boundaries: DEFAULTS, weeklyReviewDay: 6, weeklyReviewInWrapUp: true });
+      mockPut.mockRejectedValueOnce(new Error('nope'));
+      renderCard();
+      const day = await screen.findByLabelText('Weekly review day');
+      await waitFor(() => expect(day).toHaveValue('6'));
+      expect(within(day).getByRole('option', { name: 'Saturday' })).toBeInTheDocument();
+      fireEvent.change(day, { target: { value: '2' } });
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error', title: 'Could not save the weekly review' })));
+    });
   });
 });

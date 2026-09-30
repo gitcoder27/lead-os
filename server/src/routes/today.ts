@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { TASK_KEY_PATTERN, TODAY_TOP_LIMIT, type SetTodayTop3Request, type TodayRhythmBoundaries } from "shared/types";
+import { TASK_KEY_PATTERN, TODAY_TOP_LIMIT, type SetTodayTop3Request, type UpdateTodayRhythmSettingsRequest } from "shared/types";
 import { validate } from "../middleware/validate";
 import { TodayService } from "../services/today.service";
 
@@ -24,8 +24,14 @@ const rhythmSettingsSchema = z.object({
       standupStart: clockTime,
       middayStart: clockTime,
       wrapUpStart: clockTime,
-    }),
-  }),
+    }).optional(),
+    // docs/59 §5.1: the weekly review day (0 = Sunday … 6 = Saturday) and its wrap-up row.
+    weeklyReviewDay: z.number().int().min(0, "weeklyReviewDay must be 0 to 6").max(6, "weeklyReviewDay must be 0 to 6").optional(),
+    weeklyReviewInWrapUp: z.boolean().optional(),
+  }).strict().refine(
+    (body) => body.boundaries !== undefined || body.weeklyReviewDay !== undefined || body.weeklyReviewInWrapUp !== undefined,
+    "Provide boundaries, weeklyReviewDay or weeklyReviewInWrapUp",
+  ),
 });
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
@@ -77,8 +83,7 @@ export function createTodayRouter(todayService: TodayService): Router {
 
   router.put("/settings", validate(rhythmSettingsSchema), async (req, res, next) => {
     try {
-      const { boundaries } = req.body as { boundaries: TodayRhythmBoundaries };
-      res.json(await todayService.updateRhythmSettings(boundaries, req.auth!.user.workspaceId));
+      res.json(await todayService.updateRhythmSettings(req.body as UpdateTodayRhythmSettingsRequest, req.auth!.user.workspaceId));
     } catch (error) {
       next(error);
     }

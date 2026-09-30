@@ -1,5 +1,6 @@
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
+import { WeeklyReviewService } from "./weekly-review.service";
 import { buildTopThreeActions, TodayPlanService } from "./today-plan.service";
 import { CaptureService } from "./capture.service";
 import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
@@ -36,6 +37,7 @@ import type {
   TodayGettingStarted,
   TodayResponse,
   TodayRhythmBoundaries,
+  UpdateTodayRhythmSettingsRequest,
   TodayRhythmSettings,
   TodayRhythmState,
   TodayStandupFocus,
@@ -93,7 +95,7 @@ type TodayBuildContext = {
 
 type TodayStateSnapshot = {
   phase3: boolean;
-  rhythm: TodayRhythmSettings;
+  rhythm: Pick<TodayRhythmSettings, "boundaries">;
   standup?: StandupSessionSummary;
   asks: TodayCheckInAsk[];
   delta?: { checkIns: CheckInSince[]; resolvedCount: number };
@@ -172,6 +174,7 @@ export class TodayService {
   private readonly oneOnOneService?: OneOnOneService;
   private readonly stateService: TodayStateService;
   private readonly settings = new SettingsService();
+  private readonly weeklyReviews = new WeeklyReviewService();
 
   constructor(
     private readonly issueService: IssueService,
@@ -258,13 +261,21 @@ export class TodayService {
   }
 
   async getRhythmSettings(workspaceId?: string): Promise<TodayRhythmSettings> {
-    return this.stateService.getRhythmSettings(workspaceId);
+    const [rhythm, review] = await Promise.all([
+      this.stateService.getRhythmSettings(workspaceId),
+      this.settings.getWeeklyReviewSettings(workspaceId),
+    ]);
+    return { ...rhythm, weeklyReviewDay: review.day, weeklyReviewInWrapUp: review.inWrapUp };
   }
 
-  async updateRhythmSettings(boundaries: TodayRhythmBoundaries, workspaceId?: string): Promise<TodayRhythmSettings> {
-    const settings = await this.stateService.updateRhythmSettings(boundaries, workspaceId);
+  /** Any of the stage times, the weekly review day and its wrap-up row; only what is given changes. */
+  async updateRhythmSettings(update: UpdateTodayRhythmSettingsRequest, workspaceId?: string): Promise<TodayRhythmSettings> {
+    if (update.boundaries) await this.stateService.updateRhythmSettings(update.boundaries, workspaceId);
+    if (update.weeklyReviewDay !== undefined || update.weeklyReviewInWrapUp !== undefined) {
+      await this.settings.setWeeklyReviewSettings(workspaceId, { day: update.weeklyReviewDay, inWrapUp: update.weeklyReviewInWrapUp });
+    }
     this.clearTodayCache(workspaceId);
-    return settings;
+    return this.getRhythmSettings(workspaceId);
   }
 
   /**
@@ -369,6 +380,13 @@ export class TodayService {
     ]);
     const canonical = await canonicalPromise;
     const plan = await planPromise;
+    // docs/59 §5.1: additive, like the plan: a failure only drops the review row.
+    const weeklyReview = (await phase3Promise)
+      ? await this.weeklyReviews.todayStatus({ type: "manager", accountId: managerAccountId, workspaceId }, date).catch((error: unknown) => {
+        logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), date, err: error }, "Today weekly review status unavailable");
+        return undefined;
+      })
+      : undefined;
     const collab = (await teamModePromise) === "collab";
     const sourceStatus: TodaySourceStatus = {
       issues: issueResult.status === "fulfilled" ? "ready" : "unavailable",
@@ -499,6 +517,7 @@ export class TodayService {
       }), plan),
       ...(state ? { checkInAsks: [...openAsks.values()] } : {}),
       ...(gettingStarted ? { gettingStarted } : {}),
+      ...(weeklyReview ? { weeklyReview } : {}),
       ...(state?.delta
         ? {
           delta: buildDelta({

@@ -4,6 +4,7 @@ import type {
   SaveWeeklyReviewRequest,
   TaskViewDefinition,
   TeamMode,
+  TodayWeeklyReview,
   WeeklyReviewCheckInRow,
   WeeklyReviewOneOnOneRow,
   WeeklyReviewPastWeek,
@@ -156,6 +157,27 @@ export class WeeklyReviewService {
       nextWorkdayTop3,
       saved: await this.getSaved(principal, range.start),
     };
+  }
+
+  /**
+   * docs/59 §5.1: what Today offers. The review day (default Friday, when "Show it in wrap-up" is
+   * on) shows the review, or its done state; Monday and Tuesday offer "Review last week" while last
+   * week is neither completed nor dismissed. Nothing otherwise. `date` is the manager's local day.
+   */
+  async todayStatus(principal: TaskPrincipal, date: string): Promise<TodayWeeklyReview | undefined> {
+    const { day, inWrapUp } = await this.settings.getWeeklyReviewSettings(principal.workspaceId);
+    if (!inWrapUp) return undefined;
+    const dow = isoDayOfWeek(date);
+    const thisWeek = mondayOf(date);
+    const lastWeek = addDaysToIsoDay(thisWeek, -7);
+    if ((dow === 1 || dow === 2) && !(await this.lastWeekHandled(principal, lastWeek))) {
+      return { due: true, catchUp: true, weekStart: lastWeek };
+    }
+    if (dow !== day) return undefined;
+    const record = await this.savedRow(principal, thisWeek);
+    if (record?.completedAt) return { due: false, completedAt: record.completedAt, weekStart: thisWeek };
+    if (record?.dismissedAt) return undefined;
+    return { due: true, weekStart: thisWeek };
   }
 
   /** Last week is handled once it was completed or the manager said "Not this week". */

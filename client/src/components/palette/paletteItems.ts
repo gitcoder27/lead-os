@@ -89,6 +89,15 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backu
         href: '/tasks?view=meetings',
       },
     );
+    // docs/59 §5.1: the weekly review is a mode of Today (`/?mode=review`).
+    commands.push({
+      id: 'action-weekly-review',
+      group: 'actions',
+      title: 'Weekly review',
+      description: 'Close the week: what got done, what went quiet, next week',
+      keywords: 'weekly review week friday close report update retro',
+      href: '/?mode=review',
+    });
     // P3-D5: standup mode is a deep-linked overlay on the Team page.
     commands.push({
       id: 'action-standup',

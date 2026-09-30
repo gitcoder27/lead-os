@@ -588,6 +588,50 @@ describe('TodayPage V2', () => {
     expect(within(panel).queryByText(/No check-in today/)).not.toBeInTheDocument();
   });
 
+  describe('weekly review row (docs/59 §5.1)', () => {
+    const wrapUpFocus = {
+      stage: 'wrap_up' as const,
+      wrapUp: { missingCheckIns: [], openPromises: [], carryCandidates: [], eodNoteTarget: target({ view: 'notes', date: '2026-03-08' }) },
+    };
+
+    it('leads the wrap-up panel on the review day', async () => {
+      teamModeMock.mode = 'solo';
+      const response = todayResponse({
+        rhythm: { stage: 'wrap_up', label: 'Wrap-up', detail: 'Close loops' },
+        focus: wrapUpFocus,
+        weeklyReview: { due: true, weekStart: '2026-03-02' },
+      });
+      mockFetch(response);
+      renderToday(response);
+
+      const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
+      const row = within(panel).getByTestId('today-weekly-review');
+      expect(within(row).getByRole('button', { name: 'Start review' })).toBeInTheDocument();
+      // First in the panel, ahead of the wrap-up block itself.
+      const sections = [...panel.querySelectorAll('section')];
+      expect(sections[0]).toBe(row);
+    });
+
+    it('shows the catch-up in the morning panel, and nothing when the server offers nothing', async () => {
+      teamModeMock.mode = 'solo';
+      const morning = todayResponse({ weeklyReview: { due: true, catchUp: true, weekStart: '2026-03-02' } });
+      mockFetch(morning);
+      renderToday(morning);
+      expect(await screen.findByText('Review last week')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Not this week' })).toBeInTheDocument();
+      cleanup();
+
+      const plain = todayResponse({
+        rhythm: { stage: 'wrap_up', label: 'Wrap-up', detail: 'Close loops' },
+        focus: wrapUpFocus,
+      });
+      mockFetch(plain);
+      renderToday(plain);
+      await screen.findByRole('complementary', { name: 'Wrap-up panel' });
+      expect(screen.queryByTestId('today-weekly-review')).not.toBeInTheDocument();
+    });
+  });
+
   describe('getting started (docs/56 P2-02)', () => {
     const fresh = { people: false, tasks: false, jira: false, rhythm: false };
 

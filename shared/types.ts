@@ -364,8 +364,34 @@ export const DEFAULT_TODAY_RHYTHM_BOUNDARIES: TodayRhythmBoundaries = {
   wrapUpStart: "16:00",
 };
 
+/** docs/59 §5.1 (WR-06): the weekly review's day (0 = Sunday … 6 = Saturday) defaults to Friday. */
+export const DEFAULT_WEEKLY_REVIEW_DAY = 5;
+
 export interface TodayRhythmSettings {
   boundaries: TodayRhythmBoundaries;
+  /** Day of the week the review is offered (0–6, Sunday = 0). */
+  weeklyReviewDay: number;
+  /** Show the review as the first row of the wrap-up panel on that day. */
+  weeklyReviewInWrapUp: boolean;
+}
+
+/** `PUT /api/today/settings`: any of the fields; only the given ones change. */
+export interface UpdateTodayRhythmSettingsRequest {
+  boundaries?: TodayRhythmBoundaries;
+  weeklyReviewDay?: number;
+  weeklyReviewInWrapUp?: boolean;
+}
+
+/** docs/59 §5.1: what Today offers about the weekly review right now. */
+export interface TodayWeeklyReview {
+  /** The review (or its catch-up) is waiting to be done. */
+  due: boolean;
+  /** Set on the review day once this week's review is finished. */
+  completedAt?: string;
+  /** Monday or Tuesday, last week unreviewed: "Review last week". */
+  catchUp?: boolean;
+  /** Monday of the week the row is about. */
+  weekStart: string;
 }
 
 export interface TodayRhythmState {
@@ -651,6 +677,8 @@ export interface TodayResponse {
   checkInAsks?: TodayCheckInAsk[];
   /** docs/56 P2-02: first-run checklist; absent when it could not be computed. */
   gettingStarted?: TodayGettingStarted;
+  /** docs/59 §5.1: absent when nothing is offered (not the review day, no catch-up, or the Tasks workspace is off). */
+  weeklyReview?: TodayWeeklyReview;
 }
 
 /** Which first-run steps are already done. Each is true once the workspace has it. */

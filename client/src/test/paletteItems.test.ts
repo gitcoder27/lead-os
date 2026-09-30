@@ -382,3 +382,17 @@ describe('Waiting and Meetings are Tasks views (docs/57 P3-06)', () => {
     expect(buildQuickActions({ tasksPhase3: true }).find((command) => command.id === 'action-capture')?.description).toBe('Tasks, waiting, notes');
   });
 });
+
+describe('Weekly review (docs/59 §5.1)', () => {
+  it('has a Weekly review command under Phase 3 that opens the review mode of Today', () => {
+    const commands = buildNavigationCommands({ tasksPhase3: true });
+    expect(commands.find((command) => command.id === 'action-weekly-review')).toMatchObject({ title: 'Weekly review', href: '/?mode=review' });
+    for (const query of ['weekly', 'friday', 'review', 'retro']) {
+      expect(filterCommands(commands, query).map((command) => command.id), query).toContain('action-weekly-review');
+    }
+  });
+
+  it('has no such command without the Tasks workspace', () => {
+    expect(buildNavigationCommands().some((command) => command.id === 'action-weekly-review')).toBe(false);
+  });
+});

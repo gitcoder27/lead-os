@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BookmarkPlus, Check, Pencil, Trash2, X } from 'lucide-react';
+import { BookmarkPlus, CalendarCheck, Check, Pencil, Trash2, X } from 'lucide-react';
+import { openWeeklyReview } from '@/lib/weekly-review';
 import type { TaskViewCount, TaskViewMeta } from '@/types';
 import { FOCUS_RING } from './TaskDetailPrimitives';
 
@@ -160,7 +161,22 @@ export function TaskViewRail({
       aria-label="Task views"
     >
       {renderItems(plan)}
-      {review.length > 0 && (<>{heading('Review')}{renderItems(review)}</>)}
+      {review.length > 0 && (
+        <>
+          {heading('Review')}
+          {renderItems(review)}
+          {/* docs/59 §5.1: the weekly review lives on Today; this is its door from Tasks. */}
+          <button
+            type="button"
+            onClick={() => openWeeklyReview()}
+            className="mt-px flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:text-[var(--text-primary)]"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <CalendarCheck size={13} aria-hidden="true" />
+            <span className="truncate">Weekly review</span>
+          </button>
+        </>
+      )}
       {saved.length > 0 && (<>{heading('My views')}{renderItems(saved)}</>)}
       {naming ? (
         <form

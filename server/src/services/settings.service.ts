@@ -12,6 +12,7 @@ import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "./workspace.service"
 import {
   DEFAULT_ATTENTION_RULES,
   DEFAULT_TEAM_MODE,
+  DEFAULT_WEEKLY_REVIEW_DAY,
   type AttentionRules,
   type JiraSyncScopeMode,
   type TeamMode,
@@ -39,6 +40,9 @@ export const TEAM_MODE_KEY = "team_mode";
  * keys are kept so saved values carry over; defaults live only in
  * `DEFAULT_ATTENTION_RULES` (shared/types).
  */
+export const WEEKLY_REVIEW_DAY_KEY = "weekly_review_day";
+export const WEEKLY_REVIEW_IN_WRAPUP_KEY = "weekly_review_in_wrapup";
+
 export const ATTENTION_RULE_KEYS = {
   staleHours: "team_tracker_stale_threshold_hours",
   noCurrentHours: "team_tracker_no_current_threshold_hours",
@@ -92,6 +96,36 @@ export class SettingsService {
       .values({ workspaceId: normalizedWorkspaceId, key: TEAM_MODE_KEY, value: teamMode })
       .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value: teamMode } });
     return teamMode;
+  }
+
+  /** docs/59 §5.1: the weekly review day (0–6, default Friday) and whether wrap-up shows it (default on). */
+  async getWeeklyReviewSettings(workspaceId?: string): Promise<{ day: number; inWrapUp: boolean }> {
+    const raw = await this.getConfigValue(WEEKLY_REVIEW_DAY_KEY, workspaceId);
+    const parsed = raw === undefined ? NaN : Number.parseInt(raw, 10);
+    return {
+      day: Number.isInteger(parsed) && parsed >= 0 && parsed <= 6 ? parsed : DEFAULT_WEEKLY_REVIEW_DAY,
+      inWrapUp: await this.getBooleanConfig(WEEKLY_REVIEW_IN_WRAPUP_KEY, true, workspaceId),
+    };
+  }
+
+  async setWeeklyReviewSettings(
+    workspaceId: string | undefined,
+    update: { day?: number; inWrapUp?: boolean },
+  ): Promise<{ day: number; inWrapUp: boolean }> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const entries: Array<[string, string]> = [];
+    if (update.day !== undefined) {
+      if (!Number.isInteger(update.day) || update.day < 0 || update.day > 6) throw new HttpError(400, "weeklyReviewDay must be a whole number from 0 to 6");
+      entries.push([WEEKLY_REVIEW_DAY_KEY, String(update.day)]);
+    }
+    if (update.inWrapUp !== undefined) entries.push([WEEKLY_REVIEW_IN_WRAPUP_KEY, update.inWrapUp ? "true" : "false"]);
+    for (const [key, value] of entries) {
+      await db
+        .insert(configTable)
+        .values({ workspaceId: scope, key, value })
+        .onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value } });
+    }
+    return this.getWeeklyReviewSettings(scope);
   }
 
   async getJiraBaseUrl(workspaceId?: string): Promise<string | undefined> {

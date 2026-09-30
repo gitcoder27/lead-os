@@ -220,7 +220,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
   app.use("/api/capture", requireManager(services.authService), clearTodayCacheOnWrite, createCaptureRouter(new CaptureService()));
   app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));
-  app.use("/api/review", requireManager(services.authService), createReviewRouter(taskKeysService, new WeeklyReviewService(undefined, undefined, undefined, services.oneOnOneService)));
+  app.use("/api/review", requireManager(services.authService), clearTodayCacheOnWrite, createReviewRouter(taskKeysService, new WeeklyReviewService(undefined, undefined, undefined, services.oneOnOneService)));
   app.use("/api/contacts", requireManager(services.authService), createContactsRouter());
   app.use("/api/notes", requireManager(services.authService), createNotesRouter(dailyNotesService));
   app.use(

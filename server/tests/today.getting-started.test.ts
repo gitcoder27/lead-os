@@ -54,7 +54,7 @@ describe("Today getting-started checklist (P2-02)", () => {
     await db.insert(tasks).values({ taskKey: "T-1", title: "First task", ownerType: "manager", ownerId: "manager-1", createdAt: "2026-03-08T04:00:00.000Z", updatedAt: "2026-03-08T04:00:00.000Z" });
     expect((await getToday()).gettingStarted).toMatchObject({ people: true, tasks: true, jira: false, rhythm: false });
 
-    await service.updateRhythmSettings({ standupStart: "09:15", middayStart: "11:00", wrapUpStart: "17:00" });
+    await service.updateRhythmSettings({ boundaries: { standupStart: "09:15", middayStart: "11:00", wrapUpStart: "17:00" } });
     expect((await getToday()).gettingStarted).toMatchObject({ rhythm: true, jira: false });
 
     await db.insert(configTable).values([

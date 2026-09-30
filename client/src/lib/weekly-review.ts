@@ -63,6 +63,16 @@ export function mondayOfLocal(isoDay: string): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+/**
+ * Open the weekly review from anywhere in the app (the Today row, the palette, the Tasks rail): the
+ * URL carries the mode, and the app's `popstate` handling turns it into the review.
+ */
+export function openWeeklyReview(week?: string): void {
+  const target = week ? `/?mode=review&week=${encodeURIComponent(week)}` : '/?mode=review';
+  window.history.pushState(null, '', target);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 /** The saved record a fresh review starts from. */
 export function blankSavedState(weekStart: string): WeeklyReviewSavedState {
   const now = new Date().toISOString();

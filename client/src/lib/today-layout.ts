@@ -11,6 +11,7 @@ import type {
   TodayRhythmStage,
   TodayStandupFocus,
   TodayTeamPulseItem,
+  TodayWeeklyReview,
   TeamMode,
 } from '@/types';
 import { usesCheckIns } from '@/lib/participation';
@@ -22,6 +23,7 @@ import { usesCheckIns } from '@/lib/participation';
  */
 export type TodayPanelSectionId =
   | 'plan'
+  | 'weeklyReview'
   | 'wrapUp'
   | 'standup'
   | 'delta'
@@ -32,7 +34,16 @@ export type TodayPanelSectionId =
   | 'promises'
   | 'people';
 
-export function todayPanelOrder(stage: TodayRhythmStage | undefined): TodayPanelSectionId[] {
+export function todayPanelOrder(stage: TodayRhythmStage | undefined, weeklyReview?: TodayWeeklyReview): TodayPanelSectionId[] {
+  const order = stageOrder(stage);
+  if (!weeklyReview) return order;
+  // docs/59 §5.1: the catch-up is offered all day Monday and Tuesday; on the review day the row
+  // leads from midday on (the review is a Friday-afternoon habit, and the morning has the digest).
+  const shown = weeklyReview.catchUp || stage === 'midday_check' || stage === 'wrap_up';
+  return shown ? ['weeklyReview', ...order] : order;
+}
+
+function stageOrder(stage: TodayRhythmStage | undefined): TodayPanelSectionId[] {
   switch (stage) {
     case 'morning_plan':
     case 'standup_window':

@@ -158,11 +158,13 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     const service = todayService();
     await expect(service.getRhythmSettings()).resolves.toEqual({
       boundaries: { standupStart: "10:00", middayStart: "12:00", wrapUpStart: "16:00" },
+      weeklyReviewDay: 5,
+      weeklyReviewInWrapUp: true,
     });
-    await service.updateRhythmSettings({ standupStart: "09:15", middayStart: "11:00", wrapUpStart: "17:00" });
+    await service.updateRhythmSettings({ boundaries: { standupStart: "09:15", middayStart: "11:00", wrapUpStart: "17:00" } });
     const today = await service.getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
     expect(today.rhythm.stage).toBe("standup_window");
-    await expect(service.updateRhythmSettings({ standupStart: "12:00", middayStart: "11:00", wrapUpStart: "17:00" }))
+    await expect(service.updateRhythmSettings({ boundaries: { standupStart: "12:00", middayStart: "11:00", wrapUpStart: "17:00" } }))
       .rejects.toMatchObject({ status: 400 });
   });
 

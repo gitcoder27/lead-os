@@ -66,6 +66,18 @@ describe('todayPanelOrder (docs/53 F6)', () => {
     expect(todayPanelOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
     expect(todayPanelOrder(undefined)).toEqual(['plan', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
   });
+
+  it('leads with the weekly review on the review day from midday on, and with the catch-up all day (docs/59 §5.1)', () => {
+    const reviewDay = { due: true, weekStart: '2026-09-28' };
+    expect(todayPanelOrder('morning_plan', reviewDay)[0]).toBe('plan');
+    expect(todayPanelOrder('midday_check', reviewDay).slice(0, 2)).toEqual(['weeklyReview', 'dueSoon']);
+    expect(todayPanelOrder('wrap_up', reviewDay).slice(0, 2)).toEqual(['weeklyReview', 'wrapUp']);
+    const catchUp = { due: true, catchUp: true, weekStart: '2026-09-28' };
+    for (const stage of ['morning_plan', 'standup_window', 'midday_check', 'wrap_up'] as const) {
+      expect(todayPanelOrder(stage, catchUp)[0], stage).toBe('weeklyReview');
+    }
+    expect(todayPanelOrder('wrap_up', undefined)).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
+  });
 });
 
 describe('groupQueueItems', () => {

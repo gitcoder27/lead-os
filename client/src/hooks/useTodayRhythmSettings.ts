@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import type { TodayRhythmBoundaries, TodayRhythmSettings } from '@/types';
+import type { TodayRhythmSettings, UpdateTodayRhythmSettingsRequest } from '@/types';
 
 /** docs/56 P2-05: the workspace's Today stage times (`GET/PUT /api/today/settings`). */
 export function useTodayRhythmSettings() {
@@ -16,8 +16,9 @@ export function useUpdateTodayRhythmSettings() {
   const queryClient = useQueryClient();
   const authScopeKey = useAuthScopeKey();
   return useMutation({
-    mutationFn: (boundaries: TodayRhythmBoundaries) =>
-      api.put<TodayRhythmSettings>('/today/settings', { boundaries }),
+    // Any of the stage times, the weekly review day and its wrap-up row; only the given fields change.
+    mutationFn: (update: UpdateTodayRhythmSettingsRequest) =>
+      api.put<TodayRhythmSettings>('/today/settings', update),
     onSuccess: (settings) => {
       queryClient.setQueryData(['today-rhythm-settings', authScopeKey], settings);
       // The stage on Today (and the getting-started tick) follows these times.

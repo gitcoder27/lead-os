@@ -292,7 +292,7 @@ describe("today routes", () => {
     const cookie = await managerCookie();
     const app = createTestApp();
     const initial = await invoke(app, { method: "GET", url: "/api/today/settings", headers: { cookie } });
-    expect(initial.body).toEqual({ boundaries: { standupStart: "10:00", middayStart: "12:00", wrapUpStart: "16:00" } });
+    expect(initial.body).toEqual({ boundaries: { standupStart: "10:00", middayStart: "12:00", wrapUpStart: "16:00" }, weeklyReviewDay: 5, weeklyReviewInWrapUp: true });
 
     const bad = await invoke(app, {
       method: "PUT",
@@ -315,7 +315,38 @@ describe("today routes", () => {
       headers: { cookie },
       body: { boundaries: { standupStart: "09:30", middayStart: "12:00", wrapUpStart: "17:00" } },
     });
-    expect(saved.body).toEqual({ boundaries: { standupStart: "09:30", middayStart: "12:00", wrapUpStart: "17:00" } });
+    expect(saved.body).toEqual({ boundaries: { standupStart: "09:30", middayStart: "12:00", wrapUpStart: "17:00" }, weeklyReviewDay: 5, weeklyReviewInWrapUp: true });
+  });
+
+  it("PUT /api/today/settings saves the weekly review day and wrap-up row on their own, validating 0-6 (docs/59 §5.1)", async () => {
+    vi.useRealTimers();
+    const cookie = await managerCookie();
+    const app = createTestApp();
+    const put = (body: unknown) => invoke(app, { method: "PUT", url: "/api/today/settings", headers: { cookie }, body });
+
+    const saved = await put({ weeklyReviewDay: 4 });
+    expect(saved.status).toBe(200);
+    // Stage times are untouched by a review-only save.
+    expect(saved.body).toEqual({ boundaries: { standupStart: "10:00", middayStart: "12:00", wrapUpStart: "16:00" }, weeklyReviewDay: 4, weeklyReviewInWrapUp: true });
+    expect((await put({ weeklyReviewInWrapUp: false })).body).toMatchObject({ weeklyReviewDay: 4, weeklyReviewInWrapUp: false });
+    expect((await put({ weeklyReviewDay: 0 })).body).toMatchObject({ weeklyReviewDay: 0 });
+    expect((await put({ weeklyReviewDay: 6 })).body).toMatchObject({ weeklyReviewDay: 6 });
+    // Validation: 0–6 whole numbers only, at least one field, nothing unknown.
+    for (const body of [{ weeklyReviewDay: 7 }, { weeklyReviewDay: -1 }, { weeklyReviewDay: 2.5 }, { weeklyReviewDay: "5" }, { weeklyReviewInWrapUp: "yes" }, {}, { surprise: 1 }]) {
+      expect((await put(body)).status, JSON.stringify(body)).toBe(400);
+    }
+    expect((await invoke(app, { method: "GET", url: "/api/today/settings", headers: { cookie } })).body).toMatchObject({ weeklyReviewDay: 6, weeklyReviewInWrapUp: false });
+  });
+
+  it("developers cannot read or write the settings (403)", async () => {
+    vi.useRealTimers();
+    const app = createTestApp();
+    await managerCookie();
+    await authService.createUser({ username: "dev-user", displayName: "Dev", password: "secret123", role: "developer", developerAccountId: "dev-1" });
+    const { sessionId } = await authService.authenticate("dev-user", "secret123");
+    const cookie = serializeSessionCookie(sessionId);
+    expect((await invoke(app, { method: "GET", url: "/api/today/settings", headers: { cookie } })).status).toBe(403);
+    expect((await invoke(app, { method: "PUT", url: "/api/today/settings", headers: { cookie }, body: { weeklyReviewDay: 3 } })).status).toBe(403);
   });
 
   it("POST restore without a patch is rejected by validation", async () => {

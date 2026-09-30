@@ -42,7 +42,7 @@ export interface CheckInSince {
  * standup sessions, check-ins and resolved issues.
  */
 export class TodayStateService {
-  async getRhythmSettings(workspaceId?: string): Promise<TodayRhythmSettings> {
+  async getRhythmSettings(workspaceId?: string): Promise<Pick<TodayRhythmSettings, "boundaries">> {
     const scope = normalizeWorkspaceId(workspaceId);
     const row = (await db
       .select({ value: configTable.value })
@@ -80,7 +80,7 @@ export class TodayStateService {
     return Boolean(row);
   }
 
-  async updateRhythmSettings(boundaries: TodayRhythmBoundaries, workspaceId?: string): Promise<TodayRhythmSettings> {
+  async updateRhythmSettings(boundaries: TodayRhythmBoundaries, workspaceId?: string): Promise<Pick<TodayRhythmSettings, "boundaries">> {
     const error = validateRhythmBoundaries(boundaries);
     if (error) throw new HttpError(400, error);
     const scope = normalizeWorkspaceId(workspaceId);

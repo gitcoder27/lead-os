@@ -53,6 +53,7 @@ import { TodaySinceStrip } from './TodaySinceStrip';
 import { TodayStandupCard } from './TodayStandupStatus';
 import { TodayPanelList } from './TodayPanelList';
 import { TodayTextCaptureDialog, type TodayCaptureExtras, type TodayCapturePreset } from './TodayTextCaptureDialog';
+import { TodayWeeklyReviewRow } from './TodayWeeklyReviewRow';
 import { TodayWrapUp } from './TodayWrapUp';
 import './today.css';
 
@@ -367,6 +368,8 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const renderPanelSection = (section: TodayPanelSectionId) => {
     if (!snapshot) return null;
     switch (section) {
+      case 'weeklyReview':
+        return snapshot.weeklyReview ? <TodayWeeklyReviewRow key="weeklyReview" review={snapshot.weeklyReview} /> : null;
       case 'delta':
         return <TodaySinceStrip key="delta" delta={snapshot.delta} date={snapshot.date} onOpenTarget={openTarget} />;
       case 'standup':
@@ -462,6 +465,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const hasSection = (section: TodayPanelSectionId): boolean => {
     if (!snapshot) return false;
     switch (section) {
+      case 'weeklyReview': return Boolean(snapshot.weeklyReview && (snapshot.weeklyReview.due || snapshot.weeklyReview.completedAt));
       case 'plan': return Boolean(plan);
       case 'wrapUp': return Boolean(focus && 'wrapUp' in focus);
       case 'standup': return Boolean(standup && (standup.status === 'completed' || stage !== 'midday_check'));
@@ -475,7 +479,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       default: return false;
     }
   };
-  const panelSections = snapshot ? todayPanelOrder(stage).filter(hasSection).map(renderPanelSection) : [];
+  const panelSections = snapshot ? todayPanelOrder(stage, snapshot.weeklyReview).filter(hasSection).map(renderPanelSection) : [];
 
   return (
     <main className="today-page">

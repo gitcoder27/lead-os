@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.TODAY_TOP_LIMIT = exports.DEFAULT_WEEKLY_REVIEW_DAY = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isTaskHidden = isTaskHidden;
@@ -16,6 +16,8 @@ exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = {
     middayStart: "12:00",
     wrapUpStart: "16:00",
 };
+/** docs/59 §5.1 (WR-06): the weekly review's day (0 = Sunday … 6 = Saturday) defaults to Friday. */
+exports.DEFAULT_WEEKLY_REVIEW_DAY = 5;
 /** docs/57 §6 (P3-01): how many tasks the manager can pin as the day's top. */
 exports.TODAY_TOP_LIMIT = 3;
 /** docs/56 P1-01: workspace `team_mode`. `solo` is the default; `collab`

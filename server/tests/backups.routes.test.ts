@@ -12,9 +12,10 @@ import { BackupService } from "../src/services/backup.service";
 import { SettingsService } from "../src/services/settings.service";
 import { resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
+import { runScratchPath } from "./helpers/tmp";
 
-const testBackupDirectory = path.resolve("/tmp", "lead-os-test-backups-routes");
-const outsideFile = path.resolve("/tmp", "lead-os-test-backups-routes-secret.db");
+const testBackupDirectory = runScratchPath("backups-routes");
+const outsideFile = runScratchPath("backups-routes-secret.db");
 
 async function upsertConfig(key: string, value: string): Promise<void> {
   await db.insert(configTable).values({ key, value }).onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value } });
@@ -117,7 +118,7 @@ describe("backups routes", () => {
     const app = createTestApp();
 
     for (const name of [
-      encodeURIComponent("../lead-os-test-backups-routes-secret.db"),
+      encodeURIComponent("../backups-routes-secret.db"),
       "..%2F..%2Fetc%2Fpasswd",
       encodeURIComponent(outsideFile),
       "not-a-db.txt",

@@ -65,8 +65,9 @@ import { BackupService } from "../src/services/backup.service";
 import { DEFAULT_BACKUP_MAX_SCHEDULED_SNAPSHOTS, SettingsService } from "../src/services/settings.service";
 import { getPersistedJiraApiToken, storeJiraApiToken } from "../src/services/jira-credentials.service";
 import { isEncryptedSecret } from "../src/services/secret-crypto";
+import { runScratchPath } from "./helpers/tmp";
 
-const testBackupDirectory = path.resolve("/tmp", "lead-os-test-config-backups");
+const testBackupDirectory = runScratchPath("config-backups");
 const testWorkspaceId = "default";
 
 beforeEach(async () => {

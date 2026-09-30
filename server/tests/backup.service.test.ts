@@ -10,8 +10,9 @@ import { SettingsService } from "../src/services/settings.service";
 import { storeJiraApiToken } from "../src/services/jira-credentials.service";
 import { isEncryptedSecret } from "../src/services/secret-crypto";
 import { resetDatabase } from "./helpers/db";
+import { runScratchPath } from "./helpers/tmp";
 
-const testBackupDirectory = path.resolve("/tmp", "lead-os-test-backups");
+const testBackupDirectory = runScratchPath("backups-service");
 
 async function upsertConfig(key: string, value: string): Promise<void> {
   await db.insert(configTable).values({ key, value }).onConflictDoUpdate({ target: [configTable.workspaceId, configTable.key], set: { value } });

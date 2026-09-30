@@ -17,12 +17,31 @@ describe('accent surfaces use theme tokens (docs/56 P7-05)', () => {
     'components/settings/AssistantSection.tsx',
     'components/settings/TagManagementSection.tsx',
   ];
+  // Text on a danger or success fill uses its own token (docs/56 P7-05 review).
+  const statusFiles = [
+    ['components/tasks/TaskDrawer.tsx', null],
+    ['components/actions/ManagerActionInbox.tsx', 'var(--on-danger)'],
+    ['components/table/DismissCell.tsx', 'var(--on-success)'],
+  ] as const;
 
   it.each(accentFiles)('%s has no hard-coded white', (file) => {
     const source = src(file);
     expect(source).not.toMatch(/#fff\b/i);
     expect(source).not.toMatch(/#ffffff\b/i);
     expect(source).toContain('var(--on-accent)');
+  });
+
+  it.each(statusFiles)('%s has no hard-coded white on a status fill', (file, token) => {
+    const source = src(file);
+    expect(source).not.toMatch(/#fff\b|#ffffff\b|text-white/i);
+    if (token) expect(source).toContain(token);
+  });
+
+  it('the solid danger button and the status tokens are themed, not literal', () => {
+    const css = src('index.css');
+    expect(css).toMatch(/\.ui-btn-danger-solid \{[^}]*color: var\(--on-danger\)/);
+    expect(css.match(/--on-danger:/g)).toHaveLength(2);
+    expect(css.match(/--on-success:/g)).toHaveLength(2);
   });
 
   it('the Copilot dock shadow comes from the shared overlay token', () => {

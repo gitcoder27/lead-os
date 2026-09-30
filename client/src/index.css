@@ -30,8 +30,10 @@
   --panel-shadow:  0 24px 60px rgba(15, 23, 42, 0.08);
   --soft-shadow:   0 14px 32px rgba(15, 23, 42, 0.06);
   --success:       #10B981;
+  --on-success:    #FFFFFF;
   --warning:       #F59E0B;
   --danger:        #EF4444;
+  --on-danger:     #FFFFFF;
   --danger-muted:  #DC2626;
   --info:          #8B5CF6;
   --app-header-height: 72px;
@@ -90,8 +92,10 @@
   --panel-shadow:  0 22px 60px rgba(0, 0, 0, 0.34);
   --soft-shadow:   0 10px 30px rgba(0, 0, 0, 0.16);
   --success:       #10B981;
+  --on-success:    #FFFFFF;
   --warning:       #F59E0B;
   --danger:        #EF4444;
+  --on-danger:     #FFFFFF;
   --danger-muted:  #DC2626;
   --info:          #8B5CF6;
 
@@ -239,7 +243,7 @@ body::after {
 .ui-btn-secondary:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 .ui-btn-danger { color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, var(--border)); }
 .ui-btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.ui-btn-danger-solid { background: var(--danger-muted); color: #fff; }
+.ui-btn-danger-solid { background: var(--danger-muted); color: var(--on-danger); }
 
 .ui-btn:disabled, .ui-btn-ghost:disabled, .ui-btn-solid:disabled, .ui-btn-quiet:disabled,
 .ui-btn-secondary:disabled, .ui-btn-danger:disabled, .ui-btn-danger-solid:disabled { opacity: 0.5; }

@@ -310,7 +310,7 @@ export function ManagerActionInbox({
                 className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none"
                 style={{
                   background: 'var(--danger)',
-                  color: '#fff',
+                  color: 'var(--on-danger)',
                   boxShadow: '0 0 0 2px var(--bg-secondary)',
                 }}
               >

@@ -82,7 +82,7 @@ export function DismissCell({ issueKey, onConfirm }: DismissCellProps) {
               onClick={confirm}
               className="h-6 w-6 rounded-md flex items-center justify-center transition-all hover:scale-110 shrink-0"
               style={{
-                color: '#fff',
+                color: 'var(--on-success)',
                 background: 'var(--success)',
                 boxShadow: '0 0 0 1px rgba(16,185,129,0.3), 0 1px 3px rgba(0,0,0,0.15)',
               }}

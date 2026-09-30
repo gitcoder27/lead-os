@@ -629,8 +629,7 @@ function MoreActions({ task, canDelete, onDelete, onOpenFullPage }: {
                   role="menuitem"
                   autoFocus
                   onClick={() => { close(); onDelete(); }}
-                  className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold text-white transition-[filter] hover:brightness-110 ${FOCUS_RING}`}
-                  style={{ background: 'var(--danger)' }}
+                  className="ui-btn-danger-solid"
                 >
                   Delete task
                 </button>

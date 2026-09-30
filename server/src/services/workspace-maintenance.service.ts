@@ -18,6 +18,7 @@ import {
   teamTrackerDays,
   teamTrackerItems,
   teamTrackerSavedViews,
+  weeklyReviews,
   tasks,
   developerNotes, contacts } from "../db/schema";
 import { BackupService } from "./backup.service";
@@ -79,7 +80,11 @@ export class WorkspaceMaintenanceService {
         const selected = rows.filter((row) => target === "workspace" || (target === "team_tracker" ? row.ownerType === "developer" : row.trackedByManagerId === managerAccountId || (row.ownerType === "manager" && row.ownerId === managerAccountId)));
         await new TaskService().purge(selected.map((row) => row.id), normalizedWorkspaceId);
         // docs/57 §2: contacts are the manager's own Tasks data.
-        if (target !== "team_tracker") await db.delete(contacts).where(and(eq(contacts.workspaceId, normalizedWorkspaceId), eq(contacts.managerAccountId, managerAccountId)));
+        if (target !== "team_tracker") {
+          await db.delete(contacts).where(and(eq(contacts.workspaceId, normalizedWorkspaceId), eq(contacts.managerAccountId, managerAccountId)));
+          // Weekly reviews (and the saved updates) name this manager's tasks: they go with them.
+          await db.delete(weeklyReviews).where(and(eq(weeklyReviews.workspaceId, normalizedWorkspaceId), eq(weeklyReviews.managerAccountId, managerAccountId)));
+        }
         if (target === "team_tracker" || target === "workspace") {
           await db.delete(teamTrackerCheckIns).where(eq(teamTrackerCheckIns.workspaceId, normalizedWorkspaceId));
           await db.delete(developerNotes).where(eq(developerNotes.workspaceId, normalizedWorkspaceId));

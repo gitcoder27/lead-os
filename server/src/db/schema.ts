@@ -723,3 +723,24 @@ export const oneOnOneAgendaItems = sqliteTable("one_on_one_agenda_items", {
   uniqueIndex("idx_one_on_one_agenda_unique").on(table.workspaceId, table.seriesId, table.taskId),
   index("idx_one_on_one_agenda_series").on(table.workspaceId, table.seriesId, table.position),
 ]);
+
+/**
+ * docs/59 §9: one manager's weekly review for one week (Monday, manager zone). Private to the
+ * manager; `decisions_json` is `{ taskKey: action }`, `excluded_json` the report lines unticked.
+ */
+export const weeklyReviews = sqliteTable("weekly_reviews", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  weekStart: text("week_start").notNull(),
+  step: text("step").notNull().default("look_back"),
+  decisionsJson: text("decisions_json").notNull().default("{}"),
+  excludedJson: text("excluded_json").notNull().default("[]"),
+  reportMarkdown: text("report_markdown"),
+  startedAt: text("started_at").notNull(),
+  completedAt: text("completed_at"),
+  dismissedAt: text("dismissed_at"),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_weekly_reviews_unique").on(table.workspaceId, table.managerAccountId, table.weekStart),
+]);

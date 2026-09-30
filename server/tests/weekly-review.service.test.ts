@@ -133,6 +133,38 @@ describe("week range and default (§4)", () => {
   });
 });
 
+describe("Monday default uses the saved week (WR-02)", () => {
+  const LAST = "2026-09-28";
+
+  it("stays on this week once last week was completed or dismissed, and returns to last week on reopen", async () => {
+    expect((await build(MONDAY)).defaultedToLastWeek).toBe(true);
+    await review.save(manager, LAST, { completed: true });
+    const done = await build(MONDAY);
+    expect(done.defaultedToLastWeek).toBe(false);
+    expect(done.range.start).toBe("2026-10-05");
+    await review.save(manager, LAST, { completed: false });
+    expect((await build(MONDAY)).defaultedToLastWeek).toBe(true);
+    await review.save(manager, LAST, { dismissed: true });
+    expect((await build(MONDAY)).defaultedToLastWeek).toBe(false);
+  });
+
+  it("only counts the caller's own record", async () => {
+    await review.save(other, LAST, { completed: true });
+    expect((await build(MONDAY)).defaultedToLastWeek).toBe(true);
+  });
+
+  it("returns the saved state with the week", async () => {
+    await review.save(manager, LAST, { step: "people", decisions: { "T-1": "drop" } });
+    const response = await build(FRIDAY, { week: LAST });
+    expect(response.saved).toMatchObject({ weekStart: LAST, step: "people", decisions: { "T-1": "drop" } });
+    expect((await build(FRIDAY, { week: "2026-10-05" })).saved).toBeNull();
+  });
+
+  it("rejects a weekStart that is not a Monday", async () => {
+    await expect(review.save(manager, "2026-09-29", {})).rejects.toMatchObject({ status: 400 });
+  });
+});
+
 describe("closed this week", () => {
   it("cuts closed rows to the manager's calendar days, in each zone", async () => {
     const mon = await add("Closed Monday");

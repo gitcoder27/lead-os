@@ -11,6 +11,7 @@ import {
   teamTrackerDays,
   teamTrackerItems,
   teamTrackerSavedViews,
+  weeklyReviews,
   workspaces,
 } from "../src/db/schema";
 import { AuthService } from "../src/services/auth.service";
@@ -219,5 +220,18 @@ describe("auth user maintenance", () => {
     const trackerRows = await db.select().from(teamTrackerItems).where(eq(teamTrackerItems.id, trackerItem!.id));
     expect(trackerRows[0]?.title).toBe("Delegated tracker work");
     expect(trackerRows[0]?.managerDeskItemId).toBeNull();
+  });
+
+  it("purges a deleted manager's weekly reviews and only theirs", async () => {
+    const owner = await authService.createUser({ username: "owner", displayName: "Owner", password: "secret123", role: "manager" });
+    await authService.createUser({ username: "shared-manager", displayName: "Shared", password: "secret123", role: "manager", workspaceId: owner.workspaceId });
+    const now = "2026-10-02T12:00:00.000Z";
+    await db.insert(weeklyReviews).values([
+      { workspaceId: owner.workspaceId, managerAccountId: "shared-manager", weekStart: "2026-09-28", reportMarkdown: "private", startedAt: now, updatedAt: now },
+      { workspaceId: owner.workspaceId, managerAccountId: "owner", weekStart: "2026-09-28", startedAt: now, updatedAt: now },
+    ]);
+    await maintenance.deleteUser({ username: "shared-manager", workspaceId: owner.workspaceId, role: "manager", purgePrivateData: true });
+    const left = await db.select().from(weeklyReviews);
+    expect(left.map((row) => row.managerAccountId)).toEqual(["owner"]);
   });
 });

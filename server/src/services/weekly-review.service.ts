@@ -1,18 +1,23 @@
-import { and, between, desc, eq, inArray } from "drizzle-orm";
+import { and, between, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { WEEKLY_REVIEW_LIMITS, WEEKLY_REVIEW_STEPS } from "shared/types";
 import type {
+  SaveWeeklyReviewRequest,
   TaskViewDefinition,
   TeamMode,
   WeeklyReviewCheckInRow,
   WeeklyReviewOneOnOneRow,
+  WeeklyReviewPastWeek,
   WeeklyReviewPersonRow,
   WeeklyReviewRange,
   WeeklyReviewResponse,
+  WeeklyReviewSavedState,
   WeeklyReviewSection,
   WeeklyReviewSourceStatus,
   WeeklyReviewTaskRow,
 } from "shared/types";
 import { db } from "../db/connection";
-import { developers, teamTrackerCheckIns, teamTrackerDays } from "../db/schema";
+import { developers, teamTrackerCheckIns, teamTrackerDays, weeklyReviews } from "../db/schema";
+import { HttpError } from "../middleware/errorHandler";
 import { logger } from "../utils/logger";
 import { todayIsoDate } from "../utils/date";
 import { OneOnOneService } from "./one-on-one.service";
@@ -142,12 +147,88 @@ export class WeeklyReviewService {
       rosterSize: roster.rows.length,
       oneOnOneEnabled,
       sections,
+      saved: await this.getSaved(principal, range.start),
     };
   }
 
-  /** WR-02 reads `completed_at` / `dismissed_at`; until that table exists nothing is ever handled. */
-  private async lastWeekHandled(_principal: TaskPrincipal, _lastWeekStart: string): Promise<boolean> {
-    return false;
+  /** Last week is handled once it was completed or the manager said "Not this week". */
+  private async lastWeekHandled(principal: TaskPrincipal, lastWeekStart: string): Promise<boolean> {
+    const row = await this.savedRow(principal, lastWeekStart);
+    return Boolean(row?.completedAt || row?.dismissedAt);
+  }
+
+  // ── Saved progress (docs/59 §9): private to the manager, one row per week ──
+
+  private async savedRow(principal: TaskPrincipal, weekStart: string) {
+    return (
+      await db
+        .select()
+        .from(weeklyReviews)
+        .where(and(
+          eq(weeklyReviews.workspaceId, normalizeWorkspaceId(principal.workspaceId)),
+          eq(weeklyReviews.managerAccountId, principal.accountId),
+          eq(weeklyReviews.weekStart, weekStart),
+        ))
+        .limit(1)
+    )[0];
+  }
+
+  async getSaved(principal: TaskPrincipal, weekStart: string): Promise<WeeklyReviewSavedState | null> {
+    const row = await this.savedRow(principal, weekStart);
+    return row ? toSavedState(row) : null;
+  }
+
+  /** Upsert this manager's record for `weekStart` (a Monday); only the given fields change. */
+  async save(principal: TaskPrincipal, weekStart: string, input: SaveWeeklyReviewRequest): Promise<WeeklyReviewSavedState> {
+    if (isoDayOfWeek(weekStart) !== 1) throw new HttpError(400, "weekStart must be a Monday");
+    const workspaceId = normalizeWorkspaceId(principal.workspaceId);
+    const now = new Date().toISOString();
+    const existing = await this.savedRow(principal, weekStart);
+
+    const decisions = existing ? parseDecisions(existing.decisionsJson) : {};
+    for (const [key, action] of Object.entries(input.decisions ?? {})) {
+      if (action === null) delete decisions[key];
+      else decisions[key] = action;
+    }
+    if (Object.keys(decisions).length > WEEKLY_REVIEW_LIMITS.decisions) throw new HttpError(400, "Too many decisions saved for one week");
+
+    const patch = {
+      ...(input.step !== undefined && { step: input.step }),
+      decisionsJson: JSON.stringify(decisions),
+      ...(input.excluded !== undefined && { excludedJson: JSON.stringify([...new Set(input.excluded)]) }),
+      ...(input.reportMarkdown !== undefined && { reportMarkdown: input.reportMarkdown }),
+      ...(input.completed !== undefined && { completedAt: input.completed ? (existing?.completedAt ?? now) : null }),
+      ...(input.dismissed !== undefined && { dismissedAt: input.dismissed ? (existing?.dismissedAt ?? now) : null }),
+      updatedAt: now,
+    };
+    if (existing) {
+      await db.update(weeklyReviews).set(patch).where(eq(weeklyReviews.id, existing.id));
+    } else {
+      await db.insert(weeklyReviews).values({
+        workspaceId,
+        managerAccountId: principal.accountId,
+        weekStart,
+        step: WEEKLY_REVIEW_STEPS[0],
+        startedAt: now,
+        ...patch,
+      });
+    }
+    return (await this.getSaved(principal, weekStart))!;
+  }
+
+  /** Completed weeks, newest first: the "Past updates" list. */
+  async listWeeks(principal: TaskPrincipal, limit = 12): Promise<WeeklyReviewPastWeek[]> {
+    const rows = await db
+      .select()
+      .from(weeklyReviews)
+      .where(and(
+        eq(weeklyReviews.workspaceId, normalizeWorkspaceId(principal.workspaceId)),
+        eq(weeklyReviews.managerAccountId, principal.accountId),
+        isNotNull(weeklyReviews.completedAt),
+      ))
+      .orderBy(desc(weeklyReviews.weekStart))
+      .limit(limit);
+    return rows.map((row) => ({ weekStart: row.weekStart, completedAt: row.completedAt!, reportMarkdown: row.reportMarkdown }));
   }
 
   // ── Task sections ──
@@ -326,6 +407,41 @@ interface SectionContext {
   /** Task ids on a 1:1 agenda (docs/59 §4): never part of the review. */
   excluded: Set<number>;
   managerTouchDays: number;
+}
+
+type WeeklyReviewRecord = typeof weeklyReviews.$inferSelect;
+
+function parseDecisions(json: string): Record<string, string> {
+  try {
+    const value = JSON.parse(json) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseExcluded(json: string): string[] {
+  try {
+    const value = JSON.parse(json) as unknown;
+    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function toSavedState(row: WeeklyReviewRecord): WeeklyReviewSavedState {
+  const step = (WEEKLY_REVIEW_STEPS as readonly string[]).includes(row.step) ? (row.step as WeeklyReviewSavedState["step"]) : WEEKLY_REVIEW_STEPS[0];
+  return {
+    weekStart: row.weekStart,
+    step,
+    decisions: parseDecisions(row.decisionsJson),
+    excluded: parseExcluded(row.excludedJson),
+    reportMarkdown: row.reportMarkdown,
+    startedAt: row.startedAt,
+    completedAt: row.completedAt,
+    dismissedAt: row.dismissedAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 function minDay(a: string, b: string): string {

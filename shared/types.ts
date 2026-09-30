@@ -3086,4 +3086,59 @@ export interface WeeklyReviewResponse {
   oneOnOneEnabled: boolean;
   /** One entry per section, in step order; `checkIns` is present only in collab mode. */
   sections: WeeklyReviewSection[];
+  /** The manager's saved progress for this week (docs/59 §9); null until something was saved. */
+  saved: WeeklyReviewSavedState | null;
+}
+
+/** The six steps of the review (docs/59 §5.3), by stable id. People is hidden for an empty roster. */
+export const WEEKLY_REVIEW_STEPS = ["look_back", "waiting", "loose_ends", "people", "next_week", "send"] as const;
+export type WeeklyReviewStepId = (typeof WEEKLY_REVIEW_STEPS)[number];
+
+/** Limits shared by the route's validation and the client. */
+export const WEEKLY_REVIEW_LIMITS = { reportChars: 20_000, decisions: 2_000, excluded: 2_000, lineIdChars: 120 } as const;
+
+/** What the manager has done so far in one week's review; private to them. */
+export interface WeeklyReviewSavedState {
+  /** Monday, manager zone. */
+  weekStart: string;
+  step: WeeklyReviewStepId;
+  /** `{ taskKey: action }`, e.g. `T-42: "check_monday"`. */
+  decisions: Record<string, string>;
+  /** Report lines the manager unticked (task keys or synthetic line ids). */
+  excluded: string[];
+  reportMarkdown: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  dismissedAt: string | null;
+  updatedAt: string;
+}
+
+/**
+ * `PUT /api/review/week/:weekStart`. Every field is optional and only the given ones change.
+ * `decisions` is merged by task key (a `null` value removes that key, which is how Undo clears one);
+ * `excluded` replaces the list. `completed` / `dismissed` set their timestamp, and `false` clears it.
+ */
+export interface SaveWeeklyReviewRequest {
+  step?: WeeklyReviewStepId;
+  decisions?: Record<string, string | null>;
+  excluded?: string[];
+  reportMarkdown?: string | null;
+  completed?: boolean;
+  dismissed?: boolean;
+}
+
+export interface SaveWeeklyReviewResponse {
+  saved: WeeklyReviewSavedState;
+}
+
+/** A finished week, for "Past updates". */
+export interface WeeklyReviewPastWeek {
+  weekStart: string;
+  completedAt: string;
+  reportMarkdown: string | null;
+}
+
+/** `GET /api/review/weeks`: completed weeks, newest first. */
+export interface WeeklyReviewWeeksResponse {
+  weeks: WeeklyReviewPastWeek[];
 }

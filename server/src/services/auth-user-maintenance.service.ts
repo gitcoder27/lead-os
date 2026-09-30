@@ -12,6 +12,7 @@ import {
   managerDeskLinks,
   teamTrackerItems,
   teamTrackerSavedViews,
+  weeklyReviews,
   workspaces,
   tasks,
 } from "../db/schema";
@@ -288,6 +289,9 @@ export class AuthUserMaintenanceService {
     if (user.role !== "manager") {
       return;
     }
+    await db
+      .delete(weeklyReviews)
+      .where(and(eq(weeklyReviews.workspaceId, user.workspaceId), eq(weeklyReviews.managerAccountId, user.username)));
     await this.eventsService.deletePrivateForAuthor(user.workspaceId, user.username);
     if (await new TaskKeysService().canonicalEnabled(user.workspaceId)) {
       const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, user.workspaceId), or(eq(tasks.trackedByManagerId, user.username), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, user.username)))));

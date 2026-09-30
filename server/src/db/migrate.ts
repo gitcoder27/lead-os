@@ -595,6 +595,23 @@ CREATE TABLE IF NOT EXISTS one_on_one_agenda_items (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_one_on_one_agenda_unique ON one_on_one_agenda_items(workspace_id, series_id, task_id);
 CREATE INDEX IF NOT EXISTS idx_one_on_one_agenda_series ON one_on_one_agenda_items(workspace_id, series_id, position);
+
+-- Weekly review (docs/59 §9): one manager-private row per manager and week. Additive.
+CREATE TABLE IF NOT EXISTS weekly_reviews (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id       TEXT NOT NULL DEFAULT 'default',
+  manager_account_id TEXT NOT NULL,
+  week_start         TEXT NOT NULL,
+  step               TEXT NOT NULL DEFAULT 'look_back',
+  decisions_json     TEXT NOT NULL DEFAULT '{}',
+  excluded_json      TEXT NOT NULL DEFAULT '[]',
+  report_markdown    TEXT,
+  started_at         TEXT NOT NULL,
+  completed_at       TEXT,
+  dismissed_at       TEXT,
+  updated_at         TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_reviews_unique ON weekly_reviews(workspace_id, manager_account_id, week_start);
 `;
 
 // Phase 2d: these tables are renamed to legacy_* archives by the contract

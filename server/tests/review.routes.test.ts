@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers } from "../src/db/schema";
+import { configTable, developers, weeklyReviews } from "../src/db/schema";
 import { errorHandler, notFoundHandler } from "../src/middleware/errorHandler";
 import { requireManager } from "../src/middleware/auth";
 import { createReviewRouter } from "../src/routes/review";
@@ -84,5 +84,96 @@ describe("GET /api/review/week", () => {
     const response = await invoke(app, { method: "GET", url: "/api/review/week?week=2026-10-01&tz=Mars%2FOlympus", headers });
     expect(response.status).toBe(200);
     expect(response.body.timeZone).not.toBe("Mars/Olympus");
+  });
+});
+
+describe("saving a week: PUT /api/review/week/:weekStart, GET /api/review/weeks", () => {
+  const WEEK = "2026-09-28";
+  const put = async (headers: { cookie: string }, weekStart: string, body: unknown) =>
+    invoke(app, { method: "PUT", url: `/api/review/week/${weekStart}`, headers, body });
+  const getWeek = async (headers: { cookie: string }, week = WEEK) =>
+    invoke(app, { method: "GET", url: `/api/review/week?week=${week}&tz=UTC`, headers });
+
+  it("is manager-only and needs the Tasks workspace", async () => {
+    const dev = { cookie: await cookie("dev-user") };
+    expect((await put(dev, WEEK, { step: "waiting" })).status).toBe(403);
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks", headers: dev })).status).toBe(403);
+    const manager = { cookie: await cookie("manager-a") };
+    expect((await put(manager, WEEK, { step: "waiting" })).status).toBe(404);
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks", headers: manager })).status).toBe(404);
+  });
+
+  it("rejects a weekStart that is not a Monday, and bad bodies, with 400", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    expect((await put(headers, "2026-09-29", { step: "waiting" })).status).toBe(400);
+    expect((await put(headers, "nope", {})).status).toBe(400);
+    expect((await put(headers, WEEK, { step: "nowhere" })).status).toBe(400);
+    expect((await put(headers, WEEK, { decisions: { "not a key": "done" } })).status).toBe(400);
+    expect((await put(headers, WEEK, { decisions: { "T-1": "no spaces allowed" } })).status).toBe(400);
+    expect((await put(headers, WEEK, { reportMarkdown: "x".repeat(20_001) })).status).toBe(400);
+    expect((await put(headers, WEEK, { surprise: true })).status).toBe(400);
+    expect((await put(headers, WEEK, { reportMarkdown: "x".repeat(20_000) })).status).toBe(200);
+  });
+
+  it("upserts, merges decisions by task key (null removes), and replaces excluded", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    expect((await getWeek(headers)).body.saved).toBeNull();
+
+    const first = await put(headers, WEEK, { step: "waiting", decisions: { "T-1": "check_monday", "T-2": "drop" }, excluded: ["T-9", "T-9", "jira:summary"] });
+    expect(first.status).toBe(200);
+    expect(first.body.saved).toMatchObject({ weekStart: WEEK, step: "waiting", decisions: { "T-1": "check_monday", "T-2": "drop" }, excluded: ["T-9", "jira:summary"], completedAt: null, dismissedAt: null });
+
+    const second = await put(headers, WEEK, { decisions: { "T-2": null, "T-3": "monday" } });
+    expect(second.body.saved.decisions).toEqual({ "T-1": "check_monday", "T-3": "monday" });
+    // Untouched fields survive a partial save.
+    expect(second.body.saved.step).toBe("waiting");
+    expect(second.body.saved.excluded).toEqual(["T-9", "jira:summary"]);
+    expect(second.body.saved.startedAt).toBe(first.body.saved.startedAt);
+
+    const third = await put(headers, WEEK, { excluded: [] });
+    expect(third.body.saved.excluded).toEqual([]);
+    expect((await getWeek(headers)).body.saved).toEqual(third.body.saved);
+  });
+
+  it("completes (keeping the first completion time), reopens, dismisses and lists past weeks newest first", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const done = await put(headers, WEEK, { completed: true, reportMarkdown: "**Weekly update**\n- Shipped it" });
+    expect(done.body.saved.completedAt).toEqual(expect.any(String));
+    const again = await put(headers, WEEK, { completed: true });
+    expect(again.body.saved.completedAt).toBe(done.body.saved.completedAt);
+    await put(headers, "2026-10-05", { completed: true, reportMarkdown: "newer" });
+    await put(headers, "2026-10-12", { step: "waiting" });
+    await put(headers, "2026-10-19", { dismissed: true });
+
+    const weeks = await invoke(app, { method: "GET", url: "/api/review/weeks?limit=12", headers });
+    expect(weeks.body.weeks.map((week: { weekStart: string }) => week.weekStart)).toEqual(["2026-10-05", WEEK]);
+    expect(weeks.body.weeks[1].reportMarkdown).toBe("**Weekly update**\n- Shipped it");
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks?limit=1", headers })).body.weeks).toHaveLength(1);
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks?limit=0", headers })).status).toBe(400);
+
+    const reopened = await put(headers, WEEK, { completed: false });
+    expect(reopened.body.saved.completedAt).toBeNull();
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks", headers })).body.weeks).toHaveLength(1);
+    expect((await put(headers, "2026-10-19", { dismissed: false })).body.saved.dismissedAt).toBeNull();
+  });
+
+  it("keeps each manager's record private, even inside one workspace", async () => {
+    await enablePhase3();
+    await auth.createUser({ username: "manager-b", displayName: "B", password: "secret123", role: "manager", workspaceId: "default" });
+    const a = { cookie: await cookie("manager-a") };
+    const b = { cookie: await cookie("manager-b") };
+    await put(a, WEEK, { step: "send", decisions: { "T-1": "drop" }, completed: true, reportMarkdown: "A's update" });
+
+    // B sees nothing of A's, and B's write makes B's own row.
+    expect((await getWeek(b)).body.saved).toBeNull();
+    expect((await invoke(app, { method: "GET", url: "/api/review/weeks", headers: b })).body.weeks).toEqual([]);
+    await put(b, WEEK, { step: "waiting" });
+    expect((await getWeek(a)).body.saved).toMatchObject({ step: "send", decisions: { "T-1": "drop" }, reportMarkdown: "A's update" });
+    expect((await getWeek(b)).body.saved).toMatchObject({ step: "waiting", decisions: {}, reportMarkdown: null, completedAt: null });
+    const rows = await db.select().from(weeklyReviews);
+    expect(rows).toHaveLength(2);
   });
 });

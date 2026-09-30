@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, contacts, developers, tasks, teamTrackerItems } from "../src/db/schema";
+import { configTable, contacts, developers, tasks, teamTrackerItems, weeklyReviews } from "../src/db/schema";
 import { ContactsService } from "../src/services/contacts.service";
 import { TaskService } from "../src/services/task.service";
 import { TaskEventsService } from "../src/services/task-events.service";
@@ -54,7 +54,14 @@ describe("canonical tasks", () => {
     await service.create({ title: "Private task", nextAction: "Private" }, manager);
     await service.create({ title: "Developer task" }, developer);
     await new ContactsService().create(manager.accountId, { displayName: "Acme Legal" }, "default");
+    const stamp = "2026-10-02T12:00:00.000Z";
+    await db.insert(weeklyReviews).values([
+      { workspaceId: "default", managerAccountId: manager.accountId, weekStart: "2026-09-28", startedAt: stamp, updatedAt: stamp },
+      { workspaceId: "default", managerAccountId: "someone-else", weekStart: "2026-09-28", startedAt: stamp, updatedAt: stamp },
+    ]);
     await new WorkspaceMaintenanceService().reset(manager.accountId, "workspace", "default");
+    // The reset manager's weekly reviews go with their tasks; another manager's stay.
+    expect((await db.select().from(weeklyReviews)).map((row) => row.managerAccountId)).toEqual(["someone-else"]);
     expect(await db.select().from(tasks)).toEqual([]);
     expect(await db.select().from(contacts)).toEqual([]);
     expect(await events.listRawForWorkspace()).toEqual([]);

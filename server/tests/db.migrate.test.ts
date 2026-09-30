@@ -230,4 +230,25 @@ describe("database migrations", () => {
     const sequences = rawDb.prepare("PRAGMA table_info(task_key_sequences)").all() as { name: string; pk: number }[];
     expect(sequences.find((col) => col.name === "workspace_id")?.pk).toBe(1);
   });
+
+  it("creates weekly_reviews additively and idempotently, with one row per manager and week", () => {
+    const shadowDb = new Database(":memory:");
+    try {
+      migrate(shadowDb);
+      migrate(shadowDb);
+      const columns = (shadowDb.prepare("PRAGMA table_info(weekly_reviews)").all() as { name: string }[]).map((column) => column.name);
+      expect(columns).toEqual([
+        "id", "workspace_id", "manager_account_id", "week_start", "step", "decisions_json", "excluded_json",
+        "report_markdown", "started_at", "completed_at", "dismissed_at", "updated_at",
+      ]);
+      const insert = shadowDb.prepare("INSERT INTO weekly_reviews (workspace_id, manager_account_id, week_start, started_at, updated_at) VALUES (?, ?, ?, 'x', 'x')");
+      insert.run("default", "m1", "2026-09-28");
+      insert.run("default", "m2", "2026-09-28");
+      expect(() => insert.run("default", "m1", "2026-09-28")).toThrow(/UNIQUE/);
+      const row = shadowDb.prepare("SELECT step, decisions_json, excluded_json FROM weekly_reviews WHERE manager_account_id = 'm1'").get();
+      expect(row).toEqual({ step: "look_back", decisions_json: "{}", excluded_json: "[]" });
+    } finally {
+      shadowDb.close();
+    }
+  });
 });

@@ -85,12 +85,24 @@ The run order above is superseded. Only these steps remain; everything else is p
 | W5 | Deploy | Back up prod, test migrations on a copy of the prod DB, set `TRUST_PROXY=loopback`, deploy via `scripts/deploy.sh prod` |
 
 **Parked backlog (not part of this release; revisit later):**
-- P3-07, P3-08, P3-09, P3-10 (recurrence, weekly review, list scale, decisions).
+- P3-07, P3-09, P3-10 (recurrence, list scale, decisions). P3-08 moved to the WR phase below.
 - All of P4 (collaborative loop).
 - P5-03 to P5-10 (Jira polish).
-- P6-02, P6-03, P6-04 (exports, digest, Copilot brief).
+- P6-04 (Copilot brief). P6-02 and P6-03 moved to the WR phase below.
 - **P6-05 (Copilot full-access safety): explicitly declined by the user.** Keep Copilot "full access" off.
 - P7-02, P7-03, P7-04, P7-06 to P7-11, P7-13.
+
+## Next phase: Weekly review and proactive nudges (planned 2026-09-30)
+
+Replaces **P3-08**, **P6-02** and **P6-03**. Spec: [docs/59](59-weekly-review-spec.md). Checklist, owners, run order and trigger prompts: [docs/60](60-weekly-review-implementation-plan.md), which is the tracker for these items (its own Progress log). Not duplicated here.
+
+| Phase | Items | Owner | Checkpoint |
+|---|---|---|---|
+| A · Weekly review | WR-01 … WR-06 | Opus 01–03, Sonnet 04–06 | R1 |
+| B · Update and export | WR-07 … WR-10 | Sonnet 07, 08, 10; Opus 09 | R2 (A+B shippable) |
+| C · Digest and reminders | WR-11 … WR-16 | Opus 11–13, 15; Sonnet 14, 16 | R3 |
+
+Starts after the wrap-up steps W1–W5 above (independent of them; nothing in it touches the deploy). First step to trigger: **WR-01**.
 
 ## Phase overview
 
@@ -278,7 +290,7 @@ Serialize these among themselves. Spec first (P3-00).
 - [ ] **P3-07** Date parsing and recurrence.
   - Files: `capture-grammar.ts:154-165`, `task.service.ts`.
   - Accept: natural-language dates ("next Friday", "in 2 weeks", "eow") with a chip preview, and `~weekly`/`~monthly` recurrence on tasks.
-- [ ] **P3-08** Weekly review flow.
+- [ ] **P3-08** Weekly review flow. **Moved to WR-01…WR-06 ([docs/60](60-weekly-review-implementation-plan.md)).**
   - Files: new under `client/src/components/today/` or Tasks; `today.service.ts`.
   - Accept: closed last 7 days, stale delegated tasks, open follow-ups, and a "carry / drop / schedule" action per item.
 - [ ] **P3-09** Tasks list at scale.
@@ -362,9 +374,9 @@ Depends on P1. Items are independent (`parallel-ok`).
 - [x] **P6-01** Backups UI and access.
   - Files: `server/src/app.ts:169`, `routes/backups.ts:17,26`, `routes/config.ts:33-40`, `SettingsMaintenanceSection.tsx:147-150`, `paletteItems.ts:50`.
   - Accept: `/api/backups` under `requireManager`; a Settings > Data card with schedule, "Back up now", snapshot list and download; restore documented as CLI-only; optional off-box hook (rsync/S3) documented or implemented.
-- [ ] **P6-02** Weekly summary and exports.
+- [ ] **P6-02** Weekly summary and exports. **Moved to WR-07…WR-10 ([docs/60](60-weekly-review-implementation-plan.md)).**
   - Accept: a Weekly review report (follow-ups closed, carry-forward rate, blocked items, and in collab, check-in cadence) with Copy-as-Markdown and CSV export on that report and on Tasks, Team and Work.
-- [ ] **P6-03** Daily digest and reminders.
+- [ ] **P6-03** Daily digest and reminders. **Moved to WR-11…WR-16 ([docs/60](60-weekly-review-implementation-plan.md)).**
   - Files: scheduler pattern at `backup.service.ts:64`, `sync/engine.ts:40`.
   - Accept: an opt-in daily digest (email or webhook) and reminders for snooze expiry and due follow-ups. Browser push is an acceptable first step.
 - [ ] **P6-04** Copilot: morning brief and reporting tools.
@@ -456,6 +468,7 @@ Depends on P1. Items are independent (`parallel-ok`).
 | 2026-09-30 | P7-01 / P6-06 / P3-01 (review fixes) | main (single commit) | Sonnet | **Toasts.** A warning that carries a message now persists like an error (a one-line warning such as "This day is read-only" still times out at 5 s); a "Dismiss all (n)" button appears once two toasts are waiting to be dismissed (timed ones are left alone), which also answers the unbounded-stack note; the stack is a labelled `Notifications` region placed first in the DOM (it is fixed-position, so nothing moves) so a keyboard user reaches a toast and can pause its timer before the page. **Reset dialog:** the typed-confirmation input keeps its name and is now described by the visible "Type RESET CONFIGURATION to confirm" text (`aria-describedby`), and the copy says the task-model setup is kept along with the tasks (the server keeps `tasks_*` keys, P3-00a). **Today plan:** the pin button dropped `aria-pressed` (its label already flips between Pin and Unpin, which double-announced the state). Tests: toast persistence, Dismiss all, region order; dialog description; capture live region. |
 | 2026-09-30 | P7-05 (review fix) | main (single commit) | Sonnet | The three literal whites left on status fills now use tokens: new `--on-danger` and `--on-success` (white in both themes, since `--danger` and `--success` do not change), used by the action-inbox count badge, the dismiss-confirm tick and `.ui-btn-danger-solid`; the task drawer's "Delete task" confirm uses `.ui-btn-danger-solid` (the darker `--danger-muted` fill) instead of `text-white` on `--danger`, as the P7-05 row proposed. `themeTokens.test.ts` now also scans those files and checks both tokens are defined once per theme. |
 | 2026-09-30 | P7-12 / P3-05 (review fixes) | main (single commit) | Sonnet | AGENTS.md: the Copilot-instructions path is `agent/.github/instructions/` (the root `.github/instructions/` never existed), the `overview/` client folder that does not exist is gone from the Frontend Map, `shared/capture-grammar.js` is named as the second committed CommonJS artifact with how to regenerate it (both are in sync with their sources), and the capture convention now records the deliberate exception (assigning work to a developer's day, `useAddTrackerItem` → `POST /api/team-tracker/:id/items`, which enforces availability, takes a description and returns the board item, so it is not routed through free-text capture) plus the rule that capture callers send `clientToday` and `tz`. docs/36 and docs/37 mark `/follow-ups` and `/meetings` as retired with their Tasks replacements. |
+| 2026-09-30 | WR-00 (P3-08, P6-02, P6-03 planning) | main (single commit) | Opus | Docs only. Spec [docs/59](59-weekly-review-spec.md) and plan [docs/60](60-weekly-review-implementation-plan.md) for the weekly review, the boss update and CSV, and the daily digest (Teams workflow + browser push). User decisions in docs/59 §11. The three parked items now point to the WR phase; progress for WR items is logged in docs/60. |
 
 ## Findings from verification
 

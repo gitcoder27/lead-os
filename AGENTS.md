@@ -20,10 +20,10 @@ Supporting folders:
 
 - `data/`: repo-root runtime SQLite data, backups, and manual snapshots.
 - `server/data/`: server-only test/config fixtures, not the runtime DB.
-- `docs/`: product, architecture, workflow, deployment, and handoff docs.
+- `docs/`: product, architecture, workflow, deployment, and handoff docs. Current work is tracked in `docs/56-implementation-plan-solo-first.md` (plan, run rules, progress log) and specified in `docs/57-tasks-consolidation-spec.md`; production deploy and backup/restore steps are in `docs/23`.
 - `agent/`: repo-local prompts and skills.
 - `.github/instructions/`: backend/frontend guidance for GitHub Copilot-style agents.
-- `scripts/`: deploy and worktree maintenance scripts.
+- `scripts/`: deploy, `check-db-artifacts.sh` (`npm run guard:data`, fails if runtime DB files are tracked), and legacy worktree scripts.
 
 ## App Surfaces and Routing
 
@@ -36,7 +36,7 @@ Canonical routes:
 - `/team`: Team Tracker for day plans, current work, status, check-ins, attention signals, saved views, and carry-forward.
 - `/tasks`: the Tasks workspace (`?view=<id>` plus filter overrides; `?task=` opens the drawer). Built-in views: Planned today, Inbox, My tasks, Waiting / Delegated (`waiting`, the old Follow-ups), Meetings (`meetings`, with `n/m actions` from child tasks), Later, Needs attention, Closed · last 7 days; saved views are per manager. Needs Phase 3 (stage `2c`); `/desk` is the legacy Manager Desk page and the same route in a workspace without Phase 3.
 - `/notes`: manager-private daily scratchpad (`?date=YYYY-MM-DD`), served by `/api/notes`; never part of Manager Desk or Today data.
-- `/settings`: Jira config, field discovery, team membership, app users, backups, and workspace maintenance.
+- `/settings` (`?section=<id>` deep-links a section): Navigation, Day Rhythm, Attention Rules, Jira Connection, Sync Scope, Copilot, Team Members (incl. `team_mode`), Defect Tags, Task Labels, **Data & Backups** (`data`: schedule, Back up now, snapshot list and download; restore is CLI-only), Data Maintenance (typed-confirmation resets), and Developer Access. Reset configuration also needs a typed phrase, checked on the server.
 - `/my-day`: developer-only daily workspace for current, planned, completed, and dropped work plus check-ins.
 
 Legacy paths normalize in `App.tsx`: `/dashboard` -> `/work`, `/team-tracker` -> `/team`, `/manager-desk` -> `/desk`, `/today` -> `/`. `/follow-ups` and `/followups` redirect to `/tasks?view=waiting`, `/meetings` and `/meeting` to `/tasks?view=meetings` (`legacyTaskViewRedirect` in `App.tsx`; the rest of the query string is kept). The server still accepts `follow-ups` / `meetings` in action targets, nav preferences and `list_tasks` for one release (docs/57 P7-13); Today rows now target `view: "tasks"` with a `taskView`.
@@ -52,6 +52,8 @@ First-run setup opens the Setup Wizard for manager account creation, Jira connec
 Feature folders under `client/src/components/`:
 
 - `layout/`: shell, header, navigation, dashboard layout.
+- `ui/`: shared primitives: `Dialog` (the one modal shell, focus-trapped, portal), `Popover`, `Kbd`, `ShortcutSheet`, `EmptyState`.
+- `actions/`: manager action inbox (header).
 - `today/`: manager daily command view.
 - `work/`, `overview/`, `filters/`, `table/`, `triage/`, `alerts/`, `workload/`: Work dashboard and defect triage.
 - `team-tracker/`: manager team board and developer day tracking.
@@ -73,10 +75,13 @@ Frontend conventions:
 - App-wide providers live in `client/src/context/` for auth, theme, and toast state.
 - `client/src/types/index.ts` re-exports `shared/types`; `client/src/types/manager-desk.ts` adds UI labels/mappings.
 - Prefer `@/` imports and shared contracts from `shared/types`.
+- Modals use `components/ui/Dialog` (`role="alertdialog"` for destructive confirms). Destructive actions ask for a typed phrase and list what is lost, not `window.confirm`.
+- Toasts (`useToast`): errors persist until dismissed and are announced as `role="alert"`; other toasts last 5 s; all pause while hovered or focused; an identical toast raised again is de-duplicated.
+- Text on an accent fill uses `var(--on-accent)`, never a literal white; overlays use `var(--overlay-shadow)`.
 
 ## Backend Map
 
-Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups`, `assistant` (manager-only `/api/assistant` Copilot chat/confirm/conversations), `contacts` (manager-private external people a task can wait on).
+Routes live in `server/src/routes/`: `auth`, `config`, `issues`, `overview`, `team`, `team-tracker`, `my-day`, `manager-desk`, `manager-actions`, `today`, `search`, `work` (Work dashboard saved views), `alerts`, `suggestions`, `sync`, `tags`, `backups` (manager-only: list, `POST /run`, `GET /:name/download`; restore stays the `backup:restore` CLI), `assistant` (manager-only `/api/assistant` Copilot chat/confirm/conversations), `contacts` (manager-private external people a task can wait on), `tasks`, `task-views`, `task-labels`, `capture` (the shared capture grammar endpoint), `notes` (private daily notes), `one-on-ones`, and `preferences` (per-manager navigation layout).
 
 Services live in `server/src/services/` and cover issues, workload, alerts, automation suggestions, settings/config, tags, backups, auth, Team Tracker, My Day, Manager Desk, developer availability, workspace maintenance, and board query logic.
 
@@ -108,6 +113,7 @@ Backend conventions:
 - The first app account must be a manager.
 - Most API routes are manager-only.
 - Developer users route to `/my-day`; developer API access is primarily through `/api/my-day`.
+- Jira sync scope (`jira_sync_scope_mode`): `team_and_unassigned` (default: roster plus unassigned issues, works with an empty roster), `team_assignees` (roster only) or `base_query` (exact JQL). Workspaces that already had issues or Jira settings when the default changed were pinned to `team_assignees` by the `jira_sync_scope_pin_v1` migration. `GET /api/sync/status` carries `syncScope: { mode, rosterSize }` for the Work empty-state diagnostic.
 - Jira config is a mix of env vars and persisted SQLite settings. The live Jira API token is handled by runtime credentials/config flows; never hardcode or commit secrets.
 - Copilot config lives in the `config` table (`ai_assistant_enabled`, `ai_provider`, `ai_base_url`, `ai_model`, `ai_max_tool_iterations`, `ai_response_style`, `ai_suggest_followups`, encrypted `ai_api_key`) via `GET/PUT /api/config/ai` + `POST /api/config/ai/test`; Cmd/Ctrl+J toggles the dock. Replies stream via provider SSE (`delta`/`reasoning_delta` NDJSON events), follow-up chips via `followups`, and `retry: true` on `/chat` regenerates the last answer.
 
@@ -116,10 +122,12 @@ Backend conventions:
 Run from repo root:
 
 - Install/dev: `npm install`, `npm run dev`, `npm run dev:server`, `npm run dev:client`.
+- Quality gates: `npm run lint`, `npm run format:check`, `npm run guard:data`.
 - Validate/build: `npm run typecheck`, `npm run build:check`, `npm run build`, `npm run start`.
 - Tests: `npm run test`, `npm run test --workspace=client`, `npm run test:coverage`.
 - Ops: `npm run backup:restore -- <path-to-backup-db>`, `npm run manager-desk:cleanup-carry-forward -- <args>`, `npm run tasks:drop-legacy --workspace=server -- --workspace <id> [--apply]` (dry-run default; drops `legacy_*` archives once stage `2d` + `p2_contract` have soaked 30 days), `npm run one-on-one --workspace=server -- --workspace <id> [--status|--enable|--disable]` (`one_on_one_enabled` toggle for the manager-private 1:1 workspace, `/team?dev=<id>&panel=one-on-one`), `npm run one-on-one:topics --workspace=server -- --workspace <id> [--keys T-1,T-2 --apply]` (P0-S5: lists legacy developer-owned 1:1 topics; dry-run default; `--apply` moves the picked keys to manager ownership), `npm run team-mode --workspace=server -- --workspace <id> [--status|--set solo|collab]` (workspace `team_mode`; default `solo`, also in Settings → Team Members).
-- Users: `npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <manager|developer> [--developer-account-id <id>]`. Reset a password (signs the user out everywhere; prefer stdin): `printf '%s' <password> | npm run auth:reset-password --workspace=server -- --username <name> --password-stdin`. Behind nginx/cloudflared set `TRUST_PROXY=loopback` (see docs/23).
+- Task migration tooling (`tasks:cutover`, `tasks:stage`, `tasks:contract`, `tasks:phase3`, `tasks:export-legacy`; see docs/57 and `docs/PHASE2_PRODUCTION_RUNBOOK.md`) is one-off; run it against a copy first.
+- Users: `npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <manager|developer> [--developer-account-id <id>]`. Delete a user (dry run first with `--dry-run`): `npm run auth:delete-user --workspace=server -- --username <name> --workspace-id <id> --role <manager|developer> --confirm <name> [--purge-private-data]`. Reset a password (signs the user out everywhere; prefer stdin): `printf '%s' <password> | npm run auth:reset-password --workspace=server -- --username <name> --password-stdin`. Behind nginx/cloudflared set `TRUST_PROXY=loopback` (see docs/23).
 - Deploy/worktrees: `npm run deploy:prod`, `npm run sync:worktrees`.
 
 Windows users can use `run-node20.ps1` modes: `all`, `install`, `build`, `test`, `dev`, `client-dev`, `client-build`, `client-test`.
@@ -158,12 +166,9 @@ Preferred handoff validation: `npm run typecheck`, `npm run build:check`, plus t
 - Production manager URL defaults to `https://lead.daycommand.online`; developer URL defaults to `https://developer.daycommand.online`.
 - Production deploys must run only from `/home/ubuntu/apps/lead-os-prod` or via `scripts/deploy.sh prod`, which resolves to that checkout and refuses unsafe states.
 
-## Worktree Workflow
+## Working Rules
 
-- Main integration workspace: `/home/ubuntu/Development/lead-os` on `main`.
-- Codex worktree A: `/home/ubuntu/Development/lead-os-codex-a` on `task/codex-a`.
-- Codex worktree B: `/home/ubuntu/Development/lead-os-codex-b` on `task/codex-b`.
-- Start each checkout from its own root with `npm run dev`; ports come from that checkout's env files.
-- Keep branches task-scoped and small.
-- Do not broaden a worktree change beyond the assigned task.
-- Do not deploy production from the development checkout.
+- This is a solo project: work happens sequentially in `/home/ubuntu/Development/lead-os` directly on `main`. No worktrees and no task branches unless asked (`npm run sync:worktrees` is a legacy helper).
+- Start from a clean `git status`, keep changes task-scoped, and make one commit per item (`type(scope): summary (ITEM-ID)`) so it can be reverted alone. Track items in docs/56 (tick the box and add a Progress log row in the same commit).
+- Do not push or deploy unless asked. Never run against runtime data, and never trigger a real Jira sync or write: use test DBs and mocked Jira clients.
+- Start a checkout from its own root with `npm run dev`; ports come from that checkout's env files. Do not deploy production from the development checkout.

@@ -22,7 +22,8 @@ export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
 export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
 /** docs/56 P1-02: the no-current-work signal is opt-in in solo mode. */
 export const DEFAULT_TEAM_TRACKER_SOLO_NO_CURRENT_ENABLED = false;
-export const DEFAULT_JIRA_SYNC_SCOPE_MODE: JiraSyncScopeMode = "team_assignees";
+/** docs/56 P5-01: unassigned defects sync by default. Workspaces that predate this are pinned by `pinLegacyJiraSyncScope`. */
+export const DEFAULT_JIRA_SYNC_SCOPE_MODE: JiraSyncScopeMode = "team_and_unassigned";
 export const DEFAULT_BACKUP_ENABLED = true;
 export const DEFAULT_BACKUP_INTERVAL_MINUTES = 30;
 export const DEFAULT_BACKUP_RETENTION_DAYS = 14;
@@ -55,7 +56,9 @@ export function defaultAttentionRules(): AttentionRules {
 }
 
 export function normalizeJiraSyncScopeMode(value: string | null | undefined): JiraSyncScopeMode {
-  return value === "base_query" ? "base_query" : DEFAULT_JIRA_SYNC_SCOPE_MODE;
+  return value === "base_query" || value === "team_assignees" || value === "team_and_unassigned"
+    ? value
+    : DEFAULT_JIRA_SYNC_SCOPE_MODE;
 }
 
 export function normalizeTeamMode(value: string | null | undefined): TeamMode {

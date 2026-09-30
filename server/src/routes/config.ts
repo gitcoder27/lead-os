@@ -46,7 +46,7 @@ const configSchema = z.object({
     backupOnStartup: z.boolean().optional(),
     backupStartupMaxAgeHours: z.number().int().positive().optional(),
     backupBeforeReset: z.boolean().optional(),
-    jiraSyncScopeMode: z.enum(["team_assignees", "base_query"]).optional(),
+    jiraSyncScopeMode: z.enum(["team_assignees", "team_and_unassigned", "base_query"]).optional(),
     jiraSyncJql: z.string().optional(),
     jiraDevDueDateField: z.string().optional(),
     jiraAspenSeverityField: z.string().optional(),

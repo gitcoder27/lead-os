@@ -242,10 +242,37 @@ describe('DefectTable', () => {
       expect(within(card).getByText('Never')).toBeInTheDocument();
       expect(within(card).getByText('Issues synced').nextElementSibling).toHaveTextContent('0');
       expect(within(card).getByText(/Team assignees/)).toBeInTheDocument();
-      expect(within(card).getByText(/empty roster returns nothing/i)).toBeInTheDocument();
+      expect(within(card).getByText(/only pulls issues assigned to people on your team/i)).toBeInTheDocument();
       expect(screen.queryByText(/project is clean/i)).not.toBeInTheDocument();
       fireEvent.click(within(card).getByRole('button', { name: 'Open sync settings' }));
       expect(onOpenSyncSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('the diagnostic shows synced count, scope and roster size (docs/56 P5-01)', () => {
+      mockSyncStatus = {
+        status: 'idle',
+        jiraConfigured: true,
+        lastSyncedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+        issuesSynced: 0,
+        syncScope: { mode: 'team_assignees', rosterSize: 0 },
+      };
+      renderEmpty();
+
+      const card = screen.getByTestId('work-nothing-synced');
+      expect(within(card).getByText('Issues synced').nextElementSibling).toHaveTextContent('0');
+      expect(within(card).getByText('Scope').nextElementSibling).toHaveTextContent(/Team assignees/);
+      expect(within(card).getByText('Roster size').nextElementSibling).toHaveTextContent('0 tracked people');
+      expect(within(card).getByText(/your roster is empty, so nothing can match/i)).toBeInTheDocument();
+    });
+
+    it('roster-only scope with people on the roster points at unassigned issues instead of blaming the roster', () => {
+      mockSyncStatus = { status: 'idle', jiraConfigured: true, syncScope: { mode: 'team_assignees', rosterSize: 1 } };
+      renderEmpty();
+
+      const card = screen.getByTestId('work-nothing-synced');
+      expect(within(card).getByText('Roster size').nextElementSibling).toHaveTextContent('1 tracked person');
+      expect(within(card).queryByText(/roster is empty/i)).not.toBeInTheDocument();
+      expect(within(card).getByText(/switch the scope to include unassigned issues/i)).toBeInTheDocument();
     });
 
     it('connected and the last sync returned nothing: still the diagnostic, with the sync time', () => {

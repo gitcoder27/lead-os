@@ -57,6 +57,7 @@ describe("sync routes", () => {
       getRuntimeStatus: vi.fn(() => ({ status: "idle" as const, errorMessage: undefined })),
       isAutoSyncEnabled: vi.fn(async () => false),
       isJiraConfigured: vi.fn(async () => true),
+      getSyncScope: vi.fn(async () => ({ mode: "team_and_unassigned" as const, rosterSize: 3 })),
     });
 
     const res = await invoke(app, { method: "GET", url: "/api/sync/status" });
@@ -66,6 +67,7 @@ describe("sync routes", () => {
       status: "idle",
       autoSyncEnabled: false,
       jiraConfigured: true,
+      syncScope: { mode: "team_and_unassigned", rosterSize: 3 },
     });
   });
 
@@ -75,6 +77,7 @@ describe("sync routes", () => {
       getRuntimeStatus: vi.fn(() => ({ status: "idle" as const, errorMessage: undefined })),
       isAutoSyncEnabled: vi.fn(async () => true),
       isJiraConfigured: vi.fn(async () => false),
+      getSyncScope: vi.fn(async () => ({ mode: "team_and_unassigned" as const, rosterSize: 0 })),
     });
 
     const res = await invoke(app, { method: "GET", url: "/api/sync/status" });

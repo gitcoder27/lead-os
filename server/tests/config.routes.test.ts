@@ -262,7 +262,7 @@ ORDER BY updated DESC`,
     const res = await invoke(app, { method: "GET", url: "/api/config" });
 
     expect(res.status).toBe(200);
-    expect(res.body?.jiraSyncScopeMode).toBe("team_assignees");
+    expect(res.body?.jiraSyncScopeMode).toBe("team_and_unassigned");
     expect(res.body?.jiraSyncJql).toBe(`project = AM
 AND issuetype = Bug
 ORDER BY updated DESC`);

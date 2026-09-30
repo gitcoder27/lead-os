@@ -66,11 +66,12 @@ import { AttentionRulesSection } from '@/components/settings/AttentionRulesSecti
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
+import { SYNC_SCOPE_SHORT_LABELS, SYNC_SCOPE_SUMMARIES } from '@/lib/sync-scope';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
 type SectionId = 'navigation' | 'rhythm' | 'attention' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'maintenance' | 'access';
 type CreatableUserRole = Extract<AuthUser['role'], 'manager' | 'developer'>;
-const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_assignees';
+const DEFAULT_SYNC_SCOPE_MODE: JiraSyncScopeMode = 'team_and_unassigned';
 
 const SECTION_IDS: readonly SectionId[] = ['navigation', 'rhythm', 'attention', 'connection', 'sync', 'assistant', 'team', 'tags', 'labels', 'maintenance', 'access'];
 
@@ -807,7 +808,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     }
   }, [trimmedJiraBaseUrl]);
 
-  const syncScopeLabel = syncScopeMode === 'base_query' ? 'Base query' : 'Team assignees';
+  const syncScopeLabel = SYNC_SCOPE_SHORT_LABELS[syncScopeMode];
 
   const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
     navigation: { title: 'Navigation', description: 'Choose which pages stay in the top bar and arrange their order.' },
@@ -1045,7 +1046,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         { label: 'Jira email', value: trimmedJiraEmail || '-' },
                         { label: 'Project key', value: trimmedJiraProjectKey || '—' },
                         { label: 'API token', value: config?.jiraApiToken ? 'Saved' : 'Not saved' },
-                        { label: 'Sync scope', value: syncScopeMode === 'base_query' ? 'Base query only.' : 'Team assignees appended at sync time.' },
+                        { label: 'Sync scope', value: SYNC_SCOPE_SUMMARIES[syncScopeMode] },
                       ] as Array<{ label: string; value: string }>).map((row, idx) => (
                         <div
                           key={row.label}
@@ -1064,7 +1065,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       {syncScopeMode === 'base_query'
                         ? 'The saved query defines the Jira defect universe for this workspace.'
-                        : 'Team assignees and the manager lead identity are appended automatically at sync time.'}
+                        : syncScopeMode === 'team_and_unassigned'
+                          ? 'Team assignees, the manager lead identity and unassigned issues are added automatically at sync time.'
+                          : 'Team assignees and the manager lead identity are appended automatically at sync time.'}
                     </p>
                   </div>
 
@@ -1322,16 +1325,23 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   <div>
                     <SettingsGroupLabel>Scope Mode</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                      Choose whether Jira sync is limited to the tracked roster or driven directly by the base query.
+                      Choose whether Jira sync covers the tracked roster (with or without unassigned issues) or is driven directly by the base query.
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="grid gap-2 sm:grid-cols-3">
                       {([
+                        {
+                          id: 'team_and_unassigned' as const,
+                          icon: <Users size={14} />,
+                          label: 'Team + unassigned',
+                          badge: 'Default',
+                          description: 'Active team members, the manager identity and unassigned issues. Works with an empty roster.',
+                        },
                         {
                           id: 'team_assignees' as const,
                           icon: <Users size={14} />,
                           label: 'Team assignees',
-                          badge: 'Default',
-                          description: 'Append active team members and the manager identity. Empty roster returns no defects.',
+                          badge: 'Roster only',
+                          description: 'Only active team members and the manager identity. Empty roster returns no defects.',
                         },
                         {
                           id: 'base_query' as const,

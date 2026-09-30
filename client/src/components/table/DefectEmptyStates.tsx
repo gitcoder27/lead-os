@@ -1,15 +1,11 @@
 import { CircleCheck, PlugZap, RefreshCw } from 'lucide-react';
 import type { JiraSyncScopeMode, SyncStatus } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
+import { SYNC_SCOPE_DESCRIPTIONS } from '@/lib/sync-scope';
 
 const shell = 'flex-1 min-w-0 min-h-0 flex items-center justify-center p-4 text-center';
 const card = 'max-w-[440px] rounded-2xl px-5 py-4';
 const cardStyle = { background: 'var(--bg-secondary)', border: '1px solid var(--border-strong)' } as const;
-
-const SCOPE_LABELS: Record<JiraSyncScopeMode, string> = {
-  team_assignees: 'Team assignees (only tracked people’s issues)',
-  base_query: 'Base query (exact JQL)',
-};
 
 /** docs/56 P2-03: no Jira connection, which is a normal state, not a problem. */
 export function JiraNotConnectedState({ onConnectJira, onAddTask }: { onConnectJira?: () => void; onAddTask: () => void }) {
@@ -47,6 +43,9 @@ export function NothingSyncedState({
   onOpenSyncSettings?: () => void;
 }) {
   const lastSynced = syncStatus?.lastSyncedAt;
+  const mode = scopeMode ?? syncStatus?.syncScope?.mode;
+  const rosterSize = syncStatus?.syncScope?.rosterSize;
+  const rosterOnly = mode === 'team_assignees';
   return (
     <div className={shell} data-testid="work-nothing-synced">
       <div className={card} style={cardStyle}>
@@ -65,16 +64,24 @@ export function NothingSyncedState({
             <dt style={{ color: 'var(--text-muted)' }}>Issues synced</dt>
             <dd>{syncStatus?.issuesSynced ?? 0}</dd>
           </div>
-          {scopeMode ? (
+          {mode ? (
             <div className="flex justify-between gap-4">
               <dt style={{ color: 'var(--text-muted)' }}>Scope</dt>
-              <dd className="text-right">{SCOPE_LABELS[scopeMode]}</dd>
+              <dd className="text-right">{SYNC_SCOPE_DESCRIPTIONS[mode]}</dd>
+            </div>
+          ) : null}
+          {rosterSize !== undefined ? (
+            <div className="flex justify-between gap-4">
+              <dt style={{ color: 'var(--text-muted)' }}>Roster size</dt>
+              <dd>{rosterSize === 1 ? '1 tracked person' : `${rosterSize} tracked people`}</dd>
             </div>
           ) : null}
         </dl>
         <p className="mt-3 text-[13px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-          {scopeMode === 'team_assignees'
-            ? 'This scope only pulls issues assigned to people on your team, so an empty roster returns nothing. Add team members, or switch the scope to the base query.'
+          {rosterOnly
+            ? rosterSize === 0
+              ? 'This scope only pulls issues assigned to people on your team, and your roster is empty, so nothing can match. Add team members, or switch the scope to include unassigned issues or the base query.'
+              : 'This scope only pulls issues assigned to people on your team. If defects are unassigned or belong to someone else, switch the scope to include unassigned issues or the base query.'
             : 'Run a sync, and check the base query in Settings if it stays empty.'}
         </p>
         {onOpenSyncSettings ? (

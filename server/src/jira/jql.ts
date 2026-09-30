@@ -130,8 +130,12 @@ function joinClauses(clauses: string[], multiline: boolean): string {
   return clauses.join(multiline ? "\nAND " : " AND ").trim();
 }
 
+/** The parenthesised clause the team-and-unassigned scope appends. */
+const MANAGED_TEAM_OR_UNASSIGNED = /^\(\s*assignee\s+IN\s*\(.*\)\s+OR\s+assignee\s+IS\s+EMPTY\s*\)$/is;
+
 function isAssigneeClause(clause: string): boolean {
-  return /^assignee\b/i.test(clause.trim());
+  const trimmed = clause.trim();
+  return /^assignee\b/i.test(trimmed) || MANAGED_TEAM_OR_UNASSIGNED.test(trimmed);
 }
 
 function combineBodyAndOrder(body: string, orderBy: string): string {
@@ -158,11 +162,17 @@ function quoteAccountId(accountId: string): string {
   return JSON.stringify(accountId);
 }
 
-export function appendManagedAssigneeClause(query: string, teamAccountIds: Iterable<string>): string {
+export function appendManagedAssigneeClause(
+  query: string,
+  teamAccountIds: Iterable<string>,
+  includeUnassigned = false
+): string {
   const uniqueTeamIds = Array.from(new Set(Array.from(teamAccountIds).map((id) => id.trim()).filter(Boolean)));
-  const assigneeClause = uniqueTeamIds.length > 0
-    ? `assignee IN (${uniqueTeamIds.map(quoteAccountId).join(", ")})`
-    : "assignee IS EMPTY AND assignee IS NOT EMPTY";
+  const teamClause = `assignee IN (${uniqueTeamIds.map(quoteAccountId).join(", ")})`;
+  // docs/56 P5-01: with unassigned included an empty roster still returns the unassigned issues.
+  const assigneeClause = includeUnassigned
+    ? (uniqueTeamIds.length > 0 ? `(${teamClause} OR assignee IS EMPTY)` : "assignee IS EMPTY")
+    : (uniqueTeamIds.length > 0 ? teamClause : "assignee IS EMPTY AND assignee IS NOT EMPTY");
   const { body, orderBy } = splitOrderBy(query.trim());
   const multiline = body.includes("\n");
   const clauses = hasTopLevelKeyword(body, "OR")
@@ -183,20 +193,25 @@ function buildBaseJql(projectKey: string, configuredJql: string | undefined, nor
   return normalizeManagedAssigneeClause ? stripManagedAssigneeClause(query) : query;
 }
 
+/** Modes where the sync appends (and the saved JQL must not carry) an assignee clause. */
+export function isManagedAssigneeMode(mode: JiraSyncScopeMode): boolean {
+  return mode === "team_assignees" || mode === "team_and_unassigned";
+}
+
 export function normalizeConfiguredJqlForMode(query: string, mode: JiraSyncScopeMode): string {
-  return mode === "team_assignees" ? stripManagedAssigneeClause(query) : query.trim();
+  return isManagedAssigneeMode(mode) ? stripManagedAssigneeClause(query) : query.trim();
 }
 
 export function buildScopedJql(
   projectKey: string,
   configuredJql: string | undefined,
   teamAccountIds: Iterable<string>,
-  mode: JiraSyncScopeMode = "team_assignees"
+  mode: JiraSyncScopeMode
 ): string {
-  const baseQuery = buildBaseJql(projectKey, configuredJql, mode === "team_assignees");
+  const baseQuery = buildBaseJql(projectKey, configuredJql, isManagedAssigneeMode(mode));
   if (mode === "base_query") {
     return baseQuery;
   }
 
-  return appendManagedAssigneeClause(baseQuery, teamAccountIds);
+  return appendManagedAssigneeClause(baseQuery, teamAccountIds, mode === "team_and_unassigned");
 }

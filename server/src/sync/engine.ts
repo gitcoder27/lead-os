@@ -100,6 +100,16 @@ export class SyncEngine {
     return Boolean(baseUrl && email && project && token);
   }
 
+  /** docs/56 P5-01: the scope mode and how many tracked people (with a Jira account) it applies to. Config only. */
+  async getSyncScope(workspaceId?: string): Promise<{ mode: JiraSyncScopeMode; rosterSize: number }> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const [mode, roster] = await Promise.all([
+      this.settings.getJiraSyncScopeMode(normalizedWorkspaceId),
+      this.getActiveTeamAccountIds(normalizedWorkspaceId),
+    ]);
+    return { mode, rosterSize: roster.size };
+  }
+
   async getLastSyncLog(workspaceId?: string): Promise<typeof syncLog.$inferSelect | undefined> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const rows = await db

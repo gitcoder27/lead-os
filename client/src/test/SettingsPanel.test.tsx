@@ -377,6 +377,28 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('offers team + unassigned as the default scope and saves it (docs/56 P5-01)', async () => {
+    mockPut.mockResolvedValue({ success: true });
+
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /sync scope/i }));
+    const option = await screen.findByRole('button', { name: /team \+ unassigned default/i });
+    expect(screen.getByRole('button', { name: /team assignees roster only/i })).toBeInTheDocument();
+    fireEvent.click(option);
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }));
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith('/config/settings', expect.objectContaining({
+        jiraSyncScopeMode: 'team_and_unassigned',
+      }));
+    });
+  });
+
   it('saves base-query sync scope mode from the Sync Scope screen', async () => {
     mockPut.mockResolvedValue({ success: true });
 

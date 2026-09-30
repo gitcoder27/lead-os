@@ -23,6 +23,7 @@ export function createSyncRouter(syncEngine: SyncEngine): Router {
       const runtime = syncEngine.getRuntimeStatus(req.auth!.user.workspaceId);
       const autoSyncEnabled = await syncEngine.isAutoSyncEnabled(req.auth!.user.workspaceId);
       const jiraConfigured = await syncEngine.isJiraConfigured(req.auth!.user.workspaceId);
+      const syncScope = await syncEngine.getSyncScope(req.auth!.user.workspaceId);
       const status = runtime.status === "syncing" || runtime.status === "error"
         ? runtime.status
         : latest?.status === "error"
@@ -35,6 +36,7 @@ export function createSyncRouter(syncEngine: SyncEngine): Router {
         errorMessage: runtime.errorMessage ?? latest?.errorMessage ?? undefined,
         autoSyncEnabled,
         jiraConfigured,
+        syncScope,
       });
     } catch (error) {
       next(error);

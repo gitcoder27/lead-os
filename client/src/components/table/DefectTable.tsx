@@ -935,7 +935,7 @@ export function DefectTable({
   if (!baseIssues.length && !hasActiveFilters) {
     // Connected, yet the last sync returned nothing (or none ran): explain, do not claim the project is clean.
     if (syncStatus?.jiraConfigured && (!syncStatus.lastSyncedAt || !syncStatus.issuesSynced)) {
-      return <NothingSyncedState syncStatus={syncStatus} scopeMode={config?.jiraSyncScopeMode} onOpenSyncSettings={onOpenSyncSettings} />;
+      return <NothingSyncedState syncStatus={syncStatus} scopeMode={config?.jiraSyncScopeMode ?? syncStatus.syncScope?.mode} onOpenSyncSettings={onOpenSyncSettings} />;
     }
     return <ProjectCleanState />;
   }

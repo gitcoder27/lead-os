@@ -1445,6 +1445,43 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   runConstraintRepairStatements(sqlite, true);
   migrateSecretConfigValues(sqlite);
   backfillTeamMode(sqlite);
+  pinLegacyJiraSyncScope(sqlite);
+}
+
+export const JIRA_SCOPE_PIN_MIGRATION = "jira_sync_scope_pin_v1";
+
+/**
+ * docs/56 P5-01: the default scope now includes unassigned issues. A workspace that
+ * predates that and never saved a scope was running roster-only (`team_assignees`)
+ * implicitly, so pin it explicitly and leave its sync unchanged. "Existing" means it
+ * has synced issues or saved Jira settings; a workspace with neither starts on the
+ * new default. Explicit values are never overwritten, and it runs once.
+ */
+export function pinLegacyJiraSyncScope(sqlite: BetterSqlite3.Database): void {
+  if (sqlite.prepare("SELECT 1 FROM data_migrations WHERE name = ?").get(JIRA_SCOPE_PIN_MIGRATION)) {
+    return;
+  }
+  sqlite.transaction(() => {
+    const workspaceRows = sqlite
+      .prepare(
+        `SELECT DISTINCT workspace_id AS workspaceId FROM issues
+         UNION
+         SELECT DISTINCT workspace_id AS workspaceId FROM config WHERE key LIKE 'jira%'`
+      )
+      .all() as Array<{ workspaceId: string }>;
+    const insert = sqlite.prepare(
+      "INSERT INTO config (workspace_id, key, value) VALUES (?, 'jira_sync_scope_mode', 'team_assignees') ON CONFLICT(workspace_id, key) DO NOTHING"
+    );
+    const pinned: string[] = [];
+    for (const { workspaceId } of workspaceRows) {
+      if (insert.run(workspaceId).changes > 0) {
+        pinned.push(workspaceId);
+      }
+    }
+    sqlite
+      .prepare("INSERT INTO data_migrations (name, applied_at, report_json) VALUES (?, ?, ?)")
+      .run(JIRA_SCOPE_PIN_MIGRATION, new Date().toISOString(), JSON.stringify({ pinned }));
+  })();
 }
 
 export const TEAM_MODE_MIGRATION = "team_mode_v1";

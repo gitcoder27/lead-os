@@ -3,7 +3,11 @@ import { z } from "zod";
 export type WorkloadLevel = "light" | "medium" | "heavy";
 export type TeamScopeState = "in_team" | "out_of_team" | "unassigned";
 export type SyncScopeState = "active" | "inaccessible" | "out_of_scope";
-export type JiraSyncScopeMode = "team_assignees" | "base_query";
+/**
+ * `team_and_unassigned` (docs/56 P5-01) is the default for workspaces that have not saved a scope:
+ * the roster plus unassigned issues. `team_assignees` (roster only) and `base_query` (exact JQL) stay selectable.
+ */
+export type JiraSyncScopeMode = "team_assignees" | "team_and_unassigned" | "base_query";
 
 export type FilterType =
   | "all"
@@ -209,6 +213,8 @@ export interface SyncStatus {
   issuesSynced?: number;
   errorMessage?: string;
   autoSyncEnabled?: boolean;
+  /** docs/56 P5-01: what the sync pulls and how many tracked people it is scoped to (config only). */
+  syncScope?: { mode: JiraSyncScopeMode; rosterSize: number };
   /**
    * docs/56 P2-03: a complete Jira connection is saved. `false` means Jira-only
    * UI (sync controls, sync errors, defect signals) should stay out of the way.

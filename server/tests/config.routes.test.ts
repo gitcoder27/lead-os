@@ -939,7 +939,7 @@ ORDER BY updated DESC`);
     expect(getJiraApiToken()).toBe("live-token");
 
     const app = createTestApp();
-    const res = await invoke(app, { method: "POST", url: "/api/config/reset" });
+    const res = await invoke(app, { method: "POST", url: "/api/config/reset", body: { confirmationText: "reset configuration" } });
     expect(res.status).toBe(200);
     expect(res.body?.success).toBe(true);
 
@@ -961,6 +961,29 @@ ORDER BY updated DESC`);
     expect(getJiraApiToken()).toBe("");
     expect(typeof res.body?.backup?.path).toBe("string");
     expect(fs.existsSync(res.body?.backup?.path)).toBe(true);
+  });
+
+  it("POST /api/config/reset refuses without the typed confirmation and wipes nothing (docs/56 P6-06)", async () => {
+    await db.insert(configTable).values([
+      { key: "jira_base_url", value: "https://tenant.atlassian.net" },
+      { key: "jira_api_token", value: "token-from-db" },
+    ]);
+    await db.insert(developers).values({ accountId: "dev-1", displayName: "Dev", isActive: 1 });
+    setJiraApiToken("live-token");
+    const configBefore = await db.select().from(configTable);
+    const app = createTestApp();
+
+    const noBody = await invoke(app, { method: "POST", url: "/api/config/reset" });
+    const empty = await invoke(app, { method: "POST", url: "/api/config/reset", body: { confirmationText: "" } });
+    const wrong = await invoke(app, { method: "POST", url: "/api/config/reset", body: { confirmationText: "CLEAR EVERYTHING" } });
+
+    expect(noBody.status).toBe(400);
+    expect(empty.status).toBe(400);
+    expect(wrong.status).toBe(400);
+    expect(wrong.body?.error).toBe('Type "RESET CONFIGURATION" to confirm this reset');
+    expect(await db.select().from(configTable)).toEqual(configBefore);
+    expect(await db.select().from(developers)).toHaveLength(1);
+    expect(getJiraApiToken()).toBe("live-token");
   });
 
   it("GET /api/config/ai returns public defaults without a key", async () => {

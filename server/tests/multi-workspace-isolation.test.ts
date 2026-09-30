@@ -260,7 +260,7 @@ describe("multi-workspace API isolation", () => {
     const bBeforeReset = await db.select().from(issues).where(eq(issues.workspaceId, managerB.workspaceId));
     expect(bBeforeReset).toHaveLength(1);
 
-    const resetRes = await invoke(app, { method: "POST", url: "/api/config/reset", headers: { cookie: managerACookie } });
+    const resetRes = await invoke(app, { method: "POST", url: "/api/config/reset", headers: { cookie: managerACookie }, body: { confirmationText: "RESET CONFIGURATION" } });
     expect(resetRes.status).toBe(200);
 
     const bAfterReset = await db.select().from(issues).where(eq(issues.workspaceId, managerB.workspaceId));

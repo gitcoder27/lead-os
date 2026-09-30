@@ -58,6 +58,7 @@ import {
 import { TagManagementSection } from '@/components/settings/TagManagementSection';
 import { LabelsSection } from '@/components/settings/LabelsSection';
 import { UserPasswordResetAction } from '@/components/settings/UserPasswordResetAction';
+import { ResetConfigurationDialog } from '@/components/settings/ResetConfigurationDialog';
 import { SettingsDataSection } from '@/components/settings/SettingsDataSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
@@ -132,6 +133,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const [managerSearch, setManagerSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetError, setResetError] = useState<string | undefined>();
   const [fields, setFields] = useState<JiraField[]>([]);
   const [loadingFields, setLoadingFields] = useState(false);
   const [fieldSearch, setFieldSearch] = useState('');
@@ -426,14 +429,17 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     }
   };
 
-  const handleResetConfig = async () => {
-    if (!window.confirm('This will clear Jira configuration and return you to onboarding. Continue?')) {
-      return;
-    }
+  const handleResetConfig = () => {
+    setResetError(undefined);
+    setResetDialogOpen(true);
+  };
 
+  const confirmResetConfig = async (confirmationText: string) => {
     setResetting(true);
+    setResetError(undefined);
     try {
-      await resetSettingsConfig();
+      await resetSettingsConfig(confirmationText);
+      setResetDialogOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['config'] });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['issues'] }),
@@ -443,7 +449,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       ]);
       addToast({ type: 'success', title: 'Configuration reset', message: 'Re-run setup to configure a new Jira account.' });
     } catch (err) {
-      addToast({ type: 'error', title: 'Failed to reset configuration', message: err instanceof Error ? err.message : 'Please try again.' });
+      // The dialog stays open with the error inline; it is the place the manager is looking.
+      setResetError(err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setResetting(false);
     }
@@ -2211,6 +2218,17 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           </div>
         )}
         </div>
+      ) : null}
+      {resetDialogOpen ? (
+        <ResetConfigurationDialog
+          backupBeforeReset={config?.backupBeforeReset ?? true}
+          isResetting={resetting}
+          error={resetError}
+          onConfirm={(text) => void confirmResetConfig(text)}
+          onClose={() => {
+            if (!resetting) setResetDialogOpen(false);
+          }}
+        />
       ) : null}
     </motion.div>
   );

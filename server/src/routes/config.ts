@@ -55,6 +55,14 @@ const configSchema = z.object({
   query: z.any().optional(),
 });
 
+const RESET_CONFIGURATION_CONFIRMATION = "RESET CONFIGURATION";
+
+const configResetSchema = z.object({
+  body: z.object({ confirmationText: z.string() }),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
 const testSchema = z.object({
   body: z.object({
     jiraBaseUrl: z.string().url(),
@@ -688,8 +696,13 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
     }
   );
 
-  router.post("/reset", async (req, res, next) => {
+  // docs/56 P6-06: same typed-confirmation rule as the maintenance resets, so a stray or
+  // scripted POST cannot wipe the Jira connection, settings, issues and roster.
+  router.post("/reset", validate(configResetSchema), async (req, res, next) => {
     try {
+      if (req.body.confirmationText.trim().toUpperCase() !== RESET_CONFIGURATION_CONFIRMATION) {
+        throw new HttpError(400, `Type "${RESET_CONFIGURATION_CONFIRMATION}" to confirm this reset`);
+      }
       const workspaceId = req.auth!.user.workspaceId;
       const backup = backupService ? await backupService.createPreResetBackup(workspaceId) : null;
       await runInTransaction(async () => {

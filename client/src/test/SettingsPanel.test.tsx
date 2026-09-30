@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { SettingsPage } from '@/components/settings/SettingsPanel';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { TestWrapper } from '@/test/wrapper';
@@ -894,6 +894,69 @@ describe('SettingsPage', () => {
     expect(screen.getByText('128 tasks')).toBeInTheDocument();
     expect(screen.getAllByText('72 tracker items').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Reset Both Workspaces')).toBeInTheDocument();
+  });
+
+  it('resets the Jira configuration only through the typed-confirmation dialog, never window.confirm (docs/56 P6-06)', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockPost.mockResolvedValue({ success: true });
+
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(mockPost).not.toHaveBeenCalledWith('/config/reset', expect.anything());
+    expect(within(dialog).getByRole('list', { name: 'What is lost' })).toBeInTheDocument();
+    expect(within(dialog).getByText(/A backup is taken first/)).toBeInTheDocument();
+
+    const confirm = within(dialog).getByRole('button', { name: 'Reset configuration' });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Confirmation text'), { target: { value: 'RESET CONFIGURATION' } });
+    fireEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('/config/reset', { confirmationText: 'RESET CONFIGURATION' });
+    });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('keeps the reset dialog open and shows the error when the reset fails', async () => {
+    mockPost.mockRejectedValue(new Error('Reset failed on the server'));
+
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.change(within(dialog).getByLabelText('Confirmation text'), { target: { value: 'RESET CONFIGURATION' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reset configuration' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Reset failed on the server');
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+  });
+
+  it('cancelling the reset dialog changes nothing', async () => {
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalledWith('/config/reset', expect.anything());
   });
 
   it('runs the full maintenance reset after typed confirmation', async () => {

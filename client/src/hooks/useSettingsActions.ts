@@ -149,7 +149,7 @@ export function useSaveSettingsConfig() {
 
 export function useResetSettingsConfig() {
   return useMutation({
-    mutationFn: () => api.post('/config/reset'),
+    mutationFn: (confirmationText: string) => api.post('/config/reset', { confirmationText }),
   });
 }
 

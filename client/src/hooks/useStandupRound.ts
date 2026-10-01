@@ -37,7 +37,13 @@ export function useStandupRound(storageKey: string, order: string[]) {
     if (!navigator.locks) return;
     const controller = new AbortController();
     let release: (() => void) | undefined;
+    // The browser can grant the lock after this effect was cleaned up (React re-runs effects in development, and a
+    // standup can be closed the moment it opens). An abort does nothing once the lock is granted, so the callback
+    // must let go of it at once — otherwise the lock is held until the tab is refreshed and standup reports
+    // "open in another tab" every time it is opened again.
+    let cancelled = false;
     void navigator.locks.request(storageKey, { signal: controller.signal }, async () => {
+      if (cancelled) return;
       try {
         const finished = JSON.parse(localStorage.getItem(`${storageKey}:finished`) ?? '[]') as string[];
         if (finished.includes(current.current.roundId)) {
@@ -50,7 +56,7 @@ export function useStandupRound(storageKey: string, order: string[]) {
       setOwnsRound(true);
       await new Promise<void>((resolve) => { release = resolve; });
     }).catch(() => undefined);
-    return () => { controller.abort(); release?.(); };
+    return () => { cancelled = true; controller.abort(); release?.(); };
   }, [storageKey]);
 
   const clear = useCallback(() => {

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
@@ -7,6 +7,7 @@ import { isoDatePart, todayIsoDate } from "../utils/date";
 import { TaskEventsService } from "./task-events.service";
 import { JIRA_DRIFT_CLOSED_WINDOW_DAYS, JiraDriftService } from "./jira-drift.service";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
+import { SelfIdentityService } from "./self-identity.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
 export function parseTaskViewDefinition(raw: unknown): TaskViewDefinition {
@@ -156,13 +157,18 @@ function followUpMatch(row: TaskRow): boolean {
   return row.followUpAt !== null || labelsOf(row).includes(FOLLOW_UP_LABEL);
 }
 
+/** Every id that is "me": the login, and the roster record the manager marked as theirs. */
+function selfIds(principal: TaskPrincipal): string[] {
+  return principal.selfDeveloperId ? [principal.accountId, principal.selfDeveloperId] : [principal.accountId];
+}
+
 /**
- * docs/51 F3: the manager's linked developer account is also "me" — the
- * session's accountId IS that developer id (auth maps it onto the user), so
- * `ownerId = accountId` covers both manager-owned and self-owned dev rows.
+ * docs/51 F3: the manager's linked developer account is also "me". A legacy login's accountId IS
+ * that developer id; otherwise the "This is me" link names it, so `ownerId` in `selfIds` covers
+ * manager-owned rows and the roster record's rows alike.
  */
 function selfOwned(row: TaskRow, principal: TaskPrincipal): boolean {
-  return row.ownerId !== null && row.ownerId === principal.accountId;
+  return row.ownerId !== null && selfIds(principal).includes(row.ownerId);
 }
 
 /**
@@ -303,6 +309,7 @@ export class TaskViewsService {
     private readonly taskService = new TaskService(),
     private readonly events = new TaskEventsService(),
     private readonly drift = new JiraDriftService(),
+    private readonly self = new SelfIdentityService(),
   ) {}
 
   /**
@@ -313,9 +320,17 @@ export class TaskViewsService {
    * memory afterwards.
    */
   private scopePredicate(principal: TaskPrincipal): SQL {
-    return principal.type === "developer"
-      ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!
-      : sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL)`;
+    if (principal.type === "developer") return and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!;
+    // The roster record I marked as mine is mine even when I do not track its tasks.
+    const own = principal.selfDeveloperId ? sql` OR (${tasks.ownerType} = 'developer' AND ${tasks.ownerId} = ${principal.selfDeveloperId})` : sql``;
+    return sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL${own})`;
+  }
+
+  /** Adds the manager's "This is me" roster record; every public read starts here. */
+  private async withSelf(principal: TaskPrincipal): Promise<TaskPrincipal> {
+    if (principal.type !== "manager" || principal.selfDeveloperId !== undefined) return principal;
+    const selfDeveloperId = await this.self.linkedDeveloperId(principal.accountId, principal.workspaceId);
+    return selfDeveloperId ? { ...principal, selfDeveloperId } : principal;
   }
 
   private async candidateRows(principal: TaskPrincipal, filters: TaskViewFilters, today: string): Promise<TaskRow[]> {
@@ -325,10 +340,9 @@ export class TaskViewsService {
     if (filters.owner !== undefined) {
       const owner = filters.owner;
       conditions.push(
-        // docs/51 F3: "me" matches any row whose ownerId is my account id —
-        // for a linked manager that IS the developer account id.
-        owner === "me" ? eq(tasks.ownerId, principal.accountId)
-          : owner === "team" ? and(eq(tasks.ownerType, "developer"), ne(tasks.ownerId, principal.accountId))!
+        // docs/51 F3: "me" matches any row owned by my login or by the roster record I marked as mine.
+        owner === "me" ? inArray(tasks.ownerId, selfIds(principal))
+          : owner === "team" ? and(eq(tasks.ownerType, "developer"), notInArray(tasks.ownerId, selfIds(principal)))!
             : owner === "inbox" ? isNull(tasks.ownerType)
               : inArray(tasks.ownerId, owner),
       );
@@ -420,7 +434,8 @@ export class TaskViewsService {
    * Execute a validated view definition — batched link/event lookups, no per-row scans. `tz` is the
    * manager's IANA zone: deadlines and timestamps are bucketed on their day, not the server's.
    */
-  async run(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<TaskViewTask[]> {
+  async run(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<TaskViewTask[]> {
+    const principal = await this.withSelf(viewer);
     const matched = await this.evaluate(principal, definition, today, tz);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
     // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
@@ -444,8 +459,8 @@ export class TaskViewsService {
   }
 
   /** How many tasks a definition matches, without building DTOs. */
-  async count(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<number> {
-    return (await this.evaluate(principal, definition, today, tz)).length;
+  async count(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<number> {
+    return (await this.evaluate(await this.withSelf(viewer), definition, today, tz)).length;
   }
 
   /**
@@ -454,7 +469,8 @@ export class TaskViewsService {
    * range or the drift window) and one batched facts pass. A saved view with
    * an open-ended `closed.to` range falls back to its own bounded query.
    */
-  async counts(principal: TaskPrincipal, today = todayIsoDate(), tz?: string): Promise<Record<string, TaskViewCount>> {
+  async counts(viewer: TaskPrincipal, today = todayIsoDate(), tz?: string): Promise<Record<string, TaskViewCount>> {
+    const principal = await this.withSelf(viewer);
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const views = await this.list(principal.accountId, principal.workspaceId, today);
     let closedFloor = shiftDays(today, -JIRA_DRIFT_CLOSED_WINDOW_DAYS);

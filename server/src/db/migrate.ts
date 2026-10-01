@@ -286,6 +286,15 @@ CREATE TABLE IF NOT EXISTS user_nav_preferences (
   PRIMARY KEY (workspace_id, manager_account_id)
 );
 
+-- A manager's own roster record ("this is me"): one person, two identities, joined on read.
+CREATE TABLE IF NOT EXISTS manager_self_links (
+  workspace_id         TEXT NOT NULL DEFAULT 'default',
+  manager_account_id   TEXT NOT NULL,
+  developer_account_id TEXT NOT NULL,
+  updated_at           TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, manager_account_id)
+);
+
 CREATE TABLE IF NOT EXISTS task_key_sequences (
   workspace_id TEXT PRIMARY KEY,
   next_value INTEGER NOT NULL

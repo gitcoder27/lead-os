@@ -14,6 +14,7 @@ import { getJiraApiToken } from "../runtime-credentials";
 import { getPersistedJiraApiToken } from "../services/jira-credentials.service";
 import { getParticipatingDeveloperIds } from "../services/developer-participation.service";
 import type { Developer } from "shared/types";
+import { SelfIdentityService } from "../services/self-identity.service";
 
 const paramsSchema = z.object({
   params: z.object({ accountId: z.string().regex(/^[A-Za-z0-9:-]+$/, "Invalid account id format") }),
@@ -42,6 +43,12 @@ const saveDevelopersSchema = z.object({
       })
     ),
   }),
+  params: z.any().optional(),
+  query: z.any().optional(),
+});
+
+const selfLinkSchema = z.object({
+  body: z.object({ developerAccountId: z.string().regex(/^[A-Za-z0-9:-]+$/, "Invalid account id format").nullable() }),
   params: z.any().optional(),
   query: z.any().optional(),
 });
@@ -154,6 +161,24 @@ function makeManualAccountId(displayName: string): string {
 
 export function createTeamRouter(workloadService: WorkloadService, authService: AuthService): Router {
   const router = Router();
+  const selfIdentity = new SelfIdentityService();
+
+  // "This is me": the manager's own roster record. Private to the logged-in manager.
+  router.get("/self", async (req, res, next) => {
+    try {
+      res.json(await selfIdentity.get(req.auth!.user.accountId, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/self", validate(selfLinkSchema), async (req, res, next) => {
+    try {
+      res.json(await selfIdentity.set(req.auth!.user.accountId, req.body.developerAccountId, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/workload", validate(workloadQuerySchema), async (req, res, next) => {
     try {

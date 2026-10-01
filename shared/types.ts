@@ -111,6 +111,18 @@ export interface Developer {
    *  `teamMode === "collab" && participates`. Computed server-side. */
   participates: boolean;
   availability?: DeveloperAvailability;
+  /**
+   * The viewing manager's own roster record ("This is me"). Set on the Team board only. The row also
+   * lists the manager's own tasks and raises no check-in or staleness signals: nobody chases themselves.
+   */
+  isSelf?: boolean;
+}
+
+/** `GET/PUT /api/team/self`: which roster record is the logged-in manager. */
+export interface TeamSelfLink {
+  developerAccountId: string | null;
+  /** The roster record matching the manager's saved Jira account, offered until a link is set. */
+  suggestedDeveloperAccountId: string | null;
 }
 
 export type DeveloperAvailabilityState = "active" | "inactive";

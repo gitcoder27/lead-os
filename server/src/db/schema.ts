@@ -686,6 +686,20 @@ export const userNavPreferences = sqliteTable("user_nav_preferences", {
   primaryKey({ name: "pk_user_nav_preferences_workspace_manager", columns: [table.workspaceId, table.managerAccountId] }),
 ]);
 
+/**
+ * A manager's own roster record. A manager who is also on the roster is one person with two ids:
+ * their login (`manager_account_id`, owner of private tasks) and the Jira-backed developer record.
+ * The link is read-side only: no task is rewritten, and removing it restores the old behaviour.
+ */
+export const managerSelfLinks = sqliteTable("manager_self_links", {
+  workspaceId: text("workspace_id").notNull().default("default"),
+  managerAccountId: text("manager_account_id").notNull(),
+  developerAccountId: text("developer_account_id").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  primaryKey({ name: "pk_manager_self_links_workspace_manager", columns: [table.workspaceId, table.managerAccountId] }),
+]);
+
 // ── One-on-One workspace (docs/48 §2): three new tables, additive only. ──
 
 export const oneOnOneSeries = sqliteTable("one_on_one_series", {

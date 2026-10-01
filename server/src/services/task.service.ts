@@ -26,6 +26,11 @@ export interface TaskPrincipal {
   type: "manager" | "developer" | "copilot";
   accountId: string;
   workspaceId?: string;
+  /**
+   * A manager's own roster record. Set by the view service (never by callers) so "me" covers both
+   * the login's private tasks and the tasks assigned to that roster record.
+   */
+  selfDeveloperId?: string;
 }
 
 const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, "Invalid date");

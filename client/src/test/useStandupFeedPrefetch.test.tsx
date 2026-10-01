@@ -40,6 +40,21 @@ describe('standup feed preloading', () => {
     expect(mockGet).toHaveBeenCalledTimes(2);
   });
 
+  it('does not request the roster again as the cursor moves, even after the 30s the on-screen feed refreshes at', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { wrapper } = setup();
+      const prefetch = renderHook(({ ids }) => usePrefetchStandupFeeds(ids), { wrapper, initialProps: { ids: ['dev-2', 'dev-3', 'dev-1'] } });
+      await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(3));
+      await vi.advanceTimersByTimeAsync(60_000);
+      prefetch.rerender({ ids: ['dev-3', 'dev-1', 'dev-2'] });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(mockGet).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('only fetches the person who is newly in range as the cursor moves', async () => {
     const { wrapper } = setup();
     const prefetch = renderHook(({ ids }) => usePrefetchStandupFeeds(ids), { wrapper, initialProps: { ids: ['dev-2', 'dev-3'] } });

@@ -229,9 +229,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const setCheckInVisibility = (visibility: TrackerCheckInVisibility) => changeNote({ visibility });
 
   const feed = useStandupFeed(accountId);
-  // Warm the next two people and the previous one, so the arrow keys land on data that is already there.
+  // Load everyone else's feed up front, nearest first and next before previous, so no switch waits on the
+  // network. They are few (a team) and small; ones loaded recently are not requested again as the cursor moves.
   usePrefetchStandupFeeds(
-    [ordered[devIndex + 1], ordered[devIndex + 2], ordered[devIndex - 1]].flatMap((entry) => (entry ? [entry.developer.accountId] : [])),
+    ordered.flatMap((_, distance) => (distance === 0 ? [] : [ordered[devIndex + distance], ordered[devIndex - distance]]))
+      .flatMap((entry) => (entry ? [entry.developer.accountId] : [])),
     view === 'person',
   );
   const [feedForcedOpen, setFeedForcedOpen] = useState<string | null>(null);

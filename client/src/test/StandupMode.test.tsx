@@ -403,12 +403,24 @@ describe('StandupMode', () => {
       return board;
     };
 
-    it('asks to preload the next two people and the previous one, and follows the cursor', () => {
+    it('asks to preload everyone else, nearest first and next before previous, following the cursor', () => {
       const board = threePeople();
       renderStandup(board);
       expect(mockPrefetchFeeds).toHaveBeenLastCalledWith(['dev-2', 'dev-3'], true);
       fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       expect(mockPrefetchFeeds).toHaveBeenLastCalledWith(['dev-3', 'dev-1'], true);
+    });
+
+    it('orders a larger team by distance from the person on screen', () => {
+      const board = threePeople();
+      for (const [index, name] of ['Dan', 'Eve'].entries()) {
+        board.developers.push(day({ id: 10 + index, developer: { accountId: `dev-${4 + index}`, displayName: name, isActive: true }, tasks: [] }));
+      }
+      renderStandup(board);
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      // On dev-3 of 5: dev-4 and dev-2 are one away, dev-5 and dev-1 two away.
+      expect(mockPrefetchFeeds).toHaveBeenLastCalledWith(['dev-4', 'dev-2', 'dev-5', 'dev-1'], true);
     });
 
     it('keeps the Changes panel open while the next person\'s feed loads, with no pulsing skeleton', () => {

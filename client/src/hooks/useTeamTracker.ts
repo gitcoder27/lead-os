@@ -78,9 +78,14 @@ export function useStandupFeed(accountId: string | undefined, enabled = true) {
   });
 }
 
+/** A preloaded feed is not fetched again for this long, however often the cursor moves. */
+const STANDUP_FEED_PRELOAD_MS = 5 * 60_000;
+
 /**
- * Loads the feeds of the people a standup is about to move to, so ←/→ lands on data that is already
- * there (no wait, no panel opening and closing). Fresh feeds are skipped; nothing here polls.
+ * Loads the feeds of the people a standup will visit, in the order given (nearest first), so ←/→ lands
+ * on data that is already there: no wait, and no panel opening and closing. A person already loaded
+ * recently is skipped, so moving the cursor does not re-request the whole roster; nothing here polls.
+ * What is shown from cache is still refreshed in the background once it is older than 30s.
  */
 export function usePrefetchStandupFeeds(accountIds: readonly string[], enabled = true) {
   const queryClient = useQueryClient();
@@ -88,7 +93,7 @@ export function usePrefetchStandupFeeds(accountIds: readonly string[], enabled =
   const ids = accountIds.join('|');
   useEffect(() => {
     if (!enabled) return;
-    for (const accountId of ids.split('|').filter(Boolean)) void queryClient.prefetchQuery(standupFeedOptions(accountId, authScopeKey));
+    for (const accountId of ids.split('|').filter(Boolean)) void queryClient.prefetchQuery({ ...standupFeedOptions(accountId, authScopeKey), staleTime: STANDUP_FEED_PRELOAD_MS });
   }, [enabled, ids, authScopeKey, queryClient]);
 }
 

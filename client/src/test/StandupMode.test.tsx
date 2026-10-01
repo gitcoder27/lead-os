@@ -919,6 +919,18 @@ describe('StandupMode', () => {
         expect(mockRecordReviewsMutate).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-03-07', accountIds: ['dev-2'] }), expect.anything());
       });
 
+      it('shows a pending visit save inline in the top bar, never as a banner that pushes the page down', () => {
+        mockRecordReviewsMutate.mockImplementationOnce(() => undefined);   // the server has not answered yet
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+        expect(screen.getByTestId('standup-saving')).toHaveTextContent('saving');
+        expect(screen.queryByText(/Saving visits/)).not.toBeInTheDocument();
+        // Nothing sits between the top bar and the body: the body starts where it always does.
+        const header = screen.getByTestId('standup-mode').querySelector('header')!;
+        expect(header.nextElementSibling?.getAttribute('role')).not.toBe('status');
+        expect(header.nextElementSibling?.className).toContain('flex min-h-0 flex-1');
+      });
+
       it('retries a failed review after refresh without another visit', async () => {
         mockRecordReviewsMutate.mockImplementationOnce((_body, options) => options?.onError?.());
         const first = renderStandup();

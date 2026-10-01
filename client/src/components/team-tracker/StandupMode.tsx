@@ -250,6 +250,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     if (session.feedSeenThrough?.[accountId]) return;
     dispatch({ type: 'patch', patch: { feedSeenThrough: { ...session.feedSeenThrough, [accountId]: feed.data.windowEnd } } });
   }, [ownsRound, accountId, view, suspended, layer, feed.data, feed.isError, session.feedSeenThrough, dispatch]);
+  const visitsPending = session.reviewed.some((id) => !session.acknowledged?.includes(id));
   const latestSession = useLatestStandupSession(layer === 'history');
   const activeKeys = useMemo(() => feedActiveTaskKeys(feed.data?.entries ?? []), [feed.data]);
   const statusUpdate = useStatusUpdate(date);
@@ -749,6 +750,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             {session.flagged.length > 0 && (
               <span style={{ color: 'var(--text-muted)' }}> · {session.flagged.length} flagged</span>
             )}
+            {visitsPending && !reviewError && (
+              <span aria-hidden="true" data-testid="standup-saving" style={{ color: 'var(--text-muted)' }}> · saving</span>
+            )}
           </span>
         </div>
 
@@ -775,10 +779,12 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
 
       {storageFailed && <p role="alert" className="px-4 py-2 text-sm">Browser recovery is unavailable. Keep this page open until your work is saved.</p>}
       {!ownsRound && <div role="alert" className="px-4 py-2 text-sm">Standup is open in another tab. Close it there to continue here.</div>}
-      {session.reviewed.some((id) => !session.acknowledged?.includes(id)) && (
+      {/* Only a failure earns a banner. "Saving…" used to appear here on every first visit to a person for the
+          ~100ms the server took to confirm, pushing the whole page down 32px and back; it is now inline (below). */}
+      {visitsPending && reviewError && (
         <div role="status" className="flex items-center gap-3 px-4 py-2 text-xs">
-          {reviewError ? 'Visits not saved. Your progress is kept in this tab.' : 'Saving visits…'}
-          {reviewError && <button type="button" className="ui-btn" onClick={retryReviewWrites}>Retry</button>}
+          Visits not saved. Your progress is kept in this tab.
+          <button type="button" className="ui-btn" onClick={retryReviewWrites}>Retry</button>
         </div>
       )}
       {finishError && <p role="alert" className="px-4 py-2 text-sm">{finishError}</p>}

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { TestWrapper } from '@/test/wrapper';
@@ -524,6 +524,31 @@ describe('StandupMode', () => {
       // A fresh column per person: scroll starts at the top.
       expect(tasks.closest<HTMLElement>('[class*="overflow-y-auto"]')?.scrollTop ?? 0).toBe(0);
       expect(screen.getAllByText('Bob Jones').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('opening (no flash while the round lock is being granted)', () => {
+    afterEach(() => { Reflect.deleteProperty(navigator, 'locks'); });
+
+    it('shows nothing while waiting for the lock, never the "another tab" message first', async () => {
+      // A lock that someone else holds: the request never resolves.
+      Object.defineProperty(navigator, 'locks', { value: { request: () => new Promise(() => undefined) }, configurable: true });
+      renderStandup();
+      expect(screen.queryByTestId('standup-mode')).not.toBeInTheDocument();
+      expect(screen.queryByText(/open in another tab/)).not.toBeInTheDocument();
+      // Only once the grace period passes is the other tab reported.
+      await waitFor(() => expect(screen.getByText(/open in another tab/)).toBeInTheDocument(), { timeout: 2000 });
+    });
+
+    it('opens straight into the real screen when the lock is granted', async () => {
+      Object.defineProperty(navigator, 'locks', {
+        value: { request: (_name: string, _options: unknown, callback: () => Promise<void>) => { setTimeout(() => void callback(), 0); return new Promise(() => undefined); } },
+        configurable: true,
+      });
+      renderStandup();
+      expect(screen.queryByText(/open in another tab/)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('standup-progress')).toBeInTheDocument());
+      expect(screen.queryByText(/open in another tab/)).not.toBeInTheDocument();
     });
   });
 

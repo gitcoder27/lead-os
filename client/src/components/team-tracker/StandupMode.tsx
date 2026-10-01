@@ -100,7 +100,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     return () => window.removeEventListener('task-update-drafts-changed', update);
   }, [draftPrefix]);
   const initialOrder = useMemo(() => board.developers.map((entry) => entry.developer.accountId), [board.developers]);
-  const { session, dispatch, storageFailed, ownsRound, clear } = useStandupRound(storageKey, initialOrder);
+  const { session, dispatch, storageFailed, ownsRound, lockPending, clear } = useStandupRound(storageKey, initialOrder);
   const ordered = useMemo(() => (session.order ?? initialOrder).flatMap((id) => {
     const entry = board.developers.find((person) => person.developer.accountId === id);
     return entry ? [entry] : [];
@@ -693,6 +693,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     ] },
   ];
 
+  // Still waiting for the round lock (normally ~100ms): show nothing, so opening is one fade-in rather than an
+  // opaque "open in another tab" screen followed by a blank one.
+  if (lockPending) return null;
+
   if (!day || !stats || !ownsRound) {
     return createPortal(
       <div ref={rootRef} tabIndex={-1} className="standup-shell fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg-primary)' }} role="dialog" aria-modal="true" aria-label="Standup mode" data-testid="standup-mode">
@@ -714,6 +718,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.12, ease: 'easeOut' }}
       className="standup-shell fixed inset-0 flex flex-col outline-none"
       style={{ background: 'var(--bg-primary)' }}
       role="dialog"

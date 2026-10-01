@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMPTY_STANDUP_SESSION, loadStandupSession, saveStandupSession, standupSessionReducer, type StandupSessionAction } from '@/lib/standup';
 
+/** How long a standup waits for its lock before telling the manager another tab holds it. */
+export const STANDUP_LOCK_GRACE_MS = 800;
+
 export function useStandupRound(storageKey: string, order: string[]) {
   const [session, setSession] = useState(() => {
     const stored = loadStandupSession(storageKey);
@@ -11,6 +14,9 @@ export function useStandupRound(storageKey: string, order: string[]) {
   const mounted = useRef(true);
   const [storageFailed, setStorageFailed] = useState(false);
   const [ownsRound, setOwnsRound] = useState(!navigator.locks);
+  // The browser grants a free lock a moment after the request, not synchronously. Until then — and for a short
+  // grace after — the screen stays blank rather than flashing "open in another tab" and then the real thing.
+  const [lockWaited, setLockWaited] = useState(false);
   const generation = session.roundId;
   const dispatch = useCallback((action: StandupSessionAction) => {
     if (current.current.roundId !== generation) return;
@@ -32,6 +38,12 @@ export function useStandupRound(storageKey: string, order: string[]) {
   useEffect(() => {
     if (ownsRound) setStorageFailed(!saveStandupSession(storageKey, current.current));
   }, [ownsRound, storageKey]);
+
+  useEffect(() => {
+    if (ownsRound || lockWaited) return undefined;
+    const timer = window.setTimeout(() => setLockWaited(true), STANDUP_LOCK_GRACE_MS);
+    return () => window.clearTimeout(timer);
+  }, [ownsRound, lockWaited]);
 
   useEffect(() => {
     if (!navigator.locks) return;
@@ -69,5 +81,5 @@ export function useStandupRound(storageKey: string, order: string[]) {
     current.current = { ...EMPTY_STANDUP_SESSION, roundId: crypto.randomUUID(), startedAt: new Date().toISOString(), order };
   }, [storageKey, order]);
 
-  return { session, dispatch, storageFailed, ownsRound, clear };
+  return { session, dispatch, storageFailed, ownsRound, lockPending: !ownsRound && !lockWaited, clear };
 }

@@ -1,7 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { useStandupRound } from '@/hooks/useStandupRound';
+import { STANDUP_LOCK_GRACE_MS, useStandupRound } from '@/hooks/useStandupRound';
 
 /**
  * A faithful-enough Web Locks fake: a lock is *granted* the moment it is free, but its callback runs a task
@@ -88,6 +88,27 @@ describe('standup round lock (re-opening standup)', () => {
     expect(second.result.current.ownsRound).toBe(false);
     first.unmount();
     await waitFor(() => expect(second.result.current.ownsRound).toBe(true), { timeout: 1000 });
+    second.unmount();
+  });
+
+  it('reports the lock as pending until it is granted, so the screen can stay blank instead of flashing a message', async () => {
+    const view = renderHook(() => useStandupRound('standup-key', ['a']));
+    expect(view.result.current.ownsRound).toBe(false);
+    expect(view.result.current.lockPending).toBe(true);
+    await waitFor(() => expect(view.result.current.ownsRound).toBe(true), { timeout: 1000 });
+    expect(view.result.current.lockPending).toBe(false);
+    view.unmount();
+  });
+
+  it('only stops waiting — and so only shows "open in another tab" — after the grace period', async () => {
+    const first = renderHook(() => useStandupRound('standup-key', ['a']));
+    await waitFor(() => expect(first.result.current.ownsRound).toBe(true), { timeout: 1000 });
+    const second = renderHook(() => useStandupRound('standup-key', ['a']));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); });
+    expect(second.result.current).toMatchObject({ ownsRound: false, lockPending: true });
+    await waitFor(() => expect(second.result.current.lockPending).toBe(false), { timeout: STANDUP_LOCK_GRACE_MS + 1000 });
+    expect(second.result.current.ownsRound).toBe(false);
+    first.unmount();
     second.unmount();
   });
 });

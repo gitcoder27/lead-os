@@ -3,6 +3,7 @@ import type { TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import { cleanFlagReason, type DayStats } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
 import { Avatar } from './StandupPrimitives';
+import { YouTag } from '@/components/team-tracker/YouTag';
 
 export const STATUS_OPTIONS: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];
 export const STATUS_LABELS: Record<TrackerDeveloperStatus, string> = {
@@ -61,6 +62,7 @@ export function StandupPersonHeader({
           <div className="flex flex-wrap items-center gap-2">
             <h2 data-standup-person tabIndex={-1} className="break-words text-[20px] font-semibold leading-7 outline-none" style={{ color: 'var(--text-primary)' }}>
               {day.developer.displayName}
+              <YouTag show={day.developer.isSelf} />
             </h2>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">

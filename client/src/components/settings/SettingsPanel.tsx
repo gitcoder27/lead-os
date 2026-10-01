@@ -63,6 +63,7 @@ import { SettingsDataSection } from '@/components/settings/SettingsDataSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
+import { SelfLinkAction } from '@/components/settings/SelfLinkAction';
 import { TeamModeSection } from '@/components/settings/TeamModeSection';
 import { DayRhythmSection } from '@/components/settings/DayRhythmSection';
 import { AttentionRulesSection } from '@/components/settings/AttentionRulesSection';
@@ -1636,6 +1637,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       >
                                         {member.jiraAccountId || member.source !== 'manual' ? 'Jira linked' : 'Manual'}
                                       </span>
+                                      <SelfLinkAction member={member} disabled={teamActionLoading} />
                                     </div>
                                   </div>
                                   <button

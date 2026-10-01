@@ -2,6 +2,7 @@ import { TriangleAlert, Bell, Check, ListChecks } from 'lucide-react';
 import type { TrackerDeveloperDay } from '@/types';
 import { TrackerStatusPill } from '../TrackerStatusPill';
 import { Avatar, Kbd } from './StandupPrimitives';
+import { YouTag } from '@/components/team-tracker/YouTag';
 
 /**
  * docs/50 §3: roster in board order. Current = accent bar + ring; reviewed =
@@ -56,7 +57,7 @@ export function StandupRail({
               type="button"
               role="option"
               aria-selected={active}
-              aria-label={`${day.developer.displayName}${isReviewed ? ', visited' : ''}${isReviewed && !acknowledged.has(id) ? ', not saved' : ''}${isFlagged ? ', flagged' : ''}`}
+              aria-label={`${day.developer.displayName}${day.developer.isSelf ? ' (you)' : ''}${isReviewed ? ', visited' : ''}${isReviewed && !acknowledged.has(id) ? ', not saved' : ''}${isFlagged ? ', flagged' : ''}`}
               tabIndex={active ? 0 : -1}
               title={day.developer.displayName}
               onClick={() => onSelect(id)}
@@ -84,6 +85,7 @@ export function StandupRail({
                   style={{ color: isReviewed && !active ? 'var(--text-secondary)' : 'var(--text-primary)' }}
                 >
                   {day.developer.displayName}
+                  <YouTag show={day.developer.isSelf} />
                 </span>
                 <span className="mt-1 flex items-center gap-1.5">
                   {day.status !== 'on_track' && <TrackerStatusPill status={day.status} />}

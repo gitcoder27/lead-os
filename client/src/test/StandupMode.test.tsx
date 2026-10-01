@@ -444,6 +444,18 @@ describe('StandupMode', () => {
     expect(screen.getByTestId('status-suggestion')).toBeInTheDocument();
   });
 
+  it('marks the manager\'s own row as You, and no one else', () => {
+    const board = buildBoard();
+    board.developers[0]!.developer = { ...board.developers[0]!.developer, isSelf: true };
+    renderStandup(board);
+    // The person header carries the tag, the rail names it for screen readers; Bob has neither.
+    expect(screen.getAllByText('You').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole('option', { name: /Alice Smith \(you\)/ })).toBeInTheDocument();
+    const bob = screen.getByRole('option', { name: /Bob Jones/ });
+    expect(bob).not.toHaveAccessibleName(/you/i);
+    expect(within(bob).queryByText('You')).toBeNull();
+  });
+
   describe('switching people stays quick and steady (docs/standup switch)', () => {
     const empty: StandupFeedResponse = { entries: [], windowStart: '2026-03-06T09:00:00Z', windowHours: 24 };
     const threePeople = () => {

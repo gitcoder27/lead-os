@@ -33,6 +33,7 @@ import { getSignalBadges, type SignalTone } from './TrackerSignalBadges';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
 import { STATUS_META, StatusDot } from './TrackerStatusPill';
 import { formatCompactRelative } from './trackerItemFormat';
+import { YouTag } from '@/components/team-tracker/YouTag';
 
 /**
  * Developer drawer building blocks. Same visual language as the task detail
@@ -243,6 +244,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: Dev
             title={day.developer.displayName}
           >
             {day.developer.displayName}
+            <YouTag show={day.developer.isSelf} />
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
             <StatusControl day={day} date={date} tasks={tasks} readOnly={readOnly} />

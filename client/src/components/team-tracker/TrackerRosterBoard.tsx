@@ -20,6 +20,7 @@ import {
 } from './rosterSignals';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { YouTag } from '@/components/team-tracker/YouTag';
 
 interface TrackerRosterBoardProps {
   date: string;
@@ -351,6 +352,7 @@ function RosterRow({
         <div className="min-w-0">
           <div className="truncate text-[13.5px] font-semibold leading-5 tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }} title={name}>
             {name}
+            <YouTag show={day.developer.isSelf} />
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             <TrackerStatusMark status={day.status} />

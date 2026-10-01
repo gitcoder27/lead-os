@@ -83,10 +83,10 @@ export class TodayPlanService {
     const inboxDefinition: TaskViewDefinition = { filters: { lane: "inbox" }, sort: "created" };
 
     const [planned, active, done, inboxCount, pinnedRows, tomorrowRows] = await Promise.all([
-      this.views.run(principal, planDefinition, date),
-      this.views.run(principal, activeDefinition, date),
-      this.views.run(principal, doneDefinition, date),
-      this.views.count(principal, inboxDefinition, date),
+      this.views.run(principal, planDefinition, date, tz),
+      this.views.run(principal, activeDefinition, date, tz),
+      this.views.run(principal, doneDefinition, date, tz),
+      this.views.count(principal, inboxDefinition, date, tz),
       this.taskService.top3Rows(principal.accountId, date, principal.workspaceId),
       this.taskService.top3Rows(principal.accountId, tomorrow, principal.workspaceId),
     ]);

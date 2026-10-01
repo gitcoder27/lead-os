@@ -7,6 +7,7 @@ import { TaskKeysService } from "../services/task-keys.service";
 import { TaskService, taskCreateSchema, taskExpectedSchema, taskUpdateSchema, taskLinkSchema, type TaskPrincipal } from "../services/task.service";
 import { TaskViewsService, decodeTaskViewDefinition } from "../services/task-views.service";
 import { todayIsoDate } from "../utils/date";
+import { isValidTimeZone } from "../services/today-clock";
 import type { Request } from "express";
 
 const key = z.string().trim().regex(/^[Tt]-\d{1,9}$/);
@@ -36,10 +37,12 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
   const tasks = new TaskService();
   const views = new TaskViewsService();
   const principal = (req: Request): TaskPrincipal => ({ type: "manager", accountId: req.auth!.user.accountId, workspaceId: req.auth!.user.workspaceId });
+  // The manager's zone when the client sends one; otherwise the server's, as before.
+  const viewZone = (req: Request): string | undefined => (isValidTimeZone(req.query.tz as string | undefined) ? (req.query.tz as string) : undefined);
   const assertCanonical = async (req: Request) => {
     if (!(await keys.canonicalEnabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Canonical tasks are not enabled");
   };
-  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional(), viewDef: z.string().max(8000).optional(), today: isoDate.optional() }) })), async (req, res, next) => {
+  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional(), viewDef: z.string().max(8000).optional(), today: isoDate.optional(), tz: z.string().max(64).optional() }) })), async (req, res, next) => {
     try {
       await assertCanonical(req);
       const actor = principal(req);
@@ -47,7 +50,7 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
       // over the legacy `view` enum and is gated on tasks_phase3_enabled.
       if (req.query.viewDef) {
         if (!(await keys.phase3Enabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Task views are not enabled");
-        res.json({ tasks: await views.run(actor, decodeTaskViewDefinition(req.query.viewDef as string), req.query.today as string | undefined) });
+        res.json({ tasks: await views.run(actor, decodeTaskViewDefinition(req.query.viewDef as string), req.query.today as string | undefined, viewZone(req)) });
         return;
       }
       const rows = await tasks.list(actor, req.query as Parameters<TaskService["list"]>[1]);
@@ -58,12 +61,12 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
     try { await assertCanonical(req); const actor = principal(req); res.status(201).json(await tasks.toDto(await tasks.create(req.body, actor), actor)); } catch (error) { next(error); }
   });
   // docs/49 §10: rail counts for every built-in and saved view, one pass.
-  router.get("/view-counts", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ today: isoDate.optional() }) })), async (req, res, next) => {
+  router.get("/view-counts", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ today: isoDate.optional(), tz: z.string().max(64).optional() }) })), async (req, res, next) => {
     try {
       await assertCanonical(req);
       if (!(await keys.phase3Enabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Task views are not enabled");
       const today = (req.query.today as string | undefined) ?? todayIsoDate();
-      res.json({ today, counts: await views.counts(principal(req), today) });
+      res.json({ today, counts: await views.counts(principal(req), today, viewZone(req)) });
     } catch (error) { next(error); }
   });
   // docs/49 §10 (D8): atomic per-task patches — bulk actions and their undo.

@@ -32,14 +32,19 @@ describe("Today targets for follow-ups and meetings", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("a due follow-up opens the Waiting view (queue row, promise and header metric)", async () => {
+  it("a due follow-up opens its own task; nothing claims it is in Waiting, which excludes follow-ups I owe myself (docs/63 #4)", async () => {
     const task = await taskService.create({ title: "Chase QA", scheduledOn: "2026-03-07", followUpAt: "2026-03-07T03:30:00.000Z", labels: ["category:follow_up"] }, principal);
     const today = await service().getToday("manager-1", "2026-03-08", undefined, { tz: "UTC" });
 
     const row = today.actionItems.find((item) => item.type === "follow_up_due")!;
-    expect(row.target).toMatchObject({ type: "follow_up", view: "tasks", taskView: "waiting", taskKey: task.taskKey });
-    expect(today.promises[0]!.target).toMatchObject({ view: "tasks", taskView: "waiting", taskKey: task.taskKey });
-    expect(today.summary.find((metric) => metric.id === "promises")?.target).toMatchObject({ view: "tasks", taskView: "waiting" });
+    expect(row.target).toMatchObject({ type: "follow_up", view: "tasks", taskKey: task.taskKey });
+    expect(row.target.taskView).toBeUndefined();
+    expect(today.promises[0]!.target).toMatchObject({ view: "tasks", taskKey: task.taskKey });
+    expect(today.promises[0]!.target.taskView).toBeUndefined();
+    // The count covers follow-ups the Waiting lens would not list, so it names no list: a click focuses the queue.
+    const metric = today.summary.find((entry) => entry.id === "promises")!;
+    expect(metric.value).toBe(1);
+    expect(metric.target).toBeUndefined();
     expect(JSON.stringify(today)).not.toContain('"view":"follow-ups"');
   });
 

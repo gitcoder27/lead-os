@@ -262,6 +262,14 @@ describe("Today plan (P3-01)", () => {
     expect(honolulu).toMatchObject({ overdue: true });
   });
 
+  it("admits an open, inactive deadline-only task on the manager's day, not the server's (docs/63 #4)", async () => {
+    // 2026-03-08T16:00Z is 01:00 on the 9th in Tokyo (after today) but 06:00 on the 8th in Honolulu.
+    const key = await add("Deadline only", { scheduledOn: null, dueAt: "2026-03-08T16:00:00.000Z" });
+    const keys = async (tz: string) => (await getToday(testApp, tz)).focus.plan.items.map((item: { taskKey: string }) => item.taskKey);
+    expect(await keys("Asia/Tokyo")).toEqual([]);
+    expect(await keys("Pacific/Honolulu")).toEqual([key]);
+  });
+
   it("drops a pin once the task is delegated, parked or waiting, and brings it back when it is mine again", async () => {
     await db.insert(developers).values({ accountId: "dev-1", displayName: "Dev One", isActive: 1 });
     const delegated = await add("Hand off", { scheduledOn: DATE });

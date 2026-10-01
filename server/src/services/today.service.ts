@@ -730,6 +730,7 @@ export class TodayService {
           { ...buildFollowUpCreateParams(date, actionTarget, title, request.preset, tz), source: "today" },
           undefined,
           workspaceId,
+          { tz, today: date },
         );
         return commandResponse(command.kind, actionTarget, followUp.result, {
           label: "Undo",
@@ -819,6 +820,7 @@ export class TodayService {
       },
       canonical ? meetingTarget.taskKey : undefined,
       workspaceId,
+      { tz, today: request.date },
     );
     return followUp;
   }
@@ -835,6 +837,7 @@ export class TodayService {
     params: FollowUpCreateParams,
     parentTaskKey: string | undefined,
     workspaceId?: string,
+    clock?: { tz: string; today: string },
   ): Promise<CreatedFollowUp> {
     const taskKeys = new TaskKeysService();
     if (await taskKeys.phase3Enabled(workspaceId).catch(() => false)) {
@@ -845,6 +848,8 @@ export class TodayService {
         {
           text: params.title,
           confirm: true,
+          // The manager's zone and day, so a typed `tomorrow`/`fri` resolves where they are, not where the server is.
+          ...(clock ? { tz: clock.tz, clientToday: clock.today } : {}),
           defaults: {
             scheduledOn: params.date,
             labels: ["category:follow_up"],
@@ -1058,7 +1063,7 @@ function buildSummary(params: {
       ? metric("due-work", "Due today", params.dueToday, "defects", params.dueToday > 0 ? "warning" : "neutral", target("view", "work", { filter: "dueToday" }))
       : undefined,
     params.deskAvailable
-      ? metric("promises", "Follow-ups", params.followUpsDue, "due now", params.followUpsDue > 0 ? "warning" : "neutral", target("view", "tasks", { taskView: "waiting" }))
+      ? metric("promises", "Follow-ups", params.followUpsDue, "due now", params.followUpsDue > 0 ? "warning" : "neutral")
       : undefined,
   ];
 
@@ -1388,10 +1393,18 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionIt
   return rows;
 }
 
+/**
+ * A follow-up row opens its own task. The Waiting lens holds only follow-ups that wait on someone (docs/51 F1),
+ * while Today also counts the ones I owe myself, so a view is named only when there is no task to open.
+ */
+function followUpView(item: Pick<ManagerDeskItem, "taskKey">): { taskView?: "waiting" } {
+  return item.taskKey ? {} : { taskView: "waiting" };
+}
+
 function buildFollowUpActions(items: ManagerDeskItem[], clock: DayClock): TodayActionItem[] {
   const date = clock.date;
   return items.map((item) => {
-    const actionTarget = target("follow_up", "tasks", { taskView: "waiting",
+    const actionTarget = target("follow_up", "tasks", { ...followUpView(item),
       managerDeskItemId: item.id,
       taskKey: item.taskKey ?? undefined,
       date: item.originDate || date,
@@ -1606,7 +1619,7 @@ function buildTeamPulse(
 
 function buildPromiseItem(item: ManagerDeskItem, clock: DayClock): TodayPromiseItem {
   const date = clock.date;
-  const promiseTarget = target("follow_up", "tasks", { taskView: "waiting",
+  const promiseTarget = target("follow_up", "tasks", { ...followUpView(item),
     managerDeskItemId: item.id,
     taskKey: item.taskKey ?? undefined,
     date: item.originDate || date,
@@ -1677,7 +1690,7 @@ function buildStandupPrompts(
       };
     });
   const promisePrompts = followUps.slice(0, 2).map((item) => {
-    const promiseTarget = target("follow_up", "tasks", { taskView: "waiting", managerDeskItemId: item.id, taskKey: item.taskKey ?? undefined, date: item.originDate || date });
+    const promiseTarget = target("follow_up", "tasks", { ...followUpView(item), managerDeskItemId: item.id, taskKey: item.taskKey ?? undefined, date: item.originDate || date });
     return {
       id: `standup-follow-up-${item.id}`,
       title: item.title,

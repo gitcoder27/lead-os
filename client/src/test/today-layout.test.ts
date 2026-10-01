@@ -189,6 +189,20 @@ describe('since-last-visit strip', () => {
     expect(chips[3]?.target).toBeUndefined();
   });
 
+  it('links a lone follow-up that came due but names no list for several (Waiting excludes the ones I owe myself)', () => {
+    const promise = (id: number) => ({
+      id: `promise-${id}`, title: `Chase ${id}`, detail: '', severity: 'warning' as const,
+      target: { type: 'follow_up' as const, view: 'tasks' as const, taskKey: `T-${id}` },
+      primaryAction: { kind: 'mark_done' as const, label: 'Done', target: { type: 'follow_up' as const, view: 'tasks' as const, taskKey: `T-${id}` } },
+      secondaryActions: [],
+    });
+    const one = deltaChips({ ...base, followUpsNewlyDue: { count: 1, items: [promise(1)] } }, '2026-03-08').find((chip) => chip.id === 'followUpsNewlyDue');
+    expect(one?.target).toMatchObject({ taskKey: 'T-1' });
+    const many = deltaChips({ ...base, followUpsNewlyDue: { count: 2, items: [promise(1), promise(2)] } }, '2026-03-08').find((chip) => chip.id === 'followUpsNewlyDue');
+    expect(many?.label).toBe('2 follow-ups came due');
+    expect(many?.target).toBeUndefined();
+  });
+
   it('is empty without a baseline', () => {
     expect(deltaChips({ ...base, since: undefined }, '2026-03-08')).toEqual([]);
   });

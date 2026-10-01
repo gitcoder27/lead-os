@@ -329,4 +329,21 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
     expect(titles).toContain("A's task");
     expect(titles).not.toContain("B's task");
   });
+
+  it("buckets deadlines on the manager's day when the client sends its zone (docs/63 #4)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    // 2026-03-08T16:00Z is 01:00 on the 9th in Tokyo but 06:00 on the 8th in Honolulu.
+    const task = await createTask(headers, { title: "Deadline only", dueAt: "2026-03-08T16:00:00.000Z" });
+    const view = encodeViewDef({ filters: { horizon: "today" } });
+    const titles = async (tz: string) => (await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${view}&today=2026-03-08&tz=${encodeURIComponent(tz)}`, headers })).body.tasks.map((t: { taskKey: string }) => t.taskKey);
+    expect(await titles("Asia/Tokyo")).toEqual([]);
+    expect(await titles("Pacific/Honolulu")).toEqual([task.taskKey]);
+    // An unknown zone is ignored (the server's zone applies) rather than rejected.
+    expect((await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${view}&today=2026-03-08&tz=Not/AZone`, headers })).status).toBe(200);
+    // The rail counts take the same zone.
+    const counts = async (tz: string) => (await invoke(app, { method: "GET", url: `/api/tasks/view-counts?today=2026-03-08&tz=${encodeURIComponent(tz)}`, headers })).body.counts.today.count;
+    expect(await counts("Asia/Tokyo")).toBe(0);
+    expect(await counts("Pacific/Honolulu")).toBe(1);
+  });
 });

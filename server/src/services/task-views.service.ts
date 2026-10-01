@@ -110,13 +110,13 @@ function hasVisibleWaitingOn(row: TaskRow, principal?: TaskPrincipal): boolean {
  * docs/57 §1: the row's lifecycle lane (the shared `taskLane` rule). With a principal, a waiting-on
  * party that is not theirs to see does not make the row "waiting".
  */
-export function taskRowLane(row: TaskRow, today: string, principal?: TaskPrincipal): TaskLane {
+export function taskRowLane(row: TaskRow, today: string, principal?: TaskPrincipal, tz?: string): TaskLane {
   return taskLane({
     status: row.status,
     later: row.later === 1,
     hideUntil: row.hideUntil,
     scheduledOn: row.scheduledOn,
-    dueDate: isoDatePart(row.dueAt) ?? null,
+    dueDate: isoDatePart(row.dueAt, tz) ?? null,
     ownerType: row.ownerType,
     needsTriage: row.needsTriage === 1,
     waiting: hasVisibleWaitingOn(row, principal),
@@ -130,15 +130,15 @@ interface RowFacts {
   jiraLinked: Set<number> | null;
 }
 
-export function taskSignals(row: TaskRow, facts: RowFacts, today: string): TaskSignals {
+export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string): TaskSignals {
   const open = OPEN_STATUSES.has(row.status);
-  const plan = taskPlanDate(row);
+  const plan = taskPlanDate(row, tz);
   const overdue = open && plan.date !== null && plan.date < today;
-  const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt)!;
+  const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
   const idleDays = daysBetween(lastActivity, today);
   const stale = open && idleDays >= TASK_STALE_DAYS;
-  const followUpDate = isoDatePart(row.followUpAt);
-  const waitingSince = isoDatePart(row.waitingSince);
+  const followUpDate = isoDatePart(row.followUpAt, tz);
+  const waitingSince = isoDatePart(row.waitingSince, tz);
   return {
     overdue,
     overdueDays: overdue ? daysBetween(plan.date!, today) : null,
@@ -193,9 +193,9 @@ function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSigna
 export function matchesTaskViewFilters(
   row: TaskRow,
   filters: TaskViewFilters,
-  context: { principal: TaskPrincipal; today: string; facts: RowFacts; signals: TaskSignals },
+  context: { principal: TaskPrincipal; today: string; facts: RowFacts; signals: TaskSignals; tz?: string },
 ): boolean {
-  const { principal, today, facts, signals } = context;
+  const { principal, today, facts, signals, tz } = context;
   if (row.deletedAt) return false;
   if (filters.owner !== undefined) {
     const owner = filters.owner;
@@ -225,12 +225,12 @@ export function matchesTaskViewFilters(
     if (!row.closedAt) return false;
     // docs/51 F6: the local close date, not the UTC slice — same convention
     // as `dueAt` bucketing via isoDatePart.
-    const closedDate = isoDatePart(row.closedAt)!;
+    const closedDate = isoDatePart(row.closedAt, tz)!;
     if (filters.closed.from && closedDate < filters.closed.from) return false;
     if (filters.closed.to && closedDate > filters.closed.to) return false;
   } else if (filters.withClosed && row.closedAt) {
     // Open rows always match; a closed row only inside the bounded range.
-    const closedDate = isoDatePart(row.closedAt)!;
+    const closedDate = isoDatePart(row.closedAt, tz)!;
     if (filters.withClosed.from && closedDate < filters.withClosed.from) return false;
     if (filters.withClosed.to && closedDate > filters.withClosed.to) return false;
   } else if (row.closedAt && filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
@@ -242,12 +242,12 @@ export function matchesTaskViewFilters(
   }
   if (filters.jiraDrift !== undefined && signals.drift !== filters.jiraDrift) return false;
   if (filters.staleDays !== undefined) {
-    const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt)!;
+    const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
     if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
   }
-  if (filters.lane && taskRowLane(row, today, principal) !== filters.lane) return false;
+  if (filters.lane && taskRowLane(row, today, principal, tz) !== filters.lane) return false;
   if (filters.horizon) {
-    const plan = taskPlanDate(row).date;
+    const plan = taskPlanDate(row, tz).date;
     if (!plan) return false;
     if (filters.horizon === "today" ? plan > today : plan <= today) return false;
   }
@@ -263,8 +263,8 @@ export function matchesTaskViewFilters(
   return true;
 }
 
-function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"]): TaskRow[] {
-  const planKey = (row: TaskRow) => taskPlanDate(row).date ?? "9999-12-31";
+function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"], tz?: string): TaskRow[] {
+  const planKey = (row: TaskRow) => taskPlanDate(row, tz).date ?? "9999-12-31";
   // docs/51 F7: inside a plan-date bucket a manual rank wins; rows that were
   // never ordered (NULL) keep their startsAt/createdAt order after it.
   const byPosition = (a: TaskRow, b: TaskRow) => {
@@ -400,25 +400,28 @@ export class TaskViewsService {
     };
   }
 
-  private matching(principal: TaskPrincipal, rows: TaskRow[], definition: TaskViewDefinition, facts: RowFacts, today: string) {
+  private matching(principal: TaskPrincipal, rows: TaskRow[], definition: TaskViewDefinition, facts: RowFacts, today: string, tz?: string) {
     const filters = definition.filters ?? {};
     const matched: { row: TaskRow; signals: TaskSignals }[] = [];
     for (const row of rows) {
-      const signals = taskSignals(row, facts, today);
-      if (matchesTaskViewFilters(row, filters, { principal, today, facts, signals })) matched.push({ row, signals });
+      const signals = taskSignals(row, facts, today, tz);
+      if (matchesTaskViewFilters(row, filters, { principal, today, facts, signals, tz })) matched.push({ row, signals });
     }
     return matched;
   }
 
-  private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string) {
+  private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string, tz?: string) {
     const rows = await this.candidateRows(principal, definition.filters ?? {}, today);
     const facts = await this.facts(principal, rows, today, needsJiraLinks([definition]));
-    return this.matching(principal, rows, definition, facts, today);
+    return this.matching(principal, rows, definition, facts, today, tz);
   }
 
-  /** Execute a validated view definition — batched link/event lookups, no per-row scans. */
-  async run(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate()): Promise<TaskViewTask[]> {
-    const matched = await this.evaluate(principal, definition, today);
+  /**
+   * Execute a validated view definition — batched link/event lookups, no per-row scans. `tz` is the
+   * manager's IANA zone: deadlines and timestamps are bucketed on their day, not the server's.
+   */
+  async run(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<TaskViewTask[]> {
+    const matched = await this.evaluate(principal, definition, today, tz);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
     // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
     const meetingIds = matched.filter((entry) => entry.row.kind === "meeting").map((entry) => entry.row.id);
@@ -435,14 +438,14 @@ export class TaskViewsService {
       }
       for (const [id, actions] of byParent) signalsById.get(id)!.actions = actions;
     }
-    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort);
+    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, tz);
     const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
     return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)! }));
   }
 
   /** How many tasks a definition matches, without building DTOs. */
-  async count(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate()): Promise<number> {
-    return (await this.evaluate(principal, definition, today)).length;
+  async count(principal: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<number> {
+    return (await this.evaluate(principal, definition, today, tz)).length;
   }
 
   /**
@@ -451,7 +454,7 @@ export class TaskViewsService {
    * range or the drift window) and one batched facts pass. A saved view with
    * an open-ended `closed.to` range falls back to its own bounded query.
    */
-  async counts(principal: TaskPrincipal, today = todayIsoDate()): Promise<Record<string, TaskViewCount>> {
+  async counts(principal: TaskPrincipal, today = todayIsoDate(), tz?: string): Promise<Record<string, TaskViewCount>> {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const views = await this.list(principal.accountId, principal.workspaceId, today);
     let closedFloor = shiftDays(today, -JIRA_DRIFT_CLOSED_WINDOW_DAYS);
@@ -470,8 +473,8 @@ export class TaskViewsService {
     for (const view of views) {
       const closed = view.definition.filters?.closed;
       const matched = closed && !closed.from
-        ? await this.evaluate(principal, view.definition, today)
-        : this.matching(principal, universe, view.definition, facts, today);
+        ? await this.evaluate(principal, view.definition, today, tz)
+        : this.matching(principal, universe, view.definition, facts, today, tz);
       counts[view.id] = {
         count: matched.length,
         overdue: matched.filter((entry) => entry.signals.overdue).length,

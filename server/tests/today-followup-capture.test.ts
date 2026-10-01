@@ -93,6 +93,19 @@ describe("Today follow-ups through capture (P3-05)", () => {
     expect([...created.labels].sort()).toEqual(["category:follow_up", "vendors"]);
   });
 
+  it("resolves typed dates on the manager's day and zone, not the server's (docs/63 #4)", async () => {
+    // 20:00Z on the 8th is already the 9th in Kolkata (the dev machine's zone) but still the 8th in Honolulu.
+    vi.setSystemTime(new Date("2026-03-08T20:00:00.000Z"));
+    const response = await todayService().executeCommand("manager-1", command({
+      date: "2026-03-08",
+      tz: "Pacific/Honolulu",
+      title: "Chase the vendor !due:tomorrow",
+      command: { kind: "capture_follow_up", label: "Follow up", target: { type: "view", view: "team" } },
+    }), manager);
+    // "tomorrow" is the 9th for the manager, so the deadline is the end of the 9th in Honolulu (UTC-10).
+    expect((response.result as { dueAt: string }).dueAt).toBe("2026-03-10T09:59:59.999Z");
+  });
+
   it("rejects a title the grammar can't resolve, and creates nothing", async () => {
     await expect(todayService().executeCommand("manager-1", followUpCommand("Ask @ghost about it"), manager))
       .rejects.toMatchObject({ status: 400, message: expect.stringContaining("ghost") });

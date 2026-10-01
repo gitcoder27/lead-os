@@ -3,12 +3,13 @@ import { z } from "zod";
 import type { ManagerActionCommandRequest, ManagerActionSurface } from "shared/types";
 import { validate } from "../middleware/validate";
 import { TodayService } from "../services/today.service";
+import { calendarDate } from "./calendar-date";
 
-const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+const realDate = calendarDate;
 
 const getActionsSchema = z.object({
   query: z.object({
-    date: z.string().regex(dateRegex, "date must be YYYY-MM-DD"),
+    date: realDate("date must be YYYY-MM-DD"),
     surface: z.enum(["today", "header"]).optional(),
     limit: z.coerce.number().int().min(1).max(50).optional(),
   }),
@@ -41,7 +42,7 @@ const actionTargetSchema = z.object({
   trackerItemId: z.number().int().positive().optional(),
   taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
   taskView: z.string().max(64).optional(),
-  date: z.string().regex(dateRegex, "target date must be YYYY-MM-DD").optional(),
+  date: realDate("target date must be YYYY-MM-DD").optional(),
   filter: z.string().optional(),
   panel: z.string().optional(),
   mode: z.literal("standup").optional(),
@@ -66,7 +67,7 @@ const actionCommandSchema = z.object({
   target: actionTargetSchema,
   confirm: z.boolean().optional(),
   undoable: z.boolean().optional(),
-  toDate: z.string().regex(dateRegex, "toDate must be YYYY-MM-DD").optional(),
+  toDate: realDate("toDate must be YYYY-MM-DD").optional(),
 });
 
 const taskKeySchema = z.string().trim().regex(/^[Tt]-\d{1,9}$/);
@@ -95,7 +96,7 @@ const restoreSchema = z.discriminatedUnion("type", [
       status: z.enum(["open", "active", "blocked", "done", "dropped"]).optional(),
       followUpAt: isoOrNull.optional(),
       outcome: z.string().nullable().optional(),
-      scheduledOn: z.string().regex(dateRegex).nullable().optional(),
+      scheduledOn: realDate("scheduledOn must be YYYY-MM-DD").nullable().optional(),
     }).strict(),
     alsoDeleteDeskItemId: z.number().int().positive().optional(),
     alsoDeleteTaskKey: taskKeySchema.optional(),
@@ -110,7 +111,7 @@ const commandSchema = z.object({
   params: z.any().optional(),
   body: z.object({
     command: actionCommandSchema,
-    date: z.string().regex(dateRegex, "date must be YYYY-MM-DD"),
+    date: realDate("date must be YYYY-MM-DD"),
     title: z.string().optional(),
     outcome: z.string().optional(),
     preset: z.enum(["later_today", "tomorrow", "next_week"]).optional(),

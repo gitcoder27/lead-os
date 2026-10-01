@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { encodeTaskViewDefinition } from '@/lib/task-views';
+import { getLocalTimeZone } from '@/lib/utils';
 import type {
   SaveTaskViewRequest,
   TaskSavedView,
@@ -11,6 +12,12 @@ import type {
   TaskViewTasksResponse,
   UpdateTaskViewRequest,
 } from '@/types';
+
+/** docs/63 #4: the manager's zone rides along, so a deadline lands on the same day here as on Today. */
+function zoneParam(): string {
+  const zone = getLocalTimeZone();
+  return zone ? `&tz=${encodeURIComponent(zone)}` : '';
+}
 
 /**
  * Phase 3 (P3-D9/D10): task view hooks. `useTaskViews` lists built-ins plus
@@ -36,7 +43,7 @@ export function useTaskViewTasks(definition: TaskViewDefinition | undefined, ena
   return useQuery({
     queryKey: ['tasks', scope, 'view', encoded, today ?? null],
     queryFn: () =>
-      api.get<TaskViewTasksResponse>(`/tasks?viewDef=${encodeURIComponent(encoded)}${today ? `&today=${today}` : ''}`),
+      api.get<TaskViewTasksResponse>(`/tasks?viewDef=${encodeURIComponent(encoded)}${today ? `&today=${today}` : ''}${zoneParam()}`),
     enabled: enabled && Boolean(definition),
     staleTime: 10_000,
     // docs/49 R5: keep the previous list on screen while a new view loads.
@@ -49,7 +56,7 @@ export function useTaskViewCounts(enabled: boolean, today: string) {
   const scope = useAuthScopeKey();
   return useQuery({
     queryKey: ['task-view-counts', scope, today],
-    queryFn: () => api.get<TaskViewCountsResponse>(`/tasks/view-counts?today=${today}`),
+    queryFn: () => api.get<TaskViewCountsResponse>(`/tasks/view-counts?today=${today}${zoneParam()}`),
     enabled,
     staleTime: 15_000,
     placeholderData: keepPreviousData,

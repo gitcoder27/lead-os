@@ -3,12 +3,13 @@ import { z } from "zod";
 import { TASK_KEY_PATTERN, TODAY_TOP_LIMIT, type SetTodayTop3Request, type UpdateTodayRhythmSettingsRequest } from "shared/types";
 import { validate } from "../middleware/validate";
 import { TodayService } from "../services/today.service";
+import { calendarDate } from "./calendar-date";
 
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be HH:MM (24h)");
 
 const dateQuerySchema = z.object({
   query: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
+    date: calendarDate(),
     // docs/53 F5: manager IANA zone; an unknown zone falls back to the server's.
     tz: z.string().max(64).optional(),
   }),
@@ -34,7 +35,7 @@ const rhythmSettingsSchema = z.object({
   ),
 });
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD");
+const isoDate = calendarDate();
 
 const top3Schema = z.object({
   query: z.any().optional(),

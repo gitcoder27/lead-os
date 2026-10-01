@@ -120,6 +120,22 @@ describe("today routes", () => {
     expect(response.body?.error).toContain("date must be YYYY-MM-DD");
   });
 
+  it("rejects dates that have the shape but name no real day, on every Today entry point (docs/63 #4)", async () => {
+    const cookie = await managerCookie();
+    const app = createTestApp();
+    for (const date of ["2026-02-31", "2026-13-01", "2026-00-10", "2025-02-29"]) {
+      expect((await invoke(app, { method: "GET", url: `/api/today?date=${date}`, headers: { cookie } })).status, `GET today ${date}`).toBe(400);
+      expect((await invoke(app, { method: "GET", url: `/api/manager-actions?date=${date}`, headers: { cookie } })).status, `GET actions ${date}`).toBe(400);
+      expect((await invoke(app, { method: "PUT", url: "/api/today/top3", headers: { cookie }, body: { date, taskKeys: [] } })).status, `PUT top3 ${date}`).toBe(400);
+      const command = { kind: "snooze", label: "Snooze", target: { type: "view", view: "team" } };
+      expect((await invoke(app, { method: "POST", url: "/api/manager-actions/commands", headers: { cookie }, body: { date, command } })).status, `POST command ${date}`).toBe(400);
+      expect((await invoke(app, { method: "POST", url: "/api/manager-actions/commands", headers: { cookie }, body: { date: "2026-03-08", command: { ...command, toDate: date } } })).status, `POST toDate ${date}`).toBe(400);
+    }
+    // A leap day is real.
+    expect((await invoke(app, { method: "GET", url: "/api/today?date=2028-02-29", headers: { cookie } })).status).toBe(200);
+    expect((await invoke(app, { method: "PUT", url: "/api/today/top3", headers: { cookie }, body: { date: "2028-02-29", taskKeys: [] } })).status).toBe(200);
+  });
+
   it("GET /api/manager-actions returns the header action queue without calm fallback rows", async () => {
     const cookie = await managerCookie();
     const response = await invoke(createTestApp(), {

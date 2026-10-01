@@ -373,9 +373,9 @@ export function deltaChips(delta: TodayDelta | undefined, date: string): TodayDe
       id: 'followUpsNewlyDue',
       label: `${plural(followUpsNewlyDue.count, 'follow-up')} came due`,
       tone: 'warning',
-      target: followUpsNewlyDue.count === 1 && followUpsNewlyDue.items[0]
-        ? followUpsNewlyDue.items[0].target
-        : { type: 'view', view: 'tasks', taskView: 'waiting', date },
+      // Several follow-ups have no single list that holds exactly them (Waiting excludes the ones I owe
+      // myself), so only a lone follow-up is a link; the queue has the rest.
+      target: followUpsNewlyDue.count === 1 && followUpsNewlyDue.items[0] ? followUpsNewlyDue.items[0].target : undefined,
       detail: followUpsNewlyDue.items.map((item) => item.title).join(', '),
     });
   }

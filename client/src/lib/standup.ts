@@ -31,13 +31,16 @@ export interface StandupTask {
 
 const OPENISH = new Set(['open', 'active', 'blocked']);
 
-/** Open work in board position order — the j/k navigation set. */
+/**
+ * Open work in board position order — the j/k navigation set. The current task (status `active`) always comes
+ * first, so a person's standup opens on what they are doing now; the rest keep their board order.
+ */
 export function openTasksFor(day: TrackerDeveloperDay | undefined): StandupTask[] {
   if (!day) return [];
   if (day.tasks?.length) {
     return day.tasks
       .filter((task): task is SurfaceTask => OPENISH.has(task.status) && !task.checkInRequest)
-      .sort((left, right) => left.position - right.position)
+      .sort((left, right) => Number(right.status === 'active') - Number(left.status === 'active') || left.position - right.position)
       .map((task) => ({
         taskKey: task.taskKey,
         title: task.title,

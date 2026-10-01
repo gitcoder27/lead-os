@@ -125,10 +125,6 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     setSelectedTaskKey(session.taskKey);
     setView(session.request ? 'wrapup' : session.view ?? 'person');
   }, [session.roundId, session.currentId, session.taskKey, session.request, session.view, ordered]);
-  useEffect(() => {
-    const focus = window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>('[data-standup-person]')?.focus(), 0);
-    return () => window.clearTimeout(focus);
-  }, [rootRef, currentId, view]);
   const [layer, setLayer] = useState<StandupLayer>('none');
   const [pendingStatus, setPendingStatus] = useState<TrackerDeveloperStatus | null>(null);
   const [statusPreselect, setStatusPreselect] = useState<string[]>([]);
@@ -207,6 +203,19 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const stats = useMemo(() => (day ? dayStats(day, date) : null), [day, date]);
   const taskIndex = Math.max(0, openTasks.findIndex((task) => task.taskKey === selectedTaskKey));
   const focusedTask = openTasks[taskIndex];
+  // Moving to a person puts the keyboard on their first task (the current one, which sorts first), so j/k, e, u
+  // and Enter work at once. The name only takes focus where there is no task to land on (and in the wrap-up).
+  const landingTaskKey = useRef<string | undefined>(undefined);
+  landingTaskKey.current = view === 'person' ? focusedTask?.taskKey : undefined;
+  // Also re-land when the first row appears (the board arriving after the screen, or a person's first task added).
+  const hasLandingRow = Boolean(landingTaskKey.current);
+  useEffect(() => {
+    const focus = window.setTimeout(() => {
+      const row = landingTaskKey.current ? taskRowRefs.current.get(landingTaskKey.current) : undefined;
+      (row ?? rootRef.current?.querySelector<HTMLElement>('[data-standup-person]'))?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(focus);
+  }, [rootRef, currentId, view, hasLandingRow]);
   const setTaskIndex = (index: number) => {
     const taskKey = openTasks[index]?.taskKey;
     setSelectedTaskKey(taskKey);

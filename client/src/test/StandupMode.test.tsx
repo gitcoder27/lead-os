@@ -347,7 +347,8 @@ describe('StandupMode', () => {
 
   it('moves real task focus and leaves native button Enter unclaimed', async () => {
     renderStandup();
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Alice Smith' })).toHaveFocus());
+    // Opening lands on the first task, not the name.
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
     fireEvent.keyDown(document.activeElement!, { key: 'j' });
     await waitFor(() => expect(taskRows()[1]).toHaveFocus());
     const next = screen.getByRole('button', { name: 'Next developer' });
@@ -355,7 +356,57 @@ describe('StandupMode', () => {
     expect(fireEvent.keyDown(next, { key: 'Enter' })).toBe(true);
     expect(mockOnOpenTask).not.toHaveBeenCalled();
     fireEvent.click(next);
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Bob Jones' })).toHaveFocus());
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+  });
+
+  describe('landing on a person (docs: standup switch)', () => {
+    const withCurrentLast = () => {
+      const board = buildBoard();
+      board.developers[1] = day({
+        id: 2,
+        developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true },
+        tasks: [
+          surfaceTask({ id: 4, taskKey: 'T-4', title: 'Planned first', ownerId: 'dev-2', status: 'open', position: 0 }),
+          surfaceTask({ id: 5, taskKey: 'T-5', title: 'Blocked second', ownerId: 'dev-2', status: 'blocked', position: 1 }),
+          surfaceTask({ id: 6, taskKey: 'T-6', title: 'In progress now', ownerId: 'dev-2', status: 'active', position: 2 }),
+        ],
+      });
+      return board;
+    };
+
+    it('puts keyboard focus on the first task after ← / →, never on the name', async () => {
+      renderStandup(withCurrentLast());
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      expect(screen.getByRole('heading', { name: 'Bob Jones' })).not.toHaveFocus();
+      expect(taskRows()[0]).toHaveAttribute('aria-selected', 'true');
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+      await waitFor(() => expect(screen.getByRole('listbox', { name: "Alice Smith's tasks" })).toBeInTheDocument());
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    });
+
+    it('lists the current task first, then the rest in board order, and selects it on arrival', async () => {
+      renderStandup(withCurrentLast());
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      await waitFor(() => expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument());
+      const rows = taskRows();
+      expect(rows.map((row) => within(row).getByText(/^T-\d+$/).textContent)).toEqual(['T-6', 'T-4', 'T-5']);
+      expect(within(rows[0]!).getByText('Current')).toBeInTheDocument();
+      await waitFor(() => expect(rows[0]).toHaveFocus());
+      // j walks the same order the screen shows.
+      fireEvent.keyDown(document.activeElement!, { key: 'j' });
+      await waitFor(() => expect(taskRows()[1]).toHaveFocus());
+    });
+
+    it('falls back to the name only when the person has no open task', async () => {
+      const board = buildBoard();
+      board.developers[1] = day({ id: 2, developer: { accountId: 'dev-2', displayName: 'Bob Jones', isActive: true }, tasks: [] });
+      renderStandup(board);
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Bob Jones' })).toHaveFocus());
+    });
   });
 
   it('starts a new identity on a second round without carrying flags or drafts', async () => {

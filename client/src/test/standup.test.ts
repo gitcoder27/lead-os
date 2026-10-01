@@ -71,6 +71,22 @@ describe('standup tasks & day stats', () => {
     expect(doneTodayFor(alice)).toEqual([{ taskKey: 'T-4', title: 'Closed today' }]);
   });
 
+  it('puts the current task first wherever it sits on the board, keeping board order for the rest', () => {
+    const later = day({
+      tasks: [
+        task({ id: 1, taskKey: 'T-1', status: 'open', position: 0 }),
+        task({ id: 2, taskKey: 'T-2', status: 'blocked', position: 1 }),
+        task({ id: 3, taskKey: 'T-3', status: 'active', position: 2 }),
+        task({ id: 4, taskKey: 'T-4', status: 'open', position: 3 }),
+      ],
+    });
+    expect(openTasksFor(later).map((entry) => entry.taskKey)).toEqual(['T-3', 'T-1', 'T-2', 'T-4']);
+    expect(dayStats(later, '2026-03-07').current?.taskKey).toBe('T-3');
+    // With nothing current the board order stands.
+    const none = day({ tasks: [task({ id: 1, taskKey: 'T-1', status: 'open', position: 1 }), task({ id: 2, taskKey: 'T-2', status: 'open', position: 0 })] });
+    expect(openTasksFor(none).map((entry) => entry.taskKey)).toEqual(['T-2', 'T-1']);
+  });
+
   it('falls back to legacy tracker items when tasks are absent', () => {
     const legacy = day({
       currentItem: { id: 1, dayId: 1, originDate: '2026-03-07', taskKey: 'T-9', lifecycle: 'tracker_only', itemType: 'custom', title: 'Legacy', state: 'in_progress', position: 0, createdAt: '', updatedAt: '' },

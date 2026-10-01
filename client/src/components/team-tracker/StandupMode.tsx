@@ -677,13 +677,21 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const progress = ordered.length ? reviewedCount / ordered.length : 0;
   const allReviewed = ordered.length > 0 && reviewedCount === ordered.length;
 
-  const actionGroups: StandupActionGroup[] = [{ label: 'Standup', actions: [
-    { keys: ['←'], label: 'Previous', onRun: () => moveDeveloper(-1), disabled: devIndex === 0 },
-    { keys: ['→'], label: 'Next', onRun: () => moveDeveloper(1) },
-    { keys: ['u'], label: 'Update', onRun: actions.update, disabled: !focusedTask },
-    { keys: ['c'], label: 'Note', onRun: actions.checkIn },
-    { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
-  ] }];
+  // The footer carries only what a standup uses constantly; the rest lives behind "?" (the full shortcut sheet).
+  const actionGroups: StandupActionGroup[] = [
+    { label: 'Person', actions: [
+      { keys: ['←'], label: 'Previous', onRun: () => moveDeveloper(-1), disabled: devIndex === 0 },
+      { keys: ['→'], label: 'Next', onRun: () => moveDeveloper(1) },
+      { keys: ['c'], label: 'Note', onRun: actions.checkIn },
+      { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
+    ] },
+    { label: 'Task', actions: [
+      { keys: ['.'], label: 'Current', onRun: actions.setCurrent, disabled: !focusedTask || focusedTask.status === 'active' },
+      { keys: ['e'], label: 'Done', onRun: actions.done, disabled: !focusedTask },
+      { keys: ['b'], label: 'Blocked', onRun: actions.blocked },
+      { keys: ['u'], label: 'Update', onRun: actions.update, disabled: !focusedTask },
+    ] },
+  ];
 
   if (!day || !stats || !ownsRound) {
     return createPortal(

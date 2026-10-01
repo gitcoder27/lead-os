@@ -1130,6 +1130,31 @@ describe('StandupMode', () => {
       }
     });
 
+    it('the footer shows the handful of shortcuts a standup uses all the time, and no more', () => {
+      renderStandup();
+      const bar = screen.getByTestId('standup-action-bar');
+      const chips = within(bar).getAllByRole('button').map((button) => button.getAttribute('title'));
+      expect(chips).toEqual([
+        'Previous (←)', 'Next (→)', 'Note (c)', 'Flag (f)',
+        'Current (.)', 'Done (e)', 'Blocked (b)', 'Update (u)',
+      ]);
+    });
+
+    it('the Current, Done and Blocked chips run what . e and b run', () => {
+      renderStandup();
+      const bar = () => screen.getByTestId('standup-action-bar');
+      // Alice's first task is already current, so there is nothing to make current.
+      expect(within(bar()).getByRole('button', { name: /Current/ })).toBeDisabled();
+      fireEvent.keyDown(document.body, { key: 'j' });
+      expect(within(bar()).getByRole('button', { name: /Current/ })).toBeEnabled();
+      fireEvent.click(within(bar()).getByRole('button', { name: /Current/ }));
+      expect(mockSetCurrentMutate).toHaveBeenCalledWith('T-2', expect.anything());
+      fireEvent.click(within(bar()).getByRole('button', { name: /Done/ }));
+      expect(mockUpdateTaskMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
+      fireEvent.click(within(bar()).getByRole('button', { name: /Blocked/ }));
+      expect(screen.getByRole('dialog', { name: /Alice Smith/ })).toBeInTheDocument();
+    });
+
     it('action bar chips run the same handlers as keys', () => {
       renderStandup();
       const bar = screen.getByTestId('standup-action-bar');

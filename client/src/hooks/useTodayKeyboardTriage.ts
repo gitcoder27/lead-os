@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { resolveTriageKey, shouldIgnoreTriageEvent } from '@/lib/today-triage';
+import { focusedRowId, resolveTriageKey, triageOwnsEvent } from '@/lib/today-triage';
 import type { TodayActionCommand, TodayActionItem } from '@/types';
 
 interface UseTodayKeyboardTriageOptions {
@@ -16,6 +16,10 @@ interface UseTodayKeyboardTriageOptions {
 /**
  * docs/53 U4: j/k/Enter/e/s/f/c/z on Today. The active row is tracked by id
  * so optimistic removals keep the cursor on the next row, not a stale index.
+ *
+ * docs/63 #3: the cursor and real focus move together. Keys act on the row
+ * that has focus (else the cursor row), only from the page or the queue, and
+ * Enter/Space on a focused button is left to the browser.
  */
 export function useTodayKeyboardTriage({ items, enabled, onOpen, onRunCommand, onUndo }: UseTodayKeyboardTriageOptions) {
   const [activeId, setActiveId] = useState<string | undefined>();
@@ -43,17 +47,24 @@ export function useTodayKeyboardTriage({ items, enabled, onOpen, onRunCommand, o
   useEffect(() => {
     if (!enabled) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (shouldIgnoreTriageEvent(event)) return;
+      if (!triageOwnsEvent(event)) return;
       const current = handlers.current;
-      const item = current.activeIndex >= 0 ? current.items[current.activeIndex] : undefined;
+      // A focused row is the target, wherever the cursor was left.
+      const focusedId = focusedRowId(event.target);
+      const focusedIndex = focusedId === undefined ? -1 : current.items.findIndex((entry) => entry.id === focusedId);
+      const index = focusedIndex >= 0 ? focusedIndex : current.activeIndex;
+      // Focus on something that is not a top-level row (a group's member) acts on no row at all.
+      const item = focusedId !== undefined && focusedIndex < 0 ? undefined : index >= 0 ? current.items[index] : undefined;
       const intent = resolveTriageKey(event.key, item);
       if (!intent) return;
       if (intent.type === 'move') {
         if (current.items.length === 0) return;
         event.preventDefault();
-        const from = current.activeIndex < 0 ? (intent.delta > 0 ? -1 : current.items.length) : current.activeIndex;
+        const from = index < 0 ? (intent.delta > 0 ? -1 : current.items.length) : index;
         const next = Math.min(Math.max(from + intent.delta, 0), current.items.length - 1);
-        setActiveId(current.items[next]?.id);
+        const nextId = current.items[next]?.id;
+        setActiveId(nextId);
+        if (nextId) focusRow(nextId);
         return;
       }
       if (intent.type === 'undo') {
@@ -73,4 +84,10 @@ export function useTodayKeyboardTriage({ items, enabled, onOpen, onRunCommand, o
   }, [enabled]);
 
   return { activeId: activeIndex >= 0 ? activeId : undefined, setActiveId };
+}
+
+/** Moves real focus (and the scroll position) to a queue row's link. */
+function focusRow(id: string) {
+  const row = Array.from(document.querySelectorAll('[data-today-queue] [data-row-id]')).find((node) => node.getAttribute('data-row-id') === id);
+  row?.querySelector<HTMLElement>('[data-row-link]')?.focus();
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTodayQueueView, resolveTriageKey, shouldIgnoreTriageEvent } from '@/lib/today-triage';
+import { buildTodayQueueView, focusedRowId, resolveTriageKey, shouldIgnoreTriageEvent, triageOwnsEvent } from '@/lib/today-triage';
 import { getTodayFreshness } from '@/lib/today-freshness';
 import type { TodayActionCommand, TodayActionItem } from '@/types';
 
@@ -105,5 +105,55 @@ describe('getTodayFreshness (docs/53 U8)', () => {
       lastErrorMessage: 'Network down',
     });
     expect(getTodayFreshness({ dataUpdatedAt: 1000, errorUpdatedAt: 3000, failedPolls: 2, error })).toMatchObject({ state: 'stale', updatedAt: 1000 });
+  });
+});
+
+describe('triageOwnsEvent (docs/63 #3)', () => {
+  const fixture = () => {
+    document.body.innerHTML = `
+      <header><button id="header-btn">Refresh</button></header>
+      <div data-today-queue>
+        <div data-row-id="row-1"><button id="row-link" data-row-link>Open</button><button id="row-primary">Done</button></div>
+        <div data-testid="today-group"><div data-row-id="group:a"></div>
+          <div class="today-group-members"><div data-row-id="member-1"><button id="member-btn">Ask</button></div></div></div>
+        <button id="more">+3 more</button>
+      </div>
+      <aside><button id="panel-carry">Carry</button></aside>
+      <input id="field" />`;
+    return (id: string) => document.getElementById(id)!;
+  };
+  const key = (k: string, target: EventTarget | null) => ({ key: k, metaKey: false, ctrlKey: false, altKey: false, defaultPrevented: false, target });
+
+  it('owns keys from the page itself (nothing focused, or no DOM target)', () => {
+    fixture();
+    expect(triageOwnsEvent(key('e', document.body))).toBe(true);
+    expect(triageOwnsEvent(key(' ', document.body))).toBe(true);
+    expect(triageOwnsEvent(key('j', window))).toBe(true);
+  });
+
+  it('leaves Enter and Space to a focused button or link inside the queue', () => {
+    const el = fixture();
+    expect(triageOwnsEvent(key(' ', el('row-primary')))).toBe(false);
+    expect(triageOwnsEvent(key('Enter', el('row-link')))).toBe(false);
+    expect(triageOwnsEvent(key(' ', el('more')))).toBe(false);
+    // Letter shortcuts still work from a focused row.
+    expect(triageOwnsEvent(key('e', el('row-link')))).toBe(true);
+    expect(triageOwnsEvent(key('j', el('row-primary')))).toBe(true);
+  });
+
+  it('does not act on the queue from a control outside it, or from a field', () => {
+    const el = fixture();
+    for (const id of ['panel-carry', 'header-btn', 'field']) {
+      for (const k of ['e', 's', 'f', 'c', 'j', 'Enter', ' ']) expect(triageOwnsEvent(key(k, el(id)))).toBe(false);
+    }
+  });
+
+  it('finds the row that holds focus, including a group member', () => {
+    const el = fixture();
+    expect(focusedRowId(el('row-primary'))).toBe('row-1');
+    expect(focusedRowId(el('member-btn'))).toBe('member-1');
+    expect(focusedRowId(el('more'))).toBeUndefined();
+    expect(focusedRowId(document.body)).toBeUndefined();
+    expect(focusedRowId(window)).toBeUndefined();
   });
 });

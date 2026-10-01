@@ -124,7 +124,7 @@
 }
 
 .notes-day-row:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -319,7 +319,7 @@
 }
 
 .notes-nav-button:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -459,7 +459,7 @@
 }
 
 .notes-context-toggle:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -499,7 +499,7 @@
 }
 
 .notes-context-chip:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -1048,7 +1048,7 @@
 }
 
 .notes-from-row:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
@@ -1211,7 +1211,7 @@
 .notes-ghost-button:focus-visible,
 .notes-icon-button:focus-visible,
 .notes-link-button:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -1414,7 +1414,7 @@
 }
 
 .notes-wrapup-choices button:focus-visible {
-  outline: 2px solid var(--border-active);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 0;
 }
 

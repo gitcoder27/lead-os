@@ -12,9 +12,10 @@ export type TodayTriageIntent =
   | { type: 'undo' };
 
 export const TODAY_TRIAGE_KEYS: Array<{ keys: string[]; label: string }> = [
-  { keys: ['j', 'k'], label: 'Move down / up' },
-  { keys: ['Enter'], label: 'Open' },
-  { keys: ['e', 'Space'], label: 'Primary action' },
+  { keys: ['j', 'k', '↓', '↑'], label: 'Move down / up' },
+  { keys: ['Enter'], label: 'Open (a focused button keeps its own action)' },
+  { keys: ['e'], label: 'Primary action' },
+  { keys: ['Space'], label: 'Primary action when no button is focused' },
   { keys: ['s'], label: 'Snooze to tomorrow' },
   { keys: ['f'], label: 'Follow up' },
   { keys: ['c'], label: 'Check-in' },
@@ -70,6 +71,34 @@ export function shouldIgnoreTriageEvent(event: Pick<KeyboardEvent, 'metaKey' | '
   if (!target || typeof target.closest !== 'function') return false;
   if (target.isContentEditable) return true;
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"], [role="menu"]'));
+}
+
+const ACTIVATION_KEYS = new Set(['Enter', ' ']);
+const NATIVE_CONTROLS = 'a[href], button, summary, select, [role="button"], [role="menuitem"], [role="tab"], [role="switch"], [role="checkbox"], [role="link"]';
+
+function isPageTarget(target: unknown): boolean {
+  if (!target || typeof (target as Element).closest !== 'function') return true;
+  return target === document.body || target === document.documentElement;
+}
+
+/**
+ * docs/63 #3: triage may act only when the keyboard is on the page itself or
+ * inside the queue. A focused control in the side panel, header or a dialog
+ * keeps its own keys, and Enter/Space on any focused button or link stays the
+ * browser's native activation — never a second action on another row.
+ */
+export function triageOwnsEvent(event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'defaultPrevented' | 'target'>): boolean {
+  if (shouldIgnoreTriageEvent(event)) return false;
+  if (isPageTarget(event.target)) return true;
+  const target = event.target as Element;
+  if (!target.closest('[data-today-queue]')) return false;
+  return !(ACTIVATION_KEYS.has(event.key) && target.closest(NATIVE_CONTROLS));
+}
+
+/** The queue row that holds the keyboard, when focus sits inside one. */
+export function focusedRowId(target: EventTarget | null): string | undefined {
+  if (isPageTarget(target)) return undefined;
+  return (target as Element).closest('[data-row-id]')?.getAttribute('data-row-id') ?? undefined;
 }
 
 // ── docs/53 F13: honest totals + in-place expansion ──────────────────────

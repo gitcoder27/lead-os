@@ -656,7 +656,7 @@ function TodayPartialDataNotice({
   return (
     <div className="today-notice" role="status">
       <p>{unavailable.join(', ') || 'Some sources'} unavailable — showing what loaded.</p>
-      <button type="button" onClick={onRetry} disabled={isFetching} className="ui-btn-ghost" style={{ color: 'var(--warning)' }}>
+      <button type="button" onClick={onRetry} disabled={isFetching} className="ui-btn-ghost" style={{ color: 'var(--warning-text)' }}>
         {isFetching ? 'Retrying…' : 'Retry'}
       </button>
     </div>

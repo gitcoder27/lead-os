@@ -213,6 +213,78 @@ describe('TodayPage V2', () => {
     expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-1' }));
   });
 
+  describe('keyboard ownership (docs/63 #3)', () => {
+    const rowsOf = () => screen.getAllByTestId('today-action-row');
+
+    it('j and k move real focus to the row, so Tab and native activation continue from it', async () => {
+      mockFetch(todayResponse());
+      renderToday();
+      await screen.findByRole('heading', { name: 'Queue' });
+
+      fireEvent.keyDown(window, { key: 'j' });
+      expect(document.activeElement).toBe(within(rowsOf()[0]!).getByText('AM-1 Issue 1').closest('button'));
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+      expect(document.activeElement).toBe(rowsOf()[1]!.querySelector('[data-row-link]'));
+      expect(rowsOf()[1]).toHaveAttribute('data-keyboard-active', 'true');
+      fireEvent.keyDown(document.activeElement!, { key: 'k' });
+      expect(document.activeElement).toBe(rowsOf()[0]!.querySelector('[data-row-link]'));
+    });
+
+    it('Space on a focused button is never a second action on the cursor row', async () => {
+      mockFetch(todayResponse());
+      const { onOpenTodayTarget } = renderToday(todayResponse(), vi.fn());
+      await screen.findByRole('heading', { name: 'Queue' });
+
+      // Cursor on row 2 (a confirm-gated Done), focus then Tabs to row 1's own button.
+      fireEvent.keyDown(window, { key: 'j' });
+      fireEvent.keyDown(window, { key: 'j' });
+      const rowOneButton = within(rowsOf()[0]!).getByRole('button', { name: 'Open issue' });
+      rowOneButton.focus();
+      fireEvent.keyDown(rowOneButton, { key: ' ' });
+      fireEvent.keyDown(rowOneButton, { key: 'Enter' });
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(onOpenTodayTarget).not.toHaveBeenCalled();
+    });
+
+    it('a letter shortcut acts on the focused row, not the row the cursor was left on', async () => {
+      mockFetch(todayResponse());
+      const { onOpenTodayTarget } = renderToday(todayResponse(), vi.fn());
+      await screen.findByRole('heading', { name: 'Queue' });
+
+      fireEvent.keyDown(window, { key: 'j' });
+      fireEvent.keyDown(window, { key: 'j' }); // cursor: row 2
+      const link = rowsOf()[0]!.querySelector<HTMLElement>('[data-row-link]')!;
+      link.focus();
+      fireEvent.keyDown(link, { key: 'e' });
+
+      expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ issueKey: 'AM-1' }));
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('does not run queue shortcuts from a control in the side panel', async () => {
+      const oneOnOne = target({ type: 'developer', developerAccountId: 'dev-9', panel: 'one-on-one' });
+      const response = todayResponse();
+      response.actionItems = [
+        ...response.actionItems,
+        actionItem(40, { id: 'one-on-one-1', type: 'one_on_one', title: '1:1 with Ayan today', target: oneOnOne, primaryAction: command('open', 'Open 1:1', oneOnOne), secondaryActions: [] }),
+      ];
+      mockFetch(response);
+      const { onOpenTodayTarget } = renderToday(response, vi.fn());
+      await screen.findByRole('heading', { name: 'Queue' });
+
+      fireEvent.keyDown(window, { key: 'j' });
+      const panel = screen.getByRole('complementary');
+      const control = within(panel).getAllByRole('button')[0]!;
+      control.focus();
+      for (const key of ['e', 's', 'f', 'c', ' ', 'Enter']) fireEvent.keyDown(control, { key });
+
+      expect(onOpenTodayTarget).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
   it('runs undoable writes without confirm, offers a 6s Undo, and z posts the restore (docs/53 F11)', async () => {
     const followUpTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: 44, date: '2026-03-08' });
     const undoRequest = {

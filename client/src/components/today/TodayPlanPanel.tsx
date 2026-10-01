@@ -86,7 +86,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
                 <button type="button" className="today-row-link" onClick={() => onRunCommand(openCommand(item.target))}>
                   <span className="today-row-title-line"><span className="today-row-title">{item.title}</span></span>
                   {detail ? (
-                    <span className="today-row-meta" style={detail.overdue ? { color: 'var(--warning)' } : undefined}>{detail.text}</span>
+                    <span className="today-row-meta" style={detail.overdue ? { color: 'var(--warning-text)' } : undefined}>{detail.text}</span>
                   ) : null}
                 </button>
                 <span className="today-row-actions">

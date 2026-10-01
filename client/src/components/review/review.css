@@ -139,7 +139,7 @@
   background: var(--bg-tertiary);
 }
 
-.review-phone-step-btn:focus-visible { outline: 2px solid var(--border-active); outline-offset: 1px; }
+.review-phone-step-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* ── Frame: rail + main ──────────────────────────────────────────────── */
 
@@ -199,7 +199,7 @@
 }
 
 .review-step:hover { background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent); color: var(--text-primary); }
-.review-step:focus-visible { outline: 2px solid var(--border-active); outline-offset: -1px; }
+.review-step:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
 
 .review-step[aria-current='step'] {
   color: var(--text-primary);
@@ -386,7 +386,7 @@
 
 .review-check:checked { background: var(--accent-solid); box-shadow: none; }
 .review-check:checked::after { transform: rotate(45deg) scale(1); }
-.review-check:focus-visible { outline: 2px solid var(--border-active); outline-offset: 2px; }
+.review-check:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 .review-row-body { display: block; min-width: 0; }
 
@@ -398,7 +398,7 @@
   text-align: left;
 }
 
-.review-row-title-btn:focus-visible { outline: 2px solid var(--border-active); outline-offset: 1px; }
+.review-row-title-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 .review-row-title {
   display: block;

@@ -124,8 +124,9 @@
 }
 
 .notes-day-row:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary));
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .notes-day-row.selected {
@@ -1048,8 +1049,9 @@
 }
 
 .notes-from-row:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary));
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .notes-from-key {

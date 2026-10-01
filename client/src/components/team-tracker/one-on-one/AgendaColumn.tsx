@@ -239,7 +239,7 @@ function AgendaRow({
       }}
       // docs/54 D2/D3: the shared list-row idiom — hairline dividers, tint on
       // hover, keyboard ring on focus.
-      className="group flex min-h-[40px] items-start gap-2 border-b px-1.5 py-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)]"
+      className="group flex min-h-[40px] items-start gap-2 border-b px-1.5 py-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] ui-row-focus"
       style={{
         borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)',
         background: dragId === item.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : undefined,

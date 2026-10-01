@@ -282,6 +282,21 @@ body::after {
   .ui-btn { padding: 0 8px; }
 }
 
+/* ── Row selection / keyboard focus ───────────────────────────────────
+ * One idiom for a list row that is selected or holds keyboard focus: a soft accent tint and a thin accent bar
+ * on its left edge. Never a ring around the whole row (it reads as a hard box on dense lists).
+ */
+.ui-row-focus:focus-visible {
+  outline: none;
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* A composer or field group that holds focus: a faint 1px glow on its border, not an outline offset from it. */
+.ui-focus-within:focus-within {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 /* ── Tone + chips (docs/54 V6) ───────────────────────────────────────
  * A tone class sets `--tone`; chips, icons and avatar rings derive from it
  * so severity reads the same on every surface.

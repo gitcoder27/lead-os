@@ -162,7 +162,7 @@ export const TaskListRow = memo(function TaskListRow({
       tabIndex={focused ? 0 : -1}
       onClick={handleClick}
       onFocus={(event) => { if (event.target === event.currentTarget) handlers.onFocusRow(task.taskKey); }}
-      className="group relative cursor-pointer px-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)]"
+      className="group relative cursor-pointer px-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] ui-row-focus"
       style={{
         background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined,
       }}

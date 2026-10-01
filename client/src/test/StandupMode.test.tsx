@@ -569,10 +569,12 @@ describe('StandupMode', () => {
     }
   });
 
-  it('the shell turns the cyan focus ring off for task rows only', () => {
+  it('the shell drops the cyan focus ring for selectable rows and text fields, and keeps it for buttons and links', () => {
     const css = readFileSync(resolve(__dirname, '../components/team-tracker/standup/standup.css'), 'utf8');
-    expect(css).toMatch(/\.standup-shell \.standup-task-row:focus-visible \{\s*outline: none;/);
-    // Everything else in standup keeps the visible ring.
+    expect(css).toMatch(/\.standup-shell \[role='option'\]:focus-visible \{\s*outline: none;/);
+    expect(css).toMatch(/\.standup-shell textarea:focus-visible \{\s*outline: none;/);
+    expect(css).toMatch(/\.standup-shell input:focus-visible,\s*\.standup-shell select:focus-visible \{\s*outline: none;/);
+    // Everything else in standup (buttons, links) keeps the visible ring.
     expect(css).toMatch(/\.standup-shell :focus-visible \{\s*outline: 2px solid var\(--accent\)/);
   });
 

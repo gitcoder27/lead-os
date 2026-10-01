@@ -27,14 +27,21 @@ body.standup-open {
   outline-offset: 2px;
 }
 
+/* Selected rows (the tasks, the people rail) are marked by a soft tint and a left accent bar, which is also their
+   focus indicator; a 2px cyan ring around the whole row on top of that was too loud now that focus lands on them. */
 .standup-shell [role='option']:focus-visible {
-  outline-offset: -3px;
+  outline: none;
 }
 
-/* The selected task is marked by a soft tint and a left accent bar (StandupTaskList), which is also its focus
-   indicator; a 2px cyan ring around the whole row on top of that was too loud now that focus lands on it. */
-.standup-shell .standup-task-row:focus-visible {
+/* Text fields show focus with their caret and their container (the composer glows faintly), not an outline. */
+.standup-shell textarea:focus-visible {
   outline: none;
+}
+
+.standup-shell input:focus-visible,
+.standup-shell select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .standup-shell button, .standup-shell select { min-height: 36px; }

@@ -335,7 +335,7 @@ function RosterRow({
           onOpenDrawer(day.developer.accountId);
         }
       }}
-      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)] md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${ROSTER_GRID}`}
+      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${ROSTER_GRID}`}
       style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
       {railColor && (

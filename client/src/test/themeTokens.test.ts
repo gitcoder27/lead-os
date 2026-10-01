@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -109,12 +109,25 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });
 
-  it('every focus outline and the Today keyboard cursor use the opaque ring, not the translucent border', () => {
+  it('every remaining focus outline uses the opaque ring, not the translucent border; chip text is mixed toward the text colour', () => {
     expect(css).toMatch(/\.ui-chip \{[^}]*color-mix\(in srgb, var\(--tone, var\(--text-secondary\)\) 45%, var\(--text-primary\)\)/);
-    const today = src('components/today/today.css');
-    expect(today).toMatch(/data-keyboard-active='true'\] \{\s*box-shadow: inset 0 0 0 2px var\(--focus-ring\)/);
     for (const file of ['index.css', 'components/today/today.css', 'components/notes/notes.css', 'components/review/review.css']) {
       expect(src(file)).not.toMatch(/outline: 2px solid var\(--border-active\)/);
     }
+  });
+
+  it('no list row is selected or focused with a ring around the whole row; they share one tint-and-bar idiom', () => {
+    const walk = (dir: string): string[] => readdirSync(resolve(__dirname, '..', dir)).flatMap((name) => {
+      const rel = `${dir}/${name}`;
+      return statSync(resolve(__dirname, '..', rel)).isDirectory() ? walk(rel) : /\.(css|tsx)$/.test(name) ? [rel] : [];
+    });
+    const offenders = walk('components').filter((file) => /inset 0 0 0 2px|inset_0_0_0_2px/.test(src(file)));
+    expect(offenders).toEqual([]);
+    const css = src('index.css');
+    expect(css).toMatch(/\.ui-row-focus:focus-visible \{[^}]*outline: none;[^}]*box-shadow: inset 3px 0 0 var\(--accent\)/);
+    for (const file of ['components/tasks/TaskListRow.tsx', 'components/team-tracker/TrackerRosterBoard.tsx', 'components/team-tracker/one-on-one/AgendaColumn.tsx']) {
+      expect(src(file)).toContain('ui-row-focus');
+    }
+    expect(src('components/today/today.css')).toMatch(/data-keyboard-active='true'\] \{[^}]*inset 3px 0 0 var\(--accent\)/);
   });
 });

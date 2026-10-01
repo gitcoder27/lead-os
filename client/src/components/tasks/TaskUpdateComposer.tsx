@@ -246,7 +246,7 @@ function OwnedTaskUpdateComposer({
         }}
         className={
           quiet
-            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] outline-none transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] focus-visible:bg-[var(--bg-tertiary)] focus-visible:ring-2 focus-visible:ring-[var(--border-active)]'
+            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] outline-none transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] focus-visible:bg-[var(--bg-tertiary)]'
             : 'mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[12px] transition-colors'
         }
         style={{ color: 'var(--text-muted)', background: quiet ? undefined : 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
@@ -261,7 +261,7 @@ function OwnedTaskUpdateComposer({
 
   return (
     <div
-      className="mt-1 rounded-xl px-2 py-1.5"
+      className="ui-focus-within mt-1 rounded-xl px-2 py-1.5"
       style={{
         background: 'color-mix(in srgb, var(--bg-tertiary) 45%, transparent)',
         border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',

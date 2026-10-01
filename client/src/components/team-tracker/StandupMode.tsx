@@ -11,7 +11,7 @@ import { useStandupRound } from '@/hooks/useStandupRound';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import './standup/standup.css';
 import { api } from '@/lib/api';
-import { useLatestStandupSession, useStandupFeed } from '@/hooks/useTeamTracker';
+import { useLatestStandupSession, usePrefetchStandupFeeds, useStandupFeed } from '@/hooks/useTeamTracker';
 import {
   useAddCheckIn,
   useReassignTrackerItem,
@@ -229,8 +229,20 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const setCheckInVisibility = (visibility: TrackerCheckInVisibility) => changeNote({ visibility });
 
   const feed = useStandupFeed(accountId);
+  // Warm the next two people and the previous one, so the arrow keys land on data that is already there.
+  usePrefetchStandupFeeds(
+    [ordered[devIndex + 1], ordered[devIndex + 2], ordered[devIndex - 1]].flatMap((entry) => (entry ? [entry.developer.accountId] : [])),
+    view === 'person',
+  );
   const [feedForcedOpen, setFeedForcedOpen] = useState<string | null>(null);
-  const feedHidden = feedCollapsed || (feedForcedOpen !== accountId && feed.data?.entries.length === 0);
+  // The panel's width follows whether this person has changes. While their feed is still loading it keeps the
+  // previous person's state, so it never opens (skeleton) and then collapses — or the reverse — mid-switch.
+  const feedSettled = feed.data !== undefined || feed.isError;
+  const lastFeedHidden = useRef(false);
+  const feedHidden = feedCollapsed || (feedSettled ? feedForcedOpen !== accountId && feed.data?.entries.length === 0 : lastFeedHidden.current);
+  useEffect(() => {
+    if (feedSettled) lastFeedHidden.current = feedHidden;
+  }, [feedSettled, feedHidden]);
   useEffect(() => {
     if (!ownsRound || !accountId || view !== 'person' || suspended || layer !== 'none' || !feed.data?.windowEnd || feed.data.truncated || feed.isError || feed.data.entries.length > 0) return;
     if (session.feedSeenThrough?.[accountId]) return;
@@ -801,11 +813,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             </div>
           ) : (
             <div className={`grid grid-cols-1 lg:h-full ${feedHidden ? 'lg:grid-cols-[minmax(0,1fr)_auto]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]'}`}>
-              <motion.div
+              {/* No slide or fade on a person switch: a standup moves fast. The key resets scroll and local state. */}
+              <div
                 key={day.developer.accountId}
-                initial={reduceMotion ? false : { opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                 className="min-w-0 px-5 py-5 lg:overflow-y-auto lg:px-6"
               >
                 <div className="mx-auto max-w-[860px] space-y-5">
@@ -855,7 +865,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                     }
                   />
                 </div>
-              </motion.div>
+              </div>
 
               <aside
                 className={`min-w-0 border-t py-5 lg:flex lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 ${feedHidden ? 'px-2' : 'px-5'}`}

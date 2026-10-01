@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { registerSurfaceTaskIds, surfaceTaskToWorkItem } from '@/lib/surface-tasks';
@@ -56,15 +57,39 @@ export function useTeamTracker(date: string, query?: TeamTrackerBoardQuery, enab
   });
 }
 
+/** A feed younger than this is served from cache without a request (switching back and forth is free). */
+const STANDUP_FEED_STALE_MS = 30_000;
+
+function standupFeedOptions(accountId: string, authScopeKey: string) {
+  return {
+    queryKey: ['team-tracker', 'standup-feed', accountId, authScopeKey],
+    queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?${new URLSearchParams({ accountId, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}`),
+    staleTime: STANDUP_FEED_STALE_MS,
+  };
+}
+
 /** Phase 3 (P3-D5/D6, §6.1): rolling-window standup feed for one developer. */
 export function useStandupFeed(accountId: string | undefined, enabled = true) {
   const authScopeKey = useAuthScopeKey();
   return useQuery<StandupFeedResponse>({
-    queryKey: ['team-tracker', 'standup-feed', accountId, authScopeKey],
-    queryFn: () => api.get<StandupFeedResponse>(`/team-tracker/standup/feed?${new URLSearchParams({ accountId: accountId!, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}`),
+    ...standupFeedOptions(accountId ?? '', authScopeKey),
     refetchInterval: enabled ? 30_000 : false,
     enabled: enabled && Boolean(accountId),
   });
+}
+
+/**
+ * Loads the feeds of the people a standup is about to move to, so ←/→ lands on data that is already
+ * there (no wait, no panel opening and closing). Fresh feeds are skipped; nothing here polls.
+ */
+export function usePrefetchStandupFeeds(accountIds: readonly string[], enabled = true) {
+  const queryClient = useQueryClient();
+  const authScopeKey = useAuthScopeKey();
+  const ids = accountIds.join('|');
+  useEffect(() => {
+    if (!enabled) return;
+    for (const accountId of ids.split('|').filter(Boolean)) void queryClient.prefetchQuery(standupFeedOptions(accountId, authScopeKey));
+  }, [enabled, ids, authScopeKey, queryClient]);
 }
 
 /** docs/50 v2: the manager's most recent sealed standup — "previous round" recall. */

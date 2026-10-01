@@ -102,14 +102,9 @@ export function StandupFeed({
         if (element.clientHeight > 0 && element.scrollTop + element.clientHeight >= element.scrollHeight - 4 && !data?.truncated && !isError && !isLoading) onReadThrough?.();
       }}>
         {isLoading ? (
-          <div className="space-y-2" aria-busy="true" aria-label="Loading feed">
-            {[70, 55, 62].map((width) => (
-              <div key={width} className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                <div className="h-3 animate-pulse rounded" style={{ width: `${width}%`, background: 'var(--bg-tertiary)' }} />
-                <div className="mt-2 h-2.5 w-2/5 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)' }} />
-              </div>
-            ))}
-          </div>
+          // Calm and static: a pulsing skeleton on every person switch reads as flicker. Prefetching normally
+          // means this is never seen; when it is, it holds the space without moving.
+          <div aria-busy="true" aria-label="Loading feed" className="min-h-[120px]" />
         ) : isError ? (
           <div
             role="alert"

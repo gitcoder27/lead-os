@@ -63,8 +63,13 @@ vi.mock('@/hooks/useTeamMode', () => ({
   useSetTeamMode: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// A test can answer per person (e.g. one feed still loading); by default everyone gets `mockFeed`.
+let feedFor: ((accountId: string | undefined) => { data: StandupFeedResponse | undefined; isLoading: boolean; isError: boolean }) | null = null;
+const mockPrefetchFeeds = vi.fn();
+
 vi.mock('@/hooks/useTeamTracker', () => ({
-  useStandupFeed: () => ({ data: mockFeed, isLoading: false, isError: false }),
+  useStandupFeed: (accountId?: string) => (feedFor ? feedFor(accountId) : { data: mockFeed, isLoading: false, isError: false }),
+  usePrefetchStandupFeeds: (ids: string[], enabled?: boolean) => mockPrefetchFeeds(ids, enabled),
   useLatestStandupSession: () => ({ data: { session: mockLastSession }, isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 
@@ -246,6 +251,7 @@ function taskRows() {
 
 beforeEach(() => {
   teamModeMock.mode = 'collab';
+  feedFor = null;
   vi.clearAllMocks();
   mockApiPost.mockReset();
   mockApiPost.mockResolvedValue({ session: { id: 1 }, followUps: [] });
@@ -383,6 +389,79 @@ describe('StandupMode', () => {
     expect(screen.getByText('24h window')).toBeInTheDocument();
     // Suggestion badge renders for dev-1.
     expect(screen.getByTestId('status-suggestion')).toBeInTheDocument();
+  });
+
+  describe('switching people stays quick and steady (docs/standup switch)', () => {
+    const empty: StandupFeedResponse = { entries: [], windowStart: '2026-03-06T09:00:00Z', windowHours: 24 };
+    const threePeople = () => {
+      const board = buildBoard();
+      board.developers.push(day({
+        id: 3,
+        developer: { accountId: 'dev-3', displayName: 'Cara Diaz', isActive: true },
+        tasks: [surfaceTask({ id: 5, taskKey: 'T-5', title: 'Cara task', ownerId: 'dev-3', position: 0 })],
+      }));
+      return board;
+    };
+
+    it('asks to preload the next two people and the previous one, and follows the cursor', () => {
+      const board = threePeople();
+      renderStandup(board);
+      expect(mockPrefetchFeeds).toHaveBeenLastCalledWith(['dev-2', 'dev-3'], true);
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      expect(mockPrefetchFeeds).toHaveBeenLastCalledWith(['dev-3', 'dev-1'], true);
+    });
+
+    it('keeps the Changes panel open while the next person\'s feed loads, with no pulsing skeleton', () => {
+      feedFor = (id) => (id === 'dev-2' ? { data: undefined, isLoading: true, isError: false } : { data: mockFeed, isLoading: false, isError: false });
+      renderStandup();
+      expect(screen.getByRole('region', { name: 'Since last standup' })).toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      // The tasks switch at once; the panel neither collapses nor shows a pulsing skeleton while waiting.
+      expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+      const panel = screen.getByRole('region', { name: 'Since last standup' });
+      expect(within(panel).getByLabelText('Loading feed')).toBeInTheDocument();
+      expect(panel.querySelector('.animate-pulse')).toBeNull();
+    });
+
+    it('keeps the rail while the next feed loads when the previous person had no changes, then settles once', () => {
+      let bob: ReturnType<NonNullable<typeof feedFor>> = { data: undefined, isLoading: true, isError: false };
+      feedFor = (id) => (id === 'dev-2' ? bob : { data: empty, isLoading: false, isError: false });
+      const view = renderStandup();
+      // Alice has nothing: the panel is the slim rail.
+      expect(screen.queryByRole('region', { name: 'Since last standup' })).not.toBeInTheDocument();
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      // Bob is still loading: it must not pop open as a skeleton and collapse again.
+      expect(screen.queryByRole('region', { name: 'Since last standup' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading feed')).not.toBeInTheDocument();
+      // His feed arrives with changes: the panel opens exactly once.
+      bob = { data: mockFeed, isLoading: false, isError: false };
+      view.rerender(
+        <TestWrapper>
+          <StandupMode date="2026-03-07" board={buildBoard()} onClose={mockOnClose} onOpenTask={mockOnOpenTask} />
+        </TestWrapper>,
+      );
+      expect(screen.getByRole('region', { name: 'Since last standup' })).toBeInTheDocument();
+    });
+
+    it('shows a failed feed instead of hiding it behind the previous state', () => {
+      feedFor = (id) => (id === 'dev-2' ? { data: undefined, isLoading: false, isError: true } : { data: empty, isLoading: false, isError: false });
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      expect(screen.getByRole('alert')).toHaveTextContent('Feed unavailable');
+    });
+
+    it('swaps people without a slide or fade, as a fresh column that starts at the top', () => {
+      renderStandup();
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+      const tasks = screen.getByRole('listbox', { name: "Bob Jones's tasks" });
+      // Only the person column (up to <main>): the overlay itself fades in once, on open.
+      for (let node: HTMLElement | null = tasks; node && node.tagName !== 'MAIN'; node = node.parentElement) {
+        expect(node.getAttribute('style') ?? '').not.toMatch(/opacity|transform/);
+      }
+      // A fresh column per person: scroll starts at the top.
+      expect(tasks.closest<HTMLElement>('[class*="overflow-y-auto"]')?.scrollTop ?? 0).toBe(0);
+      expect(screen.getAllByText('Bob Jones').length).toBeGreaterThan(0);
+    });
   });
 
   it('keeps 1:1 reminders out of standup', () => {

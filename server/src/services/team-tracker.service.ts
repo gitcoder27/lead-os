@@ -81,6 +81,7 @@ import { isoDatePart, todayIsoDate } from "../utils/date";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService, type TaskEventActor, type TaskEventInput } from "./task-events.service";
 import { TaskService, type TaskPrincipal, type TaskRow } from "./task.service";
+import { SelfIdentityService } from "./self-identity.service";
 import { surfaceTaskToWorkItem } from "./task-view-models";
 import { TASK_KEY_PATTERN } from "shared/types";
 import { resolveTimeZone } from "./today-clock";
@@ -644,6 +645,16 @@ const ATTENTION_REASON_META: Record<
   waiting: { label: "Waiting", priority: 10 },
 };
 
+/** The freshness flags that ask the manager to chase someone: none apply to the manager's own row. */
+const SELF_ROW_QUIET = {
+  staleByTime: false,
+  staleWithOpenRisk: false,
+  staleWithoutCurrentWork: false,
+  statusChangeWithoutFollowUp: false,
+  untouched: false,
+  noCurrentTracked: false,
+} as const;
+
 function buildAttentionReasons(
   day: TrackerDeveloperDay
 ): TrackerAttentionReason[] {
@@ -964,6 +975,7 @@ export class TeamTrackerService {
 
   private readonly taskKeys = new TaskKeysService();
   private readonly tasks = new TaskService();
+  private readonly selfIdentity = new SelfIdentityService();
   private readonly eventsService = new TaskEventsService(this.taskKeys);
 
   private async emit(row: { taskKey: string | null; workspaceId: string; id: number }, event: Omit<TaskEventInput, "taskKey" | "workspaceId">, actor: TaskEventActor = { type: "system" }): Promise<void> {
@@ -1045,7 +1057,10 @@ export class TeamTrackerService {
       .sort((left, right) => left.developer.displayName.localeCompare(right.developer.displayName));
 
     const canonical = await this.taskKeys.canonicalEnabled(workspaceId);
-    const viewer: TaskPrincipal = { type: "manager", accountId: options?.managerAccountId ?? "", workspaceId };
+    const managerAccountId = options?.managerAccountId ?? "";
+    // "This is me": the viewer's own roster record also lists their own tasks, live days only.
+    const selfDeveloperId = viewMode === "history" ? undefined : await this.selfIdentity.linkedDeveloperId(managerAccountId, workspaceId);
+    const viewer: TaskPrincipal = { type: "manager", accountId: managerAccountId, workspaceId, ...(selfDeveloperId && { selfDeveloperId }) };
     const devDays = viewMode === "history"
       ? await Promise.all(
           activeDevelopers.map((developer) =>
@@ -3299,12 +3314,15 @@ export class TeamTrackerService {
     const scope = normalizeWorkspaceId(workspaceId);
     const principal = viewer ?? { type: "manager" as const, accountId: "", workspaceId: scope };
     const ownerIds = developerList.map((developer) => developer.accountId);
-    const [taskRows, days, notes, recent] = await Promise.all([
+    const selfId = principal.selfDeveloperId && ownerIds.includes(principal.selfDeveloperId) ? principal.selfDeveloperId : undefined;
+    const [boardRows, ownRows, days, notes, recent] = await Promise.all([
       this.tasks.developerBoardRows(ownerIds, date, scope, timeZone),
+      selfId ? this.tasks.managerBoardRows(principal.accountId, selfId, date, scope, timeZone) : Promise.resolve([]),
       db.select().from(teamTrackerDays).where(and(eq(teamTrackerDays.workspaceId, scope), inArray(teamTrackerDays.developerAccountId, ownerIds), lte(teamTrackerDays.date, date))).orderBy(desc(teamTrackerDays.date)),
       db.select().from(developerNotes).where(and(eq(developerNotes.workspaceId, scope), inArray(developerNotes.developerAccountId, ownerIds))),
       this.getRecentCheckInsByDeveloper(ownerIds, date, scope),
     ]);
+    const taskRows = [...boardRows, ...ownRows];
     const exactIds = days.filter((day) => day.date === date).map((day) => day.id);
     const [phase3, surfaceTasks, checkIns] = await Promise.all([
       this.taskKeys.phase3Enabled(scope),
@@ -3314,12 +3332,14 @@ export class TeamTrackerService {
     const surfaceByOwner = new Map<string, SurfaceTask[]>();
     const itemsByOwner = new Map<string, TrackerWorkItem[]>();
     for (const surfaceTask of surfaceTasks) {
-      const tasks = surfaceByOwner.get(surfaceTask.ownerId!) ?? [];
+      // My own manager-owned tasks sit on my roster row.
+      const owner = selfId && surfaceTask.ownerType === "manager" ? selfId : surfaceTask.ownerId!;
+      const tasks = surfaceByOwner.get(owner) ?? [];
       tasks.push(surfaceTask);
-      surfaceByOwner.set(surfaceTask.ownerId!, tasks);
-      const items = itemsByOwner.get(surfaceTask.ownerId!) ?? [];
+      surfaceByOwner.set(owner, tasks);
+      const items = itemsByOwner.get(owner) ?? [];
       items.push(surfaceTaskToWorkItem(surfaceTask));
-      itemsByOwner.set(surfaceTask.ownerId!, items);
+      itemsByOwner.set(owner, items);
     }
     const effectiveDayByOwner = new Map<string, typeof teamTrackerDays.$inferSelect>();
     for (const day of days) if (!effectiveDayByOwner.has(day.developerAccountId)) effectiveDayByOwner.set(day.developerAccountId, day);
@@ -3331,7 +3351,10 @@ export class TeamTrackerService {
       entries.push(mapCheckIn(checkIn));
       checkInsByDay.set(checkIn.dayId, entries);
     }
-    return developerList.map((developer) => {
+    return developerList.map((person) => {
+      const isSelf = person.accountId === selfId;
+      // Nobody chases themselves: my row is never on the check-in clock.
+      const developer = isSelf ? { ...person, isSelf: true, participates: false } : person;
       const day = effectiveDayByOwner.get(developer.accountId);
       const exact = day?.date === date ? day : undefined;
       const mapped = (itemsByOwner.get(developer.accountId) ?? []).sort((left, right) => left.position - right.position);
@@ -3345,6 +3368,7 @@ export class TeamTrackerService {
         ? [...(surfaceByOwner.get(developer.accountId) ?? [])].sort((left, right) => left.position - right.position).find((task) => task.status === "blocked")
         : undefined;
       const signals = buildSignals({ date, status, lastCheckInAt: day?.lastCheckInAt, statusUpdatedAt: day?.statusUpdatedAt, statusUpdatedBy: day?.statusUpdatedBy, updatedAt: day?.updatedAt ?? `${date}T00:00:00Z`, currentItem, plannedItems, config, participates: developer.participates, freshness: freshnessByOwner.get(developer.accountId) });
+      if (isSelf) Object.assign(signals.freshness, SELF_ROW_QUIET);
       return { id: exact?.id ?? 0, date, developer, availability: developer.availability ?? { state: "active" }, status,
         statusSuggestion: blockedTask ? { status: "blocked", reasonTaskKey: blockedTask.taskKey, reasonTaskTitle: blockedTask.title } : undefined,
         managerNotes: notesByOwner.get(developer.accountId), lastCheckInAt: day?.lastCheckInAt ?? undefined, nextFollowUpAt: day?.nextFollowUpAt ?? undefined,

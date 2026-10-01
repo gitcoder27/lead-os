@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
+import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
 import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
@@ -828,6 +828,34 @@ export class TaskService {
         sql`(${tasks.status} IN ('open','active','blocked') OR (${tasks.closedAt} >= ${start} AND ${tasks.closedAt} < ${end}))`
       ));
     return rows;
+  }
+
+  /**
+   * The manager's own tasks that belong on their own Team row ("This is me"): the same open-or-closed-
+   * today window as `developerBoardRows`, but only plain tasks that are theirs to do. Parked, waiting,
+   * meeting and 1:1 prep tasks stay off the board, as does anything linked to another person: a 1:1
+   * topic is private prep and never appears on a developer's row (docs/48 P0-S5), even my own.
+   */
+  async managerBoardRows(managerAccountId: string, selfDeveloperId: string, date: string, workspaceId?: string, timeZone?: string): Promise<TaskRow[]> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    parseInput(dateOnly, date);
+    const zone = resolveTimeZone(timeZone);
+    const start = zonedTimeToUtc(date, 0, 0, zone).toISOString();
+    const end = zonedTimeToUtc(addDaysToIsoDay(date, 1), 0, 0, zone).toISOString();
+    const rows = await db.select().from(tasks)
+      .where(and(
+        eq(tasks.workspaceId, scope),
+        eq(tasks.ownerType, "manager"),
+        eq(tasks.ownerId, managerAccountId),
+        eq(tasks.kind, "task"),
+        isNull(tasks.deletedAt),
+        isNull(tasks.waitingOnType),
+        sql`(${tasks.status} IN ('open','active','blocked') OR (${tasks.closedAt} >= ${start} AND ${tasks.closedAt} < ${end}))`,
+        sql`NOT EXISTS (SELECT 1 FROM one_on_one_agenda_items a WHERE a.task_id = ${tasks.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM task_links l WHERE l.task_id = ${tasks.id} AND l.kind = 'person' AND l.ref <> ${selfDeveloperId})`,
+      ));
+    const today = todayIsoDate();
+    return rows.filter((row) => !isTaskHidden({ later: row.later === 1, hideUntil: row.hideUntil }, today));
   }
 
   /**

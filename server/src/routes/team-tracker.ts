@@ -299,7 +299,8 @@ export function createTeamTrackerRouter(
         const signals = await oneOnOnes.dueSignals(req.auth!.user.workspaceId, date);
         const byDeveloper = new Map(signals.map((s) => [s.developerAccountId, s]));
         for (const day of board.developers) {
-          const signal = byDeveloper.get(day.developer.accountId);
+          // Nobody holds a 1:1 with themselves: the manager's own row never shows one as due.
+          const signal = day.developer.isSelf ? undefined : byDeveloper.get(day.developer.accountId);
           if (signal) {
             day.oneOnOne = {
               seriesId: signal.seriesId,

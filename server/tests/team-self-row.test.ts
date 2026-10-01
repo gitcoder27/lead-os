@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { configTable, developers, oneOnOneAgendaItems, oneOnOneSeries, tasks } from "../src/db/schema";
+import express from "express";
+import { configTable, developers, oneOnOneAgendaItems, oneOnOneSeries, oneOnOneSessions, tasks } from "../src/db/schema";
+import { createTeamTrackerRouter } from "../src/routes/team-tracker";
+import { ManagerDeskService } from "../src/services/manager-desk.service";
+import { invoke } from "./helpers/http";
 import { SelfIdentityService } from "../src/services/self-identity.service";
 import { TaskService, type TaskPrincipal } from "../src/services/task.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
@@ -124,5 +128,25 @@ describe("the manager's own row on the Team board", () => {
     expect(updated.state).toBe("in_progress");
     expect((await db.select().from(tasks).where(eq(tasks.taskKey, created.taskKey)))[0]!.status).toBe("active");
     expect(row(await boardFor(), "dev-ayan").currentItem?.title).toBe("Do the thing");
+  });
+
+  it("never shows a 1:1 as due with myself, but still shows one for a teammate", async () => {
+    await db.insert(configTable).values({ key: "one_on_one_enabled", value: "true" });
+    for (const developerAccountId of ["dev-ayan", "dev-priya"]) {
+      const series = (await db.insert(oneOnOneSeries).values({ workspaceId: "default", developerAccountId, cadence: "weekly", createdAt: "2026-03-01T00:00:00Z" }).returning())[0]!;
+      await db.insert(oneOnOneSessions).values({ workspaceId: "default", seriesId: series.id, scheduledFor: "2026-03-05", status: "scheduled", createdAt: "2026-03-01T00:00:00Z" });
+    }
+    await self.set("ayan", "dev-ayan", "default");
+    const app = express();
+    app.use((req, _res, next) => {
+      req.auth = { sessionId: "s", user: { username: "ayan", accountId: "ayan", workspaceId: "default", displayName: "Ayan", role: "manager" } };
+      next();
+    });
+    app.use("/api/team-tracker", createTeamTrackerRouter(trackerService, new ManagerDeskService(trackerService)));
+    const response = await invoke(app, { method: "GET", url: `/api/team-tracker?date=${DATE}&tz=UTC` });
+    expect(response.status).toBe(200);
+    const byId = new Map<string, { oneOnOne?: unknown }>(response.body.developers.map((entry: { developer: { accountId: string }; oneOnOne?: unknown }) => [entry.developer.accountId, entry]));
+    expect(byId.get("dev-ayan")?.oneOnOne).toBeUndefined();
+    expect(byId.get("dev-priya")?.oneOnOne).toBeDefined();
   });
 });

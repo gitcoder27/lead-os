@@ -7,6 +7,7 @@ import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
+import { SelfIdentityService } from "../src/services/self-identity.service";
 import {
   getRhythmState,
   resolveTimeZone,
@@ -337,6 +338,20 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     const row = today.actionItems.find((item) => item.type === "one_on_one")!;
     expect(row.context).toBe("Scheduled Thu 5 Mar — 3d overdue");
     expect(JSON.stringify(today)).not.toMatch(/Scheduled \d{4}-|Overdue \d{4}-/);
+  });
+
+  it("never lists a 1:1 with the manager's own roster record (SELF)", async () => {
+    const oneOnOneService = {
+      enabled: async () => true,
+      dueSignals: async () => [{ sessionId: 7, developerAccountId: "dev-1", developerName: "Alice Smith", scheduledFor: "2026-03-05", overdueDays: 3 }],
+    };
+    const service = new TodayService(issueService, trackerService, managerDeskService, {
+      getLastSyncLog: async () => undefined,
+      getRuntimeStatus: () => ({ status: "idle" as const }),
+    }, { todayCacheTtlMs: 0, oneOnOneService: oneOnOneService as never });
+    expect((await service.getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" })).actionItems.some((item) => item.type === "one_on_one")).toBe(true);
+    await new SelfIdentityService().set("manager-1", "dev-1");
+    expect((await service.getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" })).actionItems.some((item) => item.type === "one_on_one")).toBe(false);
   });
 
   describe("since-last-visit delta", () => {

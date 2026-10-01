@@ -57,6 +57,7 @@ import { IssueService, type TodayIssue } from "./issue.service";
 import { ManagerDeskService } from "./manager-desk.service";
 import { TeamTrackerService } from "./team-tracker.service";
 import { SettingsService } from "./settings.service";
+import { SelfIdentityService } from "./self-identity.service";
 import { getParticipatingDeveloperIds } from "./developer-participation.service";
 import { tracksNoCurrent, usesCheckIns } from "./tracker-freshness";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -174,6 +175,7 @@ export class TodayService {
   private readonly oneOnOneService?: OneOnOneService;
   private readonly stateService: TodayStateService;
   private readonly settings = new SettingsService();
+  private readonly selfIdentity = new SelfIdentityService();
   private readonly weeklyReviews = new WeeklyReviewService();
 
   constructor(
@@ -375,7 +377,11 @@ export class TodayService {
       // is off or the service wasn't wired.
       measureSource(async () =>
         this.oneOnOneService && (await this.oneOnOneService.enabled(workspaceId))
-          ? this.oneOnOneService.dueSignals(workspaceId, date)
+          ? this.oneOnOneService.dueSignals(workspaceId, date).then(async (signals) => {
+              // Nobody holds a 1:1 with themselves.
+              const self = await this.selfIdentity.linkedDeveloperId(managerAccountId, workspaceId);
+              return self ? signals.filter((signal) => signal.developerAccountId !== self) : signals;
+            })
           : [],
       ),
       // docs/53 §8.5-7: rhythm settings, standup sessions, check-in asks and

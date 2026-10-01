@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { Keyboard, Loader2, RefreshCw } from 'lucide-react';
-import { deltaChips, formatClock, formatSince, headerMetrics, metricLabel } from '@/lib/today-layout';
+import { formatClock, metricLabel, todayHeaderMetrics } from '@/lib/today-layout';
 import { TODAY_TRIAGE_KEYS } from '@/lib/today-triage';
 import type { TodayFreshness } from '@/lib/today-freshness';
 import type { TodayActionTarget, TodayResponse } from '@/types';
@@ -40,9 +40,7 @@ export function TodayRhythmHeader({
   const until = formatClock(today.rhythm.nextStage?.startsAt);
   const updated = formatDistanceToNowStrict(parseISO(today.generatedAt), { addSuffix: true });
   const isStale = freshness?.state === 'stale';
-  const metrics = headerMetrics(today.summary);
-  // A visit with nothing new gets one quiet note here, not a panel section.
-  const quietSince = today.delta?.since && deltaChips(today.delta, today.date).length === 0 ? formatSince(today.delta.since) : undefined;
+  const metrics = todayHeaderMetrics(today.summary);
 
   return (
     <div className="today-band" role="region" aria-label="Today summary">
@@ -73,7 +71,6 @@ export function TodayRhythmHeader({
           </button>
         );
       })}
-      {quietSince ? <span className="today-band-note">No changes since {quietSince}</span> : null}
       <span className="today-band-end">
         <span className="today-freshness" data-state={freshness?.state ?? 'fresh'} role={isStale ? 'status' : undefined}>
           {isFetching ? 'Refreshing…' : isStale ? `Couldn't refresh · ${updated}` : `Updated ${updated}`}

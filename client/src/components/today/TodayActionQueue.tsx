@@ -46,7 +46,6 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
   const actionable = view.head.filter((item) => item.type !== 'calm');
   const isDone = actionable.length === 0;
   const remaining = view.totalCount;
-  const progress = cleared + remaining > 0 ? Math.round((cleared / (cleared + remaining)) * 100) : 100;
   const renderRow = (item: TodayActionItem, featured: boolean) => {
     const group = groups?.get(item.id);
     if (group) {
@@ -84,14 +83,8 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
       <div className="today-section-head">
         <h2 id="today-queue-heading" ref={headingRef} tabIndex={-1} className="today-section-title">Queue</h2>
         {!isDone ? <span className="today-section-count">{remaining}</span> : null}
-        {cleared > 0 ? (
-          <span className="today-section-actions today-progress" aria-label={`${cleared} cleared, ${remaining} left`}>
-            <span className="today-progress-track" aria-hidden="true">
-              <span className="today-progress-fill block" style={{ width: `${progress}%` }} />
-            </span>
-            {cleared} cleared
-          </span>
-        ) : null}
+        {/* What I actually finished today — a plain fact, not a ratio against a queue that changes under it. */}
+        {cleared > 0 ? <span className="today-section-actions today-freshness">{cleared} done today</span> : null}
       </div>
 
       {isDone ? (

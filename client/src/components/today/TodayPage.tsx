@@ -45,7 +45,7 @@ import { TodayCheckInDialog } from './TodayCheckInDialog';
 import { TodayConfirmDialog } from './TodayConfirmDialog';
 import { TodayGettingStarted } from './TodayGettingStarted';
 import { TodayDueSoon } from './TodayDueSoon';
-import { TodayPeoplePulse, pulsePersonFromFocus, pulsePersonFromItem } from './TodayPeoplePulse';
+import { TodayPeoplePulse, pulsePersonFromFocus } from './TodayPeoplePulse';
 import { TodayPlanPanel } from './TodayPlanPanel';
 import { TodayPromisesList } from './TodayPromisesList';
 import { TodayRhythmHeader } from './TodayRhythmHeader';
@@ -186,7 +186,8 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   const { queueView, queueGroups, groupByCommand, panelRows } = useMemo(() => {
     const visible = withoutWrapUpItems(snapshot?.actionItems ?? [], focus);
     const overflow = withoutWrapUpItems(snapshot?.overflowActionItems ?? [], focus);
-    const split = splitPanelRows([...visible, ...overflow]);
+    const onPlan = new Set((focus?.plan?.items ?? []).map((item) => item.taskKey));
+    const split = splitPanelRows([...visible, ...overflow], onPlan);
     const grouped = groupQueueItems(split.queue);
     const shipped = (snapshot?.actionItems.length ?? 0) + (snapshot?.overflowActionItems?.length ?? 0);
     const removed = shipped - grouped.items.length;
@@ -235,6 +236,17 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       ...(has('team') ? [{ label: 'Team', target: { type: 'view', view: 'team', date } as TodayActionTarget }] : []),
     ];
   }, [snapshot?.summary, snapshot?.date]);
+  // docs/63 #7: setup guidance is for a workspace with nothing in it. Once any task, plan row or queue row
+  // exists it is clutter above the real work; the optional steps stay in Settings.
+  const hasRealWork = Boolean(
+    snapshot?.gettingStarted?.tasks
+    || (plan?.items.length ?? 0) > 0
+    || allQueueItems.some((item) => item.type !== 'calm'),
+  );
+  const gettingStartedSteps = snapshot?.gettingStarted && !gettingStartedDismissed && !hasRealWork
+    && Object.values(snapshot.gettingStarted).some((done) => !done)
+    ? snapshot.gettingStarted
+    : undefined;
   const nextUp = snapshot?.rhythm.nextStage
     ? `${stageLabels[snapshot.rhythm.nextStage.stage]} at ${formatClock(snapshot.rhythm.nextStage.startsAt)}`
     : undefined;
@@ -371,9 +383,6 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       .filter((person) => !queuedPeople.has(person.accountId))
       .map((person) => pulsePersonFromFocus(person, snapshot?.teamPulse.find((entry) => entry.accountId === person.accountId)))
     : [];
-  const otherPeople = pulse.rows
-    .filter((person) => !quietPeople.some((quiet) => quiet.accountId === person.accountId))
-    .map(pulsePersonFromItem);
 
   const renderPanelSection = (section: TodayPanelSectionId) => {
     if (!snapshot) return null;
@@ -394,22 +403,10 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         );
       case 'oneOnOnes':
         return <TodayPanelList key="oneOnOnes" title="1:1s" icon="calendar" items={panelRows.oneOnOnes} today={snapshot.date} onRunCommand={runCommand} />;
-      case 'carry': {
-        const carryCommands = panelRows.carry.map((item) => item.primaryAction).filter((command) => command.kind === 'carry_forward');
-        return (
-          <TodayPanelList
-            key="carry"
-            title="Carry from earlier"
-            icon="desk"
-            items={panelRows.carry}
-            today={snapshot.date}
-            bulk={carryCommands.length > 1
-              ? { label: `Carry all ${carryCommands.length}`, onRun: () => runBulk(carryCommands, (count) => `Carried ${count} into today`) }
-              : undefined}
-            onRunCommand={runCommand}
-          />
-        );
-      }
+      // docs/63 #7: no "Carry all" — renewing old work in one move postpones the decision about it.
+      // Each row carries or finishes on its own; dropping or rescheduling happens in the Tasks drawer.
+      case 'carry':
+        return <TodayPanelList key="carry" title="Carry from earlier" icon="desk" items={panelRows.carry} today={snapshot.date} onRunCommand={runCommand} />;
       case 'plan':
         return plan ? (
           <TodayPlanPanel
@@ -455,16 +452,6 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
         );
       case 'promises':
         return <TodayPromisesList key="promises" items={rail} onRunCommand={runCommand} />;
-      case 'people':
-        return (
-          <TodayPeoplePulse
-            key="people"
-            title="People"
-            people={otherPeople}
-            onRunCommand={runCommand}
-            onViewAll={() => openTarget({ type: 'view', view: 'team', date: snapshot.date })}
-          />
-        );
       default:
         return null;
     }
@@ -486,7 +473,6 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       case 'oneOnOnes': return panelRows.oneOnOnes.length > 0;
       case 'carry': return panelRows.carry.length > 0;
       case 'promises': return rail.length > 0;
-      case 'people': return otherPeople.length > 0;
       default: return false;
     }
   };
@@ -522,9 +508,9 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
             onFocus={trackRowFocus}
           >
             <div className="today-main-col">
-              {snapshot.gettingStarted && !gettingStartedDismissed && Object.values(snapshot.gettingStarted).some((done) => !done) ? (
+              {gettingStartedSteps ? (
                 <TodayGettingStarted
-                  steps={snapshot.gettingStarted}
+                  steps={gettingStartedSteps}
                   onCapture={() => openCapture()}
                   onOpenTarget={openTarget}
                   onDismiss={dismissGettingStarted}

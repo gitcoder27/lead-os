@@ -1536,7 +1536,7 @@ function buildOneOnOneActions(signals: OneOnOneDueSignal[]): TodayActionItem[] {
       type: "one_on_one",
       title: overdue ? `1:1 with ${signal.developerName} overdue` : `1:1 with ${signal.developerName} today`,
       context: overdue
-        ? `Scheduled ${signal.scheduledFor} — ${signal.overdueDays}d overdue`
+        ? `Scheduled ${friendlyDay(signal.scheduledFor)} — ${signal.overdueDays}d overdue`
         : "Scheduled for today",
       signal: overdue ? `Overdue ${signal.overdueDays}d` : "1:1 today",
       severity: overdue ? "warning" : "info",
@@ -1962,9 +1962,24 @@ function formatIsoDateSignal(value: string, clock: DayClock): string {
     return "Due today";
   }
   if (day < clock.date) {
-    return `Overdue ${day}`;
+    return `Overdue ${friendlyDay(day)}`;
   }
-  return `Due ${day}`;
+  return `Due ${friendlyDay(day)}`;
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * docs/63 #7: one date style on Today ("Thu 5 Mar", as the client's row context prints carry dates), not
+ * ISO strings beside friendly ones. Display only; the underlying values are untouched.
+ */
+export function friendlyDay(isoDay: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDay);
+  if (!match) return isoDay;
+  const at = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (Number.isNaN(at.getTime())) return isoDay;
+  return `${WEEKDAYS[at.getUTCDay()]} ${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
 }
 
 function formatFreshness(value?: string): string | undefined {

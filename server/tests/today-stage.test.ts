@@ -151,7 +151,7 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
 
     const utc = await service.getToday("manager-1", "2026-03-08", undefined, { tz: "UTC" });
     expect(utc.rhythm).toMatchObject({ stage: "morning_plan", timeZone: "UTC", localTime: "04:00" });
-    expect(utc.promises[0]).toMatchObject({ detail: "Overdue 2026-03-07", severity: "critical" });
+    expect(utc.promises[0]).toMatchObject({ detail: "Overdue Sat 7 Mar", severity: "critical" });
   });
 
   it("reads configurable stage boundaries and rejects out-of-order ones", async () => {
@@ -322,6 +322,21 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     // 101 overdue issues + dev-1's stale-check-in row.
     expect(today.totalCount).toBe(102);
     expect(today.summary.find((metric) => metric.id === "attention")?.value).toBe(102);
+  });
+
+  it("prints Today dates in one friendly style, including an overdue 1:1 (docs/63 #7)", async () => {
+    const oneOnOneService = {
+      enabled: async () => true,
+      dueSignals: async () => [{ sessionId: 7, developerAccountId: "dev-1", developerName: "Alice Smith", scheduledFor: "2026-03-05", overdueDays: 3 }],
+    };
+    const service = new TodayService(issueService, trackerService, managerDeskService, {
+      getLastSyncLog: async () => undefined,
+      getRuntimeStatus: () => ({ status: "idle" as const }),
+    }, { todayCacheTtlMs: 0, oneOnOneService: oneOnOneService as never });
+    const today = await service.getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
+    const row = today.actionItems.find((item) => item.type === "one_on_one")!;
+    expect(row.context).toBe("Scheduled Thu 5 Mar — 3d overdue");
+    expect(JSON.stringify(today)).not.toMatch(/Scheduled \d{4}-|Overdue \d{4}-/);
   });
 
   describe("since-last-visit delta", () => {

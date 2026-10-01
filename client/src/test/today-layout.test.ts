@@ -4,7 +4,9 @@ import {
   deltaChips,
   formatSince,
   headerMetrics,
+  todayHeaderMetrics,
   isNotePerson,
+  metricLabel,
   relabelCheckInCommands,
   railItems,
   signalChips,
@@ -60,11 +62,12 @@ function promise(id: number): TodayPromiseItem {
 
 describe('todayPanelOrder (docs/53 F6)', () => {
   it('fills the stage panel by stage; the queue always owns the left column', () => {
-    expect(todayPanelOrder('morning_plan')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
-    expect(todayPanelOrder('standup_window')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
-    expect(todayPanelOrder('midday_check')).toEqual(['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people']);
-    expect(todayPanelOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
-    expect(todayPanelOrder(undefined)).toEqual(['plan', 'delta', 'oneOnOnes', 'carry', 'promises', 'people']);
+    // No "people" list in any stage: Today shows the exceptions in the queue, and Team owns the roster (docs/63 #7).
+    expect(todayPanelOrder('morning_plan')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises']);
+    expect(todayPanelOrder('standup_window')).toEqual(['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises']);
+    expect(todayPanelOrder('midday_check')).toEqual(['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises']);
+    expect(todayPanelOrder('wrap_up')).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises']);
+    expect(todayPanelOrder(undefined)).toEqual(['plan', 'delta', 'oneOnOnes', 'carry', 'promises']);
   });
 
   it('leads with the weekly review on the review day from midday on, and with the catch-up all day (docs/59 §5.1)', () => {
@@ -76,7 +79,7 @@ describe('todayPanelOrder (docs/53 F6)', () => {
     for (const stage of ['morning_plan', 'standup_window', 'midday_check', 'wrap_up'] as const) {
       expect(todayPanelOrder(stage, catchUp)[0], stage).toBe('weeklyReview');
     }
-    expect(todayPanelOrder('wrap_up', undefined)).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people']);
+    expect(todayPanelOrder('wrap_up', undefined)).toEqual(['wrapUp', 'delta', 'oneOnOnes', 'promises']);
   });
 });
 
@@ -156,9 +159,19 @@ describe('row and header copy', () => {
     expect(signalChips('')).toEqual([]);
   });
 
-  it('keeps four decision metrics plus a broken sync (docs/53 U3)', () => {
+  it('keeps four decision metrics plus a broken sync for the Work strip (docs/53 U3)', () => {
     const summary = ['attention', 'work', 'team', 'stale', 'due-work', 'promises', 'sync'].map((id) => ({ id, label: id, value: 1, detail: '', severity: 'warning' as const }));
     expect(headerMetrics(summary).map((metric) => metric.id)).toEqual(['attention', 'stale', 'due-work', 'promises', 'sync']);
+  });
+
+  it('Today\'s header keeps the decision metrics that are above zero, never the open count (docs/63 #7)', () => {
+    const at = (value: number) => (id: string) => ({ id, label: id, value, detail: '', severity: 'warning' as const });
+    const ids = ['attention', 'work', 'team', 'stale', 'due-work', 'promises', 'sync'];
+    expect(todayHeaderMetrics(ids.map(at(1))).map((metric) => metric.id)).toEqual(['stale', 'due-work', 'promises', 'sync']);
+    // A quiet day has no header counters at all.
+    expect(todayHeaderMetrics(ids.map(at(0)))).toEqual([]);
+    expect(todayHeaderMetrics([...ids.slice(0, 4).map(at(0)), at(2)('due-work'), at(0)('promises')]).map((metric) => metric.id)).toEqual(['due-work']);
+    expect(metricLabel('due-work', 2, 'due')).toBe('defects due');
   });
 
   it('builds follow-up titles from the person and issue (docs/53 F16)', () => {
@@ -216,6 +229,21 @@ describe('since-last-visit strip', () => {
 });
 
 describe('splitPanelRows', () => {
+  it('drops a carry row for a task already on my plan, and the pin rows the plan owns (docs/63 #7)', () => {
+    const carry = (id: string, taskKey: string) => row(id, { type: 'desk_carry_forward', target: { ...desk(9), type: 'manager_desk_item', taskKey } });
+    const items = [
+      carry('c1', 'T-1'),
+      carry('c2', 'T-2'),
+      row('pin', { type: 'top_three', target: { type: 'view', view: 'tasks', taskKey: 'T-1' } }),
+      row('i', { type: 'overdue_issue', target: { type: 'issue', view: 'work', issueKey: 'AM-1' } }),
+    ];
+    const split = splitPanelRows(items, new Set(['T-1']));
+    expect(split.carry.map((item) => item.id)).toEqual(['c2']);
+    expect(split.queue.map((item) => item.id)).toEqual(['i']);
+    // Without a plan nothing is folded, but a pin is still never a queue row.
+    expect(splitPanelRows(items).carry.map((item) => item.id)).toEqual(['c1', 'c2']);
+  });
+
   it('hands standup, 1:1 and carry rows to the panel and keeps the rest in order', () => {
     const items = [
       row('f1'),

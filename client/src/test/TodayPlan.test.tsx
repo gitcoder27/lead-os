@@ -193,16 +193,22 @@ describe('TodayPage plan', () => {
   });
   afterEach(() => cleanup());
 
-  it('shows my plan and puts pinned tasks at the top of the queue', async () => {
+  it('shows my plan with pinned tasks first, and lists each pinned task once (docs/63 #7)', async () => {
     const items = [planItem('T-2', 'Beta', { pinned: true }), planItem('T-1', 'Alpha')];
-    mockFetch(today('morning_plan', plan({ items, top3: ['T-2'] }), [queueRow('T-2', 'Beta', 0)]));
+    const exception: TodayActionItem = { ...queueRow('J-1', 'AM-1 Overdue defect', 1), id: 'overdue-1', type: 'overdue_issue' };
+    mockFetch(today('morning_plan', plan({ items, top3: ['T-2'] }), [queueRow('T-2', 'Beta', 0), exception]));
     renderToday();
 
     expect(await screen.findByRole('heading', { name: 'My plan' })).toBeInTheDocument();
-    expect(screen.getAllByTestId('today-plan-row')).toHaveLength(2);
+    const planRows = screen.getAllByTestId('today-plan-row');
+    expect(planRows).toHaveLength(2);
+    expect(planRows[0]).toHaveTextContent('Beta');
+    expect(planRows[0]).toHaveAttribute('data-pinned', 'true');
+    // The queue keeps the exception; the pin's own queue row is not a second copy of Beta.
     const queueRows = screen.getAllByTestId('today-action-row');
-    expect(queueRows[0]).toHaveTextContent('Beta');
-    expect(queueRows[0]).toHaveTextContent('Top 1');
+    expect(queueRows).toHaveLength(1);
+    expect(queueRows[0]).toHaveTextContent('AM-1 Overdue defect');
+    expect(screen.getAllByText('Beta')).toHaveLength(1);
   });
 
   it('pins a task with PUT /today/top3, keeping the order already picked', async () => {
@@ -265,8 +271,9 @@ describe('TodayPage plan', () => {
     mockFetch(response);
     renderToday();
 
-    // A fresh mount with empty storage still shows what was finished earlier today.
-    expect(await screen.findByText('4 cleared')).toBeInTheDocument();
+    // A fresh mount with empty storage still shows what was finished earlier today — as a plain fact, with no progress bar.
+    expect(await screen.findByText('4 done today')).toBeInTheDocument();
+    expect(document.querySelector('.today-progress-track')).toBeNull();
     expect(window.sessionStorage.length).toBe(0);
   });
 

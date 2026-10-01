@@ -31,8 +31,7 @@ export type TodayPanelSectionId =
   | 'quiet'
   | 'oneOnOnes'
   | 'carry'
-  | 'promises'
-  | 'people';
+  | 'promises';
 
 export function todayPanelOrder(stage: TodayRhythmStage | undefined, weeklyReview?: TodayWeeklyReview): TodayPanelSectionId[] {
   const order = stageOrder(stage);
@@ -47,14 +46,14 @@ function stageOrder(stage: TodayRhythmStage | undefined): TodayPanelSectionId[] 
   switch (stage) {
     case 'morning_plan':
     case 'standup_window':
-      return ['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['plan', 'standup', 'delta', 'oneOnOnes', 'carry', 'promises'];
     case 'midday_check':
-      return ['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['dueSoon', 'plan', 'quiet', 'delta', 'standup', 'oneOnOnes', 'carry', 'promises'];
     case 'wrap_up':
       // The wrap-up block carries Done today and tomorrow's top 3 itself.
-      return ['wrapUp', 'delta', 'oneOnOnes', 'promises', 'people'];
+      return ['wrapUp', 'delta', 'oneOnOnes', 'promises'];
     default:
-      return ['plan', 'delta', 'oneOnOnes', 'carry', 'promises', 'people'];
+      return ['plan', 'delta', 'oneOnOnes', 'carry', 'promises'];
   }
 }
 
@@ -72,13 +71,18 @@ export interface TodayPanelRows {
 /**
  * docs/53 U1: the stage panel owns the day's fixtures — standup, 1:1s and
  * carry-forward — so the queue is only the things that need a decision.
+ * docs/63 #7: My plan owns pinned tasks (they lead it with their pin), so their
+ * `top_three` queue rows are not listed a second time.
  */
-export function splitPanelRows(items: TodayActionItem[]): TodayPanelRows {
+export function splitPanelRows(items: TodayActionItem[], onPlan: ReadonlySet<string> = new Set()): TodayPanelRows {
   const out: TodayPanelRows = { queue: [], oneOnOnes: [], carry: [] };
   for (const item of items) {
     if (item.type === 'standup') out.standup ??= item;
     else if (item.type === 'one_on_one') out.oneOnOnes.push(item);
-    else if (item.type === 'desk_carry_forward') out.carry.push(item);
+    // docs/63 #7: a carried task already on my plan is that plan row, not a second "carry" row to renew.
+    else if (item.type === 'desk_carry_forward') {
+      if (!(item.target.taskKey && onPlan.has(item.target.taskKey))) out.carry.push(item);
+    } else if (item.type === 'top_three') continue;
     else out.queue.push(item);
   }
   return out;
@@ -381,17 +385,26 @@ export function formatClock(value: string | undefined): string | undefined {
 
 const HEADER_METRIC_IDS = ['attention', 'stale', 'due-work', 'promises', 'sync'] as const;
 
-/** Four decision metrics (+ Sync only while it's broken); inventory counts are dropped. */
+/** Four decision metrics (+ Sync only while it's broken); inventory counts are dropped. The Work page's strip reads these. */
 export function headerMetrics(summary: TodayResponse['summary']) {
   return HEADER_METRIC_IDS
     .map((id) => summary.find((metric) => metric.id === id))
     .filter((metric): metric is TodayResponse['summary'][number] => Boolean(metric));
 }
 
+/**
+ * Today's own header: the same metrics minus the open total, and only while above zero (Sync only while it's
+ * broken). The Queue heading carries the open count, so there is no separate "open" figure to reconcile with it,
+ * and a quiet day has no counters at all (docs/63 #7).
+ */
+export function todayHeaderMetrics(summary: TodayResponse['summary']) {
+  return headerMetrics(summary).filter((metric) => metric.id !== 'attention' && metric.value > 0);
+}
+
 const METRIC_LABELS: Record<string, [string, string]> = {
-  attention: ['open', 'open'],
   stale: ['stale', 'stale'],
-  'due-work': ['due', 'due'],
+  // Jira defects due today — not tasks, 1:1s or follow-ups.
+  'due-work': ['defect due', 'defects due'],
   promises: ['follow-up', 'follow-ups'],
   sync: ['sync issue', 'sync issue'],
 };

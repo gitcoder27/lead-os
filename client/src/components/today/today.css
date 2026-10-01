@@ -435,6 +435,12 @@
   .today-progress-fill { transition: none; }
 }
 
+.today-truncated {
+  padding: 8px 8px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .today-more {
   display: block;
   width: 100%;

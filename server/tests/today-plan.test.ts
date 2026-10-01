@@ -9,6 +9,9 @@ import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskService, type TaskPrincipal } from "../src/services/task.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { TodayService } from "../src/services/today.service";
+import { TodayPlanService } from "../src/services/today-plan.service";
+import { TodayStateService } from "../src/services/today-state.service";
+import { WeeklyReviewService } from "../src/services/weekly-review.service";
 
 /** docs/57 §6 (P3-01): Today "my plan", the pinned top 3, and real completions. */
 const DATE = "2026-03-08";
@@ -309,6 +312,41 @@ describe("Today plan (P3-01)", () => {
     }
     // Ordinary tasks scheduled today are not carry rows, so the plan is the only place wrap-up can list them.
     expect(after.focus.wrapUp.carryCandidates).toEqual([]);
+  });
+
+  it("reports a failed plan, state or weekly-review read instead of dropping it silently (docs/63 #6)", async () => {
+    await add("Planned", { scheduledOn: DATE });
+    const healthy = await getToday();
+    expect(healthy.isPartial).toBe(false);
+    expect(healthy.sourceStatus).toMatchObject({ plan: "ready", state: "ready", review: "ready" });
+
+    vi.spyOn(TodayPlanService.prototype, "build").mockRejectedValue(new Error("plan down"));
+    const noPlan = await getToday();
+    expect(noPlan.focus.plan).toBeUndefined();
+    expect(noPlan.isPartial).toBe(true);
+    expect(noPlan.sourceStatus).toMatchObject({ plan: "unavailable", state: "ready", review: "ready" });
+    vi.restoreAllMocks();
+
+    vi.spyOn(TodayStateService.prototype, "getRhythmSettings").mockRejectedValue(new Error("state down"));
+    const noState = await getToday();
+    expect(noState.isPartial).toBe(true);
+    expect(noState.sourceStatus).toMatchObject({ plan: "ready", state: "unavailable" });
+    vi.restoreAllMocks();
+
+    vi.spyOn(WeeklyReviewService.prototype, "todayStatus").mockRejectedValue(new Error("review down"));
+    const noReview = await getToday();
+    expect(noReview.isPartial).toBe(true);
+    expect(noReview.sourceStatus).toMatchObject({ plan: "ready", review: "unavailable" });
+    vi.restoreAllMocks();
+  });
+
+  it("leaves the plan and review out of the status when the workspace does not use them", async () => {
+    await db.delete(configTable);
+    const today = await getToday();
+    expect(today.sourceStatus.plan).toBeUndefined();
+    expect(today.sourceStatus.review).toBeUndefined();
+    expect(today.sourceStatus.state).toBe("ready");
+    expect(today.isPartial).toBe(false);
   });
 
   it("has no plan without the canonical task model", async () => {

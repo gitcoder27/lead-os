@@ -347,14 +347,18 @@ export class TodayService {
     const canonicalPromise = taskKeys.canonicalEnabled(workspaceId).catch(() => false);
     // docs/56 P1-03: collab-only surfaces (the "Stale check-ins" metric).
     const teamModePromise = this.settings.getTeamMode(workspaceId).catch(() => "solo" as const);
-    // docs/57 §6 (P3-01): the manager's own plan. Additive — a failure only drops it.
-    const planPromise: Promise<TodayPlanFocus | undefined> = canonicalPromise
-      .then((enabled) => (enabled
-        ? new TodayPlanService().build({ type: "manager", accountId: managerAccountId, workspaceId }, date, context.tz)
-        : undefined))
+    // docs/57 §6 (P3-01): the manager's own plan. Additive — a failure only drops it, but it is reported
+    // in `sourceStatus` (docs/63 #6) so an absent plan never reads as an empty one.
+    const planPromise: Promise<{ plan?: TodayPlanFocus; failed: boolean }> = canonicalPromise
+      .then(async (enabled) => ({
+        plan: enabled
+          ? await new TodayPlanService().build({ type: "manager", accountId: managerAccountId, workspaceId }, date, context.tz)
+          : undefined,
+        failed: false,
+      }))
       .catch((error: unknown) => {
         logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), date, err: error }, "Today plan unavailable");
-        return undefined;
+        return { plan: undefined, failed: true };
       });
     const [issueResult, teamResult, deskResult, syncResult, driftResult, oneOnOneResult, stateResult] = await Promise.all([
       measureSource(() => this.issueService.getTodaySnapshot(date, workspaceId)),
@@ -379,11 +383,14 @@ export class TodayService {
       measureSource(() => this.loadTodayState(managerAccountId, date, workspaceId, context, phase3Promise)),
     ]);
     const canonical = await canonicalPromise;
-    const plan = await planPromise;
-    // docs/59 §5.1: additive, like the plan: a failure only drops the review row.
-    const weeklyReview = (await phase3Promise)
+    const { plan, failed: planFailed } = await planPromise;
+    // docs/59 §5.1: additive, like the plan: a failure only drops the review row (and is reported).
+    const reviewEnabled = await phase3Promise;
+    let reviewFailed = false;
+    const weeklyReview = reviewEnabled
       ? await this.weeklyReviews.todayStatus({ type: "manager", accountId: managerAccountId, workspaceId }, date).catch((error: unknown) => {
         logger.warn({ workspaceId: normalizeWorkspaceId(workspaceId), date, err: error }, "Today weekly review status unavailable");
+        reviewFailed = true;
         return undefined;
       })
       : undefined;
@@ -395,6 +402,10 @@ export class TodayService {
       sync: syncResult.status === "fulfilled" ? "ready" : "unavailable",
       drift: driftResult.status === "fulfilled" ? "ready" : "unavailable",
       one_on_one: oneOnOneResult.status === "fulfilled" ? "ready" : "unavailable",
+      // Rhythm settings, standup, asks and the since-last-visit reads; always attempted.
+      state: stateResult.status === "fulfilled" ? "ready" : "unavailable",
+      ...(canonical ? { plan: planFailed ? "unavailable" as const : "ready" as const } : {}),
+      ...(reviewEnabled ? { review: reviewFailed ? "unavailable" as const : "ready" as const } : {}),
     };
     const unavailableSources = Object.entries(sourceStatus)
       .filter(([, status]) => status === "unavailable")

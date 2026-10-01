@@ -225,6 +225,16 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     () => railItems(focus && 'wrapUp' in focus ? [] : snapshot?.promises ?? [], snapshot?.meetingPrompts ?? [], allQueueItems),
     [focus, snapshot?.promises, snapshot?.meetingPrompts, allQueueItems],
   );
+  // Where the rows past the server's cap can be read in full: only workspaces that have them.
+  const truncationHandoff = useMemo(() => {
+    const has = (id: string) => (snapshot?.summary.find((metric) => metric.id === id)?.value ?? 0) > 0;
+    const date = snapshot?.date;
+    return [
+      ...(has('work') ? [{ label: 'Work', target: { type: 'view', view: 'work', date } as TodayActionTarget }] : []),
+      { label: 'Tasks', target: { type: 'view', view: 'tasks', date } as TodayActionTarget },
+      ...(has('team') ? [{ label: 'Team', target: { type: 'view', view: 'team', date } as TodayActionTarget }] : []),
+    ];
+  }, [snapshot?.summary, snapshot?.date]);
   const nextUp = snapshot?.rhythm.nextStage
     ? `${stageLabels[snapshot.rhythm.nextStage.stage]} at ${formatClock(snapshot.rhythm.nextStage.startsAt)}`
     : undefined;
@@ -422,6 +432,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
             pinning={top3.isPending}
             onSetTomorrowTop3={plan ? (taskKeys) => top3.mutate({ date: plan.tomorrowTop3.date, taskKeys }) : undefined}
             today={snapshot.date}
+            complete={!snapshot.isPartial}
             queuedPeople={queuedPeople}
             onRunCommand={runCommand}
             onBulk={runBulk}
@@ -528,6 +539,9 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
                 expandedGroups={expandedGroups}
                 onToggleGroup={toggleGroup}
                 today={snapshot.date}
+                incomplete={Boolean(snapshot.isPartial)}
+                handoff={truncationHandoff}
+                onOpenTarget={openTarget}
                 activeItemId={triage.activeId}
                 pendingTargetKey={pendingTargetKey}
                 cleared={cleared}
@@ -645,6 +659,9 @@ function TodayPartialDataNotice({
     sync: 'Sync',
     drift: 'Jira drift',
     one_on_one: '1:1s',
+    plan: 'My plan',
+    state: 'Standup, asks and changes',
+    review: 'Weekly review',
   };
   const unavailable = sourceStatus
     ? (Object.entries(sourceStatus) as Array<[TodaySourceName, 'ready' | 'unavailable']>)

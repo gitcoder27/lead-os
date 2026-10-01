@@ -3,7 +3,7 @@ import { CircleCheck } from 'lucide-react';
 import { TodayActionRow, TodayGroupRow, type TodayRunCommand } from './TodayActionRow';
 import type { TodayQueueGroup } from '@/lib/today-layout';
 import type { TodayQueueView } from '@/lib/today-triage';
-import type { TodayActionGroup, TodayActionItem } from '@/types';
+import type { TodayActionGroup, TodayActionItem, TodayActionTarget } from '@/types';
 
 interface TodayActionQueueProps {
   view: TodayQueueView;
@@ -20,6 +20,11 @@ interface TodayActionQueueProps {
   expandedGroups?: Set<string>;
   onToggleGroup?: (id: string) => void;
   today?: string;
+  /** docs/63 #6: a source failed, so an empty queue is not evidence that nothing needs attention. */
+  incomplete?: boolean;
+  /** Where the rows past the shipped cap live (existing workspaces). */
+  handoff?: Array<{ label: string; target: TodayActionTarget }>;
+  onOpenTarget?: (target: TodayActionTarget) => void;
   onRunCommand: TodayRunCommand;
 }
 
@@ -35,7 +40,7 @@ const groupLabels: Record<TodayActionGroup, string> = {
  * header shows what's been cleared, and an empty queue says so plainly.
  */
 export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueProps>(function TodayActionQueue(
-  { view, expanded, onToggleExpanded, activeItemId, pendingTargetKey, cleared, nextUp, groups, expandedGroups, onToggleGroup, today, onRunCommand },
+  { view, expanded, onToggleExpanded, activeItemId, pendingTargetKey, cleared, nextUp, groups, expandedGroups, onToggleGroup, today, incomplete = false, handoff = [], onOpenTarget, onRunCommand },
   headingRef,
 ) {
   const actionable = view.head.filter((item) => item.type !== 'calm');
@@ -90,13 +95,22 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
       </div>
 
       {isDone ? (
-        <div className="today-done" role="status">
-          <CircleCheck size={18} style={{ color: 'var(--success)' }} aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="today-done-title">{cleared > 0 ? `Clear for now · ${cleared} cleared` : 'Clear for now'}</p>
-            {nextUp ? <p className="today-done-next">Next: {nextUp}</p> : null}
+        incomplete ? (
+          <div className="today-done" role="status">
+            <div className="min-w-0">
+              <p className="today-done-title">Nothing to show, but not everything loaded</p>
+              <p className="today-done-next">Retry above before treating the queue as clear.</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="today-done" role="status">
+            <CircleCheck size={18} style={{ color: 'var(--success)' }} aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="today-done-title">{cleared > 0 ? `No urgent exceptions · ${cleared} done today` : 'No urgent exceptions'}</p>
+              {nextUp ? <p className="today-done-next">Next: {nextUp}</p> : null}
+            </div>
+          </div>
+        )
       ) : (
         <div className="today-list">
           {view.head.map((item, index) => renderRow(item, index === 0))}
@@ -117,6 +131,19 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
                   : 'Show less'
                 : `+${view.hiddenCount} more`}
             </button>
+          ) : null}
+          {view.unreachableCount > 0 ? (
+            <p className="today-truncated" data-testid="today-truncated">
+              {view.unreachableCount} lower-priority {view.unreachableCount === 1 ? 'item isn’t' : 'items aren’t'} loaded on Today.
+              {handoff.length > 0 ? ' See the full list in ' : ''}
+              {handoff.map((link, index) => (
+                <span key={link.label}>
+                  {index > 0 ? (index === handoff.length - 1 ? ' or ' : ', ') : ''}
+                  <button type="button" className="ui-link" onClick={() => onOpenTarget?.(link.target)}>{link.label}</button>
+                </span>
+              ))}
+              {handoff.length > 0 ? '.' : ''}
+            </p>
           ) : null}
         </div>
       )}

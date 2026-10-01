@@ -71,7 +71,10 @@ describe('buildTodayQueueView (docs/53 F13)', () => {
     const view = buildTodayQueueView({ items, overflowItems: overflow, totalCount: 30, expanded: false });
     expect(view.head.map((row) => row.id)).toEqual(['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']);
     expect(view.groups).toEqual([]);
-    expect(view.hiddenCount).toBe(22);
+    // "+N more" counts rows that expanding reveals; the 18 the server never sent are reported apart (docs/63 #6).
+    expect(view.hiddenCount).toBe(4);
+    expect(view.unreachableCount).toBe(18);
+    expect(view.totalCount).toBe(30);
     expect(view.ordered).toHaveLength(8);
   });
 
@@ -81,12 +84,14 @@ describe('buildTodayQueueView (docs/53 F13)', () => {
       ['next', ['r8', 'o2']],
       ['later', ['r9', 'o1']],
     ]);
-    expect(view.hiddenCount).toBe(18);
+    expect(view.hiddenCount).toBe(0);
+    expect(view.unreachableCount).toBe(18);
     expect(view.ordered.map((row) => row.id).slice(8)).toEqual(['r8', 'o2', 'r9', 'o1']);
   });
 
   it('falls back to counting shipped rows for old servers without totalCount', () => {
     expect(buildTodayQueueView({ items, expanded: false }).hiddenCount).toBe(2);
+    expect(buildTodayQueueView({ items, expanded: false }).unreachableCount).toBe(0);
     expect(buildTodayQueueView({ items: [item('calm', { type: 'calm' })], expanded: false }).hiddenCount).toBe(0);
   });
 });

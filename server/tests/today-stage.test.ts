@@ -312,6 +312,18 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     expect(today.summary.find((metric) => metric.id === "attention")?.value).toBe(27);
   });
 
+  it("keeps counting past the shipped cap, so the client can say how many rows it never received (docs/63 #6)", async () => {
+    for (let index = 0; index < 101; index += 1) {
+      await seedIssue(`AM-${index + 1}`, { dueDate: "2026-03-01" });
+    }
+    const today = await todayService().getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
+    const shipped = today.actionItems.length + (today.overflowActionItems?.length ?? 0);
+    expect(shipped).toBe(100);
+    // 101 overdue issues + dev-1's stale-check-in row.
+    expect(today.totalCount).toBe(102);
+    expect(today.summary.find((metric) => metric.id === "attention")?.value).toBe(102);
+  });
+
   describe("since-last-visit delta", () => {
     it("has no baseline on the first visit, then anchors to the last activity before a new visit", async () => {
       const service = todayService();

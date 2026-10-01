@@ -111,8 +111,13 @@ export interface TodayQueueView {
   head: TodayActionItem[];
   /** When expanded: the remaining rows grouped Now / Next / Later (ranked within). */
   groups: Array<{ group: TodayActionGroup; items: TodayActionItem[] }>;
-  /** Rows not currently rendered (0 when expanded and all rows shipped). */
+  /** Shipped rows not currently rendered: "+N more" reveals exactly these. */
   hiddenCount: number;
+  /**
+   * docs/63 #6: rows the server counted but did not send (past its cap). Expanding never reveals them,
+   * so they are reported separately instead of inflating "+N more".
+   */
+  unreachableCount: number;
   /** Actionable rows in the full queue (server total when provided). */
   totalCount: number;
   /** Display order — the keyboard triage list. */
@@ -141,7 +146,8 @@ export function buildTodayQueueView(params: {
   return {
     head,
     groups,
-    hiddenCount: Math.max(totalCount - renderedActionable, 0),
+    hiddenCount: Math.max(actionable - renderedActionable, 0),
+    unreachableCount: Math.max(totalCount - actionable, 0),
     totalCount,
     ordered: [...head, ...groups.flatMap((entry) => entry.items)],
   };

@@ -165,22 +165,54 @@ describe('TodayPage V2', () => {
     expect(screen.getByRole('button', { name: '+3 more' })).toBeInTheDocument();
   });
 
-  it('expands "+N more" in place, grouped Now / Next / Later, with the server total (docs/53 F13)', async () => {
+  it('expands "+N more" in place, grouped Now / Next / Later, and says what the server never sent (docs/53 F13, docs/63 #6)', async () => {
     const response = todayResponse();
     const overflow = [
       actionItem(20, { id: 'overflow-next', group: 'next', title: 'AM-20 Next row' }),
       actionItem(21, { id: 'overflow-later', group: 'later', title: 'AM-21 Later row' }),
     ];
     mockFetch({ ...response, overflowActionItems: overflow, totalCount: 15 });
-    renderToday();
+    const { onOpenTodayTarget } = renderToday();
 
-    fireEvent.click(await screen.findByRole('button', { name: '+3 more' }));
+    // 11 + 2 rows shipped, 12 shown: one is reachable by expanding, two were never sent.
+    fireEvent.click(await screen.findByRole('button', { name: '+1 more' }));
 
     expect(screen.getAllByTestId('today-action-row')).toHaveLength(13);
     expect(screen.queryByRole('group', { name: /^Now/ })).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Later (1)' })).toHaveTextContent('AM-21 Later row');
-    // Two rows are still past the shipped overflow cap.
-    expect(screen.getByRole('button', { name: /Show less · 2 more/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+    const note = screen.getByTestId('today-truncated');
+    expect(note).toHaveTextContent('2 lower-priority items aren’t loaded on Today.');
+    // The fixture has defects and a team, so all three existing workspaces are offered.
+    expect(within(note).getByRole('button', { name: 'Work' })).toBeInTheDocument();
+    expect(within(note).getByRole('button', { name: 'Team' })).toBeInTheDocument();
+    fireEvent.click(within(note).getByRole('button', { name: 'Tasks' }));
+    expect(onOpenTodayTarget).toHaveBeenCalledWith(expect.objectContaining({ view: 'tasks' }));
+  });
+
+  it('never advertises rows it cannot show: 101 signals ship 100, and the collapsed link counts only reachable rows', async () => {
+    const shipped = Array.from({ length: 100 }, (_, index) => actionItem(index + 1));
+    mockFetch(todayResponse({ actionItems: shipped.slice(0, 20), overflowActionItems: shipped.slice(20), totalCount: 101 }));
+    renderToday();
+
+    fireEvent.click(await screen.findByRole('button', { name: '+88 more' }));
+    expect(screen.getAllByTestId('today-action-row')).toHaveLength(100);
+    expect(screen.getByTestId('today-truncated')).toHaveTextContent('1 lower-priority item isn’t loaded on Today.');
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /more$/ })).not.toBeInTheDocument();
+  });
+
+  it('an empty queue with a failed source is not called clear (docs/63 #6)', async () => {
+    const calm = actionItem(1, { id: 'today-calm', type: 'calm', title: 'Team is calm', severity: 'success', primaryAction: command('open', 'Open Team', target()), secondaryActions: [] });
+    mockFetch(todayResponse({
+      actionItems: [calm], promises: [], totalCount: 0, isPartial: true,
+      sourceStatus: { issues: 'ready', team: 'unavailable', desk: 'ready', sync: 'ready', drift: 'ready', one_on_one: 'ready', state: 'ready', plan: 'unavailable' },
+    }));
+    renderToday();
+
+    expect(await screen.findByText('Nothing to show, but not everything loaded')).toBeInTheDocument();
+    expect(screen.queryByText('No urgent exceptions')).not.toBeInTheDocument();
+    expect(screen.getByText(/Team, My plan unavailable — showing what loaded\./)).toBeInTheDocument();
   });
 
   it('sends the browser time zone with the Today read (docs/53 F5)', async () => {
@@ -1244,7 +1276,7 @@ describe('TodayPage V2', () => {
       mockFetch(response);
       renderToday(response);
 
-      const done = await screen.findByText('Clear for now');
+      const done = await screen.findByText('No urgent exceptions');
       expect(done.closest('[role="status"]')).toHaveTextContent('Next: Wrap-up at 16:00');
       expect(screen.queryAllByTestId('today-action-row')).toHaveLength(0);
     });

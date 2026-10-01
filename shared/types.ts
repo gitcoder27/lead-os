@@ -646,8 +646,11 @@ export interface TodayMeetingPrompt {
   secondaryActions: TodayActionCommand[];
 }
 
-export type TodaySourceName = "issues" | "team" | "desk" | "sync" | "drift" | "one_on_one";
-export type TodaySourceStatus = Record<TodaySourceName, "ready" | "unavailable">;
+export type TodayCoreSourceName = "issues" | "team" | "desk" | "sync" | "drift" | "one_on_one";
+/** docs/63 #6: additive reads that used to fail silently. Present only when the source applies to the workspace. */
+export type TodayExtraSourceName = "plan" | "state" | "review";
+export type TodaySourceName = TodayCoreSourceName | TodayExtraSourceName;
+export type TodaySourceStatus = Record<TodayCoreSourceName, "ready" | "unavailable"> & Partial<Record<TodayExtraSourceName, "ready" | "unavailable">>;
 
 export interface TodayResponse {
   date: string;

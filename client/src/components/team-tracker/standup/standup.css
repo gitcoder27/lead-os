@@ -31,6 +31,12 @@ body.standup-open {
   outline-offset: -3px;
 }
 
+/* The selected task is marked by a soft tint and a left accent bar (StandupTaskList), which is also its focus
+   indicator; a 2px cyan ring around the whole row on top of that was too loud now that focus lands on it. */
+.standup-shell .standup-task-row:focus-visible {
+  outline: none;
+}
+
 .standup-shell button, .standup-shell select { min-height: 36px; }
 .standup-shell input, .standup-shell textarea { max-width: 100%; }
 .standup-shell p, .standup-shell h2 { overflow-wrap: anywhere; }

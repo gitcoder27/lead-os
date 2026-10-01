@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient } from '@tanstack/react-query';
 import { TestWrapper } from '@/test/wrapper';
 import type {
@@ -550,6 +552,28 @@ describe('StandupMode', () => {
       await waitFor(() => expect(screen.getByTestId('standup-progress')).toBeInTheDocument());
       expect(screen.queryByText(/open in another tab/)).not.toBeInTheDocument();
     });
+  });
+
+  it('marks the selected task with a soft tint and a left accent bar, not a ring around the whole row', async () => {
+    renderStandup();
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    const [selected, other] = [taskRows()[0]!, taskRows()[1]!];
+    expect(selected).toHaveAttribute('aria-selected', 'true');
+    expect(selected.style.boxShadow).toMatch(/inset 3px 0px? 0px? (?:0px )?var\(--accent\)|inset 3px 0 0 var\(--accent\)/);
+    expect(selected.style.background).toContain('var(--accent) 8%');
+    // Unselected rows carry neither; and no row opts back in to the focus-visible ring utility.
+    expect(other.style.boxShadow).toBe('');
+    for (const row of taskRows()) {
+      expect(row.className).toContain('standup-task-row');
+      expect(row.className).not.toContain('focus-visible:shadow');
+    }
+  });
+
+  it('the shell turns the cyan focus ring off for task rows only', () => {
+    const css = readFileSync(resolve(__dirname, '../components/team-tracker/standup/standup.css'), 'utf8');
+    expect(css).toMatch(/\.standup-shell \.standup-task-row:focus-visible \{\s*outline: none;/);
+    // Everything else in standup keeps the visible ring.
+    expect(css).toMatch(/\.standup-shell :focus-visible \{\s*outline: 2px solid var\(--accent\)/);
   });
 
   it('keeps 1:1 reminders out of standup', () => {

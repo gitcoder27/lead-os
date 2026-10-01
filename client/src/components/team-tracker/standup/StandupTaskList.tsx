@@ -81,14 +81,14 @@ export function StandupTaskList({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); onOpen(task.taskKey); }
                 }}
-                // docs/54 D3: the list-row idiom from /tasks — focus is a tint plus a
-                // keyboard ring; the left accent bar is reserved for "featured".
-                // j/k moves the focus state without moving DOM focus, so the ring
-                // is rendered from state, not :focus-visible.
-                className="relative block w-full px-3 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] focus-visible:shadow-[inset_0_0_0_2px_var(--border-active)] [&:not(:first-child)]:border-t"
+                // The selected task is a soft tint with a thin accent bar on the left. Keyboard focus now lands on it
+                // as soon as you move to a person, so a full ring (which :focus-visible would draw permanently)
+                // was far too loud; the tint + bar is the focus indicator, rendered from state so it also follows j/k.
+                className="standup-task-row relative block w-full px-3 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] [&:not(:first-child)]:border-t"
                 style={{
                   borderColor: 'var(--border)',
-                  background: focused ? 'color-mix(in srgb, var(--bg-tertiary) 85%, transparent)' : undefined,
+                  background: focused ? 'color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary))' : undefined,
+                  boxShadow: focused ? 'inset 3px 0 0 var(--accent)' : undefined,
                 }}
               >
                 <span className="flex min-h-[38px] items-center gap-2.5">

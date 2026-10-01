@@ -61,9 +61,9 @@ function queueRow(key: string, title: string, index: number): TodayActionItem {
   };
 }
 
-function today(stage: 'morning_plan' | 'wrap_up', focusPlan: TodayPlanFocus | undefined, actionItems: TodayActionItem[] = []): TodayResponse {
+function today(stage: 'morning_plan' | 'wrap_up', focusPlan: TodayPlanFocus | undefined, actionItems: TodayActionItem[] = [], carryCandidates: TodayActionItem[] = []): TodayResponse {
   const focus = stage === 'wrap_up'
-    ? { stage, wrapUp: { missingCheckIns: [], openPromises: [], carryCandidates: [], eodNoteTarget: { type: 'view', view: 'notes', date: DATE } } }
+    ? { stage, wrapUp: { missingCheckIns: [], openPromises: [], carryCandidates, eodNoteTarget: { type: 'view', view: 'notes', date: DATE } } }
     : { stage, morning: { nowCount: 0, oneOnOnes: [] } };
   return {
     date: DATE,
@@ -261,7 +261,7 @@ describe('TodayPage plan', () => {
   });
 
   it('reads the cleared count from real completions, not from this session', async () => {
-    const response = today('morning_plan', plan({ doneToday: { count: 4, items: [] } }), [queueRow('T-1', 'Alpha', 0)]);
+    const response = today('morning_plan', plan({ doneToday: { count: 4, items: [] } }), [{ ...queueRow('T-1', 'Alpha', 0), id: 'overdue-1', type: 'overdue_issue' }]);
     mockFetch(response);
     renderToday();
 
@@ -285,7 +285,9 @@ describe('TodayPage plan', () => {
     const tomorrow = screen.getByRole('group', { name: "Tomorrow's top 3" });
     expect(within(tomorrow).getByText(/1\/3/)).toBeInTheDocument();
     expect(within(tomorrow).getByTestId('tomorrow-top3-row')).toHaveTextContent('Beta');
-    fireEvent.click(within(tomorrow).getByRole('button', { name: "Pick Alpha for tomorrow's top 3" }));
+    const open = screen.getByRole('group', { name: 'Still open today (1)' });
+    expect(within(open).queryByText('Beta')).not.toBeInTheDocument();
+    fireEvent.click(within(open).getByRole('button', { name: "Pick Alpha for tomorrow's top 3" }));
 
     await waitFor(() => expect(calls(fetchMock, '/api/today/top3')).toHaveLength(1));
     expect(JSON.parse(String(calls(fetchMock, '/api/today/top3')[0]![1]?.body))).toEqual({ date: '2026-03-09', taskKeys: ['T-2', 'T-1'] });
@@ -300,6 +302,106 @@ describe('TodayPage plan', () => {
     fireEvent.click(await screen.findByRole('button', { name: "Remove Alpha from tomorrow's top 3" }));
     await waitFor(() => expect(calls(fetchMock, '/api/today/top3')).toHaveLength(1));
     expect(JSON.parse(String(calls(fetchMock, '/api/today/top3')[0]![1]?.body))).toEqual({ date: '2026-03-09', taskKeys: ['T-2'] });
+  });
+
+  describe('wrap-up keeps unfinished work (docs/63 #2)', () => {
+    const four = () => plan({ items: ['Alpha', 'Beta', 'Gamma', 'Delta'].map((title, index) => planItem(`T-${index + 1}`, title)) });
+
+    it('shows every unfinished plan task in the morning and again at wrap-up, none lost at the phase change', async () => {
+      mockFetch(today('morning_plan', four()));
+      renderToday();
+      await screen.findByRole('heading', { name: 'My plan' });
+      const morning = screen.getAllByTestId('today-plan-row').map((row) => row.textContent);
+      expect(morning.join('|')).toMatch(/Alpha.*Beta.*Gamma.*Delta/);
+      cleanup();
+
+      mockFetch(today('wrap_up', four()));
+      renderToday();
+      const open = await screen.findByRole('group', { name: 'Still open today (4)' });
+      expect(within(open).getAllByTestId('tomorrow-top3-candidate')).toHaveLength(3);
+      fireEvent.click(within(open).getByRole('button', { name: '+1 more' }));
+      const titles = within(open).getAllByTestId('tomorrow-top3-candidate').map((row) => row.textContent ?? '');
+      expect(titles).toHaveLength(4);
+      expect(titles[3]).toContain('Delta');
+    });
+
+    it('finishes an unfinished task from the wrap-up through the command engine', async () => {
+      let current = today('wrap_up', four());
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/api/manager-actions/commands')) {
+          current = today('wrap_up', plan({ items: four().items.slice(1), doneToday: { count: 1, items: [] } }));
+          return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify(url.includes('/api/today?') ? current : { ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      renderToday();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Done Alpha' }));
+      await waitFor(() => expect(calls(fetchMock as ReturnType<typeof mockFetch>, '/api/manager-actions/commands')).toHaveLength(1));
+      await waitFor(() => expect(screen.getByRole('group', { name: 'Still open today (3)' })).toBeInTheDocument());
+      expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    });
+
+    it('keeps unfinished tasks visible when tomorrow is full, with Pick disabled and explained', async () => {
+      const picked = ['T-1', 'T-2', 'T-3'].map((key) => planItem(key, `Pinned ${key}`, { pinned: true }));
+      mockFetch(today('wrap_up', plan({
+        items: [...picked, planItem('T-4', 'Delta'), planItem('T-5', 'Epsilon')],
+        tomorrowTop3: { date: '2026-03-09', items: picked },
+      })));
+      renderToday();
+
+      const open = await screen.findByRole('group', { name: 'Still open today (2)' });
+      const pick = within(open).getByRole('button', { name: "Pick Delta for tomorrow's top 3" });
+      expect(pick).toBeDisabled();
+      expect(pick).toHaveAttribute('title', expect.stringContaining('full'));
+      expect(within(open).getByText('Epsilon')).toBeInTheDocument();
+    });
+
+    it('folds a carry row for a planned task into that task instead of listing it twice', async () => {
+      const carry: TodayActionItem = {
+        ...queueRow('T-1', 'Alpha', 0),
+        id: 'today-desk-carry-1',
+        type: 'desk_carry_forward',
+        primaryAction: { kind: 'carry_forward', label: 'Carry to tomorrow', target: queueRow('T-1', 'Alpha', 0).target, toDate: '2026-03-09', confirm: false, undoable: true },
+      };
+      mockFetch(today('wrap_up', plan({ items: [planItem('T-1', 'Alpha')] }), [], [carry]));
+      renderToday();
+
+      const open = await screen.findByRole('group', { name: 'Still open today (1)' });
+      expect(within(open).getByRole('button', { name: 'Carry Alpha to tomorrow' })).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /Carry to tomorrow/ })).not.toBeInTheDocument();
+      expect(screen.getAllByText('Alpha')).toHaveLength(1);
+    });
+
+    it('makes no "nothing left" claim while a source failed to load (docs/63 #6)', async () => {
+      const response = today('wrap_up', plan({ doneToday: { count: 2, items: [] } }));
+      mockFetch({ ...response, isPartial: true, sourceStatus: { issues: 'ready', team: 'unavailable', desk: 'ready', sync: 'ready', drift: 'ready', one_on_one: 'ready' } });
+      renderToday();
+
+      await screen.findByRole('heading', { name: 'Wrap-up' });
+      expect(screen.getByText(/Team unavailable/)).toBeInTheDocument();
+      expect(screen.queryByText(/Nothing left|Nothing was planned|Loops closed/)).not.toBeInTheDocument();
+    });
+
+    it('makes no completion claim while a plan task is open, and none on a day with nothing at all', async () => {
+      mockFetch(today('wrap_up', plan({ items: [planItem('T-1', 'Alpha')], doneToday: { count: 2, items: [] } })));
+      renderToday();
+      await screen.findByRole('group', { name: 'Still open today (1)' });
+      expect(screen.queryByText(/Nothing left|Loops closed|Nothing was planned/)).not.toBeInTheDocument();
+      cleanup();
+
+      mockFetch(today('wrap_up', plan()));
+      renderToday();
+      expect(await screen.findByText('Nothing was planned or finished today.')).toBeInTheDocument();
+      expect(screen.queryByText(/Loops closed|Nothing left/)).not.toBeInTheDocument();
+      cleanup();
+
+      mockFetch(today('wrap_up', plan({ doneToday: { count: 2, items: [] } })));
+      renderToday();
+      expect(await screen.findByText('Nothing left on your plan, promises, carry-over or check-ins.')).toBeInTheDocument();
+    });
   });
 
   it('without a plan (legacy task model) Today renders as before', async () => {

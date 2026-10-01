@@ -285,6 +285,24 @@ describe("Today plan (P3-01)", () => {
     expect((await getToday()).focus.plan.top3).toEqual([parked]);
   });
 
+  it("keeps four ordinary unpinned tasks on the plan across the wrap-up boundary (docs/63 #2)", async () => {
+    const keys = [await add("Alpha", { scheduledOn: DATE }), await add("Bravo", { scheduledOn: DATE }), await add("Charlie", { scheduledOn: DATE }), await add("Delta", { scheduledOn: DATE })];
+
+    vi.setSystemTime(new Date("2026-03-08T15:59:00.000Z"));
+    const before = await getToday();
+    vi.setSystemTime(new Date("2026-03-08T16:00:00.000Z"));
+    const after = await getToday();
+
+    expect(before.rhythm.stage).toBe("midday_check");
+    expect(after.rhythm.stage).toBe("wrap_up");
+    for (const today of [before, after]) {
+      expect(today.focus.plan.items.map((item: { taskKey: string }) => item.taskKey).sort()).toEqual([...keys].sort());
+      expect(today.focus.plan.items.every((item: { pinned: boolean }) => !item.pinned)).toBe(true);
+    }
+    // Ordinary tasks scheduled today are not carry rows, so the plan is the only place wrap-up can list them.
+    expect(after.focus.wrapUp.carryCandidates).toEqual([]);
+  });
+
   it("has no plan without the canonical task model", async () => {
     await db.delete(configTable);
     expect((await getToday()).focus.plan).toBeUndefined();

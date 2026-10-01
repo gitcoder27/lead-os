@@ -571,7 +571,7 @@ describe('TodayPage V2', () => {
     expect(screen.getByRole('button', { name: /^Note$/i })).toBeInTheDocument();
   });
 
-  it('solo: the wrap-up reaches "Loops closed for today" with no check-in block (P1-04)', async () => {
+  it('solo: the wrap-up states exactly what is clear, with no check-in block (P1-04)', async () => {
     teamModeMock.mode = 'solo';
     const response = todayResponse({
       rhythm: { stage: 'wrap_up', label: 'Wrap-up', detail: 'Close loops' },
@@ -584,7 +584,8 @@ describe('TodayPage V2', () => {
     renderToday(response);
 
     const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
-    expect(within(panel).getByText('Loops closed for today.')).toBeInTheDocument();
+    expect(within(panel).getByText('No open promises, carry-over or missing check-ins.')).toBeInTheDocument();
+    expect(within(panel).queryByText(/Loops closed/)).not.toBeInTheDocument();
     expect(within(panel).queryByText(/No check-in today/)).not.toBeInTheDocument();
   });
 

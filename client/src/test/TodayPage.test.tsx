@@ -1447,11 +1447,11 @@ describe('TodayPage V2', () => {
       });
     });
 
-    it('identical follow-ups fold into one row with "Done all"', async () => {
+    it('same-titled follow-ups stay separate rows, each with its own Done and no "Done all" (docs/63 #5)', async () => {
       const followUp = (id: number) => {
-        const deskTarget = target({ type: 'follow_up', view: 'follow-ups', managerDeskItemId: id });
+        const deskTarget = target({ type: 'follow_up', view: 'tasks', managerDeskItemId: id, taskKey: `T-${id}` });
         return actionItem(id, {
-          id: `follow-up-${id}`, type: 'follow_up_due', title: 'Standup follow-up: Harsha', signal: 'Overdue follow-up', target: deskTarget,
+          id: `follow-up-${id}`, type: 'follow_up_due', title: 'Send update', signal: 'Overdue follow-up', target: deskTarget,
           primaryAction: { kind: 'mark_done', label: 'Done', target: deskTarget, undoable: true }, secondaryActions: [],
         });
       };
@@ -1459,12 +1459,16 @@ describe('TodayPage V2', () => {
       const fetchMock = mockFetch(response);
       renderToday(response);
 
-      const group = await screen.findByRole('group', { name: 'Standup follow-up: Harsha · ×2' });
-      expect(screen.getAllByTestId('today-action-row')).toHaveLength(2);
-      fireEvent.click(within(group).getByRole('button', { name: 'Done all' }));
+      await screen.findByRole('heading', { name: 'Queue' });
+      expect(screen.queryByRole('button', { name: 'Done all' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: /×2/ })).not.toBeInTheDocument();
+      const rows = screen.getAllByTestId('today-action-row').filter((entry) => entry.textContent?.includes('Send update'));
+      expect(rows).toHaveLength(2);
+      fireEvent.click(within(rows[0]!).getByRole('button', { name: 'Done' }));
       await waitFor(() => {
         const done = fetchMock.mock.calls.filter(([, init]) => String((init as RequestInit | undefined)?.body).includes('"kind":"mark_done"'));
-        expect(done).toHaveLength(2);
+        expect(done).toHaveLength(1);
+        expect(String((done[0]![1] as RequestInit).body)).toContain('"taskKey":"T-70"');
       });
     });
 

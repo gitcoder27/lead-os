@@ -231,14 +231,25 @@ describe('splitPanelRows', () => {
     expect(split.carry.map((item) => item.id)).toEqual(['c']);
   });
 
-  it('folds identical follow-ups (two or more) with a Done-all bulk', () => {
-    const items = [row('p1', { title: 'Ping QA' }), row('p2', { title: 'ping qa ' }), row('p3', { title: 'Other' })];
+  it('never folds follow-ups by title: same-titled rows are separate commitments with no bulk completion (docs/63 #5)', () => {
+    const items = [
+      row('p1', { title: 'Send update', type: 'follow_up_due', target: desk(1) }),
+      row('p2', { title: 'send update ', type: 'follow_up_due', target: desk(2) }),
+      row('m1', { title: 'Design review', type: 'meeting_outcome', target: desk(3) }),
+      row('m2', { title: 'Design review', type: 'meeting_outcome', target: desk(4) }),
+    ];
     const { items: out, groups } = groupQueueItems(items);
+    expect(groups.size).toBe(0);
+    expect(out.map((item) => item.id)).toEqual(['p1', 'p2', 'm1', 'm2']);
+    expect(out.some((item) => /all/i.test(item.primaryAction.label))).toBe(false);
+  });
+
+  it('still folds three or more people with the same reason into one Ask-all row', () => {
+    const person = (id: string) => row(id, { type: 'stale_check_in', signal: 'Stale by time', target: dev(id), primaryAction: { kind: 'add_check_in', label: 'Add check-in', target: dev(id) }, secondaryActions: [{ kind: 'ask_check_in', label: 'Ask', target: dev(id) }] });
+    const { items: out, groups } = groupQueueItems([person('a'), person('b'), person('c'), row('z')]);
     expect(out).toHaveLength(2);
-    const group = [...groups.values()][0]!;
-    expect(group).toMatchObject({ kind: 'duplicates', reason: '×2' });
-    expect(group.bulk?.label).toBe('Done all');
-    expect(out[0]?.primaryAction.label).toBe('Done all');
+    expect([...groups.values()][0]).toMatchObject({ kind: 'people', reason: 'Stale by time' });
+    expect(out[0]?.primaryAction.label).toBe('Ask all');
   });
 });
 

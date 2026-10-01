@@ -86,14 +86,18 @@ export function splitPanelRows(items: TodayActionItem[]): TodayPanelRows {
 
 // ── Queue grouping ────────────────────────────────────────────────────────
 
-/** Rows about people that share one reason collapse into a single group row. */
+/**
+ * Rows about people that share one reason collapse into a single group row.
+ * docs/63 #5: only people. Rows that merely share a title (two "Send update" follow-ups for different
+ * people) are different commitments, so they stay separate and nothing offers to finish them together.
+ */
 const PEOPLE_TYPES = new Set<TodayActionItem['type']>(['stale_check_in', 'developer_attention']);
 export const QUEUE_GROUP_MIN = 3;
 
 export interface TodayQueueGroup {
   id: string;
-  kind: 'people' | 'duplicates';
-  /** The chip on the group row ("Stale by time", "×2"). */
+  kind: 'people';
+  /** The chip on the group row ("Stale by time"). */
   reason: string;
   members: TodayActionItem[];
   /** The group row's one-tap write, fanned out per member. */
@@ -102,25 +106,16 @@ export interface TodayQueueGroup {
 
 /**
  * One row per fact: "5 people · Stale by time · Ask all" instead of five
- * identical rows, and one "Standup follow-up: Harsha ×2 · Done all" instead
- * of two. The group sits at its highest-ranked member's position and is a
+ * identical rows. The group sits at its highest-ranked member's position and is a
  * synthetic queue item, so limits, expansion and triage treat it as a row.
  */
 export function groupQueueItems(items: TodayActionItem[]): { items: TodayActionItem[]; groups: Map<string, TodayQueueGroup> } {
-  const buckets = new Map<string, { kind: TodayQueueGroup['kind']; reason: string; members: TodayActionItem[] }>();
+  const buckets = new Map<string, { reason: string; members: TodayActionItem[] }>();
   for (const item of items) {
-    let key: string | undefined;
-    let kind: TodayQueueGroup['kind'] = 'people';
-    let reason = '';
-    if (PEOPLE_TYPES.has(item.type)) {
-      reason = signalChips(item.signal)[0] ?? item.signal;
-      key = `people|${item.type}|${reason}|${item.primaryAction.kind}`;
-    } else if (item.type === 'follow_up_due' || item.type === 'meeting_outcome') {
-      kind = 'duplicates';
-      key = `dup|${item.type}|${item.title.trim().toLowerCase()}`;
-    }
-    if (!key) continue;
-    const bucket = buckets.get(key) ?? { kind, reason, members: [] };
+    if (!PEOPLE_TYPES.has(item.type)) continue;
+    const reason = signalChips(item.signal)[0] ?? item.signal;
+    const key = `people|${item.type}|${reason}|${item.primaryAction.kind}`;
+    const bucket = buckets.get(key) ?? { reason, members: [] };
     bucket.members.push(item);
     buckets.set(key, bucket);
   }
@@ -128,10 +123,9 @@ export function groupQueueItems(items: TodayActionItem[]): { items: TodayActionI
   const groups = new Map<string, TodayQueueGroup>();
   const memberToGroup = new Map<string, string>();
   for (const [key, bucket] of buckets) {
-    const min = bucket.kind === 'people' ? QUEUE_GROUP_MIN : 2;
-    if (bucket.members.length < min) continue;
+    if (bucket.members.length < QUEUE_GROUP_MIN) continue;
     const id = `group:${key}`;
-    groups.set(id, buildGroup(id, bucket.kind, bucket.reason, bucket.members));
+    groups.set(id, buildGroup(id, bucket.reason, bucket.members));
     for (const member of bucket.members) memberToGroup.set(member.id, id);
   }
   if (groups.size === 0) return { items, groups };
@@ -151,27 +145,14 @@ export function groupQueueItems(items: TodayActionItem[]): { items: TodayActionI
   return { items: out, groups };
 }
 
-function buildGroup(id: string, kind: TodayQueueGroup['kind'], reason: string, members: TodayActionItem[]): TodayQueueGroup {
-  if (kind === 'duplicates') {
-    const lead = members[0]!;
-    const commands = members.map((member) => member.primaryAction).filter((command) => command.kind === lead.primaryAction.kind);
-    return {
-      id,
-      kind,
-      reason: `×${members.length}`,
-      members,
-      bulk: commands.length === members.length && lead.primaryAction.kind === 'mark_done'
-        ? { label: 'Done all', commands, toast: (count) => `Marked ${count} done` }
-        : undefined,
-    };
-  }
+function buildGroup(id: string, reason: string, members: TodayActionItem[]): TodayQueueGroup {
   const asks = members
     .filter((member) => !member.askedAt)
     .map((member) => member.secondaryActions.find((action) => action.kind === 'ask_check_in'))
     .filter((command): command is TodayActionCommand => Boolean(command));
   return {
     id,
-    kind,
+    kind: 'people',
     reason,
     members,
     bulk: asks.length > 0
@@ -184,7 +165,7 @@ function groupItem(group: TodayQueueGroup): TodayActionItem {
   const lead = group.members[0]!;
   const teamTarget: TodayActionTarget = { type: 'view', view: 'team', date: lead.target.date };
   const asked = group.members.filter((member) => member.askedAt).length;
-  const base = {
+  return {
     id: group.id,
     type: lead.type,
     signal: group.reason,
@@ -192,21 +173,6 @@ function groupItem(group: TodayQueueGroup): TodayActionItem {
     priority: lead.priority,
     group: lead.group,
     secondaryActions: [],
-  };
-  if (group.kind === 'duplicates') {
-    return {
-      ...base,
-      title: lead.title,
-      context: lead.context,
-      freshness: lead.freshness,
-      target: lead.target,
-      primaryAction: group.bulk
-        ? { kind: lead.primaryAction.kind, label: group.bulk.label, target: lead.target }
-        : lead.primaryAction,
-    };
-  }
-  return {
-    ...base,
     title: `${group.members.length} people`,
     context: group.members.map((member) => firstName(member.title)).join(', '),
     freshness: asked > 0 ? `${asked} asked` : undefined,

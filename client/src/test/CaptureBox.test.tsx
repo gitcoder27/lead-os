@@ -237,6 +237,33 @@ describe('CaptureBox (P3-D8)', () => {
     expect(lastBody().confirm).toBe(true);
   });
 
+  it('holds a malformed @mention for a decision, says what it would keep, and sends the text untouched on confirm (docs/63 #8)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Ask @harsha, about the rollout' } });
+    // The preview already warns before anything is sent.
+    expect(screen.getByText(/isn't a valid mention — did you mean @harsha\?/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /capture/i }));
+    expect(lastBody().text).toBe('Ask @harsha, about the rollout');
+    expect(lastBody().confirm).toBeUndefined();
+
+    const options = mockMutate.mock.calls.at(-1)?.[1] as { onSuccess: (res: CaptureResponseBody) => void };
+    act(() =>
+      options.onSuccess({
+        intent: 'create',
+        blocked: false,
+        confirmRequired: true,
+        diagnostics: [{ severity: 'warning', code: 'malformed-mention', token: '@harsha,', message: '"@harsha," isn\'t a valid mention — did you mean @harsha? Otherwise it stays in the title as text' }],
+      } as CaptureResponseBody),
+    );
+    expect(screen.getAllByRole('status').some((node) => node.textContent?.includes('press Enter or Capture again to keep it as text'))).toBe(true);
+    expect(screen.queryByText(/Past date/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }));
+    // Nothing is rewritten on confirm: same text, now with the confirmation.
+    expect(lastBody().text).toBe('Ask @harsha, about the rollout');
+    expect(lastBody().confirm).toBe(true);
+  });
+
   it('shows server diagnostics when the server blocks', () => {
     const { input } = renderBox();
     fireEvent.change(input, { target: { value: 'T-999: hello' } });

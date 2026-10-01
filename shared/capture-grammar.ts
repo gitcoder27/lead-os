@@ -101,6 +101,8 @@ export type CaptureDiagnosticCode =
   | "past-date"
   | "unparsed-date"
   | "unparsed-token"
+  /** docs/63 #8: an `@…` word that is not a valid mention (`@harsha,`); needs a decision before it becomes title text. */
+  | "malformed-mention"
   | "unknown-person"
   | "ambiguous-person"
   | "jira-not-synced"
@@ -301,6 +303,15 @@ export function normalizeCaptureTaskKey(raw: string): string {
   return match ? `T-${Number(match[1])}` : raw;
 }
 
+/** A word that starts like a mention (after stray brackets or quotes) and has a name after the `@`. A bare `@` is just text. */
+const MALFORMED_MENTION = /^[([{"'`]*@\S/;
+
+/** `@harsha,` → `@harsha`: the mention a stray bracket or punctuation mark probably spoiled, or undefined. */
+function mentionRepair(raw: string): string | undefined {
+  const trimmed = raw.replace(/^[([{"'`]+(?=@)/, "").replace(/[)\]}"'`,;.!?:]+$/, "");
+  return trimmed !== raw && PERSON_REF.test(trimmed) ? trimmed : undefined;
+}
+
 function splitWords(text: string): CaptureWord[] {
   const words: CaptureWord[] = [];
   for (const match of text.matchAll(/\S+/g)) {
@@ -423,7 +434,20 @@ export function parseCapture(text: string, today: string): ParsedCapture {
       token = { ...base, kind: "waiting" };
     } else if (label) {
       token = { ...base, kind: "label", value: label[1]!.toLowerCase() };
-    } else if (/^[@^+#]/.test(word.raw)) {
+    } else if (MALFORMED_MENTION.test(word.raw)) {
+      // docs/63 #8: a mention that does not parse would otherwise become title text and leave the task
+      // unowned without anyone noticing. Nothing is stripped or guessed: the text is kept as typed, the
+      // manager is asked to fix it or keep it, and a repair is only ever suggested.
+      const repaired = mentionRepair(word.raw);
+      diagnostics.push({
+        severity: "warning",
+        code: "malformed-mention",
+        message: repaired
+          ? `"${word.raw}" isn't a valid mention — did you mean ${repaired}? Otherwise it stays in the title as text`
+          : `"${word.raw}" isn't a valid mention — it stays in the title as text`,
+        token: word.raw,
+      });
+    } else if (/^[\^+#]/.test(word.raw)) {
       // Looks like a token but doesn't parse — keep it as title text.
       pushDiagnostic(diagnostics, "warning", "unparsed-token", `"${word.raw}" isn't recognized — kept as text`, undefined);
     }
@@ -576,7 +600,7 @@ export function resolveCapture(parsed: ParsedCapture, lookups: CaptureLookups = 
   if (followUp) labels.unshift("category:follow_up");
 
   const blocked = diagnostics.some((entry) => entry.severity === "error");
-  const confirmRequired = !blocked && diagnostics.some((entry) => entry.code === "past-date");
+  const confirmRequired = !blocked && diagnostics.some((entry) => entry.code === "past-date" || entry.code === "malformed-mention");
 
   return {
     intent: parsed.intent,

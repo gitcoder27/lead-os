@@ -31,7 +31,7 @@ Routing is custom in `client/src/App.tsx` using `window.history.pushState` and `
 
 Canonical routes:
 
-- `/`: Today, the manager daily command view (`focus.plan` is my plan; up to three tasks can be pinned per day with `PUT /api/today/top3` and lead the queue).
+- `/`: Today, the manager daily command view: my commitments plus actionable exceptions, not a team board (`focus.plan` is My plan and stays reachable through wrap-up as "Still open today"; up to three optional pins per day via `PUT /api/today/top3` lead My plan and are not repeated as queue rows; dates are calendar-validated and resolved in the client's `tz`). `sourceStatus` also reports `plan`/`state`/`review` when they fail, and queue rows past the server's 100-row cap are reported, not advertised.
 - `/work`: Jira defect and work triage dashboard.
 - `/team`: Team Tracker for day plans, current work, status, check-ins, attention signals, saved views, and carry-forward.
 - `/tasks`: the Tasks workspace (`?view=<id>` plus filter overrides; `?task=` opens the drawer). Built-in views: Planned today, Inbox, My tasks, Waiting / Delegated (`waiting`, the old Follow-ups), Meetings (`meetings`, with `n/m actions` from child tasks), Later, Needs attention, Closed · last 7 days; saved views are per manager. Needs Phase 3 (stage `2c`); a workspace with no task data starts there (`db/canonical-start.ts`, run by `migrate()` and on workspace creation), and workspaces with legacy data keep the cutover tooling. `/desk` is the legacy Manager Desk page and the same route in a workspace without Phase 3.
@@ -113,6 +113,7 @@ Backend conventions:
 - The first app account must be a manager.
 - Most API routes are manager-only.
 - Developer users route to `/my-day`; developer API access is primarily through `/api/my-day`.
+- Task views (`GET /api/tasks?viewDef=`, `/api/tasks/view-counts`) and Today's plan accept the client's `tz` so deadlines bucket on the manager's day; malformed `@mention` words (`@harsha,`) need a capture confirmation and are refused outright by callers without one (Today's follow-up dialog, Copilot `capture`, `createTaskViaCapture`), while the literal task APIs are unchanged.
 - Jira sync scope (`jira_sync_scope_mode`): `team_and_unassigned` (default: roster plus unassigned issues, works with an empty roster), `team_assignees` (roster only) or `base_query` (exact JQL). Workspaces that already had issues or Jira settings when the default changed were pinned to `team_assignees` by the `jira_sync_scope_pin_v1` migration. `GET /api/sync/status` carries `syncScope: { mode, rosterSize }` for the Work empty-state diagnostic.
 - Jira config is a mix of env vars and persisted SQLite settings. The live Jira API token is handled by runtime credentials/config flows; never hardcode or commit secrets.
 - Copilot config lives in the `config` table (`ai_assistant_enabled`, `ai_provider`, `ai_base_url`, `ai_model`, `ai_max_tool_iterations`, `ai_response_style`, `ai_suggest_followups`, encrypted `ai_api_key`) via `GET/PUT /api/config/ai` + `POST /api/config/ai/test`; Cmd/Ctrl+J toggles the dock. Replies stream via provider SSE (`delta`/`reasoning_delta` NDJSON events), follow-up chips via `followups`, and `retry: true` on `/chat` regenerates the last answer.

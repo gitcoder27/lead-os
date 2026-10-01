@@ -192,7 +192,67 @@ describe("parseCapture — dates", () => {
   it("token-shaped words that don't parse stay in the title with a warning", () => {
     const parsed = resolved("Email @@ops and ##help now");
     expect(parsed.title).toBe("Email @@ops and ##help now");
-    expect(parsed.diagnostics.filter((d) => d.code === "unparsed-token")).toHaveLength(2);
+    expect(parsed.diagnostics.filter((d) => d.code === "unparsed-token")).toHaveLength(1);
+    expect(parsed.diagnostics.filter((d) => d.code === "malformed-mention")).toHaveLength(1);
+  });
+
+  describe("malformed mentions (docs/63 #8)", () => {
+    const mention = (text: string) => resolved(text).diagnostics.find((d) => d.code === "malformed-mention");
+
+    it.each([
+      ["Ask @dev-1, about the rollout", "@dev-1,", "@dev-1"],
+      ["Ask (@sam) about it", "(@sam)", "@sam"],
+      ["Ask \"@sam\" about it", "\"@sam\"", "@sam"],
+    ])("%s → needs a decision, suggests the clean mention, changes nothing", (text, token, repair) => {
+      const parsed = resolved(text);
+      const diagnostic = mention(text)!;
+      expect(diagnostic).toMatchObject({ severity: "warning", token });
+      expect(diagnostic.message).toContain(`did you mean ${repair}?`);
+      // Nothing was stripped, nothing was assigned: the text is exactly as typed and nobody owns it.
+      expect(parsed.title).toBe(text);
+      expect(parsed.owner).toBeNull();
+      expect(parsed.peopleLinks).toEqual([]);
+      expect(parsed.blocked).toBe(false);
+      expect(parsed.confirmRequired).toBe(true);
+    });
+
+    it("a mention whose trailing . or : parses as part of the name is blocked as unknown, never kept as a literal title", () => {
+      for (const text of ["Ask @dev-1. Then ship", "Ask @sam: and ship"]) {
+        const parsed = resolved(text);
+        expect(parsed.diagnostics.find((d) => d.code === "unknown-person")?.severity, text).toBe("error");
+        expect(parsed.blocked, text).toBe(true);
+        expect(parsed.owner, text).toBeNull();
+      }
+    });
+
+    it("has no suggestion when no clean mention can be recovered", () => {
+      const diagnostic = mention("Ping @@ops today")!;
+      expect(diagnostic.message).not.toContain("did you mean");
+      expect(resolved("Ping @@ops today").confirmRequired).toBe(true);
+    });
+
+    it("a valid mention — including a Jira colon id — is untouched and needs no confirmation", () => {
+      for (const text of ["Ask @sam about it", "Ask @712020:abc-1234 about it", "Ask @dev-1 about it"]) {
+        const parsed = resolved(text);
+        expect(parsed.diagnostics.some((d) => d.code === "malformed-mention"), text).toBe(false);
+        expect(parsed.confirmRequired, text).toBe(false);
+      }
+    });
+
+    it("emails, a bare @ and a mid-word @ are ordinary text", () => {
+      for (const text of ["Write to ops@example.com today", "Meet @ 5pm", "Call a@b about it"]) {
+        const parsed = resolved(text);
+        expect(parsed.diagnostics.some((d) => d.code === "malformed-mention"), text).toBe(false);
+        expect(parsed.title, text).toBe(text);
+        expect(parsed.confirmRequired, text).toBe(false);
+      }
+    });
+
+    it("an unknown but well-formed person is still an error, not a silent literal", () => {
+      const parsed = resolved("Ask @ghost about it");
+      expect(parsed.diagnostics.find((d) => d.code === "unknown-person")?.severity).toBe("error");
+      expect(parsed.blocked).toBe(true);
+    });
   });
 });
 

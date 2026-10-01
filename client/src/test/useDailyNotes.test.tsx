@@ -248,6 +248,23 @@ describe('daily note mutations', () => {
       expect(apiMocks.post.mock.calls[1]![1]).toMatchObject({ text: 'Ask ghost about pricing', requestId: 'r6' });
     });
 
+    it('keeps a malformed @mention\'s words exactly, minus only the @, and assigns nobody (docs/63 #8)', async () => {
+      const malformed = { severity: 'warning', code: 'malformed-mention', message: '"(@harsha)," isn\'t a valid mention', token: '(@harsha),' };
+      apiMocks.post
+        .mockResolvedValueOnce({ intent: 'create', confirmRequired: true, diagnostics: [malformed] })
+        .mockResolvedValueOnce(created());
+      const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });
+      await act(async () => {
+        await result.current.mutateAsync({ title: 'Ask (@harsha), about pricing', requestId: 'r9' });
+      });
+      // First post sends the note text untouched; the retry drops only the stray @ — brackets and commas stay.
+      expect(apiMocks.post).toHaveBeenCalledTimes(2);
+      expect(apiMocks.post.mock.calls[0]![1]).toMatchObject({ text: 'Ask (@harsha), about pricing' });
+      const retry = apiMocks.post.mock.calls[1]![1];
+      expect(retry.text).toBe('Ask (harsha), about pricing');
+      expect(retry.defaults?.ownerAccountId).toBeUndefined();
+    });
+
     it('still rejects an ambiguous name, so the manager chooses', async () => {
       apiMocks.post.mockResolvedValueOnce({ intent: 'create', blocked: true, diagnostics: [{ severity: 'error', code: 'ambiguous-person', message: '@al is ambiguous — pick someone', token: '@al' }] });
       const { result } = renderHook(() => useCreateDailyNoteTask(DATE), { wrapper: createWrapper(new QueryClient()) });

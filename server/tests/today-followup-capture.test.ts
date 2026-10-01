@@ -112,6 +112,15 @@ describe("Today follow-ups through capture (P3-05)", () => {
     expect(await db.select().from(tasks)).toHaveLength(0);
   });
 
+  it("refuses a follow-up title with a malformed @mention instead of saving it as text (docs/63 #8)", async () => {
+    await expect(todayService().executeCommand("manager-1", followUpCommand("Ask @dev-1, about it"), manager))
+      .rejects.toMatchObject({ status: 400, message: expect.stringContaining("isn't a valid mention") });
+    expect(await db.select().from(tasks)).toHaveLength(0);
+    // A valid mention still works, and plain text containing an email is left alone.
+    const ok = await todayService().executeCommand("manager-1", followUpCommand("Mail ops@example.com"), manager);
+    expect((ok.result as { title: string }).title).toBe("Mail ops@example.com");
+  });
+
   it("undo of a task that is already gone is harmless", async () => {
     const service = todayService();
     const response = await service.executeCommand("manager-1", followUpCommand("Short lived"), manager);

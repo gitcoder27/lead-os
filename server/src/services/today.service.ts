@@ -2,7 +2,7 @@ import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
 import { WeeklyReviewService } from "./weekly-review.service";
 import { buildTopThreeActions, TodayPlanService } from "./today-plan.service";
-import { CaptureService } from "./capture.service";
+import { CaptureService, malformedMentionMessage } from "./capture.service";
 import { JiraDriftService, type JiraDriftEntry } from "./jira-drift.service";
 import { OneOnOneService } from "./one-on-one.service";
 import { performance } from "node:perf_hooks";
@@ -852,6 +852,8 @@ export class TodayService {
   ): Promise<CreatedFollowUp> {
     const taskKeys = new TaskKeysService();
     if (await taskKeys.phase3Enabled(workspaceId).catch(() => false)) {
+      const malformed = malformedMentionMessage(params.title);
+      if (malformed) throw new HttpError(400, malformed);
       const links = params.links ?? [];
       const jiraKeys = links.flatMap((link) => (link.linkType === "issue" ? [link.issueKey] : []));
       const developerAccountIds = links.flatMap((link) => (link.linkType === "developer" ? [link.developerAccountId] : []));

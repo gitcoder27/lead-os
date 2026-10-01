@@ -38,6 +38,18 @@ export function isUntriaged(resolved: ResolvedCapture, defaults: CaptureDefaults
 }
 
 /**
+ * docs/63 #8: callers that cannot ask the manager to confirm (Copilot's capture tool, Today's follow-up
+ * dialog) still must not turn `@harsha,` into a title with an unnoticed, unowned literal. Returns the
+ * message to refuse with, or undefined when the text has no malformed mention. Update and note bodies are
+ * literal text and are never inspected.
+ */
+export function malformedMentionMessage(text: string): string | undefined {
+  const parsed = parseCapture(text, todayIsoDate());
+  if (parsed.intent !== "create") return undefined;
+  return parsed.diagnostics.find((entry) => entry.code === "malformed-mention")?.message;
+}
+
+/**
  * Phase 3 (P3-D7/D8, §4.3): `POST /api/capture` — the single capture box.
  * Re-parses the text server-side (the client preview is never trusted),
  * resolves tokens against workspace data, then dispatches to task creation,

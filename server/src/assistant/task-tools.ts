@@ -2,7 +2,7 @@ import { z } from "zod";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskService, taskCreateSchema, taskUpdateSchema, taskLinkSchema } from "../services/task.service";
 import { TaskKeysService } from "../services/task-keys.service";
-import { CaptureService } from "../services/capture.service";
+import { CaptureService, malformedMentionMessage } from "../services/capture.service";
 import { compact, type AssistantToolDefinition, type AssistantToolContext } from "./tools";
 
 const key = z.string().regex(/^[Tt]-\d{1,9}$/);
@@ -67,6 +67,8 @@ export function canonicalTaskTools({ phase3 = true }: { phase3?: boolean } = {})
         if (!(await new TaskKeysService().phase3Enabled(ctx.workspaceId))) throw new HttpError(409, "Phase 3 capture is not enabled");
         const parsed = z.object({ text: z.string().min(1).max(4000) }).strict().safeParse(raw);
         if (!parsed.success) throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join(", "));
+        const malformed = malformedMentionMessage(parsed.data.text);
+        if (malformed) throw new HttpError(400, malformed);
         const outcome = await new CaptureService().run(
           { text: parsed.data.text, confirm: true },
           { type: "copilot", accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId },

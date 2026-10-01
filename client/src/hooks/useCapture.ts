@@ -47,7 +47,7 @@ export interface CreatedViaCapture {
  * docs/57 §3 (P3-05): one-shot task creation for UI paths that are not the
  * capture box (inline add, dialogs, child tasks). The text goes through the
  * shared grammar and `defaults` carry the structured context. A past date is
- * accepted (these paths have no confirm step); an error diagnostic rejects with
+ * accepted (these paths have no confirm step) but a malformed `@mention` is not; an error diagnostic rejects with
  * `CaptureRejectedError`. `post` is injected so a caller can own its own cache
  * invalidation (the notes hooks guard against an auth-scope change).
  */
@@ -64,7 +64,14 @@ export async function createTaskViaCapture(
   const tz = getLocalTimeZone();
   const body: CaptureRequestBody = { text, clientToday: today, ...(tz && { tz }), requestId, ...(defaults ? { defaults } : {}) };
   let res = await post(body);
-  if (res.confirmRequired) res = await post({ ...body, confirm: true });
+  if (res.confirmRequired) {
+    // These paths have no confirm step, so they accept a past date on the manager's behalf — but never a
+    // malformed @mention, which would become an unowned literal title (docs/63 #8). It is refused as an error.
+    if (res.diagnostics.some((entry) => entry.code === 'malformed-mention')) {
+      throw new CaptureRejectedError(res.diagnostics.map((entry) => (entry.code === 'malformed-mention' ? { ...entry, severity: 'error' as const } : entry)));
+    }
+    res = await post({ ...body, confirm: true });
+  }
   if (res.blocked) throw new CaptureRejectedError(res.diagnostics);
   if (!res.task) throw new Error('The task was not created.');
   return { task: res.task, warnings: res.diagnostics.filter((entry) => entry.severity !== 'error') };

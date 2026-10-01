@@ -280,6 +280,42 @@ describe("POST /api/capture (P3-D7/D8)", () => {
     expect(all).toHaveLength(0);
   });
 
+  it("holds a malformed @mention for confirmation; confirming keeps the text as typed and assigns nobody (docs/63 #8)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const held = await capture(headers, "Ask @dev-1, about the rollout");
+    expect(held.status).toBe(200);
+    expect(held.body.confirmRequired).toBe(true);
+    expect(held.body.task).toBeUndefined();
+    expect(held.body.diagnostics.find((d: { code: string }) => d.code === "malformed-mention")).toMatchObject({ token: "@dev-1," });
+    expect(await db.select().from(tasks)).toHaveLength(0);
+
+    const kept = await capture(headers, "Ask @dev-1, about the rollout", { confirm: true });
+    expect(kept.body.task.title).toBe("Ask @dev-1, about the rollout");
+    // No ownership was guessed from the almost-mention.
+    expect(kept.body.task.ownerId).not.toBe("dev-1");
+    expect(kept.body.task.links.filter((link: { kind: string }) => link.kind === "person")).toEqual([]);
+  });
+
+  it("the literal task API still stores a title exactly as given: no grammar, no repair, no inferred owner (docs/63 #8)", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const res = await invoke(app, { method: "POST", url: "/api/tasks", headers, body: { title: "Ask @dev-1, about it (imported)" } });
+    expect(res.status).toBe(201);
+    expect(res.body.title).toBe("Ask @dev-1, about it (imported)");
+    expect(res.body.ownerId).not.toBe("dev-1");
+  });
+
+  it("does not hold a well-formed mention, an email or a bare @", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    for (const text of ["Ask @dev-1 about it", "Write to ops@example.com", "Meet @ 5pm"]) {
+      const res = await capture(headers, text);
+      expect(res.body.confirmRequired, text).toBeUndefined();
+      expect(res.body.task?.title, text).toBeTruthy();
+    }
+  });
+
   it("keeps an unsynced #KEY as title text with a warning", async () => {
     await enablePhase3();
     const headers = { cookie: await cookie("manager-a") };

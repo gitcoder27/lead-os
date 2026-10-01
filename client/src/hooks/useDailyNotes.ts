@@ -168,10 +168,11 @@ function useMutationScopeGuard(): (scopeAtSend: string) => boolean {
 }
 
 /**
- * Note text is not typed as a command, so an `@name` nobody matches stays as
- * plain words (retried once without the `@`) instead of blocking the task or a
- * whole wrap-up batch. Nobody is assigned by guesswork; an ambiguous name still
- * rejects so the manager chooses.
+ * Note text is not typed as a command, so an `@name` nobody matches — or one a
+ * comma or bracket spoiled (`@harsha,`) — stays as plain words (retried once
+ * without the `@`) instead of blocking the task or a whole wrap-up batch. The
+ * words themselves are kept exactly; nobody is assigned by guesswork, and an
+ * ambiguous name still rejects so the manager chooses.
  */
 async function createFromNote(input: CreateViaCapture) {
   try {
@@ -179,8 +180,8 @@ async function createFromNote(input: CreateViaCapture) {
   } catch (error) {
     if (!(error instanceof CaptureRejectedError)) throw error;
     const errors = error.diagnostics.filter((entry) => entry.severity === 'error');
-    if (errors.length === 0 || !errors.every((entry) => entry.code === 'unknown-person' && entry.token)) throw error;
-    const text = errors.reduce((current, entry) => current.replace(entry.token!, entry.token!.replace(/^@/, '')), input.text);
+    if (errors.length === 0 || !errors.every((entry) => (entry.code === 'unknown-person' || entry.code === 'malformed-mention') && entry.token)) throw error;
+    const text = errors.reduce((current, entry) => current.replace(entry.token!, entry.token!.replace(/^([([{"'`]*)@/, '$1')), input.text);
     return createTaskViaCapture(postCapture, { ...input, text });
   }
 }

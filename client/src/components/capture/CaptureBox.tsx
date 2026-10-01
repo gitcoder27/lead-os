@@ -491,8 +491,8 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       </div>
 
       {confirmArmed && (
-        <div className="text-[12px]" role="status" style={{ color: 'var(--warning)' }}>
-          Past date — press Enter or Capture again to confirm.
+        <div className="text-[12px]" role="status" style={{ color: 'var(--warning-text)' }}>
+          {confirmMessage(serverDiagnostics)}
         </div>
       )}
 
@@ -526,4 +526,11 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       </div>
     </div>
   );
+}
+
+/** What pressing Capture a second time would accept: a past date, or a malformed @mention kept as typed. */
+function confirmMessage(diagnostics: CaptureDiagnostic[]): string {
+  const mention = diagnostics.find((entry) => entry.code === 'malformed-mention');
+  if (mention) return `${mention.message}. Edit it, or press Enter or Capture again to keep it as text.`;
+  return 'Past date — press Enter or Capture again to confirm.';
 }

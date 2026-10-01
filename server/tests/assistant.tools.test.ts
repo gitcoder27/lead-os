@@ -175,6 +175,18 @@ describe("assistant tools", () => {
     await expect(capture.execute({ text: "anything" }, ctx())).rejects.toMatchObject({ status: 409 });
   });
 
+  it("the capture tool refuses a malformed @mention rather than creating an unowned literal title (docs/63 #8)", async () => {
+    await db.insert(configTable).values([
+      { key: "tasks_phase1_enabled", value: "true" },
+      { key: "tasks_phase2_stage", value: "2c" },
+      { key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    const capture = createAssistantTools(true).find((tool) => tool.name === "capture")!;
+    await expect(capture.execute({ text: "Ask @dev-1, about it" }, ctx())).rejects.toMatchObject({ status: 400, message: expect.stringContaining("isn't a valid mention") });
+    const { result } = await capture.execute({ text: "Ask about the rollout" }, ctx());
+    expect(JSON.stringify(result)).toContain("Ask about the rollout");
+  });
+
   it("gates the 1:1 tools on one_on_one_enabled (48 §7)", async () => {
     // Flag off → the tools are not registered for the LLM.
     const gated = createAssistantTools(true, { oneOnOne: false });

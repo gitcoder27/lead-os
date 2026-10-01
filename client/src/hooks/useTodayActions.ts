@@ -13,6 +13,8 @@ import type {
   TodayResponse,
 } from '@/types';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
+import { focusWithAsk, focusWithCheckIn, focusWithout } from '@/lib/today-optimistic';
+import { invalidateTaskSurfaces } from '@/hooks/useTaskListMutations';
 
 interface UseTodayActionsOptions {
   date: string;
@@ -45,6 +47,13 @@ function isNavigationCommand(command: TodayActionCommand): boolean {
   return NAVIGATION_KINDS.has(command.kind);
 }
 
+type TodaySnapshot = Array<[readonly unknown[], TodayResponse | undefined]>;
+
+/** Identity of a write: the same command on the same target is one write, however many times it is triggered. */
+function commandKey(command: TodayActionCommand): string {
+  return `${command.kind}|${JSON.stringify(command.target)}`;
+}
+
 /** One Undo can reverse a whole bulk write (Carry all, Ask all). */
 type PendingUndo = { undos: ManagerActionUndo[]; title: string; expiresAt: number };
 
@@ -54,12 +63,20 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
   // docs/53 U4: `z` undoes the most recent write still inside its window.
   const undoStack = useRef<PendingUndo[]>([]);
 
+  // Writes in flight, by command identity: a second click (or a held key) on the
+  // same row rejoins the first write instead of sending it again.
+  const inFlight = useRef(new Map<string, Promise<unknown>>());
+
   const invalidateToday = () => {
-    qc.invalidateQueries({ queryKey: ['today'] });
+    // Task writes also change Tasks lists, drawers, event history and view counts.
+    invalidateTaskSurfaces(qc);
     qc.invalidateQueries({ queryKey: ['manager-actions'] });
-    qc.invalidateQueries({ queryKey: ['manager-desk'] });
-    qc.invalidateQueries({ queryKey: ['team-tracker'] });
-    qc.invalidateQueries({ queryKey: ['workload'] });
+    qc.invalidateQueries({ queryKey: ['daily-notes'] });
+  };
+
+  const snapshotToday = (): TodaySnapshot => qc.getQueriesData<TodayResponse>({ queryKey: ['today', date] });
+  const restoreToday = (snapshot: TodaySnapshot) => {
+    for (const [key, data] of snapshot) qc.setQueryData(key, data);
   };
 
   const removeTargetOptimistically = (target: TodayActionTarget, kind?: TodayActionCommand['kind']) => {
@@ -88,7 +105,9 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         totalCount: current.totalCount === undefined ? undefined : Math.max(current.totalCount - removed, 0),
         promises: current.promises.filter((item) => !matchesTarget(item.target)),
         meetingPrompts: current.meetingPrompts.filter((item) => !matchesTarget(item.target)),
-        focus: current.focus ? { ...current.focus, plan: planWithout(current.focus.plan, target.taskKey, kind === 'mark_done') } : current.focus,
+        focus: current.focus
+          ? { ...focusWithout(current.focus, matchesTarget), plan: planWithout(current.focus.plan, target.taskKey, kind === 'mark_done') }
+          : current.focus,
       };
     });
   };
@@ -115,6 +134,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         teamPulse: current.teamPulse.map((person) =>
           person.accountId === accountId ? { ...withoutAsk(person), askedAt } : person,
         ),
+        focus: current.focus ? focusWithAsk(current.focus, accountId, askedAt) : current.focus,
       };
     });
   };
@@ -176,6 +196,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
             primaryAction: openCommand('Open developer'),
           };
         }),
+        focus: current.focus && target.developerAccountId ? focusWithCheckIn(current.focus, target.developerAccountId) : current.focus,
       };
     });
   };
@@ -246,6 +267,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       // docs/53 P5: every mutating kind cancels the in-flight Today poll so a
       // stale response can't overwrite the optimistic write.
       await qc.cancelQueries({ queryKey: ['today', date] });
+      const previous = snapshotToday();
       if (
         command.kind === 'mark_done' ||
         command.kind === 'snooze' ||
@@ -261,6 +283,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       if (command.kind === 'ask_check_in') {
         markAskedOptimistically(command.target);
       }
+      return { previous };
     },
     onSuccess: (result, variables) => {
       if (isActionResult(result, 'cancelled')) {
@@ -278,7 +301,10 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       }
       addToast(title, 'success');
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      // Put the rows back first: if the refetch below also fails, the work the
+      // write never touched must still be on screen.
+      if (context) restoreToday(context.previous);
       invalidateToday();
       addToast(error.message, 'error');
     },
@@ -324,22 +350,34 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
    * the first failure and reports how many landed.
    */
   const runBulk = async (commands: TodayActionCommand[], title: (count: number) => string) => {
-    if (commands.length === 0) return;
+    // A row already being written (a double click, a second "Carry all") is not sent twice.
+    const fresh = commands.filter((command) => !inFlight.current.has(commandKey(command)));
+    if (fresh.length === 0) return;
+    let release!: () => void;
+    const settled = new Promise<void>((resolve) => { release = resolve; });
+    for (const command of fresh) inFlight.current.set(commandKey(command), settled);
     await qc.cancelQueries({ queryKey: ['today', date] });
-    for (const command of commands) {
+    const previous = snapshotToday();
+    for (const command of fresh) {
       if (command.kind === 'ask_check_in') markAskedOptimistically(command.target);
       else removeTargetOptimistically(command.target, command.kind);
     }
     const undos: ManagerActionUndo[] = [];
     let done = 0;
     try {
-      for (const command of commands) {
+      for (const command of fresh) {
         const response = await postCommand({ command });
         if (response.undo) undos.push(response.undo);
         done += 1;
       }
       offerUndo(undos, title(done));
     } catch (error) {
+      // Rows whose write never landed come back; the ones that did stay gone.
+      restoreToday(previous);
+      for (const command of fresh.slice(0, done)) {
+        if (command.kind === 'ask_check_in') markAskedOptimistically(command.target);
+        else removeTargetOptimistically(command.target, command.kind);
+      }
       addToast({
         type: 'error',
         title: done > 0 ? `${title(done)} — then stopped` : 'Could not complete',
@@ -347,6 +385,8 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       });
       if (undos.length) offerUndo(undos, title(done));
     } finally {
+      for (const command of fresh) inFlight.current.delete(commandKey(command));
+      release();
       invalidateToday();
     }
   };
@@ -362,14 +402,6 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     return true;
   }, [runUndo]);
 
-  const runAction = (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
-    if (isNavigationCommand(command)) {
-      onOpenTarget(command.target);
-      return;
-    }
-    mutation.mutate({ command, ...options });
-  };
-
   // docs/53 F9: dialogs await the action so they can stay open with an inline
   // error when the write fails instead of silently discarding input.
   const runActionAsync = async (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
@@ -377,7 +409,24 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       onOpenTarget(command.target);
       return;
     }
-    await mutation.mutateAsync({ command, ...options });
+    const key = commandKey(command);
+    const running = inFlight.current.get(key);
+    if (running) {
+      await running;
+      return;
+    }
+    const write = mutation.mutateAsync({ command, ...options });
+    inFlight.current.set(key, write);
+    try {
+      await write;
+    } finally {
+      if (inFlight.current.get(key) === write) inFlight.current.delete(key);
+    }
+  };
+
+  const runAction = (command: TodayActionCommand, options: Omit<TodayActionVariables, 'command'> = {}) => {
+    // The failure is already toasted and rolled back by the mutation.
+    void runActionAsync(command, options).catch(() => undefined);
   };
 
   return {

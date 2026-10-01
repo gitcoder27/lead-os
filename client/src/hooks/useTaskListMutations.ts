@@ -49,7 +49,7 @@ interface GuardedItem extends TaskChangeItem {
 // debounce them (~500ms trailing) so rapid bulk edits trigger one recount.
 let countsTimer: ReturnType<typeof setTimeout> | null = null;
 
-function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
+export function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
   for (const key of ['tasks', 'task-detail', 'task-events', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
     qc.invalidateQueries({ queryKey: [key] });
   }

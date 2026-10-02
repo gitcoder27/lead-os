@@ -48,7 +48,7 @@ import { TaskDrawer, navigateToTaskPage } from './TaskDrawer';
 import { TaskBulkBar } from './TaskBulkBar';
 import { InlineAddRow, TASK_LIST_CONTAINER, TaskList } from './TaskList';
 import type { TaskRowHandlers } from './TaskListRow';
-import { TaskKeyboardHint, TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
+import { TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } from './TaskListStates';
 import { AssignMenu, CheckByMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, WaitingMenu, checkByTimestamp, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
 import { useContacts } from '@/hooks/useContacts';
 import { TaskToolbar } from './TaskToolbar';
@@ -833,9 +833,6 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
         onSelect={(id) => setView(id)}
         onRename={handleRenameSaved}
         onDelete={handleDeleteSaved}
-        onSaveView={handleSaveView}
-        saving={saveView.isPending}
-        canSave={Boolean(definition)}
       />
 
       <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -859,6 +856,9 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           labels={labelRegistry}
           isSavedView={Boolean(savedSelected)}
           hasOverrides={overridesActive}
+          onSaveView={handleSaveView}
+          saving={saveView.isPending}
+          canSave={Boolean(definition)}
           onUpdateView={handleUpdateSaved}
           onRevert={clearFilters}
           onShowShortcuts={(anchor) => setShortcutsAnchor(anchor)}
@@ -924,7 +924,6 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               onSubmitAdd={handleInlineAdd}
               onMoveOverdueToToday={(rows) => schedule(rows, 'today')}
               onToggleGroup={(key) => { if (key === 'done-today') setDoneTodayOpen((open) => !open); }}
-              footer={<TaskKeyboardHint onShowAll={() => openShortcuts()} />}
             />
           )}
         </div>

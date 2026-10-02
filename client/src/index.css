@@ -783,3 +783,13 @@ textarea.ui-field { resize: none; }
   .task-row-date { min-width: 0; justify-content: flex-start; }
   .task-row-next { margin-left: 6rem; margin-right: 3rem; }
 }
+
+/* A two-row mobile shell: identity/actions, then wrapping destination links. */
+@media (max-width: 767px) {
+  .header-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; }
+  .header-identity-nav { display: contents; }
+  .header-brand { grid-column: 1; grid-row: 1; }
+  .header-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; }
+  .header-navigation { grid-column: 1 / -1; grid-row: 2; }
+  .header-navigation nav { justify-content: space-between; }
+}

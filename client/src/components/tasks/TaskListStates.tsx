@@ -1,7 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { TriangleAlert, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
-import { Kbd } from '@/components/ui/Kbd';
 import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -51,73 +50,6 @@ export function TaskListSkeleton({ grouped = false }: { grouped?: boolean }) {
           {section([2, 3, 4, 5], false)}
         </>
       ) : section([0, 1, 2, 3, 4, 5], true)}
-    </div>
-  );
-}
-
-const KEY_HINT_STORAGE = 'leados.tasks.keyHintDismissed';
-
-function readHintDismissed(): boolean {
-  try {
-    return window.localStorage.getItem(KEY_HINT_STORAGE) === '1';
-  } catch {
-    return false;
-  }
-}
-
-const Key = Kbd;
-
-/**
- * docs/51 U3: one quiet, dismissible line under the list that teaches the
- * five keys that matter and points at `?` for the rest. Dismissal is a
- * per-browser convenience (localStorage); the toolbar keyboard button and `?`
- * remain. Pointer-only devices never see it.
- */
-export function TaskKeyboardHint({ onShowAll }: { onShowAll: () => void }) {
-  const [dismissed, setDismissed] = useState(readHintDismissed);
-  if (dismissed) return null;
-  const dismiss = () => {
-    setDismissed(true);
-    try {
-      window.localStorage.setItem(KEY_HINT_STORAGE, '1');
-    } catch {
-      // Storage unavailable — the hint just returns next visit.
-    }
-  };
-  const item = (keys: ReactNode, label: string) => (
-    <span className="flex items-center gap-1">
-      {keys}
-      <span>{label}</span>
-    </span>
-  );
-  return (
-    <div
-      className="mt-4 hidden flex-wrap items-center gap-x-3.5 gap-y-1.5 px-2 text-[12px] md:flex [@media(hover:none)]:hidden"
-      style={{ color: 'var(--text-muted)' }}
-      aria-label="Keyboard shortcuts hint"
-      role="note"
-    >
-      {item(<><Key>j</Key><Key>k</Key></>, 'move')}
-      {item(<Key>x</Key>, 'select')}
-      {item(<Key>e</Key>, 'done')}
-      {item(<Key>s</Key>, 'schedule')}
-      {item(<Key>a</Key>, 'assign')}
-      <button
-        type="button"
-        onClick={onShowAll}
-        className="flex items-center gap-1 rounded-md px-1 transition-colors hover:text-[var(--text-primary)]"
-      >
-        <Key>?</Key> all shortcuts
-      </button>
-      <button
-        type="button"
-        onClick={dismiss}
-        className="flex h-5 w-5 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-        aria-label="Dismiss keyboard hint"
-        title="Dismiss"
-      >
-        <X size={12} />
-      </button>
     </div>
   );
 }

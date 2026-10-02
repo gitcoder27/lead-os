@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Header } from '@/components/layout/Header';
 import { QuickActionsProvider } from '@/context/QuickActionsContext';
@@ -88,15 +88,15 @@ describe('Header', () => {
     expect(screen.getByText('Team')).toBeInTheDocument();
     expect(screen.getByText('Desk')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /open today in new tab/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open work in new tab/i })).toHaveAttribute('href', '/work');
-    expect(screen.getByRole('link', { name: /open work in new tab/i })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: /open team in new tab/i })).toHaveAttribute('href', '/team');
-    expect(screen.getByRole('link', { name: /open desk in new tab/i })).toHaveAttribute('href', '/desk');
+    expect(screen.getByRole('link', { name: 'Work' })).toHaveAttribute('href', '/work');
+    expect(screen.getByRole('link', { name: 'Work' })).not.toHaveAttribute('target');
+    expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('href', '/team');
+    expect(screen.getByRole('link', { name: 'Desk' })).toHaveAttribute('href', '/desk');
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
 
     expect(screen.getByText('Notes')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open notes in new tab/i })).toHaveAttribute('href', '/notes');
+    expect(screen.getByRole('menuitem', { name: 'Notes' })).toHaveAttribute('href', '/notes');
     // docs/57 P3-06: Follow-ups and Meetings are Tasks views, not pages.
     expect(screen.queryByText('Follow-ups')).not.toBeInTheDocument();
     expect(screen.queryByText('Meetings')).not.toBeInTheDocument();
@@ -105,15 +105,27 @@ describe('Header', () => {
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
   });
 
-  it('shows the Today new-tab action only when Today is inactive', () => {
+  it('uses native destination links on active and inactive workspaces', () => {
     render(<Header activeView="team" onViewChange={vi.fn()} />);
 
-    expect(screen.getByRole('link', { name: /open today in new tab/i })).toHaveAttribute('href', '/');
-    expect(screen.queryByRole('link', { name: /open team in new tab/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open desk in new tab/i })).toHaveAttribute('href', '/desk');
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Desk' })).toHaveAttribute('href', '/desk');
 
     fireEvent.click(screen.getByRole('button', { name: /more/i }));
-    expect(screen.getByRole('link', { name: /open notes in new tab/i })).toHaveAttribute('href', '/notes');
+    expect(screen.getByRole('menuitem', { name: 'Notes' })).toHaveAttribute('href', '/notes');
+  });
+
+  it('navigates ordinary link clicks and leaves modified clicks to the browser', () => {
+    const navigate = vi.fn();
+    render(<Header activeView="today" onViewChange={navigate} />);
+    const work = screen.getByRole('link', { name: 'Work' });
+    fireEvent.click(work); expect(navigate).toHaveBeenCalledWith('work');
+    navigate.mockClear();
+    const modified = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true, button: 0 });
+    work.dispatchEvent(modified);
+    expect(modified.defaultPrevented).toBe(false); expect(navigate).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/in new tab/)).not.toBeInTheDocument();
   });
 
   it('renders a customized layout with promoted pages and reordered chips', () => {
@@ -251,12 +263,24 @@ describe('Header', () => {
     expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
   });
 
-  it('opens the secondary workspace menu on hover', () => {
+  it('opens the secondary workspace menu explicitly and supports Escape focus return', () => {
     render(<Header activeView="work" onViewChange={vi.fn()} />);
 
-    fireEvent.mouseEnter(screen.getByRole('button', { name: /more/i }).parentElement as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: /more/i }));
 
     expect(screen.getByText('Notes')).toBeInTheDocument();
+  });
+
+  it('the workspace menu supports arrow navigation and Escape restores its trigger', async () => {
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+    const more = screen.getByRole('button', { name: /more/i });
+    more.focus(); fireEvent.click(more);
+    const menu = screen.getByRole('menu', { name: 'More workspaces' });
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Notes' }));
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await waitFor(() => expect(document.activeElement).toBe(more));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('shows the manager action inbox across manager views', () => {

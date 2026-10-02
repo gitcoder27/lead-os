@@ -118,11 +118,11 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
         className="relative z-header shrink-0 px-1 pt-0.5 md:px-1.5"
       >
         <div
-          className="dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between"
+          className="header-panel dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between"
           style={{ borderColor: 'var(--border-strong)' }}
         >
-          <div className="flex min-w-0 flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
+          <div className="header-identity-nav flex min-w-0 flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-3">
+            <div className="header-brand flex min-w-0 items-center gap-2 md:gap-2.5">
               {onOpenMobileSidebar && (
                 <button
                   onClick={onOpenMobileSidebar}
@@ -134,32 +134,32 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   <PanelLeftOpen size={16} style={{ color: 'var(--text-secondary)' }} />
                 </button>
               )}
-              <div className="h-11 w-11 rounded-[16px] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
+              <div className="h-8 w-8 md:h-11 md:w-11 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
                 <LeadOSMark size={32} />
               </div>
-              <div className="min-w-[148px]">
+              <div className="min-w-0">
                 <h1
                   className="font-sans text-[17px] font-semibold leading-tight truncate md:text-[18px]"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   LeadOS
                 </h1>
-                <div className="hidden text-[12px] leading-4 sm:block" style={{ color: 'var(--text-secondary)' }}>
+                <div className="hidden text-[12px] leading-4 xl:block" style={{ color: 'var(--text-secondary)' }}>
                   People, work, risks, and planning
                 </div>
               </div>
             </div>
             {onViewChange && (
-              <div className="min-w-0 overflow-visible">
+              <div className="header-navigation min-w-0 overflow-visible">
                 <HeaderNav activeView={activeView} isManager={user?.role === 'manager'} onViewChange={onViewChange} />
               </div>
             )}
           </div>
 
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
+          <div className="header-actions flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
             {showJiraSync && (
             <div
-              className="h-9 rounded-xl px-2.5 flex items-center gap-2"
+              className="hidden sm:flex h-9 rounded-xl px-2.5 items-center gap-2"
               style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
               title={syncTitle}
             >
@@ -250,9 +250,10 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                     border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)',
                   }}
                   title="Quick capture (Ctrl/⌘+I)"
+                  aria-label="Capture"
                 >
                   <Plus size={12} />
-                  <span>Capture</span>
+                  <span className="hidden sm:inline">Capture</span>
                   <Kbd variant="bare" className="hidden lg:inline">⌘I</Kbd>
                 </button>
               )}

@@ -221,20 +221,63 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     expect(lastDefinition().filters.kind).toBe('meeting');
   });
 
-  it('applies URL overrides and shows them as removable chips', () => {
+  it('applies URL overrides and clears them inside consolidated options', () => {
     window.history.replaceState(null, '', '/tasks?view=my-tasks&owner=dev-1&group=owner&signal=drift');
     render(<TasksPage />);
     const definition = lastDefinition();
     expect(definition.filters.owner).toEqual(['dev-1']);
     expect(definition.group).toBe('owner');
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Owner filter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View options (3)' }));
+    fireEvent.click(within(screen.getByRole('menu', { name: 'View options' })).getByRole('menuitemcheckbox', { name: 'Dev One' }));
     expect(lastDefinition().filters.owner).toBe('me');
+  });
+
+  it('uses three stable toolbar targets, counts override categories and preserves hidden URL options', () => {
+    window.history.replaceState(null, '', '/tasks?view=my-tasks&status=open,blocked&owner=me&kind=meeting');
+    render(<TasksPage />);
+    expect(screen.getByRole('button', { name: 'View options (3)' })).toBeInTheDocument();
+    expect(screen.getByText(/Applied options:/)).toHaveTextContent('status: open, blocked');
+    for (const name of ['Owner filter', 'Status filter', 'Label filter', 'Display', 'Filter', 'Save current view', 'Reset']) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Search tasks' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Task view' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View options (3)' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reset' }));
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS[2]!.definition);
+  });
+
+  it('save dialog retains its name after failure, retries, omits search and returns focus to options', async () => {
+    mockSaveView.mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValueOnce({ id: 11, name: 'Mine', definition: {}, position: 0, createdAt: '', updatedAt: '' });
+    render(<TasksPage />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tasks' }), { target: { value: 'transient' } });
+    const options = screen.getByRole('button', { name: 'View options' });
+    fireEvent.click(options); fireEvent.click(screen.getByRole('menuitem', { name: 'Save current view' }));
+    const dialog = screen.getByRole('dialog', { name: 'Save view' });
+    expect(within(dialog).getByRole('button', { name: 'Save view' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Saved view name' }), { target: { value: 'Mine' } });
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Save view' })); });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Could not save view');
+    expect(within(dialog).getByRole('textbox')).toHaveValue('Mine');
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Save view' })); });
+    expect(mockSaveView).toHaveBeenLastCalledWith({ name: 'Mine', definition: BUILTIN_VIEWS[0]!.definition });
+    expect(screen.queryByRole('dialog', { name: 'Save view' })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(options));
+  });
+
+  it('Escape cancels a save without writing and returns to options', async () => {
+    render(<TasksPage />);
+    const options = screen.getByRole('button', { name: 'View options' });
+    fireEvent.click(options); fireEvent.click(screen.getByRole('menuitem', { name: 'Save current view' }));
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Save view' }), { key: 'Escape' });
+    expect(mockSaveView).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Save view' })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(options));
   });
 
   it('label filter shows system labels prefix-free and toggles canonical names (D8)', () => {
     render(<TasksPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Label filter' }));
-    const menu = screen.getByRole('menu', { name: 'Label filter' });
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    const menu = screen.getByRole('menu', { name: 'View options' });
     fireEvent.click(within(menu).getByRole('menuitemcheckbox', { name: 'follow up' }));
     expect(lastDefinition().filters.labels).toEqual(['category:follow_up']);
   });
@@ -244,8 +287,8 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     render(<TasksPage />);
     expect(screen.queryByRole('button', { name: 'Type filter' })).toBeNull();
     expect(lastDefinition().filters.kind).toBe('meeting');
-    fireEvent.click(screen.getByRole('button', { name: 'Display' }));
-    const menu = screen.getByRole('menu', { name: 'Display options' });
+    fireEvent.click(screen.getByRole('button', { name: /View options/ }));
+    const menu = screen.getByRole('menu', { name: 'View options' });
     const groups = within(menu).getAllByRole('menuitemradio').map((item) => item.textContent);
     expect(groups).toEqual(['Schedule', 'Recently updated', 'Recently created', 'Priority', 'Check-by date', 'None', 'Schedule', 'Owner', 'Status', 'Waiting on']);
   });
@@ -261,16 +304,17 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     fireEvent.click(screen.getByLabelText('Delete Escalations'));
     expect(mockDeleteView).toHaveBeenCalledWith(7);
 
-    fireEvent.click(screen.getByText('Save current view'));
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save current view' }));
     fireEvent.change(screen.getByLabelText('Saved view name'), { target: { value: 'Mine' } });
-    await act(async () => { fireEvent.click(screen.getByLabelText('Save view')); });
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: 'Save view' })).getByRole('button', { name: 'Save view' })); });
     expect(mockSaveView).toHaveBeenCalledWith({ name: 'Mine', definition: BUILTIN_VIEWS[0]!.definition });
 
     fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Escalations' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Status filter' }));
-    fireEvent.click(within(screen.getByRole('menu', { name: 'Status filter' })).getByRole('menuitemcheckbox', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    fireEvent.click(within(screen.getByRole('menu', { name: 'View options' })).getByRole('menuitemcheckbox', { name: 'Open' }));
     expect(screen.getByLabelText('Unsaved filter changes')).toBeTruthy();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Update view' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'Update view' })); });
     expect(mockUpdateView).toHaveBeenCalledWith({ id: 7, updates: { definition: { filters: { status: ['open'] } } } });
   });
 
@@ -559,8 +603,8 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(within(menu).getByRole('menuitem', { name: 'Me' })).toBeTruthy();
     expect(within(menu).queryByRole('menuitem', { name: 'Dev One' })).toBeNull();
     fireEvent.keyDown(menu, { key: 'Escape' });
-    fireEvent.click(screen.getByRole('button', { name: 'Owner filter' }));
-    const ownerMenu = screen.getByRole('menu', { name: 'Owner filter' });
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    const ownerMenu = screen.getByRole('menu', { name: 'View options' });
     expect(within(ownerMenu).queryByRole('menuitemcheckbox', { name: 'Dev One' })).toBeNull();
     expect(within(ownerMenu).getByRole('menuitemcheckbox', { name: 'Me' })).toBeTruthy();
   });
@@ -991,18 +1035,14 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     expect(within(row('T-2')).getByText('T-2')).toBeVisible();
   });
 
-  it('keyboard hint teaches the core keys and stays dismissed (U3)', () => {
-    window.localStorage.removeItem('leados.tasks.keyHintDismissed');
-    const { unmount } = render(<TasksPage />);
-    const hint = screen.getByRole('note', { name: 'Keyboard shortcuts hint' });
-    fireEvent.click(within(hint).getByRole('button', { name: /all shortcuts/ }));
-    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), { key: 'Escape' });
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss keyboard hint' }));
-    expect(screen.queryByRole('note', { name: 'Keyboard shortcuts hint' })).toBeNull();
-    unmount();
+  it('keeps keyboard help without a hint strip or storage reads', () => {
+    const read = vi.spyOn(Storage.prototype, 'getItem');
     render(<TasksPage />);
     expect(screen.queryByRole('note', { name: 'Keyboard shortcuts hint' })).toBeNull();
-    window.localStorage.removeItem('leados.tasks.keyHintDismissed');
+    fireEvent.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }));
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+    expect(read.mock.calls.some(([key]) => key === 'leados.tasks.keyHintDismissed')).toBe(false);
+    read.mockRestore();
   });
 
   it('skeleton draws section labels for grouped views (U5)', () => {

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { BookmarkPlus, CalendarCheck, Check, Pencil, Trash2, X } from 'lucide-react';
-import { openWeeklyReview } from '@/lib/weekly-review';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
 import type { TaskViewCount, TaskViewMeta } from '@/types';
 import { FOCUS_RING } from './TaskDetailPrimitives';
 
@@ -34,9 +33,6 @@ export function TaskViewRail({
   onSelect,
   onRename,
   onDelete,
-  onSaveView,
-  saving,
-  canSave,
 }: {
   views: TaskViewMeta[];
   counts: Record<string, TaskViewCount> | undefined;
@@ -45,15 +41,10 @@ export function TaskViewRail({
   /** docs/51 F10: commits the inline rename; return false to keep editing. */
   onRename: (view: TaskViewMeta, name: string) => Promise<boolean>;
   onDelete: (view: TaskViewMeta) => void;
-  onSaveView: (name: string) => Promise<boolean>;
-  saving: boolean;
-  canSave: boolean;
 }) {
   const plan = views.filter((view) => view.builtin && view.section !== 'review');
   const review = views.filter((view) => view.builtin && view.section === 'review');
   const saved = views.filter((view) => !view.builtin);
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
@@ -165,60 +156,11 @@ export function TaskViewRail({
         <>
           {heading('Review')}
           {renderItems(review)}
-          {/* docs/59 §5.1: the weekly review lives on Today; this is its door from Tasks. */}
-          <button
-            type="button"
-            onClick={() => openWeeklyReview()}
-            className="mt-px flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-medium transition-colors hover:text-[var(--text-primary)]"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            <CalendarCheck size={13} aria-hidden="true" />
-            <span className="truncate">Weekly review</span>
-          </button>
+
         </>
       )}
       {saved.length > 0 && (<>{heading('My views')}{renderItems(saved)}</>)}
-      {naming ? (
-        <form
-          className="mt-3 flex items-center gap-1.5 px-1"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (!name.trim()) return;
-            if (await onSaveView(name.trim())) {
-              setNaming(false);
-              setName('');
-            }
-          }}
-        >
-          <input
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => { if (event.key === 'Escape') setNaming(false); }}
-            placeholder="View name"
-            className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[12px] outline-none"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-            aria-label="Saved view name"
-          />
-          <button type="submit" disabled={!name.trim() || saving} className="flex h-7 w-7 items-center justify-center rounded-lg disabled:opacity-40" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }} aria-label="Save view">
-            <Check size={12} />
-          </button>
-          <button type="button" onClick={() => setNaming(false)} className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--text-muted)' }} aria-label="Cancel save">
-            <X size={12} />
-          </button>
-        </form>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setNaming(true)}
-          disabled={!canSave}
-          className="mt-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-semibold transition-colors hover:brightness-110 disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
-        >
-          <BookmarkPlus size={12} />
-          Save current view
-        </button>
-      )}
+
     </nav>
   );
 }

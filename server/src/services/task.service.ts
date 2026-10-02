@@ -269,6 +269,22 @@ export class TaskService {
     });
   }
 
+  /** All dates, including undated/Later. Private relationships belong to this manager. */
+  async personCommitments(accountId: string, principal: TaskPrincipal): Promise<ManagerTask[]> {
+    if (principal.type !== "manager") throw new HttpError(403, "Manager access required");
+    const scope = normalizeWorkspaceId(principal.workspaceId);
+    const person = (await db.select().from(developers).where(and(eq(developers.workspaceId, scope), eq(developers.accountId, accountId))).limit(1))[0];
+    if (!person) throw new HttpError(404, "Person not found");
+    const rows = await db.select().from(tasks).where(and(
+      eq(tasks.workspaceId, scope), isNull(tasks.deletedAt), inArray(tasks.status, ["open", "active", "blocked"]),
+      sql`((${tasks.ownerType} = 'developer' AND ${tasks.ownerId} = ${accountId}) OR
+        ((${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId})) AND
+        ((${tasks.waitingOnType} = 'developer' AND ${tasks.waitingOnRef} = ${accountId}) OR
+        EXISTS (SELECT 1 FROM task_links l WHERE l.workspace_id = ${scope} AND l.task_id = ${tasks.id} AND l.kind = 'person' AND l.ref = ${accountId}))))`
+    )).orderBy(tasks.createdAt, tasks.id);
+    return this.toDtos(rows, principal) as Promise<ManagerTask[]>;
+  }
+
   private async validateShape(row: Pick<TaskRow, "ownerType" | "ownerId" | "later" | "startsAt" | "endsAt" | "parentId" | "workspaceId" | "scheduledOn" | "hideUntil">, id?: number): Promise<void> {
     if (Boolean(row.ownerType) !== Boolean(row.ownerId)) throw new HttpError(400, "Owner type and ID must be supplied together");
     if (row.later && row.scheduledOn) throw new HttpError(409, "Later tasks have no date");

@@ -427,3 +427,41 @@ describe("POST /api/tasks/bulk (docs/49 §10, D8)", () => {
     });
   });
 });
+
+describe("person commitments (R6)", () => {
+  it("includes every open date and relationship, excludes closed/deleted and other managers' private context", async () => {
+    const headers = { cookie: await cookie("manager-a") };
+    const other = { cookie: await cookie("manager-b") };
+    const linked = async (h: Headers, body: Record<string, unknown>) => {
+      const task = await createTask(h, body);
+      expect((await invoke(app, { method: "POST", url: `/api/tasks/${task.taskKey}/links`, headers: h, body: { kind: "person", ref: "dev-1" } })).status).toBe(201);
+      return task;
+    };
+    const future = await linked(headers, { title: "I owe future", scheduledOn: shift(25), nextAction: "Prepare decision" });
+    await linked(headers, { title: "I owe parked", later: true });
+    await linked(headers, { title: "I owe undated", scheduledOn: null });
+    await createTask(headers, { title: "Waiting without link", waitingOn: { type: "developer", ref: "dev-1" }, scheduledOn: null });
+    await createTask(other, { title: "Their shared work", ownerType: "developer", ownerId: "dev-1", scheduledOn: shift(10), nextAction: "Other manager private", followUpAt: `${shift(3)}T12:00:00Z` });
+    await linked(other, { title: "Private one-on-one topic", ownerType: "manager" });
+    const closed = await linked(headers, { title: "Closed" });
+    await invoke(app, { method: "PATCH", url: `/api/tasks/${closed.taskKey}`, headers, body: { status: "done" } });
+    const deleted = await linked(headers, { title: "Deleted" });
+    await invoke(app, { method: "DELETE", url: `/api/tasks/${deleted.taskKey}`, headers });
+    await createTask(headers, { title: "Unrelated" });
+    const response = await invoke(app, { method: "GET", url: "/api/tasks/person/dev-1", headers });
+    expect(response.status).toBe(200);
+    expect(titles(response.body.tasks)).toEqual(["I owe future", "I owe parked", "I owe undated", "Their shared work", "Waiting without link"]);
+    expect(response.body.tasks.find((t: { taskKey: string }) => t.taskKey === future.taskKey).nextAction).toBe("Prepare decision");
+    expect(response.body.tasks.find((t: { title: string }) => t.title === "Their shared work")).toMatchObject({ nextAction: null, followUpAt: null, trackedByManagerId: null });
+    expect((await invoke(app, { method: "GET", url: "/api/tasks/person/missing", headers })).status).toBe(404);
+  });
+
+  it("enforces manager and workspace boundaries", async () => {
+    await auth.createUser({ username: "developer-r6", displayName: "Dev", password: "secret123", role: "developer", developerAccountId: "dev-1", workspaceId: "default" });
+    expect((await invoke(app, { method: "GET", url: "/api/tasks/person/dev-1", headers: { cookie: await cookie("developer-r6") } })).status).toBe(403);
+    await db.insert(workspaces).values({ id: "r6-other", name: "Other", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    await auth.createUser({ username: "other-r6", displayName: "Other", password: "secret123", role: "manager", workspaceId: "r6-other" });
+    await db.insert(configTable).values({ key: "tasks_phase2_stage", value: "2c", workspaceId: "r6-other" });
+    expect((await invoke(app, { method: "GET", url: "/api/tasks/person/dev-1", headers: { cookie: await cookie("other-r6") } })).status).toBe(404);
+  });
+});

@@ -1033,6 +1033,10 @@ export interface DeveloperTask {
   deletedAt: string | null;
   links: TaskLink[];
 }
+/** Manager-private, all-date open commitments associated with a roster person. */
+export interface PersonCommitmentsResponse {
+  tasks: ManagerTask[];
+}
 export interface ManagerTask extends DeveloperTask {
   legacyDeskItemId?: number;
   later: boolean;

@@ -249,7 +249,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: Dev
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
             <StatusControl day={day} date={date} tasks={tasks} readOnly={readOnly} />
             <dl className="flex items-center gap-4 text-[12.5px]">
-              <Counter label="Load" value={load} title="Current work plus planned tasks" />
+              <Counter label="Open items" value={load} title="Count of current and planned items; not effort or capacity" />
               <Counter label="Done" value={day.completedItems.length} title="Completed on this day" />
             </dl>
             <FreshnessLine day={day} />
@@ -293,10 +293,12 @@ function latestStatusRationale(day: TrackerDeveloperDay): TrackerCheckIn | undef
  * why the status is what it is, and when to look again. Absent when all is well.
  */
 function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
+  const mode = useTeamMode();
+  const checkInClock = usesCheckIns(mode, day.participates);
   const badges = getSignalBadges(day);
   const rationale = latestStatusRationale(day);
   const followUp = day.nextFollowUpAt ? describeMoment(day.nextFollowUpAt, 'open') : null;
-  if (badges.length === 0 && !rationale && !followUp) return null;
+  if (badges.length === 0 && !rationale && !followUp && !RATIONALE_STATUSES.includes(day.status)) return null;
 
   const statusTone = RATIONALE_STATUSES.includes(day.status) ? STATUS_META[day.status].color : null;
   const leadTone = TONE_RANK.find((tone) => badges.some((badge) => badge.tone === tone));
@@ -325,6 +327,12 @@ function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
           ))}
         </div>
       )}
+      {checkInClock && day.signals.freshness.staleByTime && (
+        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Last check-in exceeds the freshness window.</p>
+      )}
+      {!checkInClock && day.signals.freshness.untouched && (
+        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>No recent manager touch.</p>
+      )}
       {rationaleText && rationale && (
         <p className="text-[12.5px] leading-5" style={{ color: 'var(--text-secondary)' }}>
           <span className="font-medium" style={{ color: STATUS_META[day.status].color }}>
@@ -339,10 +347,18 @@ function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
           </span>
         </p>
       )}
+      {RATIONALE_STATUSES.includes(day.status) && day.statusUpdatedAt && (
+        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+          Status since <time dateTime={day.statusUpdatedAt} title={formatAbsoluteDateTime(day.statusUpdatedAt)}>{formatCompactRelative(day.statusUpdatedAt)}</time>
+        </p>
+      )}
+      {!followUp && (badges.length > 0 || RATIONALE_STATUSES.includes(day.status)) && (
+        <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Next check not scheduled.</p>
+      )}
       {followUp && (
         <p className="flex items-center gap-1.5 text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
           <BellRing size={12} style={{ color: toneColor(followUp.tone === 'default' ? 'muted' : followUp.tone) }} aria-hidden="true" />
-          Follow up {followUp.label}
+          Next check {followUp.label}
           {followUp.hint && <span style={{ color: toneColor(followUp.tone) }}>· {followUp.hint}</span>}
         </p>
       )}
@@ -671,7 +687,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
               {followUp && (
                 <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
                   <BellRing size={11} aria-hidden="true" />
-                  Follow up {followUp.label}
+                  Next check {followUp.label}
                 </span>
               )}
             </div>

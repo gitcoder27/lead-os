@@ -5,6 +5,9 @@ import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssue
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 
+let mockPersonCanonical = false;
+vi.mock('@/hooks/useTasksPhase3', () => ({ useTasksPhase3: () => mockPersonCanonical }));
+vi.mock('@/hooks/usePersonCommitments', () => ({ usePersonCommitments: () => ({ data: { tasks: [] }, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() }) }));
 const mockCarryForwardMutate = vi.fn();
 const mockUpdateDayMutate = vi.fn();
 const mockUpdateAvailabilityMutate = vi.fn();
@@ -469,6 +472,7 @@ describe('TeamTrackerPage', () => {
     mockUpdateTrackerItemMutate.mockReset();
     mockSetCurrentMutate.mockReset();
     mockAddToast.mockReset();
+    mockPersonCanonical = false;
     mockCreateManagerDeskItemMutate.mockReset();
     mockUpdateManagerDeskItemMutate.mockReset();
     mockAddTrackerItemMutate.mockReset();
@@ -1090,6 +1094,21 @@ describe('TeamTrackerPage', () => {
     );
     clickDeveloperRow('Alice Smith');
     expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('puts all-date commitments before current work and shows risk age and next check near the identity', () => {
+    mockPersonCanonical = true;
+    render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    clickDeveloperRow('Bob Jones');
+    const drawer = screen.getByRole('dialog', { name: 'Bob Jones developer details' });
+    const commitments = within(drawer).getByText('Open commitments');
+    const current = within(drawer).getByText('Current work');
+    expect(commitments.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(drawer).getByText('All dates')).toBeInTheDocument();
+    expect(within(drawer).getByText(/Status since/)).toBeInTheDocument();
+    expect(within(drawer).getByText(/Next check/)).toBeInTheDocument();
+    expect(within(drawer).getByText('Open items')).toBeInTheDocument();
+    expect(within(drawer).queryByText('Follow-ups')).not.toBeInTheDocument();
   });
 
   it('shows developer-linked manager follow-ups in the drawer and completes the same desk item', () => {

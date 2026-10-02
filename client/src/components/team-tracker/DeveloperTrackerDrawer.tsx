@@ -1,3 +1,5 @@
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
+import { PersonCommitments } from './PersonCommitments';
 import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, UserMinus, Users } from 'lucide-react';
@@ -99,7 +101,8 @@ export function DeveloperTrackerDrawer({
   const refocusItemIdRef = useRef<number | null>(null);
   const composerApisRef = useRef(new Map<number, { expand: () => void; focus: () => void }>());
   const assignedTodayCount = (day?.currentItem ? 1 : 0) + (day?.plannedItems.length ?? 0);
-  const managerDesk = useManagerDesk(date, open && Boolean(day) && !readOnly);
+  const canonical = useTasksPhase3();
+  const managerDesk = useManagerDesk(date, open && Boolean(day) && !readOnly && !canonical);
   const updateManagerDeskItem = useUpdateManagerDeskItem(date);
   const managerFollowUps = day
     ? getDeveloperManagerFollowUps(managerDesk.data?.items ?? [], day.developer.accountId)
@@ -356,6 +359,10 @@ export function DeveloperTrackerDrawer({
                   titleId={titleId}
                 />
 
+                {!readOnly && canonical && (
+                  <PersonCommitments key={day.developer.accountId} isSelf={day.developer.isSelf} accountId={day.developer.accountId} onCapture={() => setDeskCaptureOpen(true)} />
+                )}
+
                 <DrawerSection icon={<Crosshair size={14} />} title="Current work">
                   {day.currentItem ? (
                     <TrackerItemRow
@@ -474,7 +481,7 @@ export function DeveloperTrackerDrawer({
                 <Divider />
 
                 {!readOnly && (
-                  <ManagerFollowUpRow
+                  !canonical && <ManagerFollowUpRow
                     day={day}
                     items={managerFollowUps}
                     isLoading={managerDesk.isLoading}

@@ -197,8 +197,8 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
   const load = getRosterLoad(day);
   const detail = `${day.currentItem ? '1 current' : 'No current'} · ${day.plannedItems.length} planned`;
   return (
-    <div className="flex items-center gap-2" title={`Load ${load} — ${detail}`}>
-      <MobileLabel>Load</MobileLabel>
+    <div className="flex items-center gap-2" title={`${load} open items — ${detail}; count, not effort or capacity`}>
+      <MobileLabel>Open items</MobileLabel>
       <span className="w-4 text-[13px] font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
         {load}
       </span>
@@ -427,7 +427,7 @@ function ColumnHeader({ freshnessLabel }: { freshnessLabel: string }) {
       <span>Developer</span>
       <span>Current work</span>
       <span>Up next</span>
-      <span>Load</span>
+      <span>Open items</span>
       <span>{freshnessLabel}</span>
       <span>Attention</span>
       <span className="sr-only">Actions</span>

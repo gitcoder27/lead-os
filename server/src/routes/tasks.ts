@@ -57,6 +57,9 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
       res.json({ tasks: await tasks.toDtos(rows, actor) });
     } catch (error) { next(error); }
   });
+  router.get("/person/:accountId", validate(z.object({ params: z.object({ accountId: z.string().trim().min(1).max(128) }), body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
+    try { await assertCanonical(req); res.json({ tasks: await tasks.personCommitments(req.params.accountId as string, principal(req)) }); } catch (error) { next(error); }
+  });
   router.post("/", validate(z.object({ body: taskCreateSchema, params: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
     try { await assertCanonical(req); const actor = principal(req); res.status(201).json(await tasks.toDto(await tasks.create(req.body, actor), actor)); } catch (error) { next(error); }
   });

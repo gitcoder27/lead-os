@@ -2,6 +2,12 @@
 
 Spec: [docs/59-weekly-review-spec.md](59-weekly-review-spec.md) (design, copy, rules, decisions in §11). This doc is the execution plan and tracker, in the style of [docs/56](56-implementation-plan-solo-first.md). It replaces the parked items **P3-08** (weekly review), **P6-02** (weekly summary and exports) and **P6-03** (daily digest and reminders); docs/56 points here.
 
+## Current-code reconciliation (2026-10-02)
+
+Checked against `ad33356`: WR-01–06 are implemented (five steps, private server projection, stored review progress, decision Undo and Today/palette/Tasks entry points). WR-07–10 remain absent: no report builder/Send update, export helper or Jira resolution-date report section. Reuse the existing review state, mutations and server privacy filtering for R9. TS-07/R7 intentionally removes only the Tasks rail review link; Today and palette remain.
+
+The user's R1–R12 instruction authorizes completing WR-07–10 in one scoped R9 commit, continuing without separate item triggers, and verifying with synthetic fixtures/fresh isolated test databases. Historical owner/model assignments and review checkpoints do not require delegation for this sequential run. No runtime database copies, outbound notifications, push or deploy. WR-11–16 remain deferred; R12 is an in-app event loop only.
+
 ## Working rules
 
 Same as docs/56 "Working rules (single checkout)":

@@ -1,5 +1,11 @@
 # 61 - Implementation plan: Tasks screen fixes
 
+## Current-code reconciliation (2026-10-02)
+
+Checked against `ad33356` before implementation: TS-01 is complete and reused. TS-02/04/05/06/07 remain open. TS-03 is partially present in `TaskUpdateComposer`: session-storage drafts and request IDs exist, but developer-day keys, auth cleanup, editable failed posts and revision-safe completion need repair. Implement D3's in-memory lifetime while preserving Standup's existing draft listing and metadata. TS-08 remains a separate investigation, outside R1–R12.
+
+The user's R1–R12 instruction supersedes the older one-item stop rule and authorizes desktop/mobile/theme/keyboard browser verification using synthetic fixtures or a fresh isolated DB. No runtime database or source copy is needed. Track TS-04 in R2, TS-03 in R3, TS-02 in R4, TS-05/06 in R5 and TS-07 in R7, with one commit per R item. Existing Undo and review entry points remain.
+
 ## Context and goal
 
 The Tasks screen review found a useful daily-work foundation weakened by unsafe Undo, draft loss, misleading queue copy, stale counts, inaccessible row interactions and repeated metadata. This plan turns that review into bounded, independently revertible work: protect capture, today's work, follow-through and closing tasks without expanding the product. Sources are the supplied three desktop screenshots, the code review and the user's verified facts; no browser, application, runtime database or Jira was used to prepare this document.

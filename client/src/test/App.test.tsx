@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App, { legacyTaskViewRedirect } from '@/App';
-import { ApiRequestError } from '@/lib/api';
+import { api, ApiRequestError } from '@/lib/api';
 import type { TaskResolution } from '@/types';
 
 const useBootstrapStateMock = vi.fn();
@@ -114,10 +114,6 @@ vi.mock('@/components/setup/SetupWizard', () => ({
   ),
 }));
 
-vi.mock('@/components/my-day/MyDayPage', () => ({
-  MyDayPage: () => <div>My day loaded</div>,
-}));
-
 vi.mock('@/components/my-day/LoginPage', () => ({
   LoginPage: ({ role }: { role?: 'manager' | 'developer' }) => <div>{role === 'manager' ? 'Manager login' : 'Developer login'}</div>,
 }));
@@ -172,6 +168,16 @@ describe('App', () => {
     });
 
     useTaskResolutionMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
+  });
+
+  it('offers retry after an initial bootstrap failure instead of loading forever', () => {
+    const refetch = vi.fn();
+    useBootstrapStateMock.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load setup');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Setup wizard')).not.toBeInTheDocument();
   });
 
   it('shows loading while bootstrap state is loading', () => {
@@ -282,6 +288,23 @@ describe('App', () => {
 
     render(<App />);
     expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+  });
+
+  it.each(['pending', 'error', 'absent'])('opens an authenticated developer day with %s bootstrap data', async (state) => {
+    window.history.replaceState(null, '', '/my-day');
+    useAuthMock.mockReturnValue({ user: { role: 'developer', accountId: 'dev-1', developerAccountId: 'dev-1' }, isLoading: false, isAuthenticated: true });
+    useBootstrapStateMock.mockReturnValue({ data: undefined, isLoading: state === 'pending', isError: state === 'error', refetch: vi.fn() });
+    const dayRead = vi.spyOn(api, 'get').mockResolvedValue({
+      date: '2026-10-03', viewMode: 'live', developer: { accountId: 'dev-1', displayName: 'Developer', isActive: true },
+      status: 'on_track', availability: { state: 'available', writeAllowed: true }, isReadOnly: false,
+      plannedItems: [], completedItems: [], droppedItems: [], checkIns: [], isStale: false,
+    });
+    const view = render(<App />);
+    try {
+      expect(await screen.findByText('Nothing planned yet')).toBeInTheDocument();
+      expect(screen.queryByText('Could not load setup. Check your connection and retry.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status', { name: 'Loading workspace' })).not.toBeInTheDocument();
+    } finally { view.unmount(); dayRead.mockRestore(); }
   });
 
   it('renders the dedicated settings page for authenticated managers on /settings', async () => {

@@ -1,3 +1,4 @@
+import { QueryReadError } from '@/components/ui/QueryReadError';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Plus, X } from 'lucide-react';
 import { useCreateOneOnOneSeries, useOneOnOneSeriesList } from '@/hooks/useOneOnOne';
@@ -82,7 +83,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           </div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          {availableDevelopers.length > 0 && (
+          {!list.isError && list.data && availableDevelopers.length > 0 && (
             <button
               type="button"
               onClick={() => setCreating((value) => !value)}
@@ -107,7 +108,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
         </div>
       </div>
 
-      {creating && (
+      {creating && !list.isError && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
           <select
             value={newDev}
@@ -152,7 +153,8 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
         className="flex-1 overflow-y-auto rounded-xl border"
         style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}
       >
-        {list.isLoading ? (
+        {list.isError && <QueryReadError message={list.data ? 'Could not refresh 1:1s. Showing saved content.' : 'Could not load 1:1s.'} onRetry={() => list.refetch()} retrying={list.isFetching} />}
+        {list.isError && !(list.data?.series.length) ? null : list.isLoading ? (
           <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
             Loading 1:1s…
           </div>

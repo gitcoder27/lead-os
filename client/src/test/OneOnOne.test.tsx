@@ -21,8 +21,8 @@ const mockAddToast = vi.fn();
 const mockQuickAttach = vi.fn();
 
 let mockEnabled = true;
-let mockList: { data?: { series: OneOnOneSeriesSummary[] }; isLoading: boolean } = { data: { series: [] }, isLoading: false };
-let mockDetail: { data?: OneOnOneSeriesDetail; isError?: boolean } = { data: undefined };
+let mockList: { data?: { series: OneOnOneSeriesSummary[] }; isLoading: boolean; isError?: boolean; refetch?: () => void } = { data: { series: [] }, isLoading: false };
+let mockDetail: { data?: OneOnOneSeriesDetail; isError?: boolean; refetch?: () => void } = { data: undefined };
 let mockSuggestions: { data?: OneOnOneSuggestionsResponse; isLoading: boolean } = { data: undefined, isLoading: false };
 
 vi.mock('@/context/ToastContext', () => ({
@@ -185,6 +185,27 @@ beforeEach(() => {
 });
 
 describe('OneOnOneWorkspace', () => {
+  it('retries a failed series read without offering to create a duplicate series', () => {
+    const refetch = vi.fn();
+    mockList = { isLoading: false, isError: true, refetch };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load 1:1s');
+    expect(screen.queryByText('Start 1:1 series')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('keeps cached workspace content when a refresh fails and offers retry', () => {
+    mockList = { data: { series: [summary()] }, isLoading: false };
+    const refetch = vi.fn();
+    mockDetail = { data: detail(), isError: true, refetch };
+    render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh');
+    expect(screen.getByText('Agenda')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
   it('renders the agenda, session, and history columns', () => {
     render(<OneOnOneWorkspace developerAccountId="dev-1" onClose={vi.fn()} />);
     expect(screen.getByTestId('one-on-one-workspace')).toBeInTheDocument();
@@ -528,6 +549,16 @@ describe('Add to 1:1 agenda (developer drawer rows)', () => {
 });
 
 describe('OneOnOneSeriesPanel', () => {
+  it('offers retry, not first-use creation, when the list fails', () => {
+    const refetch = vi.fn();
+    mockList = { isLoading: false, isError: true, refetch };
+    render(<OneOnOneSeriesPanel developers={[]} onOpenDeveloper={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load 1:1s');
+    expect(screen.queryByText('Pick a developer to start a 1:1 series.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
   it('lists series with next session, overdue state and agenda counts', () => {
     mockList = {
       data: {

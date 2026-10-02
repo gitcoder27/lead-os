@@ -1,3 +1,4 @@
+import { QueryReadError } from '@/components/ui/QueryReadError';
 import { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, ChevronDown, Keyboard, Pause, Play, X } from 'lucide-react';
 import {
@@ -49,7 +50,8 @@ interface OneOnOneWorkspaceProps {
  */
 export function OneOnOneWorkspace({ developerAccountId, onClose, onOpenTask }: OneOnOneWorkspaceProps) {
   const { addToast } = useToast();
-  const { series, isLoading } = useOneOnOneSeriesForDeveloper(developerAccountId);
+  const list = useOneOnOneSeriesForDeveloper(developerAccountId);
+  const { series, isLoading } = list;
   const detail = useOneOnOneSeries(series?.id);
   const createSeries = useCreateOneOnOneSeries();
   const [newCadence, setNewCadence] = useState<OneOnOneCadence>('weekly');
@@ -101,6 +103,14 @@ export function OneOnOneWorkspace({ developerAccountId, onClose, onOpenTask }: O
     return <WorkspaceFrame name="" onClose={onClose}><PanelMessage>Loading 1:1…</PanelMessage></WorkspaceFrame>;
   }
 
+  if (list.isError && !list.data) {
+    return <WorkspaceFrame name="1:1" onClose={onClose}><QueryReadError message="Could not load 1:1s." onRetry={() => list.refetch()} retrying={list.isFetching} /></WorkspaceFrame>;
+  }
+
+  if (!series && list.isError) {
+    return <WorkspaceFrame name="1:1" onClose={onClose}><QueryReadError message="Could not refresh 1:1s. Retry before creating a series." onRetry={() => list.refetch()} retrying={list.isFetching} /></WorkspaceFrame>;
+  }
+
   if (!series) {
     return (
       <WorkspaceFrame name="1:1" onClose={onClose}>
@@ -131,12 +141,16 @@ export function OneOnOneWorkspace({ developerAccountId, onClose, onOpenTask }: O
   if (!detail.data) {
     return (
       <WorkspaceFrame name={series.developerName} onClose={onClose}>
-        <PanelMessage>{detail.isError ? 'Could not load the 1:1 workspace.' : 'Loading 1:1…'}</PanelMessage>
+        {detail.isError ? <QueryReadError message="Could not load the 1:1 workspace." onRetry={() => detail.refetch()} retrying={detail.isFetching} /> : <PanelMessage>Loading 1:1…</PanelMessage>}
       </WorkspaceFrame>
     );
   }
 
-  return <Workspace detail={detail.data} onClose={onClose} onOpenTask={onOpenTask} />;
+  return <>
+    {list.isError && <QueryReadError message="Could not refresh 1:1s. Showing saved content." onRetry={() => list.refetch()} retrying={list.isFetching} />}
+    {detail.isError && <QueryReadError message="Could not refresh the 1:1 workspace. Showing saved content." onRetry={() => detail.refetch()} retrying={detail.isFetching} />}
+    <Workspace detail={detail.data} onClose={onClose} onOpenTask={onOpenTask} />
+  </>;
 }
 
 const ONE_ON_ONE_SHORTCUTS: ShortcutGroup[] = [

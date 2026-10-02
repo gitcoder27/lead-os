@@ -1,3 +1,4 @@
+import { QueryReadError } from '@/components/ui/QueryReadError';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -445,7 +446,7 @@ function AppContent() {
   const bootstrapQuery = useBootstrapState();
   const bootstrapState = bootstrapQuery.data;
   const isAuthenticatedManager = isAuthenticated && user?.role === 'manager';
-  const isBootstrapPending = !isAuthenticatedManager && (bootstrapQuery.isLoading || !bootstrapState);
+  const isBootstrapPending = !isAuthenticated && (bootstrapQuery.isLoading || (!bootstrapState && !bootstrapQuery.isError));
 
   // P3-D1: sync the flag-scoped canonical desk path before any navigation runs.
   setTasksNavEnabled(Boolean(features?.tasksPhase3));
@@ -1085,6 +1086,10 @@ function AppContent() {
   }, [isAuthenticatedManager, captureOpen, openCapture]);
 
   const renderActiveView = () => {
+    if (!authLoading && !isAuthenticated && !bootstrapState && bootstrapQuery.isError) {
+      return <QueryReadError message="Could not load setup. Check your connection and retry." onRetry={() => bootstrapQuery.refetch()} retrying={bootstrapQuery.isFetching} />;
+    }
+
     if (authLoading || isBootstrapPending) {
       return activeView === 'today' ? <TodayBootLoading /> : <FullPageLoading />;
     }

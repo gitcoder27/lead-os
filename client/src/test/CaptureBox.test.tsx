@@ -589,3 +589,19 @@ describe('CaptureBox (P3-D8)', () => {
     });
   });
 });
+
+describe('progressive capture guidance', () => {
+  it('keeps plain-title capture obvious and preserves a draft while examples are opened', () => {
+    render(<CaptureBox onClose={vi.fn()} />, { wrapper: TestWrapper });
+    const input = screen.getByRole('textbox', { name: 'Capture' });
+    expect(input).toHaveAttribute('placeholder', 'What do you need to do?');
+    expect(input).toHaveAccessibleDescription('A title is enough. Extras are optional.');
+    const summary = screen.getByText('Examples');
+    const details = summary.closest('details')!;
+    expect(details.open).toBe(false);
+    fireEvent.change(input, { target: { value: 'Keep my draft' } });
+    fireEvent.click(summary);
+    expect(details.open).toBe(true); expect(input).toHaveValue('Keep my draft');
+    expect(screen.getByText('Review the rollout checklist !tomorrow')).toBeInTheDocument();
+  });
+});

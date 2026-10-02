@@ -1,0 +1,53 @@
+.action-confirm-target {
+  margin-top: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.action-confirm-changes {
+  margin: 8px 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.action-confirm-changes > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.35fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.action-confirm-changes dt {
+  color: var(--text-secondary);
+}
+.action-confirm-changes dd {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.action-confirm-technical summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.action-confirm-technical pre {
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.action-confirm-card button:focus-visible,
+.action-confirm-technical summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .action-confirm-card button,
+  .action-confirm-technical summary {
+    min-height: 44px;
+  }
+}

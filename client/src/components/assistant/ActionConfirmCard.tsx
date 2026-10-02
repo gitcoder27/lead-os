@@ -1,16 +1,10 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  ClipboardList,
-  Edit3,
-  MessageSquare,
-  NotebookPen,
-  RefreshCw,
-  Sparkles,
-  UserPlus,
-  Zap,
-  ChevronDown,
-} from 'lucide-react';
+import { useMemo } from 'react';
+import { useDevelopers } from '@/hooks/useDevelopers';
+import { useContacts } from '@/hooks/useContacts';
+import { readableActionPreview } from '@/lib/action-preview';
+import './action-confirm.css';
+import { motion, useReducedMotion } from 'framer-motion';
+import { ClipboardList, Edit3, MessageSquare, NotebookPen, RefreshCw, Sparkles, UserPlus, Zap } from 'lucide-react';
 import type { AssistantActionDecision, AssistantActionProposal } from '@/types';
 
 interface ActionConfirmCardProps {
@@ -31,16 +25,30 @@ const TOOL_ICONS: Record<string, typeof Sparkles> = {
 };
 
 export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmCardProps) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { data: developers } = useDevelopers();
+  const { data: contacts } = useContacts();
+  const names = useMemo(
+    () =>
+      new Map([
+        ...(developers ?? []).flatMap((person) => [
+          [person.accountId, person.displayName] as const,
+          ...(person.jiraAccountId ? [[person.jiraAccountId, person.displayName] as const] : []),
+        ]),
+        ...(contacts ?? []).map((person) => [`contact:${person.id}`, person.displayName] as const),
+      ]),
+    [developers, contacts],
+  );
+  const readable = readableActionPreview(proposal.preview ?? {}, names);
+  const reducedMotion = useReducedMotion();
   const Icon = TOOL_ICONS[proposal.tool] ?? Sparkles;
   const previewEntries = Object.entries(proposal.preview ?? {});
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
+      initial={reducedMotion ? false : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.18 }}
-      className="rounded-xl px-3 py-2.5"
+      className="action-confirm-card rounded-xl px-3 py-2.5"
       style={{
         background: 'var(--bg-secondary)',
         border: '1px solid color-mix(in srgb, var(--accent) 30%, var(--border-strong))',
@@ -67,35 +75,31 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
               </span>
             ) : null}
           </div>
-          {previewEntries.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setDetailsOpen((open) => !open)}
-              className="mt-1 inline-flex items-center gap-1 text-[12px]"
-              style={{ color: 'var(--text-muted)' }}
-              aria-expanded={detailsOpen}
-            >
-              <ChevronDown
-                size={11}
-                style={{ transform: detailsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
-              />
-              Details
-            </button>
-          ) : null}
-          {detailsOpen ? (
-            <dl className="mt-1.5 space-y-0.5">
-              {previewEntries.map(([key, value]) => (
-                <div key={key} className="flex gap-2 text-[12px] leading-4">
-                  <dt className="shrink-0 font-mono" style={{ color: 'var(--text-muted)' }}>
-                    {key}
-                  </dt>
-                  <dd className="min-w-0 break-words" style={{ color: 'var(--text-secondary)' }}>
-                    {typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}
+          {readable.target && <p className="action-confirm-target">{readable.target}</p>}
+          {readable.rows.length > 0 && (
+            <dl aria-label="Proposed changes" className="action-confirm-changes">
+              {readable.rows.map((row, index) => (
+                <div key={`${row.label}-${index}`}>
+                  <dt>{row.label}</dt>
+                  <dd>
+                    {row.before !== undefined && (
+                      <>
+                        <span>{row.before}</span>
+                        <span aria-label="changes to"> → </span>
+                      </>
+                    )}
+                    {row.value}
                   </dd>
                 </div>
               ))}
             </dl>
-          ) : null}
+          )}
+          {previewEntries.length > 0 && (
+            <details className="action-confirm-technical">
+              <summary>Technical details</summary>
+              <pre>{JSON.stringify(proposal.preview, null, 2)}</pre>
+            </details>
+          )}
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"

@@ -1,0 +1,41 @@
+.capture-guidance {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.capture-examples summary {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 28px;
+  color: var(--accent);
+}
+.capture-examples summary:focus-visible,
+.capture-title-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.capture-examples ul {
+  padding: 0;
+  list-style: none;
+  margin: 6px 0 8px;
+  display: grid;
+  gap: 10px;
+}
+.capture-examples li {
+  display: grid;
+  gap: 2px;
+}
+.capture-examples strong {
+  font-weight: 500;
+}
+.capture-examples code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .capture-examples summary {
+    min-height: 44px;
+  }
+}

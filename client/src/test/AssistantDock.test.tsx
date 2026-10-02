@@ -83,6 +83,8 @@ describe('AssistantDock', () => {
       if (url === '/assistant/conversations') {
         return Promise.resolve({ conversations: [] });
       }
+      if (url.startsWith('/team/developers')) return Promise.resolve({ developers: [] });
+      if (url === '/contacts') return Promise.resolve({ contacts: [] });
       return Promise.resolve(undefined);
     });
   });
@@ -521,6 +523,8 @@ describe('AssistantDock', () => {
       if (url === '/assistant/conversations') {
         return Promise.resolve({ conversations: [] });
       }
+      if (url.startsWith('/team/developers')) return Promise.resolve({ developers: [] });
+      if (url === '/contacts') return Promise.resolve({ contacts: [] });
       return Promise.resolve(undefined);
     });
     renderDock();

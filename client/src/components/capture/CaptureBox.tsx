@@ -1,5 +1,5 @@
 import { useAuthScopeKey } from '@/context/AuthContext';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, X, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -18,6 +18,7 @@ import { useCreateContact } from '@/hooks/useContacts';
 import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
 import { getLocalIsoDate, getLocalTimeZone } from '@/lib/utils';
 import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
+import './capture-experience.css';
 import { TokenSuggestionList } from './TokenSuggestionList';
 
 /** Per-kind token highlight colors — the live preview paints these in-place. */
@@ -149,6 +150,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
  * submit. Errors block the submit; warnings may need a confirm press.
  */
 export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: CaptureBoxProps) {
+  const hintId = useId();
   const { addToast } = useToast();
   const capture = useCapture();
   const scope = useAuthScopeKey();
@@ -424,9 +426,10 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
           }}
           rows={3}
           spellCheck={false}
-          placeholder='Capture… @person !date #JIRA-1 ^T-9 +label !due:fri /f /later /meeting — "T-5: text" updates, "/note" journals'
+          placeholder="What do you need to do?"
+          aria-describedby={hintId}
           aria-label="Capture"
-          className="relative w-full resize-none rounded-xl px-3 py-2 text-[13px] leading-relaxed outline-none"
+          className="capture-title-input relative w-full resize-none rounded-xl px-3 py-2 text-[13px] leading-relaxed outline-none"
           style={{
             background: 'transparent',
             color: 'transparent',
@@ -446,6 +449,15 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
             }}
           />
         ) : null}
+      </div>
+
+      <div className="capture-guidance">
+        <p id={hintId}>A title is enough. Extras are optional.</p>
+        <details className="capture-examples"><summary>Examples</summary><ul>
+          <li><strong>Just a task</strong><code>Prepare the release update</code></li>
+          <li><strong>Plan for tomorrow</strong><code>Review the rollout checklist !tomorrow</code></li>
+          <li><strong>Private daily note</strong><code>/note Decision: keep Friday for verification</code></li>
+        </ul><p>Type @ to choose a person, # to link Jira or + to add a label.</p></details>
       </div>
 
       {/* Structured summary */}

@@ -254,7 +254,7 @@ export class SyncEngine {
   ): typeof issues.$inferInsert {
     const labels = item.fields.labels ?? [];
     const flagged = Array.isArray(item.fields.customfield_10021) && item.fields.customfield_10021.some((it) => it.id === "10019");
-    const devDueDateField = devDueDateFieldOverride || config.JIRA_DEV_DUE_DATE_FIELD;
+    const devDueDateField = devDueDateFieldOverride ?? config.JIRA_DEV_DUE_DATE_FIELD;
     const aspenSeverityField = aspenSeverityFieldOverride || config.JIRA_ASPEN_SEVERITY_FIELD;
     const developmentDueDate = this.toDateValue(item.fields[devDueDateField]);
     const aspenSeverity = aspenSeverityField ? this.toDbTextValue(item.fields[aspenSeverityField]) : null;
@@ -463,7 +463,7 @@ export class SyncEngine {
         "updated",
         "resolutiondate",
         "customfield_10021",
-        devDueDateFieldOverride || config.JIRA_DEV_DUE_DATE_FIELD,
+        devDueDateFieldOverride ?? config.JIRA_DEV_DUE_DATE_FIELD,
         aspenSeverityFieldOverride || config.JIRA_ASPEN_SEVERITY_FIELD,
       ].filter((field): field is string => Boolean(field));
       const issuesFromJira = await jiraClient.searchIssues(batchJql, fields);

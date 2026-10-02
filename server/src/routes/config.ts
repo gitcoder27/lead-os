@@ -273,7 +273,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         (await getConfigValue(workspaceId, "jira_sync_jql")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_SYNC_JQL) ?? "",
         jiraSyncScopeMode
       );
-      const jiraDevDueDateField = (await getConfigValue(workspaceId, "jira_dev_due_date_field")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_DEV_DUE_DATE_FIELD) ?? "customfield_10128";
+      const jiraDevDueDateField = (await getConfigValue(workspaceId, "jira_dev_due_date_field")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_DEV_DUE_DATE_FIELD) ?? '';
       const jiraAspenSeverityField = (await getConfigValue(workspaceId, "jira_aspen_severity_field")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_ASPEN_SEVERITY_FIELD) ?? "";
       const managerRows = await db
         .select({ id: appUsers.id })

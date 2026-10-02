@@ -23,7 +23,8 @@ export type FilterType =
   | "blocked"
   | "stale"
   | "highPriority"
-  | "outOfTeam";
+  | "outOfTeam"
+  | 'excluded';
 
 export interface LocalTag {
   id: number;
@@ -76,6 +77,9 @@ export interface Issue {
   scopeChangedAt?: string;
   localTags: LocalTag[];
   analysisNotes?: string;
+  /** Latest local triage edit; Jira freshness always uses updatedAt. */
+  localUpdatedAt?: string;
+  snoozedUntil?: string;
   trackerAssignmentsToday?: IssueTrackerAssignmentSummary;
   excluded?: boolean;
   /** docs/56 P1-05: computed server-side from the Attention rules (open issues only). */
@@ -853,12 +857,54 @@ export interface WorkspaceMaintenanceResetResponse {
 }
 
 export interface IssueUpdate {
-  assigneeId?: string;
+  assigneeId?: string | null;
   priorityName?: string;
-  dueDate?: string;
-  developmentDueDate?: string;
+  dueDate?: string | null;
+  developmentDueDate?: string | null;
   flagged?: boolean;
-  analysisNotes?: string;
+  analysisNotes?: string | null;
+}
+
+export const ISSUE_BULK_LIMIT = 20;
+export interface IssueStatusExpectation {
+  name: string;
+  category: string;
+}
+export interface IssueTransition {
+  id: string;
+  name: string;
+  to: IssueStatusExpectation;
+  supported: boolean;
+  reason?: string;
+}
+export interface IssueTransitionsResponse {
+  transitions: IssueTransition[];
+  currentStatus: IssueStatusExpectation;
+}
+export interface IssueTransitionResponse {
+  issue: Issue;
+  refreshPending?: boolean;
+}
+export type IssueOperation =
+  | { kind: 'update'; update: IssueUpdate }
+  | { kind: 'exclude' }
+  | { kind: 'restore' }
+  | { kind: 'snooze'; until: string }
+  | { kind: 'transitionTo'; category: 'new' | 'indeterminate' | 'done'; expectedStatus: IssueStatusExpectation };
+export interface IssueBulkItem {
+  key: string;
+  operation: IssueOperation;
+}
+export interface IssueBulkResult {
+  key: string;
+  ok: boolean;
+  issue?: Issue;
+  error?: string;
+  status?: number;
+  refreshPending?: boolean;
+}
+export interface IssueBulkResponse {
+  results: IssueBulkResult[];
 }
 
 export interface IssueCommentRequest {

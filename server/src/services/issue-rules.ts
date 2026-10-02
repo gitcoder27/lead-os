@@ -4,6 +4,7 @@ import { hasWorkingHoursElapsed, weekdayWindow } from "./working-hours";
 type RuleIssue = {
   statusCategory: string;
   excluded?: boolean | number | null;
+  snoozedUntil?: string | null;
   teamScopeState?: string | null;
   syncScopeState?: string | null;
   dueDate?: string | null;
@@ -11,15 +12,17 @@ type RuleIssue = {
   updatedAt: string;
 };
 
-function isExcluded(issue: Pick<RuleIssue, "excluded">): boolean {
-  return issue.excluded === true || issue.excluded === 1;
+export function isExcluded(issue: Pick<RuleIssue, "excluded" | 'snoozedUntil'>): boolean {
+  return (issue.excluded === true || issue.excluded === 1 ||
+    Boolean(issue.snoozedUntil && Date.parse(issue.snoozedUntil) > Date.now())
+  );
 }
 
 export function getEffectiveDueDate(issue: Pick<RuleIssue, "developmentDueDate" | "dueDate">): string | null {
   return issue.developmentDueDate ?? issue.dueDate ?? null;
 }
 
-export function isActiveTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "excluded" | "teamScopeState" | "syncScopeState">): boolean {
+export function isActiveTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "excluded" | 'snoozedUntil' | "teamScopeState" | "syncScopeState">): boolean {
   return issue.statusCategory !== "done" &&
     !isExcluded(issue) &&
     (issue.teamScopeState ?? "in_team") !== "out_of_team" &&
@@ -27,7 +30,7 @@ export function isActiveTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "exc
 }
 
 export function isVisibleWorkIssue(
-  issue: Pick<RuleIssue, "statusCategory" | "excluded" | "teamScopeState" | "syncScopeState">,
+  issue: Pick<RuleIssue, "statusCategory" | "excluded" | 'snoozedUntil' | "teamScopeState" | "syncScopeState">,
   mode: JiraSyncScopeMode
 ): boolean {
   if (issue.statusCategory === "done" || isExcluded(issue) || (issue.syncScopeState ?? "active") !== "active") {
@@ -41,7 +44,7 @@ export function isVisibleWorkIssue(
   return (issue.teamScopeState ?? "in_team") !== "out_of_team";
 }
 
-export function isOutOfTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "excluded" | "teamScopeState" | "syncScopeState">): boolean {
+export function isOutOfTeamIssue(issue: Pick<RuleIssue, "statusCategory" | "excluded" | 'snoozedUntil' | "teamScopeState" | "syncScopeState">): boolean {
   return issue.statusCategory !== "done" &&
     !isExcluded(issue) &&
     (issue.teamScopeState ?? "in_team") === "out_of_team" &&

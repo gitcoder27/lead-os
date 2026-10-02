@@ -9,7 +9,7 @@ const envSchema = z.object({
   JIRA_API_TOKEN: z.string().min(1).optional(),
   JIRA_PROJECT_KEY: z.string().min(1).optional(),
   JIRA_SYNC_JQL: z.string().min(1).optional(),
-  JIRA_DEV_DUE_DATE_FIELD: z.string().min(1).default("customfield_10128"),
+  JIRA_DEV_DUE_DATE_FIELD: z.string().default(''),
   JIRA_ASPEN_SEVERITY_FIELD: z.string().min(1).optional(),
 });
 

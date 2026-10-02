@@ -21,6 +21,7 @@ export function TaskPopover({
   width = 224,
   onAccelerator,
   role = 'menu',
+  className = '',
 }: {
   anchor: HTMLElement | null;
   onClose: () => void;
@@ -30,6 +31,7 @@ export function TaskPopover({
   /** Return true when the key was handled. */
   onAccelerator?: (key: string) => boolean;
   role?: 'menu' | 'dialog';
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -43,7 +45,8 @@ export function TaskPopover({
       const height = ref.current?.offsetHeight ?? 0;
       const below = rect.bottom + 4;
       const top = below + height > window.innerHeight - 8 && rect.top - height - 4 > 8 ? rect.top - height - 4 : below;
-      const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
+      const measuredWidth = Math.min(width, window.innerWidth - 16);
+      const left = Math.min(Math.max(8, rect.right - measuredWidth), window.innerWidth - measuredWidth - 8);
       setPosition({ top, left });
     };
     place();
@@ -127,11 +130,12 @@ export function TaskPopover({
       aria-label={label}
       data-popover-layer=""
       onKeyDown={handleKeyDown}
-      className="fixed z-popover max-h-[360px] overflow-y-auto rounded-xl p-1"
+      className={`fixed z-popover max-h-[360px] overflow-y-auto rounded-xl p-1 ${className}`}
       style={{
         top: position?.top ?? -9999,
         left: position?.left ?? -9999,
         width,
+        maxWidth: 'calc(100vw - 16px)',
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--panel-shadow)',

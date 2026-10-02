@@ -36,6 +36,8 @@ export const issues = sqliteTable("issues", {
   lastReconciledAt: text("last_reconciled_at"),
   scopeChangedAt: text("scope_changed_at"),
   analysisNotes: text("analysis_notes"),
+  localUpdatedAt: text("local_updated_at"),
+  snoozedUntil: text("snoozed_until"),
   excluded: integer("excluded").notNull().default(0),
 }, (table) => [
   primaryKey({ name: "pk_issues_workspace_jira_key", columns: [table.workspaceId, table.jiraKey] }),

@@ -25,6 +25,7 @@ export const FILTER_LABELS: Record<FilterType, string> = {
   stale: 'Stale',
   highPriority: 'High Priority',
   outOfTeam: 'Other Team',
+  excluded: 'Excluded / snoozed',
 };
 
 export const FILTER_KEYS: FilterType[] = [
@@ -36,6 +37,7 @@ export const FILTER_KEYS: FilterType[] = [
   'blocked',
   'stale',
   'highPriority',
+  'excluded',
 ];
 
 export const CARD_CONFIGS = [

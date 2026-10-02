@@ -19,6 +19,7 @@ const FILTER_TYPES: DashboardFilterState['activeFilter'][] = [
   'stale',
   'highPriority',
   'outOfTeam',
+  'excluded',
 ];
 
 const SUMMARY_FILTERS: TrackerBoardSummaryFilter[] = [

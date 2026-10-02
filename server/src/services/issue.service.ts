@@ -1,9 +1,13 @@
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { HttpError } from '../middleware/errorHandler';
+import { IssueExecutionService, type JiraMutationClient } from './jira-execution.service';
+import { and, desc, eq, ne, or, isNull, lte } from "drizzle-orm";
 import type {
   DeveloperIssue,
   FilterType,
   Issue as SharedIssue,
   IssueUpdate,
+  IssueBulkItem,
+  IssueStatusExpectation,
   LocalTag,
   OverviewCounts,
   IssueTrackerAssignmentSummary,
@@ -13,7 +17,8 @@ import { db } from "../db/connection";
 import { configTable, developers, issueScopeHistory, issues, issueTags, localTags, syncLog } from "../db/schema";
 import { JiraClient } from "../jira/client";
 import { endOfWeekIsoDate, todayIsoDate } from "../utils/date";
-import { getEffectiveDueDate, isOutOfTeamIssue, isStaleIssue, isVisibleWorkIssue, type JiraStaleRule } from "./issue-rules";
+import { getEffectiveDueDate,
+  isExcluded, isOutOfTeamIssue, isStaleIssue, isVisibleWorkIssue, type JiraStaleRule } from "./issue-rules";
 
 /** docs/56 P1-05: the client reads staleness from here instead of its own 48h copy. */
 function withStale(issue: SharedIssue, rule: JiraStaleRule, now: Date): SharedIssue {
@@ -58,7 +63,7 @@ export interface TodayIssueSnapshot {
   dueToday: number;
 }
 
-type JiraMutationClient = Pick<JiraClient, "updateIssue" | "addComment">;
+
 type JiraClientResolver = JiraMutationClient | (() => Promise<JiraMutationClient>);
 
 export class IssueService {
@@ -143,6 +148,7 @@ export class IssueService {
       eq(issues.workspaceId, normalizedWorkspaceId),
       ne(issues.statusCategory, "done"),
       eq(issues.excluded, 0),
+      or(isNull(issues.snoozedUntil), lte(issues.snoozedUntil, now.toISOString()))!,
       eq(issues.syncScopeState, "active"),
     ];
 
@@ -214,7 +220,7 @@ export class IssueService {
       .limit(1);
     const existingRow = existing[0];
     if (!existingRow) {
-      throw new Error("Issue not found");
+      throw new HttpError(404,"Issue not found");
     }
 
     const jiraFields: Record<string, unknown> = {};
@@ -222,7 +228,7 @@ export class IssueService {
     const updatedAt = new Date().toISOString();
 
     if (payload.assigneeId !== undefined) {
-      jiraFields.assignee = { accountId: payload.assigneeId };
+      jiraFields.assignee = payload.assigneeId ? { accountId: payload.assigneeId } : null;
     }
     if (payload.priorityName !== undefined) {
       jiraFields.priority = { name: payload.priorityName };
@@ -231,7 +237,9 @@ export class IssueService {
       jiraFields.duedate = payload.dueDate;
     }
     if (payload.developmentDueDate !== undefined) {
-      jiraFields[devDueDateField] = payload.developmentDueDate;
+      if (!devDueDateField && payload.dueDate !== undefined && payload.dueDate !== payload.developmentDueDate)
+        throw new HttpError(400, 'Conflicting due dates');
+      jiraFields[devDueDateField || 'duedate'] = payload.developmentDueDate;
     }
     if (payload.flagged !== undefined) {
       jiraFields.customfield_10021 = payload.flagged ? [{ id: "10019" }] : null;
@@ -261,7 +269,8 @@ export class IssueService {
       localUpdate.dueDate = payload.dueDate;
     }
     if (payload.developmentDueDate !== undefined) {
-      localUpdate.developmentDueDate = payload.developmentDueDate;
+      localUpdate.developmentDueDate = devDueDateField ? payload.developmentDueDate : null;
+      if (!devDueDateField) localUpdate.dueDate = payload.developmentDueDate;
     }
     if (payload.flagged !== undefined) {
       localUpdate.flagged = payload.flagged ? 1 : 0;
@@ -272,7 +281,7 @@ export class IssueService {
 
     await db
       .update(issues)
-      .set({ ...localUpdate, updatedAt })
+      .set({ ...localUpdate, localUpdatedAt: updatedAt })
       .where(and(eq(issues.workspaceId, normalizedWorkspaceId), eq(issues.jiraKey, jiraKey)));
 
     if (
@@ -284,7 +293,7 @@ export class IssueService {
       await this.recordScopeHistory(existingRow, {
         ...existingRow,
         ...localUpdate,
-        updatedAt,
+        localUpdatedAt: updatedAt,
       }, updatedAt);
     }
 
@@ -299,26 +308,53 @@ export class IssueService {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     const issue = await this.getById(jiraKey, todayIsoDate(), normalizedWorkspaceId);
     if (!issue) {
-      throw new Error("Issue not found");
+      throw new HttpError(404,"Issue not found");
     }
     const jiraClient = await this.getJiraClient(normalizedWorkspaceId);
     await jiraClient.addComment(jiraKey, text);
   }
 
   async excludeIssue(jiraKey: string, workspaceId?: string): Promise<void> {
+    if (!(await this.getById(jiraKey, undefined, workspaceId))) throw new HttpError(404, 'Issue not found');
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await db
       .update(issues)
-      .set({ excluded: 1 })
+      .set({ excluded: 1, snoozedUntil: null, localUpdatedAt: new Date().toISOString() })
       .where(and(eq(issues.workspaceId, normalizedWorkspaceId), eq(issues.jiraKey, jiraKey)));
   }
 
   async restoreIssue(jiraKey: string, workspaceId?: string): Promise<void> {
+    if (!(await this.getById(jiraKey, undefined, workspaceId))) throw new HttpError(404, 'Issue not found');
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     await db
       .update(issues)
-      .set({ excluded: 0 })
+      .set({ excluded: 0, snoozedUntil: null, localUpdatedAt: new Date().toISOString() })
       .where(and(eq(issues.workspaceId, normalizedWorkspaceId), eq(issues.jiraKey, jiraKey)));
+  }
+
+  async snoozeIssue(jiraKey: string, until: string, workspaceId?: string): Promise<void> {
+    if (!Number.isFinite(Date.parse(until)) || Date.parse(until) <= Date.now())
+      throw new HttpError(400, 'Choose a future snooze time');
+    if (!(await this.getById(jiraKey, undefined, workspaceId))) throw new HttpError(404, 'Issue not found');
+    await db
+      .update(issues)
+      .set({ excluded: 0, snoozedUntil: new Date(until).toISOString(), localUpdatedAt: new Date().toISOString() })
+      .where(and(eq(issues.workspaceId, normalizeWorkspaceId(workspaceId)), eq(issues.jiraKey, jiraKey)));
+  }
+
+  getTransitions(jiraKey: string, workspaceId?: string) {
+    return new IssueExecutionService(this, () => this.getJiraClient(workspaceId)).getTransitions(jiraKey, workspaceId);
+  }
+  transition(jiraKey: string, transitionId: string, expectedStatus: IssueStatusExpectation, workspaceId?: string) {
+    return new IssueExecutionService(this, () => this.getJiraClient(workspaceId)).transition(
+      jiraKey,
+      transitionId,
+      expectedStatus,
+      workspaceId,
+    );
+  }
+  bulk(items: IssueBulkItem[], workspaceId?: string) {
+    return new IssueExecutionService(this, () => this.getJiraClient(workspaceId)).bulk(items, workspaceId);
   }
 
   async getOverviewCounts(workspaceId?: string): Promise<OverviewCounts> {
@@ -456,6 +492,8 @@ export class IssueService {
         return visibleWorkIssues().filter((issue) => issue.stale ?? isStaleIssue(issue, context.attentionRules, context.now));
       case "highPriority":
         return visibleWorkIssues().filter((issue) => issue.priorityName === "Highest" || issue.priorityName === "High");
+      case 'excluded':
+        return result.filter(isExcluded);
       case "outOfTeam":
         return result.filter((issue) => isOutOfTeamIssue(issue));
       case "all":
@@ -466,7 +504,7 @@ export class IssueService {
     }
   }
 
-  private async resolveTeamScopeState(assigneeId?: string, workspaceId?: string): Promise<"in_team" | "out_of_team" | "unassigned"> {
+  private async resolveTeamScopeState(assigneeId?: string | null, workspaceId?: string): Promise<"in_team" | "out_of_team" | "unassigned"> {
     if (!assigneeId) {
       return "unassigned";
     }
@@ -484,7 +522,7 @@ export class IssueService {
     return activeTeamIds.has(assigneeId) ? "in_team" : "out_of_team";
   }
 
-  private async resolveAssigneeName(assigneeId?: string, workspaceId?: string): Promise<string | null> {
+  private async resolveAssigneeName(assigneeId?: string | null, workspaceId?: string): Promise<string | null> {
     if (!assigneeId) {
       return null;
     }
@@ -574,6 +612,8 @@ export class IssueService {
       scopeChangedAt: row.scopeChangedAt ?? undefined,
       localTags: tags,
       analysisNotes: row.analysisNotes ?? undefined,
+      localUpdatedAt: row.localUpdatedAt ?? undefined,
+      snoozedUntil: row.snoozedUntil ?? undefined,
       trackerAssignmentsToday,
       excluded: row.excluded === 1,
     };

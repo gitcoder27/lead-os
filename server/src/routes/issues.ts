@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
-import type { IssueCommentResponse } from "shared/types";
+import { ISSUE_BULK_LIMIT, type IssueCommentResponse } from "shared/types";
 import { IssueService } from "../services/issue.service";
 import { validate } from "../middleware/validate";
 import { HttpError } from "../middleware/errorHandler";
 
-const keyRegex = /^[A-Z]+-\d+$/;
+const keyRegex = /^[A-Z][A-Z0-9_]*-\d+$/;
 const accountIdRegex = /^[A-Za-z0-9:-]+$/;
 const filterSchema = z.enum([
   "all",
@@ -22,6 +22,7 @@ const filterSchema = z.enum([
   "stale",
   "highPriority",
   "outOfTeam",
+  'excluded',
 ]);
 const sortSchema = z.enum(["priority", "dueDate", "updated", "created"]);
 const orderSchema = z.enum(["asc", "desc"]);
@@ -32,19 +33,62 @@ const paramsSchema = z.object({
   query: z.any().optional(),
 });
 
-const updateSchema = z.object({
-  params: z.object({ key: z.string().regex(keyRegex, "Invalid issue key format") }),
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((day) => {
+    const date = new Date(`${day}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === day; }, 'Invalid calendar date');
+const issueUpdateBody = z
+    .object({
+      assigneeId: z.string().regex(accountIdRegex).nullable().optional(),
+      priorityName: z.enum(["Highest", "High", "Medium", "Low", "Lowest"]).optional(),
+      dueDate: calendarDate.nullable().optional(),
+      developmentDueDate: calendarDate.nullable().optional(),
+      flagged: z.boolean().optional(),
+      analysisNotes: z.string().max(10000).nullable().optional(),
+    })
+  .strict()
+    .refine((value) => Object.keys(value).length > 0, 'At least one field is required');
+const updateSchema = z.object( { ...paramsSchema.shape, body: issueUpdateBody });
+const statusExpectation = z
+  .object({ name: z.string().min(1).max(200), category: z.enum(['new', 'indeterminate', 'done']) })
+  .strict();
+const transitionSchema = z.object({
+  ...paramsSchema.shape,
+  body: z.object({ transitionId: z.string().regex(/^\d{1,64}$/), expectedStatus: statusExpectation }).strict(),
+});
+const snoozeBody = z.object({ until: z.string().datetime({ offset: true }) }).strict();
+const snoozeSchema = z.object({ ...paramsSchema.shape, body: snoozeBody });
+const bulkSchema = z.object({
+  params: z.unknown().optional(),
+  query: z.unknown().optional(),
   body: z
     .object({
-      assigneeId: z.string().regex(accountIdRegex).optional(),
-      priorityName: z.enum(["Highest", "High", "Medium", "Low", "Lowest"]).optional(),
-      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      developmentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-      flagged: z.boolean().optional(),
-      analysisNotes: z.string().max(10000).optional(),
+      items: z
+        .array(
+          z
+            .object({
+              key: z.string().regex(keyRegex),
+              operation: z.discriminatedUnion('kind', [
+                z.object({ kind: z.literal('update'), update: issueUpdateBody }).strict(),
+                z.object({ kind: z.literal('exclude') }).strict(),
+                z.object({ kind: z.literal('restore') }).strict(),
+                z.object({ kind: z.literal('snooze'), until: snoozeBody.shape.until }).strict(),
+                z
+                  .object({
+                    kind: z.literal('transitionTo'),
+                    category: z.enum(['new', 'indeterminate', 'done']),
+                    expectedStatus: statusExpectation,
+                  })
+                  .strict(),
+              ]),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(ISSUE_BULK_LIMIT)
+        .refine((items) => new Set(items.map((item) => item.key)).size === items.length, 'Duplicate issue keys'),
     })
-    .refine((value) => Object.keys(value).length > 0, { message: "At least one field is required" }),
-  query: z.any().optional(),
+    .strict(),
 });
 
 const commentSchema = z.object({
@@ -94,6 +138,43 @@ export function createIssuesRouter(issueService: IssueService): Router {
         noTags,
       }, req.auth!.user.workspaceId);
       res.json({ issues });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/bulk', validate(bulkSchema), async (req, res, next) => {
+    try {
+      res.json(await issueService.bulk(req.body.items, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.get('/:key/transitions', validate(paramsSchema), async (req, res, next) => {
+    try {
+      res.json(await issueService.getTransitions(req.params.key as string, req.auth!.user.workspaceId));
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.post('/:key/transition', validate(transitionSchema), async (req, res, next) => {
+    try {
+      res.json(
+        await issueService.transition(
+          req.params.key as string,
+          req.body.transitionId,
+          req.body.expectedStatus,
+          req.auth!.user.workspaceId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.post('/:key/snooze', validate(snoozeSchema), async (req, res, next) => {
+    try {
+      await issueService.snoozeIssue(req.params.key as string, req.body.until, req.auth!.user.workspaceId);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

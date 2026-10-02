@@ -204,15 +204,16 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
     expect(mockAddToast.mock.calls[1]?.[0]).toMatchObject({ type: 'success', title: 'Restored PROJ-101 in Jira' });
   });
 
-  it('says when a field that was empty cannot be put back', () => {
+  it('undoes assignment back to unassigned', () => {
     mockMutate.mockImplementation((_vars: unknown, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
     renderBar(blankIssue());
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply assignee' }));
 
     const toast = mockAddToast.mock.calls[0]?.[0];
-    expect(toast.action).toBeUndefined();
-    expect(toast.message).toMatch(/cannot be cleared/);
+    expect(toast.action.label).toBe('Undo');
+    toast.action.onClick();
+    expect(mockMutate.mock.calls[1]?.[0]).toEqual({ key: 'PROJ-101', update: { assigneeId: null } });
   });
 
   it('warns when the suggested due date is already past', () => {
@@ -231,7 +232,7 @@ describe('buildUndoUpdate', () => {
       complete: true,
     });
     expect(buildUndoUpdate(issue({ priorityName: 'P1', dueDate: undefined }), { priorityName: 'High', dueDate: '2026-03-02' })).toEqual({
-      update: {},
+      update: {dueDate: null},
       complete: false,
     });
   });

@@ -1,0 +1,68 @@
+.work-select-control {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 28px;
+  min-width: 28px;
+  cursor: pointer;
+}
+.work-select-control input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.work-select-control input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.work-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font-size: 13px;
+}
+.work-bulk-targets {
+  padding: 0;
+  list-style: none;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.work-bulk-targets li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px 12px;
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.work-bulk-targets li [role] {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+}
+.work-issue-more:focus-visible,
+.work-action-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .work-select-control,
+  .work-issue-more,
+  .work-action-button,
+  .work-selection-bar button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .work-bulk-targets button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .work-bulk-actions button, .work-status-actions button, .work-execution-menu button { min-height: 44px; }
+}

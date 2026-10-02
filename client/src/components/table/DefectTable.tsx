@@ -1,3 +1,7 @@
+import { WorkBulkTriage } from '@/components/work/WorkBulkTriage';
+import { WorkIssueMenu } from '@/components/work/WorkIssueMenu';
+import { ISSUE_BULK_LIMIT } from '@/types';
+import '@/components/work/work-execution.css';
 import { csvFileName, downloadCsv, workCsv } from '@/lib/csv';
 import { useMemo, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
@@ -205,6 +209,8 @@ export function DefectTable({
   const { data: syncStatus } = useSyncStatus();
   const { openCapture } = useQuickActions();
   const { exclude, restore } = useExcludeIssue();
+  const excludeIssue = exclude.mutate;
+  const restoreIssue = restore.mutate;
   const { addToast } = useToast();
   const statusStorageKey = useScopedStorageKey(STATUS_FILTER_STORAGE_KEY);
 
@@ -220,6 +226,46 @@ export function DefectTable({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [excludedStatuses, setExcludedStatuses] = useState<string[]>(() => readPersistedExcludedStatuses(statusStorageKey));
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const selectionScope = [
+    statusStorageKey,
+    filter,
+    assigneeFilter,
+    tagId,
+    noTags,
+    searchQuery,
+    excludedStatuses.join(','),
+  ].join('|');
+  const [selection, setSelection] = useState<{ scope: string; keys: Set<string> }>({
+    scope: selectionScope,
+    keys: new Set(),
+  });
+  const selectedKeys = useMemo(
+    () => (selection.scope === selectionScope ? selection.keys : new Set<string>()),
+    [selection, selectionScope],
+  );
+  const selectionRef = useRef({ keys: selectedKeys, scope: selectionScope });
+  selectionRef.current = { keys: selectedKeys, scope: selectionScope };
+  const toggleSelected = useCallback(
+    (key: string) =>
+      setSelection((current) => {
+        const keys = new Set(current.scope === selectionScope ? current.keys : []);
+        if (keys.has(key)) keys.delete(key);
+        else if (keys.size < ISSUE_BULK_LIMIT) keys.add(key);
+        return { scope: selectionScope, keys };
+      }),
+    [selectionScope],
+  );
+  const removeSelected = useCallback(
+    (keys: string[]) =>
+      setSelection((current) => ({
+        ...current,
+        keys: new Set([...current.keys].filter((key) => !keys.includes(key))),
+      })),
+    [],
+  );
 
   const tableRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -372,7 +418,7 @@ export function DefectTable({
 
   const handleExclude = useCallback(
     (issueKey: string, _e: React.MouseEvent) => {
-      exclude.mutate(issueKey, {
+      excludeIssue(issueKey, {
         onSuccess: () => {
           addToast({
             type: 'success',
@@ -380,7 +426,7 @@ export function DefectTable({
             message: 'Issue excluded from tracking',
             action: {
               label: 'Undo',
-              onClick: () => restore.mutate(issueKey),
+              onClick: () => restoreIssue(issueKey),
             },
             duration: 8000,
           });
@@ -390,11 +436,48 @@ export function DefectTable({
         },
       });
     },
-    [exclude, restore, addToast]
+    [excludeIssue, restoreIssue, addToast]
   );
 
   const columns = useMemo(
     () => [
+      ...(selectionMode
+        ? [
+            columnHelper.display({
+              id: 'select',
+              header: ({ table }) => {
+                const keys = table
+                  .getRowModel()
+                  .rows.slice(0, ISSUE_BULK_LIMIT)
+                  .map((row) => row.original.jiraKey);
+                const all = keys.length > 0 && keys.every((key) => selectionRef.current.keys.has(key));
+                return (
+                  <label className="work-select-control">
+                    <input
+                      type="checkbox"
+                      aria-label="Select first 20 visible defects"
+                      checked={all}
+                      onChange={() => setSelection({ scope: selectionRef.current.scope, keys: all ? new Set() : new Set(keys) })}
+                    />
+                  </label>
+                );
+              },
+              cell: ({ row }) => (
+                <label className="work-select-control" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${row.original.jiraKey}`}
+                    checked={selectionRef.current.keys.has(row.original.jiraKey)}
+                    disabled={!selectionRef.current.keys.has(row.original.jiraKey) && selectionRef.current.keys.size >= ISSUE_BULK_LIMIT}
+                    onChange={() => toggleSelected(row.original.jiraKey)}
+                  />
+                </label>
+              ),
+              size: 44,
+              enableSorting: false,
+            }),
+          ]
+        : []),
       ...(filter === 'outOfTeam'
         ? [
             columnHelper.display({
@@ -499,6 +582,13 @@ export function DefectTable({
             style={{ color: 'var(--text-primary)' }}
           >
             {info.getValue()}
+            {info.row.original.excluded ? (
+              <small className="block">Excluded</small>
+            ) : info.row.original.snoozedUntil && Date.parse(info.row.original.snoozedUntil) > Date.now() ? (
+              <small className="block">
+                Snoozed until {new Date(info.row.original.snoozedUntil).toLocaleDateString()}
+              </small>
+            ) : null}
           </span>
         ),
         size: undefined, // flex
@@ -690,6 +780,13 @@ export function DefectTable({
         sortDescFirst: true,
         size: 78,
       }),
+      columnHelper.display({
+        id: 'more',
+        header: '',
+        size: 44,
+        enableSorting: false,
+        cell: ({ row }) => <WorkIssueMenu issue={row.original} />,
+      }),
       columnHelper.accessor('flagged', {
         header: '',
         cell: (info) =>
@@ -701,6 +798,8 @@ export function DefectTable({
       }),
     ],
     [
+      selectionMode,
+      toggleSelected,
       editingCell,
       handleCellClick,
       closeInlineEdit,
@@ -792,7 +891,7 @@ export function DefectTable({
     );
   }
 
-  if (isError) {
+  if (isError && !bulkOpen) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-6 text-center">
         <div>
@@ -816,6 +915,19 @@ export function DefectTable({
     );
   }
 
+  const selectedIssues = table
+    .getRowModel()
+    .rows.map((row) => row.original)
+    .filter((issue) => selectedKeys.has(issue.jiraKey));
+  const bulkDialog = bulkOpen ? (
+    <WorkBulkTriage
+      issues={selectedIssues}
+      onClose={() => setBulkOpen(false)}
+      onApplied={removeSelected}
+      onOpen={onSelectIssue}
+    />
+  ) : null;
+
   const toolbar = (
     <div
       ref={searchContainerRef}
@@ -833,6 +945,17 @@ export function DefectTable({
       </div>
 
       <div className="flex items-center justify-end gap-1.5 min-w-0 md:min-w-[260px]">
+        <button
+          type="button"
+          className="ui-btn-ghost work-action-button"
+          aria-pressed={selectionMode}
+          onClick={() => {
+            setSelectionMode(!selectionMode);
+            setSelection({ scope: selectionScope, keys: new Set() });
+          }}
+        >
+          {selectionMode ? 'Cancel' : 'Select'}
+        </button>
         <button type="button" className="ui-btn-ghost" aria-label="Export CSV" disabled={!filteredIssues.length} onClick={() => downloadCsv(workCsv(table.getRowModel().rows.map((row) => row.original)), csvFileName('work', 'current', getLocalIsoDate()))}>CSV</button>
         <button
           type="button"
@@ -934,7 +1057,7 @@ export function DefectTable({
     );
   }
 
-  if (!baseIssues.length && !hasActiveFilters) {
+  if (!baseIssues.length && !hasActiveFilters && !bulkOpen) {
     // Connected, yet the last sync returned nothing (or none ran): explain, do not claim the project is clean.
     if (syncStatus?.jiraConfigured && (!syncStatus.lastSyncedAt || !syncStatus.issuesSynced)) {
       return <NothingSyncedState syncStatus={syncStatus} scopeMode={config?.jiraSyncScopeMode ?? syncStatus.syncScope?.mode} onOpenSyncSettings={onOpenSyncSettings} />;
@@ -942,7 +1065,7 @@ export function DefectTable({
     return <ProjectCleanState />;
   }
 
-  if (!baseIssues.length) {
+  if (!baseIssues.length && !bulkOpen) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {toolbar}
@@ -963,6 +1086,22 @@ export function DefectTable({
   return (
     <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
       {toolbar}
+      {selectionMode && (
+        <div className="work-selection-bar">
+          <span role="status">
+            {selectedIssues.length} selected · up to {ISSUE_BULK_LIMIT}
+          </span>
+          <button
+            type="button"
+            className="ui-btn-primary"
+            disabled={!selectedIssues.length}
+            onClick={() => setBulkOpen(true)}
+          >
+            Update selected
+          </button>
+        </div>
+      )}
+      {bulkDialog}
 
       <div
         className="flex-1 min-w-0 overflow-auto px-1 pb-1"

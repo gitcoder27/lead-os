@@ -343,7 +343,7 @@ Depends on P2-03. `parallel-ok` with P3.
 - [ ] **P5-03** Sync freshness and failure visibility.
   - Files: `routes/sync.ts:31`, `engine.ts:199-202`, `issue.service.ts:334`, `Header.tsx:33`, `ErrorBanner.tsx:12-20`, `jira/client.ts:74-92`, `TriagePanel.tsx:72-79`.
   - Accept: `lastSuccessAt` stored separately; "Jira synced 12m ago" chip on Today and Work; banner has Retry and a Settings link; retries for 5xx; no raw Jira JSON in toasts.
-- [ ] **P5-04** Triage edit correctness.
+- [x] **P5-04** Triage edit correctness.
   - Files: `TriageQuickActions.tsx:263,301`, `InlineEditAssignee.tsx:37`, `InlineEditDueDate.tsx:116`, `routes/issues.ts:8,39-46`, `issue.service.ts:204-208`, `config.ts:12`.
   - Accept: can unassign and clear dates (accept `null`); date commits on blur or Enter; standard `duedate` is used when no dev-due field is configured; the issue-key regex accepts digits in project keys.
 - [ ] **P5-05** Comment write-back feedback.
@@ -352,10 +352,10 @@ Depends on P2-03. `parallel-ok` with P3.
 - [ ] **P5-06** Alert quality.
   - Files: `alert.service.ts:99-144`, `issue.service.ts:403-405,428`, `DefectTable.tsx:1021`, `utils.ts:66`, `manager-attention.ts` (deleted in P1-06).
   - Accept: status-aware stale (skip To Do and waiting states); Jira status-category check instead of the "To Do" name; server threshold passed to the client; `detectedAt` is stable; alert snooze until a date.
-- [ ] **P5-07** Local writes must not reset Jira staleness.
+- [x] **P5-07** Local writes must not reset Jira staleness.
   - Files: `issue.service.ts:193,246`.
   - Accept: a separate `localUpdatedAt`.
-- [ ] **P5-08** Excluded/snoozed list and restore.
+- [x] **P5-08** Excluded/snoozed list and restore.
   - Files: `DefectTable.tsx:36-75`.
   - Accept: an "Excluded / snoozed" filter, row-level snooze (tomorrow, next week, custom), and restore.
 - [ ] **P5-09** Scale.
@@ -434,7 +434,7 @@ Order: trust R1–R4, Tasks interactions R5 (TS-05/06), Team R6, shared shell R7
 - [x] **R7** Compact shared navigation and consolidated Tasks options (TS-07).
 - [x] **R8** Reachable mobile My plan with urgent queue visibility.
 - [x] **R9** Weekly report preview, copy, CSV and completion (WR-07–10).
-- [ ] **R10** Jira edit/freshness/restore semantics and bounded execution actions.
+- [x] **R10** Jira edit/freshness/restore semantics and bounded execution actions.
 - [ ] **R11** Progressive capture examples and readable confirmed changes.
 - [ ] **R12** Durable deduplicated in-app assignment/reply/blocker events and read state.
 
@@ -554,3 +554,4 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 - The `team_mode` migration must be tested against a copy of the production database before deploy. Do not run it against production data directly.
 
 | 2026-10-02 | R9 | main (this commit) | Codex | WR-07–10 delivered on the existing review: Shipped / Next week / Blocked & risks, selected lines, edited Markdown, escaped HTML + plain clipboard with fallback, past reports, acknowledged Finish and Today/palette Send links. Named-person risks opt in; no task bodies/keys or agenda tasks in reports. Pending task decisions cannot be reported; acknowledged rows supply CSV closed timestamps. Progress saves serialize newer edits, retain failures without a retry loop, and never complete through a later background edit. Fresh blocked tasks are included; manager-zone review queries reuse one agenda-id set. Jira resolution dates are nullable/unbackfilled, requested in both sync paths, mapped or set on observed Done transitions and retained when absent; scoped weekly facts omit unknown resolved counts. Tasks/Work export actual current filtered/sorted rows, not lingering/progress extras; agenda markers omit topics/session actions, with BOM/CRLF/quoted cells/formula guards/local filenames. 243 targeted client and 77 isolated server cases pass, plus final clipboard/past/Send rerun; typecheck/build:check/guard:data and touched lint pass (existing warnings). Synthetic browser: light/dark, 1440/390/320/720 CSS px (DPR2 at 720), keyboard x/j/Enter, opt-in hints, failed-save retention, formatted copy and acknowledged Finish; no overflow, 44 px mobile actions, screenshots inspected. No runtime DB copies or Jira network; legacy migration exercised in memory. Completion names the actual next workday only when pins exist. Final audit updates the route section contract and checks that a freshly raised blocker is included; all 10 review route cases pass. |
+| 2026-10-03 | R10 / P5-04, P5-07, P5-08 | main (this commit) | Codex | Explicit null unassign/date clears, calendar/key validation, draft date commits on blur/Enter (Esc cancels), standard duedate fallback honoring configured blanks, and Undo to empty values. Nullable localUpdatedAt/snoozedUntil migration preserves Jira freshness and sync values. Excluded / snoozed filter offers tomorrow/next week/custom/restore; visibility shared by Work, Today and search. Successful issue writes clear Today cache. Jira status actions discover current per-issue transitions, reject forms/required fields, recheck expected status before POST, and retain acknowledged success when refresh fails. Reviewed bulk selection is capped at 20, frozen through refreshes, yields safe per-item results and retries only failures; ambiguous category changes require individual review. Stabilized table controls and reserved native keyboard actions; bounded popovers/touch targets. Isolated/mocked server suites: 124 cases; targeted client suites: 115 cases, including failed writes/recovery/selection/date/Undo. typecheck, build:check, guard:data and touched lint pass (existing warnings). Synthetic browser matrix at 1440/390/320/720 DPR2, both themes: partial retries, focus return, disabled form actions, Escape layering and no document overflow; screenshots inspected. No real Jira calls or runtime DB access. |

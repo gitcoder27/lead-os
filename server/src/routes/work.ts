@@ -18,6 +18,7 @@ const workFilterSchema = z.enum([
   "stale",
   "highPriority",
   "outOfTeam",
+  'excluded',
 ]);
 
 const createSavedViewSchema = z.object({

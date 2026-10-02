@@ -856,7 +856,10 @@ describe('DefectTable', () => {
     );
 
     fireEvent.click(screen.getByText('Mar 7'));
-    fireEvent.change(screen.getByDisplayValue('2026-03-07'), { target: { value: '2026-03-10' } });
+    const editor =screen.getByDisplayValue('2026-03-07');
+    fireEvent.change(editor, { target: { value: '2026-03-10' } });
+    expect(mockUpdateIssueMutate).not.toHaveBeenCalled();
+    fireEvent.keyDown(editor, { key: 'Enter' });
 
     expect(mockUpdateIssueMutate).toHaveBeenCalledWith(
       { key: 'PROJ-102', update: { developmentDueDate: '2026-03-10' } },

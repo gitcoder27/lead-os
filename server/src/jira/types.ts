@@ -38,3 +38,12 @@ export interface JiraUser {
 export interface JiraCommentResponse {
   id: string;
 }
+
+export interface JiraTransition {
+  id: string;
+  name: string;
+  hasScreen?: boolean;
+  isAvailable?: boolean;
+  fields?: Record<string, { required?: boolean }>;
+  to?: { name?: string; statusCategory?: { key?: string } };
+}

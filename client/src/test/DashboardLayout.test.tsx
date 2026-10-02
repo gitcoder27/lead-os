@@ -350,6 +350,15 @@ describe('DashboardLayout', () => {
     expect(lastTableCall.noTags).toBe(false);
   });
 
+  it('leaves Enter on native controls to the control', () => {
+    render(<DashboardLayout />, { wrapper: TestWrapper });
+    const button = screen.getByRole('button', { name: 'Sidebar Blocked' });
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    button.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Close Triage' })).not.toBeInTheDocument();
+  });
+
   it('opens the focused visible table row from keyboard navigation', () => {
     render(<DashboardLayout />, { wrapper: TestWrapper });
 

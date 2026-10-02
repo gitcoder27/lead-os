@@ -34,7 +34,7 @@ export function InlineEditAssignee({ issueKey, currentId, onClose }: InlineEditA
   const handleChange = (value: string) => {
     if (value !== (currentId ?? '')) {
       updateIssue.mutate(
-        { key: issueKey, update: { assigneeId: value || undefined } },
+        { key: issueKey, update: { assigneeId: value || null } },
         {
           onError: (err) => {
             addToast({ type: 'error', title: `Failed to update ${issueKey}`, message: err.message });

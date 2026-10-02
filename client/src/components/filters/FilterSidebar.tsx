@@ -75,6 +75,7 @@ const FILTER_ICON_MAP: Record<FilterType, LucideIcon> = {
   stale: CalendarClock,
   highPriority: Flame,
   outOfTeam: Users,
+  excluded: CalendarX2,
 };
 
 

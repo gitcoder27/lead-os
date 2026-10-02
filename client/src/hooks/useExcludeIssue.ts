@@ -30,7 +30,9 @@ export function useExcludeIssue() {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
+      for (const family of ['overview', 'today', 'alerts', 'workload', 'weekly-review'])
+        void
+      queryClient.invalidateQueries({ queryKey: [family] });
     },
   });
 
@@ -39,7 +41,9 @@ export function useExcludeIssue() {
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['overview'] });
+      for (const family of ['overview', 'today', 'alerts', 'workload', 'weekly-review'])
+        void
+      queryClient.invalidateQueries({ queryKey: [family] });
     },
   });
 

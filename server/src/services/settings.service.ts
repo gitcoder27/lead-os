@@ -179,9 +179,9 @@ export class SettingsService {
   }
 
   async getJiraDevDueDateField(workspaceId?: string): Promise<string> {
-    return (await this.getConfigValue("jira_dev_due_date_field", workspaceId)) ||
-      this.envFallback(workspaceId, config.JIRA_DEV_DUE_DATE_FIELD) ||
-      config.JIRA_DEV_DUE_DATE_FIELD;
+    const saved = await this.getConfigValue("jira_dev_due_date_field", workspaceId);
+    // An explicitly blank field selects standard Jira duedate.
+    return (saved !== undefined ? saved : this.envFallback(workspaceId, config.JIRA_DEV_DUE_DATE_FIELD) ?? "").trim();
   }
 
   async getJiraAspenSeverityField(workspaceId?: string): Promise<string | undefined> {

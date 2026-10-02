@@ -224,7 +224,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       setJql(config.jiraSyncJql || '');
       setSyncScopeMode(config.jiraSyncScopeMode || DEFAULT_SYNC_SCOPE_MODE);
       setAutoSyncEnabled(config.jiraAutoSyncEnabled ?? true);
-      setDevDueDateField(config.jiraDevDueDateField || 'customfield_10128');
+      setDevDueDateField(config.jiraDevDueDateField ?? '');
       setAspenSeverityField(config.jiraAspenSeverityField || '');
       setManagerJiraAccountId(config.managerJiraAccountId || '');
     }
@@ -1449,13 +1449,13 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <div className="space-y-2">
                       <CompactFieldRow
                         label="Dev Due Date"
-                        description="Date field shown as development due date in triage."
+                        description="Custom development due-date field. Leave blank to use Jira’s standard due date."
                         value={devDueDateField}
                         onChange={setDevDueDateField}
                         onDiscover={() => handleDiscoverFields('dueDate')}
                         loading={loadingFields && fieldPickerTarget === 'dueDate'}
                         active={fieldPickerTarget === 'dueDate'}
-                        placeholder="customfield_10128"
+                        placeholder="Standard due date"
                       />
                       <CompactFieldRow
                         label="ASPEN Severity"

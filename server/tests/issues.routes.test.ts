@@ -84,3 +84,40 @@ describe("issues routes", () => {
     expect(issueService.addComment).toHaveBeenCalledWith("AM-123", "Reviewed with Jira owner", "default");
   });
 });
+
+describe('execution validation', () => {
+  it('accepts project digits/underscores and explicit null clears', async () => {
+    const update = vi.fn(async () => ({ jiraKey: 'AB2_ENG-1' }));
+    const response = await invoke(createTestApp({ update } as unknown as Partial<IssueService>), {
+      method: 'PATCH',
+      url: '/api/issues/AB2_ENG-1',
+      body: { assigneeId: null, dueDate: null, analysisNotes: null },
+    });
+    expect(response.status).toBe(200);
+    expect(update).toHaveBeenCalledWith(
+      'AB2_ENG-1',
+      { assigneeId: null, dueDate: null, analysisNotes: null },
+      'default',
+    );
+  });
+  it('rejects impossible calendar dates and empty assignees before writing', async () => {
+    const update = vi.fn();
+    const app = createTestApp({ update });
+    for (const body of [{ dueDate: '2026-02-30' }, { assigneeId: '' }, {}, { statusName: 'Done' }]) {
+      expect((await invoke(app, { method: 'PATCH', url: '/api/issues/AB2-1', body })).status).toBe(400);
+    }
+    expect(update).not.toHaveBeenCalled();
+  });
+  it('rejects duplicates and more than twenty targets, and forwards guarded transitions', async () => {
+    const bulk = vi.fn(async () => ({ results: [] }));
+    const transition = vi.fn(async () => ({}));
+    const app = createTestApp({ bulk, transition } as unknown as Partial<IssueService>);
+    const item = { key: 'AB2-1', operation: { kind: 'restore' } };
+    for (const items of [[item, item], Array.from({ length: 21 }, (_, i) => ({ ...item, key: `AB2-${i + 1}` }))])
+      expect((await invoke(app, { method: 'POST', url: '/api/issues/bulk', body: { items } })).status).toBe(400);
+    expect(bulk).not.toHaveBeenCalled();
+    const body = { transitionId: '21', expectedStatus: { name: 'Open', category: 'new' } };
+    expect((await invoke(app, { method: 'POST', url: '/api/issues/AB2-1/transition', body })).status).toBe(200);
+    expect(transition).toHaveBeenCalledWith('AB2-1', '21', body.expectedStatus, 'default');
+  });
+});

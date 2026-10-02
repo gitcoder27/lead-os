@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 import type { Developer, Issue, IssueUpdate } from '@/types';
 
 function getOptimisticAssigneeName(
-  assigneeId: string | undefined,
+  assigneeId: string | null | undefined,
   developerQueries: Array<[QueryKey, Developer[] | undefined]>,
   fallbackName?: string
 ) {
@@ -36,14 +36,14 @@ function applyIssueUpdate(
   const nextIssue: Issue = {
     ...issue,
     ...(update.assigneeId !== undefined && {
-      assigneeId: update.assigneeId,
+      assigneeId: update.assigneeId ?? undefined,
       assigneeName: getOptimisticAssigneeName(update.assigneeId, developerQueries, issue.assigneeName),
     }),
     ...(update.priorityName !== undefined && { priorityName: update.priorityName }),
-    ...(update.dueDate !== undefined && { dueDate: update.dueDate }),
-    ...(update.developmentDueDate !== undefined && { developmentDueDate: update.developmentDueDate }),
+    ...(update.dueDate !== undefined && { dueDate: update.dueDate ?? undefined }),
+    ...(update.developmentDueDate !== undefined && { developmentDueDate: update.developmentDueDate ?? undefined }),
     ...(update.flagged !== undefined && { flagged: update.flagged }),
-    ...(update.analysisNotes !== undefined && { analysisNotes: update.analysisNotes }),
+    ...(update.analysisNotes !== undefined && { analysisNotes: update.analysisNotes ?? undefined }),
   };
 
   return nextIssue;

@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS issues (
   last_seen_in_scoped_sync_at TEXT,
   last_reconciled_at TEXT,
   scope_changed_at TEXT,
+  local_updated_at TEXT,
+  snoozed_until TEXT,
   PRIMARY KEY (workspace_id, jira_key)
 );
 
@@ -694,6 +696,8 @@ CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_developer_account_id
 `;
 
 const alterStatements = [
+  'ALTER TABLE issues ADD COLUMN local_updated_at TEXT',
+  'ALTER TABLE issues ADD COLUMN snoozed_until TEXT',
   "ALTER TABLE issues ADD COLUMN resolved_at TEXT",
   "ALTER TABLE issues ADD COLUMN aspen_severity TEXT",
   "ALTER TABLE issues ADD COLUMN development_due_date TEXT",
@@ -1031,6 +1035,8 @@ const workspaceKeyRebuilds: RebuildSpec[] = [
       "last_reconciled_at",
       "scope_changed_at",
       "analysis_notes",
+      'local_updated_at',
+      'snoozed_until',
       "excluded",
     ],
     defaults: {
@@ -1077,6 +1083,8 @@ const workspaceKeyRebuilds: RebuildSpec[] = [
         last_reconciled_at TEXT,
         scope_changed_at TEXT,
         analysis_notes  TEXT,
+        local_updated_at TEXT,
+        snoozed_until TEXT,
         excluded        INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (workspace_id, jira_key)
       )

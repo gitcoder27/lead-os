@@ -169,7 +169,8 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     res.json({ status: "ok" });
   });
 
-  app.use("/api/issues", requireManager(services.authService), createIssuesRouter(services.issueService));
+  app.use("/api/issues", requireManager(services.authService),
+    clearTodayCacheOnWrite, createIssuesRouter(services.issueService),);
   app.use("/api/overview", requireManager(services.authService), createOverviewRouter(services.issueService));
   // docs/56: developer participation feeds Today, so a roster write drops its cache too.
   app.use("/api/team", requireManager(services.authService), clearTodayCacheOnWrite, createTeamRouter(services.workloadService, services.authService));

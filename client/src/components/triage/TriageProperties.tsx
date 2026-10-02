@@ -17,7 +17,10 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
     { label: 'Component', value: issue.component ?? '—' },
     { label: 'Reporter', value: issue.reporterName ?? '—' },
     { label: 'Created', value: formatRelativeTime(issue.createdAt), mono: true },
-    { label: 'Updated', value: formatRelativeTime(issue.updatedAt), mono: true },
+    { label: 'Jira updated', value: formatRelativeTime(issue.updatedAt), mono: true },
+    ...(issue.localUpdatedAt
+      ? [{ label: 'Local edit', value: formatRelativeTime(issue.localUpdatedAt), mono: true }]
+      : []),
   ];
 
   return (

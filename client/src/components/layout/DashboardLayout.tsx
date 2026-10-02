@@ -39,7 +39,7 @@ function shouldIgnoreDashboardShortcut(target: EventTarget | null): boolean {
     return false;
   }
 
-  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+  return Boolean(target.closest('input, textarea, select, button, a, [role="button"], [role="dialog"], [data-popover-layer], [contenteditable="true"]'));
 }
 
 function hasShortcutModifier(event: KeyboardEvent): boolean {
@@ -96,7 +96,7 @@ function useDashboardShortcuts({
     };
 
     const handler = (event: KeyboardEvent) => {
-      if (hasShortcutModifier(event) || shouldIgnoreDashboardShortcut(event.target)) {
+      if (event.defaultPrevented || hasShortcutModifier(event) || shouldIgnoreDashboardShortcut(event.target)) {
         return;
       }
 

@@ -110,7 +110,7 @@ export function mergeRowUpdates(rows: SuggestionRow[]): IssueUpdate {
 export interface SuggestionUndo {
   /** The write that puts back what the issue had before; empty when nothing can be restored. */
   update: IssueUpdate;
-  /** False when a field was empty (or not a standard priority) before: the API cannot clear it yet. */
+  /** False when the previous priority is outside the supported standard priorities. */
   complete: boolean;
 }
 
@@ -123,12 +123,10 @@ export function buildUndoUpdate(issue: Issue, applied: IssueUpdate): SuggestionU
     else complete = false;
   }
   if (applied.dueDate !== undefined) {
-    if (day(issue.dueDate)) update.dueDate = day(issue.dueDate);
-    else complete = false;
+    update.dueDate = day(issue.dueDate) || null;
   }
   if (applied.assigneeId !== undefined) {
-    if (issue.assigneeId) update.assigneeId = issue.assigneeId;
-    else complete = false;
+    update.assigneeId = issue.assigneeId ?? null;
   }
   return { update, complete };
 }

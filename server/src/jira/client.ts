@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { JiraIssue, JiraSearchResult, JiraUser } from "./types";
+import { JiraIssue, JiraSearchResult, JiraUser, JiraTransition } from "./types";
 
 const JIRA_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -168,6 +168,21 @@ export class JiraClient {
       method: "PUT",
       body: JSON.stringify({ fields }),
     });
+  }
+
+  async getTransitions(issueKey: string): Promise<JiraTransition[]> {
+    const response = await this.request<{ transitions?: JiraTransition[] }>(
+      `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions?expand=transitions.fields`,
+    );
+    return response.transitions ?? [];
+  }
+
+  async transitionIssue(issueKey: string, transitionId: string): Promise<void> {
+    await this.request<void>(
+      `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
+      { method: 'POST', body: JSON.stringify({ transition: { id: transitionId } }) },
+      false,
+    );
   }
 
   async addComment(issueKey: string, text: string): Promise<void> {

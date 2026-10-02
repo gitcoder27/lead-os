@@ -169,6 +169,7 @@ export class SearchService {
           dueDate: issues.dueDate,
           updatedAt: issues.updatedAt,
           excluded: issues.excluded,
+          snoozedUntil: issues.snoozedUntil,
           teamScopeState: issues.teamScopeState,
           syncScopeState: issues.syncScopeState,
         })

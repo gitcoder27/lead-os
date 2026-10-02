@@ -1,4 +1,4 @@
-import { priorityColor, formatDate } from '@/lib/utils';
+import { IssueDateEditor } from '@/components/table/IssueDateEditor';import { priorityColor, formatDate } from '@/lib/utils';
 import { PRIORITY_OPTIONS } from '@/lib/constants';
 import type { Issue, Developer } from '@/types';
 
@@ -59,7 +59,7 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
           <select
             autoFocus
             value={issue.assigneeId ?? ''}
-            onChange={(e) => { onUpdate(issue.jiraKey, { assigneeId: e.target.value || undefined }); onEditField(null); }}
+            onChange={(e) => { onUpdate(issue.jiraKey, { assigneeId: e.target.value || null }); onEditField(null); }}
             onBlur={() => onEditField(null)}
             className="text-[12px] bg-transparent outline-none cursor-pointer font-medium"
             style={{ color: 'var(--text-primary)' }}
@@ -93,13 +93,11 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
         onClick={() => onEditField(editingField === 'dueDate' ? null : 'dueDate')}
       >
         {editingField === 'dueDate' ? (
-          <input
-            type="date"
-            autoFocus
-            value={dueValue ?? ''}
-            onChange={(e) => { onUpdate(issue.jiraKey, { developmentDueDate: e.target.value }); onEditField(null); }}
-            onBlur={() => onEditField(null)}
-            className="text-[12px] bg-transparent outline-none cursor-pointer font-medium"
+          <IssueDateEditor
+            key={issue.jiraKey}
+            currentValue={dueValue }
+            onSave={(value) =>  onUpdate(issue.jiraKey, { developmentDueDate: value }) }onClose={() => onEditField(null)}
+            className="text-[12px] bg-transparent cursor-pointer font-medium"
             style={{ color: 'var(--text-primary)' }}
           />
         ) : (

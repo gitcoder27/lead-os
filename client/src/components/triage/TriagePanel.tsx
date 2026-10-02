@@ -11,6 +11,7 @@ import { useIssueTagActions } from '@/hooks/useIssueTagActions';
 import { useTriageNotes } from '@/hooks/useTriageNotes';
 import { useToast } from '@/context/ToastContext';
 import { TriagePanelHeader } from './TriagePanelHeader';
+import { IssueStatusActions } from './IssueStatusActions';
 import { TriageQuickActions } from './TriageQuickActions';
 import { TriageNotesEditor } from './TriageNotesEditor';
 import { TriageTagBar } from './TriageTagBar';
@@ -53,6 +54,14 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
     if (!issueKey) return;
     const handler = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
+      if (
+        e.defaultPrevented ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        (t instanceof HTMLElement && t.closest('[data-popover-layer], [aria-modal=true]'))
+      )
+        return;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return;
       switch (e.key) {
         case 'Escape': onClose(); break;
@@ -126,6 +135,8 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
               <div className="triage-reveal triage-reveal-2">
                 <TriageQuickActions issue={issue} developers={developers} editingField={editingField} onEditField={setEditingField} onUpdate={handleUpdate} />
               </div>
+
+              <IssueStatusActions issue={issue} />
 
               <TriageNotesEditor value={notes.notesValue} onChange={notes.handleChange} onBlurSave={notes.handleBlurSave} isSaved={notes.notesSaved} />
               <TriageTagBar tags={issue.localTags} allTags={tagActions.allTags} assignedTagIds={tagActions.assignedTagIds} isPending={tagActions.isPending} onToggle={tagActions.toggleTag} onCreate={tagActions.createOrAssignTag} />

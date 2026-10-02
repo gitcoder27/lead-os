@@ -85,6 +85,25 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
   const themes = [['light', light], ['dark', dark]] as const;
   const surfaces = ['--bg-primary', '--bg-secondary', '--bg-tertiary', '--bg-elevated'];
 
+  it.each(themes)('%s: Tasks warning/danger text clears 4.5:1 on normal, hover, focus, selected and severity fills', (_name, tokens) => {
+    const rgba = tokens['--accent-glow']!.match(/[\d.]+/g)!.map(Number);
+    for (const surface of surfaces) {
+      const base = rgb(tokens[surface]!);
+      const states = [base, mix(rgb(tokens['--bg-tertiary']!), base, 0.7), mix(rgb(tokens['--bg-tertiary']!), base, 0.55), mix(rgba.slice(0, 3) as Rgb, base, rgba[3]!)];
+      for (const tone of ['warning', 'danger']) {
+        const text = rgb(tokens[`--task-${tone}-text`]!);
+        for (const state of states) {
+          for (const share of [0, 0.12, 0.16, 0.2]) {
+            const background = mix(rgb(tokens[`--${tone}`]!), state, share);
+            expect(ratio(text, background), `${tone} on ${surface}, tint ${share}`).toBeGreaterThanOrEqual(4.5);
+          }
+        }
+      }
+      // The key itself retains the existing colour and passes on its unselected surface.
+      if (surface === '--bg-primary') expect(ratio(rgb(tokens['--text-disabled']!), base), `key on ${surface}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it.each(themes)('%s: accent text clears 4.5:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--accent-text']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(4.5);
   });

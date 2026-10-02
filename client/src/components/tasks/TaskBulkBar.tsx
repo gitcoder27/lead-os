@@ -27,7 +27,7 @@ export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
         {count} selected
       </span>
       <span className="h-4 w-px" style={{ background: 'var(--border)' }} />
-      <BulkButton label="Done" hint="space" onClick={onDone}><Check size={13} /></BulkButton>
+      <BulkButton label="Done" hint="e" onClick={onDone}><Check size={13} /></BulkButton>
       <BulkButton label="Schedule" hint="s" onClick={(event) => onMenu('schedule', event.currentTarget)}><CalendarClock size={13} /></BulkButton>
       <BulkButton label="Assign" hint="a" onClick={(event) => onMenu('assign', event.currentTarget)}><UserRound size={13} /></BulkButton>
       <BulkButton label="Label" hint="l" onClick={(event) => onMenu('label', event.currentTarget)}><Tag size={13} /></BulkButton>

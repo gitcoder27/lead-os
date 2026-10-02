@@ -43,8 +43,7 @@ interface TaskListProps {
  * docs/49 §5/§6.1 + docs/51 D2: grouped, dense list. Groups are flat
  * sections — a quiet sticky label (indicator · name · count) over hairline-
  * divided rows — not bordered cards, so chrome never outweighs a three-task
- * day. Each section is a labelled `role="group"` containing a real `listbox`
- * of `option` rows (docs/51 A1), with exit-only row motion.
+ * day. Each section owns a labelled native list with exit-only row motion.
  */
 export function TaskList({
   groups,
@@ -65,7 +64,6 @@ export function TaskList({
   footer,
 }: TaskListProps) {
   const reduceMotion = useReducedMotion();
-  const selectionActive = selected.size > 0;
   return (
     <div className={`${TASK_LIST_CONTAINER} pb-28 pt-2`}>
       {groups.map((group, index) => {
@@ -92,18 +90,15 @@ export function TaskList({
               />
             )}
             {!collapsed && (
-              <div
-                role="listbox"
+              <ul
                 aria-label={group.label || 'Tasks'}
-                aria-multiselectable="true"
                 className="divide-y"
                 style={{ borderColor: RULE }}
               >
                 <AnimatePresence initial={false}>
                   {group.tasks.map((task) => (
-                    <motion.div
+                    <motion.li
                       key={task.taskKey}
-                      role="presentation"
                       exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
                       transition={{ duration: reduceMotion ? 0 : 0.15 }}
                       style={{ borderColor: RULE, overflow: 'hidden' }}
@@ -116,16 +111,15 @@ export function TaskList({
                         attentionMode={attentionMode}
                         focused={task.taskKey === focusedKey}
                         selected={selected.has(task.taskKey)}
-                        selectionActive={selectionActive}
                         dateColumn={dateColumn}
                         ownerName={ownerName}
                         labelColor={labelColor}
                         handlers={handlers}
                       />
-                    </motion.div>
+                    </motion.li>
                   ))}
                 </AnimatePresence>
-              </div>
+              </ul>
             )}
             {/* Labeled groups add from the label's "+"; unlabeled lists keep a footer row. Collapsed groups keep both hidden. */}
             {!collapsed && !group.collapsible && (addingGroup === group.key || !group.label) && (
@@ -168,10 +162,10 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
   const overdue = group.key === 'Overdue';
   const severity = overdue ? worstOverdueTone(group.tasks, today) : null;
   const tone = severity
-    ? `var(--${severity})`
+    ? severity === 'danger' ? 'var(--task-danger-text)' : 'var(--task-warning-text)'
     : context.mode === 'scheduled' && context.bucket === 'Today' ? 'var(--accent)'
       : context.mode === 'meeting' && context.bucket === 'Today' ? 'var(--accent)'
-        : context.mode === 'meeting' && context.bucket === 'Needs outcome' ? 'var(--warning)' : undefined;
+        : context.mode === 'meeting' && context.bucket === 'Needs outcome' ? 'var(--task-warning-text)' : undefined;
   const movable = overdue ? group.tasks.filter((task) => !task.lingering) : [];
   const count = group.count ?? group.tasks.length;
 

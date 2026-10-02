@@ -104,7 +104,7 @@ const EMPTY_ADD_KEY = 'empty-view';
 const POINTER_LINGER_DWELL_MS = 1500;
 
 function isEditable(element: HTMLElement): boolean {
-  return element.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
+  return element.isContentEditable || ['TEXTAREA', 'SELECT'].includes(element.tagName) || (element.tagName === 'INPUT' && (element as HTMLInputElement).type !== 'checkbox');
 }
 
 function plural(count: number, noun = 'task'): string {
@@ -244,9 +244,10 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     (ownerType: string | null, ownerId: string | null) => {
       if (ownerType === 'developer' && ownerId) {
         if (ownerId === selfAccountId) return 'Me';
-        return developerList.find((dev) => dev.accountId === ownerId)?.displayName ?? 'Developer';
+        return developerList.find((dev) => dev.accountId === ownerId)?.displayName ?? 'Unknown owner';
       }
-      return ownerType ? 'Me' : 'Inbox';
+      if (!ownerType) return 'Unassigned';
+      return ownerId === selfAccountId ? 'Me' : 'Another manager';
     },
     [developerList, selfAccountId],
   );
@@ -321,7 +322,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const focusDom = useCallback((key: string | undefined) => {
     if (!key) return;
     requestAnimationFrame(() => {
-      const element = rowElement(key);
+      const element = rowElement(key)?.querySelector<HTMLElement>('[data-task-open]');
       element?.focus({ preventScroll: true });
       element?.scrollIntoView?.({ block: 'nearest' });
     });
@@ -576,9 +577,13 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     setMenu({ kind, keys, anchor });
   }, []);
   const closeMenu = useCallback(() => {
+    const anchor = menu?.anchor;
     setMenu(null);
-    focusDom(focusedKeyRef.current);
-  }, [focusDom]);
+    requestAnimationFrame(() => {
+      if (anchor?.isConnected) anchor.focus({ preventScroll: true });
+      else focusDom(focusedKeyRef.current);
+    });
+  }, [focusDom, menu]);
   const menuTargets = useMemo(
     () => (menu ? menu.keys.map((key) => rowByKey.get(key)).filter((task): task is NonNullable<typeof task> => Boolean(task)) : []),
     [menu, rowByKey],
@@ -637,7 +642,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       focusRow(nextKey, { dom: true });
     };
     const focused = focusedKeyRef.current;
-    const anchor = focused ? rowElement(focused) : null;
+    const anchor = focused ? rowElement(focused)?.querySelector<HTMLElement>('[data-task-open]') ?? null : null;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     // docs/51 F7: Alt+↑/↓ reorders the focused row within its day bucket on
     // schedule-grouped views. Alt+anything-else keeps its normal behavior.
@@ -673,7 +678,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       case 'k': case 'ArrowUp': move(-1, event.shiftKey); break;
       case 'Enter': case 'o': if (focused) openTask(focused); else handled = false; break;
       case 'x': if (focused) selectRow(focused, 'toggle'); break;
-      case ' ': case 'e': toggleDone(targetsFor()); break;
+      case 'e': toggleDone(targetsFor()); break;
       case 's': openMenu('schedule', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'a': openMenu('assign', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'l': openMenu('label', targetsFor().map((task) => task.taskKey), anchor); break;
@@ -711,7 +716,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       if (active && active !== document.body && !mainRef.current?.contains(active)) return;
       if (active && isEditable(active)) return;
       // Let focused buttons (chips, rail items) keep Space/Enter.
-      if (active?.tagName === 'BUTTON' && (event.key === ' ' || event.key === 'Enter')) return;
+      if ((active?.tagName === 'BUTTON' || (active instanceof HTMLInputElement && active.type === 'checkbox')) && (event.key === ' ' || event.key === 'Enter')) return;
       keyHandler.current(event);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -1018,7 +1023,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           anchor={menu.anchor}
           canLater={menuTargets.some((task) => task.ownerType !== 'developer')}
           onClose={closeMenu}
-          onOpen={() => { closeMenu(); openTask(menuTarget.taskKey); }}
+          onSchedule={() => setMenu({ ...menu, kind: 'schedule' })}
           onStatus={() => setMenu({ ...menu, kind: 'status' })}
           onAssign={() => setMenu({ ...menu, kind: 'assign' })}
           onLabels={() => setMenu({ ...menu, kind: 'label' })}

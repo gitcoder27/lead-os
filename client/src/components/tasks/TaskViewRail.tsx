@@ -11,8 +11,8 @@ import { FOCUS_RING } from './TaskDetailPrimitives';
  * group header, and the row always agree.
  */
 function severityTone(count: TaskViewCount, fallback: string): string {
-  if ((count.missed ?? 0) > 0) return 'var(--danger)';
-  if (count.overdue > 0) return 'var(--warning)';
+  if ((count.missed ?? 0) > 0) return 'var(--task-danger-text)';
+  if (count.overdue > 0) return 'var(--task-warning-text)';
   return fallback;
 }
 
@@ -22,7 +22,7 @@ function badgeStyle(viewId: string, count: TaskViewCount | undefined): { tone: s
   switch (viewId) {
     case 'inbox': return { tone: 'var(--accent)', value: count.count };
     case 'today': return { tone: severityTone(count, 'var(--accent)'), value: count.count };
-    case 'attention': return { tone: severityTone(count, 'var(--warning)'), value: count.count };
+    case 'attention': return { tone: severityTone(count, 'var(--task-warning-text)'), value: count.count };
     default: return { tone: null, value: count.count };
   }
 }
@@ -118,7 +118,7 @@ export function TaskViewRail({
                   className={`min-w-[20px] rounded-full px-1.5 text-center text-[11px] tabular-nums ${tone ? 'font-bold' : 'font-medium'}`}
                   style={{
                     color: tone ?? 'var(--text-muted)',
-                    background: tone ? `color-mix(in srgb, ${tone} 16%, transparent)` : 'transparent',
+                    background: tone ? `color-mix(in srgb, ${tone === 'var(--task-warning-text)' ? 'var(--warning)' : tone === 'var(--task-danger-text)' ? 'var(--danger)' : tone} 16%, transparent)` : 'transparent',
                   }}
                 >
                   {value}

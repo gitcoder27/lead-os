@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
-  ArrowUpRight,
   Ban,
   CalendarArrowUp,
   CalendarClock,
@@ -357,10 +356,10 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   );
 }
 
-export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater }: {
+export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater }: {
   anchor: HTMLElement;
   onClose: () => void;
-  onOpen: () => void;
+  onSchedule: () => void;
   onStatus: () => void;
   onAssign: () => void;
   onLabels: () => void;
@@ -374,7 +373,7 @@ export function MoreMenu({ anchor, onClose, onOpen, onStatus, onAssign, onLabels
 }) {
   return (
     <TaskPopover anchor={anchor} onClose={onClose} label="More actions" width={210}>
-      <MenuItem icon={<ArrowUpRight size={13} />} label="Open" hint="↵" onSelect={onOpen} />
+      <MenuItem icon={<CalendarClock size={13} />} label="Schedule…" hint="s" onSelect={onSchedule} />
       <MenuItem icon={<CircleDashed size={13} />} label="Status…" onSelect={onStatus} />
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />

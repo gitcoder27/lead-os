@@ -20,12 +20,16 @@ function Bone({ className = '', style }: { className?: string; style?: CSSProper
 export function TaskListSkeleton({ grouped = false }: { grouped?: boolean }) {
   const rule = 'color-mix(in srgb, var(--border) 55%, transparent)';
   const row = (index: number) => (
-    <div key={index} className="flex h-[38px] items-center gap-2 px-2">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center"><Bone className="h-[15px] w-[15px] rounded-full" /></span>
-      <span className="flex w-5 shrink-0 md:w-12"><Bone className="hidden h-2.5 w-9 md:block" /></span>
-      <Bone className="h-3" style={{ width: SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length] }} />
-      <span className="flex-1" />
-      <span className="flex w-[84px] shrink-0 justify-end pr-1.5"><Bone className="h-2.5 w-12" /></span>
+    <div key={index} className="task-row" aria-hidden="true">
+      <div className="task-row-layout">
+        <span className="task-row-control"><Bone className="h-4 w-4" /></span>
+        <span className="task-row-control"><Bone className="h-[15px] w-[15px] rounded-full" /></span>
+        <div className="task-row-content">
+          <span className="task-row-open"><Bone className="h-3" style={{ width: SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length] }} /></span>
+          <span className="task-row-metadata"><Bone className="h-2.5 w-12" /></span>
+        </div>
+        <span className="task-row-control"><Bone className="h-2 w-4" /></span>
+      </div>
     </div>
   );
   const section = (rows: number[], first: boolean) => (
@@ -224,7 +228,8 @@ export const TASK_SHORTCUTS: ShortcutGroup[] = [
   {
     group: 'Act',
     keys: [
-      ['e / Space', 'Toggle done'],
+      ['e', 'Toggle done'],
+      ['Space', 'Activate focused control'],
       ['s', 'Schedule — then t m w l c or 1–7'],
       ['a', 'Assign'],
       ['l', 'Labels'],

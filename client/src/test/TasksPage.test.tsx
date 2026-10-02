@@ -134,6 +134,8 @@ function row(key: string): HTMLElement {
   return document.querySelector(`[data-task-row="${key}"]`) as HTMLElement;
 }
 
+const openRow = (key: string) => row(key).querySelector<HTMLButtonElement>('[data-task-open]')!;
+
 function press(key: string, init: KeyboardEventInit = {}) {
   act(() => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key, ...init });
@@ -190,7 +192,7 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     press('g');
     press('j');
     expect(lastDefinition()).toEqual(BUILTIN_VIEWS[3]!.definition); // still waiting
-    expect(document.querySelector('[data-task-row][tabindex="0"]')).not.toBeNull();
+    expect(document.querySelector('[data-task-row][data-focused="true"]')).not.toBeNull();
   });
 
   it('resolves retired view ids from the URL (D6)', () => {
@@ -430,16 +432,16 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
   it('j/k move focus with roving tabindex; Enter opens; focus returns after the drawer closes', () => {
     render(<TasksPage />);
     press('j');
-    expect(row('T-2')).toHaveAttribute('tabindex', '0');
+    expect(row('T-2')).toHaveAttribute('data-focused', 'true');
     press('j');
-    expect(row('T-1')).toHaveAttribute('tabindex', '0');
+    expect(row('T-1')).toHaveAttribute('data-focused', 'true');
     press('k');
-    expect(row('T-2')).toHaveAttribute('tabindex', '0');
+    expect(row('T-2')).toHaveAttribute('data-focused', 'true');
     press('Enter');
     expect(screen.getByTestId('drawer').textContent).toContain('T-2');
     // Shortcuts are suspended while the drawer is open.
     press('j');
-    expect(row('T-2')).toHaveAttribute('tabindex', '0');
+    expect(row('T-2')).toHaveAttribute('data-focused', 'true');
     fireEvent.click(screen.getByText('close drawer'));
     expect(screen.queryByTestId('drawer')).toBeNull();
   });
@@ -449,16 +451,16 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const search = screen.getByLabelText('Search tasks');
     search.focus();
     fireEvent.keyDown(search, { key: 'j' });
-    expect(row('T-2')).toHaveAttribute('tabindex', '-1');
+    expect(row('T-2')).not.toHaveAttribute('data-focused');
     fireEvent.keyDown(document.body, { key: 'k', metaKey: true });
-    expect(row('T-2')).toHaveAttribute('tabindex', '-1');
+    expect(row('T-2')).not.toHaveAttribute('data-focused');
     press('/');
   });
 
-  it('Space marks the focused task done and the row lingers until focus moves (R1/R2)', async () => {
+  it('e marks the focused task done and the row lingers until focus moves (R1/R2)', async () => {
     const { rerender } = render(<TasksPage />);
     press('j');
-    await act(async () => { press(' '); });
+    await act(async () => { press('e'); });
     expect(mockApply).toHaveBeenCalledWith(
       [expect.objectContaining({ task: expect.objectContaining({ taskKey: 'T-2' }), changes: { status: 'done' } })],
       expect.objectContaining({ label: 'Marked 1 task done' }),
@@ -480,12 +482,12 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     press('x');
     expect(screen.getByRole('toolbar', { name: 'Bulk actions' })).toBeTruthy();
     expect(screen.getByText('2 selected')).toBeTruthy();
-    expect(row('T-1')).toHaveAttribute('aria-selected', 'true');
+    expect(row('T-1')).toContainElement(within(row('T-1')).getByRole('checkbox', { checked: true }));
     await act(async () => { press('#'); });
     expect(mockApply.mock.calls[0]![0]).toHaveLength(2);
     expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ status: 'dropped' });
     press('Escape');
-    expect(row('T-1')).toHaveAttribute('aria-selected', 'false');
+    expect(within(row('T-1')).getByRole('checkbox')).not.toBeChecked();
     // The bar leaves via its exit animation.
     await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Bulk actions' })).toBeNull());
   });
@@ -519,9 +521,10 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     );
   });
 
-  it('status glyph opens a five-status menu', async () => {
+  it('More retains the five-status menu', async () => {
     render(<TasksPage />);
-    fireEvent.click(within(row('T-1')).getByRole('button', { name: /Change status/ }));
+    fireEvent.click(within(row('T-1')).getByRole('button', { name: 'More actions for T-1' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Status…' }));
     const menu = screen.getByRole('menu', { name: 'Set status' });
     expect(within(menu).getAllByRole('menuitemradio')).toHaveLength(5);
     await act(async () => { fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Blocked' })); });
@@ -548,7 +551,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     render(<TasksPage />);
     // Owner grouping files dev-self work under Me, not a second self-named group.
     const groupLabels = [...document.querySelectorAll('section h2')].map((el) => el.textContent);
-    expect(groupLabels).toEqual(['Me', 'Developer']);
+    expect(groupLabels).toEqual(['Me', 'Unknown owner']);
     // The assign menu and owner filter don't list self twice.
     press('j');
     press('a');
@@ -656,7 +659,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
 
       const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
       expect(headings).toEqual(['Today', 'Upcoming', 'Needs outcome', 'Recent']);
-      const inGroup = (label: string) => within(screen.getByRole('listbox', { name: label })).getAllByRole('option').map((option) => option.getAttribute('data-task-row'));
+      const inGroup = (label: string) => Array.from(screen.getByRole('list', { name: label }).querySelectorAll('[data-task-row]')).map((item) => item.getAttribute('data-task-row'));
       expect(inGroup('Today')).toEqual(['T-10']);
       expect(inGroup('Upcoming')).toEqual(['T-11']);
       expect(inGroup('Needs outcome')).toEqual(['T-12']);
@@ -671,7 +674,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       render(<TasksPage />);
 
       expect(within(row('T-10')).getByTestId('meeting-actions')).toHaveTextContent('2/3 actions');
-      expect(row('T-10').getAttribute('aria-label')).toContain('2/3 actions');
+      expect(openRow('T-10').getAttribute('aria-label')).toContain('2/3 actions');
       expect(within(row('T-11')).queryByTestId('meeting-actions')).toBeNull();
     });
 
@@ -775,7 +778,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     await act(async () => { fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'High' })); });
     expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ priority: 'high' });
     // … menu parity: the same action lives in the More menu.
-    fireEvent.click(within(row('T-1')).getByRole('button', { name: 'More actions' }));
+    fireEvent.click(within(row('T-1')).getByRole('button', { name: /More actions for/  }));
     const more = screen.getByRole('menu', { name: 'More actions' });
     fireEvent.click(within(more).getByRole('menuitem', { name: /Priority/ }));
     expect(screen.getByRole('menu', { name: 'Set priority' })).toBeTruthy();
@@ -828,9 +831,9 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     press('j');
     press('x');
     expect(screen.getByRole('toolbar', { name: 'Bulk actions' })).toBeTruthy();
-    await act(async () => { press(' '); });
+    await act(async () => { press('e'); });
     await waitFor(() => expect(screen.queryByRole('toolbar', { name: 'Bulk actions' })).toBeNull());
-    expect(row('T-2')).toHaveAttribute('aria-selected', 'false');
+    expect(within(row('T-2')).getByRole('checkbox')).not.toBeChecked();
   });
 
   it('rescheduling appends a destination hint to the lingering row (docs/51 F13)', async () => {
@@ -845,9 +848,9 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     );
     rerender(<TasksPage />);
     expect(row('T-2').textContent).toContain('moved → Tomorrow');
-    expect(row('T-2').getAttribute('aria-label')).toContain('moved → Tomorrow');
+    expect(openRow('T-2').getAttribute('aria-label')).toContain('moved → Tomorrow');
     // Only the title/meta dims — the action cluster keeps full opacity.
-    const dimmed = row('T-2').querySelector('span[style*="opacity: 0.6"]');
+    const dimmed = row('T-2').querySelector('.task-row-content[style*="opacity: 0.6"]');
     expect(dimmed).toBeTruthy();
     expect(row('T-2').style.opacity).toBe('');
   });
@@ -880,29 +883,27 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(mockDrawerProps?.orderedKeys).toEqual(['T-2', 'T-1']);
     await act(async () => { mockDrawerProps?.onStepTask?.('T-1'); });
     expect(screen.getByTestId('drawer').textContent).toContain('T-1');
-    expect(row('T-1')).toHaveAttribute('tabindex', '0');
+    expect(row('T-1')).toHaveAttribute('data-focused', 'true');
   });
 
-  it('sections are labelled groups owning clean listboxes (docs/51 A1)', () => {
+  it('sections are labelled groups owning native lists (docs/51 A1)', () => {
     render(<TasksPage />);
     for (const section of screen.getAllByRole('group')) {
       const headerId = section.getAttribute('aria-labelledby');
       expect(headerId).toBeTruthy();
       expect(document.getElementById(headerId!)?.tagName).toBe('H2');
     }
-    for (const box of screen.getAllByRole('listbox')) {
-      // Only presentation wrappers and option rows inside the listbox.
-      for (const child of Array.from(box.children)) {
-        expect(['presentation', 'option'].includes(child.getAttribute('role') ?? '')).toBe(true);
-      }
-      expect(box.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+    for (const box of screen.getAllByRole('list').filter((list) => list.querySelector('[data-task-row]'))) {
+      expect(box.tagName).toBe('UL');
+      for (const child of Array.from(box.children)) expect(child.tagName).toBe('LI');
+      expect(box.querySelector('[role="option"]')).toBeNull();
     }
   });
 
   it('row aria-labels carry the visible metadata (docs/51 A2)', () => {
     render(<TasksPage />);
     // T-2: overdue 3d, nextAction, owner hidden (manager-owned in a Me view).
-    expect(row('T-2').getAttribute('aria-label')).toBe('T-2 Old one, Open, 3d overdue');
+    expect(openRow('T-2').getAttribute('aria-label')).toBe('T-2 Old one, Open, 3d overdue');
   });
 
   it('popover outside-clicks restore focus to the row (docs/51 A5)', async () => {
@@ -914,7 +915,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeTruthy();
     fireEvent.mouseDown(document.body);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Schedule' })).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(row('T-2')));
+    await waitFor(() => expect(document.activeElement).toBe(openRow('T-2')));
   });
 
   it('closing the shortcuts dialog restores focus (docs/51 A5)', async () => {
@@ -925,7 +926,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const dialog = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(row('T-2')));
+    await waitFor(() => expect(document.activeElement).toBe(openRow('T-2')));
   });
 
   it('? opens the shortcut cheat sheet', () => {
@@ -942,10 +943,10 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     render(<TasksPage />);
     const rail = within(screen.getByRole('navigation', { name: 'Task views' }));
     const badge = within(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).getByText('2');
-    expect(styleOf(badge)).toContain('var(--warning)');
-    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--warning)');
-    expect(styleOf(screen.getByText('3d overdue'))).toContain('var(--warning)');
-    expect(styleOf(screen.getByText('3d overdue'))).not.toContain('var(--danger)');
+    expect(styleOf(badge)).toContain('var(--task-warning-text)');
+    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--task-warning-text)');
+    expect(styleOf(screen.getByText('3d overdue'))).toContain('var(--task-warning-text)');
+    expect(styleOf(screen.getByText('3d overdue'))).not.toContain('var(--task-danger-text)');
   });
 
   it('a missed deadline turns the badge, label and row red together (D1)', () => {
@@ -959,9 +960,9 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     );
     render(<TasksPage />);
     const rail = within(screen.getByRole('navigation', { name: 'Task views' }));
-    expect(styleOf(within(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).getByText('2'))).toContain('var(--danger)');
-    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--danger)');
-    expect(styleOf(screen.getByText('2d overdue'))).toContain('var(--danger)');
+    expect(styleOf(within(rail.getByRole('button', { name: 'Planned today, 2 tasks' })).getByText('2'))).toContain('var(--task-danger-text)');
+    expect(styleOf(screen.getByRole('heading', { name: 'Overdue' }))).toContain('var(--task-danger-text)');
+    expect(styleOf(screen.getByText('2d overdue'))).toContain('var(--task-danger-text)');
   });
 
   it('a follow-up shows the bell only — no duplicate label chip (D4)', () => {
@@ -979,22 +980,15 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     expect(screen.getByText('1 matching').className).not.toContain('md:hidden');
   });
 
-  it('the focused row keeps its date visible — hover actions are hover-only (U2)', () => {
+  it('keeps the date and all controls visible without hover', () => {
     render(<TasksPage />);
     press('j');
-    expect(row('T-2')).toHaveAttribute('tabindex', '0');
     expect(within(row('T-2')).getByText('3d overdue')).toBeTruthy();
-    const actions = within(row('T-2')).getByRole('button', { name: 'Mark done (space)' }).parentElement!;
-    expect(actions.className).toContain('opacity-0');
-    expect(actions.className).toContain('right-full');
-  });
-
-  it('the key slot turns into the selection box for the focused row (U4)', () => {
-    render(<TasksPage />);
-    const select = within(row('T-2')).getByRole('button', { name: 'Select T-2' });
-    expect(select.className).toContain('group-hover:opacity-100');
-    press('j');
-    expect(within(row('T-2')).getByRole('button', { name: 'Select T-2' }).className).toContain('opacity-100');
+    const more = within(row('T-2')).getByRole('button', { name: 'More actions for T-2' });
+    expect(more).not.toHaveAttribute('tabindex', '-1');
+    expect(more.className).not.toMatch(/opacity-0|group-hover/);
+    expect(within(row('T-2')).getByRole('checkbox', { name: 'Select T-2' })).toBeVisible();
+    expect(within(row('T-2')).getByText('T-2')).toBeVisible();
   });
 
   it('keyboard hint teaches the core keys and stays dismissed (U3)', () => {
@@ -1015,13 +1009,13 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     mockUseTaskViewTasks.mockReturnValue({ data: undefined, isLoading: true, isError: false, isFetching: true, isPlaceholderData: false, error: null, refetch: vi.fn() });
     render(<TasksPage />);
     const skeleton = screen.getByLabelText('Loading tasks');
-    expect(skeleton.querySelectorAll('.h-\\[38px\\]').length).toBe(6);
+    expect(skeleton.querySelectorAll('.task-row-layout').length).toBe(6);
     expect(skeleton.querySelectorAll('.h-9').length).toBe(2);
   });
 
   it('a mouse-pinned row releases once the pointer moves to another row (U6)', async () => {
     const { rerender } = render(<TasksPage />);
-    const done = within(row('T-2')).getByRole('button', { name: 'Mark done (space)' });
+    const done = within(row('T-2')).getByRole('button', { name: 'Mark done T-2' });
     fireEvent.pointerDown(done);
     await act(async () => { fireEvent.click(done); });
     mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
@@ -1041,5 +1035,39 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+});
+
+
+describe('R5 native row controls and readable context', () => {
+  it('keeps key/title opening separate from selection and exposes four native controls', () => {
+    render(<TasksPage />);
+    expect(row('T-1').querySelector('[role="option"]')).toBeNull();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    const item = row('T-1');
+    const selection = within(item).getByRole('checkbox', { name: 'Select T-1' });
+    expect(selection).not.not.toHaveAttribute('data-focused');
+    expect(within(item).getAllByRole('button')).toHaveLength(3);
+    fireEvent.click(selection);
+    expect(selection).toBeChecked();
+    fireEvent.click(within(item).getByText('T-1'));
+    expect(screen.getByTestId('drawer')).toHaveTextContent('T-1');
+  });
+
+  it('shows one overdue fact, preserves check-by and names owners in mixed views', () => {
+    window.history.replaceState(null, '', '/tasks?view=attention');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ title: 'Check in', ownerType: 'developer', ownerId: 'dev-1', dueAt: '2026-09-24', scheduledOn: null, followUpAt: '2026-09-25T09:00:00Z', waitingOn: { type: 'text', label: 'Finance', ref: null, since: '2026-09-20T09:00:00Z' }, signals: { ...NO_SIGNALS, overdue: true, overdueDays: 2, overdueSource: 'due' } })]));
+    render(<TasksPage />);
+    expect(within(row('T-1')).getByText('2d overdue')).toBeInTheDocument();
+    expect(within(row('T-1')).queryByText('Overdue 2d')).not.toBeInTheDocument();
+    expect(within(row('T-1')).getByText('Dev One')).toBeInTheDocument();
+    expect(within(row('T-1')).getByRole('button', { name: /T-1 Check in/ }).getAttribute('aria-label')?.match(/overdue/g)).toHaveLength(1);
+  });
+
+  it('offers Schedule from the always-visible More menu', () => {
+    render(<TasksPage />);
+    fireEvent.click(within(row('T-1')).getByRole('button', { name: 'More actions for T-1' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Schedule/ }));
+    expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeInTheDocument();
   });
 });

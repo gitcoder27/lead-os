@@ -1,13 +1,11 @@
 import { memo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
-import { Bell, BellRing, CalendarClock, Check, Ellipsis, Flag, GitCompareArrows, Hourglass, RotateCcw } from 'lucide-react';
+import { Bell, BellRing, Ellipsis, Flag, GitCompareArrows, Hourglass } from 'lucide-react';
 import { taskLabelDisplayName, type TaskSignals, type TaskViewDefinition } from '@/types';
 import type { TaskGroupContext } from '@/lib/task-views';
 import {
   impliedMeta,
   isOpenStatus,
   meetingTime,
-  overdueLevel,
-  overdueTone,
   relativeTaskDate,
   waitingChips,
   type ListTask,
@@ -15,7 +13,6 @@ import {
   type RelativeDateTone,
 } from '@/lib/task-list';
 import { labelChipStyle } from './label-colors';
-import { Avatar } from './TaskDetailPrimitives';
 import { TaskStatusGlyph, TASK_STATUS_META } from './TaskMenus';
 
 export type RowTask = ListTask & { signals?: TaskSignals };
@@ -34,8 +31,8 @@ const FOLLOW_UP_LABEL = 'category:follow_up';
 const DATE_TONES: Record<RelativeDateTone, string> = {
   default: 'var(--text-secondary)',
   muted: 'var(--text-muted)',
-  warning: 'var(--warning)',
-  danger: 'var(--danger)',
+  warning: 'var(--task-warning-text)',
+  danger: 'var(--task-danger-text)',
 };
 
 /**
@@ -46,8 +43,8 @@ const DATE_TONES: Record<RelativeDateTone, string> = {
 export function SeverityMark({ tone, level, children }: { tone: 'danger' | 'warning'; level: OverdueLevel; children: ReactNode }) {
   const color = DATE_TONES[tone];
   const style: CSSProperties = { color };
-  if (level >= 2) style.background = `color-mix(in srgb, ${color} ${level === 3 ? 20 : 12}%, transparent)`;
-  if (level === 3) style.boxShadow = `inset 0 0 0 1px color-mix(in srgb, ${color} 45%, transparent)`;
+  if (level >= 2) style.background = `color-mix(in srgb, var(--${tone}) ${level === 3 ? 20 : 12}%, transparent)`;
+  if (level === 3) style.boxShadow = `inset 0 0 0 1px color-mix(in srgb, var(--${tone}) 45%, transparent)`;
   return (
     <span className={`whitespace-nowrap rounded-md px-1.5 py-px tabular-nums ${level === 3 ? 'font-bold' : 'font-semibold'}`} style={style}>
       {children}
@@ -56,11 +53,8 @@ export function SeverityMark({ tone, level, children }: { tone: 'danger' | 'warn
 }
 
 /**
- * docs/49 §5 + docs/51 D3/U2/U4: one dense row — status glyph · key (which
- * becomes the selection box on hover/focus) · title · labels ·
- * [hover actions] · signals · Jira ref · owner · date. The hover actions sit
- * *left* of the metadata, so the date stays readable on every row, including
- * the focused one. The date column is only reserved when the group has dates.
+ * Native sibling controls: selection, completion, open and More. Metadata
+ * wraps below the title on phones, with no hover-only actions.
  */
 export const TaskListRow = memo(function TaskListRow({
   task,
@@ -70,7 +64,6 @@ export const TaskListRow = memo(function TaskListRow({
   attentionMode,
   focused,
   selected,
-  selectionActive,
   dateColumn = true,
   ownerName,
   labelColor,
@@ -83,7 +76,6 @@ export const TaskListRow = memo(function TaskListRow({
   attentionMode: boolean;
   focused: boolean;
   selected: boolean;
-  selectionActive: boolean;
   /** docs/51 D3: false when no row in this group shows a date — collapse the column. */
   dateColumn?: boolean;
   ownerName: (ownerType: string | null, ownerId: string | null) => string;
@@ -96,20 +88,13 @@ export const TaskListRow = memo(function TaskListRow({
   const time = meetingTime(task);
   const jira = task.links.find((link) => link.kind === 'jira' && link.role === 'primary') ?? task.links.find((link) => link.kind === 'jira');
   const signals = task.signals;
-  const owner = task.ownerType ? ownerName(task.ownerType, task.ownerId) : 'Inbox';
+  const owner = ownerName(task.ownerType, task.ownerId);
   const labels = task.labels.filter((label) => label !== FOLLOW_UP_LABEL);
-  // The checkbox takes over the key slot whenever selecting is in play.
-  const checkboxShown = selected || selectionActive || focused;
-
   // docs/51 A2: the row's aria-label, attention chips, and icon cluster all
   // describe the same visible signals — compute the wording once.
   const attentionReasons: { label: string; tone: 'danger' | 'warning'; level: OverdueLevel }[] = [];
   const iconSignals: { label: string; color: string; icon: ReactNode }[] = [];
   if (attentionMode && signals) {
-    if (signals.overdue) {
-      const days = signals.overdueDays ?? 0;
-      attentionReasons.push({ label: `Overdue ${days}d`, tone: overdueTone(signals.overdueSource), level: overdueLevel(days, signals.overdueSource) });
-    }
     if (signals.stale) attentionReasons.push({ label: `Stale ${signals.staleDays}d`, tone: 'warning', level: 2 });
     if (signals.drift) attentionReasons.push({ label: 'Jira drift', tone: 'warning', level: 2 });
   } else {
@@ -117,11 +102,11 @@ export const TaskListRow = memo(function TaskListRow({
     if (task.priority === 'high') iconSignals.push({ label: 'High priority', color: 'var(--text-primary)', icon: <Flag size={12} fill="currentColor" /> });
     if (task.followUpAt || task.labels.includes(FOLLOW_UP_LABEL)) {
       iconSignals.push(signals?.followUpDue
-        ? { label: 'Follow-up due', color: 'var(--warning)', icon: <BellRing size={12} /> }
+        ? { label: 'Follow-up due', color: 'var(--task-warning-text)', icon: <BellRing size={12} /> }
         : { label: 'Follow-up', color: 'var(--text-muted)', icon: <Bell size={12} /> });
     }
-    if (signals?.stale) iconSignals.push({ label: `No activity for ${signals.staleDays}d`, color: 'var(--warning)', icon: <Hourglass size={12} /> });
-    if (signals?.drift) iconSignals.push({ label: 'Jira and task disagree on done-ness', color: 'var(--warning)', icon: <GitCompareArrows size={12} /> });
+    if (signals?.stale) iconSignals.push({ label: `No activity for ${signals.staleDays}d`, color: 'var(--task-warning-text)', icon: <Hourglass size={12} /> });
+    if (signals?.drift) iconSignals.push({ label: 'Jira and task disagree on done-ness', color: 'var(--task-warning-text)', icon: <GitCompareArrows size={12} /> });
   }
   // docs/57 §4 (P3-03): the Waiting lens reads as aging + check-by text.
   const waiting = context.mode === 'party' || definition?.filters?.waiting === true ? waitingChips(task, today) : null;
@@ -139,13 +124,14 @@ export const TaskListRow = memo(function TaskListRow({
     task.lingering ? (task.lingerHint ?? 'moved') : null,
   ].filter(Boolean).join(', ');
 
-  const handleClick = (event: MouseEvent<HTMLDivElement>) => {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (event.shiftKey) {
       event.preventDefault();
       handlers.onSelect(task.taskKey, 'range');
     } else if (event.metaKey || event.ctrlKey) {
       handlers.onSelect(task.taskKey, 'toggle');
     } else {
+      event.currentTarget.focus();
       handlers.onFocusRow(task.taskKey);
       handlers.onOpen(task.taskKey);
     }
@@ -154,177 +140,49 @@ export const TaskListRow = memo(function TaskListRow({
   const dim = task.lingering ? 0.6 : undefined;
 
   return (
-    <div
-      role="option"
-      aria-selected={selected}
-      aria-label={ariaLabel}
-      data-task-row={task.taskKey}
-      tabIndex={focused ? 0 : -1}
-      onClick={handleClick}
-      onFocus={(event) => { if (event.target === event.currentTarget) handlers.onFocusRow(task.taskKey); }}
-      className="group relative cursor-pointer px-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] ui-row-focus"
-      style={{
-        background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined,
-      }}
-    >
-      <div className="flex min-h-[38px] items-center gap-2">
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={(event) => { stop(event); handlers.onFocusRow(task.taskKey); handlers.onMenu(task.taskKey, 'status', event.currentTarget); }}
-          aria-label={`Status: ${TASK_STATUS_META[task.status].label}. Change status`}
-          aria-haspopup="menu"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
-        >
+    <div data-task-row={task.taskKey} className="task-row ui-row-focus" data-focused={focused || undefined}
+      onFocus={() => handlers.onFocusRow(task.taskKey)}
+      style={{ background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined }}>
+      <div className="task-row-layout">
+        <label className="task-row-control task-row-selection" title="Select (x) · Shift-click for a range">
+          <input type="checkbox" checked={selected} aria-label={`${selected ? 'Deselect' : 'Select'} ${task.taskKey}`}
+            onChange={() => {}}
+            onClick={(event) => { stop(event); handlers.onSelect(task.taskKey, event.shiftKey ? 'range' : 'toggle'); }} />
+        </label>
+        <button type="button" className="task-row-control" onClick={() => handlers.onToggleDone(task.taskKey)}
+          aria-label={`${closed ? 'Reopen' : 'Mark done'} ${task.taskKey}`} title={`${closed ? 'Reopen' : 'Mark done'} (e)`}>
           <TaskStatusGlyph status={task.status} />
         </button>
-
-        {/* docs/51 U4/D3: the key slot doubles as the selection box — no
-            reserved gutter. It shows on hover, on the focused row, whenever a
-            selection exists, and always on touch screens (no hover there). */}
-        <span className="relative flex h-6 w-5 shrink-0 items-center md:w-12">
-          <span className="hidden md:inline" style={{ opacity: dim }}>
-            <span
-              className={`font-mono text-[12px] tabular-nums transition-opacity ${checkboxShown ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'}`}
-              style={{ color: 'var(--text-disabled)' }}
-            >
-              {task.taskKey}
-            </span>
-          </span>
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={(event) => { stop(event); handlers.onSelect(task.taskKey, event.shiftKey ? 'range' : 'toggle'); }}
-            aria-label={selected ? `Deselect ${task.taskKey}` : `Select ${task.taskKey}`}
-            title="Select (x) · Shift-click for a range"
-            className={`absolute left-0 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded border transition-opacity ${checkboxShown ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100'}`}
-            style={{ borderColor: selected ? 'var(--accent)' : 'var(--border-strong)', background: selected ? 'var(--accent)' : 'var(--bg-primary)', color: 'var(--bg-primary)' }}
-          >
-            {selected && <Check size={11} strokeWidth={3} />}
+        <div className="task-row-content" style={{ opacity: dim }}>
+          <button type="button" className="task-row-open" data-task-open={task.taskKey} aria-label={ariaLabel} aria-describedby={date ? `task-date-description-${task.taskKey}` : undefined} onClick={handleClick}>
+            <span className="task-row-key font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
+            {time && <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>}
+            <span className="task-row-title text-[13px] font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
           </button>
-        </span>
-
-        {/* docs/51 F13: only title/meta dim on a lingering row — controls stay opaque. */}
-        <span className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: dim }}>
-          {time && (
-            <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>
-          )}
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            style={{
-              color: closed ? 'var(--text-muted)' : 'var(--text-primary)',
-              textDecoration: closed ? 'line-through' : undefined,
-            }}
-          >
-            {task.title}
+          <span className="task-row-metadata">
+            {labels.slice(0, 2).map((label) => <span key={label} className="task-row-label hidden max-w-[120px] truncate rounded-md px-1.5 py-px text-[11px] font-semibold sm:inline" title={taskLabelDisplayName(label)} style={labelChipStyle(labelColor(label))}>{taskLabelDisplayName(label)}</span>)}
+            {labels.length > 2 && <span className="hidden shrink-0 text-[11px] sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>+{labels.length - 2}</span>}
+            {task.lingering && isOpenStatus(task.status) && <span className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>}
+            {actions && <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="meeting-actions">{actions}</span>}
+            {waiting?.check && <span className="text-[11px]" data-testid="waiting-check">{waiting.check.tone === 'muted' ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span> : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}</span>}
+            {waiting?.aging && <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>}
+            {attentionReasons.map((reason) => <span key={reason.label} className="text-[11px]"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
+            {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
+            {jira && <span className="hidden rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
+            {showOwner && <span className="task-row-owner text-[12px]" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
+            {(dateColumn || date) && <span className="task-row-date text-[12px] tabular-nums" title={date?.title} aria-label={date?.title}>
+              {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>)}
+            </span>}
           </span>
-          {labels.slice(0, 2).map((label) => (
-            <span key={label} className="hidden shrink-0 rounded-md px-1.5 py-px text-[11px] font-semibold sm:inline" style={labelChipStyle(labelColor(label))}>
-              {taskLabelDisplayName(label)}
-            </span>
-          ))}
-          {labels.length > 2 && (
-            <span className="hidden shrink-0 text-[11px] font-semibold sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>
-              +{labels.length - 2}
-            </span>
-          )}
-          {task.lingering && isOpenStatus(task.status) && (
-            <span className="shrink-0 text-[11px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>
-          )}
-        </span>
-
-        {/* Metadata cluster. `relative` anchors the hover actions to its left edge. */}
-        <span className="relative flex shrink-0 items-center gap-2">
-          <span
-            className="pointer-events-none absolute right-full top-1/2 mr-2 flex -translate-y-1/2 items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [@media(hover:none)]:hidden"
-            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.18)' }}
-          >
-            <RowAction label="Schedule (s)" menu onClick={(event) => { stop(event); handlers.onFocusRow(task.taskKey); handlers.onMenu(task.taskKey, 'schedule', event.currentTarget); }}>
-              <CalendarClock size={13} />
-            </RowAction>
-            <RowAction label={closed ? 'Reopen (space)' : 'Mark done (space)'} onClick={(event) => { stop(event); handlers.onFocusRow(task.taskKey); handlers.onToggleDone(task.taskKey); }}>
-              {closed ? <RotateCcw size={13} /> : <Check size={13} />}
-            </RowAction>
-            <RowAction label="More actions" menu onClick={(event) => { stop(event); handlers.onFocusRow(task.taskKey); handlers.onMenu(task.taskKey, 'more', event.currentTarget); }}>
-              <Ellipsis size={13} />
-            </RowAction>
-          </span>
-
-          {(attentionReasons.length > 0 || iconSignals.length > 0 || waitingText.length > 0 || actions) && (
-            <span className="flex items-center gap-1.5" style={{ opacity: dim }}>
-              {actions && (
-                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="meeting-actions">{actions}</span>
-              )}
-              {waiting?.check && (
-                <span className="text-[11px]" data-testid="waiting-check">
-                  {waiting.check.tone === 'muted'
-                    ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span>
-                    : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}
-                </span>
-              )}
-              {waiting?.aging && (
-                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>
-              )}
-              {attentionReasons.map((reason) => (
-                <span key={reason.label} className="text-[11px]">
-                  <SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark>
-                </span>
-              ))}
-              {iconSignals.map((signal) => (
-                <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>
-              ))}
-            </span>
-          )}
-          {jira && (
-            <span className="hidden rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', opacity: dim }}>
-              {jira.ref}
-            </span>
-          )}
-          {showOwner && (
-            <span role="img" aria-label={`Owner: ${owner}`} className="flex" title={owner} style={{ opacity: dim }}>
-              {task.ownerType ? (
-                <Avatar name={owner} seed={task.ownerId ?? owner} size={20} />
-              ) : (
-                <span className="h-5 w-5 rounded-full" style={{ border: '1px dashed var(--border-strong)' }} aria-hidden="true" />
-              )}
-            </span>
-          )}
-          {(dateColumn || date) && (
-            <span className="flex w-[84px] justify-end text-[12px] tabular-nums" title={date?.title} style={{ opacity: dim }}>
-              {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? (
-                <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark>
-              ) : (
-                <span className="whitespace-nowrap px-1.5" style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>
-              ))}
-            </span>
-          )}
-        </span>
+        </div>
+        <button type="button" className="task-row-control" aria-label={`More actions for ${task.taskKey}`} aria-haspopup="menu"
+          onClick={(event) => { handlers.onFocusRow(task.taskKey); handlers.onMenu(task.taskKey, 'more', event.currentTarget); }}><Ellipsis size={15} /></button>
       </div>
-      {task.nextAction && (
-        <p className="-mt-1.5 truncate pb-2 pl-[60px] text-[12px] md:pl-[88px]" style={{ color: 'var(--text-muted)', opacity: dim }}>
-          → {task.nextAction}
-        </p>
-      )}
+      {date && <span className="sr-only" id={`task-date-description-${task.taskKey}`}>{date.title}</span>}
+      {task.nextAction && <p className="task-row-next text-[12px]" style={{ color: 'var(--text-muted)', opacity: dim }}>→ {task.nextAction}</p>}
     </div>
   );
 });
-
-function RowAction({ label, menu = false, onClick, children }: { label: string; menu?: boolean; onClick: (event: MouseEvent<HTMLButtonElement>) => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      tabIndex={-1}
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      aria-haspopup={menu ? 'menu' : undefined}
-      className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-      style={{ color: 'var(--text-secondary)' }}
-    >
-      {children}
-    </button>
-  );
-}
 
 function SignalIcon({ label, color, children }: { label: string; color: string; children: ReactNode }) {
   return (

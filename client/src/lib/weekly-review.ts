@@ -67,8 +67,11 @@ export function mondayOfLocal(isoDay: string): string {
  * Open the weekly review from anywhere in the app (the Today row, the palette, the Tasks rail): the
  * URL carries the mode, and the app's `popstate` handling turns it into the review.
  */
-export function openWeeklyReview(week?: string): void {
-  const target = week ? `/?mode=review&week=${encodeURIComponent(week)}` : '/?mode=review';
+export function openWeeklyReview(week?: string, step?: 'send'): void {
+  const params = new URLSearchParams({ mode: 'review' });
+  if (week) params.set('week', week);
+  if (step) params.set('step', step);
+  const target = `/?${params}`;
   window.history.pushState(null, '', target);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
@@ -84,6 +87,8 @@ export interface ReviewDecision {
   taskKey: string;
   row: WeeklyReviewTaskRow;
   choice: DecisionChoice;
+  pending?: boolean;
+  acknowledged?: Partial<WeeklyReviewTaskRow>;
 }
 
 export interface ReviewStepContext {
@@ -120,6 +125,9 @@ export interface ReviewStepContext {
   retry: () => void;
   /** One polite live-region sentence ("Left out of the update."). */
   announce: (message: string) => void;
+  saveReport?: (markdown: string, completed?: boolean) => Promise<void>;
+  editReport?: (markdown: string | null) => void;
+  finishReview?: () => void;
 }
 
 export interface ReviewStepDef {

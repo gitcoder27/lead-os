@@ -184,7 +184,7 @@ describe('People step (docs/59 §5.3 step 4)', () => {
     renderReview();
     await screen.findByRole('heading', { level: 2, name: 'What closed this week' });
     expect(within(rail()).queryByRole('button', { name: /People/ })).not.toBeInTheDocument();
-    expect(within(rail()).getAllByRole('button')).toHaveLength(4);
+    expect(within(rail()).getAllByRole('button')).toHaveLength(5);
     fireEvent.keyDown(document.body, { key: '4' });
     expect(await screen.findByRole('heading', { level: 2, name: /top 3/ })).toBeInTheDocument();
   });

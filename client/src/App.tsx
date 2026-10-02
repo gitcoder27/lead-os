@@ -916,9 +916,12 @@ function AppContent() {
       params.set('mode', 'review');
       if (next.week) params.set('week', next.week);
       else params.delete('week');
+      if (next.step) params.set('step', next.step);
+      else params.delete('step');
     } else {
       params.delete('mode');
       params.delete('week');
+      params.delete('step');
     }
     const search = params.toString();
     const target = `${window.location.pathname}${search ? `?${search}` : ''}`;
@@ -1279,6 +1282,7 @@ function AppContent() {
           <Suspense fallback={<PanelLoading />}>
             <WeeklyReviewMode
               week={reviewMode.week}
+              initialStep={reviewMode.step}
               onWeekChange={(week) => handleReviewModeChange({ week }, { replace: true })}
               onExit={() => handleReviewModeChange(undefined)}
               onOpenTarget={handleOpenTodayTarget}

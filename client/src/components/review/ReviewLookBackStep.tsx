@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { CalendarCheck, Flag } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ReviewJiraSummary } from './ReviewJiraSummary';
 import { ReviewSourceNote } from './ReviewSourceNote';
 import { shouldIgnoreTriageEvent } from '@/lib/today-triage';
 import { defaultInUpdate, findSection, type ReviewStepContext } from '@/lib/weekly-review';
@@ -81,7 +82,7 @@ export function ReviewLookBackStep({ ctx }: { ctx: ReviewStepContext }) {
   if (closed?.status === 'unavailable') {
     return <ReviewSourceNote what="this week's closed tasks" onRetry={ctx.retry} />;
   }
-  if (flat.length === 0) {
+  if (flat.length === 0 && !ctx.review.jira) {
     return (
       <EmptyState
         compact
@@ -165,6 +166,7 @@ export function ReviewLookBackStep({ ctx }: { ctx: ReviewStepContext }) {
           </section>
         );
       })}
+      <ReviewJiraSummary ctx={ctx} />
     </div>
   );
 }

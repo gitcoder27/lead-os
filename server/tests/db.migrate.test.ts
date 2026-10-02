@@ -12,6 +12,21 @@ describe("database migrations", () => {
     await resetDatabase();
   });
 
+  it("adds nullable resolution history to legacy workspace rebuilds without backfilling Done issues", () => {
+    const legacy = new Database(":memory:");
+    try {
+      legacy.exec(`CREATE TABLE issues (jira_key TEXT PRIMARY KEY, summary TEXT NOT NULL, priority_name TEXT NOT NULL, priority_id TEXT NOT NULL, status_name TEXT NOT NULL, status_category TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, synced_at TEXT NOT NULL);
+        INSERT INTO issues VALUES ('OLD-1', 'Existing done', 'High', '1', 'Done', 'done', '2020-01-01', '2020-01-02', '2020-01-02');`);
+      migrate(legacy);
+      const column = (legacy.prepare('PRAGMA table_info(issues)').all() as { name: string; notnull: number }[]).find((entry) => entry.name === 'resolved_at');
+      expect(column?.notnull).toBe(0);
+      expect(legacy.prepare('SELECT resolved_at FROM issues WHERE jira_key = ?').get('OLD-1')).toEqual({ resolved_at: null });
+      legacy.prepare('UPDATE issues SET resolved_at = ?').run('2026-10-01T09:00:00Z');
+      migrate(legacy);
+      expect(legacy.prepare('SELECT resolved_at FROM issues WHERE jira_key = ?').get('OLD-1')).toEqual({ resolved_at: '2026-10-01T09:00:00Z' });
+    } finally { legacy.close(); }
+  });
+
   it("keeps shadow backfill event writes nullable until an explicit contract", () => {
     const shadowDb = new Database(":memory:");
     try {

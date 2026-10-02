@@ -30,6 +30,7 @@ export const issues = sqliteTable("issues", {
   flagged: integer("flagged").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  resolvedAt: text("resolved_at"),
   syncedAt: text("synced_at").notNull(),
   lastSeenInScopedSyncAt: text("last_seen_in_scoped_sync_at"),
   lastReconciledAt: text("last_reconciled_at"),

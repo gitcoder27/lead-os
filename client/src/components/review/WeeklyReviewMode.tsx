@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, CircleAlert } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TaskPopover } from '@/components/ui/Popover';
 import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
@@ -28,6 +29,7 @@ import './review.css';
 export interface WeeklyReviewModeProps {
   /** Any day in the week to review; without it the server picks (last week on a Monday or Tuesday). */
   week?: string;
+  initialStep?: 'send';
   onWeekChange: (week: string | undefined) => void;
   onExit: () => void;
   /** Open a person or a 1:1 on the Team page (App's target handler); Back returns to the review. */
@@ -48,7 +50,7 @@ const GENERAL_KEYS: ShortcutGroup['keys'] = [
  * rail draw at once; the body loads. The read model is a snapshot, so rows never reshuffle while a
  * step is open.
  */
-export function WeeklyReviewMode({ week, onWeekChange, onExit, onOpenTarget, steps = REVIEW_STEPS }: WeeklyReviewModeProps) {
+export function WeeklyReviewMode({ week, initialStep, onWeekChange, onExit, onOpenTarget, steps = REVIEW_STEPS }: WeeklyReviewModeProps) {
   const query = useWeeklyReview(week);
 
   if (query.data) {
@@ -56,6 +58,7 @@ export function WeeklyReviewMode({ week, onWeekChange, onExit, onOpenTarget, ste
       <ReviewSession
         key={query.data.range.start}
         review={query.data}
+        initialStep={initialStep}
         retry={() => void query.refetch()}
         steps={steps}
         onWeekChange={onWeekChange}
@@ -140,6 +143,7 @@ function ReviewSkeleton() {
 
 function ReviewSession({
   review,
+  initialStep,
   retry,
   steps,
   onWeekChange,
@@ -147,6 +151,7 @@ function ReviewSession({
   onOpenTarget,
 }: {
   review: WeeklyReviewResponse;
+  initialStep?: 'send';
   retry: () => void;
   steps: ReviewStepEntry[];
   onWeekChange: (week: string | undefined) => void;
@@ -158,10 +163,11 @@ function ReviewSession({
   const openTask = useCallback((taskKey: string) => openTaskDrawer?.(taskKey), [openTaskDrawer]);
   const developers = useDevelopers();
   const { user } = useAuth();
-  const { saved, patch, flush } = useReviewProgress(review.range.start, review.saved);
+  const queryClient = useQueryClient();
+  const { saved, patch, flush, saveNow } = useReviewProgress(review.range.start, review.saved);
 
   const visible = useMemo(() => steps.filter((step) => !step.visible || step.visible(review)), [steps, review]);
-  const [index, setIndex] = useState(() => Math.max(0, visible.findIndex((step) => step.id === saved.step)));
+  const [index, setIndex] = useState(() => Math.max(0, visible.findIndex((step) => step.id === (initialStep ?? saved.step))));
   // Steps the manager has moved on from (a resumed review counts everything before its saved step).
   const [left, setLeft] = useState<Set<string>>(() => new Set(visible.slice(0, index).map((step) => step.id)));
   const [announcement, setAnnouncement] = useState({ text: '', n: 0 });
@@ -194,7 +200,7 @@ function ReviewSession({
     setIncluded: (lineId, defaultIncluded, included) => {
       // Several ticks can land in one render (a whole group): always build on the latest list.
       excludedRef.current = withLineIncluded(excludedRef.current, lineId, defaultIncluded, included);
-      patch({ excluded: excludedRef.current });
+      patch({ excluded: excludedRef.current, ...(saved.reportMarkdown !== null && { reportMarkdown: null }) });
     },
     openTask,
     personName,
@@ -211,7 +217,16 @@ function ReviewSession({
     selfAccountId: user?.accountId,
     retry,
     announce,
-  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, pins, pin, unpin, skippedSessions, skipSession, openTarget, capture, user?.accountId, retry, announce]);
+    editReport: (markdown) => patch({ reportMarkdown: markdown }),
+    saveReport: async (markdown, completed = false) => {
+      await saveNow({ reportMarkdown: markdown, ...(completed && { completed: true }) });
+      if (completed) {
+        void queryClient.invalidateQueries({ queryKey: ['today'] });
+        void queryClient.invalidateQueries({ queryKey: ['weekly-review-past'] });
+      }
+    },
+    finishReview: onExit,
+  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, pins, pin, unpin, skippedSessions, skipSession, openTarget, capture, user?.accountId, retry, announce, saveNow, queryClient, onExit]);
 
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= visible.length || next === index) return;

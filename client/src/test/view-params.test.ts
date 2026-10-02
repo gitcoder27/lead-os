@@ -6,6 +6,7 @@ import {
   deskDateFromParams,
   deskDateToSearch,
   notesDateFromParams,
+  reviewModeFromParams,
   taskKeyFromParams,
   taskKeyToParams,
   teamBoardQueryFromParams,
@@ -110,5 +111,13 @@ describe('task key params', () => {
     writeTaskParam(undefined);
     expect(window.location.search).toBe('?q=alice');
     window.history.replaceState(null, '', '/');
+  });
+});
+
+describe('weekly report deep links', () => {
+  it('opens Send update only for the explicit review mode and ignores unknown steps', () => {
+    expect(reviewModeFromParams(new URLSearchParams('mode=review&step=send'))).toEqual({ week: undefined, step: 'send' });
+    expect(reviewModeFromParams(new URLSearchParams('mode=review&step=unknown'))).toEqual({ week: undefined });
+    expect(reviewModeFromParams(new URLSearchParams('step=send'))).toBeUndefined();
   });
 });

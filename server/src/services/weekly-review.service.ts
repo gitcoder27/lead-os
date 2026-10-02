@@ -1,3 +1,4 @@
+import { isVisibleWorkIssue } from "./issue-rules";
 import { and, between, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { WEEKLY_REVIEW_LIMITS, WEEKLY_REVIEW_STEPS } from "shared/types";
 import type {
@@ -6,6 +7,7 @@ import type {
   TeamMode,
   TodayWeeklyReview,
   WeeklyReviewCheckInRow,
+  WeeklyReviewJira,
   WeeklyReviewOneOnOneRow,
   WeeklyReviewPastWeek,
   WeeklyReviewPin,
@@ -18,7 +20,7 @@ import type {
   WeeklyReviewTaskRow,
 } from "shared/types";
 import { db } from "../db/connection";
-import { developers, teamTrackerCheckIns, teamTrackerDays, weeklyReviews } from "../db/schema";
+import { developers, issues, teamTrackerCheckIns, teamTrackerDays, weeklyReviews } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { logger } from "../utils/logger";
 import { todayIsoDate } from "../utils/date";
@@ -114,7 +116,7 @@ export class WeeklyReviewService {
     ]);
 
     const ctx: SectionContext = { principal, workspaceId, timeZone, today, range, excluded, managerTouchDays: rules.managerTouchDays };
-    const [closed, quiet, slipped, inbox, undated, laterNextWeek, plannedNextWeek, nextWorkdayTop3] = await Promise.all([
+    const [closed, quiet, slipped, inbox, undated, laterNextWeek, plannedNextWeek, nextWorkdayTop3, blocked, jira] = await Promise.all([
       this.closed(ctx),
       this.quiet(ctx),
       this.slipped(ctx),
@@ -123,6 +125,8 @@ export class WeeklyReviewService {
       this.laterNextWeek(ctx),
       this.plannedNextWeek(ctx, nextWorkdayAfter(today)),
       this.nextWorkdayPins(ctx, nextWorkdayAfter(today)),
+      this.tasks(ctx, { filters: { status: ["blocked"] }, sort: "updated" }),
+      this.jiraSection(ctx),
     ]);
     // Lanes are exclusive, but the Waiting lens also catches blocked and legacy rows: a quiet row is
     // decided once, in step 2.
@@ -132,6 +136,7 @@ export class WeeklyReviewService {
     const sections: WeeklyReviewSection[] = [
       { id: "closed", status: "ready", rows: closed },
       { id: "quiet", status: "ready", rows: quiet },
+      { id: "blocked", status: "ready", rows: blocked },
       { id: "slipped", status: "ready", rows: notQuiet(slipped) },
       { id: "inbox", status: "ready", rows: notQuiet(inbox) },
       { id: "undated", status: "ready", rows: notQuiet(undated) },
@@ -155,8 +160,39 @@ export class WeeklyReviewService {
       oneOnOneEnabled,
       sections,
       nextWorkdayTop3,
+      ...(jira && { jira }),
       saved: await this.getSaved(principal, range.start),
     };
+  }
+
+  private async jiraSection(ctx: SectionContext): Promise<WeeklyReviewJira | undefined> {
+    try {
+      if (!(await this.settings.isJiraConfigured(ctx.workspaceId))) return undefined;
+      const mode = await this.settings.getJiraSyncScopeMode(ctx.workspaceId);
+      const rows = (await db.select().from(issues).where(eq(issues.workspaceId, ctx.workspaceId)))
+        // Scope and exclusion rules also apply to historical done rows.
+        .filter((row) => isVisibleWorkIssue({ ...row, statusCategory: "new" }, mode));
+      const inWeek = (value: string | null) => {
+        const day = toZonedIsoDay(value, ctx.timeZone);
+        return Boolean(day && day >= ctx.range.start && day <= ctx.range.end);
+      };
+      const critical = (row: typeof issues.$inferSelect) => /^(highest|high)$/i.test(row.priorityName);
+      const resolved = rows.filter((row) => row.statusCategory === "done" && inWeek(row.resolvedAt));
+      const dto = (row: typeof issues.$inferSelect) => ({
+        key: row.jiraKey, summary: row.summary, priority: row.priorityName,
+        openDays: Math.max(0, Math.round((Date.parse(ctx.today) - Date.parse(toZonedIsoDay(row.createdAt, ctx.timeZone) ?? ctx.today)) / 86_400_000)),
+      });
+      return {
+        status: "ready",
+        resolved: rows.some((row) => row.resolvedAt) ? resolved.length : null,
+        opened: rows.filter((row) => inWeek(row.createdAt)).length,
+        topResolved: resolved.filter(critical).sort((a, b) => (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? "") || a.jiraKey.localeCompare(b.jiraKey)).slice(0, 3).map(dto),
+        criticalOpen: rows.filter((row) => isVisibleWorkIssue(row, mode) && critical(row)).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.jiraKey.localeCompare(b.jiraKey)).map(dto),
+      };
+    } catch (error) {
+      logger.warn({ error }, "Could not build weekly review Jira section");
+      return { status: "unavailable", resolved: null, opened: 0, topResolved: [], criticalOpen: [] };
+    }
   }
 
   /**
@@ -263,7 +299,7 @@ export class WeeklyReviewService {
   // ── Task sections ──
 
   private async tasks(ctx: SectionContext, definition: TaskViewDefinition): Promise<WeeklyReviewTaskRow[]> {
-    const rows = await this.views.run(ctx.principal, definition, ctx.today);
+    const rows = await this.views.run(ctx.principal, definition, ctx.today, ctx.timeZone, ctx.excluded);
     return rows.filter((row) => !ctx.excluded.has(row.id));
   }
 

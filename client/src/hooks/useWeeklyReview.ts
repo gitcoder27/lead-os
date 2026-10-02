@@ -5,7 +5,7 @@ import { useToast } from '@/context/ToastContext';
 import { api } from '@/lib/api';
 import { blankSavedState } from '@/lib/weekly-review';
 import { getLocalTimeZone } from '@/lib/utils';
-import type { SaveWeeklyReviewRequest, SaveWeeklyReviewResponse, WeeklyReviewResponse, WeeklyReviewSavedState } from '@/types';
+import type { SaveWeeklyReviewRequest, SaveWeeklyReviewResponse, WeeklyReviewResponse, WeeklyReviewSavedState, WeeklyReviewWeeksResponse } from '@/types';
 
 /** How long a burst of ticks waits before it is written (docs/59 §5.3: saved, debounced). */
 export const REVIEW_SAVE_DELAY_MS = 400;
@@ -52,28 +52,35 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
   const [saved, setSaved] = useState<WeeklyReviewSavedState>(() => initial ?? blankSavedState(weekStart));
   const pending = useRef<SaveWeeklyReviewRequest>({});
   const timer = useRef<number | null>(null);
-  const inFlight = useRef(false);
+  const inFlight = useRef<Promise<WeeklyReviewSavedState | null> | null>(null);
+  const acknowledged = useRef(initial);
 
-  const flush = useCallback(() => {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
+  const flush = useCallback(async (): Promise<WeeklyReviewSavedState | null> => {
+    if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null; }
+    if (inFlight.current) {
+      const result = await inFlight.current;
+      // A failed attempt leaves the payload pending for an explicit retry or the next edit.
+      if (!result) return null;
+      return flush();
     }
     const body = pending.current;
-    if (Object.keys(body).length === 0 || inFlight.current) return;
+    if (Object.keys(body).length === 0) return acknowledged.current;
     pending.current = {};
-    inFlight.current = true;
-    api.put<SaveWeeklyReviewResponse>(`/review/week/${weekStart}`, body)
-      .catch((error: Error) => {
-        pending.current = merge(body, pending.current);
-        addToast({ type: 'error', title: "Couldn't save your review progress", message: error.message });
-      })
-      .finally(() => {
-        inFlight.current = false;
-        if (Object.keys(pending.current).length > 0 && timer.current === null) {
-          timer.current = window.setTimeout(flush, REVIEW_SAVE_DELAY_MS);
-        }
-      });
+    const request = api.put<SaveWeeklyReviewResponse>(`/review/week/${weekStart}`, body).then(({ saved: result }) => {
+      acknowledged.current = result;
+      setSaved((current) => ({ ...current, completedAt: result.completedAt, dismissedAt: result.dismissedAt, updatedAt: result.updatedAt }));
+      return result;
+    }).catch((error: Error) => {
+      pending.current = merge(body, pending.current);
+      delete pending.current.completed;
+      addToast({ type: 'error', title: "Couldn't save your review progress", message: error.message });
+      return null;
+    });
+    inFlight.current = request;
+    const result = await request;
+    inFlight.current = null;
+    if (result && Object.keys(pending.current).length > 0) return flush();
+    return result;
   }, [addToast, weekStart]);
 
   const patch = useCallback((change: SaveWeeklyReviewRequest) => {
@@ -94,9 +101,15 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
   }, [flush]);
 
   // Leaving the review (Esc, back, a route change) writes what is waiting.
-  useEffect(() => () => flush(), [flush]);
+  useEffect(() => () => { void flush(); }, [flush]);
 
-  return { saved, patch, flush };
+  const saveNow = useCallback(async (change: SaveWeeklyReviewRequest) => {
+    patch(change);
+    const result = await flush();
+    if (!result) throw new Error("Your update is still here. Couldn't save it; try again.");
+    return result;
+  }, [patch, flush]);
+  return { saved, patch, flush, saveNow };
 }
 
 /** "Not this week": records a dismissal for that week only, and Today drops the catch-up row. */
@@ -109,5 +122,15 @@ export function useDismissReviewWeek() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['today'] });
     },
+  });
+}
+
+/** Private completed reports; never includes another manager's saved text. */
+export function useReviewPastWeeks() {
+  const scope = useAuthScopeKey();
+  return useQuery<WeeklyReviewWeeksResponse>({
+    queryKey: ['weekly-review-past', scope],
+    queryFn: ({ signal }) => api.get<WeeklyReviewWeeksResponse>('/review/weeks?limit=12', { signal }),
+    staleTime: 60_000,
   });
 }

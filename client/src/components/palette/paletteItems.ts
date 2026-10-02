@@ -98,6 +98,7 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backu
       keywords: 'weekly review week friday close report update retro',
       href: '/?mode=review',
     });
+    commands.push({ id: 'action-copy-weekly-update', group: 'actions', title: 'Copy weekly update', description: 'Preview and copy your update', keywords: 'weekly report teams copy update', href: '/?mode=review&step=send' });
     // P3-D5: standup mode is a deep-linked overlay on the Team page.
     commands.push({
       id: 'action-standup',

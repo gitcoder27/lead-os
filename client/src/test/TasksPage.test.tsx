@@ -1,7 +1,10 @@
+import type * as Csv from '@/lib/csv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TaskViewMeta, TaskViewTask } from '@/types';
 
+const mockCsvDownload = vi.fn();
+vi.mock('@/lib/csv', async (original) => ({ ...await original<typeof Csv>(), downloadCsv: (...args: unknown[]) => mockCsvDownload(...args) }));
 const mockUseTaskViews = vi.fn();
 const mockUseTaskViewTasks = vi.fn();
 const mockUseTaskViewCounts = vi.fn();
@@ -164,6 +167,18 @@ beforeEach(async () => {
 });
 
 describe('TasksPage rail and views (docs/49 §3/§4)', () => {
+  it('exports the searched current rows, excluding private agenda and other rows', () => {
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ title: 'Match ordinary', details: 'PRIVATE BODY' }), task({ id: 2, taskKey: 'T-2', title: 'Other title' }), task({ id: 3, taskKey: 'T-3', title: 'Match private agenda', oneOnOne: true })]));
+    render(<TasksPage />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tasks' }), { target: { value: 'Match' } });
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export CSV' }));
+    expect(mockCsvDownload).toHaveBeenCalledTimes(1);
+    expect(mockCsvDownload.mock.calls[0]?.[0]).toContain('Match ordinary');
+    expect(mockCsvDownload.mock.calls[0]?.[0]).not.toMatch(/Other title|Match private agenda|PRIVATE BODY/);
+    expect(mockCsvDownload.mock.calls[0]?.[1]).toBe('leados-tasks-today-2026-09-26.csv');
+  });
+
   it('renders plan + review sections with counts and runs the default Planned today view', () => {
     render(<TasksPage />);
     const rail = within(screen.getByRole('navigation', { name: 'Task views' }));

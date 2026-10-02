@@ -67,13 +67,15 @@ interface TaskToolbarProps {
   onSaveView: (name: string) => Promise<boolean>;
   saving: boolean;
   canSave: boolean;
+  onExport?: () => void;
+  canExport?: boolean;
 }
 
 /** Search, consolidated options and keyboard help at every width. */
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
     title, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
-    effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave,
+    effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
   const open = (kind: OpenMenu) => (event: MouseEvent<HTMLElement>) =>
@@ -266,6 +268,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
           ))}
           <MenuDivider />
           <MenuHeading>View</MenuHeading>
+          {onExport && <MenuItem label="Export CSV" disabled={!canExport} onSelect={() => { close(); onExport(); }} />}
           <MenuItem label="Save current view" disabled={!canSave} onSelect={() => { close(); setSaveOpen(true); setSaveError(false); }} />
           {hasOverrides && isSavedView && <MenuItem label="Update view" onSelect={() => { close(); onUpdateView(); }} />}
           {hasOverrides && <MenuItem label={isSavedView ? 'Revert' : 'Reset'} onSelect={() => { close(); onRevert(); }} />}

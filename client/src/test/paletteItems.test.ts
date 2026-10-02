@@ -84,6 +84,12 @@ const dailyNote: DailyNoteSummary = {
 };
 
 describe('palette item builders', () => {
+  it('opens Copy weekly update at Send update without completing anything', () => {
+    const commands = buildNavigationCommands({ tasksPhase3: true });
+    expect(commands.find((command) => command.id === 'action-copy-weekly-update')?.href).toBe('/?mode=review&step=send');
+    expect(buildNavigationCommands({ tasksPhase3: false }).some((command) => command.id === 'action-copy-weekly-update')).toBe(false);
+  });
+
   it('maps an issue to a work target', () => {
     const item = issueToPaletteItem(issue, 0);
 

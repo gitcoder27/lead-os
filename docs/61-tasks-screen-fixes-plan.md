@@ -289,3 +289,4 @@ TS-08 has not run. Append its evidence, unresolved provenance, written decision 
 ## Open questions
 
 None requiring a product decision before implementation. Any unexpected need for a feature, migration, runtime-data access or change to a locked decision must be raised with the user before proceeding.
+| 2026-10-02 | WR-10 / R9 | main (this commit) | Codex | Separately authorized CSV now lives inside the consolidated View options menu; the three main toolbar targets and rail remain as delivered in TS-07. Exports current searched/grouped/sorted view rows, omits agenda-marked tasks and lingering/progress extras; current-row and private-data regressions pass. See docs/56 R9 and docs/60 WR-10. |

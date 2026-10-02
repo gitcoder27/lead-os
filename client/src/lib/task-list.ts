@@ -187,7 +187,7 @@ export interface LingerEntry {
   hint?: string | null;
 }
 
-export type ListTask = ManagerTask & { lingering?: boolean; lingerHint?: string | null };
+export type ListTask = ManagerTask & { oneOnOne?: true; lingering?: boolean; lingerHint?: string | null };
 
 export interface RenderGroup extends Omit<TaskViewGroupBucket, 'tasks'> {
   tasks: ListTask[];

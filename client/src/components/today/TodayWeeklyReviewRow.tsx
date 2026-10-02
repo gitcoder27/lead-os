@@ -26,7 +26,7 @@ export function TodayWeeklyReviewRow({ review }: { review: TodayWeeklyReview }) 
             </span>
           </span>
           <span className="today-row-actions">
-            <button type="button" className="ui-btn-ghost" onClick={() => openWeeklyReview(review.weekStart)}>Open</button>
+            <button type="button" className="ui-btn-ghost" onClick={() => openWeeklyReview(review.weekStart, 'send')}>Copy update</button>
           </span>
         </div>
       ) : (

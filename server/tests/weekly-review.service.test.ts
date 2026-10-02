@@ -91,7 +91,7 @@ describe("week range and default (§4)", () => {
     expect(response.today).toBe("2026-10-02");
     expect(response.nextWorkday).toBe("2026-10-05");
     expect(response.defaultedToLastWeek).toBe(false);
-    expect(response.sections.map((entry) => entry.id)).toEqual(["closed", "quiet", "slipped", "inbox", "undated", "laterNextWeek", "plannedNextWeek", "oneOnOnes", "people"]);
+    expect(response.sections.map((entry) => entry.id)).toEqual(["closed", "quiet", "blocked", "slipped", "inbox", "undated", "laterNextWeek", "plannedNextWeek", "oneOnOnes", "people"]);
   });
 
   it("puts a Sunday evening in Auckland into the new week, and a Monday morning in Honolulu into the old one", async () => {
@@ -474,7 +474,7 @@ describe("1:1 tasks never appear (docs/59 §4, §10)", () => {
     await add("Slipped normally", { scheduledOn: "2026-09-29" });
 
     const response = await build(FRIDAY, { week: "2026-09-28" });
-    for (const id of ["closed", "quiet", "slipped", "inbox", "undated", "laterNextWeek"]) {
+    for (const id of ["closed", "quiet", "blocked", "slipped", "inbox", "undated", "laterNextWeek"]) {
       const list = titles(response, id);
       for (const hidden of ["Discuss performance concerns", "Career growth chat", "Draft the promo case", "Old undated topic", "Existing task attached to the agenda"]) {
         expect(list, `${id} must not list "${hidden}"`).not.toContain(hidden);

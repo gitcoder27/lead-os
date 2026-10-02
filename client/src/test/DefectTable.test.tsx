@@ -1,3 +1,4 @@
+import type * as Csv from '@/lib/csv';
 import * as React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
@@ -32,6 +33,8 @@ vi.mock('framer-motion', () => {
   return { motion };
 });
 
+const mockCsvDownload = vi.fn();
+vi.mock('@/lib/csv', async (original) => ({ ...await original<typeof Csv>(), downloadCsv: (...args: unknown[]) => mockCsvDownload(...args) }));
 const mockIssues: Issue[] = [
   {
     jiraKey: 'PROJ-101',
@@ -612,6 +615,16 @@ describe('DefectTable', () => {
 
     const rows = screen.getAllByRole('row');
     expect(rows[1]).toHaveTextContent('PROJ-102');
+  });
+
+  it('exports exactly the filtered Work rows without private analysis notes', () => {
+    mockCsvDownload.mockClear();
+    render(<TestWrapper><DefectTable {...defaultProps} /></TestWrapper>);
+    fireEvent.click(screen.getByLabelText('Open defect search'));
+    fireEvent.change(screen.getByLabelText('Search defects by ID or title'), { target: { value: 'PROJ-101' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    const csv = mockCsvDownload.mock.calls[0]?.[0];
+    expect(csv).toContain('PROJ-101'); expect(csv).not.toMatch(/PROJ-102|PROJ-103|Initial root-cause/);
   });
 
   it('filters visible defects by Jira ID from search', () => {

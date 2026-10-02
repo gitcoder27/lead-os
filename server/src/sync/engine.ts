@@ -166,6 +166,7 @@ export class SyncEngine {
         "duedate",
         "created",
         "updated",
+        "resolutiondate",
         "customfield_10021",
         devDueDateField,
         aspenSeverityField,
@@ -281,6 +282,7 @@ export class SyncEngine {
       flagged: flagged ? 1 : 0,
       createdAt: item.fields.created ?? syncedAt,
       updatedAt: item.fields.updated ?? syncedAt,
+      resolvedAt: typeof item.fields.resolutiondate === "string" && Number.isFinite(Date.parse(item.fields.resolutiondate)) ? new Date(item.fields.resolutiondate).toISOString() : null,
       syncedAt,
       lastReconciledAt: syncedAt,
     };
@@ -406,6 +408,9 @@ export class SyncEngine {
     if (!existingRow) {
       return;
     }
+    // Keep a known date when Jira omits it. Only an observed transition can supply a fallback;
+    // importing an already-done issue must not invent historical resolution data.
+    row.resolvedAt ??= existingRow.resolvedAt ?? (existingRow.statusCategory !== "done" && row.statusCategory === "done" ? row.syncedAt : null);
     const { jiraKey, ...updateRow } = row;
     const compactedUpdate = this.compactRow(updateRow);
     const nextRow = { ...existingRow, ...compactedUpdate } as typeof issues.$inferSelect;
@@ -456,6 +461,7 @@ export class SyncEngine {
         "duedate",
         "created",
         "updated",
+        "resolutiondate",
         "customfield_10021",
         devDueDateFieldOverride || config.JIRA_DEV_DUE_DATE_FIELD,
         aspenSeverityFieldOverride || config.JIRA_ASPEN_SEVERITY_FIELD,

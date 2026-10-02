@@ -48,8 +48,8 @@ describe('TodayWeeklyReviewRow', () => {
     renderRow({ due: false, completedAt, weekStart: '2026-09-28' });
     expect(screen.getByText('Weekly review done · 15:42')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start review' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
-    expect(window.location.search).toBe('?mode=review&week=2026-09-28');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy update' }));
+    expect(window.location.search).toBe('?mode=review&week=2026-09-28&step=send');
   });
 
   it('offers the catch-up on Monday with Start and Not this week; the dismissal is for that week only', async () => {

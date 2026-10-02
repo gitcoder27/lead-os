@@ -644,3 +644,35 @@
 @media (prefers-reduced-motion: reduce) {
   .review-slot[data-filled='true'] .review-slot-mark { animation: none; }
 }
+
+.review-send-intro { color: var(--text-secondary); margin-bottom: 16px; }
+.review-report { border: 1px solid var(--border); border-radius: 12px; padding: 24px; background: var(--bg-secondary); overflow-wrap: anywhere; }
+.review-report-title { font-weight: 650; margin-bottom: 20px; }
+.review-report h3 { font-weight: 600; margin: 20px 0 8px; }
+.review-report ul { list-style: none; padding: 0; }
+.review-report li { padding: 4px 0; }
+.review-report li > label { display: flex; align-items: flex-start; gap: 12px; min-height: 28px; cursor: pointer; }
+.review-report input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; margin-top: 3px; }
+.review-report input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.review-report li[data-included='false'] label > span { color: var(--text-secondary); }
+.review-person-hint { display: block; margin-left: 30px; color: var(--text-secondary); font-size: 12px; }
+.review-report-editor { display: block; font-weight: 600; }
+.review-report textarea { width: 100%; min-height: 360px; margin-top: 12px; resize: vertical; font-weight: 400; line-height: 1.6; padding: 12px; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; }
+.review-send-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
+.review-past { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 16px; }
+.review-past summary { cursor: pointer; padding: 12px 0; }
+.review-past ul { list-style: none; padding: 0; }
+.review-past li { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); padding: 8px 0; }
+@media (max-width: 767px) {
+  .review-report { padding: 16px; }
+  .review-report li > label { min-height: 44px; }
+  .review-send-actions button, .review-past button { min-height: 44px; }
+  .review-send-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-send-actions button:last-child { grid-column: 1 / -1; }
+}
+
+.review-jira-lines { padding: 0; list-style: none; }
+.review-jira-lines label { display: flex; align-items: center; min-height: 44px; gap: 12px; padding: 4px 0; cursor: pointer; }
+
+.review-past-label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.review-past-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; }

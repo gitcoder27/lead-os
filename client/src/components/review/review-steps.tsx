@@ -6,6 +6,7 @@ import { ReviewLookBackStep } from './ReviewLookBackStep';
 import { ReviewLooseEndsStep } from './ReviewLooseEndsStep';
 import { ReviewNextWeekStep } from './ReviewNextWeekStep';
 import { peopleNeedingYou, ReviewPeopleStep } from './ReviewPeopleStep';
+import { ReviewSendStep } from './ReviewSendStep';
 import { ReviewWaitingStep } from './ReviewWaitingStep';
 
 export type ReviewStepEntry = ReviewStepDef & { Component: ComponentType<{ ctx: ReviewStepContext }> };
@@ -135,4 +136,9 @@ export const NEXT_WEEK_STEP: ReviewStepEntry = {
  * The steps the review currently has, in order. Later steps (Waiting, Loose ends, People, Next
  * week, Send update) each add their entry here, so every commit ships a working review.
  */
-export const REVIEW_STEPS: ReviewStepEntry[] = [LOOK_BACK_STEP, WAITING_STEP, LOOSE_ENDS_STEP, PEOPLE_STEP, NEXT_WEEK_STEP];
+export const SEND_STEP: ReviewStepEntry = {
+  id: 'send', label: 'Send update', heading: 'Your weekly update', summary: () => '', count: () => null,
+  keys: [['j / k', 'Next / previous line'], ['x', 'Include or exclude a line'], ['y', 'Copy for Teams']],
+  Component: ReviewSendStep,
+};
+export const REVIEW_STEPS: ReviewStepEntry[] = [LOOK_BACK_STEP, WAITING_STEP, LOOSE_ENDS_STEP, PEOPLE_STEP, NEXT_WEEK_STEP, SEND_STEP];

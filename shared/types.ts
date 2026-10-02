@@ -1363,7 +1363,7 @@ export interface TaskSignals {
   actions?: { done: number; total: number };
 }
 
-export type TaskViewTask = ManagerTask & { signals: TaskSignals };
+export type TaskViewTask = ManagerTask & { signals: TaskSignals; oneOnOne?: true };
 
 export interface TaskViewTasksResponse {
   tasks: TaskViewTask[];
@@ -3106,6 +3106,7 @@ export interface TestAiAssistantConfigResponse {
 export type WeeklyReviewSectionId =
   | "closed"
   | "quiet"
+  | "blocked"
   | "slipped"
   | "inbox"
   | "undated"
@@ -3166,7 +3167,7 @@ interface WeeklyReviewSectionBase {
   status: WeeklyReviewSourceStatus;
 }
 
-export type WeeklyReviewTaskSectionId = "closed" | "quiet" | "slipped" | "inbox" | "undated" | "laterNextWeek" | "plannedNextWeek";
+export type WeeklyReviewTaskSectionId = "closed" | "quiet" | "blocked" | "slipped" | "inbox" | "undated" | "laterNextWeek" | "plannedNextWeek";
 
 /** One task section per id (distributed, so `Extract<WeeklyReviewSection, { id: "closed" }>` works). */
 type WeeklyReviewTaskSection<Id extends WeeklyReviewTaskSectionId = WeeklyReviewTaskSectionId> = Id extends WeeklyReviewTaskSectionId
@@ -3197,6 +3198,22 @@ export interface WeeklyReviewPin {
   oneOnOne?: true;
 }
 
+export interface WeeklyReviewJiraIssue {
+  key: string;
+  summary: string;
+  priority: string;
+  openDays: number;
+}
+
+export interface WeeklyReviewJira {
+  status: WeeklyReviewSourceStatus;
+  /** null until a visible issue has a known resolution date. */
+  resolved: number | null;
+  opened: number;
+  topResolved: WeeklyReviewJiraIssue[];
+  criticalOpen: WeeklyReviewJiraIssue[];
+}
+
 export interface WeeklyReviewResponse {
   /** The manager's local day the review was built for. */
   today: string;
@@ -3216,6 +3233,8 @@ export interface WeeklyReviewResponse {
   sections: WeeklyReviewSection[];
   /** The tasks already pinned for `nextWorkday` (still open and mine), in pin order. */
   nextWorkdayTop3: WeeklyReviewPin[];
+  /** Absent when Jira is not connected; no network calls during a review. */
+  jira?: WeeklyReviewJira;
   /** The manager's saved progress for this week (docs/59 §9); null until something was saved. */
   saved: WeeklyReviewSavedState | null;
 }

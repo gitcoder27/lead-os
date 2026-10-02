@@ -67,12 +67,15 @@ describe("GET /api/review/week", () => {
     const headers = { cookie: await cookie("manager-a") };
     const manager = { type: "manager" as const, accountId: (await auth.authenticate("manager-a", "secret123")).user.accountId, workspaceId: "default" };
     await new TaskService().create({ title: "Slipped long ago", ownerType: "manager", ownerId: manager.accountId, scheduledOn: "2020-01-01" } as never, manager);
+    await new TaskService().create({ title: "Fresh blocker", ownerType: "manager", ownerId: manager.accountId, status: "blocked" }, manager);
     const response = await invoke(app, { method: "GET", url: "/api/review/week?week=2026-10-01&tz=UTC", headers });
     expect(response.status).toBe(200);
     expect(response.body.range).toEqual({ start: "2026-09-28", end: "2026-10-04", nextStart: "2026-10-05", nextEnd: "2026-10-11" });
     expect(response.body.timeZone).toBe("UTC");
     const ids = response.body.sections.map((entry: { id: string }) => entry.id);
-    expect(ids).toEqual(["closed", "quiet", "slipped", "inbox", "undated", "laterNextWeek", "plannedNextWeek", "oneOnOnes", "people"]);
+    expect(ids).toEqual(["closed", "quiet", "blocked", "slipped", "inbox", "undated", "laterNextWeek", "plannedNextWeek", "oneOnOnes", "people"]);
+    const blocked = response.body.sections.find((entry: { id: string }) => entry.id === "blocked");
+    expect(blocked.rows.map((row: { title: string }) => row.title)).toEqual(["Fresh blocker"]);
     const slipped = response.body.sections.find((entry: { id: string }) => entry.id === "slipped");
     expect(slipped.rows.map((row: { title: string }) => row.title)).toEqual(["Slipped long ago"]);
     expect(slipped.rows[0].signals.overdue).toBe(true);

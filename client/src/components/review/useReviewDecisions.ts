@@ -41,7 +41,7 @@ export function useReviewDecisions({
     const taskKey = row.taskKey;
     if (busy.current.has(taskKey)) return;
     busy.current.add(taskKey);
-    setDecisions((current) => new Map(current).set(taskKey, { taskKey, row, choice }));
+    setDecisions((current) => new Map(current).set(taskKey, { taskKey, row, choice, pending: true }));
     stack.current.push(taskKey);
     patch({ decisions: { [taskKey]: choice.action } });
     announce(`${choice.announce} Press z to undo.`);
@@ -49,6 +49,7 @@ export function useReviewDecisions({
       busy.current.delete(taskKey);
       if (receipt) {
         receipts.current.set(taskKey, receipt);
+        setDecisions((current) => new Map(current).set(taskKey, { taskKey, row, choice, pending: false, acknowledged: receipt.tasks.find((task) => task.taskKey === taskKey) }));
         return;
       }
       clear(taskKey);

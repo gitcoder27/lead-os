@@ -22,6 +22,7 @@ export interface JiraIssue {
     duedate?: string | null;
     created?: string;
     updated?: string;
+    resolutiondate?: string | null;
     customfield_10021?: Array<{ id?: string }> | null;
     [key: string]: unknown;
   };

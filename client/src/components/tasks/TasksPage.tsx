@@ -1,3 +1,4 @@
+import { csvFileName, downloadCsv, tasksCsv } from '@/lib/csv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -856,6 +857,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           labels={labelRegistry}
           isSavedView={Boolean(savedSelected)}
           hasOverrides={overridesActive}
+          onExport={() => downloadCsv(tasksCsv(baseGroups.flatMap((group) => group.tasks), ownerName, today), csvFileName('tasks', selectedId, today))}
+          canExport={Boolean(tasks.data) && !tasks.isPlaceholderData}
           onSaveView={handleSaveView}
           saving={saveView.isPending}
           canSave={Boolean(definition)}

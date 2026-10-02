@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS issues (
   flagged         INTEGER DEFAULT 0,
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL,
+  resolved_at     TEXT,
   synced_at       TEXT NOT NULL,
   last_seen_in_scoped_sync_at TEXT,
   last_reconciled_at TEXT,
@@ -693,6 +694,7 @@ CREATE INDEX IF NOT EXISTS idx_manager_desk_links_workspace_developer_account_id
 `;
 
 const alterStatements = [
+  "ALTER TABLE issues ADD COLUMN resolved_at TEXT",
   "ALTER TABLE issues ADD COLUMN aspen_severity TEXT",
   "ALTER TABLE issues ADD COLUMN development_due_date TEXT",
   "ALTER TABLE issues ADD COLUMN analysis_notes TEXT",
@@ -1023,6 +1025,7 @@ const workspaceKeyRebuilds: RebuildSpec[] = [
       "flagged",
       "created_at",
       "updated_at",
+      "resolved_at",
       "synced_at",
       "last_seen_in_scoped_sync_at",
       "last_reconciled_at",
@@ -1068,6 +1071,7 @@ const workspaceKeyRebuilds: RebuildSpec[] = [
         flagged         INTEGER NOT NULL DEFAULT 0,
         created_at      TEXT NOT NULL,
         updated_at      TEXT NOT NULL,
+        resolved_at     TEXT,
         synced_at       TEXT NOT NULL,
         last_seen_in_scoped_sync_at TEXT,
         last_reconciled_at TEXT,

@@ -1,3 +1,4 @@
+import { oneOnOneTaskIds } from "./one-on-one-tasks";
 import { and, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
@@ -434,7 +435,7 @@ export class TaskViewsService {
    * Execute a validated view definition — batched link/event lookups, no per-row scans. `tz` is the
    * manager's IANA zone: deadlines and timestamps are bucketed on their day, not the server's.
    */
-  async run(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string): Promise<TaskViewTask[]> {
+  async run(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string, agendaTaskIds?: ReadonlySet<number>): Promise<TaskViewTask[]> {
     const principal = await this.withSelf(viewer);
     const matched = await this.evaluate(principal, definition, today, tz);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
@@ -455,7 +456,8 @@ export class TaskViewsService {
     }
     const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, tz);
     const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
-    return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)! }));
+    const agendaIds = agendaTaskIds ?? await oneOnOneTaskIds(principal.workspaceId);
+    return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)!, ...(agendaIds.has(dto.id) && { oneOnOne: true as const }) }));
   }
 
   /** How many tasks a definition matches, without building DTOs. */

@@ -1,3 +1,4 @@
+import { csvFileName, downloadCsv, workCsv } from '@/lib/csv';
 import { useMemo, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -28,7 +29,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
-import { isOverdue, isDueToday } from '@/lib/utils';
+import { isOverdue, isDueToday, getLocalIsoDate } from '@/lib/utils';
 import type { Issue, FilterType } from '@/types';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { JiraNotConnectedState, NothingSyncedState, ProjectCleanState } from './DefectEmptyStates';
@@ -832,6 +833,7 @@ export function DefectTable({
       </div>
 
       <div className="flex items-center justify-end gap-1.5 min-w-0 md:min-w-[260px]">
+        <button type="button" className="ui-btn-ghost" aria-label="Export CSV" disabled={!filteredIssues.length} onClick={() => downloadCsv(workCsv(table.getRowModel().rows.map((row) => row.original)), csvFileName('work', 'current', getLocalIsoDate()))}>CSV</button>
         <button
           type="button"
           onClick={handleClearFilters}

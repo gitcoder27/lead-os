@@ -417,10 +417,15 @@ Depends on P1. Items are independent (`parallel-ok`).
 
 ---
 
+## Application review
+
+- [x] **REVIEW-65** Review current UI/UX, functionality and ease of use; publish concise findings in [docs/65](65-application-experience-review.md). Documentation only; recommendations do not authorize backlog implementation.
+
 ## Progress log
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
+| 2026-10-02 | REVIEW-65 | main (same commit) | Codex | Current-code review plus isolated read-only frontend fixtures on desktop/mobile. Prioritized trust repairs, Team/person context, weekly reporting and staged Jira improvements. 505 selected client tests, 96 server tests, typecheck and build:check passed. No runtime data, Jira, push or deploy. |
 | 2026-09-30 | P1-07 follow-up: docs/62 | main (uncommitted) | Copilot | Trust and simplification update: owned drafts, acknowledged visits, immutable seal/archive retries, stable follow-up identity, per-person feed bounds, manager timezone, accessible shell and reduced bookkeeping. Tests cover recovery and role boundaries; implementation decisions and manual-validation limits are in [docs/50](50-standup-mode-redesign-spec.md#2026-09-30-trust-and-simplification-update). Browser checks left to the user; no runtime/Jira/production changes. |
 | 2026-09-29 | P0-V1, P0-V2, P0-V3 | (read-only, no branch) | Sonnet | V1 found a leak: added P0-S5. V2 shapes P1-02. V3: stage 2c and phase 3 on in dev and prod. |
 | 2026-09-29 | P0-S4 | task/p0-s4-error-boundary | Sonnet | Root error boundary, guarded reload on `vite:preloadError` and lazy-chunk errors (30s sessionStorage guard). |

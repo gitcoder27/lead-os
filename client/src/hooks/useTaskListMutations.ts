@@ -1,3 +1,4 @@
+import { invalidateTaskViewCounts } from '@/lib/task-count-invalidation';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
@@ -45,19 +46,11 @@ interface GuardedItem extends TaskChangeItem {
   expected?: TaskExpectedState;
 }
 
-// docs/51 P1: counts aggregate across every view and re-run heavier queries —
-// debounce them (~500ms trailing) so rapid bulk edits trigger one recount.
-let countsTimer: ReturnType<typeof setTimeout> | null = null;
-
-export function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
+export function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>, scope: string) {
   for (const key of ['tasks', 'task-detail', 'task-events', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
     qc.invalidateQueries({ queryKey: [key] });
   }
-  if (countsTimer) clearTimeout(countsTimer);
-  countsTimer = setTimeout(() => {
-    countsTimer = null;
-    void qc.invalidateQueries({ queryKey: ['task-view-counts'] });
-  }, 500);
+  invalidateTaskViewCounts(qc, scope);
 }
 
 const listShape: CacheShape<TaskViewTasksResponse> = {
@@ -106,7 +99,7 @@ export function useTaskListMutations() {
           rollback();
           throw error;
         } finally {
-          if (scopeRef.current === scope) invalidateTaskSurfaces(qc);
+          if (scopeRef.current === scope) invalidateTaskSurfaces(qc, scope);
         }
       });
     } finally {

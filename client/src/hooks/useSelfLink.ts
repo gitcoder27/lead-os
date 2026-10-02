@@ -26,7 +26,7 @@ export function useSetSelfLink() {
     mutationFn: (developerAccountId: string | null) => api.put<TeamSelfLink>('/team/self', { developerAccountId }),
     onSuccess: (link) => {
       qc.setQueryData(['team-self', authScopeKey], link);
-      invalidateTaskSurfaces(qc);
+      invalidateTaskSurfaces(qc, authScopeKey);
     },
   });
 }

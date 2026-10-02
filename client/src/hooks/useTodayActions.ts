@@ -1,3 +1,4 @@
+import { useAuthScopeKey } from '@/context/AuthContext';
 import { useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -59,6 +60,7 @@ type PendingUndo = { undos: ManagerActionUndo[]; title: string; expiresAt: numbe
 
 export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) {
   const qc = useQueryClient();
+  const scope = useAuthScopeKey();
   const { addToast } = useToast();
   // docs/53 U4: `z` undoes the most recent write still inside its window.
   const undoStack = useRef<PendingUndo[]>([]);
@@ -67,12 +69,12 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
   // same row rejoins the first write instead of sending it again.
   const inFlight = useRef(new Map<string, Promise<unknown>>());
 
-  const invalidateToday = () => {
+  const invalidateToday = useCallback(() => {
     // Task writes also change Tasks lists, drawers, event history and view counts.
-    invalidateTaskSurfaces(qc);
+    invalidateTaskSurfaces(qc, scope);
     qc.invalidateQueries({ queryKey: ['manager-actions'] });
     qc.invalidateQueries({ queryKey: ['daily-notes'] });
-  };
+  }, [qc, scope]);
 
   const snapshotToday = (): TodaySnapshot => qc.getQueriesData<TodayResponse>({ queryKey: ['today', date] });
   const restoreToday = (snapshot: TodaySnapshot) => {
@@ -327,7 +329,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     } finally {
       invalidateToday();
     }
-  }, [addToast, date, qc]);
+  }, [addToast, date, qc, invalidateToday]);
 
   function offerUndo(undos: ManagerActionUndo[], title: string) {
     if (undos.length === 0) {

@@ -65,6 +65,24 @@ beforeEach(() => {
 });
 
 describe('useTaskListMutations (docs/49 R7)', () => {
+  it('recounts the scoped rail after bulk completion and successful Undo', async () => {
+    vi.useFakeTimers();
+    const { client, result } = setup();
+    const countKey = ['task-view-counts', 'scope', '2026-09-26'];
+    client.setQueryData(countKey, { counts: {} });
+    mockPost.mockResolvedValueOnce({ tasks: [task({ status: 'done' })] }).mockResolvedValueOnce({ tasks: [ONE] });
+    try {
+      let receipt: Awaited<ReturnType<typeof result.current.applyWithReceipt>> = null;
+      await act(async () => { receipt = await result.current.applyWithReceipt([{ task: ONE, changes: { status: 'done' } }], { label: 'Done', undoable: false }); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(client.getQueryState(countKey)?.isInvalidated).toBe(true);
+      client.setQueryData(countKey, { counts: {} });
+      await act(async () => { expect(await receipt!.undo()).toBe('undone'); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+      expect(client.getQueryState(countKey)?.isInvalidated).toBe(true);
+    } finally { client.clear(); vi.useRealTimers(); }
+  });
+
   it('patches cached rows optimistically and posts per-task changes with the pre-action values as a guard', async () => {
     const write = deferred();
     mockPost.mockReturnValue(write.promise);

@@ -7,6 +7,7 @@ import { useTodayActions } from '@/hooks/useTodayActions';
 import type { TodayActionCommand, TodayActionItem, TodayActionTarget, TodayPromiseItem, TodayResponse } from '@/types';
 
 const mockPost = vi.fn();
+vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'scope' }));
 vi.mock('@/lib/api', () => ({ api: { post: (...args: unknown[]) => mockPost(...args), get: vi.fn() } }));
 
 const DATE = '2026-03-08';

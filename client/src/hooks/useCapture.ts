@@ -1,3 +1,4 @@
+import { useTaskCountInvalidation } from '@/lib/task-count-invalidation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { parseCapture, type CaptureDefaults, type CaptureDiagnostic, type CaptureRequestBody, type CaptureResponseBody } from 'shared/capture-grammar';
 import type { ManagerTask } from '@/types';
@@ -12,9 +13,13 @@ export const postCapture = (body: CaptureRequestBody) => api.post<CaptureRespons
 
 export function useCapture() {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
     mutationFn: postCapture,
-    onSuccess: () => {
+    onMutate: counts.submittedScope,
+    onSuccess: (response, _variables, scope) => {
+      if (response.blocked || response.confirmRequired) return;
+      counts.recount(scope);
       for (const key of ['tasks', 'task-detail', 'task-events', 'task-resolution', 'today', 'manager-desk', 'team-tracker', 'my-day', 'daily-notes', 'workload']) {
         qc.invalidateQueries({ queryKey: [key] });
       }

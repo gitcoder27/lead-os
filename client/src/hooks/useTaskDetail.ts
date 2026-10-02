@@ -1,3 +1,4 @@
+import { useTaskCountInvalidation } from '@/lib/task-count-invalidation';
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
@@ -86,8 +87,10 @@ export function useUpdateTaskDetail(taskKey: string | undefined) {
   const { user } = useAuth();
   const scope = useAuthScopeKey();
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   const isDeveloper = user?.role === 'developer';
   return useMutation({
+    onMutate: counts.submittedScope,
     mutationFn: (updates: UpdateTaskRequest) =>
       taskWrites(qc, scope).run(taskKey ? [taskKey] : [], async () => {
         const text = Object.fromEntries(OPTIMISTIC_FIELDS.filter((field) => field in updates).map((field) => [field, updates[field]]));
@@ -109,31 +112,38 @@ export function useUpdateTaskDetail(taskKey: string | undefined) {
           throw error;
         }
       }),
+    onSuccess: (_data, _variables, scope) => counts.recount(scope),
     onSettled: () => invalidateTaskDetailSurfaces(qc, taskKey),
   });
 }
 
 export function useDeleteTaskDetail(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: counts.submittedScope,
     mutationFn: () => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}`),
-    onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
   });
 }
 
 export function useAddTaskDetailLink(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: counts.submittedScope,
     mutationFn: (input: { kind: TaskLink['kind']; ref: string; role?: TaskLink['role'] }) =>
       api.post<TaskLink>(`/tasks/${encodeURIComponent(taskKey!)}/links`, input),
-    onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
   });
 }
 
 export function useRemoveTaskDetailLink(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: counts.submittedScope,
     mutationFn: (linkId: number) => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}/links/${linkId}`),
-    onSuccess: () => invalidateTaskDetailSurfaces(qc, taskKey),
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
   });
 }

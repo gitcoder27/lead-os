@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, getAuthScopeKey, useAuth } from '@/context/AuthContext';
 import { readDailyNoteDraft, writeDailyNoteDraft } from '@/lib/daily-note-drafts';
+import { authEpoch } from '@/lib/auth-epoch';
 import type { AuthUser } from '@/types';
 
 const apiMocks = vi.hoisted(() => ({
@@ -84,6 +85,7 @@ describe('AuthProvider cache isolation', () => {
 
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
     await waitFor(() => expect(queryClient.getQueryCache().getAll()).toHaveLength(0));
+    expect(authEpoch(queryClient)).toBeGreaterThan(0);
   });
 
   it('clears React Query cache when logout returns to anonymous', async () => {
@@ -122,9 +124,11 @@ describe('AuthProvider cache isolation', () => {
   });
   it.each(['logout failure', 'session loss', 'scope change'])('clears task drafts on %s and refuses late completion', async (action) => {
     clearTaskUpdateDraftsForScope(getAuthScopeKey(managerA));
-    renderAuthProbe(createQueryClient());
+    const queryClient = createQueryClient();
+    renderAuthProbe(queryClient);
     fireEvent.click(screen.getByText('Login'));
     await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+    const epoch = authEpoch(queryClient);
     const scope = getAuthScopeKey(managerA);
     const key = `${taskUpdateDraftPrefix(scope, 'manager', 'task_drawer')}T-1`;
     const generation = taskDraftGeneration(scope, key);
@@ -135,6 +139,7 @@ describe('AuthProvider cache isolation', () => {
       fireEvent.click(screen.getByText('Logout'));
       // Cleanup begins even before the failed logout response.
       expect(readTaskUpdateDraft(key).body).toBe('');
+      expect(authEpoch(queryClient)).toBeGreaterThan(epoch);
       await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
     } else if (action === 'session loss') {
       fireEvent.click(screen.getByText('Refresh session'));
@@ -145,6 +150,7 @@ describe('AuthProvider cache isolation', () => {
       await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-b'));
     }
     expect(readTaskUpdateDraft(key).body).toBe('');
+    expect(authEpoch(queryClient)).toBeGreaterThan(epoch);
     expect(completeTaskUpdateDraft(scope, key, draft, generation)).toBe(false);
     writeTaskUpdateDraft(scope, key, draft, generation);
     expect(readTaskUpdateDraft(key).body).toBe('');

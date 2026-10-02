@@ -68,6 +68,8 @@ export function prefetchMyDayTaskEvents(qc: ReturnType<typeof useQueryClient>, a
 }
 
 function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['task-inbox'] });
+  qc.invalidateQueries({ queryKey: ['task-inbox-event'] });
   qc.invalidateQueries({ queryKey: ['task-events'] });
   qc.invalidateQueries({ queryKey: ['team-tracker'] });
   qc.invalidateQueries({ queryKey: ['my-day'] });

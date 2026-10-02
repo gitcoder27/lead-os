@@ -61,7 +61,7 @@ export function usePrefetchTaskDetail() {
 }
 
 function invalidateTaskDetailSurfaces(qc: ReturnType<typeof useQueryClient>, taskKey?: string) {
-  for (const key of ['task-detail', 'tasks', 'task-events', 'task-resolution', 'manager-desk', 'team-tracker', 'my-day', 'today', 'workload']) {
+  for (const key of ['task-detail', 'tasks', 'task-events', 'task-inbox', 'task-inbox-event', 'task-resolution', 'manager-desk', 'team-tracker', 'my-day', 'today', 'workload']) {
     qc.invalidateQueries({ queryKey: [key] });
   }
   if (taskKey) qc.invalidateQueries({ queryKey: ['task-detail'], exact: false });

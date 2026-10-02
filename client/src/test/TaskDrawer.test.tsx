@@ -158,6 +158,15 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.getByRole('textbox', { name: /Add an update to/ })).toBeTruthy();
   });
 
+  it.each(['45', '-1'])('keeps only a valid exact-event target when normalizing an alias (%s)', (eventId) => {
+    window.history.replaceState(null, '', `/t/T-6?event=${eventId}`);
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-6" fullPage onBack={vi.fn()} onNavigateTask={vi.fn()} />);
+    expect(window.location.pathname).toBe('/t/T-7');
+    expect(window.location.search).toBe(eventId === '45' ? '?event=45' : '');
+    window.history.replaceState(null, '', '/');
+  });
+
   it('hides tracking, labels and private controls for developer principals', () => {
     mockUser.mockReturnValue({ accountId: 'u-dev', role: 'developer', developerAccountId: 'dev-1' });
     const task = {

@@ -1,3 +1,4 @@
+import { createTaskInboxRouter } from "./routes/task-inbox";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import path from "node:path";
@@ -28,7 +29,7 @@ import { createPreferencesRouter } from "./routes/preferences";
 import { createWorkSavedViewsRouter } from "./routes/work";
 import { createAssistantRouter } from "./routes/assistant";
 import type { AssistantService } from "./assistant/service";
-import { requireInstallManager, requireManager } from "./middleware/auth";
+import { requireAuth, requireInstallManager, requireManager } from "./middleware/auth";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { AlertService } from "./services/alert.service";
 import { AutomationService } from "./services/automation.service";
@@ -169,6 +170,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     res.json({ status: "ok" });
   });
 
+  app.use("/api/task-inbox", requireAuth(services.authService), createTaskInboxRouter());
   app.use("/api/issues", requireManager(services.authService),
     clearTodayCacheOnWrite, createIssuesRouter(services.issueService),);
   app.use("/api/overview", requireManager(services.authService), createOverviewRouter(services.issueService));

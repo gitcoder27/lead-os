@@ -333,7 +333,7 @@ export class TaskService {
   }
 
   private async emit(row: TaskRow, input: Omit<TaskEventInput, "taskKey" | "workspaceId" | "taskId">, principal: TaskPrincipal): Promise<void> {
-    await this.events.append({ ...input, taskId: row.id, taskKey: row.taskKey, workspaceId: row.workspaceId } as TaskEventInput, { type: "system", accountId: principal.accountId });
+    await this.events.append({ ...input, taskId: row.id, taskKey: row.taskKey, workspaceId: row.workspaceId } as TaskEventInput, { type: "system", accountId: principal.accountId, originType: principal.type });
   }
 
   private async focus(row: TaskRow, date = todayIsoDate()): Promise<void> {

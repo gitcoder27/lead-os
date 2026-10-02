@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql } from "drizzle-orm";
+import { deliverTaskEvent } from "./task-inbox-delivery";
+import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
-import { appUsers, taskEvents, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
+import { appUsers, taskEvents, taskInbox, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -40,9 +41,10 @@ export type TaskEventInput = z.input<typeof eventSchema> & {
   sourceTable?: string;
   sourceId?: number;
 };
-export type TaskEventActor = { type: "manager" | "developer" | "copilot" | "system"; accountId?: string };
+export type TaskEventActor = { originType?: "manager" | "developer" | "copilot" | "system"; type: "manager" | "developer" | "copilot" | "system"; accountId?: string };
 export type TaskViewer = { kind: "manager" | "developer"; accountId: string; workspaceId?: string };
-type EventRow = typeof taskEvents.$inferSelect;
+export type EventRow = typeof taskEvents.$inferSelect;
+export interface TaskInboxScope { workspaceId: string; recipientId: number; taskAccess: SQL | undefined }
 
 function mapEvent(row: EventRow): TaskEvent {
   const base: TaskEvent = {
@@ -125,6 +127,7 @@ export class TaskEventsService {
         sourceTable: input.sourceTable ?? null, sourceId: input.sourceId ?? null, dedupeKey,
         occurredAt: input.occurredAt ?? now, createdAt: now,
       }).returning();
+      await deliverTaskEvent(rows[0]!, actor.originType ?? actor.type, () => this.hasPrivateAgendaOrigin(rows[0]!.taskId, workspaceId));
       return { event: mapEvent(rows[0]!), replayed: false };
     });
   }
@@ -257,26 +260,82 @@ export class TaskEventsService {
   async changeVisibility(key: string, id: number, accountId: string, visibility: TaskEventVisibility, workspaceId?: string): Promise<TaskEvent> {
     const event = await this.get(id, { kind: "manager", accountId, workspaceId });
     if (await this.keys.resolve(normalizeWorkspaceId(workspaceId), event.taskKey) !== await this.keys.resolve(normalizeWorkspaceId(workspaceId), key) || event.author.id !== accountId || event.redacted || !(["update", "instruction", "decision", "blocker"] as string[]).includes(event.type) || !(["manager", "copilot"] as string[]).includes(event.author.type) || (event.meta && typeof event.meta === "object" && ("imported" in event.meta || ("via" in event.meta && event.meta.via === "context_note_field")))) throw new HttpError(403, "Visibility cannot be changed");
-    const rows = await db.update(taskEvents).set({ visibility }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.id, id))).returning();
-    return mapEvent(rows[0]!);
+    return runInTransaction(async () => {
+      const rows = await db.update(taskEvents).set({ visibility }).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.id, id))).returning();
+      if (visibility === "shared") await deliverTaskEvent(rows[0]!, event.author.type, () => this.hasPrivateAgendaOrigin(rows[0]!.taskId, normalizeWorkspaceId(workspaceId)));
+      return mapEvent(rows[0]!);
+    });
   }
 
   async pruneOrphans(workspaceId: string, all = false): Promise<void> {
     const scope = normalizeWorkspaceId(workspaceId);
     if (all) {
+      await db.delete(taskInbox).where(eq(taskInbox.workspaceId, scope));
       await db.delete(taskEvents).where(eq(taskEvents.workspaceId, scope));
       return;
     }
     await db.delete(taskEvents).where(and(eq(taskEvents.workspaceId, scope), sql`NOT EXISTS (SELECT 1 FROM team_tracker_items ti WHERE ti.workspace_id = ${scope} AND ti.task_key = ${taskEvents.taskKey})`, sql`NOT EXISTS (SELECT 1 FROM manager_desk_items di WHERE di.workspace_id = ${scope} AND di.task_key = ${taskEvents.taskKey})`));
+    await this.pruneInbox(scope);
   }
 
   async deletePrivateForAuthor(workspaceId: string, accountId: string): Promise<number> {
     const deleted = await db.delete(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.visibility, "private"), eq(taskEvents.authorId, accountId))).returning({ id: taskEvents.id });
+    await this.pruneInbox(workspaceId);
     return deleted.length;
   }
 
   async deleteForTasks(workspaceId: string, taskIds: number[]): Promise<void> {
     if (taskIds.length) await db.delete(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds)));
+    await this.pruneInbox(workspaceId);
+  }
+
+  private async pruneInbox(workspaceId: string): Promise<void> {
+    await db.delete(taskInbox).where(and(eq(taskInbox.workspaceId, normalizeWorkspaceId(workspaceId)), sql`NOT EXISTS (SELECT 1 FROM task_events e WHERE e.workspace_id = ${taskInbox.workspaceId} AND e.id = ${taskInbox.eventId})`));
+  }
+
+  private async hasPrivateAgendaOrigin(taskId: number | null, workspaceId: string): Promise<boolean> {
+    if (!taskId) return false;
+    const rows = await db.select({ id: taskEvents.id }).from(taskEvents).where(and(
+      eq(taskEvents.workspaceId, workspaceId), eq(taskEvents.taskId, taskId), eq(taskEvents.type, "created"),
+      sql`json_extract(${taskEvents.metaJson}, '$.source') = 'one_on_one'`
+    )).limit(1);
+    return rows.length > 0;
+  }
+
+  // The inbox projects canonical events through this owner, preserving the event-table boundary.
+  private inboxVisible(scope: TaskInboxScope) {
+    return and(
+      eq(taskInbox.workspaceId, scope.workspaceId), eq(taskInbox.recipientUserId, scope.recipientId),
+      eq(taskEvents.workspaceId, scope.workspaceId), eq(tasks.workspaceId, scope.workspaceId),
+      eq(taskEvents.visibility, "shared"), isNull(taskEvents.redactedAt), isNull(tasks.deletedAt), scope.taskAccess,
+      sql`NOT EXISTS (SELECT 1 FROM one_on_one_agenda_items a WHERE a.workspace_id = ${scope.workspaceId} AND a.task_id = ${tasks.id})`,
+      sql`NOT EXISTS (SELECT 1 FROM task_events created WHERE created.workspace_id = ${scope.workspaceId} AND created.task_id = ${tasks.id} AND created.type = 'created' AND json_extract(created.meta_json, '$.source') = 'one_on_one')`
+    );
+  }
+
+  private inboxQuery() {
+    return db.select({ delivery: taskInbox, event: taskEvents, task: tasks }).from(taskInbox)
+      .innerJoin(taskEvents, eq(taskEvents.id, taskInbox.eventId)).innerJoin(tasks, eq(tasks.id, taskEvents.taskId));
+  }
+
+  async inboxPage(scope: TaskInboxScope, options: { limit: number; cursor?: number; unreadOnly?: boolean }) {
+    const visible = this.inboxVisible(scope);
+    const [count] = await db.select({ value: sql<number>`count(*)` }).from(taskInbox)
+      .innerJoin(taskEvents, eq(taskEvents.id, taskInbox.eventId)).innerJoin(tasks, eq(tasks.id, taskEvents.taskId))
+      .where(and(visible, isNull(taskInbox.readAt)));
+    const rows = await this.inboxQuery().where(and(visible,
+      options.unreadOnly ? isNull(taskInbox.readAt) : undefined, options.cursor ? lt(taskInbox.id, options.cursor) : undefined
+    )).orderBy(desc(taskInbox.id)).limit(options.limit + 1);
+    return { rows, unreadCount: count?.value ?? 0 };
+  }
+
+  async inboxDeliveries(scope: TaskInboxScope, ids: number[]) {
+    return this.inboxQuery().where(and(this.inboxVisible(scope), inArray(taskInbox.id, ids)));
+  }
+
+  async inboxTarget(scope: TaskInboxScope, eventId: number, taskKey: string) {
+    const rows = await this.inboxQuery().where(and(this.inboxVisible(scope), eq(taskEvents.id, eventId), eq(tasks.taskKey, taskKey))).limit(1);
+    return rows[0];
   }
 
   async countPrivateForAuthor(workspaceId: string, accountId: string): Promise<number> {

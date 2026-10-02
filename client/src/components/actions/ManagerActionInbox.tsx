@@ -22,6 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useManagerActions } from '@/hooks/useManagerActions';
+import { useTaskInbox } from '@/hooks/useTaskInbox';
+import { TaskInboxContent } from './TaskInboxContent';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useAlerts, useDismissAlerts } from '@/hooks/useAlerts';
@@ -45,6 +47,8 @@ import { TodayTextCaptureDialog, type TodayCapturePreset } from '@/components/to
 interface ManagerActionInboxProps {
   date?: string;
   enabled?: boolean;
+  /** Today already owns the attention queue; only durable updates appear there. */
+  updatesOnly?: boolean;
   onOpenTarget: (target: ManagerActionTarget) => void;
   onViewChange: (view: AppView) => void;
 }
@@ -73,6 +77,7 @@ const iconByType: Record<TodayActionItemType, LucideIcon> = {
 export function ManagerActionInbox({
   date = getLocalIsoDate(),
   enabled = true,
+  updatesOnly = false,
   onOpenTarget,
   onViewChange,
 }: ManagerActionInboxProps) {
@@ -99,10 +104,10 @@ export function ManagerActionInbox({
     preset?: SnoozePreset;
     error?: string;
   } | null>(null);
-  // docs/53 U1: the inbox isn't rendered on `/` (Today is the inbox there),
-  // so it only ever reads /manager-actions.
-  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled });
-  const actionsData = managerActions.data;
+  const updates = useTaskInbox();
+  const unreadCount = updates.data?.pages[0]?.unreadCount ?? 0;
+  const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled: enabled && !updatesOnly });
+  const actionsData = updatesOnly ? undefined : managerActions.data;
   const actionsLoading = managerActions.isLoading;
   const actionsFetching = managerActions.isFetching;
   const actionsError = managerActions.isError;
@@ -119,11 +124,11 @@ export function ManagerActionInbox({
     );
     return tasksFromItems(devDay?.currentItem ? [devDay.currentItem] : undefined, devDay?.plannedItems);
   }, [checkInBoard.data, checkInDraft]);
-  const alertsQuery = useAlerts({ enabled });
+  const alertsQuery = useAlerts({ enabled: enabled && !updatesOnly });
   const dismissAlerts = useDismissAlerts();
 
   const signals = useMemo(() => {
-    const alerts = alertsQuery.data ?? [];
+    const alerts = updatesOnly ? [] : alertsQuery.data ?? [];
     const shownIssueKeys = new Set(actions.map((item) => item.target.issueKey).filter(Boolean));
     const shownDeveloperIds = new Set(actions.map((item) => item.target.developerAccountId).filter(Boolean));
     return alerts.filter(
@@ -131,8 +136,8 @@ export function ManagerActionInbox({
         (alert.issueKey ? !shownIssueKeys.has(alert.issueKey) : true) &&
         (alert.developerAccountId ? !shownDeveloperIds.has(alert.developerAccountId) : true)
     );
-  }, [actions, alertsQuery.data]);
-  const attentionCount = urgentCount + signals.length;
+  }, [actions, alertsQuery.data, updatesOnly]);
+  const attentionCount = urgentCount + signals.length + unreadCount;
   const pendingTargetKey = useMemo(
     () => (actionRunner.isPending ? targetKey(actionRunner.pendingTarget) : undefined),
     [actionRunner.isPending, actionRunner.pendingTarget],
@@ -286,19 +291,21 @@ export function ManagerActionInbox({
       document.body,
     );
 
+  if (updatesOnly && !updates.enabled) return null;
+
   return (
     <>
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
-            className="relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-elevated)]"
+            className="task-inbox-trigger relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-elevated)]"
             style={{
               background: open ? 'var(--bg-elevated)' : 'transparent',
               boxShadow: open ? 'var(--soft-shadow)' : 'none',
             }}
-            title={attentionCount > 0 ? `${attentionCount} need attention` : 'Manager actions'}
-            aria-label="Manager actions"
+            title={updatesOnly ? 'Updates' : attentionCount > 0 ? `${attentionCount} need attention` : 'Manager actions'}
+            aria-label={`${updatesOnly ? 'Updates' : 'Manager actions'}${unreadCount ? `, ${unreadCount} unread updates` : ''}${updates.isError ? ', updates unavailable' : ''}`}
           >
             {actionsFetching ? (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
@@ -321,6 +328,7 @@ export function ManagerActionInbox({
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
+            aria-label={updatesOnly ? 'Updates inbox' : 'Action inbox'}
             align="end"
             sideOffset={10}
             className="z-popover w-[min(calc(100vw-24px),430px)] rounded-lg border p-0 outline-none"
@@ -335,10 +343,10 @@ export function ManagerActionInbox({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Action inbox
+                    {updatesOnly ? 'Updates inbox' : 'Action inbox'}
                   </p>
                   <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
-                    {actionsLoading ? 'Syncing queue' : `${actionsData?.totalCount ?? 0} open`}
+                    {updatesOnly ? 'Changes to your team’s tasks' : actionsLoading ? 'Syncing queue' : `${actionsData?.totalCount ?? 0} open`}
                   </p>
                 </div>
                 <button
@@ -357,7 +365,8 @@ export function ManagerActionInbox({
             </div>
 
             <div className="max-h-[min(64vh,520px)] overflow-auto py-1.5">
-              {actionsLoading ? (
+              <TaskInboxContent onOpen={() => setOpen(false)} />
+              {!updatesOnly && (actionsLoading ? (
                 <InboxSkeleton />
               ) : (
                 <>
@@ -409,7 +418,7 @@ export function ManagerActionInbox({
                     </div>
                   ) : null}
                 </>
-              )}
+              ))}
             </div>
           </Popover.Content>
         </Popover.Portal>

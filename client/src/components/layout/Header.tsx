@@ -27,7 +27,7 @@ interface HeaderProps {
 
 export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenActionTarget, captureContext }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, features } = useAuth();
   const { openCapture, openCommandPalette } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
   const onWork = activeView === 'work';
@@ -191,9 +191,8 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
             )}
 
             <div className="flex items-center gap-1.5">
-              {/* docs/53 U1/P2: on `/` the page itself is the inbox. */}
-              {user?.role === 'manager' && onViewChange && activeView !== 'today' ? (
-                <ManagerActionInbox onOpenTarget={openActionTarget} onViewChange={onViewChange} />
+              {user?.role === 'manager' && onViewChange && (activeView !== 'today' || (features?.tasksPhase3 && features.teamMode === 'collab')) ? (
+                <ManagerActionInbox updatesOnly={activeView === 'today'} onOpenTarget={openActionTarget} onViewChange={onViewChange} />
               ) : null}
 
               {canQuickCapture && (

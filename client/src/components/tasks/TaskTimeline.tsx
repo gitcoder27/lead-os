@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import { useInboxTargetEvent } from '@/hooks/useTaskInbox';
 import {
   CalendarClock,
   ClipboardCheck,
@@ -273,7 +275,39 @@ export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
 const ACTION_BUTTON =
   'flex h-6 w-6 items-center justify-center rounded-md outline-none transition-opacity hover:bg-[var(--bg-tertiary)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--border-active)] group-hover/event:opacity-100 group-focus-within/event:opacity-100 [@media(hover:hover)]:opacity-0';
 
-export function TaskTimeline({ taskKey, mode, emptyLabel = 'No activity yet.', resolveName }: TaskTimelineProps) {
+export function TaskTimeline(props: TaskTimelineProps) {
+  const { user } = useAuth();
+  const requestedId = window.location.pathname === `/t/${encodeURIComponent(props.taskKey)}` ? new URLSearchParams(window.location.search).get('event') : null;
+  const eventId = requestedId && /^\d+$/.test(requestedId) && Number.isSafeInteger(Number(requestedId)) && Number(requestedId) > 0 ? Number(requestedId) : undefined;
+  const target = useInboxTargetEvent(props.taskKey, eventId);
+  const ref = useRef<HTMLElement>(null);
+  const focusedId = useRef<number>();
+  const reducedMotion = useReducedMotion();
+  const event = target.enabled && !target.isError ? target.data?.event : undefined;
+  const focusedLabel = event?.type === 'instruction' ? 'Instruction' : event?.type === 'update' ? 'Update' : event?.type === 'blocker' ? blockerAction(event) === 'cleared' ? 'Blocker cleared' : 'Blocker raised' : event?.type === 'created' || event?.type === 'assign' ? 'Assignment' : event ? EVENT_TYPE_LABELS[event.type] : '';
+  useEffect(() => {
+    if (!event || focusedId.current === event.id) return;
+    focusedId.current = event.id;
+    ref.current?.focus({ preventScroll: true });
+    ref.current?.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
+  }, [event, reducedMotion]);
+  return (
+    <>
+      {eventId && target.isLoading ? <p role="status">Opening update…</p> : null}
+      {eventId && target.enabled && target.isError ? <p role="alert">This update is unavailable. <button type="button" className="min-h-[44px] rounded-md px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]" onClick={() => void target.refetch()}>Retry</button></p> : null}
+      {event ? (
+        <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" style={{ borderColor: 'var(--accent)' }}>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
+          <p className="mb-2 mt-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
+          <EventBody text={eventDescription(event, props.resolveName) ?? ''} />
+        </section>
+      ) : null}
+      <TaskTimelineBody {...props} />
+    </>
+  );
+}
+
+function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', resolveName }: TaskTimelineProps) {
   const { user } = useAuth();
   const { addToast } = useToast();
   const managerQuery = useTaskEvents(taskKey, { enabled: mode === 'manager' });

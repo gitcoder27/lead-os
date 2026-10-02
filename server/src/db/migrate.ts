@@ -340,6 +340,20 @@ CREATE INDEX IF NOT EXISTS idx_task_events_workspace_key_time ON task_events(wor
 CREATE INDEX IF NOT EXISTS idx_task_events_workspace_author ON task_events(workspace_id, author_type, author_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_events_workspace_dedupe ON task_events(workspace_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
 
+-- No task/event content is copied; logical event refs survive canonical event table rebuilds.
+CREATE TABLE IF NOT EXISTS task_inbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL,
+  recipient_user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  event_id INTEGER NOT NULL,
+  actor_user_id INTEGER,
+  kind TEXT NOT NULL CHECK (kind IN ('assignment', 'instruction', 'reply', 'blocker', 'blocker_cleared')),
+  created_at TEXT NOT NULL,
+  read_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_task_inbox_delivery ON task_inbox(workspace_id, recipient_user_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_task_inbox_unread ON task_inbox(workspace_id, recipient_user_id, read_at, id);
+
 CREATE TABLE IF NOT EXISTS checkin_task_refs (
   workspace_id TEXT NOT NULL DEFAULT 'default',
   checkin_id INTEGER NOT NULL,

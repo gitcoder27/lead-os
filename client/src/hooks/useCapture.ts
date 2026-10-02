@@ -20,7 +20,7 @@ export function useCapture() {
     onSuccess: (response, _variables, scope) => {
       if (response.blocked || response.confirmRequired) return;
       counts.recount(scope);
-      for (const key of ['tasks', 'task-detail', 'task-events', 'task-resolution', 'today', 'manager-desk', 'team-tracker', 'my-day', 'daily-notes', 'workload']) {
+      for (const key of ['tasks', 'task-detail', 'task-events', 'task-inbox', 'task-inbox-event', 'task-resolution', 'today', 'manager-desk', 'team-tracker', 'my-day', 'daily-notes', 'workload']) {
         qc.invalidateQueries({ queryKey: [key] });
       }
     },

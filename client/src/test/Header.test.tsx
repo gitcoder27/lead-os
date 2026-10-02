@@ -300,6 +300,12 @@ describe('Header', () => {
     expect(screen.queryByTestId('manager-action-inbox')).not.toBeInTheDocument();
   });
 
+  it('shows only the durable inbox on Today in collaborative mode', () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, features: { tasksPhase3: true, teamMode: 'collab' } });
+    render(<Header activeView="today" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
+  });
+
   it('shows the capture button on all manager views including desk', () => {
     const views = ['today', 'work', 'team', 'desk', 'notes'] as const;
 

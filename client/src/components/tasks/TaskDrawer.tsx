@@ -182,7 +182,8 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
   // (P3-D3). Drawers are transient so they keep the requested key.
   useEffect(() => {
     if (fullPage && query.data && query.data.taskKey !== taskKey) {
-      navigateToTaskPage(query.data.taskKey, true);
+      const requested = Number(new URLSearchParams(window.location.search).get('event'));
+      navigateToTaskPage(query.data.taskKey, true, Number.isSafeInteger(requested) && requested > 0 ? requested : undefined);
     }
   }, [fullPage, query.data, taskKey]);
 

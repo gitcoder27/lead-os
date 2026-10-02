@@ -16,6 +16,7 @@ import type { MyDayReadOnlyReason, MyDayResponse } from '@/types';
 import { useMyDayHandlers } from './useMyDayHandlers';
 import { useMyDayShortcuts } from './useMyDayShortcuts';
 import { MyDayHeader } from './MyDayHeader';
+import { TaskInboxPopover } from '@/components/actions/TaskInboxPopover';
 import { MyDayInactiveBanner, MyDayReadOnlyBanner } from './MyDayInactiveBanner';
 import { StatusSelector } from './StatusSelector';
 import { QuickUpdates } from './QuickUpdates';
@@ -226,6 +227,7 @@ export function MyDayPage() {
       <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
         <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
           <MyDayHeader
+            inbox={<TaskInboxPopover />}
             date={date}
             setDate={setDate}
             user={user}

@@ -1,0 +1,105 @@
+.task-inbox-popover {
+  width: min(calc(100vw - 24px), 430px);
+  max-height: min(80vh, 620px);
+  overflow: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--overlay-shadow);
+}
+.task-inbox {
+  padding: 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.task-inbox-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.task-inbox h2 {
+  font-weight: 600;
+}
+.task-inbox-tabs {
+  display: flex;
+  gap: 4px;
+}
+.task-inbox button,
+.task-inbox-trigger {
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+.task-inbox button[aria-pressed='true'] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.task-inbox p {
+  padding: 12px 0;
+  color: var(--text-secondary);
+}
+.task-inbox ul {
+  list-style: none;
+  padding: 0;
+}
+.task-inbox li {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+.task-inbox li[data-unread='true'] {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+}
+.task-inbox a {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.task-inbox-meta,
+.task-inbox time {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.task-inbox a:hover,
+.task-inbox button:hover,
+.task-inbox-trigger:hover {
+  background: var(--bg-elevated);
+}
+.task-inbox button:disabled {
+  opacity: 0.5;
+}
+.task-inbox :is(button, a):focus-visible,
+.task-inbox-trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.task-inbox-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+}
+.task-inbox-trigger span {
+  position: absolute;
+  right: -5px;
+  top: -4px;
+  background: var(--danger);
+  color: var(--on-danger);
+  border-radius: 99px;
+  font-size: 11px;
+  padding: 1px 4px;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  .task-inbox button,
+  .task-inbox-trigger {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

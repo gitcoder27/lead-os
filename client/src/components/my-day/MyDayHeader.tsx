@@ -1,4 +1,5 @@
 import { ChevronRight, LogOut, RefreshCw, Sun, Moon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { AuthUser, MyDayResponse } from '@/types';
 import { getLocalIsoDate } from '@/lib/utils';
@@ -19,6 +20,7 @@ interface MyDayHeaderProps {
   onLogout: () => void;
   /** Narrow screens stack the check-in below the tasks; the status chip jumps there. */
   onJumpToCheckIn?: () => void;
+  inbox?: ReactNode;
 }
 
 function greeting(now = new Date()): string {
@@ -40,6 +42,7 @@ export function MyDayHeader({
   onToggleTheme,
   onLogout,
   onJumpToCheckIn,
+  inbox,
 }: MyDayHeaderProps) {
   const isToday = date === getLocalIsoDate();
   const firstName = user?.displayName?.trim().split(/\s+/)[0];
@@ -71,7 +74,8 @@ export function MyDayHeader({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:pt-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pt-1">
+        {inbox}
         <MyDayDateControl date={date} setDate={setDate} />
         <span className="mx-0.5 h-5 w-px" style={{ background: HAIRLINE }} aria-hidden="true" />
         <IconAction label="Refresh" onClick={onRefresh} disabled={isFetching} tone="var(--text-muted)">

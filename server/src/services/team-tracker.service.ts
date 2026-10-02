@@ -2400,7 +2400,7 @@ export class TeamTrackerService {
       const raising = (["blocked", "at_risk", "waiting"] as string[]).includes(params.status);
       const latest = raising ? null : await this.eventsService.latestOfType(resolution.taskKey, "blocker", { kind: "manager", accountId: actor?.accountId ?? "", workspaceId: normalizedWorkspaceId });
       if (raising || (latest?.meta && typeof latest.meta === "object" && "action" in latest.meta && latest.meta.action === "raised")) {
-        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: resolution.taskKey, type: "blocker", body: raising ? rationale! : null, meta: { action: raising ? "raised" : "cleared", ...(raising && { developerDayStatus: params.status }), checkInId: checkIn.id } }, { type: "system", accountId: actor?.accountId });
+        await this.eventsService.append({ workspaceId: normalizedWorkspaceId, taskKey: resolution.taskKey, type: "blocker", body: raising ? rationale! : null, meta: { action: raising ? "raised" : "cleared", ...(raising && { developerDayStatus: params.status }), checkInId: checkIn.id } }, { type: "system", accountId: actor?.accountId, originType: actor?.type === "developer" ? "developer" : actor ? "manager" : "system" });
       }
     }
     return this.getDeveloperDay(date, accountId, undefined, normalizedWorkspaceId);

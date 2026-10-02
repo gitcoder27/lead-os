@@ -69,6 +69,7 @@ export async function resetDatabase(): Promise<void> {
   rawDb.exec(`
     DELETE FROM alert_dismissals;
     DELETE FROM app_sessions;
+    DELETE FROM task_inbox;
     DELETE FROM app_users;
     DELETE FROM daily_note_task_refs;
     DELETE FROM checkin_task_refs;

@@ -1613,6 +1613,28 @@ export const TASK_EVENT_TYPES = [
   "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
 ] as const;
 export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
+/** R12: delivery/read state references canonical events; it never owns task content. */
+export type TaskInboxKind = "assignment" | "instruction" | "reply" | "blocker" | "blocker_cleared";
+export interface TaskInboxItem {
+  id: number;
+  eventId: number;
+  taskKey: string;
+  title: string;
+  kind: TaskInboxKind;
+  actorName: string;
+  excerpt: string;
+  occurredAt: string;
+  readAt: string | null;
+  href: string;
+}
+export interface TaskInboxResponse {
+  enabled: boolean;
+  unreadCount: number;
+  events: TaskInboxItem[];
+  nextCursor: string | null;
+}
+export interface TaskInboxReadRequest { ids: number[]; read: boolean }
+
 export type TaskEventVisibility = "shared" | "private";
 export interface TaskActorRef {
   type: "manager" | "developer" | "copilot" | "note" | "today" | "system" | "unknown";

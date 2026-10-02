@@ -443,6 +443,21 @@ export const dataMigrations = sqliteTable("data_migrations", {
   reportJson: text("report_json"),
 });
 
+/** Delivery identities only. Live task/event permissions are rechecked on every read. */
+export const taskInbox = sqliteTable("task_inbox", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspaceId: text("workspace_id").notNull(),
+  recipientUserId: integer("recipient_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  eventId: integer("event_id").notNull(),
+  actorUserId: integer("actor_user_id"),
+  kind: text("kind").notNull(),
+  createdAt: text("created_at").notNull(),
+  readAt: text("read_at"),
+}, (table) => [
+  uniqueIndex("idx_task_inbox_delivery").on(table.workspaceId, table.recipientUserId, table.eventId),
+  index("idx_task_inbox_unread").on(table.workspaceId, table.recipientUserId, table.readAt, table.id),
+]);
+
 export const taskEvents = sqliteTable("task_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspaceId: text("workspace_id").notNull().default("default"),

@@ -47,7 +47,7 @@ interface GuardedItem extends TaskChangeItem {
 }
 
 export function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>, scope: string) {
-  for (const key of ['tasks', 'task-detail', 'task-events', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
+  for (const key of ['tasks', 'task-detail', 'task-events', 'task-inbox', 'task-inbox-event', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
     qc.invalidateQueries({ queryKey: [key] });
   }
   invalidateTaskViewCounts(qc, scope);

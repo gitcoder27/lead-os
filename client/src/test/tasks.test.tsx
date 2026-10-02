@@ -18,6 +18,10 @@ const mockAddToast = vi.fn();
 let mockManagerEvents: { pages: Array<{ events: TaskEvent[]; nextCursor: string | null }> } | undefined;
 let mockMyDayEvents: { pages: Array<{ events: TaskEvent[]; nextCursor: string | null }> } | undefined;
 
+vi.mock('@/hooks/useTaskInbox', () => ({
+  useInboxTargetEvent: () => ({ data: undefined, isLoading: false, isError: false }),
+}));
+
 vi.mock('@/hooks/useTasks', () => ({
   useTaskResolution: () => ({ data: undefined, isError: false, isLoading: false }),
   useTaskEvents: () => ({

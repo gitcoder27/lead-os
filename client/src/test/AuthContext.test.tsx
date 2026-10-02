@@ -1,3 +1,4 @@
+import { clearTaskUpdateDraftsForScope, completeTaskUpdateDraft, newTaskUpdateDraft, readTaskUpdateDraft, taskDraftGeneration, taskUpdateDraftPrefix, writeTaskUpdateDraft } from '@/lib/task-update-drafts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,15 +33,16 @@ function createQueryClient() {
 }
 
 function AuthProbe() {
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, refreshSession } = useAuth();
 
   return (
     <div>
+      <button onClick={() => void refreshSession()}>Refresh session</button>
       <span data-testid="user">{user?.username ?? 'anonymous'}</span>
       <button type="button" onClick={() => void login('manager-a', 'secret123')}>
         Login
       </button>
-      <button type="button" onClick={() => void logout()}>
+      <button type="button" onClick={() => void logout().catch(() => {})}>
         Logout
       </button>
     </div>
@@ -118,4 +120,34 @@ describe('AuthProvider cache isolation', () => {
 
     expect(readDailyNoteDraft(scope, '2026-04-28')).toBeNull();
   });
+  it.each(['logout failure', 'session loss', 'scope change'])('clears task drafts on %s and refuses late completion', async (action) => {
+    clearTaskUpdateDraftsForScope(getAuthScopeKey(managerA));
+    renderAuthProbe(createQueryClient());
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+    const scope = getAuthScopeKey(managerA);
+    const key = `${taskUpdateDraftPrefix(scope, 'manager', 'task_drawer')}T-1`;
+    const generation = taskDraftGeneration(scope, key);
+    const draft = { ...newTaskUpdateDraft(), body: 'Private draft', private: true };
+    writeTaskUpdateDraft(scope, key, draft, generation);
+    if (action === 'logout failure') {
+      apiMocks.post.mockRejectedValueOnce(new Error('Offline'));
+      fireEvent.click(screen.getByText('Logout'));
+      // Cleanup begins even before the failed logout response.
+      expect(readTaskUpdateDraft(key).body).toBe('');
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
+    } else if (action === 'session loss') {
+      fireEvent.click(screen.getByText('Refresh session'));
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
+    } else {
+      apiMocks.post.mockResolvedValueOnce({ user: { ...managerA, username: 'manager-b', workspaceId: 'workspace-b' } });
+      fireEvent.click(screen.getByText('Login'));
+      await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-b'));
+    }
+    expect(readTaskUpdateDraft(key).body).toBe('');
+    expect(completeTaskUpdateDraft(scope, key, draft, generation)).toBe(false);
+    writeTaskUpdateDraft(scope, key, draft, generation);
+    expect(readTaskUpdateDraft(key).body).toBe('');
+  });
+
 });

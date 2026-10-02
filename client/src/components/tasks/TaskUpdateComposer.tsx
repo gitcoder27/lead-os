@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefO
 import { Lock, MessageSquarePlus, Send } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAddMyDayTaskEvent, useAddTaskEvent } from '@/hooks/useTasks';
-import { useScopedStorageKey } from '@/lib/scoped-storage';
+import { useAuthScopeKey } from '@/context/AuthContext';
+import { completeTaskUpdateDraft, readTaskUpdateDraft as readDraft, taskDraftGeneration, taskUpdateDraftPrefix, writeTaskUpdateDraft, type TaskUpdateDraft as UpdateDraft } from '@/lib/task-update-drafts';
+export { taskUpdateDrafts } from '@/lib/task-update-drafts';
 
 type ComposerMode = 'manager' | 'developer';
 type ManagerEventType = 'update' | 'instruction' | 'decision' | 'blocker';
@@ -45,46 +47,9 @@ interface TaskUpdateComposerProps {
 }
 
 export function TaskUpdateComposer(props: TaskUpdateComposerProps) {
-  const storageKey = useScopedStorageKey(`task-update:${props.mode}:${props.via ?? 'default'}:${props.taskKey}`);
-  return <OwnedTaskUpdateComposer key={storageKey} {...props} storageKey={storageKey} />;
-}
-
-interface UpdateDraft {
-  date?: string;
-  person?: { accountId: string; name: string };
-  body: string;
-  type: ManagerEventType | DeveloperEventType;
-  blockerAction: 'raised' | 'cleared';
-  private: boolean;
-  requestId: string;
-  submitted: boolean;
-}
-
-const volatileDrafts = new Map<string, UpdateDraft>();
-
-export function taskUpdateDrafts(prefix: string): Array<{ taskKey: string; person?: UpdateDraft['person'] }> {
-  try {
-    return Object.keys(sessionStorage).filter((key) => key.startsWith(prefix)).flatMap((key) => {
-      const draft = readDraft(key);
-      return draft.body.trim() ? [{ taskKey: key.slice(prefix.length), person: draft.person }] : [];
-    });
-  } catch {
-    return [...volatileDrafts].filter(([key, draft]) => key.startsWith(prefix) && draft.body.trim()).map(([key, draft]) => ({ taskKey: key.slice(prefix.length), person: draft.person }));
-  }
-}
-
-function newDraft(): UpdateDraft {
-  return { body: '', type: 'update', blockerAction: 'raised', private: false, requestId: crypto.randomUUID(), submitted: false };
-}
-
-function readDraft(key: string): UpdateDraft {
-  try {
-    const value = JSON.parse(sessionStorage.getItem(key) ?? 'null') as UpdateDraft | null;
-    if (value && typeof value.body === 'string' && typeof value.requestId === 'string'
-      && MANAGER_TYPES.some((option) => option.value === value.type)
-      && ['raised', 'cleared'].includes(value.blockerAction)) return value;
-  } catch { return volatileDrafts.get(key) ?? newDraft(); }
-  return newDraft();
+  const scope = useAuthScopeKey();
+  const storageKey = `${taskUpdateDraftPrefix(scope, props.mode, props.via, props.date)}${props.taskKey}`;
+  return <OwnedTaskUpdateComposer key={storageKey} {...props} scope={scope} storageKey={storageKey} />;
 }
 
 function OwnedTaskUpdateComposer({
@@ -103,7 +68,8 @@ function OwnedTaskUpdateComposer({
   onPosted,
   onEscape,
   storageKey,
-}: TaskUpdateComposerProps & { storageKey: string }) {
+  scope,
+}: TaskUpdateComposerProps & { storageKey: string; scope: string }) {
   const { addToast } = useToast();
   const [value, setValue] = useState<UpdateDraft>(() => {
     const stored = readDraft(storageKey);
@@ -115,15 +81,16 @@ function OwnedTaskUpdateComposer({
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(value.submitted);
   const submitting = useRef(false);
-  const [storageFailed, setStorageFailed] = useState(false);
+  const [generation] = useState(() => taskDraftGeneration(scope, storageKey));
   const change = useCallback((updates: Partial<UpdateDraft>) => {
-    const next = { ...valueRef.current, ...updates };
+    const previous = valueRef.current;
+    const edited = !('submitted' in updates);
+    const next = { ...previous, ...updates, ...(edited ? { revision: previous.revision + 1, submitted: false, requestId: previous.submitted ? crypto.randomUUID() : previous.requestId } : {}) };
     valueRef.current = next;
     setValue(next);
-    try { sessionStorage.setItem(storageKey, JSON.stringify(next)); }
-    catch { volatileDrafts.set(storageKey, next); setStorageFailed(true); }
-    window.dispatchEvent(new Event('task-update-drafts-changed'));
-  }, [storageKey]);
+    writeTaskUpdateDraft(scope, storageKey, next, generation);
+    if (edited) setFailed(false);
+  }, [scope, storageKey, generation]);
   const setDraft = (body: string) => change({ body });
   const setType = (next: UpdateDraft['type']) => change({ type: next });
   const setBlockerAction = (next: UpdateDraft['blockerAction']) => change({ blockerAction: next });
@@ -140,7 +107,7 @@ function OwnedTaskUpdateComposer({
       valueRef.current = next;
       setValue(next);
       setFailed(false);
-      if (collapsed) setExpanded(false);
+      if (collapsed && !next.body) setExpanded(false);
     };
     window.addEventListener('task-update-saved', saved);
     return () => window.removeEventListener('task-update-saved', saved);
@@ -162,7 +129,7 @@ function OwnedTaskUpdateComposer({
       focus: () => localRef.current?.focus(),
       togglePrivate: () => {
         setExpanded(true);
-        if (!valueRef.current.submitted) togglePrivate();
+        togglePrivate();
       },
     });
     return () => registerComposer?.(null);
@@ -173,7 +140,9 @@ function OwnedTaskUpdateComposer({
     if (!body || pending || submitting.current || (mode === 'developer' && !date)) {
       return;
     }
-    const requestId = value.requestId;
+    if (generation !== taskDraftGeneration(scope, storageKey)) return;
+    const submitted = { ...valueRef.current };
+    const requestId = submitted.requestId;
     submitting.current = true;
     setSending(true);
     setFailed(false);
@@ -192,16 +161,15 @@ function OwnedTaskUpdateComposer({
         requestId,
         });
       }
-      try { sessionStorage.removeItem(storageKey); } catch { setStorageFailed(true); }
-      volatileDrafts.delete(storageKey);
-      const next = { ...newDraft(), person: value.person, date };
+      if (!completeTaskUpdateDraft(scope, storageKey, submitted, generation)) return;
+      const latest = readDraft(storageKey);
+      const next = { ...latest, person: person ?? value.person, date };
       valueRef.current = next;
       setValue(next);
-      window.dispatchEvent(new CustomEvent('task-update-saved', { detail: storageKey }));
-      window.dispatchEvent(new Event('task-update-drafts-changed'));
       onPosted?.(posted);
     } catch (error) {
-      setFailed(true);
+      if (generation !== taskDraftGeneration(scope, storageKey)) return;
+      if (valueRef.current.revision === submitted.revision) setFailed(true);
       addToast(error instanceof Error ? error.message : 'Update was not acknowledged. Retry to confirm it.', 'error');
     } finally {
       submitting.current = false;
@@ -272,7 +240,6 @@ function OwnedTaskUpdateComposer({
       <textarea
         ref={setRefs}
         value={draft}
-        readOnly={value.submitted}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
         onClick={(event) => event.stopPropagation()}
@@ -289,7 +256,6 @@ function OwnedTaskUpdateComposer({
             <button
               key={option.value}
               type="button"
-              disabled={value.submitted}
               onClick={() => setType(option.value)}
               className="rounded-md px-2 py-0.5 text-[12px] font-semibold transition-colors"
               style={{
@@ -308,8 +274,7 @@ function OwnedTaskUpdateComposer({
               <button
                 key={action}
                 type="button"
-                disabled={value.submitted}
-                onClick={() => setBlockerAction(action)}
+                  onClick={() => setBlockerAction(action)}
                 className="rounded-md px-2 py-0.5 text-[12px] font-semibold capitalize transition-colors"
                 style={{
                   background: blockerAction === action ? 'var(--bg-elevated)' : 'transparent',
@@ -325,7 +290,6 @@ function OwnedTaskUpdateComposer({
         {mode === 'manager' && (
           <button
             type="button"
-            disabled={value.submitted}
             onClick={togglePrivate}
             className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[12px] font-semibold transition-colors"
             style={{
@@ -350,8 +314,7 @@ function OwnedTaskUpdateComposer({
           {pending ? 'Saving…' : failed ? 'Retry post' : 'Post'}
         </button>
       </div>
-      {failed && <p role="alert" className="mt-1 text-xs">Not acknowledged. Retry the original update to confirm it was saved.</p>}
-      {storageFailed && <p role="alert" className="mt-1 text-xs">Draft recovery is unavailable. Keep this page open until the update is saved.</p>}
+      {failed && <p role="alert" className="mt-1 text-xs">Not acknowledged. Retry to confirm it was saved, or edit this update.</p>}
     </div>
   );
 }

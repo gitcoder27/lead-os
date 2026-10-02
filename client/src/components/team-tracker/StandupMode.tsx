@@ -1,3 +1,5 @@
+import { useAuthScopeKey } from '@/context/AuthContext';
+import { taskUpdateDraftPrefix } from '@/lib/task-update-drafts';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -91,7 +93,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   useEffect(() => { rootRef.current?.focus(); }, [rootRef]);
   // P3-D5: standup order follows the board's active sort/saved view.
   const storageKey = useScopedStorageKey(`standup-session:${date}`);
-  const draftPrefix = useScopedStorageKey('task-update:manager:standup:');
+  const draftScope = useAuthScopeKey();
+  const draftPrefix = taskUpdateDraftPrefix(draftScope, 'manager', 'standup');
   const [taskDrafts, setTaskDrafts] = useState(() => taskUpdateDrafts(draftPrefix));
   const [recoverTaskKey, setRecoverTaskKey] = useState<string>();
   useEffect(() => {

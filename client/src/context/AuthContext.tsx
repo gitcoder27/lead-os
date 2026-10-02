@@ -1,3 +1,4 @@
+import { clearTaskUpdateDraftsForScope } from '@/lib/task-update-drafts';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { api } from '@/lib/api';
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (previousAuthScopeKeyRef.current !== authScopeKey) {
+      clearTaskUpdateDraftsForScope(previousAuthScopeKeyRef.current);
       clearTodaySnapshotsForScope(previousAuthScopeKeyRef.current);
       clearDailyNoteDraftsForScope(previousAuthScopeKeyRef.current);
       clearNavPreferencesCacheForScope(previousAuthScopeKeyRef.current);
@@ -83,13 +85,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    clearTaskUpdateDraftsForScope(authScopeKey);
     try {
       await api.post('/auth/logout');
     } finally {
       setUser(null);
       setFeatures(DEFAULT_FEATURES);
     }
-  }, []);
+  }, [authScopeKey]);
 
   return (
     <AuthContext.Provider

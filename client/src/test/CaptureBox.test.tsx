@@ -84,6 +84,29 @@ function succeed(body: Record<string, unknown>) {
 }
 
 describe('CaptureBox (P3-D8)', () => {
+  it('keeps the ID through confirmation but uses a fresh ID for the next intentional capture', () => {
+    const { input } = renderBox('Write update !2020-01-01');
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    const requestId = lastBody().requestId;
+    act(() => mockMutate.mock.calls.at(-1)![1].onSuccess({ intent: 'create', diagnostics: [], confirmRequired: true }));
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(lastBody()).toMatchObject({ requestId, confirm: true });
+    act(() => mockMutate.mock.calls.at(-1)![1].onSuccess({ intent: 'create', diagnostics: [], task: { taskKey: 'T-1', title: 'Write update' } }));
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(lastBody().requestId).not.toBe(requestId);
+  });
+
+  it('reuses the request identity for an ambiguous retry and changes it after editing', () => {
+    const { input } = renderBox('Write the update');
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    const first = lastBody().requestId;
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(lastBody().requestId).toBe(first);
+    fireEvent.change(input, { target: { value: 'Write the corrected update' } });
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(lastBody().requestId).not.toBe(first);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

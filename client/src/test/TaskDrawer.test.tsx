@@ -1,3 +1,4 @@
+import { clearTaskUpdateDraftsForScope, readTaskUpdateDraft, taskUpdateDraftPrefix } from '@/lib/task-update-drafts';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { dueAtForDate } from '@/types';
@@ -55,8 +56,9 @@ vi.mock('@/components/tasks/TaskTimeline', () => ({
   TaskTimelineDisclosure: () => <div data-testid="timeline" />,
 }));
 
-vi.mock('@/components/tasks/TaskUpdateComposer', () => ({
-  TaskUpdateComposer: () => <div data-testid="composer" />,
+vi.mock('@/hooks/useTasks', () => ({
+  useAddTaskEvent: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
+  useAddMyDayTaskEvent: () => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false }),
 }));
 
 vi.mock('@/components/JiraIssueLink', () => ({
@@ -108,6 +110,7 @@ function queryFor(task: TaskDetailResponse) {
 }
 
 beforeEach(() => {
+  clearTaskUpdateDraftsForScope('ws:manager:manager');
   mockMutate.mockReset();
   mockDelete.mockReset();
   mockToast.mockReset();
@@ -152,7 +155,7 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.getByRole('button', { name: 'Task status: Active' })).toBeTruthy();
     expect(screen.getByText('follow up')).toBeTruthy(); // prefix stripped
     expect(screen.getByTestId('timeline')).toBeTruthy();
-    expect(screen.getByTestId('composer')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /Add an update to/ })).toBeTruthy();
   });
 
   it('hides tracking, labels and private controls for developer principals', () => {
@@ -174,7 +177,7 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.queryByText('Priority')).toBeNull();
     expect(screen.queryByLabelText('Delete task')).toBeNull();
     expect(screen.getByTestId('timeline')).toBeTruthy();
-    expect(screen.getByTestId('composer')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /Add an update to/ })).toBeTruthy();
   });
 
   it('renders meeting fields and the action-item composer for meetings', () => {
@@ -261,7 +264,7 @@ describe('TaskDrawer body (P3-D2)', () => {
     mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ deletedAt: '2026-09-23T18:00:00Z' })));
     render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
     expect(screen.getByText(/was deleted/)).toBeTruthy();
-    expect(screen.queryByTestId('composer')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Add an update to/ })).toBeNull();
     // G7: the status control is a read-only pill on tombstones — no live control.
     expect(screen.queryByRole('button', { name: /task status/i })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Mark done' })).toBeNull();
@@ -283,7 +286,7 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(screen.getByText(/no longer own this task/i)).toBeTruthy();
     // Restricted projection: own timeline only — no editing or other sections.
     expect(screen.getByTestId('timeline')).toBeTruthy();
-    expect(screen.queryByTestId('composer')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Add an update to/ })).toBeNull();
     expect(screen.queryByText('Owner')).toBeNull();
     expect(screen.queryByText('Links')).toBeNull();
     expect(screen.queryByText('Action items')).toBeNull();
@@ -623,4 +626,45 @@ describe('TaskDrawer modal focus (D4/D5)', () => {
     expect(document.activeElement).toBe(opener);
     layout.mockRestore();
   });
+});
+
+
+describe('R3 real drawer composer lifecycle', () => {
+  beforeEach(() => mockUseTaskDetail.mockReturnValue(queryFor(managerTask())));
+  it('restores a private draft after close and task switching', () => {
+    const view = render(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    const box = screen.getByRole('textbox', { name: 'Add an update to T-7' });
+    fireEvent.change(box, { target: { value: 'Private draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Private' }));
+    view.rerender(<TaskDrawer taskKey="T-7" open={false} onClose={vi.fn()} />);
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ taskKey: 'T-8' })));
+    view.rerender(<TaskDrawer taskKey="T-8" open onClose={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: 'Add an update to T-8' })).toHaveValue('');
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    view.rerender(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: 'Add an update to T-7' })).toHaveValue('Private draft');
+    expect(screen.getByRole('button', { name: 'Private' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it.each([403, 404])('clears a draft only after confirmed access loss (%s)', (status) => {
+    const view = render(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Add an update to T-7' }), { target: { value: 'Draft' } });
+    const key = `${taskUpdateDraftPrefix('ws:manager:manager', 'manager', 'task_drawer')}T-7`;
+    mockUseTaskDetail.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: Object.assign(new Error('Denied'), { status }) });
+    view.rerender(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    expect(readTaskUpdateDraft(key).body).toBe('');
+  });
+  it('preserves drafts on a transport failure and clears them for a deleted task', () => {
+    const view = render(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Add an update to T-7' }), { target: { value: 'Keep draft' } });
+    const key = `${taskUpdateDraftPrefix('ws:manager:manager', 'manager', 'task_drawer')}T-7`;
+    mockUseTaskDetail.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: new Error('Offline') });
+    view.rerender(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    expect(readTaskUpdateDraft(key).body).toBe('Keep draft');
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ deletedAt: '2026-10-02T10:00:00Z' })));
+    view.rerender(<TaskDrawer taskKey="T-7" open onClose={vi.fn()} />);
+    expect(readTaskUpdateDraft(key).body).toBe('');
+    expect(screen.queryByRole('textbox', { name: 'Add an update to T-7' })).not.toBeInTheDocument();
+  });
+
 });

@@ -1,3 +1,4 @@
+import { clearTaskUpdateDraftsForTask } from '@/lib/task-update-drafts';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -14,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { navigateToTaskPage } from '@/lib/task-nav';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import { useDeleteTaskDetail, useTaskDetail, useUpdateTaskDetail } from '@/hooks/useTaskDetail';
@@ -164,6 +165,7 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
   const { user } = useAuth();
   const { addToast } = useToast();
   const mode: TaskDetailMode = user?.role === 'developer' ? 'developer' : 'manager';
+  const scope = useAuthScopeKey();
   const query = useTaskDetail(taskKey);
   const update = useUpdateTaskDetail(taskKey);
   const remove = useDeleteTaskDetail(taskKey);
@@ -183,6 +185,14 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
       navigateToTaskPage(query.data.taskKey, true);
     }
   }, [fullPage, query.data, taskKey]);
+
+  useEffect(() => {
+    const status = (query.error as { status?: number } | null)?.status;
+    if (status === 403 || status === 404 || (query.data && ('access' in query.data || query.data.deletedAt))) {
+      clearTaskUpdateDraftsForTask(scope, taskKey);
+      if (query.data?.taskKey !== taskKey && query.data?.taskKey) clearTaskUpdateDraftsForTask(scope, query.data.taskKey);
+    }
+  }, [scope, taskKey, query.error, query.data]);
 
   const dismiss = onClose ?? onBack;
 

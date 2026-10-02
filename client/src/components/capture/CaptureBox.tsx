@@ -1,3 +1,4 @@
+import { useAuthScopeKey } from '@/context/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, X, Zap } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -150,6 +151,8 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
 export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: CaptureBoxProps) {
   const { addToast } = useToast();
   const capture = useCapture();
+  const scope = useAuthScopeKey();
+  const attempt = useRef<{ fingerprint: string; requestId: string } | null>(null);
   const createContact = useCreateContact();
   const [text, setText] = useState(prefill);
   const [caret, setCaret] = useState(prefill.length);
@@ -261,8 +264,12 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       ? { ownerAccountId: activeAssignee.accountId }
       : undefined;
     const tz = getLocalTimeZone();
+    const clientToday = getLocalIsoDate();
+    const fingerprint = JSON.stringify({ scope, text, clientToday, tz, defaults });
+    if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, requestId: crypto.randomUUID() };
+    const requestId = attempt.current.requestId;
     capture.mutate(
-      { text, clientToday: getLocalIsoDate(), ...(tz && { tz }), ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId: crypto.randomUUID() },
+      { text, clientToday, ...(tz && { tz }), ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId },
       {
         onSuccess: (res) => {
           if (res.blocked) {
@@ -274,6 +281,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
             setServerDiagnostics(res.diagnostics);
             return;
           }
+          if (attempt.current?.requestId === requestId) attempt.current = null;
           const key = res.task?.taskKey ?? res.event?.taskKey;
           onCaptured?.({ intent: res.intent, taskKey: key });
           addToast({

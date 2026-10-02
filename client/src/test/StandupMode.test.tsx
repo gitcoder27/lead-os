@@ -1,3 +1,4 @@
+import { clearTaskUpdateDraftsForScope } from '@/lib/task-update-drafts';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
@@ -25,6 +26,8 @@ const mockOnOpenTask = vi.fn();
 const mockApiPost = vi.fn((_url: string, _body?: unknown) =>
   Promise.resolve({ session: { id: 1 }, followUps: [] }),
 );
+
+vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'standup-scope', useAuth: () => ({ user: null }) }));
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -257,6 +260,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockApiPost.mockReset();
   mockApiPost.mockResolvedValue({ session: { id: 1 }, followUps: [] });
+  clearTaskUpdateDraftsForScope('standup-scope');
   window.sessionStorage.clear();
   window.localStorage.clear();
 });

@@ -18,12 +18,14 @@ interface TodayRhythmHeaderProps {
   onOpenMetric: (target: TodayActionTarget) => void;
   /** The attention count has no page to open — it jumps to the queue. */
   onFocusQueue: () => void;
+  /** Mobile access to the existing plan (including wrap-up); absent on failed/legacy reads. */
+  onFocusPlan?: () => void;
 }
 
 /**
- * docs/53 D2/R2/R3: one 40px line — stage first, the date, four decision
+ * docs/53 D2/R2/R3: desktop has one 40px line — stage, date, four decision
  * metrics as text buttons, then freshness. Below `md` it scrolls
- * horizontally as a single chip row instead of stacking tiles.
+ * horizontally as one row; mobile commitment/queue jumps stay first with 44px targets.
  */
 export function TodayRhythmHeader({
   today,
@@ -34,6 +36,7 @@ export function TodayRhythmHeader({
   onRefresh,
   onOpenMetric,
   onFocusQueue,
+  onFocusPlan,
 }: TodayRhythmHeaderProps) {
   const shortcutsRef = useRef<HTMLButtonElement>(null);
   const date = parseISO(today.date);
@@ -44,6 +47,10 @@ export function TodayRhythmHeader({
 
   return (
     <div className="today-band" role="region" aria-label="Today summary">
+      {onFocusPlan && <div className="today-mobile-jumps">
+        <button type="button" onClick={onFocusPlan} aria-label="Jump to My plan">My plan</button>
+        <button type="button" onClick={onFocusQueue} aria-label="Jump to attention queue">Queue</button>
+      </div>}
       <span className="today-stage" title={today.rhythm.detail}>
         <span className="today-stage-dot" aria-hidden="true" />
         {today.rhythm.label}

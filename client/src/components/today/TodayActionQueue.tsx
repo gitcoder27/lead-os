@@ -81,7 +81,7 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
   return (
     <section aria-labelledby="today-queue-heading" data-today-queue="">
       <div className="today-section-head">
-        <h2 id="today-queue-heading" ref={headingRef} tabIndex={-1} className="today-section-title">Queue</h2>
+        <h2 id="today-queue-heading" ref={headingRef} tabIndex={-1} className="today-section-title today-jump-target">Queue</h2>
         {!isDone ? <span className="today-section-count">{remaining}</span> : null}
         {/* What I actually finished today — a plain fact, not a ratio against a queue that changes under it. */}
         {cleared > 0 ? <span className="today-section-actions today-freshness">{cleared} done today</span> : null}

@@ -188,6 +188,8 @@ describe('TodayPlanPanel', () => {
 describe('TodayPage plan', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.stubGlobal('matchMedia', vi.fn((media: string) => ({ media, matches: false, onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })));
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, writable: true, value: vi.fn() });
     window.sessionStorage.clear();
     window.localStorage.clear();
   });
@@ -409,6 +411,41 @@ describe('TodayPage plan', () => {
       renderToday();
       expect(await screen.findByText('Nothing left on your plan, promises, carry-over or check-ins.')).toBeInTheDocument();
     });
+  });
+
+  it.each(['morning_plan', 'wrap_up'] as const)('jumps directly to commitments and back to the unchanged urgent queue in %s', async (stage) => {
+    const queue = Array.from({ length: 30 }, (_, index) => ({ ...queueRow(`T-${index + 20}`, `Urgent ${index}`, index), type: 'overdue_issue' as const, severity: 'critical' as const }));
+    const response = today(stage, plan({ items: [planItem('T-1', 'My commitment')] }), queue);
+    const fetchMock = mockFetch(response);
+    const { onOpenTodayTarget } = renderToday();
+    const jump = await screen.findByRole('button', { name: 'Jump to My plan' });
+    const queueHeading = screen.getByRole('heading', { name: 'Queue' });
+    const commitmentHeading = screen.getByRole('heading', { name: stage === 'wrap_up' ? /Still open today/ : 'My plan' });
+    expect(queueHeading.compareDocumentPosition(commitmentHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(jump);
+    expect(document.activeElement).toBe(commitmentHeading);
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to attention queue' }));
+    expect(document.activeElement).toBe(queueHeading);
+    expect(screen.getByText('Urgent 0')).toBeInTheDocument();
+    expect(onOpenTodayTarget).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method && init.method !== 'GET')).toBe(false);
+  });
+
+  it('uses immediate scrolling for reduced motion and reaches an empty wrap-up plan', async () => {
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue({ media: '(prefers-reduced-motion: reduce)', matches: true, onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(() => false) });
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+    try {
+      mockFetch(today('wrap_up', plan())); renderToday();
+      fireEvent.click(await screen.findByRole('button', { name: 'Jump to My plan' }));
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Wrap-up' }));
+      expect(scroll).toHaveBeenLastCalledWith({ block: 'start', behavior: 'auto' });
+    } finally { media.mockRestore(); scroll.mockRestore(); }
+  });
+
+  it('does not offer a jump to an unavailable plan', async () => {
+    mockFetch(today('morning_plan', undefined)); renderToday();
+    await screen.findByRole('heading', { name: 'Queue' });
+    expect(screen.queryByRole('button', { name: 'Jump to My plan' })).not.toBeInTheDocument();
   });
 
   it('without a plan (legacy task model) Today renders as before', async () => {

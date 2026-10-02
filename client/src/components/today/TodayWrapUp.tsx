@@ -66,7 +66,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
   return (
     <section className="today-panel" aria-labelledby="today-wrap-heading">
       <div className="today-panel-head">
-        <h2 id="today-wrap-heading" className="today-section-title">Wrap-up</h2>
+        <h2 id="today-wrap-heading" tabIndex={-1} className="today-section-title today-jump-target">Wrap-up</h2>
         <span className="today-section-actions">
           <button type="button" className="ui-btn-ghost" onClick={() => onOpenTarget(wrapUp.eodNoteTarget)}>
             <NotebookPen size={13} aria-hidden="true" />
@@ -100,7 +100,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
 
       {stillOpen.length > 0 ? (
         <div role="group" aria-label={`Still open today (${stillOpen.length})`}>
-          <h3 className="today-subhead">Still open today · {stillOpen.length}</h3>
+          <h3 id="today-open-plan-heading" tabIndex={-1} className="today-subhead today-jump-target">Still open today · {stillOpen.length}</h3>
           {openRows.map((item) => (
             <StillOpenRow
               key={item.taskKey}

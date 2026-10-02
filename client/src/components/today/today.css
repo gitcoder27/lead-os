@@ -666,3 +666,11 @@
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* Mobile jumps stay in the existing fixed summary band, above long queues. */
+.today-mobile-jumps { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
+.today-mobile-jumps button { min-height: 44px; padding: 0 8px; color: var(--accent); font-size: 12px; font-weight: 600; }
+.today-mobile-jumps button:focus-visible,
+.today-jump-target:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+@media (max-width: 1023px) { .today-band { height: 48px; } }
+@media (min-width: 1024px) { .today-mobile-jumps { display: none; } }

@@ -372,10 +372,15 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     restoreFocus();
   };
 
-  const focusQueue = () => {
-    queueHeadingRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    queueHeadingRef.current?.focus({ preventScroll: true });
+  const jumpToHeading = (heading: HTMLElement | null | undefined) => {
+    heading?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    heading?.focus({ preventScroll: true });
   };
+  const focusQueue = () => jumpToHeading(queueHeadingRef.current);
+  const focusPlan = () => jumpToHeading(
+    scrollRef.current?.querySelector<HTMLElement>('#today-plan-heading, #today-open-plan-heading')
+    ?? scrollRef.current?.querySelector<HTMLElement>('#today-wrap-heading'),
+  );
 
   const queuedPeople = useMemo(() => new Set(pulse.queued.map((person) => person.accountId)), [pulse.queued]);
   const quietPeople = focus && 'midday' in focus
@@ -491,6 +496,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
             onRefresh={() => void today.refetch()}
             onOpenMetric={openTarget}
             onFocusQueue={focusQueue}
+            onFocusPlan={plan && (stage !== 'wrap_up' || focus && 'wrapUp' in focus) ? focusPlan : undefined}
           />
           {snapshot.isPartial ? (
             <TodayPartialDataNotice

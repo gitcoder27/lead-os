@@ -39,7 +39,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
   return (
     <section className="today-panel" aria-labelledby="today-plan-heading">
       <div className="today-panel-head">
-        <h2 id="today-plan-heading" className="today-section-title">My plan</h2>
+        <h2 id="today-plan-heading" tabIndex={-1} className="today-section-title today-jump-target">My plan</h2>
         {plan.items.length > 0 ? <span className="today-section-count">{plan.items.length}</span> : null}
         {plan.items.length > 0 ? (
           <span className="today-section-actions" data-testid="today-plan-pin-hint">

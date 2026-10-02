@@ -76,7 +76,7 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backu
         id: 'nav-waiting',
         group: 'actions',
         title: 'Go to Waiting',
-        description: 'Tasks · Waiting / Delegated',
+        description: 'Tasks · Waiting',
         keywords: 'follow-ups followups promises reminders delegated waiting on',
         href: '/tasks?view=waiting',
       },

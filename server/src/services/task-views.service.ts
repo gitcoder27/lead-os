@@ -51,7 +51,7 @@ export function builtinTaskViews(today: string): { id: string; name: string; sec
     { id: "my-tasks", name: "My tasks", section: "plan", definition: { filters: { owner: "me", later: false }, sort: "scheduled", group: "scheduled" } },
     // docs/57 §4 (P3-03): replaces /follow-ups — grouped by the party waited on,
     // oldest check-by first.
-    { id: "waiting", name: "Waiting / Delegated", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "checkBy", group: "party" } },
+    { id: "waiting", name: "Waiting", section: "plan", definition: { filters: { waiting: true, later: false, status: openish }, sort: "checkBy", group: "party" } },
     // docs/57 §4 (P3-06): replaces the /meetings page — open meetings plus those closed in the
     // last two weeks, grouped Today / Upcoming / Needs outcome / Recent.
     { id: "meetings", name: "Meetings", section: "plan", definition: { filters: { kind: "meeting", withClosed: { from: shiftDays(today, -13) } }, sort: "scheduled", group: "meeting" } },

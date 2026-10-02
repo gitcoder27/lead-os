@@ -373,6 +373,22 @@ describe('TasksPage rows (docs/49 §5)', () => {
 });
 
 describe('TasksPage empty/loading/error (docs/49 §11)', () => {
+  it('uses neutral Waiting empty copy without claiming all obligations are clear', () => {
+    window.history.replaceState(null, '', '/tasks?view=waiting');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([]));
+    render(<TasksPage />);
+    expect(screen.getByText('No tasks in Waiting.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nobody owes|Capture a promise with/)).not.toBeInTheDocument();
+  });
+
+  it('keeps filtered Waiting emptiness distinct', () => {
+    window.history.replaceState(null, '', '/tasks?view=waiting&status=dropped');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([]));
+    render(<TasksPage />);
+    expect(screen.getByText('No tasks match these filters.')).toBeInTheDocument();
+    expect(screen.queryByText('No tasks in Waiting.')).not.toBeInTheDocument();
+  });
+
   it('Inbox zero is a success state', () => {
     window.history.replaceState(null, '', '/tasks?view=inbox');
     mockUseTaskViewTasks.mockReturnValue(tasksResult([]));

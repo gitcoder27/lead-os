@@ -358,6 +358,7 @@ describe('Waiting and Meetings are Tasks views (docs/57 P3-06)', () => {
 
   it('finds Waiting by its old and new names', () => {
     const commands = buildNavigationCommands({ tasksPhase3: true });
+    expect(commands.find((command) => command.id === 'nav-waiting')?.description).toBe('Tasks · Waiting');
     for (const query of ['follow-ups', 'followups', 'promises', 'delegated', 'waiting']) {
       expect(filterCommands(commands, query).map((command) => command.id)).toContain('nav-waiting');
     }

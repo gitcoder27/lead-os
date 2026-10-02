@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
@@ -79,7 +79,7 @@ describe("task saved view routes (P3-D9/D10)", () => {
     // docs/51 U1: the rail view is "Planned today" — Today is the command view at /.
     expect(names.today).toBe("Planned today");
     expect(names["closed-week"]).toBe("Closed · last 7 days");
-    expect(names.waiting).toBe("Waiting / Delegated");
+    expect(names.waiting).toBe("Waiting");
     expect(names.meetings).toBe("Meetings");
     expect(response.body.views.every((view: { builtin: boolean }) => view.builtin)).toBe(true);
   });
@@ -265,6 +265,30 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
 
     const closed = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef({ filters: { closed: { from: "2000-01-01", to: today } } })}`, headers });
     expect(closed.body.tasks.map((t: { title: string }) => t.title)).toEqual(["Done task"]);
+  });
+
+  it("keeps Waiting membership and counts unchanged for fresh, quiet and explicit commitments", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-02T10:00:00Z"));
+    try {
+      await enablePhase3();
+      const headers = { cookie: await cookie("manager-a") };
+      await createTask(headers, { title: "Fresh delegation", ownerType: "developer", ownerId: "dev-1" });
+      vi.setSystemTime(new Date("2026-09-01T10:00:00Z"));
+      await createTask(headers, { title: "Quiet delegation", ownerType: "developer", ownerId: "dev-1" });
+      vi.setSystemTime(new Date("2026-10-02T10:00:00Z"));
+      await createTask(headers, { title: "Explicit waiting", waitingOn: { type: "text", label: "Finance" } });
+      await createTask(headers, { title: "Blocked", status: "blocked" });
+      await createTask(headers, { title: "Legacy waiting", labels: ["kind:waiting"] });
+      await createTask(headers, { title: "Future follow-up", ownerType: "developer", ownerId: "dev-1", followUpAt: "2026-10-20T09:00:00Z" });
+      await createTask(headers, { title: "Due follow-up", ownerType: "developer", ownerId: "dev-1", followUpAt: "2026-10-01T09:00:00Z" });
+      const definition = { filters: { waiting: true, later: false, status: ["open", "active", "blocked"] }, sort: "checkBy", group: "party" };
+      const listed = await invoke(app, { method: "GET", url: `/api/tasks?today=2026-10-02&tz=UTC&viewDef=${encodeViewDef(definition)}`, headers });
+      const titles = listed.body.tasks.map((task: { title: string }) => task.title).sort();
+      expect(titles).toEqual(["Blocked", "Due follow-up", "Explicit waiting", "Future follow-up", "Legacy waiting", "Quiet delegation"]);
+      const counts = await invoke(app, { method: "GET", url: "/api/tasks/view-counts?today=2026-10-02&tz=UTC", headers });
+      expect(counts.body.counts.waiting.count).toBe(titles.length);
+    } finally { vi.useRealTimers(); }
   });
 
   it("matches the follow-up predicate via label and followUpAt", async () => {

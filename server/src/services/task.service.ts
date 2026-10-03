@@ -9,6 +9,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskEventsService, type TaskEventInput } from "./task-events.service";
 import { TaskLabelsService } from "./task-labels.service";
+import { assertManagerTaskOwner } from "./task-ownership";
 import { DeveloperAvailabilityService } from "./developer-availability.service";
 import { ContactsService } from "./contacts.service";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -379,6 +380,7 @@ export class TaskService {
         labelsJson: data.labels ? JSON.stringify(data.labels) : null, status: data.status ?? "open", createdByType: principal.type, createdById: principal.accountId, createdAt: now, updatedAt: now,
         closedAt: data.status === "done" || data.status === "dropped" ? now : null };
       await this.validateShape(values);
+      await assertManagerTaskOwner(ownerType, ownerId, principal);
       await this.demoteOthers({ ...values, id: -1 }, principal);
       const row = (await db.insert(tasks).values(values).returning())[0]!;
       await this.focus(row, row.scheduledOn ?? todayIsoDate());
@@ -427,6 +429,9 @@ export class TaskService {
         await new TaskLabelsService().ensureRegistered(before.workspaceId, labels);
       }
       const next = { ...before, ...fields, labelsJson: labels === undefined ? before.labelsJson : JSON.stringify(labels), later: later === undefined ? before.later : Number(later) };
+      // Explicitly assigning to the manager without an ID means the initiating manager,
+      // including when repairing an old row with a mistaken roster ID.
+      if (fields.ownerType === "manager" && fields.ownerId === undefined && principal.type !== "developer") next.ownerId = principal.accountId;
       // "Later ⇒ no date" (§4.2): parking without an explicit date drops the
       // scheduled date; validateShape rejects an explicit later+date pair.
       if (later === true && data.scheduledOn === undefined) next.scheduledOn = null;
@@ -443,6 +448,7 @@ export class TaskService {
         Object.assign(next, waiting, { waitingSince: !waiting.waitingOnType ? null : sameParty ? before.waitingSince : new Date().toISOString() });
       }
       const reassigned = next.ownerType !== before.ownerType || next.ownerId !== before.ownerId;
+      if (Object.hasOwn(data, "ownerType") || Object.hasOwn(data, "ownerId")) await assertManagerTaskOwner(next.ownerType, next.ownerId, principal);
       if (reassigned) {
         if (["done", "dropped"].includes(before.status)) throw new HttpError(409, "Reopen closed work before reassigning");
         if (before.status === "active") next.status = "open";

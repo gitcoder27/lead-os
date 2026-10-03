@@ -153,6 +153,26 @@ endpoint performs a 1-token `models.list` or trivial chat call to validate crede
 Each tool = `{ name, description, parameters (JSON Schema), confirm: "always"|"never",
 execute(args, ctx) }`. `ctx` carries `managerAccountId`, `workspaceId`, `date`, services.
 
+**Canonical task ownership (TASK-OWNER-01, 2026-10-03)**
+
+`create_task` defaults to the authenticated manager. For a manager's own work,
+omit `ownerId`; roster/Jira IDs only belong with `ownerType: "developer"`.
+Explicit manager IDs must identify an active manager session account in the same
+workspace (including legacy accounts whose session ID is their linked developer ID).
+Invalid ownership returns 400 with instructions, before any task/event is committed.
+
+To repair an open task with the wrong owner, use `update_task` with
+`{ "taskKey": "T-89", "ownerType": "manager" }`; omitting `ownerId` assigns it to
+the initiating manager. Repeat for each exact T-number after inspecting it.
+Normal confirmation applies. Closed tasks must be reopened before reassignment.
+This does not change dates or infer identity from names/email. No automatic data repair runs.
+
+Today/overdue own tasks appear in Planned today and Today's My plan; future own
+tasks remain in My tasks. Needs attention and Inbox retain their signal/lifecycle
+filters. For missing-task triage, resolve the exact T-number or use `list_tasks`
+with `view: "all"`; clearing view overrides does not remove built-in membership rules.
+`delete_task` soft-deletes by T-number; hard purge remains an internal maintenance operation.
+
 **Read tools (auto-execute, `confirm: "never"`)**
 
 | tool | backed by |

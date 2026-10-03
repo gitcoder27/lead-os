@@ -9,7 +9,8 @@ const key = z.string().regex(/^[Tt]-\d{1,9}$/);
 const taskKeyProperty = { type: "string", pattern: "^[Tt]-[0-9]{1,9}$" };
 const fields = {
   title: { type: "string" }, kind: { type: "string", enum: ["task", "meeting"] }, status: { type: "string", enum: ["open", "active", "blocked", "done", "dropped"] },
-  ownerType: { type: ["string", "null"], enum: ["manager", "developer", null] }, ownerId: { type: ["string", "null"] },
+  ownerType: { type: ["string", "null"], enum: ["manager", "developer", null], description: "Use manager for the current manager's own task, developer for a roster member, or null with ownerId=null for unowned work. Creating a task defaults to the current manager." },
+  ownerId: { type: ["string", "null"], description: "For ownerType=manager, omit this to use the current manager's authenticated account ID. Never use a roster/Jira ID as a manager ID. For ownerType=developer, supply the roster accountId from get_team_board. For unowned work, set null." },
   later: { type: "boolean" }, priority: { type: "string", enum: ["normal", "high"] }, labels: { type: "array", items: { type: "string" } },
   scheduledOn: { type: ["string", "null"] }, dueAt: { type: ["string", "null"] }, followUpAt: { type: ["string", "null"] },
   startsAt: { type: ["string", "null"] }, endsAt: { type: ["string", "null"] }, participants: { type: ["string", "null"] },
@@ -20,14 +21,15 @@ export function canonicalTaskTools({ phase3 = true }: { phase3?: boolean } = {})
   const service = new TaskService();
   const principal = (ctx: AssistantToolContext) => ({ type: "copilot" as const, accountId: ctx.managerAccountId, workspaceId: ctx.workspaceId });
   function tool<T>(name: string, description: string, schema: z.ZodType<T>, properties: Record<string, unknown>, required: string[], write: boolean, execute: (args: T, ctx: AssistantToolContext) => Promise<unknown>): AssistantToolDefinition {
+    const action = name.charAt(0).toUpperCase() + name.slice(1).replaceAll("_", " ");
     return { name, description, parameters: { type: "object", properties, required, additionalProperties: false }, confirm: write ? "always" : "never",
       invalidate: write ? ["tasks", "task-events", "task-resolution", "today", "team-tracker", "my-day", "manager-desk", "daily-notes", "workload"] : [],
-      label: () => description, summarize: (args) => `${name.replaceAll("_", " ")}${args.taskKey ? ` ${String(args.taskKey)}` : args.title ? `: ${String(args.title)}` : ""}`,
+      label: () => action, summarize: (args) => `${name.replaceAll("_", " ")}${args.taskKey ? ` ${String(args.taskKey)}` : args.title ? `: ${String(args.title)}` : ""}`,
       execute: async (raw, ctx) => {
         if (!(await new TaskKeysService().canonicalEnabled(ctx.workspaceId))) throw new HttpError(409, "Canonical tasks are not enabled");
         const parsed = schema.safeParse(raw);
         if (!parsed.success) throw new HttpError(400, parsed.error.issues.map((issue) => issue.message).join(", "));
-        return { result: await execute(parsed.data, ctx), summary: description };
+        return { result: await execute(parsed.data, ctx), summary: action };
       },
     };
   }
@@ -36,8 +38,8 @@ export function canonicalTaskTools({ phase3 = true }: { phase3?: boolean } = {})
     tool("list_tasks", "List tasks", z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional() }).strict(),
       { view: { type: "string", enum: ["desk", "follow-ups", "meetings", "developer", "all"] }, ownerId: { type: "string" }, date: { type: "string" }, closedFrom: { type: "string" }, closedTo: { type: "string" } }, [], false,
       async (args, ctx) => ({ tasks: await Promise.all((await service.list(principal(ctx), args)).slice(0, 100).map((row) => service.toDto(row, principal(ctx)))) })),
-    tool("create_task", "Create task", taskCreateSchema, fields, ["title"], true, async (args, ctx) => service.toDto(await service.create(args, principal(ctx)), principal(ctx))),
-    tool("update_task", "Update task", update, { ...fields, taskKey: taskKeyProperty }, ["taskKey"], true, async ({ taskKey, ...args }, ctx) => service.toDto(await service.update(taskKey, args, principal(ctx)), principal(ctx))),
+    tool("create_task", "Create task. Defaults to the current manager. Omit ownerId for manager-owned work; only developer assignments use roster account IDs. Dated tasks appear in Planned today or My tasks, not automatically in Inbox or Needs attention.", taskCreateSchema, fields, ["title"], true, async (args, ctx) => service.toDto(await service.create(args, principal(ctx)), principal(ctx))),
+    tool("update_task", "Update task. To assign it to the current manager, set ownerType=manager and omit ownerId. Use ownerType=developer with a roster account ID only for developer assignments.", update, { ...fields, taskKey: taskKeyProperty }, ["taskKey"], true, async ({ taskKey, ...args }, ctx) => service.toDto(await service.update(taskKey, args, principal(ctx)), principal(ctx))),
     tool("delete_task", "Delete task", z.object({ taskKey: key }).strict(), { taskKey: taskKeyProperty }, ["taskKey"], true, async ({ taskKey }, ctx) => { await service.remove(taskKey, principal(ctx)); return { deleted: true, taskKey }; }),
     tool("reassign_task", "Reassign task", z.object({ taskKey: key, toAccountId: z.string().min(1) }).strict(), { taskKey: taskKeyProperty, toAccountId: { type: "string" } }, ["taskKey", "toAccountId"], true,
       async ({ taskKey, toAccountId }, ctx) => service.toDto(await service.update(taskKey, { ownerType: "developer", ownerId: toAccountId }, principal(ctx)), principal(ctx))),

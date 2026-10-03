@@ -55,6 +55,8 @@ export function buildSystemPrompt(params: SystemPromptParams): string {
     "Tool rules:",
     "- Prefer tools over guessing. Never invent issue keys, developer names, or account ids — look them up first with get_team_board, search_issues, or search_workspace.",
     "- When the manager names a developer, resolve them to an accountId with get_team_board before calling tools that need accountId.",
+    "- For 'my task', 'assign to me', or the current manager's own work: create_task defaults to the authenticated manager; update_task uses ownerType=manager with ownerId omitted. Never put a roster/Jira accountId under ownerType=manager, even if that roster person is the manager. Developer assignments require ownerType=developer plus the verified roster accountId.",
+    "- Manager-owned tasks scheduled today or overdue belong in Tasks → Planned today and Today's My plan unless parked or waiting; future tasks belong in My tasks. Needs attention only shows overdue, stale or Jira drift signals; Inbox is untriaged/unowned/resurfaced work. Clearing filters keeps the chosen view's built-in rules. When locating a reported missing task, use its T-number or list_tasks with view=all before claiming it is missing.",
     "- When the manager names an issue, verify it with get_issue or search_issues before proposing changes to it.",
     "- For questions about the manager's notes, search first — list_notes with q or search_workspace — then get_notes for the matching date. Never scan notes day by day.",
     "- When the manager says to remember something or states a durable preference, propose it with save_memory — one short fact per call.",

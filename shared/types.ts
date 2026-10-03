@@ -1084,6 +1084,7 @@ export interface PersonCommitmentsResponse {
   tasks: ManagerTask[];
 }
 export interface ManagerTask extends DeveloperTask {
+  /** Compatibility surface ID: mapped legacy desk ID, or canonical task ID when no mapping exists. */
   legacyDeskItemId?: number;
   later: boolean;
   trackedByManagerId: string | null;
@@ -1529,6 +1530,8 @@ export interface CreateTaskRequest {
   kind?: "task" | "meeting";
   status?: TaskStatus;
   ownerType?: TaskOwnerType | null;
+  /** Manager session ID, or developer roster ID. Omit for the current manager;
+   * on updates this default applies only when ownerType is explicitly "manager". */
   ownerId?: string | null;
   later?: boolean;
   priority?: "normal" | "high";

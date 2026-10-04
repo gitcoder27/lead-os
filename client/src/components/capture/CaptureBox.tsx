@@ -68,6 +68,11 @@ interface CaptureBoxProps {
   onClose: () => void;
   /** Fires after a successful capture, before close (standup session log, docs/50). */
   onCaptured?: (result: { intent: string; taskKey?: string }) => void;
+  /**
+   * docs/56 UX-10: structured context a caller adds to every capture from this box (a note
+   * source, links, a private first update). The assignee pill's owner is merged on top.
+   */
+  defaults?: CaptureDefaults;
 }
 
 /** docs/57 §3 (P3-05): Cmd/Ctrl+Enter captures and keeps the box open for the next one. */
@@ -151,7 +156,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
  * preview + structured summary; the server re-parses authoritatively on
  * submit. Errors block the submit; warnings may need a confirm press.
  */
-export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: CaptureBoxProps) {
+export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaults: baseDefaults }: CaptureBoxProps) {
   const hintId = useId();
   const { addToast } = useToast();
   const capture = useCapture();
@@ -264,9 +269,10 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
 
   const submit = (confirm = false, keepOpen = false) => {
     if (!resolved || blocked || capture.isPending) return;
-    const defaults: CaptureDefaults | undefined = activeAssignee && resolved.intent === 'create' && !resolved.owner && !resolved.later
+    const ownerDefault: CaptureDefaults | undefined = activeAssignee && resolved.intent === 'create' && !resolved.owner && !resolved.later
       ? { ownerAccountId: activeAssignee.accountId }
       : undefined;
+    const defaults: CaptureDefaults | undefined = baseDefaults || ownerDefault ? { ...baseDefaults, ...ownerDefault } : undefined;
     const tz = getLocalTimeZone();
     const clientToday = getLocalIsoDate();
     // docs/56 UX-05: the box shows `@Marcus`; the server gets the picked person's id.

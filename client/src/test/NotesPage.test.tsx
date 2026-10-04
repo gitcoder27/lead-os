@@ -133,6 +133,17 @@ const roster = [
   { accountId: 'dev-deepak', displayName: 'Deepak Singh' },
 ];
 
+const mockCaptureMutate = vi.fn();
+vi.mock('@/hooks/useCapture', () => ({
+  useCapture: () => ({ mutate: mockCaptureMutate, isPending: false }),
+}));
+vi.mock('@/hooks/useDevelopers', () => ({ useDevelopers: () => ({ data: roster, isPending: false }) }));
+vi.mock('@/hooks/useContacts', () => ({
+  useContacts: () => ({ data: [] }),
+  useCreateContact: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+vi.mock('@/hooks/useTaskLabels', () => ({ useTaskLabels: () => ({ data: { labels: [] } }) }));
+
 vi.mock('@/hooks/useManagerDesk', () => ({
   useManagerDeskDeveloperLookup: () => ({ data: roster, isLoading: false }),
 }));
@@ -671,7 +682,7 @@ describe('NotesPage', () => {
     expect(editorCalls.appendMarker.at(-1)?.key).toBe('T-12');
   });
 
-  it('creates a task from a selection with @person pre-picked as assignee', async () => {
+  it('creates a task through the shared capture box: owner pill, mention stripped, note source as defaults (UX-10)', async () => {
     editorState.body = 'Ask @Rohit to own the rollout\nneeds a runbook first';
     renderPage();
     selectInEditor(0, editorState.body.length);
@@ -679,17 +690,23 @@ describe('NotesPage', () => {
     await openTurnInto(/^Task/);
     const dialog = await screen.findByRole('dialog', { name: 'Create task' });
 
-    expect(within(dialog).getByLabelText('Title')).toHaveValue('Ask @Rohit to own the rollout');
-    expect(within(dialog).getByLabelText(/Context/)).toHaveValue('needs a runbook first');
+    // The separate form is gone: one capture input, the line prefilled without the mention.
+    expect(within(dialog).queryByLabelText('Title')).toBeNull();
+    expect(within(dialog).getByLabelText('Capture')).toHaveValue('Ask to own the rollout');
     expect(within(dialog).getByText('Rohit Sharma')).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 more line becomes a private first update/)).toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /^Create task$/ }));
-    expect(mockTaskCreateMutate.mock.calls[0][0]).toMatchObject({
-      title: 'Ask @Rohit to own the rollout',
-      developerAccountId: 'dev-rohit',
-      context: 'needs a runbook first',
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Capture$/ }));
+    expect(mockTaskCreateMutate).not.toHaveBeenCalled();
+    expect(mockCaptureMutate.mock.calls[0][0]).toMatchObject({
+      text: 'Ask to own the rollout',
+      defaults: {
+        ownerAccountId: 'dev-rohit',
+        contextNote: 'needs a runbook first',
+        source: { type: 'note', noteDate: '2026-09-12', noteKind: 'scratchpad' },
+      },
     });
-    act(() => mockTaskCreateMutate.mock.calls[0][1].onSuccess({ taskKey: 'T-90' }));
+    act(() => mockCaptureMutate.mock.calls[0][1].onSuccess({ intent: 'create', diagnostics: [], confirmRequired: false, blocked: false, task: { taskKey: 'T-90', title: 'Ask to own the rollout' } }));
     expect(editorCalls.appendMarker.at(-1)?.key).toBe('T-90');
   });
 

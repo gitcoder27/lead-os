@@ -142,6 +142,16 @@ export function mentionPattern(developers: NoteDeveloper[]): RegExp | null {
   return new RegExp(`@(${alternatives.join('|')})(?![\\p{L}\\p{N}_])`, 'giu');
 }
 
+/**
+ * docs/56 UX-10: the line without its `@mention` of `developer` — used once that person is the
+ * task's owner, so the title does not repeat them. Other text is kept as written.
+ */
+export function stripMention(text: string, developer: NoteDeveloper): string {
+  const pattern = mentionPattern([developer]);
+  if (!pattern) return text;
+  return text.replace(pattern, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 export function resolveMention(name: string, developers: NoteDeveloper[]): NoteDeveloper | null {
   const needle = name.trim().toLowerCase();
   return (

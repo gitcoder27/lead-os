@@ -325,6 +325,29 @@ describe('DefectTable', () => {
     expect(screen.getByText('Cart total calculation error')).toBeInTheDocument();
   });
 
+  it('shows cards, not a scrolling table, on a phone (UX-25)', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ media: query, matches: query === '(max-width: 640px)', addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    try {
+      const onSelectIssue = vi.fn();
+      render(
+        <TestWrapper>
+          <DefectTable {...defaultProps} onSelectIssue={onSelectIssue} />
+        </TestWrapper>
+      );
+      expect(screen.queryByRole('table')).toBeNull();
+      const cards = screen.getAllByTestId('defect-card');
+      expect(cards.length).toBeGreaterThanOrEqual(2);
+      const first = cards.find((card) => card.textContent?.includes('PROJ-101'))!;
+      expect(first).toHaveTextContent('Login page crashes on submit');
+      expect(first).toHaveTextContent('Alice');
+      expect(first).toHaveTextContent('To Do');
+      fireEvent.click(first);
+      expect(onSelectIssue).toHaveBeenCalledWith('PROJ-101');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('calls onSelectIssue when a row is clicked', () => {
     render(
       <TestWrapper>

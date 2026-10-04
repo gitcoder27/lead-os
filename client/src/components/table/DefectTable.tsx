@@ -34,6 +34,8 @@ import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { isOverdue, isDueToday, getLocalIsoDate } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { DefectCardList } from './DefectCardList';
 import type { Issue, FilterType } from '@/types';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { JiraNotConnectedState, NothingSyncedState, ProjectCleanState } from './DefectEmptyStates';
@@ -203,6 +205,8 @@ export function DefectTable({
   onConnectJira,
   onOpenSyncSettings,
 }: DefectTableProps) {
+  // docs/56 UX-25: phones get one card per defect instead of a sideways-scrolling table.
+  const isPhone = useMediaQuery('(max-width: 640px)');
   const { theme } = useTheme();
   const { data: issues, isLoading, isError, error, refetch, isFetching } = useIssues(filter, assigneeFilter, tagId, noTags);
   const { data: config } = useConfig();
@@ -1118,6 +1122,12 @@ export function DefectTable({
                 </p>
               </div>
             </div>
+          ) : isPhone ? (
+            <DefectCardList
+              issues={table.getRowModel().rows.map((row) => row.original)}
+              selectedKey={selectedKey}
+              onSelectIssue={onSelectIssue}
+            />
           ) : (
             <table className="min-w-full border-separate border-spacing-y-0">
               <thead>

@@ -159,6 +159,56 @@ describe("BackupService", () => {
     await expect(backupService.createPreResetBackup()).resolves.toBeNull();
   });
 
+  it("lists and prunes only this database's own snapshots in a shared directory", async () => {
+    // UX-01: a scratch or mis-pointed instance sharing a backup directory must never touch
+    // another database's snapshots. "alpha.sandbox" also checks the prefix is not a loose match.
+    const scratchDir = path.join(testBackupDirectory, "..", "backups-service-dbs");
+    const alpha = new BackupService(new SettingsService(), rawDb, path.join(scratchDir, "alpha.db"));
+    const sandbox = new BackupService(new SettingsService(), rawDb, path.join(scratchDir, "alpha.sandbox.db"));
+    const beta = new BackupService(new SettingsService(), rawDb, path.join(scratchDir, "beta.db"));
+
+    await (alpha as any).createBackup({ reason: "scheduled", prune: false });
+    await (alpha as any).createBackup({ reason: "scheduled", prune: false });
+    const alphaManual = await alpha.createManualBackup("keep-alpha");
+    const sandboxBackup = await sandbox.createManualBackup("keep-sandbox");
+    const legacyName = "alpha.backup-20260306-192527.db";
+    fs.copyFileSync(alphaManual.path, path.join(testBackupDirectory, legacyName));
+    fs.writeFileSync(path.join(testBackupDirectory, "unrelated.db"), "");
+
+    // Make every alpha snapshot expired, then let beta prune with a tight retention and cap.
+    const oldDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    for (const backup of await alpha.listBackups()) {
+      fs.utimesSync(backup.path, oldDate, oldDate);
+    }
+    await upsertConfig("backup_retention_days", "1");
+    await upsertConfig("backup_max_scheduled_snapshots", "1");
+    await (beta as any).createBackup({ reason: "scheduled", prune: true });
+    await (beta as any).createBackup({ reason: "scheduled", prune: true });
+
+    const betaNames = (await beta.listBackups()).map((backup) => backup.name);
+    expect(betaNames).toHaveLength(1);
+    expect(betaNames.every((name) => name.startsWith("beta.backup-"))).toBe(true);
+
+    const alphaNames = (await alpha.listBackups()).map((backup) => backup.name);
+    expect(alphaNames).toHaveLength(4);
+    expect(alphaNames).toContain(legacyName);
+    expect(alphaNames).toContain(alphaManual.name);
+    expect(alphaNames.some((name) => name.startsWith("alpha.sandbox."))).toBe(false);
+    expect((await sandbox.listBackups()).map((backup) => backup.name)).toEqual([sandboxBackup.name]);
+    expect(fs.existsSync(path.join(testBackupDirectory, "unrelated.db"))).toBe(true);
+
+    // Downloads resolve only this database's snapshots.
+    expect(await beta.findBackup(alphaManual.name)).toBeUndefined();
+    expect(await alpha.findBackup(alphaManual.name)).toBeDefined();
+
+    // Alpha's own prune still applies its retention to its own files.
+    await alpha.createManualBackup("fresh-alpha");
+    const remaining = (await alpha.listBackups()).map((backup) => backup.name);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toContain("fresh-alpha");
+    expect((await sandbox.listBackups()).map((backup) => backup.name)).toEqual([sandboxBackup.name]);
+  });
+
   it("updates runtime status when scheduling starts and stops", async () => {
     const backupService = createBackupService();
 

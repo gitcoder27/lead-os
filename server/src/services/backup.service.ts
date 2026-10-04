@@ -116,6 +116,11 @@ export class BackupService {
     return this.createBackup({ reason: "pre-reset", prune: true });
   }
 
+  /**
+   * docs/56 UX-01: only this database's snapshots (`<db>.backup-*.db`). A backup directory
+   * can be shared by several databases (a scratch copy, a worktree, a mis-pointed instance),
+   * so listing, download and pruning must never reach another database's files.
+   */
   async listBackups(): Promise<BackupRecord[]> {
     const backupDirectory = await this.getBackupDirectory();
     if (!fs.existsSync(backupDirectory)) {
@@ -125,7 +130,7 @@ export class BackupService {
     const entries = await fs.promises.readdir(backupDirectory, { withFileTypes: true });
     const backups = await Promise.all(
       entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith(".db"))
+        .filter((entry) => entry.isFile() && this.isOwnBackupName(entry.name))
         .map(async (entry) => {
           const filePath = path.join(backupDirectory, entry.name);
           const stats = await fs.promises.stat(filePath);
@@ -342,8 +347,15 @@ export class BackupService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "manual";
 
-    const dbName = path.basename(this.dbPath, ".db");
-    return `${dbName}.backup-${timestamp}-${sanitizedReason}.db`;
+    return `${this.backupPrefix()}${timestamp}-${sanitizedReason}.db`;
+  }
+
+  private backupPrefix(): string {
+    return `${path.basename(this.dbPath, ".db")}.backup-`;
+  }
+
+  private isOwnBackupName(filename: string): boolean {
+    return filename.startsWith(this.backupPrefix()) && filename.endsWith(".db");
   }
 
   private parseReasonFromFilename(filename: string): string {

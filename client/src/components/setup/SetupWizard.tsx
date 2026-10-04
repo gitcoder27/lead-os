@@ -163,33 +163,31 @@ const WORKSPACE_KIND_OPTIONS: Array<{ value: WorkspaceKind; title: string; descr
 
 const stepOrderFor = (kind: WorkspaceKind) => (kind === 'team' ? TEAM_STEP_ORDER : SOLO_STEP_ORDER);
 
-const STEP_COPY: Record<Exclude<WizardStep, 'syncing'>, { label: string; title: string; description: string; icon: typeof BriefcaseBusiness }> = {
+/** docs/56 UX-14: steps that only exist with a Jira connection; uncounted ("with Jira") until it is saved. */
+const JIRA_ONLY_STEPS = new Set<WizardStep>(['manager-mapping', 'team-members']);
+
+const STEP_COPY: Record<Exclude<WizardStep, 'syncing'>, { title: string; description: string; icon: typeof BriefcaseBusiness }> = {
   'manager-account': {
-    label: '1',
     title: 'Create manager account',
     description: 'Start with your account. Jira, team members and developer logins are all optional and can come later.',
     icon: BriefcaseBusiness,
   },
   'jira-connection': {
-    label: '2',
     title: 'Connect Jira',
     description: 'Jira is optional. Connect it for defect sync, or skip it and start with your own tasks and notes.',
     icon: PlugZap,
   },
   'manager-mapping': {
-    label: '3',
     title: 'Manager sync scope',
     description: 'Map a Jira identity only if manager-owned assignments should appear in sync scope.',
     icon: UserCog,
   },
   'team-members': {
-    label: '4',
     title: 'Build team roster',
     description: 'Choose synced Jira people now, or add team members manually from Settings later.',
     icon: Users,
   },
   'developer-access': {
-    label: '5',
     title: 'Developer access',
     description: 'Create My Day access for developers who will update their own daily workspace.',
     icon: ShieldPlus,
@@ -206,6 +204,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const teamMode = useTeamMode();
   const [workspaceKind, setWorkspaceKind] = useState<WorkspaceKind>(teamMode === 'collab' ? 'team' : 'solo');
   const stepOrder = stepOrderFor(workspaceKind);
+  const [jiraSavedHere, setJiraSavedHere] = useState(false);
+  const jiraReady = jiraSavedHere || Boolean(configQuery.data?.jiraBaseUrl && configQuery.data?.jiraApiToken);
+  // The "Step N of M" count: Jira-only steps join it once Jira is saved, so "Just me" never overstates the work.
+  const countedSteps = jiraReady ? stepOrder : stepOrder.filter((key) => !JIRA_ONLY_STEPS.has(key));
+  const stepNumber = (key: WizardStep): number | null => {
+    const index = countedSteps.indexOf(key as Exclude<WizardStep, 'syncing'>);
+    return index === -1 ? null : index + 1;
+  };
 
   const [step, setStep] = useState<WizardStep>(
     isAuthenticated && user?.role === 'manager' ? 'jira-connection' : 'manager-account'
@@ -436,6 +442,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         title: 'Jira connection saved',
         message: 'Now choose whether the manager should also be included in sync scope.',
       });
+      setJiraSavedHere(true);
       goToStep('manager-mapping');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to save Jira connection');
@@ -700,7 +707,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     title={meta.title}
                   >
                     {isComplete ? <Check size={11} /> : <Icon size={11} />}
-                    <span className="hidden sm:inline">{meta.label}</span>
+                    <span className={stepNumber(stepKey) === null ? undefined : 'hidden sm:inline'}>{stepNumber(stepKey) ?? 'with Jira'}</span>
                   </div>
                   {index < stepOrder.length - 1 && (
                     <div
@@ -740,7 +747,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
             <div className="text-[12px] font-semibold uppercase tracking-[0.24em]" style={{ color: '#fbbf24' }}>
-              Step {activeStepMeta.label} of {stepOrder.length}
+              {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira'}
             </div>
             <h2 className="mt-2 text-[24px] font-semibold leading-tight tracking-tight md:text-[28px]" style={{ color: 'var(--text-primary)' }}>
               {activeStepMeta.title}

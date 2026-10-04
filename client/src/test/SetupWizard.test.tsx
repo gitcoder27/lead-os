@@ -29,15 +29,18 @@ vi.mock('@/context/ToastContext', () => ({
   useToast: () => ({ addToast: vi.fn() }),
 }));
 
+const configMock = vi.hoisted(() => ({ jira: true }));
 vi.mock('@/hooks/useConfig', () => ({
   useConfig: () => ({
-    data: {
-      jiraBaseUrl: 'https://tenant.atlassian.net',
-      jiraEmail: 'ops@example.com',
-      jiraProjectKey: 'AM',
-      jiraApiToken: '****',
-      managerJiraAccountId: '',
-    },
+    data: configMock.jira
+      ? {
+        jiraBaseUrl: 'https://tenant.atlassian.net',
+        jiraEmail: 'ops@example.com',
+        jiraProjectKey: 'AM',
+        jiraApiToken: '****',
+        managerJiraAccountId: '',
+      }
+      : { jiraBaseUrl: '', jiraEmail: '', jiraProjectKey: '', jiraApiToken: '', managerJiraAccountId: '' },
     refetch: vi.fn(),
   }),
 }));
@@ -129,6 +132,20 @@ describe('SetupWizard', () => {
       expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('radio', { name: /me and a team/i }));
       expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
+    });
+
+    it('counts only the steps that apply until Jira is saved (UX-14)', () => {
+      configMock.jira = false;
+      try {
+        auth.authenticated = false;
+        render(<SetupWizard onComplete={vi.fn()} />);
+        expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
+        expect(screen.getAllByText('with Jira')).toHaveLength(2);
+        fireEvent.click(screen.getByRole('radio', { name: /me and a team/i }));
+        expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
+      } finally {
+        configMock.jira = true;
+      }
     });
 
     it('needs an 8-character password and sends only the manager account', async () => {

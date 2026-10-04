@@ -89,7 +89,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
   const [saveError, setSaveError] = useState(false);
   const ownerValues = overrides.owner ? overrides.owner.split(',') : [];
   const devName = (id: string) => developers.find((dev) => dev.accountId === id)?.displayName ?? id;
-  const ownerLabel = (value: string) => ({ me: 'Me', team: 'Team', inbox: 'Inbox' } as Record<string, string>)[value] ?? devName(value);
+  const ownerLabel = (value: string) => ({ me: 'You', team: 'Team', inbox: 'Inbox' } as Record<string, string>)[value] ?? devName(value);
   const toggleOwner = (value: string) => {
     if ((OWNER_TOKENS as readonly string[]).includes(value)) {
       onOverrides({ owner: overrides.owner === value ? undefined : value });

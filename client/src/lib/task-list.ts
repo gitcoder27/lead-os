@@ -47,7 +47,8 @@ export function waitingChips(
 ): { aging: string | null; check: { label: string; tone: 'danger' | 'warning' | 'muted' } | null } {
   if (!isOpenStatus(task.status)) return { aging: null, check: null };
   const days = task.signals?.waitingDays;
-  const aging = days === null || days === undefined ? null : `Waiting ${days}d`;
+  // docs/56 UX-09: "Waiting since today", never "Waiting 0d".
+  const aging = days === null || days === undefined ? null : days === 0 ? 'Waiting since today' : `Waiting ${days}d`;
   const due = localDateOf(task.followUpAt);
   if (!due) return { aging, check: null };
   const diff = daysBetween(today, due);

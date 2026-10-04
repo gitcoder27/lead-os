@@ -180,7 +180,8 @@ export function AssignMenu({ anchor, developers, onClose, onSelect }: {
   const [query, setQuery] = useState('');
   const options = useMemo(() => {
     const all: { key: string; label: string; target: AssignTarget }[] = [
-      { key: 'me', label: 'Me', target: { ownerType: 'manager', ownerId: null } },
+      // docs/56 UX-09: the manager is "You" everywhere.
+      { key: 'me', label: 'You', target: { ownerType: 'manager', ownerId: null } },
       ...developers.map((dev) => ({ key: dev.accountId, label: dev.displayName, target: { ownerType: 'developer' as const, ownerId: dev.accountId } })),
       { key: 'inbox', label: 'Unassigned (Inbox)', target: { ownerType: null, ownerId: null } },
     ];

@@ -17,7 +17,7 @@ export function ReviewWaitingStep({ ctx }: { ctx: ReviewStepContext }) {
   const section = findSection(ctx.review, 'quiet');
   const rows = section?.rows;
   const groups = useMemo<DecisionGroup[]>(() => {
-    const ownerName = (ownerType: string | null, ownerId: string | null) => (ownerType === 'developer' && ownerId ? ctx.personName(ownerId) : 'Me');
+    const ownerName = (ownerType: string | null, ownerId: string | null) => (ownerType === 'developer' && ownerId ? ctx.personName(ownerId) : 'You');
     return groupTaskViewTasks(rows ?? [], 'party', ctx.review.today, ownerName, ctx.selfAccountId).map((bucket) => ({
       key: bucket.key.replace(/[^A-Za-z0-9_-]/g, '-'),
       label: bucket.label === 'Blocked' ? 'Blocked' : bucket.label,

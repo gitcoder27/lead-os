@@ -333,6 +333,8 @@ describe('actions and undo (docs/49 §6)', () => {
     const chips = (followUpAt: string | null, waitingDays: number | null = 3, status: ManagerTask['status'] = 'open') =>
       waitingChips({ followUpAt, status, signals: { waitingDays } }, TODAY);
     expect(chips(null)).toEqual({ aging: 'Waiting 3d', check: null });
+    // UX-09: a task that started waiting today says so instead of "Waiting 0d".
+    expect(chips(null, 0).aging).toBe('Waiting since today');
     expect(chips(new Date('2026-09-24T09:00:00').toISOString()).check).toEqual({ label: 'Check 2d late', tone: 'danger' });
     expect(chips(new Date('2026-09-26T09:00:00').toISOString()).check).toEqual({ label: 'Check today', tone: 'warning' });
     expect(chips(new Date('2026-09-29T09:00:00').toISOString()).check?.tone).toBe('muted');

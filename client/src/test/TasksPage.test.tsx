@@ -599,7 +599,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ ownerType: 'developer', ownerId: 'dev-1' });
   });
 
-  it('resolves the manager\'s linked developer account as Me (docs/51 F3)', () => {
+  it('resolves the manager\'s linked developer account as You (docs/51 F3, UX-09)', () => {
     // A linked manager's accountId IS their developer account id.
     mockUser.mockReturnValue({ accountId: 'dev-1', role: 'manager', developerAccountId: 'dev-1' });
     window.history.replaceState(null, '', '/tasks?view=waiting');
@@ -608,20 +608,20 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       task({ id: 2, taskKey: 'T-6', title: 'On the team', ownerType: 'developer', ownerId: 'dev-9', status: 'blocked' }),
     ]));
     render(<TasksPage />);
-    // Owner grouping files dev-self work under Me, not a second self-named group.
+    // Owner grouping files dev-self work under You, not a second self-named group.
     const groupLabels = [...document.querySelectorAll('section h2')].map((el) => el.textContent);
-    expect(groupLabels).toEqual(['Me', 'Unknown owner']);
+    expect(groupLabels).toEqual(['You', 'Unknown owner']);
     // The assign menu and owner filter don't list self twice.
     press('j');
     press('a');
     const menu = screen.getByRole('menu', { name: 'Assign' });
-    expect(within(menu).getByRole('menuitem', { name: 'Me' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'You' })).toBeTruthy();
     expect(within(menu).queryByRole('menuitem', { name: 'Dev One' })).toBeNull();
     fireEvent.keyDown(menu, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'View options' }));
     const ownerMenu = screen.getByRole('menu', { name: 'View options' });
     expect(within(ownerMenu).queryByRole('menuitemcheckbox', { name: 'Dev One' })).toBeNull();
-    expect(within(ownerMenu).getByRole('menuitemcheckbox', { name: 'Me' })).toBeTruthy();
+    expect(within(ownerMenu).getByRole('menuitemcheckbox', { name: 'You' })).toBeTruthy();
   });
 
   it('Overdue header moves every overdue task to today', async () => {

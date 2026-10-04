@@ -122,7 +122,7 @@ export function TodayTextCaptureDialog({
               disabled={!nextAction.trim()}
               className="ui-field"
             >
-              <option value="">Me</option>
+              <option value="">You</option>
               {nextActionOwners.map((owner) => (
                 <option key={owner.accountId} value={owner.accountId}>{owner.displayName}</option>
               ))}

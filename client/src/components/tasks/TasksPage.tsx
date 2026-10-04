@@ -247,11 +247,12 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const ownerName = useCallback(
     (ownerType: string | null, ownerId: string | null) => {
       if (ownerType === 'developer' && ownerId) {
-        if (ownerId === selfAccountId) return 'Me';
+        // docs/56 UX-09: the manager is "You" everywhere.
+        if (ownerId === selfAccountId) return 'You';
         return developerList.find((dev) => dev.accountId === ownerId)?.displayName ?? 'Unknown owner';
       }
       if (!ownerType) return 'Unassigned';
-      return ownerId === selfAccountId ? 'Me' : 'Another manager';
+      return ownerId === selfAccountId ? 'You' : 'Another manager';
     },
     [developerList, selfAccountId],
   );
@@ -862,7 +863,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           labels={labelRegistry}
           isSavedView={Boolean(savedSelected)}
           hasOverrides={overridesActive}
-          onExport={() => downloadCsv(tasksCsv(baseGroups.flatMap((group) => group.tasks), ownerName, today), csvFileName('tasks', selectedId, today))}
+          // A CSV is read by others, so the manager stays "Me" there.
+          onExport={() => downloadCsv(tasksCsv(baseGroups.flatMap((group) => group.tasks), (type, id) => { const name = ownerName(type, id); return name === 'You' ? 'Me' : name; }, today), csvFileName('tasks', selectedId, today))}
           canExport={Boolean(tasks.data) && !tasks.isPlaceholderData}
           onSaveView={handleSaveView}
           saving={saveView.isPending}

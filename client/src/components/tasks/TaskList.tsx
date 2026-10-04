@@ -185,7 +185,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
     );
   } else if (context.mode === 'owner') {
     const name = context.ownerType ? ownerName(context.ownerType, context.ownerId) : null;
-    indicator = name === 'Me' ? (
+    indicator = name === 'You' ? (
       <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }} aria-hidden="true">
         <UserRound size={11} />
       </span>

@@ -1135,6 +1135,22 @@ describe('TeamTrackerPage', () => {
     expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('a blocked card with no next check offers Set check and Follow up (UX-34)', () => {
+    const bob = mockBoard.developers.find((day) => day.developer.displayName === 'Bob Jones')!;
+    bob.nextFollowUpAt = undefined;
+    render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    clickDeveloperRow('Bob Jones');
+    const drawer = screen.getByRole('dialog', { name: 'Bob Jones developer details' });
+    expect(within(drawer).queryByText('Next check not scheduled.')).not.toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: 'Follow up' })).toBeInTheDocument();
+    fireEvent.click(within(drawer).getByRole('button', { name: /Set check/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Tomorrow/ }));
+    expect(mockUpdateDayMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: bob.developer.accountId, nextFollowUpAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) }),
+      expect.anything(),
+    );
+  });
+
   it('puts all-date commitments before current work and shows risk age and next check near the identity', () => {
     mockPersonCanonical = true;
     render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
@@ -1145,7 +1161,8 @@ describe('TeamTrackerPage', () => {
     expect(commitments.compareDocumentPosition(current) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(drawer).getByText('All dates')).toBeInTheDocument();
     expect(within(drawer).getByText(/Status since/)).toBeInTheDocument();
-    expect(within(drawer).getByText(/Next check/)).toBeInTheDocument();
+    // UX-34: with no check scheduled the card offers to set one.
+    expect(within(drawer).getByRole('button', { name: /Set check/ })).toBeInTheDocument();
     expect(within(drawer).getByText('Open items')).toBeInTheDocument();
     expect(within(drawer).queryByText('Follow-ups')).not.toBeInTheDocument();
   });

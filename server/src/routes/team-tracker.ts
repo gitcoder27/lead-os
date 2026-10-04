@@ -104,7 +104,9 @@ const updateDaySchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     status: trackerStatusSchema.optional(),
     managerNotes: z.string().trim().optional(),
-  }).refine((value) => value.status !== undefined || value.managerNotes !== undefined, {
+    /** docs/56 UX-34: the next check on this person (null clears it). */
+    nextFollowUpAt: z.string().datetime({ offset: true }).nullable().optional(),
+  }).refine((value) => value.status !== undefined || value.managerNotes !== undefined || value.nextFollowUpAt !== undefined, {
     message: "At least one day field is required",
   }),
   query: z.any().optional(),
@@ -491,10 +493,11 @@ export function createTeamTrackerRouter(
     async (req, res, next) => {
       try {
         const accountId = req.params.accountId as string;
-        const { date, status, managerNotes } = req.body;
+        const { date, status, managerNotes, nextFollowUpAt } = req.body;
         const day = await trackerService.updateDay(accountId, date, {
           status,
           managerNotes,
+          nextFollowUpAt,
         }, req.auth!.user.workspaceId, { type: req.auth!.user.role });
         res.json(day);
       } catch (error) {

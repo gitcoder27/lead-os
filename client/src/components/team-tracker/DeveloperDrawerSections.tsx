@@ -19,7 +19,7 @@ import { formatAbsoluteDateTime, formatDate, getLocalIsoDate } from '@/lib/utils
 import { useToast } from '@/context/ToastContext';
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
-import { useStatusUpdate } from '@/hooks/useTeamTrackerMutations';
+import { useStatusUpdate, useUpdateDay } from '@/hooks/useTeamTrackerMutations';
 import type { TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
@@ -27,7 +27,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { IconButton } from '@/components/ui/IconButton';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { FOCUS_RING } from '@/components/ui/focus';
-import { describeMoment, describePlanDate, toneColor } from '@/components/tasks/task-detail-format';
+import { describeMoment, describePlanDate, followUpPresets, toneColor } from '@/components/tasks/task-detail-format';
 import { TrackerItemRow } from './TrackerItemRow';
 import { getSignalBadges, type SignalTone } from './TrackerSignalBadges';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
@@ -198,6 +198,8 @@ interface DeveloperHeroProps {
   load: number;
   readOnly: boolean;
   titleId: string;
+  /** docs/56 UX-34: capture a follow-up about this person (the drawer's capture). */
+  onFollowUp?: () => void;
 }
 
 /** Check-in freshness, or a quiet "last touched" for people who do not check in. */
@@ -231,7 +233,7 @@ function FreshnessLine({ day }: { day: TrackerDeveloperDay }) {
   );
 }
 
-export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: DeveloperHeroProps) {
+export function DeveloperHero({ day, date, tasks, load, readOnly, titleId, onFollowUp }: DeveloperHeroProps) {
   return (
     <header className="space-y-4">
       <div className="flex items-start gap-3.5">
@@ -256,7 +258,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId }: Dev
           </div>
         </div>
       </div>
-      <AttentionNote day={day} />
+      <AttentionNote day={day} date={date} readOnly={readOnly} onFollowUp={onFollowUp} />
     </header>
   );
 }
@@ -292,7 +294,7 @@ function latestStatusRationale(day: TrackerDeveloperDay): TrackerCheckIn | undef
  * One calm note for everything that wants the manager's attention: signals,
  * why the status is what it is, and when to look again. Absent when all is well.
  */
-function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
+function AttentionNote({ day, date, readOnly = false, onFollowUp }: { day: TrackerDeveloperDay; date: string; readOnly?: boolean; onFollowUp?: () => void }) {
   const mode = useTeamMode();
   const checkInClock = usesCheckIns(mode, day.participates);
   const badges = getSignalBadges(day);
@@ -353,7 +355,9 @@ function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
         </p>
       )}
       {!followUp && (badges.length > 0 || RATIONALE_STATUSES.includes(day.status)) && (
-        <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Next check not scheduled.</p>
+        readOnly
+          ? <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Next check not scheduled.</p>
+          : <NextCheckActions day={day} date={date} onFollowUp={onFollowUp} />
       )}
       {followUp && (
         <p className="flex items-center gap-1.5 text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
@@ -362,6 +366,53 @@ function AttentionNote({ day }: { day: TrackerDeveloperDay }) {
           {followUp.hint && <span style={{ color: toneColor(followUp.tone) }}>· {followUp.hint}</span>}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * docs/56 UX-34: when nothing is scheduled the card says what to do about it — pick when to look again,
+ * or capture a follow-up now — instead of "Next check not scheduled."
+ */
+function NextCheckActions({ day, date, onFollowUp }: { day: TrackerDeveloperDay; date: string; onFollowUp?: () => void }) {
+  const updateDay = useUpdateDay(date);
+  const { addToast } = useToast();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const setCheck = (value: string, label: string) => {
+    setAnchor(null);
+    updateDay.mutate(
+      { accountId: day.developer.accountId, nextFollowUpAt: value },
+      {
+        onSuccess: () => addToast({ type: 'success', title: `Next check ${label.toLowerCase()}` }),
+        onError: (error) => addToast({ type: 'error', title: 'Could not set the check', message: error instanceof Error ? error.message : undefined }),
+      },
+    );
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+      <button
+        type="button"
+        className="ui-btn inline-flex items-center gap-1.5"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(anchor)}
+        disabled={updateDay.isPending}
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+      >
+        <BellRing size={12} aria-hidden="true" />
+        Set check
+      </button>
+      {onFollowUp ? (
+        <button type="button" className="ui-btn-ghost inline-flex items-center gap-1.5" onClick={onFollowUp}>
+          Follow up
+        </button>
+      ) : null}
+      {anchor ? (
+        <TaskPopover anchor={anchor} onClose={() => setAnchor(null)} label="Set next check" width={220}>
+          {followUpPresets().map((preset) => (
+            <MenuItem key={preset.key} label={`${preset.label} · ${preset.hint}`} onSelect={() => setCheck(preset.value, preset.label)} />
+          ))}
+        </TaskPopover>
+      ) : null}
     </div>
   );
 }

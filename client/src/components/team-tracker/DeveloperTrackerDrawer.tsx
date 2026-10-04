@@ -357,6 +357,7 @@ export function DeveloperTrackerDrawer({
                   load={assignedTodayCount}
                   readOnly={readOnly}
                   titleId={titleId}
+                  onFollowUp={readOnly ? undefined : () => setDeskCaptureOpen(true)}
                 />
 
                 {!readOnly && canonical && (

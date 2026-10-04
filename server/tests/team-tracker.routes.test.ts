@@ -527,6 +527,33 @@ describe("team tracker routes", () => {
     expect(capacityOnly.status).toBe(400);
   });
 
+  it("PATCH /api/team-tracker/:accountId/day sets and clears the next check (UX-34)", async () => {
+    const app = createTestApp();
+
+    const set = await invoke(app, {
+      method: "PATCH",
+      url: "/api/team-tracker/dev-1/day",
+      body: { date: "2026-03-07", nextFollowUpAt: "2026-03-09T09:00:00.000Z" },
+    });
+    expect(set.status).toBe(200);
+    expect(set.body?.nextFollowUpAt).toBe("2026-03-09T09:00:00.000Z");
+
+    const cleared = await invoke(app, {
+      method: "PATCH",
+      url: "/api/team-tracker/dev-1/day",
+      body: { date: "2026-03-07", nextFollowUpAt: null },
+    });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body?.nextFollowUpAt ?? null).toBeNull();
+
+    const bad = await invoke(app, {
+      method: "PATCH",
+      url: "/api/team-tracker/dev-1/day",
+      body: { date: "2026-03-07", nextFollowUpAt: "tomorrow" },
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it("PATCH /api/team-tracker/:accountId/day rejects empty updates", async () => {
     const app = createTestApp();
 

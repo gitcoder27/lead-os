@@ -1746,6 +1746,8 @@ export class TeamTrackerService {
     updates: {
       status?: TrackerDeveloperStatus;
       managerNotes?: string;
+      /** docs/56 UX-34: set (or clear with null) the next check on this person. */
+      nextFollowUpAt?: string | null;
     },
     workspaceId?: string,
     /** docs/56 P1-02: who changed the status; omitted = unknown (legacy callers). */
@@ -1772,6 +1774,7 @@ export class TeamTrackerService {
         ...(!canonical && updates.managerNotes !== undefined && {
           managerNotes: updates.managerNotes,
         }),
+        ...(updates.nextFollowUpAt !== undefined && { nextFollowUpAt: updates.nextFollowUpAt }),
         updatedAt: now,
       })
       .where(eq(teamTrackerDays.id, day.id));

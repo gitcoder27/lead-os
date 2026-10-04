@@ -29,11 +29,14 @@ export function useUpdateDay(date: string) {
       accountId: string;
       status?: TrackerDeveloperStatus;
       managerNotes?: string;
+      /** docs/56 UX-34: set (or clear with null) the next check on this person. */
+      nextFollowUpAt?: string | null;
     }) =>
       api.patch(`/team-tracker/${params.accountId}/day`, {
         date,
         status: params.status,
         managerNotes: params.managerNotes,
+        ...(params.nextFollowUpAt !== undefined && { nextFollowUpAt: params.nextFollowUpAt }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team-tracker'] });

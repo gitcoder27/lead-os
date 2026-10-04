@@ -442,6 +442,91 @@ Order: trust R1–R4, Tasks interactions R5 (TS-05/06), Team R6, shared shell R7
 - [x] **R12** Durable deduplicated in-app assignment/reply/blocker events and read state.
 - [x] **TASK-OWNER-01** Validate manager task identities on create/reassignment; make Copilot self-assignment default to the authenticated manager and document repair by T-number.
 
+## UX review implementation (2026-10-04)
+
+Source: [docs/UX-REVIEW.md](UX-REVIEW.md) (evidence, screenshots in `docs/ux-review-assets/`, review IDs in brackets below). Review IDs `P0-1…` clash with this doc's phases, so the items here are `UX-nn`. This section supersedes nothing in docs/56/57/60/61/65/66; where an item overlaps a parked item it says so.
+
+**Authorization (user, 2026-10-04):** run batches A–I sequentially on `main`, one scoped commit per `UX-nn` item, continuing across commits and batches. Batch J (big bets) is **not** authorized; it needs a separate go-ahead. No runtime-data access, Jira sync or write, push or deploy. Keep the pre-existing untracked `CLAUDE.md` untouched. Browser validation uses a scratch copy of the sandbox DB or a fresh workspace, with `backup_directory` pointed at the scratchpad (see UX-01), using `/home/ubuntu/tools/ux-review/lib.js`.
+
+**Decisions (locked, 2026-10-04):**
+1. Header Action inbox stays as the durable-updates inbox (R12, [docs/66](66-in-app-task-updates.md)). It shows updates only on every page (as it already does on Today), gets an inbox icon instead of a sparkle, gains a "Today N" count that links to `/`, and is hidden below 480 px. Jira attention signals move into Work (UX-30).
+2. Two meeting models: **bridge only.** Keep both. 1:1 meeting tasks link to the 1:1 workspace and the palette gets "1:1 with <name>". No data-model change (UX-21, UX-35).
+3. Work page: declutter. Drop the non-defect "Attention" and "Follow-ups" tiles and the OPEN column, show tags only when present, merge Notes/Tracker into one "Linked" icon (UX-31).
+
+**Per-batch exit criteria:** every item meets the definition of done above; after each batch re-shoot the affected screens (same names as the review) and re-run axe on them, and record the before/after result and any unverified area in the Progress log row. Do not commit screenshots.
+
+### Batch A: Safety
+
+- [ ] **UX-01** `BackupService.pruneOldBackups`/`listBackups` must only list and prune this instance's own snapshots (`backup.service.ts:118-142,285-310`): a scratch, worktree or mis-pointed instance sharing `data/backups/` must never delete another DB's backups. Match by this DB's filename stem/prefix (or a marker), keep restore/download/list behavior for existing snapshots, and add a regression test with two DB names in one directory.
+
+### Batch B: Today correctness
+
+- [ ] **UX-02** [P0-1] Blocked and at-risk people get "Follow up" (capture a follow-up with the blocker reason as context) as the primary action, with the reason as the row subtitle. "Set current" stays secondary and is never previewed against the blocked task itself (`today.service.ts:1191-1207`; check `status` before `setCurrentCandidates[0]`).
+- [ ] **UX-03** [P0-4] One key set per Today build: a task shown in an earlier section is dropped from later ones (queue → promises → carry), the same way `isPinnedDuplicate` folds pinned rows (`today.service.ts:469`). Waiting items belong in promises, never in carry. Covers wrap-up ("RCA for SSO outage" in both lists).
+- [ ] **UX-04** [P1-18 part, P2-9] `hasRealWork` ignores `sync_issue` rows so the Get started checklist still shows when Jira sync fails; a solo manager with an empty roster sees "Morning" instead of "Standup window until 12:00" (`SetupWizard.tsx`/`today.service.ts` `buildGettingStarted`, Today stage chip).
+
+### Batch C: Capture and task honesty
+
+- [ ] **UX-05** [P0-3] The capture typeahead keeps `@Marcus` visible (text or atomic chip) and sends the id through `defaults`/a side map in `useCaptureTypeahead`; the raw `@manual:…` id never appears in the input. The grammar already accepts colon ids, so this is display-layer only; related to TS-08.
+- [ ] **UX-06** [P1-3] `/w` binds the only `@person` anywhere in the text and the first `!date` anywhere ("Ask @marcus … /w !fri" works; `/w @tom <title> !thu` stores a check-by, not a plan date). Preview chips say what was understood: "Check Thu" vs "Plan Thu". Update `shared/capture-grammar.ts` **and regenerate `shared/capture-grammar.js`**; grammar tests first. Do not change the literal task APIs.
+- [ ] **UX-07** [P0-2] Task drawer shows and edits "Waiting on" (person/contact/text, reusing the `w` menu) with "since 8d · check Tue"; hide "Tracked by" when it equals Owner (`TaskDetailFields`, `TaskMenus.tsx`).
+- [ ] **UX-08** [P1-12] `kind=meeting` is excluded from overdue math; "Needs outcome" shows in every view that lists the meeting, with **Capture outcome** as its row action.
+- [ ] **UX-09** [P2-5] "Waiting since today" instead of "Waiting 0d"; "You" for the manager everywhere (Today wrap-up, Team, Tasks).
+- [ ] **UX-10** [P2-8] Notes "Create task" opens the shared capture box prefilled with the line and `defaults` (owner, note source) and strips the mention from the title once the owner is set (`NotesTaskActionDialog.tsx`); the separate form goes away. Must use `useCaptureTask`/`useCapture`, not `POST /api/tasks`.
+
+### Batch D: Settings and first run
+
+- [ ] **UX-11** [P1-1] No Jira user discovery on Settings mount; discover only in Team Members on search or Refresh. Failures use plain copy ("Can't reach Jira. Check the connection.") with a link, not a persistent "fetch failed" toast (`SettingsPanel.tsx:618`).
+- [ ] **UX-12** [P1-2] Default Settings section is Navigation (Team Members when the roster is empty), not Jira Connection (`SettingsPanel.tsx:89`); no warning colour for unused Jira settings; the sticky save footer is Jira-sections only and does not claim ~120 px on phones. Smaller first step of P7-07; do not regroup the IA.
+- [ ] **UX-13** [P1-11] Zero-roster Team empty state: "Add the people you manage" with **Add person** (inline manual add) and "Import from Jira" when connected; Standup and 1:1s disabled until someone exists (`TrackerRosterBoard.tsx:493`).
+- [ ] **UX-14** [P1-18 part] Setup Wizard step count follows "Just me" / "Me and a team"; steps 3–4 are labelled "with Jira" or not counted until Jira is saved (`SetupWizard.tsx:140-149,743`).
+- [ ] **UX-15** [P2-3] Team Members: one "Which one is you?" select above the list instead of eight "This is me" chips; "Add manually" first when Jira is missing.
+
+### Batch E: Copy and consistency
+
+- [ ] **UX-16** [P1-14] Replace live "Manager Desk" and "Team Tracker" strings (Notes create-task hint `NotesTaskActionDialog.tsx:293`, Action inbox confirm `ManagerActionInbox.tsx:729`, Data Maintenance `SettingsMaintenanceSection.tsx:170-211`, Jira identity hint, Triage label and toast `TriagePanel.tsx:102`) with "Inbox" / "Tasks" / "Team board". Dead-code removal stays P7-11.
+- [ ] **UX-17** [P1-7 part, P2-4] One shared date/time formatter ("Sat 3 Oct, 10:00") used by the Team drawer, waiting lists and the 1:1 overview ("Mon 5 Oct · tomorrow", sorted by next date, agenda count only when > 0).
+- [ ] **UX-18** [P2-1] Drop the header subtitle (`Header.tsx:148`); move Work's "Sync off" and refresh into the Work toolbar so the header does not change shape per page.
+- [ ] **UX-19** [P2-2, P2-12] Today plan polish: "Top 3 · 3/3" at section-label size, Done as a ghost checkbox until hover/focus, empty-state copy wraps instead of truncating.
+- [ ] **UX-20** [P2-6] Work workload chips spelled out ("2 open · 0 Sev-1") with tooltips; text labels on hover/focus for the left rail icons.
+- [ ] **UX-21** [P2-7, P1-8 part] Palette: "1:1 with <name>" commands, one entry per Settings section (deep-link `?section=`), one naming style ("Tasks › Waiting"). Overlaps parked P7-02 (ARIA, recents, ranking): do not do those here.
+
+### Batch F: Accessibility and mobile
+
+- [ ] **UX-22** [P1-15 part] `--accent-text` token (about `#0e7490` in light) for small accent text; fix active nav/rail labels (3.68:1 and 2.79:1), badge white-on-`#ef4444` (3.76:1) and the Work amber tile (1.96:1). Both themes, numerical checks in tests where feasible.
+- [ ] **UX-23** [P1-15 part] Give the 30 `aria-label`led Work `<span>`s a role or visible text; make Team and Standup roster rows a link plus separate buttons (no nested-interactive); name the unnamed Triage icon button.
+- [ ] **UX-24** [P1-16] Mobile Today at ≤480 px: badge under the title, primary button icon-only or swipe-revealed, stage strip wraps (no "Sun 4 O"). Builds on R8; do not move My plan / Queue jumps.
+- [ ] **UX-25** [P1-17] Mobile Work: cards (title, assignee, due, status) instead of a horizontally scrolling table; no inbox-badge overlap with the logo (also covered by UX-30's <480 px hide).
+
+### Batch G: Wrap-up and weekly review
+
+- [ ] **UX-26** [P1-4, P0-4] At `stage=wrap_up` the wrap-up lists become the main column and exceptions move to the side; unified verbs "Done · Tomorrow · Drop"; a single "Move the rest to tomorrow" with Undo. Keep the "Still open today" reachability from the Wrap-up scope and the R8 mobile jumps.
+- [ ] **UX-27** [P1-13] Weekly review step 6: Copy for Teams, Copy Markdown and Finish review pinned in the step footer (where "Waiting →" sits on earlier steps), not at y≈1405.
+- [ ] **UX-28** [P2-10] Weekly review: step 1 Jira line at body size; "Shipped" excludes dropped items.
+- [ ] **UX-29** [P2-11] My Day: a task scheduled for tomorrow shows "Planned for tomorrow" or is not listed under today's Up next.
+
+### Batch H: Work, Jira and the header inbox
+
+- [ ] **UX-30** [P0-5, P1-17 part] Header Action inbox per decision 1: updates only on every page, inbox icon (not a sparkle next to Copilot's), a "Today N" count that links to `/`, hidden below 480 px; Jira attention signals move into the Work page. Reuses R12 data; do not touch the task-inbox API or read-state semantics (docs/66).
+- [ ] **UX-31** [P1-9] Work page per decision 3: remove the OPEN column and the "Attention"/"Follow-ups" tiles; tags only when present; one "Linked" icon for Notes/Tracker; five defect tiles that wrap with no truncation at 1280 px. Preserve all existing defect dashboard behavior and filters.
+- [ ] **UX-32** [P1-10] Automation suggestions never propose a target date in the past (`automation.service.ts` rules), with a service test. Broader alert quality stays P5-06.
+
+### Batch I: Team and 1:1
+
+- [ ] **UX-33** [P1-6] Team board in solo mode: drop the Attention column or merge it into Status; label the open-items meter ("2 open"); replace "No current item" with the next planned task. Over-capacity stays P7-09.
+- [ ] **UX-34** [P1-7 part] Team drawer blocked card gets "Set check" and "Follow up" actions instead of "Next check not scheduled."
+- [ ] **UX-35** [P1-8 part] 1:1 meeting tasks link to the 1:1 workspace (`/team?dev=<id>&panel=one-on-one`), per decision 2. No data-model change and no hiding of `kind=meeting` rows.
+
+### Batch J: Big bets (not authorized; needs a separate go-ahead)
+
+- [ ] **UX-36** [P1-5] Today "Start here" card (top `rankActionItems()` row with its reason and the right verb) and person clusters (group queue rows when ≥2 share an owner, cap visible queue at 7 with "+N more"). Depends on UX-02 and UX-03. Opus-grade judgment; write a short spec first.
+- [ ] **UX-37** In-app "Copy nudge" on overdue Waiting rows (no outbound delivery; does not overlap WR-13/15).
+- [ ] **UX-38** Per-series 1:1 agenda templates and optional meeting-task templates.
+- [ ] **UX-39** "Recent changes" panel with Revert, using existing `task_events`.
+- [ ] **UX-40** Contextual Copilot actions ("Draft follow-up", "Summarize for 1:1") that open Copilot prefilled, confirm-gated as today. Complements P6-04.
+
+Parked, not proposed here: calendar awareness (read-only ICS).
+
 ## Application review
 
 - [x] **REVIEW-65** Review current UI/UX, functionality and ease of use; publish concise findings in [docs/65](65-application-experience-review.md). Documentation only; recommendations do not authorize backlog implementation.
@@ -450,6 +535,7 @@ Order: trust R1–R4, Tasks interactions R5 (TS-05/06), Team R6, shared shell R7
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
+| 2026-10-04 | UX-00 / UX-REVIEW | main (this commit) | Claude | Live UI review on a scratch workspace (8 people, 53 tasks, 12 issues) plus an empty-DB first run: [docs/UX-REVIEW.md](UX-REVIEW.md), screenshots in `docs/ux-review-assets/`. Added the UX-01…UX-40 phase above (batches A–J) with three locked decisions. Documentation only; recommendations do not authorize batch J. |
 | 2026-10-03 | TASK-OWNER-01 | main (this commit) | Codex | Copilot could store a roster ID under manager ownership; Planned today/My tasks then rejected it as not me. Task creation and explicit ownership updates now validate manager session identities in the current workspace, preserving authenticated principals and legacy linked manager accounts. Explicit `ownerType: manager` with omitted `ownerId` assigns to the initiating manager, including repair of old open rows by T-number. Invalid IDs return actionable 400 errors atomically; unrelated edits and soft deletion of older malformed rows remain available. Copilot schema/prompt explain self-assignment and view membership; short action labels remain unchanged. Shared contracts document ownership and the intentional legacy desk-ID fallback. Eight regression tests cover Copilot/API writes, Tasks/Today visibility, foreign/inactive/developer identities, reassignment events, repair and cleanup. Full server: 99 files / 1465 tests pass; focused: 113 tests pass. typecheck, build:check, guard:data and lint pass (0 errors; existing warnings). New files have no lint warnings. format:check flags only pre-existing ignored `.claude/settings.local.json`. No runtime writes, real Jira, push or deployment; existing T-89/T-90 can be repaired with confirmed `update_task` calls after this update. |
 | 2026-10-03 | R12 / P4-01 | main (this commit) | Codex | Durable recipient references/read timestamps reuse canonical task events, with transactional delivery, unique replay protection, active recipients and self-identity suppression. Shared assignments/instructions/replies and raised/cleared blockers appear in the existing manager header inbox and shared developer My Day content. Personal bounded paging/counts/read/unread and exact old-event links recheck current workspace, role, ownership, visibility and redaction; private notes and agenda/1:1-origin tasks never enter the loop. Solo stays quiet; Today avoids duplicating its attention queue. Read state waits for acknowledgement; retry survives navigation, while logout/session/account changes revoke stale callbacks. Includes alias preservation, exact-event focus, cleanup and actor-role collision handling. Full client: 123 files / 1713 tests; full isolated server: 98 files / 1457 tests. Final focused client: 175 tests; inbox/event-boundary/tracker server: 97 tests. typecheck, build:check, guard:data and lint pass (0 errors, existing warnings). Synthetic manager/developer × light/dark × 1440/390/320/720 DPR2 matrix: 16 combinations pass paging, partial read retry, reload state, retry after navigation, keyboard Enter/Escape/focus, role boundaries and no overflow; screenshots inspected. Final R1 bootstrap/1:1 recovery matrix also passes four desktop/phone/theme combinations. Tracked JSON/YAML formatting passes; root format:check flags only the pre-existing ignored .claude/settings.local.json, left untouched. [docs/66](66-in-app-task-updates.md) records invariants and bounded P4 reuse; recurrence, milestones, outbound delivery and remaining P4 features stay deferred. No runtime data, real Jira, push, deployment or external notifications. |
 | 2026-10-03 | R11 | main (this commit) | Codex | Plain-title capture prompt and optional native Examples disclosure (three existing grammar examples); hints preserve context, drafts, typeahead and request identity. Copilot targets/proposed fields are visible before Confirm, with readable labels, scoped roster/contact names, local dates, clear/unassign semantics and literal message text; nested/unknown payloads remain inspectable and raw arguments stay unchanged. Technical JSON is secondary. Native disclosure/decisions have focus rings and 44px touch targets; reduced motion skips card entry animation. Client suites: 67 passed; scripted/isolated assistant confirmation suite: 18 passed. typecheck, build:check, guard:data and touched lint pass. Synthetic 1440/390/320/720 DPR2 × light/dark browser matrix: draft survives Examples, previews visible, no overflow, explicit cancellation only; screenshots inspected. No provider calls or external delivery. |

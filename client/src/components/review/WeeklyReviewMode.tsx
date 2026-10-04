@@ -192,6 +192,8 @@ function ReviewSession({
   }, [flush, onOpenTarget]);
   const capture = useCallback(() => openCapture(), [openCapture]);
 
+  // docs/56 UX-27: the footer's right-hand slot, so the last step can dock Copy/Finish where "Next →" sits.
+  const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
   const ctx = useMemo<ReviewStepContext>(() => ({
     review,
     saved,
@@ -226,7 +228,8 @@ function ReviewSession({
       }
     },
     finishReview: onExit,
-  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, pins, pin, unpin, skippedSessions, skipSession, openTarget, capture, user?.accountId, retry, announce, saveNow, queryClient, onExit]);
+    footerSlot,
+  }), [review, saved, patch, openTask, personName, decisions, decide, undoDecision, pins, pin, unpin, skippedSessions, skipSession, openTarget, capture, user?.accountId, retry, announce, saveNow, queryClient, onExit, footerSlot]);
 
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= visible.length || next === index) return;
@@ -321,7 +324,7 @@ function ReviewSession({
                     {next.label}
                     <ArrowRight size={14} aria-hidden="true" />
                   </button>
-                ) : null}
+                ) : <div ref={setFooterSlot} className="review-footer-actions" />}
               </div>
             </footer>
           ) : null}

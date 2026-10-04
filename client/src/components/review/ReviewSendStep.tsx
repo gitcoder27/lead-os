@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { WEEKLY_REVIEW_LIMITS } from '@/types';
@@ -110,6 +111,30 @@ export function ReviewSendStep({ ctx }: { ctx: ReviewStepContext }) {
   const closed = reviewReportTasks(ctx.review, state).filter(
     (row) => row.status === 'done' || row.status === 'dropped',
   );
+  const primaryActions = (
+    <div className="review-send-primary">
+      <button
+        type="button"
+        className="ui-btn-secondary"
+        disabled={busy || pending || !markdown.trim()}
+        onClick={() => void run('markdown')}
+      >
+        Copy Markdown
+      </button>
+      <button
+        type="button"
+        className="ui-btn-solid"
+        disabled={busy || pending || !markdown.trim()}
+        onClick={() => void run('teams')}
+      >
+        Copy for Teams
+      </button>
+      <button type="button" className="ui-btn-solid" disabled={busy || pending} onClick={() => void run('finish')}>
+        {busy ? 'Saving…' : 'Finish review'}
+      </button>
+    </div>
+  );
+
   return (
     <div className="review-send">
       <p className="review-send-intro">Choose what goes into your update, then copy it for your weekly report.</p>
@@ -198,26 +223,10 @@ export function ReviewSendStep({ ctx }: { ctx: ReviewStepContext }) {
         >
           Download CSV
         </button>
-        <button
-          type="button"
-          className="ui-btn-secondary"
-          disabled={busy || pending || !markdown.trim()}
-          onClick={() => void run('markdown')}
-        >
-          Copy Markdown
-        </button>
-        <button
-          type="button"
-          className="ui-btn-solid"
-          disabled={busy || pending || !markdown.trim()}
-          onClick={() => void run('teams')}
-        >
-          Copy for Teams
-        </button>
-        <button type="button" className="ui-btn-solid" disabled={busy || pending} onClick={() => void run('finish')}>
-          {busy ? 'Saving…' : 'Finish review'}
-        </button>
+        {/* docs/56 UX-27: the primary actions dock in the step footer, always in view. */}
+        {ctx.footerSlot ? null : primaryActions}
       </div>
+      {ctx.footerSlot ? createPortal(primaryActions, ctx.footerSlot) : null}
       {error && (
         <p role="alert" className="review-source-note">
           {error} Your text is kept here. Try again.

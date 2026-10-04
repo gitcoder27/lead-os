@@ -128,6 +128,8 @@ export interface ReviewStepContext {
   saveReport?: (markdown: string, completed?: boolean) => Promise<void>;
   editReport?: (markdown: string | null) => void;
   finishReview?: () => void;
+  /** docs/56 UX-27: the step footer's action slot (where "Next →" sits), for a step's own primary actions. */
+  footerSlot?: HTMLElement | null;
 }
 
 export interface ReviewStepDef {

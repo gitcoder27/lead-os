@@ -12,7 +12,7 @@ vi.mock('@/hooks/useWeeklyReview', () => ({
   useReviewPastWeeks: () => ({ data: { weeks: [] }, isError: false, isPending: false }),
 }));
 vi.mock('@/lib/report-clipboard', () => ({ copyReport: (...args: unknown[]) => clipboard(...args) }));
-function Harness() {
+function Harness({ footerSlot }: { footerSlot?: HTMLElement | null } = {}) {
   const [saved, setSaved] = useState(blankSavedState('2026-09-28'));
   const review = reportReview({
     sections: [
@@ -44,6 +44,7 @@ function Harness() {
     editReport: (markdown: string | null) => setSaved((prev) => ({ ...prev, reportMarkdown: markdown })),
     saveReport: save,
     finishReview: finish,
+    footerSlot,
   } as unknown as ReviewStepContext;
   return (
     <ToastProvider>
@@ -86,6 +87,21 @@ describe('Send update', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Finish review' }));
     await waitFor(() => expect(finish).toHaveBeenCalledTimes(1));
     expect(save).toHaveBeenLastCalledWith('**Edited update**\n- Safe <title>', true);
+  });
+  it('docks Copy Markdown, Copy for Teams and Finish review in the step footer when there is one (UX-27)', () => {
+    const footer = document.createElement('div');
+    footer.className = 'review-footer-actions';
+    document.body.appendChild(footer);
+    try {
+      render(<Harness footerSlot={footer} />);
+      for (const name of ['Copy Markdown', 'Copy for Teams', 'Finish review']) {
+        expect(footer.contains(screen.getByRole('button', { name }))).toBe(true);
+      }
+      // Secondary actions stay with the report.
+      expect(footer.contains(screen.getByRole('button', { name: 'Edit text' }))).toBe(false);
+    } finally {
+      footer.remove();
+    }
   });
   it('does not intercept typing y in the editor or copy empty text', () => {
     render(<Harness />);

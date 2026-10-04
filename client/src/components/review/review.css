@@ -659,6 +659,9 @@
 .review-report-editor { display: block; font-weight: 600; }
 .review-report textarea { width: 100%; min-height: 360px; margin-top: 12px; resize: vertical; font-weight: 400; line-height: 1.6; padding: 12px; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; }
 .review-send-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
+/* docs/56 UX-27: Copy and Finish dock in the step footer's right-hand slot. */
+.review-footer-actions { display: flex; min-width: 0; justify-content: flex-end; }
+.review-send-primary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .review-past { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 16px; }
 .review-past summary { cursor: pointer; padding: 12px 0; }
 .review-past ul { list-style: none; padding: 0; }

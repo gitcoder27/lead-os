@@ -583,7 +583,10 @@ describe('OneOnOneSeriesPanel', () => {
     expect(screen.getByTestId('one-on-one-series-panel')).toBeInTheDocument();
     expect(screen.getByText('Alice Smith')).toBeInTheDocument();
     expect(screen.getByText('overdue 6d')).toBeInTheDocument();
-    expect(screen.getAllByText(/agenda$/)).toHaveLength(2);
+    // UX-17: readable dates, soonest first, and an agenda count only when there is one.
+    expect(screen.getByText(/^Sun 1 Mar/)).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^one-on-one-series-dev-/).map((row) => row.getAttribute('data-testid'))).toEqual(['one-on-one-series-dev-2', 'one-on-one-series-dev-1']);
+    expect(screen.queryByText('0 agenda')).toBeNull();
 
     fireEvent.click(screen.getByTestId('one-on-one-series-dev-2'));
     expect(onOpenDeveloper).toHaveBeenCalledWith('dev-2');

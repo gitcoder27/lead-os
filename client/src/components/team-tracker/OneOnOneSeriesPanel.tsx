@@ -4,6 +4,8 @@ import { CalendarDays, Plus, X } from 'lucide-react';
 import { useCreateOneOnOneSeries, useOneOnOneSeriesList } from '@/hooks/useOneOnOne';
 import { useToast } from '@/context/ToastContext';
 import type { Developer, OneOnOneCadence, OneOnOneSeriesSummary } from '@/types';
+import { formatDayWithRelative } from '@/lib/date-format';
+import { getLocalIsoDate } from '@/lib/utils';
 
 const CADENCE_OPTIONS: Array<{ value: OneOnOneCadence; label: string }> = [
   { value: 'weekly', label: 'Weekly' },
@@ -169,7 +171,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           </div>
         ) : (
           <ul>
-            {(list.data?.series ?? []).map((series) => (
+            {sortByNextSession(list.data?.series ?? []).map((series) => (
               <SeriesRow key={series.id} series={series} onOpen={() => onOpenDeveloper(series.developerAccountId)} />
             ))}
           </ul>
@@ -177,6 +179,12 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
       </div>
     </div>
   );
+}
+
+/** docs/56 UX-17: the next 1:1 first; series with no session scheduled go last. */
+function sortByNextSession(series: OneOnOneSeriesSummary[]): OneOnOneSeriesSummary[] {
+  return [...series].sort((left, right) => (left.nextSessionDate ?? '9999-12-31').localeCompare(right.nextSessionDate ?? '9999-12-31')
+    || left.developerName.localeCompare(right.developerName));
 }
 
 function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: () => void }) {
@@ -201,10 +209,10 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
         </div>
         <div className="text-right">
           <div
-            className="font-mono text-[12px]"
+            className="text-[12px]"
             style={{ color: overdue ? 'var(--danger)' : 'var(--text-secondary)' }}
           >
-            {series.nextSessionDate ?? '—'}
+            {series.nextSessionDate ? formatDayWithRelative(series.nextSessionDate, getLocalIsoDate()) : 'Not scheduled'}
           </div>
           {overdue && (
             <div className="text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
@@ -212,13 +220,15 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
             </div>
           )}
         </div>
-        <span
-          className="rounded px-1.5 py-0.5 text-[11px] font-mono"
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
-          title="Open agenda items"
-        >
-          {series.openAgendaCount} agenda
-        </span>
+        {series.openAgendaCount > 0 && (
+          <span
+            className="rounded px-1.5 py-0.5 text-[11px]"
+            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
+            title="Open agenda items"
+          >
+            {series.openAgendaCount} on agenda
+          </span>
+        )}
       </button>
     </li>
   );

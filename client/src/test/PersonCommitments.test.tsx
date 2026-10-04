@@ -12,12 +12,14 @@ function task(taskKey: string, overrides: Partial<ManagerTask> = {}): ManagerTas
 beforeEach(() => { refetch.mockClear(); query = { data: { tasks: [] }, isError: false, isLoading: false, isFetching: false, refetch }; });
 describe('person commitments', () => {
   it('separates owed and waiting, renders all-date next actions, opens exact task and returns to person context', () => {
-    query.data = { tasks: [task('T-1', { title: 'Future decision', scheduledOn: '2027-01-01', nextAction: 'Prepare options' }), task('T-2', { ownerType: 'developer', ownerId: 'dev' }), task('T-3', { waitingOn: { type: 'developer', ref: 'dev', label: 'Person', since: new Date().toISOString() } }), task('T-4', { later: true })] };
+    query.data = { tasks: [task('T-1', { title: 'Future decision', scheduledOn: '2027-01-01', followUpAt: new Date('2027-01-02T10:00:00').toISOString(), nextAction: 'Prepare options' }), task('T-2', { ownerType: 'developer', ownerId: 'dev' }), task('T-3', { waitingOn: { type: 'developer', ref: 'dev', label: 'Person', since: new Date().toISOString() } }), task('T-4', { later: true })] };
     render(<PersonCommitments accountId="dev" onCapture={vi.fn()} />);
     const owed = screen.getByRole('region', { name: 'I owe them' });
     const waiting = screen.getByRole('region', { name: 'Waiting on them' });
     expect(within(owed).getByText('Next: Prepare options')).toBeInTheDocument();
-    expect(within(owed).getByText(/2027-01-01/)).toBeInTheDocument();
+    // UX-17: one date style — no ISO or locale strings.
+    expect(within(owed).getByText(/Fri 1 Jan 2027 · Next check Sat 2 Jan 2027, 10:00/)).toBeInTheDocument();
+    expect(within(owed).queryByText(/2027-01-01|1\/2\/2027/)).toBeNull();
     expect(within(owed).getByText(/Later/)).toBeInTheDocument();
     expect(within(waiting).getAllByRole('button')).toHaveLength(2);
     fireEvent.click(within(owed).getByRole('button', { name: /Future decision/ }));

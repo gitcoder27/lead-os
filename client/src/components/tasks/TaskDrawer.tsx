@@ -329,6 +329,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
   if (canStep) hints.push(['j / k', 'Prev / next task']);
   if (canEditStatus) hints.push(['e', isOpenish(task) ? 'Done' : 'Reopen']);
   if (managerEditable) hints.push(['s', 'Schedule'], ['a', 'Assign'], ['p', 'Priority'], ['l', 'Labels']);
+  if (managerEditable && task.kind !== 'meeting') hints.push(['w', 'Waiting on']);
   if (canEditDetails) hints.push(['d', 'Details']);
   if (!deleted) hints.push(['u', 'Update']);
 

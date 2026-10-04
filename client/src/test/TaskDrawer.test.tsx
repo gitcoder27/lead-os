@@ -135,6 +135,37 @@ describe('TaskDrawer body (P3-D2)', () => {
     expect(onStepTask).toHaveBeenCalledTimes(2);
   });
 
+  it('shows who a task waits on, since when and the check day, and edits it with the w menu (UX-07)', () => {
+    const since = new Date(Date.now() - 8 * 86_400_000).toISOString();
+    const check = new Date(`${shiftLocalIsoDate(getLocalIsoDate(), 2)}T09:00:00`);
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({
+      waitingOn: { type: 'developer', ref: 'dev-1', label: 'Dev One', since },
+      followUpAt: check.toISOString(),
+    } as Partial<TaskDetailResponse>)));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+
+    const button = screen.getByRole('button', { name: 'Waiting on: Dev One' });
+    expect(button.textContent).toContain('since 8d');
+    expect(button.textContent).toContain(`check ${check.toLocaleDateString('en-US', { weekday: 'short' })}`);
+    expect(screen.queryByText('Tracked by')).toBeNull();
+
+    // `w` opens the same menu as a click.
+    fireEvent.keyDown(document.body, { key: 'w' });
+    const field = screen.getByRole('textbox', { name: 'Waiting on' });
+    fireEvent.change(field, { target: { value: 'Legal' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(mockMutate).toHaveBeenCalledWith({ waitingOn: { type: 'text', label: 'Legal' } }, expect.anything());
+  });
+
+  it('keeps Tracked by when someone else owns the task, and offers to start waiting (UX-07)', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ ownerType: 'developer', ownerId: 'dev-1' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByText('Tracked by')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Waiting on: no one' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Dev One/ }));
+    expect(mockMutate).toHaveBeenCalledWith({ waitingOn: { type: 'developer', ref: 'dev-1', label: 'Dev One' } }, expect.anything());
+  });
+
   it('j/k are inert without the list order', () => {
     mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
     const onStepTask = vi.fn();
@@ -148,7 +179,8 @@ describe('TaskDrawer body (P3-D2)', () => {
     const { container } = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
     expect(screen.getByDisplayValue('Manager task')).toBeTruthy();
     const terms = within(container.querySelector('dl')!).getAllByRole('term').map((term) => term.textContent);
-    expect(terms).toEqual(['Owner', 'Tracked by', 'Scheduled', 'Follow-up', 'Due', 'Priority', 'Labels']);
+    // UX-07: Tracked by is hidden when it is the owner; Waiting on is always there for a manager.
+    expect(terms).toEqual(['Owner', 'Waiting on', 'Scheduled', 'Follow-up', 'Due', 'Priority', 'Labels']);
     expect(screen.getByRole('heading', { name: 'Links' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Activity' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Owner: You' })).toBeTruthy();

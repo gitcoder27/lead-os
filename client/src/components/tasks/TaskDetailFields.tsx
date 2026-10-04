@@ -10,6 +10,7 @@ import {
   Clock3,
   Eye,
   Flag,
+  Hourglass,
   Moon,
   Pencil,
   RotateCcw,
@@ -18,12 +19,13 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useContacts } from '@/hooks/useContacts';
 import { useDevelopers } from '@/hooks/useDevelopers';
 import { isOpenStatus, localDateOf, scheduleChanges, type SchedulePreset } from '@/lib/task-list';
 import { getLocalIsoDate } from '@/lib/utils';
 import { dueAtForDate } from '@/types';
 import type { TaskDetailResponse, TaskStatus, UpdateTaskRequest } from '@/types';
-import { AssignMenu, StatusMenu, TASK_STATUS_META, TaskStatusGlyph, type AssignTarget } from './TaskMenus';
+import { AssignMenu, StatusMenu, TASK_STATUS_META, TaskStatusGlyph, WaitingMenu, type AssignTarget } from './TaskMenus';
 import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { TaskLabelChip, TaskLabelPicker } from './TaskLabelPicker';
 import {
@@ -42,6 +44,7 @@ import {
   describeDueDate,
   describeMoment,
   describePlanDate,
+  describeWaiting,
   followUpPresets,
   formatStamp,
   toLocalDateTimeInputValue,
@@ -173,7 +176,8 @@ export function TaskProperties({ task, mode, readOnly, onPatch, people }: TaskPr
   return (
     <dl className="space-y-0.5">
       {manager && <OwnerRow task={task} editable={editable} onPatch={onPatch} people={people} />}
-      {manager && <TrackedByRow task={task} people={people} />}
+      {manager && !trackedByOwner(task) && <TrackedByRow task={task} people={people} />}
+      {manager && !isMeeting && <WaitingRow task={task} editable={editable} onPatch={onPatch} people={people} />}
       {isMeeting && (
         <>
           <MomentRow label="Starts" icon={<Clock3 size={14} />} value={task.startsAt} status={task.status} editable={editable} onCommit={(v) => onPatch({ startsAt: v })} />
@@ -263,6 +267,58 @@ function OwnerRow({ task, editable, onPatch, people }: { task: TaskDetailRespons
         )}
       </PropertyButton>
       {anchor && <AssignMenu anchor={anchor} developers={people.developers} onClose={() => setAnchor(null)} onSelect={select} />}
+    </PropertyRow>
+  );
+}
+
+/** docs/56 UX-07: "Tracked by" says nothing new when the tracker is the owner. */
+function trackedByOwner(task: TaskDetailResponse): boolean {
+  const trackedBy = 'trackedByManagerId' in task ? task.trackedByManagerId : null;
+  return Boolean(trackedBy && task.ownerType === 'manager' && task.ownerId === trackedBy);
+}
+
+/** docs/56 UX-07: who the task waits on, since when and the check day; the `w` menu edits it. */
+function WaitingRow({ task, editable, onPatch, people }: { task: TaskDetailResponse; editable: boolean; onPatch: Patch; people: TaskPeople }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const contacts = useContacts();
+  const waitingOn = 'waitingOn' in task ? task.waitingOn ?? null : null;
+  const followUpAt = 'followUpAt' in task ? task.followUpAt : null;
+  const name = waitingOn ? (waitingOn.type === 'developer' ? people.nameFor(waitingOn.ref) ?? waitingOn.label : waitingOn.label) : null;
+  const summary = waitingOn ? describeWaiting(waitingOn.since, followUpAt) : '';
+  return (
+    <PropertyRow icon={<Hourglass size={14} />} label="Waiting on">
+      <PropertyButton
+        disabled={!editable}
+        ariaLabel={`Waiting on: ${name ?? 'no one'}`}
+        title="Waiting on (W)"
+        shortcut="w"
+        popup="menu"
+        expanded={Boolean(anchor)}
+        onClick={(el) => setAnchor(anchor ? null : el)}
+      >
+        {name ? (
+          <>
+            <Avatar name={name === 'You' ? people.userName : name} seed={waitingOn?.ref ?? name} />
+            <span className="truncate font-medium">{name}</span>
+            {summary && <span className="shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{summary}</span>}
+          </>
+        ) : (
+          <Placeholder>No one</Placeholder>
+        )}
+      </PropertyButton>
+      {anchor && (
+        <WaitingMenu
+          anchor={anchor}
+          developers={people.developers}
+          contacts={contacts.data ?? []}
+          current={Boolean(waitingOn)}
+          onClose={() => setAnchor(null)}
+          onSelect={(next) => {
+            setAnchor(null);
+            onPatch({ waitingOn: next });
+          }}
+        />
+      )}
     </PropertyRow>
   );
 }

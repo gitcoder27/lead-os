@@ -130,3 +130,22 @@ export function prettyUrl(value: string): string {
     return value;
   }
 }
+
+/**
+ * docs/56 UX-07: the waiting summary next to the party — "since 8d · check Tue". The check day is a
+ * weekday within the coming week, else a date.
+ */
+export function describeWaiting(since: string | null | undefined, followUpAt: string | null | undefined, now = new Date()): string {
+  const parts: string[] = [];
+  const sinceDate = since ? safeParse(since) : null;
+  if (sinceDate) {
+    const days = differenceInCalendarDays(now, sinceDate);
+    parts.push(days <= 0 ? 'since today' : `since ${days}d`);
+  }
+  const check = followUpAt ? safeParse(followUpAt) : null;
+  if (check) {
+    const diff = differenceInCalendarDays(check, now);
+    parts.push(`check ${diff === 0 ? 'today' : diff > 0 && diff < 7 ? format(check, 'EEE') : format(check, 'd MMM')}`);
+  }
+  return parts.join(' · ');
+}

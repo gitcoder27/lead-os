@@ -1709,6 +1709,8 @@ export interface TrackerWorkItem {
   id: number;
   dayId: number;
   originDate: string;
+  /** docs/56 UX-29: the task's plan date, when it has one (a later day reads "Planned for …", not "Continued"). */
+  scheduledOn?: string;
   taskKey: string | null;
   createdBy?: TaskActorRef;
   latestEvent?: TaskEventSummary;

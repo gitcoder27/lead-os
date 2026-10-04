@@ -75,6 +75,7 @@ export function surfaceTaskToWorkItem(task: SurfaceTask, developerAccountId?: st
     id: task.trackerItemId ?? task.id,
     dayId: 0,
     originDate: task.originDate,
+    ...(task.scheduledOn ? { scheduledOn: task.scheduledOn } : {}),
     taskKey: task.taskKey,
     createdBy: task.createdByType
       ? { type: task.createdByType as TaskActorRef['type'], id: task.createdById ?? undefined }

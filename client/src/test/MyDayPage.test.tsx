@@ -1,3 +1,5 @@
+import { formatDay } from '@/lib/date-format';
+import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { format } from 'date-fns';
 import { act, render, renderHook, screen, fireEvent, within } from '@testing-library/react';
@@ -419,6 +421,28 @@ describe('MyDayPage', () => {
     );
 
     expect(screen.getAllByText(/Continued from Mar 9/)).toHaveLength(2);
+  });
+
+  it('says "Planned for tomorrow" for a task planned for a later day, not "Continued from" (UX-29)', () => {
+    const today = getLocalIsoDate();
+    const later = shiftLocalIsoDate(today, 4);
+    mockDay.plannedItems = [
+      createItem({ id: 103, taskKey: 'T-103', title: 'Write migration notes', originDate: shiftLocalIsoDate(today, 1), scheduledOn: shiftLocalIsoDate(today, 1) }),
+      createItem({ id: 104, taskKey: 'T-104', title: 'Plan offsite', originDate: '2026-03-09', scheduledOn: later }),
+    ];
+
+    render(
+      <TestWrapper>
+        <MyDayPage />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText('Planned for tomorrow')).toBeInTheDocument();
+    expect(screen.getByText(`Planned for ${formatDay(later, today)}`)).toBeInTheDocument();
+    for (const title of ['Write migration notes', 'Plan offsite']) {
+      const row = screen.getAllByText(title).at(-1)!.closest('li, [data-task-key]') as HTMLElement;
+      expect(row.textContent).not.toMatch(/Continued from/);
+    }
   });
 
   it('disables task controls when My Day is viewing history', () => {

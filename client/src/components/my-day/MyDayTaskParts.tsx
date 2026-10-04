@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AlignLeft, Check, Link2, MessageSquarePlus, PanelRight, StickyNote, X } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
-import { formatAbsoluteDateTime, formatDate, isOverdue, priorityColor } from '@/lib/utils';
+import { formatAbsoluteDateTime, formatDate, isOverdue, priorityColor, shiftLocalIsoDate } from '@/lib/utils';
+import { formatDay } from '@/lib/date-format';
 import { FOCUS_RING } from '@/components/ui/focus';
 import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { RelatedIssueChips } from '@/components/team-tracker/RelatedIssueChips';
@@ -207,7 +208,9 @@ export function TaskMeta({
   className?: string;
 }) {
   const meta: ReactNode[] = [];
-  const isContinued = Boolean(viewDate && item.originDate && item.originDate !== viewDate);
+  // docs/56 UX-29: work planned for a later day says so; it is not "continued" from anywhere.
+  const plannedLater = Boolean(viewDate && item.scheduledOn && item.scheduledOn > viewDate);
+  const isContinued = !plannedLater && Boolean(viewDate && item.originDate && item.originDate !== viewDate);
   const carried = isContinued && viewDate ? continuedDays(item.originDate, viewDate) : 0;
   const latest = item.latestEvent && !closed ? describeLatestEvent(item.latestEvent) : null;
 
@@ -259,6 +262,13 @@ export function TaskMeta({
       >
         <Link2 size={11} aria-hidden="true" />
         From your lead
+      </span>
+    );
+  }
+  if (plannedLater && !closed && viewDate && item.scheduledOn) {
+    meta.push(
+      <span key="planned-later" title={`Planned for ${formatDay(item.scheduledOn, viewDate)}`}>
+        Planned for {item.scheduledOn === shiftLocalIsoDate(viewDate, 1) ? 'tomorrow' : formatDay(item.scheduledOn, viewDate)}
       </span>
     );
   }

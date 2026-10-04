@@ -859,7 +859,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     tags: { title: 'Defect Tags', description: 'Review the shared tag library and safely remove labels.' },
     labels: { title: 'Task Labels', description: 'Manage the shared task label library — add, rename, recolor, or remove labels.' },
     data: { title: 'Data & Backups', description: 'Back up the database on a schedule, take a backup now, and download snapshots.' },
-    maintenance: { title: 'Data Maintenance', description: 'Preview and run rare cleanup resets for Manager Desk and Team Tracker.' },
+    maintenance: { title: 'Data Maintenance', description: 'Preview and run rare cleanup resets for your tasks and the Team board.' },
     access: { title: 'Developer Access', description: 'Create developer accounts and manage app user access.' },
   };
 
@@ -1274,7 +1274,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       ) : null}
                     </div>
                     <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                      Link the manager account Jira should treat as the lead when assembling sync scope and Manager Desk context.
+                      Link the manager account Jira should treat as the lead when assembling sync scope and your tasks.
                     </p>
                     <div className="space-y-2">
                       <input

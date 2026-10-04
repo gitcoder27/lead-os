@@ -82,7 +82,7 @@ export function TriageTrackerSection({
           className="shrink-0 transition-transform duration-150"
           style={{ color: 'var(--text-muted)', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
         />
-        <span className="triage-section-label"><Users size={11} /> Team Tracker</span>
+        <span className="triage-section-label"><Users size={11} /> Team board</span>
         {assignments.length > 0 && (
           <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full ml-1"
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>

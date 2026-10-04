@@ -99,7 +99,7 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
           const dev = developers?.find((d) => d.accountId === accountId);
           addToast({ type: 'success', title: `${issue.jiraKey} added to ${dev?.displayName ?? 'plan'}`, message: `Tracker updated for ${trackerDate}.` });
         },
-        onError: (err) => addToast({ type: 'error', title: `Failed to add to Team Tracker`, message: err.message }),
+        onError: (err) => addToast({ type: 'error', title: 'Failed to add to the Team board', message: err.message }),
       },
     );
   }, [addToast, addTrackerItem, developers, issue, trackerDate]);

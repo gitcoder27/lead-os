@@ -726,7 +726,7 @@ function getConfirmationCopy(command: ManagerActionCommand): {
   if (command.kind === 'mark_done') {
     return {
       title: 'Mark done?',
-      description: 'This will mark the Manager Desk item done.',
+      description: 'This will mark the task done.',
       confirmLabel: 'Mark done',
     };
   }

@@ -142,7 +142,7 @@ export function SettingsMaintenanceSection({
                 Use maintenance resets only for duplicate cleanup, test data wipes, or recovery after a bad migration.
               </p>
               <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                Manager Desk reset is scoped to your desk. Team Tracker reset clears shared tracker history, check-ins, availability, and your saved tracker views.
+                The tasks reset is scoped to your own tasks. The Team board reset clears shared board history, check-ins, availability, and your saved board views.
               </p>
               <p className="mt-2 text-[12px]" style={{ color: preview.backupBeforeReset ? 'var(--success)' : 'var(--warning)' }}>
                 {preview.backupBeforeReset
@@ -167,8 +167,8 @@ export function SettingsMaintenanceSection({
       <div className="grid gap-4 lg:grid-cols-3">
         <MaintenanceActionCard
           target="manager_desk"
-          title="Reset Manager Desk"
-          description="Clear your Manager Desk days, tasks, links, and item history. Linked tracker tasks created from those desk items are removed too."
+          title="Reset my tasks"
+          description="Clear your tasks, their days, links, and history. Team board tasks created from them are removed too."
           counts={[
             formatCount(preview.managerDesk.itemCount, 'task'),
             formatCount(preview.managerDesk.dayCount, 'day'),
@@ -187,8 +187,8 @@ export function SettingsMaintenanceSection({
 
         <MaintenanceActionCard
           target="team_tracker"
-          title="Reset Team Tracker"
-          description="Clear all tracker days, items, check-ins, availability periods, and your saved Team Tracker views. Manager Desk tasks stay intact."
+          title="Reset Team board"
+          description="Clear all Team board days, items, check-ins, availability periods, and your saved board views. Your own tasks stay intact."
           counts={[
             formatCount(preview.teamTracker.itemCount, 'tracker item'),
             formatCount(preview.teamTracker.dayCount, 'tracker day'),
@@ -208,7 +208,7 @@ export function SettingsMaintenanceSection({
         <MaintenanceActionCard
           target="workspace"
           title="Reset Both Workspaces"
-          description="Start fresh by clearing both Manager Desk and Team Tracker data together. This is the right option when duplicate migration data has polluted both screens."
+          description="Start fresh by clearing your tasks and the Team board together. This is the right option when duplicate migration data has polluted both."
           counts={fullResetCounts}
           expectedText={CONFIRMATION_TEXT.workspace}
           armed={armedTarget === 'workspace'}

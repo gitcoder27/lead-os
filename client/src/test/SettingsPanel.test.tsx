@@ -1032,6 +1032,14 @@ describe('SettingsPage', () => {
     expect(mockPost).not.toHaveBeenCalledWith('/config/reset', expect.anything());
   });
 
+  it('names Tasks and the Team board in Data Maintenance, not Manager Desk or Team Tracker (UX-16)', async () => {
+    window.history.replaceState(null, '', '/settings?section=maintenance');
+    render(<TestWrapper><SettingsPage /></TestWrapper>);
+    expect(await screen.findByText('Reset my tasks')).toBeInTheDocument();
+    expect(screen.getByText('Reset Team board')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Manager Desk|Team Tracker/);
+  });
+
   it('runs the full maintenance reset after typed confirmation', async () => {
     mockPost.mockImplementation(async (path: string, body?: unknown) => {
       if (path === '/team/discover') {

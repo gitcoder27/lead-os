@@ -231,8 +231,8 @@ describe('TriagePanel', () => {
       </TestWrapper>
     );
 
-    expect(screen.getByRole('button', { name: /team tracker/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Team Tracker')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /team board/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Team board')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add to alice/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^alice/i })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -334,7 +334,7 @@ describe('TriagePanel', () => {
       </TestWrapper>
     );
 
-    const trackerHeading = screen.getByText('Team Tracker');
+    const trackerHeading = screen.getByText('Team board');
     const suggestionsHeading = screen.getByText('Suggestions');
 
     expect(trackerHeading.compareDocumentPosition(suggestionsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

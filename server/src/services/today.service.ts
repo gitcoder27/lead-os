@@ -454,7 +454,9 @@ export class TodayService {
     const issues = issueSnapshot.issues;
     const asks = state?.asks ?? [];
     const openAsks = unansweredAsks(asks, teamBoard);
-    const rhythm = getRhythmState(now, context.tz, state?.rhythm.boundaries);
+    // docs/56 UX-04: with nobody on the roster there is no standup window, just the morning.
+    const emptyRoster = sourceStatus.team === "ready" && teamBoard.summary.total === 0;
+    const rhythm = getRhythmState(now, context.tz, state?.rhythm.boundaries, { standup: !emptyRoster });
     // docs/56 P2-02: a standup needs people; with an empty roster there is no card.
     const standup = state?.phase3 && sourceStatus.team === "ready" && teamBoard.summary.total > 0
       ? buildStandupFocus(state.standup, teamBoard, date)

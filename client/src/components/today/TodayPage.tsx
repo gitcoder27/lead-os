@@ -237,11 +237,12 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     ];
   }, [snapshot?.summary, snapshot?.date]);
   // docs/63 #7: setup guidance is for a workspace with nothing in it. Once any task, plan row or queue row
-  // exists it is clutter above the real work; the optional steps stay in Settings.
+  // exists it is clutter above the real work; the optional steps stay in Settings. UX-04: a failed Jira
+  // sync is not work, so it never hides the checklist.
   const hasRealWork = Boolean(
     snapshot?.gettingStarted?.tasks
     || (plan?.items.length ?? 0) > 0
-    || allQueueItems.some((item) => item.type !== 'calm'),
+    || allQueueItems.some((item) => item.type !== 'calm' && item.type !== 'sync_attention'),
   );
   const gettingStartedSteps = snapshot?.gettingStarted && !gettingStartedDismissed && !hasRealWork
     && Object.values(snapshot.gettingStarted).some((done) => !done)

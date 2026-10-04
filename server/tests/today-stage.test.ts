@@ -102,6 +102,14 @@ describe("today-clock (docs/53 F5/F6)", () => {
     expect(getRhythmState(new Date("2026-03-08T12:00:00Z"), "Asia/Kolkata", boundaries).nextStage).toBeUndefined();
   });
 
+  it("calls the morning one stage, until midday, when there is no standup (UX-04)", () => {
+    // 10:30 IST would be the standup window; with nobody to stand up with it is just the morning.
+    const state = getRhythmState(new Date("2026-03-08T05:00:00Z"), "Asia/Kolkata", undefined, { standup: false });
+    expect(state).toMatchObject({ stage: "morning_plan", label: "Morning", nextStage: { stage: "midday_check", startsAt: "2026-03-08T06:30:00.000Z" } });
+    expect(getRhythmState(new Date("2026-03-08T03:00:00Z"), "Asia/Kolkata", undefined, { standup: false }).label).toBe("Morning");
+    expect(getRhythmState(new Date("2026-03-08T07:00:00Z"), "Asia/Kolkata", undefined, { standup: false }).stage).toBe("midday_check");
+  });
+
   it("maps timestamps to the zoned day and keeps date-only values as-is", () => {
     expect(toZonedIsoDay("2026-03-08T20:00:00.000Z", "Asia/Kolkata")).toBe("2026-03-09");
     expect(toZonedIsoDay("2026-03-08T02:00:00.000Z", "America/Los_Angeles")).toBe("2026-03-07");

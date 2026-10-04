@@ -91,11 +91,23 @@ describe("Today getting-started checklist (P2-02)", () => {
       expect(today.focus).not.toHaveProperty("morning.standup");
     });
 
+    it("labels the morning \"Morning\", not the standup window, with an empty roster (UX-04)", async () => {
+      vi.setSystemTime(new Date("2026-03-08T05:00:00.000Z")); // 10:30 IST
+      const today = await getToday();
+      expect(today.rhythm).toMatchObject({ stage: "morning_plan", label: "Morning", nextStage: { stage: "midday_check" } });
+    });
+
     it("appears once someone is on the team", async () => {
       await db.insert(developers).values({ accountId: "dev-1", displayName: "Alice Smith", email: null, avatarUrl: null, isActive: 1 });
       const today = await getToday();
       expect(today.actionItems.some((item) => item.type === "standup")).toBe(true);
       expect(today.focus).toMatchObject({ morning: { standup: { status: "not_started" } } });
+    });
+
+    it("keeps the standup window once someone is on the team (UX-04)", async () => {
+      vi.setSystemTime(new Date("2026-03-08T05:00:00.000Z")); // 10:30 IST
+      await db.insert(developers).values({ accountId: "dev-1", displayName: "Alice Smith", email: null, avatarUrl: null, isActive: 1 });
+      expect((await getToday()).rhythm).toMatchObject({ stage: "standup_window", label: "Standup window" });
     });
   });
 });

@@ -853,6 +853,19 @@ describe('TodayPage V2', () => {
       expect(screen.queryByTestId('today-getting-started')).not.toBeInTheDocument();
     });
 
+    it('still shows when the only queue row is a failed Jira sync (UX-04)', async () => {
+      const syncRow = actionItem(1, {
+        id: 'today-sync-error',
+        type: 'sync_attention',
+        title: 'Jira sync needs review',
+        context: 'fetch failed',
+        signal: 'Sync failed',
+      });
+      mockFetch(todayResponse({ gettingStarted: fresh, ...emptyWork, actionItems: [syncRow], totalCount: 1 }));
+      renderToday();
+      expect(await screen.findByTestId('today-getting-started')).toBeInTheDocument();
+    });
+
     it('is absent once everything is done, and when the server sends no checklist', async () => {
       const done = todayResponse({ gettingStarted: { people: true, tasks: true, jira: true, rhythm: true } });
       mockFetch(done);

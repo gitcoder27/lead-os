@@ -161,11 +161,14 @@ export function getRhythmState(
   now: Date,
   timeZone: string,
   boundaries: TodayRhythmBoundaries = DEFAULT_TODAY_RHYTHM_BOUNDARIES,
+  /** docs/56 UX-04: `standup: false` (nobody on the roster) makes the morning one "Morning" stage until midday. */
+  options: { standup?: boolean } = {},
 ): TodayRhythmState {
   const local = zonedParts(now, timeZone);
   const minutes = local.hour * 60 + local.minute;
+  const withStandup = options.standup ?? true;
   const edges: Array<{ stage: TodayRhythmStage; at: string }> = [
-    { stage: "standup_window", at: boundaries.standupStart },
+    ...(withStandup ? [{ stage: "standup_window" as const, at: boundaries.standupStart }] : []),
     { stage: "midday_check", at: boundaries.middayStart },
     { stage: "wrap_up", at: boundaries.wrapUpStart },
   ];
@@ -181,6 +184,7 @@ export function getRhythmState(
   return {
     stage,
     ...stageCopy[stage],
+    ...(!withStandup && stage === "morning_plan" ? { label: "Morning" } : {}),
     timeZone,
     localTime: `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`,
     boundaries,

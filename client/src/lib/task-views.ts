@@ -164,10 +164,11 @@ export type ScheduledBucket = 'Overdue' | 'Today' | 'Tomorrow' | 'Next 7 days' |
 export const SCHEDULED_GROUP_ORDER: ScheduledBucket[] = ['Overdue', 'Today', 'Tomorrow', 'Next 7 days', 'Beyond', 'Unscheduled'];
 
 /** docs/49 §3: bucket by plan date (earlier of scheduledOn and the dueAt date). */
-export function scheduledBucket(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'>, today: string): ScheduledBucket {
+export function scheduledBucket(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'> & Partial<Pick<ManagerTask, 'kind'>>, today: string): ScheduledBucket {
   const plan = taskPlanDate(task).date;
   if (!plan) return 'Unscheduled';
-  if (plan < today) return 'Overdue';
+  // docs/56 UX-08: a past meeting is not overdue — recording its outcome is today's job.
+  if (plan < today) return task.kind === 'meeting' ? 'Today' : 'Overdue';
   if (plan === today) return 'Today';
   if (plan === shiftLocalIsoDate(today, 1)) return 'Tomorrow';
   if (plan <= shiftLocalIsoDate(today, 7)) return 'Next 7 days';

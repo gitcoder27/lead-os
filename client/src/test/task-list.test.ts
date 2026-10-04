@@ -151,6 +151,8 @@ describe('scheduled grouping (docs/49 §3)', () => {
       ['Unscheduled', ['T-2']],
     ]);
     expect(scheduledBucket(task({ scheduledOn: '2026-10-04' }), TODAY)).toBe('Beyond');
+    // UX-08: a past meeting is never Overdue (or moved by "Move all to today"); its outcome is today's job.
+    expect(scheduledBucket(task({ kind: 'meeting', scheduledOn: '2026-09-21' }), TODAY)).toBe('Today');
   });
 
   it('orders owner groups Me → developers → Inbox with owner context', () => {

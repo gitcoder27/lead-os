@@ -89,6 +89,13 @@ function sectionFromLocation(): SectionId {
   return isSectionId(param) ? param : 'connection';
 }
 
+/** docs/56 UX-11: a failed Jira user lookup in words a manager can act on (never "fetch failed"). */
+function jiraLookupError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/not configured|missing jira/i.test(message)) return "Jira isn't connected yet.";
+  return "Can't reach Jira. Check the connection.";
+}
+
 interface SettingsPageProps {
   /** Live retarget from onOpenTarget — e.g. Copilot's "Open Settings" while already on /settings. */
   requestedSection?: { section?: string; nonce: number };
@@ -595,12 +602,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         if (requestId !== discoverRequestRef.current) {
           return;
         }
-        setDiscoverTeamError(error instanceof Error ? error.message : 'Failed to discover Jira users');
+        // docs/56 UX-11: plain words inline (with a link to the connection), not a sticky error toast.
+        setDiscoverTeamError(jiraLookupError(error));
         setDiscoverHasMore(false);
         if (!append) {
           setDiscoveredUsers([]);
         }
-        addToast({ type: 'error', title: 'Failed to discover team members', message: error instanceof Error ? error.message : 'Request failed' });
       } finally {
         if (requestId !== discoverRequestRef.current) {
           return;
@@ -615,14 +622,17 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     [addToast, canUseJiraDirectory, discoverTeamMembers]
   );
 
+  // docs/56 UX-11: the Jira directory is asked only from Team Members, when someone searches
+  // (or presses Refresh) — never because Settings opened, so a down Jira costs nothing elsewhere.
   useEffect(() => {
+    if (activeSection !== 'team' || !debouncedDiscoveredSearch) return;
     void handleDiscoverTeamMembers({
       query: debouncedDiscoveredSearch,
       startAt: 0,
       append: false,
-      silentEmpty: debouncedDiscoveredSearch.length === 0,
+      silentEmpty: false,
     });
-  }, [debouncedDiscoveredSearch, handleDiscoverTeamMembers]);
+  }, [activeSection, debouncedDiscoveredSearch, handleDiscoverTeamMembers]);
 
   const handleToggleAddUser = useCallback((accountId: string) => {
     setSelectedAddUsers((prev) => {
@@ -1751,7 +1761,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                     {discoverTeamError ? (
                       <p className="mb-2 rounded-xl px-3 py-2 text-[12px]" style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}>
-                        {discoverTeamError}
+                        {discoverTeamError}{' '}
+                        <button type="button" className="font-semibold underline" onClick={() => setActiveSection('connection')}>
+                          Open Jira Connection
+                        </button>
                       </p>
                     ) : null}
 

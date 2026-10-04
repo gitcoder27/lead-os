@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { SettingsPage } from '@/components/settings/SettingsPanel';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { TestWrapper } from '@/test/wrapper';
@@ -232,6 +232,29 @@ describe('SettingsPage', () => {
     );
   });
 
+  it('never asks Jira for users on mount, and explains a failed lookup in plain words (UX-11)', async () => {
+    const discoverCalls = () => mockPost.mock.calls.filter(([path]) => path === '/team/discover');
+    render(
+      <TestWrapper>
+        <SettingsPage />
+      </TestWrapper>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /team members/i }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)); });
+    expect(discoverCalls()).toHaveLength(0);
+
+    mockPost.mockImplementation(async (path: string) => {
+      if (path === '/team/discover') throw new Error('fetch failed');
+      return {};
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /refresh jira/i }));
+    expect(await screen.findByText("Can't reach Jira. Check the connection.")).toBeInTheDocument();
+    expect(screen.queryByText('fetch failed')).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'error', title: 'Failed to discover team members' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Jira Connection' }));
+    expect(await screen.findByRole('heading', { name: /jira connection/i })).toBeInTheDocument();
+  });
+
   it('does not trigger sync when saving settings fails', async () => {
     mockPut.mockRejectedValueOnce(new Error('Invalid query'));
 
@@ -457,6 +480,8 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
+    // UX-11: the Jira directory loads on Refresh (or a search), never on mount.
+    fireEvent.click(await screen.findByRole('button', { name: /refresh jira/i }));
     fireEvent.click(await screen.findByRole('button', { name: /casey lead/i }));
     fireEvent.click(screen.getByRole('button', { name: /add 1 selected/i }));
 
@@ -557,6 +582,8 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
+    // UX-11: the Jira directory loads on Refresh (or a search), never on mount.
+    fireEvent.click(await screen.findByRole('button', { name: /refresh jira/i }));
     fireEvent.click(await screen.findByRole('button', { name: /casey lead/i }));
     fireEvent.click(screen.getByRole('button', { name: /add 1 selected/i }));
 
@@ -583,6 +610,8 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
+    // UX-11: the Jira directory loads on Refresh (or a search), never on mount.
+    fireEvent.click(await screen.findByRole('button', { name: /refresh jira/i }));
     fireEvent.click(await screen.findByRole('button', { name: /casey lead/i }));
     fireEvent.click(screen.getByRole('button', { name: /add 1 selected/i }));
 
@@ -691,6 +720,8 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
+    // UX-11: the Jira directory loads on Refresh (or a search), never on mount.
+    fireEvent.click(await screen.findByRole('button', { name: /refresh jira/i }));
     fireEvent.click(await screen.findByRole('button', { name: /casey lead/i }));
     fireEvent.click(screen.getByRole('button', { name: /add 1 selected/i }));
 

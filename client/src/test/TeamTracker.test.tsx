@@ -441,9 +441,10 @@ import { TeamTrackerPage } from '@/components/team-tracker/TeamTrackerPage';
 import { ROSTER_GRID } from '@/components/team-tracker/TrackerRosterBoard';
 
 function clickDeveloperRow(name: string) {
+  // docs/56 UX-23: a roster row opens from its name link (the row itself is not a button).
   const target = screen
-    .getAllByRole('button')
-    .find((element) => element.textContent?.includes(name) && element.getAttribute('role') === 'button');
+    .getAllByRole('link')
+    .find((element) => element.hasAttribute('data-roster-row') && element.textContent?.includes(name));
   if (!target) {
     throw new Error(`Could not find developer row for ${name}`);
   }
@@ -536,6 +537,21 @@ describe('TeamTrackerPage', () => {
     );
     expect(screen.getAllByText('Alice Smith').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Bob Jones').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('makes a roster row a link plus separate buttons, never a button holding buttons (UX-23)', () => {
+    render(
+      <TestWrapper>
+        <TeamTrackerPage />
+      </TestWrapper>
+    );
+    const links = document.querySelectorAll<HTMLElement>('[data-roster-row]');
+    expect(links.length).toBeGreaterThan(1);
+    for (const link of links) {
+      expect(link.tagName).toBe('A');
+      expect(link.closest('[role="button"]')).toBeNull();
+      expect(link.querySelector('button')).toBeNull();
+    }
   });
 
   it('speaks the shared keyboard grammar on the board (docs/54 K2)', () => {
@@ -961,7 +977,7 @@ describe('TeamTrackerPage', () => {
     expect(bob.compareDocumentPosition(alice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Each fact is said once: "Blocked" lives in the status mark, the
     // attention cell leads with the most severe remaining flag.
-    const bobRow = bob.closest('[role="button"]') as HTMLElement;
+    const bobRow = bob.closest('[data-attention]') as HTMLElement;
     expect(bobRow).toHaveAttribute('data-attention', 'danger');
     expect(within(bobRow).getByText('Overdue Jira')).toBeInTheDocument();
     expect(within(bobRow).getByText('Stale with risk')).toBeInTheDocument();
@@ -1576,8 +1592,9 @@ describe('TeamTrackerPage', () => {
     expect(header?.className).toContain(ROSTER_GRID);
 
     const devRow = screen
-      .getAllByRole('button')
-      .find((element) => element.textContent?.includes('Bob Jones'));
+      .getAllByRole('link')
+      .find((element) => element.textContent?.includes('Bob Jones'))
+      ?.closest('[data-attention], .group') as HTMLElement | null;
     expect(devRow?.className).toContain(ROSTER_GRID);
 
     // Header and rows must declare the same column gap or the tracks drift out of alignment

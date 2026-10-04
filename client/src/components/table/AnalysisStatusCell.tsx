@@ -8,6 +8,7 @@ export function AnalysisStatusCell({ hasNotes }: AnalysisStatusCellProps) {
   if (hasNotes) {
     return (
       <span
+        role="img"
         className="inline-flex items-center justify-center"
         title="Analysis complete"
         aria-label="Analysis complete"
@@ -19,6 +20,7 @@ export function AnalysisStatusCell({ hasNotes }: AnalysisStatusCellProps) {
 
   return (
     <span
+      role="img"
       className="inline-flex items-center justify-center"
       title="Analysis pending"
       aria-label="Analysis pending"

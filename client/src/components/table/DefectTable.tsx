@@ -1233,6 +1233,7 @@ export function DefectTable({
                       <td key={cell.id} className="px-2 py-1.5 text-[13px] relative z-0 first:rounded-l-[10px] last:rounded-r-[10px]">
                         {cellIndex === 0 && indicatorReason ? (
                           <span
+                            role="img"
                             className="absolute left-0 top-0 bottom-0 w-3 flex items-center justify-start cursor-help"
                             title={indicatorReason}
                             aria-label={`Row indicator: ${indicatorReason}`}

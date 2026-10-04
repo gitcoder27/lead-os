@@ -37,10 +37,12 @@ export function CommentForm({ issueKey }: CommentFormProps) {
       <button
         type="submit"
         disabled={addComment.isPending || !body.trim()}
+        aria-label="Add comment"
+        title="Add comment"
         className="p-2 rounded-lg transition-colors duration-150 disabled:opacity-40"
         style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
       >
-        <Send size={13} />
+        <Send size={13} aria-hidden="true" />
       </button>
     </form>
   );

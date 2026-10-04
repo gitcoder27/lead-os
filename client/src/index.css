@@ -298,6 +298,8 @@ body::after {
  * One idiom for a list row that is selected or holds keyboard focus: a soft accent tint and a thin accent bar
  * on its left edge. Never a ring around the whole row (it reads as a hard box on dense lists).
  */
+/* docs/56 UX-23: a row whose own link holds focus (Team roster rows) shows the same bar. */
+.ui-row-focus:has(.roster-row-link:focus-visible),
 .ui-row-focus:focus-visible {
   outline: none;
   background-color: color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary));

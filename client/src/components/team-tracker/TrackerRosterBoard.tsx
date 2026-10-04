@@ -327,18 +327,10 @@ function RosterRow({
       // docs/54 M3: no mount stagger — rows appear with the data.
       initial={false}
       animate={{ opacity: 1 }}
-      role="button"
-      tabIndex={0}
-      data-roster-row=""
+      // docs/56 UX-23: the row is not itself a button (it holds buttons). The name is the link that
+      // opens the person; a click anywhere else on the row does the same for pointer users.
       data-attention={attention.rail ?? undefined}
       onClick={() => onOpenDrawer(day.developer.accountId)}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpenDrawer(day.developer.accountId);
-        }
-      }}
       className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${ROSTER_GRID}`}
       style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
@@ -354,7 +346,18 @@ function RosterRow({
         <Avatar name={name} seed={day.developer.accountId} size={30} muted={done} />
         <div className="min-w-0">
           <div className="truncate text-[13.5px] font-semibold leading-5 tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }} title={name}>
-            {name}
+            <a
+              href={`/team?dev=${encodeURIComponent(day.developer.accountId)}`}
+              data-roster-row=""
+              className="roster-row-link outline-none hover:underline"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenDrawer(day.developer.accountId);
+              }}
+            >
+              {name}
+            </a>
             <YouTag show={day.developer.isSelf} />
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">

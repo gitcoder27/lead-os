@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { ChevronRight } from 'lucide-react';
 import { formatClock, rowContext, signalChips, type TodayQueueGroup } from '@/lib/today-layout';
-import { TodayActionMenu } from './TodayActionMenu';
+import { TodayActionMenu, actionIcon } from './TodayActionMenu';
 import type { TodayActionCommand, TodayActionItem, TodayActionItemType } from '@/types';
 
 const iconByType: Record<TodayActionItemType, LucideIcon> = {
@@ -59,6 +59,12 @@ interface TodayActionRowProps {
  * docs/53 D4/A2: two lines (title + reasons, then context), three stops —
  * one link that opens the target, the compact primary action, the menu.
  */
+/** docs/56 UX-24: shown only when the row button is icon-only (≤480px); the label stays the accessible name. */
+function PrimaryIcon({ kind }: { kind: TodayActionCommand['kind'] }) {
+  const Icon = actionIcon(kind);
+  return <Icon size={15} className="today-row-primary-icon" aria-hidden="true" />;
+}
+
 export const TodayActionRow = memo(function TodayActionRow({
   item,
   featured = false,
@@ -118,12 +124,14 @@ export const TodayActionRow = memo(function TodayActionRow({
         {/* Every row ends in its next step; plain "Open …" steps read quieter. */}
         <button
           type="button"
-          className={primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-btn'}
+          className={`${primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-btn'} today-row-primary`}
           onClick={() => onRunCommand(item.primaryAction)}
           disabled={isPending}
+          aria-label={item.primaryAction.label}
+          title={item.primaryAction.label}
         >
-          {isPending ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : null}
-          {item.primaryAction.label}
+          {isPending ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <PrimaryIcon kind={item.primaryAction.kind} />}
+          <span className="today-row-primary-label">{item.primaryAction.label}</span>
         </button>
         <TodayActionMenu
           label={item.title}
@@ -180,10 +188,13 @@ export function TodayGroupRow({ item, group, expanded, featured = false, isActiv
         <span className="today-row-actions">
           <button
             type="button"
-            className={item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-btn'}
+            className={`${item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-btn'} today-row-primary`}
             onClick={() => onRunCommand(item.primaryAction)}
+            aria-label={item.primaryAction.label}
+            title={item.primaryAction.label}
           >
-            {item.primaryAction.label}
+            <PrimaryIcon kind={item.primaryAction.kind} />
+            <span className="today-row-primary-label">{item.primaryAction.label}</span>
           </button>
         </span>
       </div>

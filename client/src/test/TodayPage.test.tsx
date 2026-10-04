@@ -639,6 +639,22 @@ describe('TodayPage V2', () => {
     });
   });
 
+  it('row buttons carry an icon and a label, so phones can show the icon alone (UX-24)', async () => {
+    mockFetch(todayResponse());
+    renderToday();
+    const [row] = await screen.findAllByTestId('today-action-row');
+    const primary = row!.querySelector<HTMLButtonElement>('.today-row-primary')!;
+    expect(primary).toHaveAttribute('aria-label', primary.querySelector('.today-row-primary-label')!.textContent);
+    expect(primary.querySelector('.today-row-primary-icon')).not.toBeNull();
+    // jsdom has no media queries: the ≤480px rules are checked in the stylesheet.
+    const css = (await import('node:fs')).readFileSync(`${process.cwd()}/src/components/today/today.css`, 'utf8');
+    const phone = css.slice(css.indexOf('@media (max-width: 480px)'));
+    expect(phone).toMatch(/\.today-row-primary-label \{ display: none; \}/);
+    expect(phone).toMatch(/\.today-row-title-line \{ flex-direction: column;/);
+    expect(phone).toMatch(/\.today-band \{[^}]*flex-wrap: wrap;/);
+    expect(phone).toMatch(/\.today-row-primary \{ min-width: 44px; min-height: 44px;/);
+  });
+
   it('captures a meeting outcome through the Today dialog', async () => {
     const meetingTarget = target({ type: 'meeting', view: 'meetings', managerDeskItemId: 91, date: '2026-03-08' });
     const fetchMock = mockFetch(todayResponse({

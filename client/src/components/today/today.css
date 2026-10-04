@@ -704,3 +704,20 @@
 .today-jump-target:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 @media (max-width: 1023px) { .today-band { height: 48px; } }
 @media (min-width: 1024px) { .today-mobile-jumps { display: none; } }
+
+/* ── Phones (docs/56 UX-24) ──────────────────────────────────────────── */
+
+.today-row-primary-icon { display: none; }
+
+@media (max-width: 480px) {
+  /* The badge sits under the title, so the title gets the whole row width. */
+  .today-row-title-line { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .today-row-title-line > .ui-chip { margin-left: 0; }
+  /* The primary action is an icon (its label stays the accessible name), with a 44px target. */
+  .today-row-primary { min-width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+  .today-row-primary-label { display: none; }
+  .today-row-primary-icon { display: inline; }
+  /* The stage strip wraps instead of clipping the date ("Sun 4 O"). */
+  .today-band { height: auto; min-height: 48px; flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 2px; padding-top: 4px; padding-bottom: 4px; }
+  .today-band > * { white-space: nowrap; }
+}

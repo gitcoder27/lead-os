@@ -30,6 +30,11 @@ const iconByKind: Partial<Record<TodayActionCommand['kind'], LucideIcon>> = {
   snooze: AlarmClock,
 };
 
+/** docs/56 UX-24: the icon a command shows when its row button is icon-only (phones). */
+export function actionIcon(kind: TodayActionCommand['kind']): LucideIcon {
+  return iconByKind[kind] ?? ArrowUpRight;
+}
+
 /** docs/53 U4: menu items show the triage key that runs them. */
 const hintByKind: Partial<Record<TodayActionCommand['kind'], string>> = {
   capture_follow_up: 'f',

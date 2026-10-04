@@ -6,6 +6,7 @@ import { DefectTable } from '@/components/table/DefectTable';
 import { TriagePanel } from '@/components/triage/TriagePanel';
 import { WorkloadBar } from '@/components/workload/WorkloadBar';
 import { WorkFocusStrip } from '@/components/work/WorkFocusStrip';
+import { WorkSyncControls } from '@/components/work/WorkSyncControls';
 import { describeWorkSavedView } from '@/components/work/workSavedViewDescription';
 import { SavedViewsMenu } from '@/components/team-tracker/SavedViewsMenu';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
@@ -504,7 +505,7 @@ export function DashboardLayout({
             onFilterChange={handleFilterChange}
             onOpenTarget={onOpenActionTarget}
             onViewChange={onViewChange}
-            actions={workViewsMenu}
+            actions={<><WorkSyncControls />{workViewsMenu}</>}
           />
 
           <ErrorBanner />

@@ -1,14 +1,11 @@
-import { useLayoutEffect, useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, Moon, Sun, PanelLeftOpen, Search, Settings, Plus, CloudOff } from 'lucide-react';
+import { Moon, Sun, PanelLeftOpen, Search, Settings, Plus } from 'lucide-react';
 import { CopilotMark } from '@/components/brand/CopilotMark';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useAssistant } from '@/context/AssistantContext';
-import { useSyncStatus } from '@/hooks/useSyncStatus';
-import { useTriggerSync } from '@/hooks/useTriggerSync';
-import { formatRelativeTime } from '@/lib/utils';
 import type { ActiveAppView, AppView } from '@/App';
 import type { ManagerActionTarget } from '@/types';
 import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
@@ -30,39 +27,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
   const { user, features } = useAuth();
   const { openCapture, openCommandPalette } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
-  const onWork = activeView === 'work';
-  const { data: sync } = useSyncStatus({ enabled: onWork });
-  // docs/56 P2-03: no Jira connection means no sync chip and no sync button. Unknown (loading) keeps them.
-  const showJiraSync = onWork && sync?.jiraConfigured !== false;
-  const triggerSync = useTriggerSync();
   const headerRef = useRef<HTMLElement | null>(null);
-  const [, setTimeTick] = useState(0);
-
-  useEffect(() => {
-    // Relative sync timestamps only change on re-render; tick even when sync data is unchanged.
-    const timer = window.setInterval(() => setTimeTick((tick) => tick + 1), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const isSyncing = sync?.status === 'syncing' || triggerSync.isPending;
-  const hasError = sync?.status === 'error';
-  const autoSyncOff = sync?.autoSyncEnabled === false;
-  const syncLabel = isSyncing
-    ? 'Syncing…'
-    : hasError
-    ? 'Sync issue'
-    : autoSyncOff
-    ? 'Sync off'
-    : sync?.lastSyncedAt
-    ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
-    : 'Not synced';
-  const syncTitle = hasError
-    ? `Sync issue${sync?.errorMessage ? `: ${sync.errorMessage}` : ''}${autoSyncOff ? ' Jira auto-sync is off; manual sync is still available.' : ''}`
-    : autoSyncOff
-    ? 'Jira auto-sync is off. Manual sync is still available; turn it back on in Settings → Sync Scope.'
-    : sync?.lastSyncedAt
-    ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
-    : 'Not synced';
   const canQuickCapture = user?.role === 'manager';
   const currentView = activeView ?? 'today';
   const defaultCaptureTarget = currentView === 'team' || currentView === 'team-tracker'
@@ -144,9 +109,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 >
                   LeadOS
                 </h1>
-                <div className="hidden text-[12px] leading-4 xl:block" style={{ color: 'var(--text-secondary)' }}>
-                  People, work, risks, and planning
-                </div>
               </div>
             </div>
             {onViewChange && (
@@ -157,39 +119,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
           </div>
 
           <div className="header-actions flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
-            {showJiraSync && (
-            <div
-              className="hidden sm:flex h-9 rounded-xl px-2.5 items-center gap-2"
-              style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
-              title={syncTitle}
-            >
-              {autoSyncOff && !isSyncing && !hasError ? (
-                <CloudOff size={13} style={{ color: 'var(--text-muted)' }} />
-              ) : (
-                <span
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{
-                    background: hasError
-                      ? 'var(--danger)'
-                      : isSyncing
-                      ? 'var(--warning)'
-                      : 'var(--success)',
-                    boxShadow: hasError
-                      ? '0 0 10px var(--danger)'
-                      : isSyncing
-                      ? '0 0 10px var(--warning)'
-                      : '0 0 10px var(--success)',
-                  }}
-                />
-              )}
-              <div className="min-w-0">
-                <div className="truncate font-mono text-[12px]" style={{ color: 'var(--text-secondary)' }}>
-                  {syncLabel}
-                </div>
-              </div>
-            </div>
-            )}
-
             <div className="flex items-center gap-1.5">
               {user?.role === 'manager' && onViewChange && (activeView !== 'today' || (features?.tasksPhase3 && features.teamMode === 'collab')) ? (
                 <ManagerActionInbox updatesOnly={activeView === 'today'} onOpenTarget={openActionTarget} onViewChange={onViewChange} />
@@ -261,22 +190,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 className="rounded-xl p-0.5 flex items-center gap-0.5"
                 style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
               >
-                {showJiraSync && (
-                  <button
-                    onClick={() => triggerSync.mutate()}
-                    disabled={isSyncing}
-                    className="h-8 w-8 rounded-lg transition-colors duration-150 disabled:opacity-50 flex items-center justify-center"
-                    style={{ background: 'transparent' }}
-                    title="Manual sync (r)"
-                  >
-                    <RefreshCw
-                      size={16}
-                      className={isSyncing ? 'animate-spin' : ''}
-                      style={{ color: 'var(--text-secondary)' }}
-                    />
-                  </button>
-                )}
-
                 <button
                   onClick={toggleTheme}
                   className="h-8 w-8 rounded-lg transition-colors duration-150 flex items-center justify-center"

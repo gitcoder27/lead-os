@@ -5,7 +5,9 @@ import {
   issueSuggestions,
   labelSuggestions,
   personSuggestions,
+  readableAlias,
   tokenFragmentAt,
+  wireText,
 } from '@/lib/capture-typeahead';
 
 const people: CapturePersonCandidate[] = [
@@ -43,7 +45,8 @@ describe('tokenFragmentAt (docs/57 P3-05)', () => {
 
 describe('personSuggestions', () => {
   it('lists developers before contacts when nothing is typed', () => {
-    expect(personSuggestions('', people).map((s) => s.insert)).toEqual(['dev-1', '557058:ab-12', 'dev-2', 'acme-legal']);
+    expect(personSuggestions('', people).map((s) => s.insert)).toEqual(['Alice', 'Jira', 'Bob', 'acme-legal']);
+    expect(personSuggestions('', people).map((s) => s.ref)).toEqual(['dev-1', '557058:ab-12', 'dev-2', 'acme-legal']);
   });
 
   it('matches names and ids, and marks contacts', () => {
@@ -51,8 +54,12 @@ describe('personSuggestions', () => {
     expect(personSuggestions('bo', people).map((s) => s.label)).toEqual(['Bob Jones']);
   });
 
-  it('inserts a colon id as-is', () => {
-    expect(personSuggestions('jir', people)[0]).toMatchObject({ insert: '557058:ab-12', label: 'Jira Person' });
+  it('inserts a readable name and keeps a colon id as the ref, never in the text (UX-05)', () => {
+    expect(personSuggestions('jir', people)[0]).toMatchObject({ insert: 'Jira', ref: '557058:ab-12', label: 'Jira Person' });
+  });
+
+  it('drops a fully typed alias so Enter can submit (UX-05)', () => {
+    expect(personSuggestions('Bob', people)).toEqual([]);
   });
 
   it('drops a fully typed handle so Enter can submit', () => {
@@ -84,11 +91,38 @@ describe('applyTokenSuggestion', () => {
 
   it('replaces the fragment, adds a space and puts the caret after it', () => {
     const text = 'Ask @al';
-    expect(applyTokenSuggestion(text, 7, tokenFragmentAt(text, 7)!, suggestion)).toEqual({ text: 'Ask @dev-1 ', caret: 11 });
+    expect(applyTokenSuggestion(text, 7, tokenFragmentAt(text, 7)!, suggestion)).toEqual({ text: 'Ask @Alice ', caret: 11 });
   });
 
   it('reuses a space that is already there', () => {
     const text = 'Ask @al about it';
-    expect(applyTokenSuggestion(text, 7, tokenFragmentAt(text, 7)!, suggestion)).toEqual({ text: 'Ask @dev-1 about it', caret: 11 });
+    expect(applyTokenSuggestion(text, 7, tokenFragmentAt(text, 7)!, suggestion)).toEqual({ text: 'Ask @Alice about it', caret: 11 });
+  });
+});
+
+describe('readableAlias / wireText (UX-05)', () => {
+  const crowd: CapturePersonCandidate[] = [
+    { accountId: 'manual:marcus-lee-ec28abd3', displayName: 'Marcus Lee', kind: 'developer' },
+    { accountId: 'manual:marcus-chen-1', displayName: 'Marcus Chen', kind: 'developer' },
+    { accountId: 'manual:tom-becker-81b9d6a0', displayName: 'Tom Becker', kind: 'developer' },
+    { accountId: 'tom', displayName: 'Tom from Legal', kind: 'contact', contactId: 3 },
+    { accountId: 'x:1', displayName: 'Sam Lee', kind: 'developer' },
+    { accountId: 'x:2', displayName: 'Sam Lee', kind: 'developer' },
+  ];
+
+  it('uses the first name when it is unique, else the whole name, else the id', () => {
+    expect(readableAlias(crowd[0]!, crowd)).toBe('MarcusLee');
+    expect(readableAlias({ accountId: 'p', displayName: 'Priya Raman', kind: 'developer' }, [...crowd, { accountId: 'p', displayName: 'Priya Raman', kind: 'developer' }])).toBe('Priya');
+    // "tom" is a contact handle, so the developer needs the full name.
+    expect(readableAlias(crowd[2]!, crowd)).toBe('TomBecker');
+    expect(readableAlias(crowd[3]!, crowd)).toBe('tom');
+    expect(readableAlias(crowd[4]!, crowd)).toBe('x:1');
+  });
+
+  it('swaps remembered aliases for ids on the wire and leaves everything else alone', () => {
+    const aliases = new Map([['marcuslee', 'manual:marcus-lee-ec28abd3'], ['tombecker', 'manual:tom-becker-81b9d6a0']]);
+    expect(wireText('Ask @MarcusLee for ETA /w @TomBecker !fri', aliases)).toBe('Ask @manual:marcus-lee-ec28abd3 for ETA /w @manual:tom-becker-81b9d6a0 !fri');
+    expect(wireText('mail me@MarcusLee and @MarcusLeeX', aliases)).toBe('mail me@MarcusLee and @MarcusLeeX');
+    expect(wireText('@marcuslee', aliases)).toBe('@manual:marcus-lee-ec28abd3');
   });
 });

@@ -245,7 +245,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
     if (tokenIndex === undefined || !resolved) return;
     const token = resolved.tokens[tokenIndex];
     if (!token) return;
-    setText(text.slice(0, token.start) + `@${accountId}` + text.slice(token.end));
+    setText(text.slice(0, token.start) + `@${typeahead.mentionFor(accountId)}` + text.slice(token.end));
   };
 
   // Assignee pill: shows the effective owner — the prop, or a `@person` the
@@ -267,11 +267,13 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured }: Capt
       : undefined;
     const tz = getLocalTimeZone();
     const clientToday = getLocalIsoDate();
-    const fingerprint = JSON.stringify({ scope, text, clientToday, tz, defaults });
+    // docs/56 UX-05: the box shows `@Marcus`; the server gets the picked person's id.
+    const wire = typeahead.toWire(text);
+    const fingerprint = JSON.stringify({ scope, text: wire, clientToday, tz, defaults });
     if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, requestId: crypto.randomUUID() };
     const requestId = attempt.current.requestId;
     capture.mutate(
-      { text, clientToday, ...(tz && { tz }), ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId },
+      { text: wire, clientToday, ...(tz && { tz }), ...(defaults && { defaults }), ...(confirm && { confirm: true }), requestId },
       {
         onSuccess: (res) => {
           if (res.blocked) {

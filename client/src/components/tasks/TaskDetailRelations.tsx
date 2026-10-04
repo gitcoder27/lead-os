@@ -330,7 +330,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   // docs/57 §3 (P3-05): an action item is a capture with this task as its parent —
   // `@dev` is the owner, `!fri` the date, and the server reports anything it can't resolve.
   const submit = async () => {
-    const text = draft.trim();
+    const text = typeahead.toWire(draft.trim());
     if (!text || createChild.isPending) return;
     try {
       const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey } });

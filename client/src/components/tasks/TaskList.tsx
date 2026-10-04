@@ -301,7 +301,7 @@ function InlineAddForm({ onCancel, onSubmit, groupLabel }: {
         const value = title.trim();
         if (!value || pending) return;
         setPending(true);
-        const ok = await onSubmit(value);
+        const ok = await onSubmit(typeahead.toWire(value));
         setPending(false);
         if (ok) { setTitle(''); setCaret(0); }
       }}

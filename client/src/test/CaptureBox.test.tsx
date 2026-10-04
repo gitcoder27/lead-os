@@ -167,7 +167,7 @@ describe('CaptureBox (P3-D8)', () => {
     expect(screen.getByRole('button', { name: 'Alice Chen' })).toBeTruthy();
 
     fireEvent.click(aliceSmith);
-    expect((input as HTMLTextAreaElement).value).toBe('@dev-1 pair on the release');
+    expect((input as HTMLTextAreaElement).value).toBe('@AliceSmith pair on the release');
     expect(screen.queryByTestId('capture-diagnostics')).toBeNull();
   });
 
@@ -514,7 +514,7 @@ describe('CaptureBox (P3-D8)', () => {
   });
 
   describe('@ and # typeahead (P3-05)', () => {
-    it('suggests people for @ and inserts the account id on Tab', () => {
+    it('suggests people for @, shows a readable name on Tab and sends the id (UX-05)', () => {
       const { input } = renderBox();
       fireEvent.change(input, { target: { value: 'Pair with @al' } });
       const list = screen.getByRole('listbox', { name: 'Person suggestions' });
@@ -523,7 +523,12 @@ describe('CaptureBox (P3-D8)', () => {
         expect.stringContaining('Alice Chen'),
       ]);
       fireEvent.keyDown(input, { key: 'Tab' });
-      expect((input as HTMLTextAreaElement).value).toBe('Pair with @dev-1 ');
+      // Two Alices: the full name keeps it unique; the id never reaches the text.
+      expect((input as HTMLTextAreaElement).value).toBe('Pair with @AliceSmith ');
+      fireEvent.change(input, { target: { value: 'Pair with @AliceSmith on the release' } });
+      expect(screen.queryByTestId('capture-diagnostics')).toBeNull();
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(lastBody().text).toBe('Pair with @dev-1 on the release');
     });
 
     it('lists contacts after developers, marked as contacts', () => {
@@ -541,14 +546,14 @@ describe('CaptureBox (P3-D8)', () => {
       fireEvent.keyDown(input, { key: 'ArrowDown' });
       expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
       fireEvent.click(screen.getAllByRole('option')[1]!);
-      expect((input as HTMLTextAreaElement).value).toBe('Ping @dev-4 ');
+      expect((input as HTMLTextAreaElement).value).toBe('Ping @AliceChen ');
     });
 
     it('Enter accepts the highlighted person instead of submitting', () => {
       const { input } = renderBox();
       fireEvent.change(input, { target: { value: 'Ask @bo' } });
       fireEvent.keyDown(input, { key: 'Enter' });
-      expect((input as HTMLTextAreaElement).value).toBe('Ask @dev-2 ');
+      expect((input as HTMLTextAreaElement).value).toBe('Ask @Bob ');
       expect(mockMutate).not.toHaveBeenCalled();
     });
 

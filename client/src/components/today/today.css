@@ -721,3 +721,11 @@
   .today-band { height: auto; min-height: 48px; flex-wrap: wrap; white-space: normal; overflow: visible; row-gap: 2px; padding-top: 4px; padding-bottom: 4px; }
   .today-band > * { white-space: nowrap; }
 }
+
+/* docs/56 UX-26: on narrow screens a wrap-up row's verbs (Done · Tomorrow · Drop) sit on their own line. */
+@media (max-width: 640px) {
+  .today-wrapup-row { grid-template-columns: 22px minmax(0, 1fr); row-gap: 2px; }
+  .today-wrapup-row > .today-row-actions { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; }
+  .today-panel-head:has(> #today-wrap-heading) { flex-wrap: wrap; }
+  .today-panel-head:has(> #today-wrap-heading) .today-section-actions { margin-left: 0; flex-wrap: wrap; }
+}

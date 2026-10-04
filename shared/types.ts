@@ -287,6 +287,8 @@ export type TodayActionKind =
   | "mark_done"
   | "carry_forward"
   | "capture_meeting_outcome"
+  /** docs/56 UX-26: wrap-up "Drop" — a task's status becomes dropped (canonical tasks only; undoable). */
+  | "drop"
   /** docs/53 F11: applies a server-issued inverse patch (the Undo of a prior command). */
   | "restore";
 

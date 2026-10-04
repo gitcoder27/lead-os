@@ -218,6 +218,11 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         return postCommand({ command });
       }
 
+      // docs/56 UX-26: wrap-up "Drop" (tasks only; the server answers with an Undo).
+      if (command.kind === 'drop' && target.taskKey) {
+        return postCommand({ command });
+      }
+
       if (command.kind === 'snooze' && (target.managerDeskItemId || target.taskKey)) {
         return postCommand({ command, preset });
       }
@@ -272,6 +277,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
       const previous = snapshotToday();
       if (
         command.kind === 'mark_done' ||
+        command.kind === 'drop' ||
         command.kind === 'snooze' ||
         command.kind === 'carry_forward' ||
         command.kind === 'capture_meeting_outcome' ||
@@ -473,6 +479,7 @@ function isActionResult(result: unknown, key: 'cancelled' | 'skipToast'): boolea
 
 function actionToastTitle({ kind, label }: Pick<TodayActionCommand, 'kind' | 'label'>): string {
   if (kind === 'mark_done') return 'Marked done';
+  if (kind === 'drop') return 'Dropped';
   if (kind === 'snooze') return 'Snoozed';
   // docs/56 P1-04: Today relabels the command "Add note" for people who do not check in.
   if (kind === 'add_check_in') return /note/i.test(label) ? 'Note added' : 'Check-in added';

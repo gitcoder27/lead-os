@@ -666,10 +666,11 @@ export class TodayService {
     if (actionTarget.taskKey && await new TaskKeysService().canonicalEnabled(workspaceId)) {
       const tasks = new TaskService();
       const principal = { type: "manager" as const, accountId: managerAccountId, workspaceId };
-      if (command.kind === "mark_done" || command.kind === "set_current_work" || command.kind === "snooze" || command.kind === "carry_forward" || command.kind === "capture_meeting_outcome") {
+      if (command.kind === "mark_done" || command.kind === "drop" || command.kind === "set_current_work" || command.kind === "snooze" || command.kind === "carry_forward" || command.kind === "capture_meeting_outcome") {
         const before = await tasks.getByKey(actionTarget.taskKey, workspaceId);
         const outcome = command.kind === "capture_meeting_outcome" ? requireTrimmedText(request.outcome, "outcome") : undefined;
         const updates = command.kind === "mark_done" ? { status: "done" as const }
+          : command.kind === "drop" ? { status: "dropped" as const }
           : command.kind === "set_current_work" ? { status: "active" as const }
           : command.kind === "snooze" ? { followUpAt: buildSnoozeIso(date, request.preset ?? "tomorrow", tz) }
           : command.kind === "capture_meeting_outcome" ? { outcome }
@@ -1931,6 +1932,8 @@ function commandLabel(kind: TodayActionCommand["kind"]): string {
       return "Done";
     case "carry_forward":
       return "Carry";
+    case "drop":
+      return "Drop";
     case "capture_meeting_outcome":
       return "Outcome";
     case "set_current_work":

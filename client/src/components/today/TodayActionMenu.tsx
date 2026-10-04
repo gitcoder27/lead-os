@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlarmClock, ArrowUpRight, CalendarClock, Check, Ellipsis, MessageSquare, MessageSquarePlus, Rows3, Send, UserRoundCheck, type LucideIcon } from 'lucide-react';
+import { AlarmClock, ArrowUpRight, CalendarClock, Check, Ellipsis, MessageSquare, MessageSquarePlus, Rows3, Send, UserRoundCheck, type LucideIcon, CircleX } from 'lucide-react';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { isLaterTodayAvailable } from '@/lib/utils';
 import type { TodayActionCommand } from '@/types';
@@ -28,6 +28,7 @@ const iconByKind: Partial<Record<TodayActionCommand['kind'], LucideIcon>> = {
   open: ArrowUpRight,
   assign_owner: ArrowUpRight,
   snooze: AlarmClock,
+  drop: CircleX,
 };
 
 /** docs/56 UX-24: the icon a command shows when its row button is icon-only (phones). */

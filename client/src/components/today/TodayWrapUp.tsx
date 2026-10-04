@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { CircleCheck, ListTodo, NotebookPen, Pin, PinOff } from 'lucide-react';
+import { Bell, CalendarArrowUp, CircleCheck, ListTodo, NotebookPen, Pin, PinOff, Rows3, type LucideIcon } from 'lucide-react';
 import { firstName, formatClock, rowContext } from '@/lib/today-layout';
-import { TodayCompactRow } from './TodayCompactRow';
 import { planDetail } from './TodayPlanPanel';
 import type { TodayRunCommand } from './TodayActionRow';
 import { TODAY_TOP_LIMIT } from '@/types';
 import type { TodayActionCommand, TodayActionItem, TodayActionTarget, TodayFocusPerson, TodayPlanFocus, TodayPlanItem, TodayWrapUpFocus } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
+import { shiftLocalIsoDate } from '@/lib/utils';
 
 export type TodayBulkRun = (commands: TodayActionCommand[], title: (count: number) => string) => void;
 
@@ -62,12 +62,39 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
   const promises = showAllPromises ? openPromises : openPromises.slice(0, PREVIEW);
   const carries = showAllCarry ? carryCandidates : carryCandidates.slice(0, PREVIEW);
   const openRows = showAllOpen ? stillOpen : stillOpen.slice(0, PREVIEW);
+  // docs/56 UX-26: one move for everything still open — the plan, promises and carry-over go to
+  // tomorrow together (one Undo). Each task is moved once.
+  const tomorrow = shiftLocalIsoDate(today, 1);
+  const moveRest: TodayActionCommand[] = [];
+  const moved = new Set<string>();
+  const keep = (key: string | undefined, command: TodayActionCommand) => {
+    const id = key ?? `${command.kind}:${JSON.stringify(command.target)}`;
+    if (moved.has(id)) return;
+    moved.add(id);
+    moveRest.push(command);
+  };
+  for (const item of stillOpen) keep(item.taskKey, tomorrowCommand(item.target, carryByTask.get(item.taskKey), tomorrow));
+  for (const promise of openPromises) {
+    const snooze = promise.secondaryActions.find((action) => action.kind === 'snooze');
+    if (snooze) keep(promise.target.taskKey, snooze);
+  }
+  for (const item of carryCandidates) keep(item.target.taskKey, { ...item.primaryAction, toDate: tomorrow });
 
   return (
     <section className="today-panel" aria-labelledby="today-wrap-heading">
       <div className="today-panel-head">
         <h2 id="today-wrap-heading" tabIndex={-1} className="today-section-title today-jump-target">Wrap-up</h2>
         <span className="today-section-actions">
+          {moveRest.length > 1 ? (
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={() => onBulk(moveRest, (count) => `Moved ${count} to tomorrow`)}
+            >
+              <CalendarArrowUp size={13} aria-hidden="true" />
+              Move the rest to tomorrow · {moveRest.length}
+            </button>
+          ) : null}
           <button type="button" className="ui-btn-ghost" onClick={() => onOpenTarget(wrapUp.eodNoteTarget)}>
             <NotebookPen size={13} aria-hidden="true" />
             Write EOD note
@@ -106,7 +133,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
               key={item.taskKey}
               item={item}
               today={today}
-              carry={carryByTask.get(item.taskKey)}
+              tomorrow={tomorrowCommand(item.target, carryByTask.get(item.taskKey), tomorrow)}
               canPick={Boolean(onSetTomorrowTop3)}
               full={pickedKeys.size >= TODAY_TOP_LIMIT}
               pinning={pinning}
@@ -128,14 +155,15 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
           {promises.map((promise) => {
             const snooze = promise.secondaryActions.find((action) => action.kind === 'snooze');
             return (
-              <TodayCompactRow
+              <WrapUpRow
                 key={promise.id}
+                icon={Bell}
                 title={promise.title}
                 detail={promise.detail}
                 severity={promise.severity}
                 target={promise.target}
-                primary={promise.primaryAction}
-                secondary={snooze ? { command: snooze, label: 'Tomorrow', preset: 'tomorrow' } : undefined}
+                done={promise.primaryAction.kind === 'mark_done' ? promise.primaryAction : undefined}
+                tomorrow={snooze ? { command: snooze, preset: 'tomorrow' } : undefined}
                 onRunCommand={onRunCommand}
               />
             );
@@ -150,14 +178,15 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
           {carries.map((item) => {
             const done = item.secondaryActions.find((action) => action.kind === 'mark_done');
             return (
-              <TodayCompactRow
+              <WrapUpRow
                 key={item.id}
+                icon={Rows3}
                 title={item.title}
                 detail={rowContext(item, today)}
                 severity={item.severity}
                 target={item.target}
-                primary={{ ...item.primaryAction, label: 'Carry' }}
-                secondary={done ? { command: done, label: 'Done' } : undefined}
+                done={done}
+                tomorrow={{ command: { ...item.primaryAction, toDate: tomorrow } }}
                 onRunCommand={onRunCommand}
               />
             );
@@ -202,11 +231,71 @@ function TodayDoneRow({ title, onOpen }: { title: string; onOpen: () => void }) 
   );
 }
 
-/** One unfinished plan task: open it, finish it, carry it, or pick it for tomorrow's top 3. */
+/** docs/56 UX-26: a wrap-up list item moves "Tomorrow": a plan date for tasks, the item's own carry otherwise. */
+function tomorrowCommand(target: TodayActionTarget, carry: TodayActionItem | undefined, tomorrow: string): TodayActionCommand {
+  if (carry) return { ...carry.primaryAction, label: 'Tomorrow', toDate: tomorrow };
+  return { kind: 'carry_forward', label: 'Tomorrow', target, toDate: tomorrow, confirm: false, undoable: true };
+}
+
+/**
+ * docs/56 UX-26: every wrap-up list speaks the same three verbs — Done · Tomorrow · Drop. Drop is
+ * offered for tasks (it is a status, reversible with Undo); legacy Desk rows keep Done and Tomorrow.
+ */
+function WrapUpRow({
+  icon: Icon,
+  title,
+  detail,
+  detailWarning = false,
+  severity,
+  target,
+  done,
+  tomorrow,
+  leading,
+  onRunCommand,
+}: {
+  icon: LucideIcon;
+  title: string;
+  detail?: string;
+  detailWarning?: boolean;
+  severity: string;
+  target: TodayActionTarget;
+  done?: TodayActionCommand;
+  tomorrow?: { command: TodayActionCommand; preset?: 'tomorrow' };
+  /** Extra controls before the verbs (the tomorrow top-3 pick). */
+  leading?: React.ReactNode;
+  onRunCommand: TodayRunCommand;
+}) {
+  const drop: TodayActionCommand | undefined = target.taskKey
+    ? { kind: 'drop', label: 'Drop', target, confirm: false, undoable: true }
+    : undefined;
+  return (
+    <div className={`today-row today-wrapup-row today-tone-${severity}`} data-testid="today-wrapup-row">
+      <span className="today-row-icon" aria-hidden="true"><Icon size={14} /></span>
+      <button type="button" className="today-row-link" onClick={() => onRunCommand({ kind: 'open', label: 'Open', target })}>
+        <span className="today-row-title-line"><span className="today-row-title">{title}</span></span>
+        {detail ? <span className="today-row-meta" style={detailWarning ? { color: 'var(--warning-text)' } : undefined}>{detail}</span> : null}
+      </button>
+      <span className="today-row-actions">
+        {leading}
+        {done ? (
+          <button type="button" className="ui-btn" aria-label={`Done: ${title}`} onClick={() => onRunCommand(done)}>Done</button>
+        ) : null}
+        {tomorrow ? (
+          <button type="button" className="ui-btn-ghost" aria-label={`Tomorrow: ${title}`} onClick={() => onRunCommand(tomorrow.command, tomorrow.preset)}>Tomorrow</button>
+        ) : null}
+        {drop ? (
+          <button type="button" className="ui-btn-ghost" aria-label={`Drop: ${title}`} onClick={() => onRunCommand(drop)}>Drop</button>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/** One unfinished plan task: Done · Tomorrow · Drop, or pick it for tomorrow's top 3. */
 function StillOpenRow({
   item,
   today,
-  carry,
+  tomorrow,
   canPick,
   full,
   pinning,
@@ -215,7 +304,7 @@ function StillOpenRow({
 }: {
   item: TodayPlanItem;
   today: string;
-  carry?: TodayActionItem;
+  tomorrow: TodayActionCommand;
   canPick: boolean;
   full: boolean;
   pinning: boolean;
@@ -224,34 +313,30 @@ function StillOpenRow({
 }) {
   const detail = planDetail(item, today);
   return (
-    <div className={`today-row today-tone-${item.priority === 'high' ? 'warning' : 'neutral'}`} data-testid="tomorrow-top3-candidate">
-      <span className="today-row-icon" aria-hidden="true"><ListTodo size={14} /></span>
-      <button type="button" className="today-row-link" onClick={() => onRunCommand({ kind: 'open', label: 'Open', target: item.target })}>
-        <span className="today-row-title-line"><span className="today-row-title">{item.title}</span></span>
-        {detail ? <span className="today-row-meta" style={detail.overdue ? { color: 'var(--warning-text)' } : undefined}>{detail.text}</span> : null}
-      </button>
-      <span className="today-row-actions">
-        {canPick ? (
+    <div data-testid="tomorrow-top3-candidate">
+      <WrapUpRow
+        icon={ListTodo}
+        title={item.title}
+        detail={detail?.text}
+        detailWarning={detail?.overdue}
+        severity={item.priority === 'high' ? 'warning' : 'neutral'}
+        target={item.target}
+        done={item.primaryAction}
+        tomorrow={{ command: tomorrow }}
+        leading={canPick ? (
           <button
             type="button"
             className="ui-btn-ghost"
             aria-label={`Pick ${item.title} for tomorrow's top ${TODAY_TOP_LIMIT}`}
-            title={full ? `Tomorrow's top ${TODAY_TOP_LIMIT} is full — remove one first` : undefined}
+            title={full ? `Tomorrow's top ${TODAY_TOP_LIMIT} is full — remove one first` : `Pick for tomorrow's top ${TODAY_TOP_LIMIT}`}
             disabled={pinning || full}
             onClick={onPick}
           >
-            Pick
+            <Pin size={13} aria-hidden="true" />
           </button>
         ) : null}
-        {carry ? (
-          <button type="button" className="ui-btn-ghost" aria-label={`Carry ${item.title} to tomorrow`} onClick={() => onRunCommand(carry.primaryAction)}>
-            Carry
-          </button>
-        ) : null}
-        <button type="button" className="ui-btn" aria-label={`${item.primaryAction.label} ${item.title}`} onClick={() => onRunCommand(item.primaryAction)}>
-          {item.primaryAction.label}
-        </button>
-      </span>
+        onRunCommand={onRunCommand}
+      />
     </div>
   );
 }

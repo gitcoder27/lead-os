@@ -484,7 +484,33 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       default: return false;
     }
   };
-  const panelSections = snapshot ? todayPanelOrder(stage, snapshot.weeklyReview).filter(hasSection).map(renderPanelSection) : [];
+  // docs/56 UX-26: at wrap-up, closing loops is the main job — the wrap-up lists take the main column
+  // and the exception queue moves to the side. Every other stage keeps the queue first.
+  const wrapUpLeads = stage === 'wrap_up' && hasSection('wrapUp');
+  const panelSections = snapshot
+    ? todayPanelOrder(stage, snapshot.weeklyReview).filter(hasSection).filter((section) => !(wrapUpLeads && section === 'wrapUp')).map(renderPanelSection)
+    : [];
+
+  const queueSection = snapshot ? (
+    <TodayActionQueue
+      ref={queueHeadingRef}
+      view={queueView}
+      expanded={queueExpanded}
+      onToggleExpanded={() => setQueueExpanded((current) => !current)}
+      groups={queueGroups}
+      expandedGroups={expandedGroups}
+      onToggleGroup={toggleGroup}
+      today={snapshot.date}
+      incomplete={Boolean(snapshot.isPartial)}
+      handoff={truncationHandoff}
+      onOpenTarget={openTarget}
+      activeItemId={triage.activeId}
+      pendingTargetKey={pendingTargetKey}
+      cleared={cleared}
+      nextUp={nextUp}
+      onRunCommand={runCommand}
+    />
+  ) : null;
 
   return (
     <main className="today-page">
@@ -513,7 +539,8 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
             ref={scrollRef}
             className="today-body"
             data-stage={stage}
-            data-panel={panelSections.length > 0 ? 'true' : 'false'}
+            data-panel={panelSections.length > 0 || wrapUpLeads ? 'true' : 'false'}
+            data-wrapup-leads={wrapUpLeads ? 'true' : undefined}
             onFocus={trackRowFocus}
           >
             <div className="today-main-col">
@@ -525,28 +552,12 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
                   onDismiss={dismissGettingStarted}
                 />
               ) : null}
-              <TodayActionQueue
-                ref={queueHeadingRef}
-                view={queueView}
-                expanded={queueExpanded}
-                onToggleExpanded={() => setQueueExpanded((current) => !current)}
-                groups={queueGroups}
-                expandedGroups={expandedGroups}
-                onToggleGroup={toggleGroup}
-                today={snapshot.date}
-                incomplete={Boolean(snapshot.isPartial)}
-                handoff={truncationHandoff}
-                onOpenTarget={openTarget}
-                activeItemId={triage.activeId}
-                pendingTargetKey={pendingTargetKey}
-                cleared={cleared}
-                nextUp={nextUp}
-                onRunCommand={runCommand}
-              />
+              {wrapUpLeads ? renderPanelSection('wrapUp') : queueSection}
             </div>
-            {panelSections.length > 0 ? (
+            {panelSections.length > 0 || wrapUpLeads ? (
               <aside className="today-panel-col" aria-label={`${snapshot.rhythm.label} panel`}>
                 {panelSections}
+                {wrapUpLeads ? <div className="today-panel today-panel-queue">{queueSection}</div> : null}
               </aside>
             ) : null}
           </div>

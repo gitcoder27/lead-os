@@ -193,6 +193,24 @@ describe("Today plan (P3-01)", () => {
     expect(planRow).toMatchObject({ overdue: false, kind: "meeting" });
   });
 
+  it("drops a task from wrap-up with an undo, and moves one to tomorrow (UX-26)", async () => {
+    const key = await add("Old idea", { scheduledOn: DATE });
+    const service = newTodayService();
+    const target = { type: "view" as const, view: "tasks" as const, taskKey: key, date: DATE };
+    const dropped = await service.executeCommand(manager.accountId, { date: DATE, tz: "UTC", command: { kind: "drop", label: "Drop", target } }, { type: "manager", accountId: manager.accountId }, manager.workspaceId);
+    expect((await taskService.getByKey(key, manager.workspaceId))?.status).toBe("dropped");
+    await service.executeCommand(manager.accountId, dropped.undo!.request, { type: "manager", accountId: manager.accountId }, manager.workspaceId);
+    expect((await taskService.getByKey(key, manager.workspaceId))?.status).toBe("open");
+
+    await service.executeCommand(manager.accountId, { date: DATE, tz: "UTC", command: { kind: "carry_forward", label: "Tomorrow", target, toDate: TOMORROW } }, { type: "manager", accountId: manager.accountId }, manager.workspaceId);
+    expect((await taskService.getByKey(key, manager.workspaceId))?.scheduledOn).toBe(TOMORROW);
+  });
+
+  it("refuses drop for anything that is not a task (UX-26)", async () => {
+    await expect(newTodayService().executeCommand(manager.accountId, { date: DATE, command: { kind: "drop", label: "Drop", target: { type: "manager_desk_item", view: "desk", managerDeskItemId: 99 } } }, { type: "manager" }, manager.workspaceId))
+      .rejects.toThrow(/Unsupported/);
+  });
+
   it("rejects closed, unknown and other people's tasks and leaves pins alone", async () => {
     const good = await add("Good", { scheduledOn: DATE });
     const done = await add("Finished", { scheduledOn: DATE });

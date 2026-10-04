@@ -62,6 +62,7 @@ const actionCommandSchema = z.object({
     "mark_done",
     "carry_forward",
     "capture_meeting_outcome",
+    "drop",
     "restore",
   ]),
   label: z.string().min(1),

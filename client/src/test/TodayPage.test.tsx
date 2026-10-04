@@ -764,7 +764,8 @@ describe('TodayPage V2', () => {
     mockFetch(response);
     renderToday(response);
 
-    const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
+    // UX-26: at wrap-up the wrap-up lists lead the main column.
+    const panel = await screen.findByRole('region', { name: 'Wrap-up' });
     expect(within(panel).getByText('No open promises, carry-over or missing check-ins.')).toBeInTheDocument();
     expect(within(panel).queryByText(/Loops closed/)).not.toBeInTheDocument();
     expect(within(panel).queryByText(/No check-in today/)).not.toBeInTheDocument();
@@ -1302,9 +1303,11 @@ describe('TodayPage V2', () => {
       const fetchMock = mockFetch(response);
       const { onOpenTodayTarget } = renderToday(response);
 
-      const panel = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
-      expect(within(panel).getByRole('heading', { name: 'Wrap-up' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument();
+      // UX-26: the wrap-up lists take the main column and the exception queue moves to the side.
+      const side = await screen.findByRole('complementary', { name: 'Wrap-up panel' });
+      expect(within(side).queryByRole('heading', { name: 'Wrap-up' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Wrap-up' })).toBeInTheDocument();
+      expect(within(side).getByRole('heading', { name: 'Queue' })).toBeInTheDocument();
       // Follow-up 44 lives in the wrap-up block only.
       expect(screen.getAllByText('Follow up with QA')).toHaveLength(1);
       expect(screen.getAllByTestId('today-action-row').some((row) => row.textContent?.includes('Follow up with QA'))).toBe(false);
@@ -1513,14 +1516,15 @@ describe('TodayPage V2', () => {
       renderToday(response);
 
       const carryGroup = await screen.findByRole('group', { name: 'Carry to tomorrow (5)' });
-      expect(within(carryGroup).getAllByTestId('today-compact-row')).toHaveLength(3);
+      expect(within(carryGroup).getAllByTestId('today-wrapup-row')).toHaveLength(3);
       // Filler context is replaced by where the item came from.
       expect(within(carryGroup).getAllByText('from Thu 5 Mar')).toHaveLength(3);
       fireEvent.click(within(carryGroup).getByRole('button', { name: '+2 more' }));
-      expect(within(carryGroup).getAllByTestId('today-compact-row')).toHaveLength(5);
+      expect(within(carryGroup).getAllByTestId('today-wrapup-row')).toHaveLength(5);
 
       expect(screen.queryByRole('button', { name: /Carry all/ })).not.toBeInTheDocument();
-      fireEvent.click(within(carryGroup).getAllByRole('button', { name: 'Carry' })[0]!);
+      // UX-26: one verb set everywhere in wrap-up — Done · Tomorrow · Drop.
+      fireEvent.click(within(carryGroup).getAllByRole('button', { name: /^Tomorrow:/ })[0]!);
       await waitFor(() => {
         const carried = fetchMock.mock.calls.filter(([, init]) => String((init as RequestInit | undefined)?.body).includes('"kind":"carry_forward"'));
         expect(carried).toHaveLength(1);

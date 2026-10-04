@@ -348,6 +348,30 @@ describe('TodayPage plan', () => {
       expect(titles[3]).toContain('Delta');
     });
 
+    it('speaks Done · Tomorrow · Drop on every row, and Drop posts a reversible drop (UX-26)', async () => {
+      const fetchMock = mockFetch(today('wrap_up', four()));
+      renderToday();
+      const open = await screen.findByRole('group', { name: 'Still open today (4)' });
+      const alpha = within(open).getAllByTestId('today-wrapup-row')[0]!;
+      const verbs = within(alpha.querySelector<HTMLElement>('.today-row-actions')!).getAllByRole('button').map((button) => button.textContent).filter(Boolean);
+      expect(verbs).toEqual(['Done', 'Tomorrow', 'Drop']);
+      fireEvent.click(within(alpha).getByRole('button', { name: 'Drop: Alpha' }));
+      await waitFor(() => expect(calls(fetchMock, '/api/manager-actions/commands')).toHaveLength(1));
+      const body = JSON.parse(String((calls(fetchMock, '/api/manager-actions/commands')[0]![1] as RequestInit).body));
+      expect(body.command).toMatchObject({ kind: 'drop', target: { taskKey: 'T-1' } });
+    });
+
+    it('moves the rest to tomorrow in one go, each task once, with Undo (UX-26)', async () => {
+      const fetchMock = mockFetch(today('wrap_up', four()));
+      renderToday();
+      fireEvent.click(await screen.findByRole('button', { name: /Move the rest to tomorrow · 4/ }));
+      await waitFor(() => expect(calls(fetchMock, '/api/manager-actions/commands')).toHaveLength(4));
+      const sent = calls(fetchMock, '/api/manager-actions/commands').map(([, init]) => JSON.parse(String((init as RequestInit).body)).command);
+      expect(sent.map((command: { kind: string; toDate?: string; target: { taskKey: string } }) => [command.kind, command.toDate, command.target.taskKey]))
+        .toEqual([['carry_forward', '2026-03-09', 'T-1'], ['carry_forward', '2026-03-09', 'T-2'], ['carry_forward', '2026-03-09', 'T-3'], ['carry_forward', '2026-03-09', 'T-4']]);
+      expect(await screen.findByText('Moved 4 to tomorrow')).toBeInTheDocument();
+    });
+
     it('finishes an unfinished task from the wrap-up through the command engine', async () => {
       let current = today('wrap_up', four());
       const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -361,7 +385,7 @@ describe('TodayPage plan', () => {
       vi.stubGlobal('fetch', fetchMock);
       renderToday();
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Done Alpha' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Done: Alpha' }));
       await waitFor(() => expect(calls(fetchMock as ReturnType<typeof mockFetch>, '/api/manager-actions/commands')).toHaveLength(1));
       await waitFor(() => expect(screen.getByRole('group', { name: 'Still open today (3)' })).toBeInTheDocument());
       expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
@@ -393,7 +417,7 @@ describe('TodayPage plan', () => {
       renderToday();
 
       const open = await screen.findByRole('group', { name: 'Still open today (1)' });
-      expect(within(open).getByRole('button', { name: 'Carry Alpha to tomorrow' })).toBeInTheDocument();
+      expect(within(open).getByRole('button', { name: 'Tomorrow: Alpha' })).toBeInTheDocument();
       expect(screen.queryByRole('group', { name: /Carry to tomorrow/ })).not.toBeInTheDocument();
       expect(screen.getAllByText('Alpha')).toHaveLength(1);
     });
@@ -435,7 +459,9 @@ describe('TodayPage plan', () => {
     const jump = await screen.findByRole('button', { name: 'Jump to My plan' });
     const queueHeading = screen.getByRole('heading', { name: 'Queue' });
     const commitmentHeading = screen.getByRole('heading', { name: stage === 'wrap_up' ? /Still open today/ : 'My plan' });
-    expect(queueHeading.compareDocumentPosition(commitmentHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // UX-26: at wrap-up the commitments lead (main column) and the queue follows; otherwise the queue leads.
+    const order = stage === 'wrap_up' ? commitmentHeading.compareDocumentPosition(queueHeading) : queueHeading.compareDocumentPosition(commitmentHeading);
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(jump);
     expect(document.activeElement).toBe(commitmentHeading);
     fireEvent.click(screen.getByRole('button', { name: 'Jump to attention queue' }));

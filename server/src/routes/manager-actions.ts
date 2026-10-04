@@ -22,6 +22,7 @@ const actionTargetContextSchema = z.object({
   taskKey: z.string().trim().regex(/^[Tt]-\d{1,9}$/).optional(),
   issueKey: z.string().optional(),
   relatedIssueKeys: z.array(z.string()).optional(),
+  reason: z.string().trim().max(200).optional(),
 });
 
 const actionTargetSchema = z.object({

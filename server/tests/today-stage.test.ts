@@ -410,8 +410,10 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     it("offers ask_check_in on developers who need a check-in", async () => {
       const today = await todayService().getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
       const row = today.actionItems.find((item) => item.target.developerAccountId === "dev-1");
-      expect(row?.primaryAction.kind).toBe("add_check_in");
+      // UX-02: dev-1 is blocked, so Follow up leads and the check-in moves stay as secondaries.
+      expect(row?.primaryAction.kind).toBe("capture_follow_up");
       expect(row?.secondaryActions[0]).toMatchObject({ kind: "ask_check_in", label: "Ask for update", undoable: true, confirm: false });
+      expect(row?.secondaryActions[1]).toMatchObject({ kind: "add_check_in" });
     });
 
     it("lands a Check-in request task on My Day, records asked_at, and undo removes both", async () => {

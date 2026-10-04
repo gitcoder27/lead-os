@@ -155,7 +155,9 @@ describe("TodayService", () => {
           id: "today-dev-dev-1-blocked",
           type: "stale_check_in",
           target: expect.objectContaining({ type: "developer", developerAccountId: "dev-1" }),
-          primaryAction: expect.objectContaining({ kind: "add_check_in" }),
+          // UX-02: blocked, so Follow up leads; the stale check-in stays a secondary.
+          primaryAction: expect.objectContaining({ kind: "capture_follow_up" }),
+          secondaryActions: expect.arrayContaining([expect.objectContaining({ kind: "add_check_in" })]),
         }),
         expect.objectContaining({
           id: "today-issue-AM-1",
@@ -315,6 +317,38 @@ describe("TodayService", () => {
       target: expect.objectContaining({ trackerItemId: planned.id }),
     });
     expect(pulseItem?.actionPreview).toBe("BE modernization");
+  });
+
+  it("makes Follow up the primary action for blocked and at-risk people, with the reason as subtitle (UX-02)", async () => {
+    await seedDeveloper("dev-2", "Noah Smith");
+    await enableCollabParticipation(["dev-2"]);
+    const planned = await trackerService.addItem("dev-1", "2026-03-08", { title: "Fix flaky payment webhook retries" });
+    await trackerService.addCheckIn("dev-1", "2026-03-08", { summary: "Waiting on payments sandbox keys", status: "blocked" }, { type: "manager", accountId: "manager-1" });
+    await trackerService.updateDay("dev-2", "2026-03-08", { status: "at_risk" });
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const blocked = response.actionItems.find((item) => item.target.developerAccountId === "dev-1");
+    const atRisk = response.actionItems.find((item) => item.target.developerAccountId === "dev-2");
+    const pulse = response.teamPulse.find((item) => item.accountId === "dev-1");
+
+    expect(blocked).toMatchObject({
+      context: "Waiting on payments sandbox keys",
+      primaryAction: {
+        kind: "capture_follow_up",
+        label: "Follow up",
+        target: expect.objectContaining({ type: "developer", developerAccountId: "dev-1", context: expect.objectContaining({ reason: "Waiting on payments sandbox keys", trackerItemId: planned.id }) }),
+      },
+    });
+    // Never previewed against the blocked task itself.
+    expect(blocked?.actionPreview).toBeUndefined();
+    // Set current stays available, as a secondary with its own tracker-item target.
+    expect(blocked?.secondaryActions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "set_current_work", target: expect.objectContaining({ type: "tracker_item", trackerItemId: planned.id }) }),
+    ]));
+    expect(atRisk?.primaryAction).toMatchObject({ kind: "capture_follow_up", label: "Follow up" });
+    expect(atRisk?.primaryAction.target.context?.reason).toBeUndefined();
+    expect(pulse?.primaryAction).toMatchObject({ kind: "capture_follow_up", label: "Follow up" });
+    expect(pulse?.actionPreview).toBeUndefined();
   });
 
   it("keeps developer targets person-only while task context rides in target.context (docs/53 F2)", async () => {

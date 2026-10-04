@@ -315,6 +315,8 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
       setTextDraft({
         command,
         title: 'Capture follow-up',
+        // UX-02: a blocked/at-risk row carries its reason; the follow-up keeps it as context.
+        description: command.target.context?.reason,
         label: 'Follow-up title',
         defaultValue: defaultFollowUpTitle(snapshot, command.target),
         saveLabel: 'Save follow-up',

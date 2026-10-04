@@ -597,6 +597,48 @@ describe('TodayPage V2', () => {
     expect(promptSpy).not.toHaveBeenCalled();
   });
 
+  it('a blocked person leads with Follow up, shows the reason, and sends it with the follow-up (UX-02)', async () => {
+    const blockedTarget = target({
+      type: 'developer',
+      view: 'team',
+      developerAccountId: 'dev-1',
+      date: '2026-03-08',
+      context: { trackerItemId: 7, reason: 'Waiting on payments sandbox keys' },
+    });
+    const fetchMock = mockFetch(todayResponse({
+      actionItems: [
+        actionItem(1, {
+          id: 'today-dev-dev-1-blocked',
+          type: 'developer_attention',
+          title: 'Marcus Lee',
+          context: 'Waiting on payments sandbox keys',
+          signal: 'Blocked',
+          target: blockedTarget,
+          primaryAction: command('capture_follow_up', 'Follow up', blockedTarget),
+          secondaryActions: [command('set_current_work', 'Set current', target({ type: 'tracker_item', view: 'team', trackerItemId: 7 }))],
+        }),
+      ],
+    }));
+    renderToday();
+
+    expect(await screen.findByText('Waiting on payments sandbox keys')).toBeInTheDocument();
+    expect(screen.queryByText(/will set/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /^follow up/i })[0]!);
+    const dialog = await screen.findByRole('dialog', { name: /capture follow-up/i });
+    expect(within(dialog).getByText('Waiting on payments sandbox keys')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: /save follow-up/i }));
+
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find(([url, init]) => (
+        url === '/api/manager-actions/commands' && (init as RequestInit | undefined)?.method === 'POST'
+      ));
+      expect(JSON.parse((postCall?.[1] as RequestInit).body as string).command).toMatchObject({
+        kind: 'capture_follow_up',
+        target: { context: { reason: 'Waiting on payments sandbox keys' } },
+      });
+    });
+  });
+
   it('captures a meeting outcome through the Today dialog', async () => {
     const meetingTarget = target({ type: 'meeting', view: 'meetings', managerDeskItemId: 91, date: '2026-03-08' });
     const fetchMock = mockFetch(todayResponse({

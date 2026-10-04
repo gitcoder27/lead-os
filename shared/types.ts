@@ -308,6 +308,8 @@ export interface TodayActionTargetContext {
   taskKey?: string;
   issueKey?: string;
   relatedIssueKeys?: string[];
+  /** docs/56 UX-02: a blocked/at-risk person's reason (their latest status check-in); the follow-up keeps it as context. */
+  reason?: string;
 }
 
 export interface TodayActionTarget {

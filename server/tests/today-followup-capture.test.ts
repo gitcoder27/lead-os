@@ -59,6 +59,17 @@ describe("Today follow-ups through capture (P3-05)", () => {
     vi.useRealTimers();
   });
 
+  it("keeps a blocker reason from the row as the follow-up's context (UX-02)", async () => {
+    const service = todayService();
+    const response = await service.executeCommand("manager-1", followUpCommand("Follow up with Alice", {
+      type: "developer", view: "team", developerAccountId: "dev-1", context: { taskKey: "T-99", reason: "Waiting on payments sandbox keys" },
+    }), manager);
+
+    const created = response.result as { taskKey: string };
+    const notes = await db.select().from(taskEvents).where(eq(taskEvents.taskKey, created.taskKey));
+    expect(notes.find((event) => event.type === "update")).toMatchObject({ body: "Follow-up for T-99 · Waiting on payments sandbox keys", visibility: "private" });
+  });
+
   it("creates a follow-up task with the developer and issue linked, and undo deletes it", async () => {
     await seedIssue("PROJ-7");
     const service = todayService();

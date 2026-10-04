@@ -25,6 +25,7 @@ import type {
   TodayActionItemType,
   TodayActionSeverity,
   TodayActionTarget,
+  TodayActionTargetContext,
   TodayCheckInAsk,
   TodayDelta,
   TodayDeltaIssue,
@@ -49,6 +50,7 @@ import type {
   TrackerAttentionItem,
   TrackerDeveloperDay,
   TrackerDeveloperSignals,
+  TrackerDeveloperStatus,
   TrackerWorkItem,
   UserRole,
 } from "shared/types";
@@ -1141,14 +1143,15 @@ function buildDeveloperActions(
       ? `${item.currentItem.jiraKey} ${item.currentItem.title}`
       : item.currentItem?.title ?? "No current work";
     const ask = openAsks.get(item.developer.accountId);
-    const primary = getDeveloperAttentionPrimary(item, clock, day, ask, usesCheckIns(item.signals));
+    const reason = statusReason(item.status, day);
+    const primary = getDeveloperAttentionPrimary(item, clock, day, ask, usesCheckIns(item.signals), reason);
     const actionTarget = primary.target;
 
     return action({
       id: `today-dev-${item.developer.accountId}-${leadReason ?? "attention"}`,
       type: actionType,
       title: item.developer.displayName,
-      context: currentWork,
+      context: reason ?? currentWork,
       signal: reasons.slice(0, 2).join(" / ") || "Needs attention",
       severity,
       priority: item.status === "blocked" ? 100 : item.isStale && !item.hasCurrentItem ? 78 : 86,
@@ -1160,8 +1163,72 @@ function buildDeveloperActions(
       freshness: rowFreshness(item.signals, day?.lastCheckInAt ?? item.lastCheckInAt),
       actionPreview: primary.actionPreview,
       askedAt: ask?.askedAt,
+      secondaryTargets: primary.secondaryTargets,
     });
   });
+}
+
+/**
+ * docs/56 UX-02: why a blocked or at-risk person is in that state, from the latest
+ * check-in that set it (rationale first, then summary). Undefined for other statuses.
+ */
+function statusReason(status: TrackerDeveloperStatus, day?: TrackerDeveloperDay): string | undefined {
+  if (status !== "blocked" && status !== "at_risk") return undefined;
+  const checkIns = [...(day?.checkIns ?? []), ...(day?.recentCheckIns ?? [])]
+    .filter((checkIn) => checkIn.status === status)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const latest = checkIns[0];
+  const text = (latest?.rationale?.trim() || latest?.summary?.trim()) ?? "";
+  return text ? compactText(text, 200) : undefined;
+}
+
+type PrimaryChoice = {
+  kind: TodayActionCommand["kind"];
+  label: string;
+  target: TodayActionTarget;
+  secondaryKinds: TodayActionCommand["kind"][];
+  actionPreview?: string;
+  secondaryTargets?: Partial<Record<TodayActionCommand["kind"], TodayActionTarget>>;
+};
+
+/**
+ * docs/56 UX-02: a blocked or at-risk person needs the blocker chased, not new current work.
+ * "Follow up" is primary (carrying the reason); "Set current" stays a secondary on its own
+ * tracker-item target and is never previewed.
+ */
+function blockedFollowUpPrimary(params: {
+  accountId: string;
+  date: string;
+  context: TodayActionTargetContext;
+  candidate?: TrackerAttentionActionItem | TrackerWorkItem;
+  reason?: string;
+  checkInKinds: TodayActionCommand["kind"][];
+}): PrimaryChoice {
+  const { accountId, date, candidate, reason } = params;
+  const context: TodayActionTargetContext = {
+    ...params.context,
+    ...(!params.context.trackerItemId && candidate ? { trackerItemId: candidate.id, taskKey: candidate.taskKey ?? undefined, issueKey: candidate.jiraKey ?? undefined } : {}),
+    ...(reason ? { reason } : {}),
+  };
+  const cleanContext = Object.fromEntries(Object.entries(context).filter(([, value]) => value !== undefined)) as TodayActionTargetContext;
+  return {
+    kind: "capture_follow_up",
+    label: "Follow up",
+    target: target("developer", "team", { developerAccountId: accountId, date, context: cleanContext }),
+    secondaryKinds: [...params.checkInKinds, ...(candidate ? ["set_current_work" as const] : []), "open"],
+    secondaryTargets: candidate
+      ? {
+          set_current_work: target("tracker_item", "team", {
+            developerAccountId: accountId,
+            trackerItemId: candidate.id,
+            taskKey: candidate.taskKey ?? undefined,
+            issueKey: candidate.jiraKey,
+            relatedIssueKeys: candidate.relatedIssueKeys,
+            date,
+          }),
+        }
+      : undefined,
+  };
 }
 
 function getDeveloperAttentionPrimary(
@@ -1170,13 +1237,8 @@ function getDeveloperAttentionPrimary(
   day?: TrackerDeveloperDay,
   ask?: TodayCheckInAsk,
   canAsk = true,
-): {
-  kind: TodayActionCommand["kind"];
-  label: string;
-  target: TodayActionTarget;
-  secondaryKinds: TodayActionCommand["kind"][];
-  actionPreview?: string;
-} {
+  reason?: string,
+): PrimaryChoice {
   const date = clock.date;
   const currentTarget = target("developer", "team", {
     developerAccountId: item.developer.accountId,
@@ -1189,6 +1251,17 @@ function getDeveloperAttentionPrimary(
     },
   });
   const setCurrentCandidate = !item.hasCurrentItem ? item.setCurrentCandidates[0] : undefined;
+
+  if (item.status === "blocked" || item.status === "at_risk") {
+    return blockedFollowUpPrimary({
+      accountId: item.developer.accountId,
+      date,
+      context: currentTarget.context ?? {},
+      candidate: setCurrentCandidate,
+      reason,
+      checkInKinds: checkInSecondaries(clock, day, day?.lastCheckInAt ?? item.lastCheckInAt, item.isStale, item.status, ask, canAsk),
+    });
+  }
 
   if (setCurrentCandidate) {
     return {
@@ -1232,19 +1305,27 @@ function getDeveloperAttentionPrimary(
   };
 }
 
+/** UX-02: the check-in moves a blocked row still offers, as secondaries. */
+function checkInSecondaries(
+  clock: DayClock,
+  day: TrackerDeveloperDay | undefined,
+  lastCheckInAt: string | undefined,
+  isStale: boolean,
+  status: TrackerDeveloperStatus,
+  ask: TodayCheckInAsk | undefined,
+  canAsk: boolean,
+): TodayActionCommand["kind"][] {
+  if (!shouldRequestDeveloperCheckIn({ clock, day, lastCheckInAt, isStale, status })) return [];
+  return ask || !canAsk ? ["add_check_in"] : ["ask_check_in", "add_check_in"];
+}
+
 function getDeveloperPulsePrimary(
   day: TrackerDeveloperDay,
   attentionItem: TrackerAttentionItem | undefined,
   clock: DayClock,
   ask?: TodayCheckInAsk,
   canAsk = true,
-): {
-  kind: TodayActionCommand["kind"];
-  label: string;
-  target: TodayActionTarget;
-  secondaryKinds: TodayActionCommand["kind"][];
-  actionPreview?: string;
-} {
+): PrimaryChoice {
   const date = clock.date;
   const openTarget = target("developer", "team", {
     developerAccountId: day.developer.accountId,
@@ -1257,6 +1338,17 @@ function getDeveloperPulsePrimary(
     },
   });
   const setCurrentCandidate = attentionItem?.setCurrentCandidates[0] ?? (!day.currentItem ? day.plannedItems[0] : undefined);
+
+  if (day.status === "blocked" || day.status === "at_risk") {
+    return blockedFollowUpPrimary({
+      accountId: day.developer.accountId,
+      date,
+      context: openTarget.context ?? {},
+      candidate: !day.currentItem ? setCurrentCandidate : undefined,
+      reason: statusReason(day.status, day),
+      checkInKinds: checkInSecondaries(clock, day, day.lastCheckInAt, day.isStale || Boolean(attentionItem?.isStale), day.status, ask, canAsk),
+    });
+  }
 
   if (!day.currentItem && setCurrentCandidate) {
     return {
@@ -1628,7 +1720,7 @@ function buildTeamPulse(
         lastUpdate: rowFreshness(day.signals, day.lastCheckInAt) ?? (usesCheckIns(day.signals) ? "No check-in" : "Not touched yet"),
         target: primary.target,
         primaryAction: command(primary.kind, primary.label, primary.target),
-        secondaryActions: primary.secondaryKinds.map((kind) => command(kind, commandLabel(kind), pulseTarget)),
+        secondaryActions: primary.secondaryKinds.map((kind) => command(kind, commandLabel(kind), primary.secondaryTargets?.[kind] ?? pulseTarget)),
         actionPreview: primary.actionPreview,
         ...(ask ? { askedAt: ask.askedAt } : {}),
         participates: day.participates,
@@ -1760,6 +1852,8 @@ function action(params: {
   actionPreview?: string;
   askedAt?: string;
   commandOptions?: Partial<Record<TodayActionCommand["kind"], CommandOptions>>;
+  /** UX-02: a secondary that acts on something other than the row's target. */
+  secondaryTargets?: Partial<Record<TodayActionCommand["kind"], TodayActionTarget>>;
 }): TodayActionItem {
   return {
     id: params.id,
@@ -1772,7 +1866,7 @@ function action(params: {
     group: params.group,
     target: params.target,
     primaryAction: command(params.primaryKind, params.primaryLabel, params.target, params.commandOptions?.[params.primaryKind]),
-    secondaryActions: params.secondaryKinds.map((kind) => command(kind, commandLabel(kind), params.target, params.commandOptions?.[kind])),
+    secondaryActions: params.secondaryKinds.map((kind) => command(kind, commandLabel(kind), params.secondaryTargets?.[kind] ?? params.target, params.commandOptions?.[kind])),
     freshness: params.freshness,
     actionPreview: params.actionPreview ? compactText(params.actionPreview, 140) : undefined,
     ...(params.askedAt ? { askedAt: params.askedAt } : {}),
@@ -2130,6 +2224,9 @@ function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarg
   }
 
   const contextTaskKey = actionTarget.taskKey ?? actionTarget.context?.taskKey;
+  const contextNote = [contextTaskKey ? `Follow-up for ${contextTaskKey}` : undefined, actionTarget.context?.reason?.trim() || undefined]
+    .filter(Boolean)
+    .join(" · ");
   return {
     date,
     title,
@@ -2140,7 +2237,7 @@ function buildFollowUpCreateParams(date: string, actionTarget: ManagerActionTarg
     // docs/53 F3: a captured follow-up must never be due immediately — the
     // default is tomorrow 09:00 local; presets shift it.
     followUpAt: buildSnoozeIso(date, preset ?? "tomorrow", tz),
-    contextNote: contextTaskKey ? `Follow-up for ${contextTaskKey}` : undefined,
+    contextNote: contextNote || undefined,
     links,
   };
 }

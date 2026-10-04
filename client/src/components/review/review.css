@@ -675,7 +675,7 @@
 }
 
 .review-jira-lines { padding: 0; list-style: none; }
-.review-jira-lines label { display: flex; align-items: center; min-height: 44px; gap: 12px; padding: 4px 0; cursor: pointer; }
+.review-jira-lines label { display: flex; align-items: center; min-height: 44px; gap: 12px; padding: 4px 0; cursor: pointer; font-size: 13.5px; }
 
 .review-past-label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .review-past-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; }

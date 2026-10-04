@@ -98,6 +98,21 @@ describe('weekly report', () => {
     expect(toMarkdown(model)).not.toMatch(/Dropped|Meeting|PRIVATE AGENDA|Next week|Blocked/);
     expect(toMarkdown(buildWeeklyReport(reportReview()))).toBe('');
   });
+  it('step 1 Jira lines are body size, like the other review rows (UX-28)', async () => {
+    const css = (await import('node:fs')).readFileSync(`${process.cwd()}/src/components/review/review.css`, 'utf8');
+    expect(css).toMatch(/\.review-jira-lines label \{[^}]*font-size: 13\.5px;/);
+  });
+
+  it('Shipped lists only done work: a dropped task is not offered as a line at all (UX-28)', () => {
+    const model = buildWeeklyReport(
+      reportReview({
+        sections: [{ id: 'closed', status: 'ready', rows: [reportTask(1, 'Shipped thing'), reportTask(2, 'Evaluate new standup bot', { status: 'dropped' })] }],
+      }),
+    );
+    const shipped = model.sections.find((section) => section.id === 'shipped')!;
+    expect(shipped.lines.map((line) => line.text)).toEqual(['Shipped thing']);
+  });
+
   it('caps next-week lines at five and resolved highlights at three, deduplicates pins and reflects review decisions', () => {
     const done = reportTask(10, 'Finished in review', { status: 'open' });
     const planned = Array.from({ length: 9 }, (_, i) =>

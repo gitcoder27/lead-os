@@ -46,8 +46,9 @@ export function buildWeeklyReport(review: WeeklyReviewResponse, state: WeeklyRep
     ...(namesPerson && { namesPerson: true as const }),
   });
   const rows = reviewReportTasks(review, state);
+  // docs/56 UX-28: dropped work did not ship, so it is not offered under Shipped at all.
   const shipped = rows
-    .filter((row) => row.status === 'done' || row.status === 'dropped')
+    .filter((row) => row.status === 'done')
     .map((row) =>
       line(
         row.taskKey,

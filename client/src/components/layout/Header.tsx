@@ -11,6 +11,7 @@ import type { ManagerActionTarget } from '@/types';
 import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
+import { TodayCountLink } from '@/components/layout/TodayCountLink';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { Kbd } from '@/components/ui/Kbd';
 
@@ -120,8 +121,13 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
 
           <div className="header-actions flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
             <div className="flex items-center gap-1.5">
-              {user?.role === 'manager' && onViewChange && (activeView !== 'today' || (features?.tasksPhase3 && features.teamMode === 'collab')) ? (
-                <ManagerActionInbox updatesOnly={activeView === 'today'} onOpenTarget={openActionTarget} onViewChange={onViewChange} />
+              {/* docs/56 UX-30: one pointer to Today ("Today N") off Today, and the updates inbox on every page;
+                  Jira attention signals live on Work. Both step aside below 480px, where the nav already has Today. */}
+              {user?.role === 'manager' && onViewChange && activeView !== 'today' ? (
+                <span className="header-wide-only"><TodayCountLink onOpenToday={() => onViewChange('today')} /></span>
+              ) : null}
+              {user?.role === 'manager' && onViewChange && features?.tasksPhase3 && features.teamMode === 'collab' ? (
+                <span className="header-wide-only"><ManagerActionInbox updatesOnly onOpenTarget={openActionTarget} onViewChange={onViewChange} /></span>
               ) : null}
 
               {canQuickCapture && (

@@ -15,7 +15,7 @@ import {
   MoreHorizontal,
   Pin,
   Rows3,
-  Sparkles,
+  Inbox,
   Target,
   Users,
   X,
@@ -310,7 +310,8 @@ export function ManagerActionInbox({
             {actionsFetching ? (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
             ) : (
-              <Sparkles size={16} style={{ color: attentionCount > 0 ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              // docs/56 UX-30: an inbox, never a sparkle beside Copilot's.
+              <Inbox size={16} style={{ color: attentionCount > 0 ? 'var(--accent)' : 'var(--text-secondary)' }} />
             )}
             {attentionCount > 0 ? (
               <span
@@ -563,7 +564,7 @@ const signalFilterByType: Partial<Record<Alert['type'], FilterType>> = {
   high_priority_not_started: 'highPriority',
 };
 
-function signalTarget(alert: Alert): ManagerActionTarget {
+export function signalTarget(alert: Alert): ManagerActionTarget {
   if (alert.issueKey) {
     return {
       type: 'issue',
@@ -579,7 +580,7 @@ function signalTarget(alert: Alert): ManagerActionTarget {
   };
 }
 
-function SignalRow({
+export function SignalRow({
   alert,
   onOpen,
   onDismiss,

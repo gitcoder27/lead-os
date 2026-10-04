@@ -806,3 +806,7 @@ textarea.ui-field { resize: none; }
 
 /* docs/56 UX-20: text under each collapsed Work filter-rail icon. */
 .filter-rail-label { margin-bottom: 6px; font-size: 10.5px; line-height: 1.1; color: var(--text-muted); }
+
+/* docs/56 UX-30: the header's Today count and updates inbox step aside on phones (the nav has Today). */
+.header-wide-only { display: contents; }
+@media (max-width: 479px) { .header-wide-only { display: none; } }

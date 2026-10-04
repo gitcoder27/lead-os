@@ -44,7 +44,11 @@ vi.mock('@/components/capture/GlobalCaptureDialog', () => ({
 }));
 
 vi.mock('@/components/actions/ManagerActionInbox', () => ({
-  ManagerActionInbox: () => <div data-testid="manager-action-inbox">Action Inbox</div>,
+  ManagerActionInbox: ({ updatesOnly }: { updatesOnly?: boolean }) => <div data-testid="manager-action-inbox" data-updates-only={String(Boolean(updatesOnly))}>Action Inbox</div>,
+}));
+
+vi.mock('@/components/layout/TodayCountLink', () => ({
+  TodayCountLink: () => <a data-testid="today-count-link" href="/">Today 14</a>,
 }));
 
 describe('Header', () => {
@@ -283,21 +287,28 @@ describe('Header', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('shows the manager action inbox across manager views', () => {
+  it('points to Today with a count off Today, and never re-lists the queue (UX-30)', () => {
     const { rerender } = render(
       <Header activeView="work" onViewChange={vi.fn()} />
     );
-
-    expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
+    expect(screen.getByTestId('today-count-link')).toBeInTheDocument();
+    // Solo: there are no task updates, so no inbox at all.
+    expect(screen.queryByTestId('manager-action-inbox')).not.toBeInTheDocument();
 
     rerender(<Header activeView="team" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('today-count-link')).toBeInTheDocument();
 
-    expect(screen.getByTestId('manager-action-inbox')).toBeInTheDocument();
-
-    // docs/53 U1: on `/` the Today page is the inbox — no duplicate trigger.
+    // On `/` Today is the page itself.
     rerender(<Header activeView="today" onViewChange={vi.fn()} />);
+    expect(screen.queryByTestId('today-count-link')).not.toBeInTheDocument();
+  });
 
-    expect(screen.queryByTestId('manager-action-inbox')).not.toBeInTheDocument();
+  it('shows the updates-only inbox on every page in collaborative mode (UX-30)', () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, features: { tasksPhase3: true, teamMode: 'collab' } });
+    const { rerender } = render(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-updates-only', 'true');
+    rerender(<Header activeView="notes" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-updates-only', 'true');
   });
 
   it('shows only the durable inbox on Today in collaborative mode', () => {

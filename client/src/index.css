@@ -793,3 +793,6 @@ textarea.ui-field { resize: none; }
   .header-navigation { grid-column: 1 / -1; grid-row: 2; }
   .header-navigation nav { justify-content: space-between; }
 }
+
+/* docs/56 UX-20: text under each collapsed Work filter-rail icon. */
+.filter-rail-label { margin-bottom: 6px; font-size: 10.5px; line-height: 1.1; color: var(--text-muted); }

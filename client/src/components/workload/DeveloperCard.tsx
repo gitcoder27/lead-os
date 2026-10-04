@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { workloadAccent, workloadAssignedLabel } from '@/lib/utils';
+import { workloadAccent, workloadAssignedLabel, workloadChipTitle } from '@/lib/utils';
 import type { DeveloperWorkload } from '@/types';
 
 interface DeveloperCardProps {
@@ -58,8 +58,8 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
             >
               {assignedLabel} today
             </span>
-            <span className="font-mono" style={{ color: 'var(--text-muted)' }}>
-              S{dev.score}
+            <span style={{ color: 'var(--text-muted)' }} title={workloadChipTitle(dev)}>
+              load {dev.score}
             </span>
             {dev.trackerStatus && (
               <span className="uppercase" style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
@@ -111,8 +111,8 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           <span className="font-mono text-[20px] font-semibold tabular-nums" style={{ color }}>
             {assignedLabel}
           </span>
-          <span className="ml-2 font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            S{dev.score}
+          <span className="ml-2 text-[12px]" style={{ color: 'var(--text-muted)' }} title={workloadChipTitle(dev)}>
+            load {dev.score}
           </span>
         </div>
         <div className="flex items-center gap-1.5">

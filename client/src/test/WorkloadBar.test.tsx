@@ -50,6 +50,20 @@ describe('WorkloadBar', () => {
     expect(screen.getByText('Eve')).toBeInTheDocument();
   });
 
+  it('spells out what the chip numbers are, with a tooltip (UX-20)', () => {
+    render(
+      <TestWrapper>
+        <WorkloadBar onDeveloperClick={onDeveloperClick} />
+      </TestWrapper>
+    );
+    const alice = screen.getByRole('button', { name: 'Filter by Alice' });
+    expect(alice.textContent).toContain('2 today · load 9');
+    expect(alice.textContent).not.toMatch(/S9/);
+    expect(alice).toHaveAttribute('title', expect.stringContaining('2 items on today'));
+    expect(alice.getAttribute('title')).toContain('4 active Jira defects');
+    expect(alice.getAttribute('title')).toContain('workload score 9');
+  });
+
   it('shows idle badge for signals.idle', async () => {
     render(
       <TestWrapper>
@@ -70,8 +84,9 @@ describe('WorkloadBar', () => {
       </TestWrapper>
     );
 
-    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('S9')).toBeInTheDocument();
+    // UX-20: spelled out, not "2" and "S9".
+    expect(screen.getByText('2 today')).toBeInTheDocument();
+    expect(screen.getByText('· load 9')).toBeInTheDocument();
   });
 
   it('applies a developer filter when a collapsed pill is clicked', () => {

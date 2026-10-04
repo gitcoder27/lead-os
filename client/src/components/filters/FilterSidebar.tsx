@@ -370,7 +370,8 @@ export function FilterSidebar({
             background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
           }}
         >
-            <div className="flex flex-col items-center gap-2">
+            {/* docs/56 UX-20: each rail icon says what it is in text (works for touch too). */}
+            <div className="flex flex-col items-center gap-1">
               <button
                 onClick={onExpand}
                 className="h-8 w-8 rounded-xl flex items-center justify-center transition-colors"
@@ -380,6 +381,7 @@ export function FilterSidebar({
               >
                 <PanelLeftOpen size={16} style={{ color: 'var(--text-secondary)' }} />
               </button>
+              <span className="filter-rail-label">Expand</span>
 
               <div className="w-8 h-px" style={{ background: 'var(--border)' }} />
 
@@ -392,6 +394,7 @@ export function FilterSidebar({
               >
                 <Filter size={16} style={{ color: activeFilter !== 'all' ? 'var(--accent)' : 'var(--text-secondary)' }} />
               </button>
+              <span className="filter-rail-label">Filters</span>
 
               <button
                 onClick={() => expandSection('tags')}
@@ -402,6 +405,7 @@ export function FilterSidebar({
               >
                 <Tag size={16} style={{ color: selectedTagId !== undefined || noTagsFilter ? 'var(--accent)' : 'var(--text-secondary)' }} />
               </button>
+              <span className="filter-rail-label">Tags</span>
 
               <button
                 onClick={() => expandSection('developers')}
@@ -412,10 +416,12 @@ export function FilterSidebar({
               >
                 <UserRound size={16} style={{ color: activeDeveloper ? 'var(--accent)' : 'var(--text-secondary)' }} />
               </button>
+              <span className="filter-rail-label">People</span>
             </div>
 
             <div className="flex flex-col items-center gap-2">
               <div
+                title="Active filters"
                 className="min-w-[40px] rounded-full px-2 py-1 text-center text-[12px] font-mono"
                 style={{
                   background: activeSelectionCount > 0 ? 'var(--accent-glow)' : 'var(--bg-tertiary)',

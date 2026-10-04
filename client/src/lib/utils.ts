@@ -108,6 +108,23 @@ export function workloadAssignedLabel(workload: Pick<DeveloperWorkload, 'assigne
   return `${workload.assignedTodayCount ?? workload.activeDefects}`;
 }
 
+/** docs/56 UX-20: the workload chip in words — "2 today · load 9" ("open" when there is no tracker count). */
+export function workloadChipText(workload: Pick<DeveloperWorkload, 'assignedTodayCount' | 'activeDefects' | 'score'>): string {
+  const scope = workload.assignedTodayCount !== undefined ? 'today' : 'open';
+  return `${workloadAssignedLabel(workload)} ${scope} · load ${workload.score}`;
+}
+
+/** docs/56 UX-20: what each workload number means, for the chip's tooltip. */
+export function workloadChipTitle(workload: Pick<DeveloperWorkload, 'assignedTodayCount' | 'activeDefects' | 'score' | 'blocked'>): string {
+  const parts = [
+    ...(workload.assignedTodayCount !== undefined ? [`${workload.assignedTodayCount} items on today's plan`] : []),
+    `${workload.activeDefects} active Jira defects`,
+    ...(workload.blocked > 0 ? [`${workload.blocked} blocked`] : []),
+    `workload score ${workload.score} (higher is busier)`,
+  ];
+  return parts.join(' · ');
+}
+
 export function workloadAccent(workload: Pick<DeveloperWorkload, 'activeDefects' | 'blocked' | 'level' | 'trackerStatus' | 'isTrackerStale' | 'signals' | 'assignedTodayCount'>): string {
   if (workload.trackerStatus === 'blocked' || workload.blocked > 0) {
     return 'var(--danger)';

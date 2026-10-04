@@ -237,6 +237,16 @@ describe('FilterSidebar', () => {
     expect(onExpand).toHaveBeenCalled();
   });
 
+  it('labels the collapsed rail icons in text (UX-20)', () => {
+    render(
+      <TestWrapper>
+        <FilterSidebar {...defaultProps} collapsed />
+      </TestWrapper>
+    );
+    for (const label of ['Filters', 'Tags', 'People']) expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByTitle('Active filters')).toBeInTheDocument();
+  });
+
   it('expands only the tags section when the tags rail button is clicked', () => {
     render(
       <TestWrapper>

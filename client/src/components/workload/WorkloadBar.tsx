@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, ChevronDown, Users, Zap } from 'lucide-react';
 import { useWorkload } from '@/hooks/useWorkload';
 import { DeveloperCard } from './DeveloperCard';
-import { workloadAccent, workloadAssignedLabel } from '@/lib/utils';
+import { workloadAccent, workloadAssignedLabel, workloadChipText, workloadChipTitle } from '@/lib/utils';
 
 interface WorkloadBarProps {
   activeDeveloper?: string;
@@ -98,6 +98,8 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       type="button"
                       onClick={() => handleDeveloperSelect(dev.developer.accountId)}
                       aria-label={`Filter by ${dev.developer.displayName}`}
+                      aria-description={workloadChipText(dev)}
+                      title={workloadChipTitle(dev)}
                       aria-pressed={isActive}
                       className="flex items-center gap-1.5 shrink-0 rounded-full border px-2 py-1 transition-colors"
                       style={{
@@ -127,11 +129,11 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       >
                         {dev.developer.displayName.split(' ')[0]}
                       </span>
-                      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color: isActive ? 'var(--accent)' : color }}>
-                        {loadLabel}
+                      <span className="text-[12px] font-semibold tabular-nums" style={{ color: isActive ? 'var(--accent)' : color }}>
+                        {loadLabel} {dev.assignedTodayCount !== undefined ? 'today' : 'open'}
                       </span>
-                      <span className="font-mono text-[12px]" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
-                        S{dev.score}
+                      <span className="text-[12px] tabular-nums" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
+                        {` · load ${dev.score}`}
                       </span>
                       {hasMismatch && !isActive && (
                         <Zap size={10} style={{ color: 'var(--warning)' }} />

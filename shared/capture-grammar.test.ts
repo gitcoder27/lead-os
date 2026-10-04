@@ -371,6 +371,31 @@ describe("waiting on (docs/57 §3, P3-03)", () => {
     expect(late.owner?.accountId).toBe("sam");
   });
 
+  it("/w binds the only @person and the first !date anywhere in the text (UX-06)", () => {
+    const ask = resolved("Ask @sam for ETA /w !fri");
+    expect(ask.blocked).toBe(false);
+    expect(ask.waitingOn?.accountId).toBe("sam");
+    expect(ask.owner).toBeNull();
+    expect(ask.followUpAt).toBe("2026-09-25");
+    expect(ask.scheduledOn).toBeNull();
+    expect(ask.title).toBe("Ask for ETA");
+
+    // A date after the title is the check-by, never a plan date.
+    const late = resolved("/w @dev-1 Send plan !thu");
+    expect(late.waitingOn?.accountId).toBe("dev-1");
+    expect(late.followUpAt).toBe("2026-09-24");
+    expect(late.scheduledOn).toBeNull();
+    expect(late.diagnostics.some((d) => d.code === "extra-date")).toBe(false);
+  });
+
+  it("/w keeps a second date as the plan date and still needs a choice between two people (UX-06)", () => {
+    const both = resolved("/w @sam !fri Contract !mon");
+    expect(both.followUpAt).toBe("2026-09-25");
+    expect(both.scheduledOn).toBe("2026-09-28");
+    const two = resolved("@dev-1 Ask @sam /w !fri");
+    expect(two.diagnostics.some((d) => d.code === "waiting-needs-person")).toBe(true);
+  });
+
   it("/w needs a person", () => {
     const parsed = resolved("Contract review /w !fri");
     expect(parsed.diagnostics.some((d) => d.code === "waiting-needs-person" && d.severity === "error")).toBe(true);

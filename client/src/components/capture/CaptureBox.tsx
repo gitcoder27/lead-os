@@ -109,8 +109,7 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
     chips.push(<Chip key="owner" icon={<UserRound size={10} />}>{developerNames.get(resolved.owner.accountId) ?? resolved.owner.accountId}</Chip>);
   }
   if (resolved.waitingOn) {
-    const check = resolved.followUpAt ? ` · check ${format(parseISO(resolved.followUpAt), 'EEE, MMM d')}` : '';
-    chips.push(<Chip key="waiting" icon={<Hourglass size={10} />}>Waiting on {resolved.waitingOn.displayName}{check}</Chip>);
+    chips.push(<Chip key="waiting" icon={<Hourglass size={10} />}>Waiting on {resolved.waitingOn.displayName}</Chip>);
   }
   if (resolved.meeting) chips.push(<Chip key="meeting" icon={<Users size={10} />}>Meeting</Chip>);
   if (resolved.later) {
@@ -119,14 +118,17 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
     chips.push(<Chip key="inbox" icon={<Inbox size={10} />}>Inbox</Chip>);
   }
   if (resolved.priority === 'high') chips.push(<Chip key="prio" icon={<Flag size={10} />}>High priority</Chip>);
+  // docs/56 UX-06: each date chip says what it was understood as — a plan date or a check-by date.
   if (resolved.scheduledOn) {
-    chips.push(<Chip key="date" icon={<CalendarDays size={10} />}>{format(parseISO(resolved.scheduledOn), 'EEE, MMM d')}</Chip>);
+    chips.push(<Chip key="date" icon={<CalendarDays size={10} />}>Plan {format(parseISO(resolved.scheduledOn), 'EEE, MMM d')}</Chip>);
   }
   if (resolved.dueOn) {
     chips.push(<Chip key="due" icon={<CalendarClock size={10} />}>Due {format(parseISO(resolved.dueOn), 'EEE, MMM d')}</Chip>);
   }
-  if (resolved.followUp && !resolved.waitingOn) {
-    chips.push(<Chip key="fu" icon={<CalendarDays size={10} />}>Follow-up{resolved.followUpAt ? ` ${format(parseISO(resolved.followUpAt), 'MMM d')}` : ''}</Chip>);
+  if (resolved.followUpAt) {
+    chips.push(<Chip key="fu" icon={<CalendarClock size={10} />}>Check {format(parseISO(resolved.followUpAt), 'EEE, MMM d')}</Chip>);
+  } else if (resolved.followUp && !resolved.waitingOn) {
+    chips.push(<Chip key="fu" icon={<CalendarDays size={10} />}>Follow-up</Chip>);
   }
   for (const label of resolved.labels.filter((l) => l !== 'category:follow_up')) {
     chips.push(<Chip key={`label-${label}`} icon={<Tags size={10} />}>+{taskLabelDisplayName(label)}</Chip>);

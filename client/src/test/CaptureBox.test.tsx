@@ -184,8 +184,24 @@ describe('CaptureBox (P3-D8)', () => {
     fireEvent.change(input, { target: { value: 'NDA review /w @acme-legal !mon' } });
 
     const summary = screen.getByTestId('capture-summary').textContent ?? '';
-    expect(summary).toMatch(/Waiting on Acme Legal · check Mon, \w{3} \d+/);
+    expect(summary).toContain('Waiting on Acme Legal');
+    expect(summary).toMatch(/Check Mon, \w{3} \d+/);
     expect(summary).not.toContain('Inbox');
+  });
+
+  it('chips say what a date means: Check for /w, Plan for a plain date (UX-06)', () => {
+    const { input } = renderBox();
+    fireEvent.change(input, { target: { value: 'Ask @Bob for ETA /w !fri' } });
+    let summary = screen.getByTestId('capture-summary').textContent ?? '';
+    expect(summary).toContain('Waiting on Bob Jones');
+    expect(summary).toMatch(/Check Fri, \w{3} \d+/);
+    expect(summary).not.toMatch(/Plan /);
+    expect(screen.queryByTestId('capture-diagnostics')).toBeNull();
+
+    fireEvent.change(input, { target: { value: 'Send plan !thu' } });
+    summary = screen.getByTestId('capture-summary').textContent ?? '';
+    expect(summary).toMatch(/Plan Thu, \w{3} \d+/);
+    expect(summary).not.toMatch(/Check /);
   });
 
   it('offers to create a contact for an unknown @person (P3-03)', () => {

@@ -38,6 +38,8 @@
  *
  *   `/w` and `/f` bind the first @person and first !date within the next two
  *   words, in either order (docs/57 §3). A `!due:` word does not count.
+ *   When nothing is in that window, `/w` binds the only @person anywhere in the
+ *   text and the first !date anywhere (the check-by date) — docs/56 UX-06.
  *
  * Dates are resolved against a caller-supplied `today` (todayIsoDate
  * semantics, D29); the client passes its local today, the server re-resolves
@@ -461,6 +463,15 @@ export function parseCapture(text: string, today: string): ParsedCapture {
       // A `!due:` deadline is transparent to /w and /f: it never uses up a slot.
       bindWindow -= 1;
     }
+  }
+
+  // docs/56 UX-06: `/w` is forgiving about word order. With nothing bound in its window it takes the
+  // only @person in the text, and the first !date anywhere is the check-by date, never a plan date.
+  if (tokens.some((entry) => entry.kind === "waiting")) {
+    const people = tokens.filter((entry) => entry.kind === "person");
+    if (!people.some((entry) => entry.forWaiting) && people.length === 1) people[0]!.forWaiting = true;
+    const firstDate = tokens.find((entry) => entry.kind === "date");
+    if (firstDate && !tokens.some((entry) => entry.kind === "date" && entry.forFollowup)) firstDate.forFollowup = true;
   }
 
   // ── Structural diagnostics (no lookups needed) ──

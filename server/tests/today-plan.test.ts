@@ -154,6 +154,33 @@ describe("Today plan (P3-01)", () => {
     expect(after.filter((item) => item.target.taskKey === key).map((item) => item.type)).toEqual(["top_three"]);
   });
 
+  it("shows each task in one section: queue, then promises, then carry; waiting is never carry (UX-03)", async () => {
+    const rca = await add("RCA for SSO outage", { scheduledOn: "2026-03-06", followUpAt: "2026-03-07T10:00:00.000Z", waitingOn: { type: "text", label: "Tom" } });
+    const ci = await add("CI cost estimate", { scheduledOn: "2026-03-05", followUpAt: "2026-03-06T10:00:00.000Z" });
+    const waiting = await add("SOC2 evidence export", { scheduledOn: "2026-03-05", waitingOn: { type: "text", label: "Kenji" } });
+    const slipped = await add("Plain slipped work", { scheduledOn: "2026-03-05" });
+    const pinned = await add("Pinned promise", { scheduledOn: DATE, followUpAt: "2026-03-07T09:00:00.000Z" });
+    await put({ date: DATE, taskKeys: [pinned] });
+
+    // 18:00 local: the wrap-up stage, where promises and carry are listed side by side.
+    const today = await getToday(testApp, "Pacific/Kiritimati");
+    type Row = { type: string; target: { taskKey?: string } };
+    const queue = today.actionItems as Row[];
+    const carry = queue.filter((item) => item.type === "desk_carry_forward").map((item) => item.target.taskKey);
+    const followUps = queue.filter((item) => item.type === "follow_up_due").map((item) => item.target.taskKey);
+    expect(followUps.sort()).toEqual([ci, rca].sort());
+    expect(carry).toEqual([slipped]);
+    expect(carry).not.toContain(waiting);
+    expect(queue.filter((item) => item.target.taskKey === pinned).map((item) => item.type)).toEqual(["top_three"]);
+
+    expect(today.focus.stage).toBe("wrap_up");
+    const promiseKeys = (today.focus.wrapUp.openPromises as Row[]).map((item) => item.target.taskKey);
+    const carryKeys = (today.focus.wrapUp.carryCandidates as Row[]).map((item) => item.target.taskKey);
+    expect(promiseKeys.sort()).toEqual([ci, rca].sort());
+    expect(carryKeys).toEqual([slipped]);
+    expect(today.promises.map((item: Row) => item.target.taskKey)).not.toContain(pinned);
+  });
+
   it("rejects closed, unknown and other people's tasks and leaves pins alone", async () => {
     const good = await add("Good", { scheduledOn: DATE });
     const done = await add("Finished", { scheduledOn: DATE });

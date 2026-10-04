@@ -461,34 +461,43 @@ export class TodayService {
       : undefined;
     const gettingStarted = await this.buildGettingStarted(workspaceId, jiraConfigured, sourceStatus.team === "ready" ? teamBoard.summary.total > 0 : undefined);
 
+    const pinnedKeys = new Set(plan?.top3 ?? []);
+    // docs/56 UX-03: one key set per build. A task lives in the first section that has it
+    // (pins → queue → promises → carry); waiting work is a promise, never carry.
+    const shownKeys = new Set<string>(pinnedKeys);
+    const deskKey = (item: ManagerDeskItem) => item.taskKey ?? `desk:${item.id}`;
     const followUps = getDueFollowUps(deskItems, clock.nowMs);
+    for (const item of followUps) shownKeys.add(deskKey(item));
     const meetings = getMeetingPrompts(deskItems, clock);
-    const carryActions = buildDeskCarryForwardActions(deskItems, clock, { canonical });
     const oneOnOneActions = buildOneOnOneActions(oneOnOneSignals);
     const pinnedActions = plan ? buildTopThreeActions(plan) : [];
-    const pinnedKeys = new Set(plan?.top3 ?? []);
     // A pinned task is one row, at the top — its carry or follow-up row folds into it.
     const isPinnedDuplicate = (item: TodayActionItem) => {
       const key = item.target.taskKey ?? item.target.context?.taskKey;
       return Boolean(key && pinnedKeys.has(key));
     };
-    const actionItems = rankActionItems([
-      ...pinnedActions,
-      ...[
-        ...buildStandupActions(standup, rhythm, teamBoard, collab),
-        ...buildDeveloperActions(teamBoard, clock, openAsks),
-        ...buildIssueActions(issues, clock),
-        ...buildFollowUpActions(followUps, clock),
-        ...buildMeetingActions(meetings),
-        ...carryActions,
-        ...buildJiraDriftActions(jiraDrift),
-        ...oneOnOneActions,
-        ...buildSyncActions(syncStatus),
-      ].filter((item) => !isPinnedDuplicate(item)),
-    ]);
+    const queueActions = [
+      ...buildStandupActions(standup, rhythm, teamBoard, collab),
+      ...buildDeveloperActions(teamBoard, clock, openAsks),
+      ...buildIssueActions(issues, clock),
+      ...buildFollowUpActions(followUps, clock),
+      ...buildMeetingActions(meetings),
+      ...buildJiraDriftActions(jiraDrift),
+      ...oneOnOneActions,
+      ...buildSyncActions(syncStatus),
+    ].filter((item) => !isPinnedDuplicate(item));
+    for (const item of queueActions) if (item.target.taskKey) shownKeys.add(item.target.taskKey);
+    const carryActions = buildDeskCarryForwardActions(
+      deskItems.filter((item) => item.kind !== "waiting" && !shownKeys.has(deskKey(item))),
+      clock,
+      { canonical },
+    );
+    const actionItems = rankActionItems([...pinnedActions, ...queueActions, ...carryActions]);
     const visibleActions = actionItems.slice(0, VISIBLE_ACTION_LIMIT);
     const overflowActions = actionItems.slice(VISIBLE_ACTION_LIMIT, VISIBLE_ACTION_LIMIT + OVERFLOW_ACTION_LIMIT);
-    const promiseItems = followUps.map((item) => buildPromiseItem(item, clock));
+    const promiseItems = followUps
+      .filter((item) => !(item.taskKey && pinnedKeys.has(item.taskKey)))
+      .map((item) => buildPromiseItem(item, clock));
 
     const today: TodayResponse = {
       date,

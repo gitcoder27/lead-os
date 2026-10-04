@@ -489,6 +489,8 @@ export interface TodayPlanItem {
   priority: "normal" | "high";
   scheduledOn: string | null;
   dueAt: string | null;
+  /** docs/56 UX-08: set for meetings, which are never overdue. */
+  kind?: "meeting";
   /** The plan date passed without the task being done. */
   overdue: boolean;
   /** Pinned in the day's top 3. */

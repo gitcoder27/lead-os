@@ -5,6 +5,7 @@ import type { TaskGroupContext } from '@/lib/task-views';
 import {
   impliedMeta,
   isOpenStatus,
+  meetingNeedsOutcome,
   meetingTime,
   relativeTaskDate,
   waitingChips,
@@ -23,6 +24,8 @@ export interface TaskRowHandlers {
   onSelect: (taskKey: string, mode: 'toggle' | 'range') => void;
   onMenu: (taskKey: string, kind: 'status' | 'schedule' | 'more', anchor: HTMLElement) => void;
   onToggleDone: (taskKey: string) => void;
+  /** docs/56 UX-08: the row action for a past meeting with no outcome. */
+  onCaptureOutcome?: (taskKey: string) => void;
 }
 
 /** docs/51 D4: the bell carries follow-up state (due or not) — the label chip would only repeat it. */
@@ -169,6 +172,14 @@ export const TaskListRow = memo(function TaskListRow({
             {attentionReasons.map((reason) => <span key={reason.label} className="text-[11px]"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
             {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
+            {handlers.onCaptureOutcome && meetingNeedsOutcome(task, today) && (
+              <button type="button" className="task-row-outcome shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-semibold"
+                aria-label={`Capture outcome for ${task.taskKey}`}
+                style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}
+                onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
+                Capture outcome
+              </button>
+            )}
             {showOwner && <span className="task-row-owner text-[12px]" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
             {(dateColumn || date) && <span className="task-row-date text-[12px] tabular-nums" title={date?.title} aria-label={date?.title}>
               {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>)}

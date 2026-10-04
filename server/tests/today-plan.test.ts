@@ -181,6 +181,18 @@ describe("Today plan (P3-01)", () => {
     expect(today.promises.map((item: Row) => item.target.taskKey)).not.toContain(pinned);
   });
 
+  it("asks for an outcome only for meetings that are not on a later day, and never calls a meeting overdue (UX-08)", async () => {
+    const past = await add("Architecture sync", { kind: "meeting", scheduledOn: "2026-03-07", startsAt: "2026-03-07T09:00:00.000Z", endsAt: "2026-03-07T10:00:00.000Z" });
+    const later = await add("1:1 with Priya", { kind: "meeting", startsAt: "2026-03-09T11:00:00.000Z", endsAt: "2026-03-09T12:00:00.000Z" });
+    const today = await getToday();
+    type Row = { type: string; target: { taskKey?: string }; primaryAction: { kind: string } };
+    const outcomes = (today.actionItems as Row[]).filter((item) => item.type === "meeting_outcome").map((item) => item.target.taskKey);
+    expect(outcomes).toContain(past);
+    expect(outcomes).not.toContain(later);
+    const planRow = (today.focus.plan.items as { taskKey: string; overdue: boolean; kind?: string }[]).find((item) => item.taskKey === past);
+    expect(planRow).toMatchObject({ overdue: false, kind: "meeting" });
+  });
+
   it("rejects closed, unknown and other people's tasks and leaves pins alone", async () => {
     const good = await add("Good", { scheduledOn: DATE });
     const done = await add("Finished", { scheduledOn: DATE });

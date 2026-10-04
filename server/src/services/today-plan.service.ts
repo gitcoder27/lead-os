@@ -39,7 +39,7 @@ function markDone(taskKey: string, date: string): TodayActionCommand {
   return { kind: "mark_done", label: "Done", target: taskTarget(taskKey, date), confirm: false, undoable: true };
 }
 
-function planItem(row: Pick<TaskRow, "taskKey" | "title" | "status" | "priority" | "scheduledOn" | "dueAt">, date: string, pinned: boolean, tz: string): TodayPlanItem {
+function planItem(row: Pick<TaskRow, "taskKey" | "title" | "status" | "priority" | "scheduledOn" | "dueAt" | "kind">, date: string, pinned: boolean, tz: string): TodayPlanItem {
   const plan = taskPlanDate(row, tz);
   return {
     taskKey: row.taskKey,
@@ -48,7 +48,9 @@ function planItem(row: Pick<TaskRow, "taskKey" | "title" | "status" | "priority"
     priority: row.priority === "high" ? "high" : "normal",
     scheduledOn: row.scheduledOn,
     dueAt: row.dueAt,
-    overdue: plan.date !== null && plan.date < date,
+    ...(row.kind === "meeting" ? { kind: "meeting" as const } : {}),
+    // docs/56 UX-08: meetings are never overdue.
+    overdue: row.kind !== "meeting" && plan.date !== null && plan.date < date,
     pinned,
     target: taskTarget(row.taskKey, date),
     primaryAction: markDone(row.taskKey, date),

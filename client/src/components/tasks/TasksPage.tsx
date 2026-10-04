@@ -53,6 +53,7 @@ import { TaskListEmpty, TaskListError, TaskListSkeleton, TaskShortcutsDialog } f
 import { AssignMenu, CheckByMenu, LabelMenu, MoreMenu, PriorityMenu, ScheduleMenu, StatusMenu, TASK_STATUS_META, WaitingMenu, checkByTimestamp, type AssignTarget, type TaskMenuKind, type TaskPriority } from './TaskMenus';
 import { useContacts } from '@/hooks/useContacts';
 import { TaskToolbar } from './TaskToolbar';
+import { TodayTextCaptureDialog } from '@/components/today/TodayTextCaptureDialog';
 import { TaskViewRail } from './TaskViewRail';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
 
@@ -153,6 +154,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const goChordTimer = useRef<number | null>(null);
   const [lingering, setLingering] = useState<Map<string, LingerEntry>>(() => new Map());
   const [menu, setMenu] = useState<OpenMenuState | null>(null);
+  // docs/56 UX-08: the meeting whose outcome is being captured from its row.
+  const [outcomeTask, setOutcomeTask] = useState<ManagerTask | null>(null);
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   // The sheet anchors to the toolbar's keyboard button (docs/54 K2).
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
@@ -613,6 +616,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     onSelect: selectRow,
     onMenu: (key, kind, anchor) => openMenu(kind, targetsFor(key).map((task) => task.taskKey), anchor),
     onToggleDone: (key) => toggleDone(targetsFor(key)),
+    onCaptureOutcome: (key) => setOutcomeTask(rowByKey.get(key) ?? null),
   };
   const stableHandlers = useMemo<TaskRowHandlers>(() => ({
     onFocusRow: (key) => handlers.current.onFocusRow(key),
@@ -620,6 +624,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     onSelect: (key, mode) => handlers.current.onSelect(key, mode),
     onMenu: (key, kind, anchor) => handlers.current.onMenu(key, kind, anchor),
     onToggleDone: (key) => handlers.current.onToggleDone(key),
+    onCaptureOutcome: (key) => handlers.current.onCaptureOutcome?.(key),
   }), []);
 
   // ── Keyboard (§7) ────────────────────────────────────────────────────────
@@ -1009,6 +1014,23 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           current={menuTargets.some((task) => Boolean(task.waitingOn))}
           onClose={closeMenu}
           onSelect={(waitingOn) => { setWaitingOn(menuTargets, waitingOn); closeMenu(); }}
+        />
+      )}
+      {outcomeTask && (
+        <TodayTextCaptureDialog
+          title="Capture outcome"
+          description={outcomeTask.title}
+          label="Meeting outcome"
+          saveLabel="Save outcome"
+          multiline
+          isSaving={false}
+          onClose={() => setOutcomeTask(null)}
+          onSave={(value) => {
+            const target = outcomeTask;
+            setOutcomeTask(null);
+            // The same write as Today's Capture outcome: the outcome closes the meeting.
+            void applyChanges([target], () => ({ outcome: value.trim(), status: 'done' }), () => `Outcome saved for ${target.taskKey}`);
+          }}
         />
       )}
       {menu?.kind === 'checkBy' && (

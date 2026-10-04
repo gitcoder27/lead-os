@@ -86,7 +86,10 @@ export interface RelativeTaskDate {
 }
 
 /** docs/49 §5.1: the row's relative date label. */
-export function relativeTaskDate(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status' | 'closedAt'>, today: string): RelativeTaskDate | null {
+export function relativeTaskDate(
+  task: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status' | 'closedAt'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'startsAt'>>,
+  today: string,
+): RelativeTaskDate | null {
   if (!isOpenStatus(task.status) && task.closedAt) {
     const closed = localDateOf(task.closedAt)!;
     return { label: `Closed ${shortDay(closed, today)}`, tone: 'muted', title: `Closed ${format(parseISO(closed), 'EEE, MMM d, yyyy')}` };
@@ -95,12 +98,29 @@ export function relativeTaskDate(task: Pick<ManagerTask, 'scheduledOn' | 'dueAt'
   if (!plan.date) return null;
   const title = `${plan.source === 'due' ? 'Due' : 'Scheduled'} ${format(parseISO(plan.date), 'EEE, MMM d, yyyy')}`;
   const diff = daysBetween(today, plan.date);
+  // docs/56 UX-08: a meeting is never overdue. Once its day has passed it needs an outcome
+  // (the Meetings lens's own rule), and with one recorded it is just a past day.
+  if (task.kind === 'meeting' && diff < 0) {
+    return meetingNeedsOutcome(task, today)
+      ? { label: 'Needs outcome', tone: 'warning', title: `Meeting ${format(parseISO(plan.date), 'EEE, MMM d, yyyy')} · no outcome yet`, level: 1 }
+      : { label: shortDay(plan.date, today), tone: 'muted', title };
+  }
   if (diff < 0) {
     return { label: `${-diff}d overdue`, tone: overdueTone(plan.source), title, level: overdueLevel(-diff, plan.source) };
   }
   if (diff === 0) return { label: plan.source === 'due' ? 'Due today' : 'Today', tone: 'default', title };
   if (diff === 1) return { label: 'Tomorrow', tone: 'default', title };
   return { label: shortDay(plan.date, today), tone: 'muted', title };
+}
+
+/** docs/56 UX-08: an open meeting whose day has passed with no outcome recorded. */
+export function meetingNeedsOutcome(
+  task: Pick<ManagerTask, 'scheduledOn' | 'status'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'startsAt'>>,
+  today: string,
+): boolean {
+  if (task.kind !== 'meeting' || !isOpenStatus(task.status) || task.outcome?.trim()) return false;
+  const day = localDateOf(task.startsAt ?? null) ?? task.scheduledOn;
+  return Boolean(day && day < today);
 }
 
 /** Short relative day name used in hints and toasts ("today", "Fri", "Oct 3"). */

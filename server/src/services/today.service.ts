@@ -1833,6 +1833,8 @@ function getMeetingPrompts(items: ManagerDeskItem[], clock: DayClock): ManagerDe
     .filter((item) => item.kind === "meeting")
     .filter((item) => !item.outcome?.trim())
     .filter((item) => !isAfterDay(item.originDate, clock))
+    // docs/56 UX-08: a meeting that starts on a later day has nothing to record yet.
+    .filter((item) => !isAfterDay(item.plannedStartAt, clock))
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 }
 

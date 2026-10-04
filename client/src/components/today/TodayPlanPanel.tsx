@@ -20,7 +20,7 @@ const PREVIEW = 6;
 
 /** The row's one-line context: its plan date, or what state it is in. */
 export function planDetail(item: TodayPlanItem, today: string): { text: string; overdue: boolean } | undefined {
-  const date = relativeTaskDate({ scheduledOn: item.scheduledOn, dueAt: item.dueAt, status: item.status, closedAt: null }, today);
+  const date = relativeTaskDate({ scheduledOn: item.scheduledOn, dueAt: item.dueAt, status: item.status, closedAt: null, kind: item.kind ?? 'task' }, today);
   if (date && (date.tone === 'danger' || date.tone === 'warning')) return { text: date.label, overdue: true };
   if (item.status === 'active') return { text: 'In progress', overdue: false };
   if (item.status === 'blocked') return { text: 'Blocked', overdue: false };

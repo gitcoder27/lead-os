@@ -122,6 +122,12 @@ describe('plan date + relative dates (docs/49 D1, §5.1)', () => {
     expect(relativeTaskDate(task({}), TODAY)).toBeNull();
     expect(relativeTaskDate(task({ status: 'done', closedAt: '2026-09-24' }), TODAY)).toMatchObject({ label: 'Closed Thu' });
   });
+
+  it('never calls a meeting overdue: a past one without an outcome needs an outcome (UX-08)', () => {
+    expect(relativeTaskDate(task({ kind: 'meeting', scheduledOn: '2026-09-25' }), TODAY)).toMatchObject({ label: 'Needs outcome', tone: 'warning' });
+    expect(relativeTaskDate(task({ kind: 'meeting', scheduledOn: '2026-09-25', outcome: 'Agreed' }), TODAY)).toMatchObject({ label: 'Fri', tone: 'muted' });
+    expect(relativeTaskDate(task({ kind: 'meeting', scheduledOn: TODAY }), TODAY)).toMatchObject({ label: 'Today' });
+  });
 });
 
 describe('scheduled grouping (docs/49 §3)', () => {

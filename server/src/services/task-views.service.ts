@@ -135,7 +135,8 @@ interface RowFacts {
 export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string): TaskSignals {
   const open = OPEN_STATUSES.has(row.status);
   const plan = taskPlanDate(row, tz);
-  const overdue = open && plan.date !== null && plan.date < today;
+  // docs/56 UX-08: a meeting is never overdue — a past one without an outcome "needs outcome" instead.
+  const overdue = open && row.kind !== "meeting" && plan.date !== null && plan.date < today;
   const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
   const idleDays = daysBetween(lastActivity, today);
   const stale = open && idleDays >= TASK_STALE_DAYS;

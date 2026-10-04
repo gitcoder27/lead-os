@@ -149,6 +149,22 @@ describe("built-in Meetings view", () => {
     expect(plain.signals.actions).toBeUndefined();
   });
 
+  it("a past meeting is never overdue, so it is not in Needs attention as overdue (UX-08)", async () => {
+    const meeting = await create({ title: "Architecture sync", kind: "meeting", scheduledOn: shift(-1), dueAt: `${shift(-1)}T10:00:00.000Z` });
+    const task = await create({ title: "Slipped work", scheduledOn: shift(-1) });
+    const list = await invoke(app, { method: "GET", url: `/api/task-views?today=${today}`, headers });
+    const definition = (list.body.views as { id: string; definition: unknown }[]).find((view) => view.id === "attention")!.definition;
+    const response = await invoke(app, {
+      method: "GET",
+      url: `/api/tasks?viewDef=${encodeURIComponent(Buffer.from(JSON.stringify(definition), "utf8").toString("base64url"))}&today=${today}`,
+      headers,
+    });
+    const rows = response.body.tasks as { taskKey: string; signals: { overdue: boolean } }[];
+    expect(rows.map((row) => row.taskKey)).toEqual([task.taskKey]);
+    const lens = await meetings();
+    expect(lens.find((row) => row.taskKey === meeting.taskKey)?.signals).toMatchObject({ overdue: false, overdueDays: null });
+  });
+
   it("view counts include the lens, and count closed rows inside the window", async () => {
     const done = await create({ title: "Wrapped", kind: "meeting", scheduledOn: today });
     await patch(done.taskKey, { status: "done" });

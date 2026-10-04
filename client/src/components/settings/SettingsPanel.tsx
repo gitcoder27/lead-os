@@ -1029,7 +1029,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     {item.status ? (
                       <p
                         className="mt-0.5 truncate text-[12px]"
-                        style={{ color: item.sv === 'success' ? 'var(--success)' : item.sv === 'warning' ? 'var(--warning)' : 'var(--text-muted)' }}
+                        style={{ color: item.sv === 'success' ? 'var(--success-text)' : item.sv === 'warning' ? 'var(--warning-text)' : 'var(--text-muted)' }}
                       >
                         {item.status}
                       </p>

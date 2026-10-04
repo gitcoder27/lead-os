@@ -170,7 +170,7 @@
 }
 
 .notes-day-row.selected .notes-day-row-date {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .notes-day-row-title {
@@ -267,7 +267,7 @@
   vertical-align: 4px;
   border-radius: 999px;
   background: var(--accent-glow);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.01em;

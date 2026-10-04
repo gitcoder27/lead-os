@@ -37,8 +37,13 @@
   --danger-muted:  #DC2626;
   --info:          #8B5CF6;
   /* docs/63 #3: text and focus colours that clear 4.5:1 / 3:1 on every surface (themeTokens.test.ts measures them). */
-  --accent-text:   #0B6B86;
+  /* docs/56 UX-22: also ≥4.5:1 on accent tints up to 22% (active nav, rail and pills). */
+  --accent-text:   #085A72;
   --warning-text:  #92400E;
+  --success-text:  #065F46;
+  --info-text:     #6D28D9;
+  /* docs/56 UX-22: count badges — white on this clears 4.5:1 (on #EF4444 it was 3.76:1). */
+  --danger-solid:  #DC2626;
   --task-warning-text: #92400E;
   --task-danger-text: #991B1B;
   --focus-ring:    #0E7490;
@@ -106,6 +111,9 @@
   --info:          #8B5CF6;
   --accent-text:   #06B6D4;
   --warning-text:  #F59E0B;
+  --success-text:  #34D399;
+  --info-text:     #A78BFA;
+  --danger-solid:  #DC2626;
   --task-warning-text: #FBBF24;
   --task-danger-text: #FCA5A5;
   --focus-ring:    #22D3EE;

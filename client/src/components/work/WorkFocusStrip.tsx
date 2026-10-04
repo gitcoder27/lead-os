@@ -1,3 +1,4 @@
+import { toneText } from '@/lib/tone-text';
 import { AlertCircle, ArrowRight, CalendarClock, ClipboardList, Loader2, RadioTower, Sparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { AppView } from '@/App';
@@ -135,7 +136,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenTarget, onV
                     <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
                   </span>
                 </span>
-                <span className="font-mono text-[15px] font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? signal.color : 'var(--text-muted)' }}>
+                <span className="font-mono text-[15px] font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? toneText(signal.color) : 'var(--text-muted)' }}>
                   {signal.value}
                 </span>
               </button>
@@ -164,7 +165,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, onOpenTarget, onV
                   <span className="block truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{metric.detail}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-1">
-                  <span className="text-[13px] font-semibold tabular-nums" style={{ color }}>
+                  <span className="text-[13px] font-semibold tabular-nums" style={{ color: toneText(color) }}>
                     {metric.value}
                   </span>
                   <ArrowRight size={10} className="opacity-0 transition-opacity group-hover:opacity-100" style={{ color: 'var(--text-muted)' }} />

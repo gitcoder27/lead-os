@@ -100,7 +100,7 @@ export function TaskViewRail({
               aria-current={selected ? 'page' : undefined}
               aria-label={counts?.[view.id] ? `${view.name}, ${value} task${value === 1 ? '' : 's'}` : view.name}
               className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[12.5px] transition-colors hover:text-[var(--text-primary)]"
-              style={{ color: selected ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: selected ? 600 : 500 }}
+              style={{ color: selected ? 'var(--accent-text)' : 'var(--text-secondary)', fontWeight: selected ? 600 : 500 }}
             >
               <span className="truncate">{view.name}</span>
               <span className="flex-1" />

@@ -32,7 +32,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
         <>
           <button ref={moreRef} type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More workspaces"
             className="flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
-            style={{ background: moreIsActive ? 'var(--bg-elevated)' : 'transparent', color: moreIsActive ? 'var(--accent)' : 'var(--text-muted)' }}>
+            style={{ background: moreIsActive ? 'var(--bg-elevated)' : 'transparent', color: moreIsActive ? 'var(--accent-text)' : 'var(--text-muted)' }}>
             <MoreHorizontal size={13} /><span className="hidden sm:inline">More</span>
           </button>
           {moreOpen && <Popover anchor={moreRef.current} onClose={() => setMoreOpen(false)} label="More workspaces" width={192}>

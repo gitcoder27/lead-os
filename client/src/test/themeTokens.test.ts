@@ -124,6 +124,37 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     }
   });
 
+  it.each(themes)('%s: accent text clears 4.5:1 on the active nav, rail and pill tints (UX-22)', (_name, tokens) => {
+    for (const surface of surfaces) {
+      for (const share of [0.12, 0.15, 0.22]) {
+        const tint = mix(rgb(tokens['--accent']!), rgb(tokens[surface]!), share);
+        expect(ratio(rgb(tokens['--accent-text']!), tint), `${surface} at ${share}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it.each(themes)('%s: success and info text tokens clear 4.5:1 on every surface and on their 8% tile tint (UX-22)', (_name, tokens) => {
+    for (const tone of ['success', 'info', 'warning', 'accent']) {
+      const text = rgb(tokens[`--${tone}-text`]!);
+      for (const surface of surfaces) {
+        expect(ratio(text, rgb(tokens[surface]!)), `${tone} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        expect(ratio(text, mix(rgb(tokens[`--${tone}`]!), rgb(tokens[surface]!), 0.08)), `${tone} on its tint over ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it.each(themes)('%s: count badges are readable: on-danger over the solid danger fill clears 4.5:1 (UX-22)', (_name, tokens) => {
+    expect(ratio(rgb(tokens['--on-danger']!), rgb(tokens['--danger-solid']!))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('small accent and status text uses the text tokens, not the raw tone (UX-22)', () => {
+    expect(src('components/layout/WorkspaceNavLink.tsx')).toContain('toneText(');
+    expect(src('components/tasks/TaskViewRail.tsx')).not.toMatch(/color: selected \? 'var\(--accent\)'/);
+    expect(src('components/actions/ManagerActionInbox.tsx')).toContain("background: 'var(--danger-solid)'");
+    expect(src('components/work/WorkFocusStrip.tsx')).toContain('toneText(');
+    expect(src('components/notes/notes.css')).not.toMatch(/\.notes-day-row\.selected \.notes-day-row-date \{\s*color: var\(--accent\);/);
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

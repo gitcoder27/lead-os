@@ -22,6 +22,9 @@ vi.mock('@/hooks/useGlobalSearch', () => ({
 vi.mock('@/hooks/useCapture', () => ({
   useCaptureTask: () => ({ create: mockCreate, isPending: false }),
 }));
+vi.mock('@/hooks/useDevelopers', () => ({ useDevelopers: () => ({ data: [{ accountId: 'dev-p', displayName: 'Priya Raman' }] }) }));
+const authFeatures = vi.hoisted(() => ({ oneOnOne: true }));
+vi.mock('@/context/AuthContext', () => ({ useAuth: () => ({ features: authFeatures }), useAuthScopeKey: () => 'scope' }));
 vi.mock('@/hooks/useManagerDesk', () => ({
   useCreateManagerDeskItem: () => ({ mutate: mockLegacyMutate, isPending: false }),
 }));
@@ -39,6 +42,16 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   phase3 = true;
   mockCreate.mockResolvedValue({ task: { taskKey: 'T-1' }, warnings: [] });
+});
+
+describe('CommandPalette commands (UX-21)', () => {
+  it('finds "1:1 with <name>" and a Settings section by name', () => {
+    const { input } = open();
+    fireEvent.change(input, { target: { value: '1:1 priya' } });
+    expect(screen.getByRole('button', { name: /1:1 with Priya Raman/ })).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'attention rules' } });
+    expect(screen.getByRole('button', { name: /Settings › Attention Rules/ })).toBeInTheDocument();
+  });
 });
 
 describe('CommandPalette quick add', () => {

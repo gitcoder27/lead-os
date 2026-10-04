@@ -63,8 +63,8 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backu
     commands.push({
       id: 'nav-backups',
       group: 'actions',
-      title: 'Open backups',
-      description: 'Settings · Data & Backups',
+      title: 'Settings › Data & Backups',
+      description: 'Back up now, schedule, snapshots',
       keywords: 'backup snapshot download restore data database',
       target: { type: 'view', view: 'settings', section: 'data' },
     });
@@ -75,16 +75,16 @@ export function buildNavigationCommands(options?: { tasksPhase3?: boolean; backu
       {
         id: 'nav-waiting',
         group: 'actions',
-        title: 'Go to Waiting',
-        description: 'Tasks · Waiting',
+        title: 'Tasks › Waiting',
+        description: 'Who you are waiting on',
         keywords: 'follow-ups followups promises reminders delegated waiting on',
         href: '/tasks?view=waiting',
       },
       {
         id: 'nav-meetings',
         group: 'actions',
-        title: 'Go to Meetings',
-        description: 'Tasks · Meetings',
+        title: 'Tasks › Meetings',
+        description: 'Outcomes and action items',
         keywords: 'actions minutes outcome',
         href: '/tasks?view=meetings',
       },
@@ -120,9 +120,50 @@ export function buildTaskViewCommands(views: TaskViewMeta[]): PaletteItem[] {
   return views.filter((view) => !(view.builtin && VIEWS_WITH_NAV_COMMANDS.has(view.id))).map((view) => ({
     id: `taskview-${view.id}`,
     group: 'actions' as const,
-    title: `Tasks: ${view.name}`,
+    title: `Tasks › ${view.name}`,
     keywords: `tasks view ${view.name.toLowerCase()}${view.builtin ? '' : ' saved'}`,
     href: `/tasks?view=${encodeURIComponent(view.id)}`,
+  }));
+}
+
+/**
+ * docs/56 UX-21: one entry per Settings section, deep-linked with `?section=`. Data & Backups is
+ * `nav-backups` above (install-workspace managers only). Titles follow the palette's one style,
+ * "Page › Section".
+ */
+const SETTINGS_SECTIONS: Array<{ section: string; label: string; keywords: string; tasksOnly?: boolean }> = [
+  { section: 'navigation', label: 'Navigation', keywords: 'header nav pages top bar more menu hidden layout' },
+  { section: 'rhythm', label: 'Day Rhythm', keywords: 'standup midday wrap-up times weekly review day' },
+  { section: 'attention', label: 'Attention Rules', keywords: 'thresholds stale quiet hours working hours rules' },
+  { section: 'connection', label: 'Jira Connection', keywords: 'jira token url email project connect' },
+  { section: 'sync', label: 'Sync Scope', keywords: 'jira sync jql scope auto-sync' },
+  { section: 'assistant', label: 'Copilot', keywords: 'assistant ai model provider api key' },
+  { section: 'team', label: 'Team Members', keywords: 'people roster developers add person this is me team mode solo collab' },
+  { section: 'tags', label: 'Defect Tags', keywords: 'tags labels defects jira' },
+  { section: 'labels', label: 'Task Labels', keywords: 'labels tags tasks colors', tasksOnly: true },
+  { section: 'maintenance', label: 'Data Maintenance', keywords: 'reset clear cleanup danger' },
+  { section: 'access', label: 'Developer Access', keywords: 'developer logins users accounts my day password' },
+];
+
+export function buildSettingsCommands(options?: { tasksPhase3?: boolean }): PaletteItem[] {
+  return SETTINGS_SECTIONS.filter((entry) => !entry.tasksOnly || options?.tasksPhase3).map((entry) => ({
+    id: `settings-${entry.section}`,
+    group: 'actions' as const,
+    title: `Settings › ${entry.label}`,
+    keywords: `settings ${entry.keywords}`,
+    target: { type: 'view' as const, view: 'settings' as const, section: entry.section },
+  }));
+}
+
+/** docs/56 UX-21: "1:1 with <name>" opens that person's 1:1 workspace on the Team page. */
+export function buildOneOnOneCommands(people: Array<{ accountId: string; displayName: string }>): PaletteItem[] {
+  return people.map((person) => ({
+    id: `oneonone-${person.accountId}`,
+    group: 'actions' as const,
+    title: `1:1 with ${person.displayName}`,
+    description: 'Team › 1:1',
+    keywords: `one on one 1on1 oneonone agenda ${person.displayName.toLowerCase()}`,
+    href: `/team?dev=${encodeURIComponent(person.accountId)}&panel=one-on-one`,
   }));
 }
 

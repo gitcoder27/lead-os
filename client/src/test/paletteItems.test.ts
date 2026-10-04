@@ -6,6 +6,8 @@ import {
   buildQuickAddItem,
   buildResultGroups,
   buildTaskViewCommands,
+  buildSettingsCommands,
+  buildOneOnOneCommands,
   checkInToPaletteItem,
   deskItemToPaletteItem,
   developerToPaletteItem,
@@ -231,6 +233,29 @@ describe('palette commands', () => {
 
     expect(backups?.target).toEqual({ type: 'view', view: 'settings', section: 'data' });
     expect(filterCommands(buildNavigationCommands({ backups: true }), 'snapshot').map((command) => command.id)).toEqual(['nav-backups']);
+    expect(buildNavigationCommands({ backups: true }).find((command) => command.id === 'nav-backups')?.title).toBe('Settings › Data & Backups');
+  });
+
+  it('opens every Settings section by name, in one naming style (UX-21)', () => {
+    const settings = buildSettingsCommands({ tasksPhase3: true });
+    expect(settings.map((command) => command.title)).toEqual([
+      'Settings › Navigation', 'Settings › Day Rhythm', 'Settings › Attention Rules', 'Settings › Jira Connection', 'Settings › Sync Scope',
+      'Settings › Copilot', 'Settings › Team Members', 'Settings › Defect Tags', 'Settings › Task Labels', 'Settings › Data Maintenance', 'Settings › Developer Access',
+    ]);
+    expect(settings.find((command) => command.title === 'Settings › Attention Rules')?.target).toEqual({ type: 'view', view: 'settings', section: 'attention' });
+    expect(filterCommands(settings, 'attention rules').map((command) => command.title)).toEqual(['Settings › Attention Rules']);
+    expect(buildSettingsCommands().some((command) => command.title === 'Settings › Task Labels')).toBe(false);
+  });
+
+  it('names task views the same way (UX-21)', () => {
+    expect(buildTaskViewCommands([{ id: 'inbox', name: 'Inbox', builtin: true, definition: {} }] as never)[0]?.title).toBe('Tasks › Inbox');
+  });
+
+  it('offers "1:1 with <name>" for each person, opening their 1:1 workspace (UX-21)', () => {
+    const commands = buildOneOnOneCommands([{ accountId: 'manual:priya-1', displayName: 'Priya Raman' }]);
+    expect(commands).toEqual([expect.objectContaining({ title: '1:1 with Priya Raman', href: '/team?dev=manual%3Apriya-1&panel=one-on-one' })]);
+    expect(filterCommands(commands, '1:1 priya')).toHaveLength(1);
+    expect(filterCommands(commands, 'one on one')).toHaveLength(1);
   });
 
   it('leaves the backups command out unless the session may manage backups (P6-01 review)', () => {
@@ -354,17 +379,16 @@ describe('exact task-key pinning', () => {
 });
 
 describe('Waiting and Meetings are Tasks views (docs/57 P3-06)', () => {
-  it('has Go to Waiting and Go to Meetings under Phase 3, opening the Tasks lenses', () => {
+  it('has Tasks › Waiting and Tasks › Meetings under Phase 3, opening the Tasks lenses (UX-21 naming)', () => {
     const commands = buildNavigationCommands({ tasksPhase3: true });
-    expect(commands.find((command) => command.id === 'nav-waiting')).toMatchObject({ title: 'Go to Waiting', href: '/tasks?view=waiting' });
-    expect(commands.find((command) => command.id === 'nav-meetings')).toMatchObject({ title: 'Go to Meetings', href: '/tasks?view=meetings' });
+    expect(commands.find((command) => command.id === 'nav-waiting')).toMatchObject({ title: 'Tasks › Waiting', href: '/tasks?view=waiting' });
+    expect(commands.find((command) => command.id === 'nav-meetings')).toMatchObject({ title: 'Tasks › Meetings', href: '/tasks?view=meetings' });
     // Neither is an app view of its own any more.
     expect(commands.filter((command) => command.id === 'nav-waiting' || command.id === 'nav-meetings').every((command) => !command.view && !command.target)).toBe(true);
   });
 
   it('finds Waiting by its old and new names', () => {
     const commands = buildNavigationCommands({ tasksPhase3: true });
-    expect(commands.find((command) => command.id === 'nav-waiting')?.description).toBe('Tasks · Waiting');
     for (const query of ['follow-ups', 'followups', 'promises', 'delegated', 'waiting']) {
       expect(filterCommands(commands, query).map((command) => command.id)).toContain('nav-waiting');
     }
@@ -375,7 +399,7 @@ describe('Waiting and Meetings are Tasks views (docs/57 P3-06)', () => {
     expect(buildNavigationCommands().some((command) => command.id === 'nav-waiting' || command.id === 'nav-meetings')).toBe(false);
   });
 
-  it('does not list the two built-in views a second time as "Tasks: …"', () => {
+  it('does not list the two built-in views a second time as "Tasks › …"', () => {
     const views = [
       { id: 'waiting', name: 'Waiting / Delegated', builtin: true, definition: {} },
       { id: 'meetings', name: 'Meetings', builtin: true, definition: {} },

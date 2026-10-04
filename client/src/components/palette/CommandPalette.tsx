@@ -28,12 +28,15 @@ import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useCreateManagerDeskItem } from '@/hooks/useManagerDesk';
 import { useCaptureTask } from '@/hooks/useCapture';
 import { getLocalIsoDate } from '@/lib/utils';
+import { useDevelopers } from '@/hooks/useDevelopers';
 import { GLOBAL_SEARCH_MIN_LENGTH, useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import {
   buildNavigationCommands,
+  buildOneOnOneCommands,
   buildQuickActions,
+  buildSettingsCommands,
   buildQuickAddItem,
   buildResultGroups,
   buildTaskViewCommands,
@@ -111,8 +114,17 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const isSearching = searchQuery.isFetching;
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
 
-  const backups = useAuth().features?.backups ?? false;
+  const { features } = useAuth();
+  const backups = features?.backups ?? false;
   const navigationCommands = useMemo(() => buildNavigationCommands({ tasksPhase3, backups }), [tasksPhase3, backups]);
+  // docs/56 UX-21: every Settings section, and "1:1 with <name>" when 1:1s are on.
+  const settingsCommands = useMemo(() => buildSettingsCommands({ tasksPhase3 }), [tasksPhase3]);
+  const oneOnOneEnabled = features?.oneOnOne ?? false;
+  const roster = useDevelopers(undefined, { enabled: oneOnOneEnabled });
+  const oneOnOneCommands = useMemo(
+    () => (oneOnOneEnabled ? buildOneOnOneCommands(roster.data ?? []) : []),
+    [oneOnOneEnabled, roster.data],
+  );
   const { data: syncStatus } = useSyncStatus();
   const jiraConfigured = syncStatus?.jiraConfigured;
   const quickActions = useMemo(() => buildQuickActions({ tasksPhase3, jiraConfigured }), [tasksPhase3, jiraConfigured]);
@@ -121,7 +133,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
 
   const items = useMemo<PaletteItem[]>(() => {
     const viewCommands = tasksPhase3 ? buildTaskViewCommands(taskViews.data?.views ?? []) : [];
-    const actions = filterCommands([...navigationCommands, ...quickActions, ...viewCommands], query);
+    const actions = filterCommands([...navigationCommands, ...quickActions, ...viewCommands, ...oneOnOneCommands, ...settingsCommands], query);
     const resultRows = hasResults
       ? buildResultGroups({
           issues: searchQuery.data?.issues ?? [],
@@ -134,7 +146,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         }, { showTaxonomy: !tasksPhase3 }).flatMap((group) => group.items)
       : [];
     return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query, { tasksPhase3 })), query);
-  }, [hasResults, navigationCommands, query, quickActions, searchQuery.data, tasksPhase3, taskViews.data]);
+  }, [hasResults, navigationCommands, oneOnOneCommands, query, quickActions, searchQuery.data, settingsCommands, tasksPhase3, taskViews.data]);
 
   useEffect(() => {
     setActiveIndex(0);

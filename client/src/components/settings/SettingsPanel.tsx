@@ -63,7 +63,9 @@ import { SettingsDataSection } from '@/components/settings/SettingsDataSection';
 import { SettingsMaintenanceSection } from '@/components/settings/SettingsMaintenanceSection';
 import { NavigationSection } from '@/components/settings/NavigationSection';
 import { AssistantSection } from '@/components/settings/AssistantSection';
-import { SelfLinkAction } from '@/components/settings/SelfLinkAction';
+import { SelfLinkSelect } from '@/components/settings/SelfLinkSelect';
+import { YouTag } from '@/components/team-tracker/YouTag';
+import { useSelfLink } from '@/hooks/useSelfLink';
 import { TeamModeSection } from '@/components/settings/TeamModeSection';
 import { DayRhythmSection } from '@/components/settings/DayRhythmSection';
 import { AttentionRulesSection } from '@/components/settings/AttentionRulesSection';
@@ -861,7 +863,54 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     access: { title: 'Developer Access', description: 'Create developer accounts and manage app user access.' },
   };
 
+  const renderAddManually = (spacing: string) => (
+    <div className={`${spacing} rounded-xl p-3`} style={{ border: 'var(--settings-inset-border)', background: 'var(--settings-inset-bg)' }}>
+      <SettingsGroupLabel>Add Manually</SettingsGroupLabel>
+      <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        Add a person before linking Jira. They can be used in Team, Desk, and developer access immediately.
+      </p>
+      <div className="mt-3 grid gap-2">
+        <input
+          type="text"
+          value={manualMemberName}
+          onChange={(e) => setManualMemberName(e.target.value)}
+          placeholder="Display name"
+          aria-label="Manual team member name"
+          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
+        />
+        <input
+          type="email"
+          value={manualMemberEmail}
+          onChange={(e) => setManualMemberEmail(e.target.value)}
+          placeholder="Email optional"
+          aria-label="Manual team member email"
+          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
+        />
+        <input
+          type="text"
+          value={manualMemberJiraAccountId}
+          onChange={(e) => setManualMemberJiraAccountId(e.target.value)}
+          placeholder="Jira account ID optional"
+          aria-label="Manual team member Jira account ID"
+          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
+        />
+        <button
+          type="button"
+          onClick={handleAddManualMember}
+          disabled={!manualMemberName.trim() || savingManualMember}
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
+          style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
+        >
+          {savingManualMember ? <><Loader2 size={13} className="animate-spin" /> Adding…</> : <><UserPlus size={13} /> Add manual member</>}
+        </button>
+      </div>
+    </div>
+  );
   const jiraInUse = Boolean(config?.jiraBaseUrl);
+  const { data: selfLink } = useSelfLink();
   const navItems: Array<{ id: SectionId; icon: ReactNode; label: string; status: string | null; sv: 'success' | 'warning' | 'muted' }> = [
     { id: 'navigation', icon: <PanelTop size={13} />, label: 'Navigation', status: null, sv: 'muted' },
     { id: 'rhythm', icon: <Clock3 size={13} />, label: 'Day Rhythm', status: null, sv: 'muted' },
@@ -1564,6 +1613,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         {developers.length}
                       </span>
                     </div>
+                    {/* docs/56 UX-15: one question, not a chip per row; without Jira, adding by hand comes first. */}
+                    <SelfLinkSelect members={developers} disabled={teamActionLoading} />
+                    {!jiraInUse ? renderAddManually('mb-3') : null}
                     <div className="relative mb-2">
                       <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                       <input
@@ -1663,7 +1715,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       >
                                         {member.jiraAccountId || member.source !== 'manual' ? 'Jira linked' : 'Manual'}
                                       </span>
-                                      <SelfLinkAction member={member} disabled={teamActionLoading} />
+                                      <YouTag show={selfLink?.developerAccountId === member.accountId} />
                                     </div>
                                   </div>
                                   <button
@@ -1694,50 +1746,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       )}
                     </div>
 
-                    <div className="mt-3 rounded-xl p-3" style={{ border: 'var(--settings-inset-border)', background: 'var(--settings-inset-bg)' }}>
-                      <SettingsGroupLabel>Add Manually</SettingsGroupLabel>
-                      <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                        Add a person before linking Jira. They can be used in Team, Desk, and developer access immediately.
-                      </p>
-                      <div className="mt-3 grid gap-2">
-                        <input
-                          type="text"
-                          value={manualMemberName}
-                          onChange={(e) => setManualMemberName(e.target.value)}
-                          placeholder="Display name"
-                          aria-label="Manual team member name"
-                          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
-                        />
-                        <input
-                          type="email"
-                          value={manualMemberEmail}
-                          onChange={(e) => setManualMemberEmail(e.target.value)}
-                          placeholder="Email optional"
-                          aria-label="Manual team member email"
-                          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
-                        />
-                        <input
-                          type="text"
-                          value={manualMemberJiraAccountId}
-                          onChange={(e) => setManualMemberJiraAccountId(e.target.value)}
-                          placeholder="Jira account ID optional"
-                          aria-label="Manual team member Jira account ID"
-                          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
-                          style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddManualMember}
-                          disabled={!manualMemberName.trim() || savingManualMember}
-                          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
-                          style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
-                        >
-                          {savingManualMember ? <><Loader2 size={13} className="animate-spin" /> Adding…</> : <><UserPlus size={13} /> Add manual member</>}
-                        </button>
-                      </div>
-                    </div>
+                    {jiraInUse ? renderAddManually('mt-3') : null}
                   </div>
 
                   {/* Jira directory */}

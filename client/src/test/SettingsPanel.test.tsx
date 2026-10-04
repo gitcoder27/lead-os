@@ -261,6 +261,15 @@ describe('SettingsPage', () => {
     expect(await screen.findByRole('heading', { name: /jira connection/i })).toBeInTheDocument();
   });
 
+  it('puts Add manually before the roster when Jira is not connected (UX-15)', async () => {
+    mockConfig.jiraBaseUrl = '';
+    window.history.replaceState(null, '', '/settings?section=team');
+    render(<TestWrapper><SettingsPage /></TestWrapper>);
+    const search = await screen.findByLabelText('Search current team');
+    const addManually = screen.getByText('Add Manually');
+    expect(addManually.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   describe('first section and quiet Jira (UX-12)', () => {
     const navStatus = (label: string) => screen.getByRole('button', { name: new RegExp(label, 'i') });
 

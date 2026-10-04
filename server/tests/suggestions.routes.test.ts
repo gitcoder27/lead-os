@@ -37,13 +37,23 @@ describe("suggestions routes (docs/56 P5-02)", () => {
   });
 
   it("counts the due-date target from the issue's creation, not from now", async () => {
-    const { app, getById } = createTestApp({ jiraKey: "AM-1", labels: [], createdAt: "2026-03-01T10:00:00.000Z" });
+    const { app, getById } = createTestApp({ jiraKey: "AM-1", labels: [], createdAt: "2026-03-19T10:00:00.000Z" });
 
     const res = await invoke(app, { method: "GET", url: "/api/suggestions/duedate/High?issue=AM-1" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ suggested: "2026-03-04", reason: "High priority target is 3 calendar days from creation." });
+    expect(res.body).toEqual({ suggested: "2026-03-22", reason: "High priority target is 3 calendar days from creation." });
     expect(getById).toHaveBeenCalledWith("AM-1", undefined, "default");
+  });
+
+  it("proposes no date when the issue's target has already passed (UX-32)", async () => {
+    const { app } = createTestApp({ jiraKey: "AM-1", labels: [], createdAt: "2026-03-01T10:00:00.000Z" });
+
+    const res = await invoke(app, { method: "GET", url: "/api/suggestions/duedate/High?issue=AM-1" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.suggested).toBeNull();
+    expect(res.body.reason).toMatch(/already passed/);
   });
 
   it("keeps the old from-now behaviour when no issue is given", async () => {

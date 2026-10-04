@@ -14,11 +14,21 @@ describe("AutomationService", () => {
 
   it("suggests due date based on priority", () => {
     const createdAt = "2026-03-01T00:00:00.000Z";
-    expect(service.suggestDueDate("Highest", createdAt).suggested).toBe("2026-03-02");
-    expect(service.suggestDueDate("High", createdAt).suggested).toBe("2026-03-04");
-    expect(service.suggestDueDate("Medium", createdAt).suggested).toBe("2026-03-08");
-    expect(service.suggestDueDate("Low", createdAt).suggested).toBe("2026-03-15");
-    expect(service.suggestDueDate("Lowest", createdAt).suggested).toBe("2026-03-15");
+    const today = "2026-03-01";
+    expect(service.suggestDueDate("Highest", createdAt, today).suggested).toBe("2026-03-02");
+    expect(service.suggestDueDate("High", createdAt, today).suggested).toBe("2026-03-04");
+    expect(service.suggestDueDate("Medium", createdAt, today).suggested).toBe("2026-03-08");
+    expect(service.suggestDueDate("Low", createdAt, today).suggested).toBe("2026-03-15");
+    expect(service.suggestDueDate("Lowest", createdAt, today).suggested).toBe("2026-03-15");
+  });
+
+  it("never proposes a target date in the past (UX-32)", () => {
+    // Created 2026-09-19, Medium → 2026-09-26: already gone by 2026-10-02.
+    const late = service.suggestDueDate("Medium", "2026-09-19T08:00:00.000Z", "2026-10-02");
+    expect(late.suggested).toBeNull();
+    expect(late.reason).toMatch(/already passed/);
+    // A target of today is still fair to suggest.
+    expect(service.suggestDueDate("Medium", "2026-09-25T08:00:00.000Z", "2026-10-02").suggested).toBe("2026-10-02");
   });
 
   it("flags the fallback priority so callers never offer it as a change (docs/56 P5-02)", () => {

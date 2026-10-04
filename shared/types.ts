@@ -936,7 +936,8 @@ export interface PrioritySuggestion {
 }
 
 export interface DueDateSuggestion {
-  suggested: string;
+  /** docs/56 UX-32: null when the priority's target date has already passed (nothing is proposed). */
+  suggested: string | null;
   reason: string;
 }
 

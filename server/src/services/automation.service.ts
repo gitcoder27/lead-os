@@ -1,5 +1,5 @@
 import type { DueDateSuggestion, PrioritySuggestion } from "shared/types";
-import { addDays, addHours } from "../utils/date";
+import { addDays, addHours, todayIsoDate } from "../utils/date";
 import { WorkloadService } from "./workload.service";
 
 export class AutomationService {
@@ -17,7 +17,8 @@ export class AutomationService {
     return { suggested: "Medium", reason: "Default suggestion for general defects.", isDefault: true };
   }
 
-  suggestDueDate(priorityName: string, createdAt: string): DueDateSuggestion {
+  /** `today` is the caller's day; a target that has already passed is never proposed (docs/56 UX-32). */
+  suggestDueDate(priorityName: string, createdAt: string, today: string = todayIsoDate()): DueDateSuggestion {
     const created = new Date(createdAt);
     let suggestedDate = created;
     let reason = "";
@@ -43,7 +44,11 @@ export class AutomationService {
         break;
     }
 
-    return { suggested: suggestedDate.toISOString().slice(0, 10), reason };
+    const suggested = suggestedDate.toISOString().slice(0, 10);
+    if (suggested < today) {
+      return { suggested: null, reason: `${reason} That target has already passed, so no date is suggested.` };
+    }
+    return { suggested, reason };
   }
 
   async suggestAssignee(workspaceId?: string) {

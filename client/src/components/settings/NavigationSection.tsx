@@ -138,7 +138,7 @@ export function NavigationSection() {
           aria-label="More menu"
         >
           {draft.moreNav.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="px-3.5 py-2.5 text-[12px]" role="listitem" style={{ color: 'var(--text-muted)' }}>
               Every page is in the top navigation — the More menu stays hidden.
             </p>
           ) : (
@@ -171,7 +171,7 @@ export function NavigationSection() {
           aria-label="Hidden pages"
         >
           {draft.hidden.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="px-3.5 py-2.5 text-[12px]" role="listitem" style={{ color: 'var(--text-muted)' }}>
               Nothing is hidden.
             </p>
           ) : (

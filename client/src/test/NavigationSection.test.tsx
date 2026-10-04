@@ -57,6 +57,8 @@ describe('NavigationSection', () => {
     expect(top.slice(1)).toEqual(['Desk', 'Team', 'Work', 'Notes']);
     expect(screen.getByText(/Every page is in the top navigation/)).toBeInTheDocument();
     expect(screen.getByText('Nothing is hidden.')).toBeInTheDocument();
+    // An empty zone is still a valid list: its note is the one item (axe aria-required-children).
+    expect(hiddenList().getByRole('listitem')).toHaveTextContent('Nothing is hidden.');
     expect(topList().queryByLabelText(/move today/i)).not.toBeInTheDocument();
   });
 

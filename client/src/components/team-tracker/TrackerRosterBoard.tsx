@@ -21,6 +21,7 @@ import {
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { YouTag } from '@/components/team-tracker/YouTag';
+import { TeamRosterEmpty } from './TeamRosterEmpty';
 
 interface TrackerRosterBoardProps {
   date: string;
@@ -37,6 +38,8 @@ interface TrackerRosterBoardProps {
   attentionItems?: TrackerAttentionItem[];
   attentionSorted?: boolean;
   readOnly?: boolean;
+  /** docs/56 UX-13: nobody is on the roster at all (not a filter that matched no one). */
+  rosterEmpty?: boolean;
 }
 
 /**
@@ -474,6 +477,7 @@ export function TrackerRosterBoard({
   attentionItems = [],
   attentionSorted = false,
   readOnly = false,
+  rosterEmpty = false,
 }: TrackerRosterBoardProps) {
   const attentionByDeveloper = new Map(attentionItems.map((item) => [item.developer.accountId, item]));
   const ranks = new Map(attentionItems.map((item, index) => [item.developer.accountId, index]));
@@ -485,6 +489,10 @@ export function TrackerRosterBoard({
   const visible = sections.flatMap((section) => section.developers);
   const touchRows = visible.filter((day) => !usesCheckIns(mode, day.participates)).length;
   const mixed = touchRows > 0 && touchRows < visible.length;
+
+  if (visibleCount === 0 && rosterEmpty && !searchActive) {
+    return <TeamRosterEmpty readOnly={readOnly} />;
+  }
 
   if (visibleCount === 0) {
     return (

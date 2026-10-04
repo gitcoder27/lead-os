@@ -18,6 +18,8 @@ interface TrackerBoardToolbarProps extends SavedViewsMenuProps<TeamTrackerSavedV
   onStartStandup?: () => void;
   /** docs/48 (OO-D7): present only when `one_on_one_enabled` is on. */
   onOpenOneOnOnes?: () => void;
+  /** docs/56 UX-13: Standup and 1:1s need someone on the roster; they stay visible but disabled. */
+  rosterEmpty?: boolean;
 }
 
 const sortOptions: Array<{ value: TeamTrackerBoardSort; label: string }> = [
@@ -45,6 +47,7 @@ export function TrackerBoardToolbar({
   totalCount,
   onStartStandup,
   onOpenOneOnOnes,
+  rosterEmpty = false,
   ...savedViewProps
 }: TrackerBoardToolbarProps) {
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -94,14 +97,14 @@ export function TrackerBoardToolbar({
 
       <div className="ml-auto flex items-center gap-1">
         {onOpenOneOnOnes && (
-          <ToolbarButton onClick={onOpenOneOnOnes} ariaLabel="Open 1:1s" title="1:1s">
+          <ToolbarButton onClick={onOpenOneOnOnes} ariaLabel="Open 1:1s" title={rosterEmpty ? 'Add someone to the team first' : '1:1s'} disabled={rosterEmpty}>
             <CalendarDays size={13} />
             1:1s
           </ToolbarButton>
         )}
 
         {onStartStandup && (
-          <ToolbarButton onClick={onStartStandup} ariaLabel="Start standup" title="Start standup" accent>
+          <ToolbarButton onClick={onStartStandup} ariaLabel="Start standup" title={rosterEmpty ? 'Add someone to the team first' : 'Start standup'} accent disabled={rosterEmpty}>
             <Presentation size={13} />
             Standup
           </ToolbarButton>
@@ -135,6 +138,7 @@ function ToolbarButton({
   accent = false,
   active = false,
   expanded,
+  disabled = false,
   children,
 }: {
   onClick: () => void;
@@ -143,6 +147,7 @@ function ToolbarButton({
   accent?: boolean;
   active?: boolean;
   expanded?: boolean;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   const tinted = accent || active;
@@ -150,10 +155,11 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={ariaLabel}
       aria-expanded={expanded}
       title={title}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         tinted ? 'hover:brightness-110' : 'hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
       } ${FOCUS_RING}`}
       style={{

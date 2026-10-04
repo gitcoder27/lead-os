@@ -602,6 +602,7 @@ export function TeamTrackerPage({
                       ? () => onStandupModeChange?.(true)
                       : undefined
                   }
+                  rosterEmpty={board.summary.total === 0 && board.inactiveDevelopers.length === 0}
                   onOpenOneOnOnes={
                     oneOnOneEnabled && !readOnly
                       ? () => onOneOnOnePanelChange?.('one-on-ones')
@@ -675,6 +676,7 @@ export function TeamTrackerPage({
                 attentionItems={workflow.attentionItems}
                 attentionSorted={resolvedSortBy === 'attention'}
                 readOnly={readOnly}
+                rosterEmpty={board.summary.total === 0 && board.inactiveDevelopers.length === 0}
               />
             )}
             {activeLens === 'inactive' && (

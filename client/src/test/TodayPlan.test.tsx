@@ -129,6 +129,20 @@ describe('TodayPlanPanel', () => {
     expect(screen.queryByTestId('today-plan-pin-hint')).not.toBeInTheDocument();
   });
 
+  it('keeps the plan quiet: label-size pin hint, a ghost Done check, wrapping empty copy (UX-19)', () => {
+    const { rerender } = panel(plan());
+    expect(screen.getByText(/Nothing is planned yet/)).toHaveClass('today-row-meta-wrap');
+
+    rerender(
+      <TodayPlanPanel plan={plan({ items: [planItem('T-1', 'One')] })} today={DATE} pinning={false} onTogglePin={noop} onRunCommand={noop} onOpenTarget={noop} onCapture={noop} />,
+    );
+    expect(screen.getByTestId('today-plan-pin-hint')).toHaveClass('today-section-hint');
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done).toHaveClass('today-plan-done');
+    expect(done).not.toHaveClass('ui-btn');
+    expect(done.textContent).toBe('');
+  });
+
   it('omits the triage button when the Inbox is empty', () => {
     panel(plan());
     expect(screen.queryByRole('button', { name: /to triage/ })).not.toBeInTheDocument();

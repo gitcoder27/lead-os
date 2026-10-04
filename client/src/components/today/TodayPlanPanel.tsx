@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Inbox, ListTodo, Pin, PinOff, Plus } from 'lucide-react';
+import { Circle, CircleCheck, Inbox, ListTodo, Pin, PinOff, Plus } from 'lucide-react';
 import { relativeTaskDate } from '@/lib/task-list';
 import { TODAY_TOP_LIMIT } from '@/types';
 import type { TodayActionCommand, TodayActionTarget, TodayPlanFocus, TodayPlanItem } from '@/types';
@@ -42,7 +42,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
         <h2 id="today-plan-heading" tabIndex={-1} className="today-section-title today-jump-target">My plan</h2>
         {plan.items.length > 0 ? <span className="today-section-count">{plan.items.length}</span> : null}
         {plan.items.length > 0 ? (
-          <span className="today-section-actions" data-testid="today-plan-pin-hint">
+          <span className="today-section-actions today-section-hint" data-testid="today-plan-pin-hint">
             {pinned === 0 ? `Pick up to ${TODAY_TOP_LIMIT}` : `Top ${TODAY_TOP_LIMIT} · ${pinned}/${TODAY_TOP_LIMIT}`}
           </span>
         ) : null}
@@ -53,7 +53,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
           <span className="today-row-icon" aria-hidden="true"><ListTodo size={14} /></span>
           <span className="today-row-link" style={{ cursor: 'default' }}>
             <span className="today-row-title-line"><span className="today-row-title">Plan your day</span></span>
-            <span className="today-row-meta">Nothing is planned yet. Add a task or triage your inbox.</span>
+            <span className="today-row-meta today-row-meta-wrap">Nothing is planned yet. Add a task or triage your inbox.</span>
           </span>
           <span className="today-row-actions">
             {plan.inboxCount > 0 ? (
@@ -100,8 +100,16 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
                   >
                     <PinIcon size={13} aria-hidden="true" />
                   </button>
-                  <button type="button" className="ui-btn" onClick={() => onRunCommand(item.primaryAction)}>
-                    {item.primaryAction.label}
+                  {/* docs/56 UX-19: a quiet check, like Tasks rows — it comes up on hover or focus. */}
+                  <button
+                    type="button"
+                    className="today-plan-done"
+                    aria-label={item.primaryAction.label}
+                    title={`${item.primaryAction.label}: ${item.title}`}
+                    onClick={() => onRunCommand(item.primaryAction)}
+                  >
+                    <Circle size={16} className="today-plan-done-idle" aria-hidden="true" />
+                    <CircleCheck size={16} className="today-plan-done-hover" aria-hidden="true" />
                   </button>
                 </span>
               </div>

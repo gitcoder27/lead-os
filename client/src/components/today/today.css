@@ -331,6 +331,36 @@
   margin-left: auto;
 }
 
+/* docs/56 UX-19: a hint beside a section title reads at label size, never louder than the title. */
+.today-section-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+/* docs/56 UX-19: My plan's Done is a ghost check that comes up on row hover or keyboard focus. */
+.today-plan-done {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--text-muted);
+  opacity: 0.6;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+.today-plan-done-hover { display: none; }
+.today-row:hover .today-plan-done,
+.today-plan-done:focus-visible { opacity: 1; color: var(--success); }
+.today-plan-done:hover .today-plan-done-idle,
+.today-plan-done:focus-visible .today-plan-done-idle { display: none; }
+.today-plan-done:hover .today-plan-done-hover,
+.today-plan-done:focus-visible .today-plan-done-hover { display: inline; }
+.today-plan-done:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.today-row-meta.today-row-meta-wrap { white-space: normal; overflow: visible; text-overflow: clip; }
+
 .today-subhead {
   padding: 12px 12px 4px;
   font-size: 11px;

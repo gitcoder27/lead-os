@@ -227,8 +227,18 @@ describe('TaskDrawer body (P3-D2)', () => {
       const input = type('Send summary @de');
       expect(screen.getByRole('listbox', { name: 'Person suggestions' })).toBeTruthy();
       fireEvent.keyDown(input, { key: 'Tab' });
-      expect(input.value).toBe('Send summary @dev-1 ');
+      // UX-05: the input shows the name; the capture still gets the id.
+      expect(input.value).toBe('Send summary @Dev ');
       expect(mockCaptureCreate).not.toHaveBeenCalled();
+    });
+
+    it('sends the picked person as an id while the input shows the name (UX-05)', async () => {
+      mockUseTaskDetail.mockReturnValue(queryFor(meeting()));
+      render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+      const input = type('Send summary @de');
+      fireEvent.keyDown(input, { key: 'Tab' });
+      await act(async () => { fireEvent.submit(input.closest('form')!); });
+      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Send summary @dev-1', defaults: { parentKey: 'T-7' } });
     });
 
     it('Enter submits the form', async () => {

@@ -49,6 +49,14 @@ interface TrackerRosterBoardProps {
 export const ROSTER_GRID =
   'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(180px,1fr)_minmax(220px,1.6fr)_minmax(150px,1fr)_64px_minmax(92px,0.55fr)_minmax(150px,0.9fr)_32px]';
 
+/** docs/56 UX-33: solo boards have no Attention column (its lead flag sits on the status line). */
+export const ROSTER_GRID_SOLO =
+  'grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(180px,1fr)_minmax(220px,1.6fr)_minmax(150px,1fr)_72px_minmax(92px,0.55fr)_32px]';
+
+export function rosterGrid(solo: boolean): string {
+  return solo ? ROSTER_GRID_SOLO : ROSTER_GRID;
+}
+
 /** Cells that span the full card width below md. */
 const MOBILE_SPAN = 'max-md:col-span-2';
 
@@ -88,17 +96,30 @@ function MetaSeparator() {
 function CurrentWork({
   item,
   done,
+  next,
+  solo = false,
   onOpenTaskDetail,
 }: {
   item?: TrackerWorkItem;
   done: boolean;
+  solo?: boolean;
+  /** docs/56 UX-33: solo boards show the next planned task when nothing is current. */
+  next?: TrackerWorkItem;
   onOpenTaskDetail?: (itemId: number, managerDeskItemId?: number) => void;
 }) {
+  if (!item && next && !done) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-secondary)' }} title={next.title}>
+        <CircleDashed size={13} className="shrink-0 opacity-70" aria-hidden="true" />
+        <span className="truncate">Next: {next.title}</span>
+      </span>
+    );
+  }
   if (!item) {
     return (
       <span className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
         <CircleDashed size={13} className="shrink-0 opacity-70" aria-hidden="true" />
-        <span className="truncate">{done ? 'Done for the day' : 'No current item'}</span>
+        <span className="truncate">{done ? 'Done for the day' : solo ? 'Nothing planned' : 'No current item'}</span>
       </span>
     );
   }
@@ -202,8 +223,8 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
   return (
     <div className="flex items-center gap-2" title={`${load} open items — ${detail}; count, not effort or capacity`}>
       <MobileLabel>Open items</MobileLabel>
-      <span className="w-4 text-[13px] font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-        {load}
+      <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+        {load} open
       </span>
       <span aria-hidden="true" className="flex items-center gap-[2px]">
         {Array.from({ length: LOAD_PIPS }, (_, index) => (
@@ -318,6 +339,7 @@ function RosterRow({
 }) {
   const mode = useTeamMode();
   const attention = getRosterAttention(day, attentionItem);
+  const solo = mode === 'solo';
   const done = day.status === 'done_for_today';
   const name = day.developer.displayName;
   const railColor = attention.rail ? ROSTER_TONE_COLOR[attention.rail] : null;
@@ -331,7 +353,7 @@ function RosterRow({
       // opens the person; a click anywhere else on the row does the same for pointer users.
       data-attention={attention.rail ?? undefined}
       onClick={() => onOpenDrawer(day.developer.accountId)}
-      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${ROSTER_GRID}`}
+      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${rosterGrid(solo)}`}
       style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
       {railColor && (
@@ -362,6 +384,11 @@ function RosterRow({
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             <TrackerStatusMark status={day.status} />
+            {solo && attention.flags[0] ? (
+              <span className="truncate text-[12px]" style={{ color: attention.flags[0].tone === 'danger' ? ROSTER_TONE_COLOR.danger : 'var(--text-muted)' }} title={attention.summary}>
+                · {attention.flags[0].label}
+              </span>
+            ) : null}
             {day.statusSuggestion && onAcceptSuggestion && (
               <button
                 type="button"
@@ -385,20 +412,22 @@ function RosterRow({
       </div>
 
       <div className={`min-w-0 ${MOBILE_SPAN}`}>
-        <CurrentWork item={day.currentItem} done={done} onOpenTaskDetail={onOpenTaskDetail} />
+        <CurrentWork item={day.currentItem} done={done} solo={solo} next={solo ? day.plannedItems[0] : undefined} onOpenTaskDetail={onOpenTaskDetail} />
       </div>
 
       <div className={`min-w-0 ${MOBILE_SPAN}`}>
-        <UpNext items={day.plannedItems} />
+        <UpNext items={solo && !day.currentItem ? day.plannedItems.slice(1) : day.plannedItems} />
       </div>
 
       <Load day={day} />
 
       <Freshness day={day} touch={!usesCheckIns(mode, day.participates)} mixed={mixed} />
 
-      <div className={`min-w-0 ${MOBILE_SPAN}`}>
-        <AttentionFlags attention={attention} />
-      </div>
+      {solo ? null : (
+        <div className={`min-w-0 ${MOBILE_SPAN}`}>
+          <AttentionFlags attention={attention} />
+        </div>
+      )}
 
       <div className="flex justify-end max-md:col-start-2 max-md:row-start-1">
         {!readOnly && (
@@ -424,10 +453,10 @@ function RosterRow({
 
 // ── Board ───────────────────────────────────────────────────────────
 
-function ColumnHeader({ freshnessLabel }: { freshnessLabel: string }) {
+function ColumnHeader({ freshnessLabel, solo }: { freshnessLabel: string; solo: boolean }) {
   return (
     <div
-      className={`hidden gap-3 px-4 py-2 text-[12px] font-medium md:grid ${ROSTER_GRID}`}
+      className={`hidden gap-3 px-4 py-2 text-[12px] font-medium md:grid ${rosterGrid(solo)}`}
       style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
     >
       <span>Developer</span>
@@ -435,7 +464,7 @@ function ColumnHeader({ freshnessLabel }: { freshnessLabel: string }) {
       <span>Up next</span>
       <span>Open items</span>
       <span>{freshnessLabel}</span>
-      <span>Attention</span>
+      {solo ? null : <span>Attention</span>}
       <span className="sr-only">Actions</span>
     </div>
   );
@@ -511,7 +540,7 @@ export function TrackerRosterBoard({
 
   return (
     <RosterSurface>
-      <ColumnHeader freshnessLabel={touchRows === visible.length ? 'Last touched' : 'Check-in'} />
+      <ColumnHeader freshnessLabel={touchRows === visible.length ? 'Last touched' : 'Check-in'} solo={mode === 'solo'} />
       {sections.map((section) => {
         const rows = attentionSorted ? sortByAttention(section.developers, ranks) : section.developers;
         const startIndex = offset;

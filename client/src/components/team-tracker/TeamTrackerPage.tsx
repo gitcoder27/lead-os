@@ -22,7 +22,7 @@ import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { TrackerSummaryStrip } from './TrackerSummaryStrip';
 import { TrackerBoardToolbar } from './TrackerBoardToolbar';
 import { InactiveDeveloperTray } from './InactiveDeveloperTray';
-import { ROSTER_GRID, RosterSurface, TrackerRosterBoard } from './TrackerRosterBoard';
+import { RosterSurface, TrackerRosterBoard, rosterGrid } from './TrackerRosterBoard';
 import { FOCUS_RING, isEditable } from '@/components/ui/focus';
 import { TeamTrackerViewSwitcher, type TeamTrackerLens } from './TeamTrackerViewSwitcher';
 import { DeveloperTrackerDrawer } from './DeveloperTrackerDrawer';
@@ -968,6 +968,7 @@ function Bone({ className }: { className: string }) {
 }
 
 function TeamTrackerSkeleton() {
+  const teamMode = useTeamMode();
   return (
     <div className="mx-auto max-w-[1600px]" aria-busy="true" aria-label="Loading team">
       <RosterSurface>
@@ -975,7 +976,7 @@ function TeamTrackerSkeleton() {
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
-            className={`grid items-center gap-3 border-t px-4 py-2.5 md:min-h-[60px] ${ROSTER_GRID}`}
+            className={`grid items-center gap-3 border-t px-4 py-2.5 md:min-h-[60px] ${rosterGrid(teamMode === 'solo')}`}
             style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
           >
             <div className="flex items-center gap-3">

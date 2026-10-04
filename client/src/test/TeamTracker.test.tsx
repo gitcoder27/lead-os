@@ -907,6 +907,29 @@ describe('TeamTrackerPage', () => {
       expect(view.getByText('Not touched in 5 working days')).toHaveClass('sr-only');
     });
 
+    it('solo: no Attention column, a labelled load and the next planned task instead of "No current item" (UX-33)', () => {
+      teamModeMock.mode = 'solo';
+      soloBoard();
+      mockBoard.developers[0] = mockDay({
+        participates: false,
+        signals: touchFreshness(),
+        currentItem: undefined,
+        plannedItems: [
+          { id: 91, dayId: 1, lifecycle: 'tracker_only', itemType: 'custom', title: 'Write the rollout plan', state: 'planned', position: 0, originDate: '2026-03-07', createdAt: '2026-03-07T08:00:00Z', updatedAt: '2026-03-07T08:00:00Z' },
+          { id: 92, dayId: 1, lifecycle: 'tracker_only', itemType: 'custom', title: 'Review metrics', state: 'planned', position: 1, originDate: '2026-03-07', createdAt: '2026-03-07T08:00:00Z', updatedAt: '2026-03-07T08:00:00Z' },
+        ] as TrackerDeveloperDay['plannedItems'],
+      });
+      render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+
+      const roster = screen.getByText('Developer').closest('.overflow-hidden') as HTMLElement;
+      const header = within(roster.firstElementChild as HTMLElement);
+      expect(header.queryByText('Attention')).not.toBeInTheDocument();
+      const view = within(roster);
+      expect(view.queryByText('No current item')).not.toBeInTheDocument();
+      expect(view.getByText('Next: Write the rollout plan')).toBeInTheDocument();
+      expect(view.getByText('2 open')).toBeInTheDocument();
+    });
+
     it('solo: a developer with nothing recorded says "Not yet", not "No check-in"', () => {
       teamModeMock.mode = 'solo';
       soloBoard();

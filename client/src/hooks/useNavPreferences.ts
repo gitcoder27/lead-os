@@ -27,9 +27,13 @@ export function useNavPreferences(): { preferences: NavPreferences } {
     }
   }, [authScopeKey, isManager, query.data]);
 
-  const preferences =
-    (isManager ? query.data ?? cached : null) ??
-    sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3, hidden: DEFAULT_NAV_PREFERENCES.hidden });
+  // A stable fallback: a fresh object per render would make every consumer that syncs from it
+  // (Settings → Navigation's draft) re-render forever while the read has failed or not loaded.
+  const fallback = useMemo(
+    () => sanitizeNavPreferences(DEFAULT_NAV_PREFERENCES.topNav, DEFAULT_NAV_PREFERENCES.moreNav, { tasksNav: tasksPhase3, hidden: DEFAULT_NAV_PREFERENCES.hidden }),
+    [tasksPhase3],
+  );
+  const preferences = (isManager ? query.data ?? cached : null) ?? fallback;
   return { preferences };
 }
 

@@ -62,9 +62,10 @@ vi.mock('@/hooks/useConfig', () => ({
   }),
 }));
 
+const rosterMock = vi.hoisted(() => ({ empty: false }));
 vi.mock('@/hooks/useDevelopers', () => ({
   useDevelopers: () => ({
-    data: [
+    data: rosterMock.empty ? [] : [
       {
         accountId: 'dev-1',
         displayName: 'Taylor Dev',
@@ -130,6 +131,11 @@ vi.mock('@/lib/api', () => ({
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Most cases exercise the Jira sections; UX-12's own cases open /settings bare.
+    window.history.replaceState(null, '', '/settings?section=connection');
+    rosterMock.empty = false;
+    mockConfig.jiraBaseUrl = 'https://acme.atlassian.net';
+    mockConfig.jiraSyncJql = 'project = AM AND issuetype = Bug';
     mockRefetch.mockClear();
     mockRefetchTagUsage.mockClear();
     Object.defineProperty(navigator, 'clipboard', {
@@ -253,6 +259,33 @@ describe('SettingsPage', () => {
     expect(mockAddToast).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'error', title: 'Failed to discover team members' }));
     fireEvent.click(screen.getByRole('button', { name: 'Open Jira Connection' }));
     expect(await screen.findByRole('heading', { name: /jira connection/i })).toBeInTheDocument();
+  });
+
+  describe('first section and quiet Jira (UX-12)', () => {
+    const navStatus = (label: string) => screen.getByRole('button', { name: new RegExp(label, 'i') });
+
+    it('opens on Navigation, with no Jira save footer', async () => {
+      window.history.replaceState(null, '', '/settings');
+      render(<TestWrapper><SettingsPage /></TestWrapper>);
+      expect(await screen.findByRole('heading', { name: 'Navigation' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Save & Sync/i })).not.toBeInTheDocument();
+    });
+
+    it('opens on Team Members when nobody is on the roster', async () => {
+      rosterMock.empty = true;
+      window.history.replaceState(null, '', '/settings');
+      render(<TestWrapper><SettingsPage /></TestWrapper>);
+      expect(await screen.findByRole('heading', { name: 'Team Members' })).toBeInTheDocument();
+    });
+
+    it('shows no warning for Jira settings that are not in use', async () => {
+      mockConfig.jiraBaseUrl = '';
+      mockConfig.jiraSyncJql = '';
+      window.history.replaceState(null, '', '/settings');
+      render(<TestWrapper><SettingsPage /></TestWrapper>);
+      await screen.findByRole('heading', { name: 'Navigation' });
+      expect(navStatus('Sync Scope').textContent).not.toContain('No query');
+    });
   });
 
   it('does not trigger sync when saving settings fails', async () => {

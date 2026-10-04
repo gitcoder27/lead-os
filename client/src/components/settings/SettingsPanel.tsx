@@ -83,10 +83,15 @@ function isSectionId(value: string | null | undefined): value is SectionId {
   return value !== null && value !== undefined && (SECTION_IDS as readonly string[]).includes(value);
 }
 
-/** ?section= deep-link — reads the current URL, falling back to the default section. */
-function sectionFromLocation(): SectionId {
+/** ?section= deep-link from the current URL, or null for the default section. */
+function sectionFromLocation(): SectionId | null {
   const param = new URLSearchParams(window.location.search).get('section');
-  return isSectionId(param) ? param : 'connection';
+  return isSectionId(param) ? param : null;
+}
+
+/** docs/56 UX-12: Settings opens on Navigation — or on Team Members while nobody is on the roster — never on Jira. */
+function defaultSection(rosterEmpty: boolean): SectionId {
+  return rosterEmpty ? 'team' : 'navigation';
 }
 
 /** docs/56 UX-11: a failed Jira user lookup in words a manager can act on (never "fetch failed"). */
@@ -188,7 +193,15 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const [deletingUsername, setDeletingUsername] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionId>(sectionFromLocation);
+  const [activeSection, setActiveSection] = useState<SectionId>(
+    () => sectionFromLocation() ?? defaultSection(!loadingDevelopers && developers.length === 0),
+  );
+  // The default follows the roster once it loads, until a section is chosen (URL or click).
+  const sectionChosenRef = useRef(sectionFromLocation() !== null);
+  useEffect(() => {
+    if (sectionChosenRef.current || loadingDevelopers) return;
+    setActiveSection(defaultSection(developers.length === 0));
+  }, [developers.length, loadingDevelopers]);
   const [showPasswordGen, setShowPasswordGen] = useState(false);
   const [showNewPw, setShowNewPw] = useState(true);
   const [copiedPw, setCopiedPw] = useState(false);
@@ -340,6 +353,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   // requestedSection target arrives while the page is already mounted.
   useEffect(() => {
     if (isSectionId(requestedSection?.section)) {
+      sectionChosenRef.current = true;
       setActiveSection(requestedSection.section);
     }
   }, [requestedSection]);
@@ -847,12 +861,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     access: { title: 'Developer Access', description: 'Create developer accounts and manage app user access.' },
   };
 
+  const jiraInUse = Boolean(config?.jiraBaseUrl);
   const navItems: Array<{ id: SectionId; icon: ReactNode; label: string; status: string | null; sv: 'success' | 'warning' | 'muted' }> = [
     { id: 'navigation', icon: <PanelTop size={13} />, label: 'Navigation', status: null, sv: 'muted' },
     { id: 'rhythm', icon: <Clock3 size={13} />, label: 'Day Rhythm', status: null, sv: 'muted' },
     { id: 'attention', icon: <Gauge size={13} />, label: 'Attention Rules', status: null, sv: 'muted' },
     { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl ? 'success' : 'muted' },
-    { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: !autoSyncEnabled ? 'muted' : jql ? 'muted' : 'warning' },
+    // docs/56 UX-12: Jira settings nobody uses are quiet — no status, no warning colour.
+    { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !jiraInUse ? null : !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: jiraInUse && autoSyncEnabled && !jql ? 'warning' : 'muted' },
     { id: 'assistant', icon: <Sparkles size={13} />, label: 'Copilot', status: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'On' : 'Off', sv: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'success' : 'muted' },
     { id: 'team', icon: <Users size={13} />, label: 'Team Members', status: `${developers.length} tracked`, sv: 'muted' },
     { id: 'tags', icon: <Tag size={13} />, label: 'Defect Tags', status: null, sv: 'muted' },
@@ -944,7 +960,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => { sectionChosenRef.current = true; setActiveSection(item.id); }}
                   className="relative flex min-w-[168px] items-start gap-2 rounded-md py-1.5 text-left transition-all md:mb-0.5 md:w-full md:min-w-0 md:last:mb-0"
                   aria-current={isActive ? 'page' : undefined}
                   style={{
@@ -2181,7 +2197,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         >
         {activeSection === 'maintenance' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="hidden text-[12px] sm:block" style={{ color: 'var(--text-muted)' }}>
               Maintenance actions run immediately after typed confirmation. The standard Save footer is intentionally hidden here.
             </p>
             <button
@@ -2197,15 +2213,16 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            {/* docs/56 UX-12: on phones the footer is one row of the two save actions. */}
+            <p className="hidden text-[12px] sm:block" style={{ color: 'var(--text-muted)' }}>
               Save stores settings only. Save &amp; Sync also triggers an immediate Jira refresh.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleResetConfig}
                 disabled={hasChanges}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50"
+                className="hidden items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50 sm:flex"
                 style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
               >
                 <TriangleAlert size={12} />

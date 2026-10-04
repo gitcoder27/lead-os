@@ -504,8 +504,6 @@ export function DashboardLayout({
           <WorkFocusStrip
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
-            onOpenTarget={onOpenActionTarget}
-            onViewChange={onViewChange}
             actions={<><WorkAttentionSignals onOpenTarget={onOpenActionTarget} /><WorkSyncControls />{workViewsMenu}</>}
           />
 

@@ -19,8 +19,7 @@ import { PriorityCell } from './PriorityCell';
 import { StatusBadge } from './StatusBadge';
 import { AssigneeCell } from './AssigneeCell';
 import { DueDateCell } from './DueDateCell';
-import { AnalysisStatusCell } from './AnalysisStatusCell';
-import { TrackerAssignmentsCell } from './TrackerAssignmentsCell';
+import { LinkedCell } from './LinkedCell';
 import { InlineEditAssignee } from './InlineEditAssignee';
 import { InlineEditDueDate } from './InlineEditDueDate';
 import { InlineEditTags } from './InlineEditTags';
@@ -501,29 +500,7 @@ export function DefectTable({
             }),
           ]
         : []),
-      columnHelper.display({
-        id: 'open',
-        header: 'Open',
-        cell: (info) => {
-          const issue = info.row.original;
-          return (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelectIssue(issue.jiraKey);
-              }}
-              className="rounded-md px-2 py-1 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
-              style={{ color: 'var(--accent)' }}
-              aria-label={`Open triage for ${issue.jiraKey}`}
-            >
-              Open
-            </button>
-          );
-        },
-        size: 58,
-        enableSorting: false,
-      }),
+      // docs/56 UX-31: no OPEN column — the whole row already opens triage.
       columnHelper.accessor('aspenSeverity', {
         id: 'aspenSeverity',
         header: 'Sev',
@@ -579,9 +556,16 @@ export function DefectTable({
       }),
       columnHelper.accessor('summary', {
         header: 'Title',
+        // docs/56 UX-31: the title is the row's native "open triage" control (the OPEN column is gone).
         cell: (info) => (
-          <span
-            className="text-[13px] truncate block max-w-[420px]"
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectIssue(info.row.original.jiraKey);
+            }}
+            aria-label={`Open triage for ${info.row.original.jiraKey}: ${info.getValue()}`}
+            className="text-[13px] truncate block max-w-[420px] text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             title={info.getValue()}
             style={{ color: 'var(--text-primary)' }}
           >
@@ -593,7 +577,7 @@ export function DefectTable({
                 Snoozed until {new Date(info.row.original.snoozedUntil).toLocaleDateString()}
               </small>
             ) : null}
-          </span>
+          </button>
         ),
         size: undefined, // flex
       }),
@@ -765,24 +749,19 @@ export function DefectTable({
         size: 100,
         enableSorting: false,
       }),
-      columnHelper.accessor((row) => (hasAnalysisNotes(row) ? 1 : 0), {
-        id: 'analysisStatus',
-        header: 'Notes',
-        cell: (info) => <AnalysisStatusCell hasNotes={Boolean(info.getValue())} />,
-        sortDescFirst: false,
-        size: 60,
-      }),
-      columnHelper.accessor((row) => getTrackerAssignmentCount(row), {
-        id: 'trackerAssignments',
-        header: 'Tracker',
+      // docs/56 UX-31: notes and Team board links share one "Linked" column that shows only what exists.
+      columnHelper.accessor((row) => getTrackerAssignmentCount(row) * 2 + (hasAnalysisNotes(row) ? 1 : 0), {
+        id: 'linked',
+        header: 'Linked',
         cell: (info) => (
-          <TrackerAssignmentsCell
-            activeCount={info.getValue()}
+          <LinkedCell
+            hasNotes={hasAnalysisNotes(info.row.original)}
+            trackerCount={getTrackerAssignmentCount(info.row.original)}
             developerNames={info.row.original.trackerAssignmentsToday?.developerNames ?? []}
           />
         ),
         sortDescFirst: true,
-        size: 78,
+        size: 80,
       }),
       columnHelper.display({
         id: 'more',

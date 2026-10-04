@@ -411,10 +411,12 @@ describe('DefectTable', () => {
     expect(screen.getByText('Assignee')).toBeInTheDocument();
     expect(screen.getByText('Due Date')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
-    expect(screen.getByText('Notes')).toBeInTheDocument();
-    expect(screen.getByText('Tracker')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /notes/i })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /notes/i })).toHaveAttribute('aria-sort', 'none');
+    // UX-31: Notes and Tracker are one "Linked" column; there is no OPEN column.
+    expect(screen.getByText('Linked')).toBeInTheDocument();
+    expect(screen.queryByText('Notes')).toBeNull();
+    expect(screen.queryByText('Tracker')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /^open$/i })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: /linked/i })).toHaveAttribute('aria-sort', 'none');
   });
 
   it('uses button semantics for inline assignee and due-date edits', () => {
@@ -605,39 +607,40 @@ describe('DefectTable', () => {
     expect(onSelectIssue).toHaveBeenCalledWith('PROJ-101');
   });
 
-  it('shows subtle analysis state indicators for complete and pending rows', () => {
+  it('shows what a defect is linked to in one column, and nothing for an unlinked one (UX-31)', () => {
     render(
       <TestWrapper>
         <DefectTable {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByLabelText('Analysis complete')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('Analysis pending').length).toBeGreaterThan(0);
+    expect(screen.getByRole('img', { name: 'Analysis notes' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '2 Team board tasks: Alice, Bob' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Analysis pending|No Team Tracker/)).toBeNull();
   });
 
-  it('shows Team Tracker assignment indicators for linked and unlinked rows', () => {
+  it('sorts by the Linked header, most linked first', () => {
     render(
       <TestWrapper>
         <DefectTable {...defaultProps} />
       </TestWrapper>
     );
 
-    expect(screen.getByLabelText('2 Team Tracker tasks linked: Alice, Bob')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('No Team Tracker tasks linked').length).toBeGreaterThan(0);
-  });
-
-  it('sorts by Notes header', () => {
-    render(
-      <TestWrapper>
-        <DefectTable {...defaultProps} />
-      </TestWrapper>
-    );
-
-    fireEvent.click(screen.getByText('Notes'));
+    fireEvent.click(screen.getByText('Linked'));
 
     const rows = screen.getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('PROJ-102');
+    expect(rows[1]).toHaveTextContent('PROJ-101');
+  });
+
+  it('shows tags only when present (UX-31)', () => {
+    render(
+      <TestWrapper>
+        <DefectTable {...defaultProps} />
+      </TestWrapper>
+    );
+    expect(screen.queryByText('No tags')).toBeNull();
+    // The add control stays reachable for every row.
+    expect(screen.getByRole('button', { name: 'Manage tags for PROJ-102' })).toBeInTheDocument();
   });
 
   it('exports exactly the filtered Work rows without private analysis notes', () => {

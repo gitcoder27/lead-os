@@ -198,16 +198,13 @@ export function InlineEditTags({ issueKey, localTags }: InlineEditTagsProps) {
               </Tooltip.Provider>
             )}
           </>
-        ) : (
-          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            No tags
-          </span>
-        )}
+        ) : null}
 
+        {/* docs/56 UX-31: tags show only when present; an empty cell keeps a quiet add that comes up on row hover or focus. */}
         <button
           ref={triggerRef}
           onClick={toggleOpen}
-          className="p-0.5 rounded transition-colors hover:bg-[var(--bg-tertiary)]"
+          className={`p-0.5 rounded transition-colors hover:bg-[var(--bg-tertiary)] ${localTags.length === 0 && !isOpen ? 'opacity-0 focus-visible:opacity-100 group-hover/row:opacity-100' : ''}`}
           title="Manage tags"
           aria-label={`Manage tags for ${issueKey}`}
         >

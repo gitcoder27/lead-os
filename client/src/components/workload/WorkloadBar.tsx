@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronUp, ChevronDown, Users, Zap } from 'lucide-react';
 import { useWorkload } from '@/hooks/useWorkload';
 import { DeveloperCard } from './DeveloperCard';
-import { workloadAccent, workloadAssignedLabel, workloadChipText, workloadChipTitle } from '@/lib/utils';
+import { workloadAccent, workloadAssignedLabel, workloadChipTitle } from '@/lib/utils';
 
 interface WorkloadBarProps {
   activeDeveloper?: string;
@@ -98,7 +98,6 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       type="button"
                       onClick={() => handleDeveloperSelect(dev.developer.accountId)}
                       aria-label={`Filter by ${dev.developer.displayName}`}
-                      aria-description={workloadChipText(dev)}
                       title={workloadChipTitle(dev)}
                       aria-pressed={isActive}
                       className="flex items-center gap-1.5 shrink-0 rounded-full border px-2 py-1 transition-colors"

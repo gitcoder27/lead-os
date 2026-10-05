@@ -737,3 +737,13 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | 2026-10-05 | HIER-04 | Searchable guarded placement dialog in drawer/row/bulk actions, contextual capture and child inheritance/clearing, ordinary subtask add and visible completion tallies. 64 backend and 82 frontend tests passed; typecheck passed. |
 | 2026-10-05 | HIER-05 | Today labels preserve ranking/pins; scoped cache refresh; task purge, manager-private and workspace cleanup, team preservation and reset previews. 91 targeted backend tests passed. |
 | 2026-10-05 | HIER-06 | Full suites: 1,505 backend and 1,832 frontend tests passed; final focused checks: 14 project backend and 256 frontend tests passed. Typecheck, build checks, lint (0 errors), data guard and tracked JSON/YAML formatting passed. Synthetic isolated-database browser checks passed for creation/editing, summaries, project/track archive/restore, moves/Undo, contextual capture, subtasks, deep links, Back/Forward, keyboard focus, saved placement filters, Today context and desktop/mobile light/dark. Login-switch mutation guards passed regression tests. Hardened workspace foreign keys, visible descendant traversal and private follow-up facts. Repository format check is blocked only by pre-existing local `.claude/settings.local.json`, left untouched. Runtime data and Jira were not used; no push/deploy. |
+
+## Projects UX redesign (docs/69)
+
+- [x] PROJ-UX-01 — screenshot/code review and design plan.
+- [ ] PROJ-UX-02 — project directory, detail hierarchy and lifecycle workflows.
+- [ ] PROJ-UX-03 — task organization workflow and final browser validation.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-05 | PROJ-UX-01 | Reviewed six supplied screenshots and related Tasks components/hooks; saved audit, direction, workflows and validation plan in docs/69. Initial checkout has only user-supplied untracked screenshots; these stay untouched. |

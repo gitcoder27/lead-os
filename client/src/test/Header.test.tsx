@@ -48,7 +48,7 @@ vi.mock('@/components/actions/ManagerActionInbox', () => ({
 }));
 
 vi.mock('@/components/layout/TodayCountLink', () => ({
-  TodayCountBadge: () => <span data-testid="today-count-badge">14</span>,
+  TodayCountBadge: ({ hidden }: { hidden?: boolean }) => <span data-testid="today-count-badge" style={{ opacity: hidden ? 0 : 1 }}>14</span>,
 }));
 
 describe('Header', () => {
@@ -300,7 +300,7 @@ describe('Header', () => {
 
     // On `/` Today is the page itself.
     rerender(<Header activeView="today" onViewChange={vi.fn()} />);
-    expect(screen.queryByTestId('today-count-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('today-count-badge')).toHaveStyle({ opacity: 0 });
   });
 
   it('shows the updates-only inbox on every page in collaborative mode (UX-30)', () => {

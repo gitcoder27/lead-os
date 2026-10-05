@@ -25,7 +25,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
   return (
     <nav aria-label="Workspace navigation" className="flex min-w-0 flex-wrap items-center gap-0.5">
       <WorkspaceNavLink label="Today" icon={Home} active={activeView === 'today'} accentColor="var(--accent)" onClick={() => onViewChange('today')} href="/"
-        badge={isManager && activeView !== 'today' ? <TodayCountBadge /> : undefined} />
+        badge={isManager ? <TodayCountBadge hidden={activeView === 'today'} /> : undefined} />
       {topPages.map((id) => {
         const meta = NAV_PAGE_META[id];
         return <WorkspaceNavLink key={id} label={meta.label} icon={meta.icon} active={Boolean(activeView && meta.matches.includes(activeView))} accentColor={meta.accentColor} onClick={() => onViewChange(meta.view)} href={meta.href} />;

@@ -622,6 +622,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       if (view === 'wrapup') {
         switch (event.key) {
           case 'ArrowLeft':
+          case 'i':
             return run(() => moveDeveloper(-1));
           case 'w':
             return run(actions.wrapUp);
@@ -640,11 +641,13 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       if (session.request) return;
 
       // docs/54 K1: letters mean what they mean on Tasks and in the drawer —
-      // e done, a assign, n new; people move on arrows only.
+      // e done, a assign, n new; people move on i/l or the arrows.
       switch (event.key) {
         case 'ArrowRight':
+        case 'l':
           return run(() => moveDeveloper(1));
         case 'ArrowLeft':
+        case 'i':
           return run(() => moveDeveloper(-1));
         case 'ArrowDown':
         case 'j':
@@ -701,8 +704,8 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   // The footer carries only what a standup uses constantly; the rest lives behind "?" (the full shortcut sheet).
   const actionGroups: StandupActionGroup[] = [
     { label: 'Person', actions: [
-      { keys: ['←'], label: 'Previous', onRun: () => moveDeveloper(-1), disabled: devIndex === 0 },
-      { keys: ['→'], label: 'Next', onRun: () => moveDeveloper(1) },
+      { keys: ['i', '←'], label: 'Previous', onRun: () => moveDeveloper(-1), disabled: devIndex === 0 },
+      { keys: ['l', '→'], label: 'Next', onRun: () => moveDeveloper(1) },
       { keys: ['c'], label: 'Note', onRun: actions.checkIn },
       { keys: ['f'], label: isFlagged ? 'Unflag' : 'Flag', onRun: actions.flag, emphasis: isFlagged },
     ] },

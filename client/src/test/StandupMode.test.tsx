@@ -731,6 +731,7 @@ describe('StandupMode', () => {
 
   it.each([
     ['ArrowRight', 1],
+    ['l', 1],
   ])('moves to the next developer with %s', (key, expectedIndex) => {
     renderStandup();
     fireEvent.keyDown(document.body, { key });
@@ -740,14 +741,14 @@ describe('StandupMode', () => {
     expect(railOptions[expectedIndex]).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('moves back with ArrowLeft', () => {
+  it.each(['ArrowLeft', 'i'])('moves back with %s', (key) => {
     renderStandup();
     fireEvent.keyDown(document.body, { key: 'ArrowRight' });
-    fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+    fireEvent.keyDown(document.body, { key });
     const rail = screen.getByRole('listbox', { name: 'Standup order' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(document.body, { key: 'ArrowRight' });
-    fireEvent.keyDown(document.body, { key: 'ArrowLeft' });
+    fireEvent.keyDown(document.body, { key });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -1356,7 +1357,7 @@ describe('StandupMode', () => {
       const bar = screen.getByTestId('standup-action-bar');
       const chips = within(bar).getAllByRole('button').map((button) => button.getAttribute('title'));
       expect(chips).toEqual([
-        'Previous (←)', 'Next (→)', 'Note (c)', 'Flag (f)',
+        'Previous (i / ←)', 'Next (l / →)', 'Note (c)', 'Flag (f)',
         'Current (.)', 'Done (e)', 'Blocked (b)', 'Update (u)',
       ]);
     });
@@ -1450,5 +1451,52 @@ describe('STANDUP-04 actionable wrap-up integration', () => {
     await waitFor(() => expect(screen.queryByText('Visits are still being saved. If this does not clear, use Retry in the banner above.')).not.toBeInTheDocument());
     fireEvent.keyDown(document.body, { key: 'Enter' });
     expect(mockApiPost.mock.calls.some(([url]) => url === '/team-tracker/standup/session')).toBe(false);
+  });
+});
+
+
+describe('STANDUP-05 letter navigation', () => {
+  it('combines j/k task navigation with i/l people navigation, including wrap-up', async () => {
+    renderStandup();
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    fireEvent.keyDown(document.activeElement!, { key: 'j' });
+    expect(taskRows()[1]).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'i' });
+    expect(taskRows()[1]).toHaveFocus(); // No previous person: keep the chosen task.
+    fireEvent.keyDown(document.activeElement!, { key: 'l' });
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    expect(screen.getByTestId('standup-progress')).toHaveTextContent('1 of 2 visited');
+    fireEvent.keyDown(document.activeElement!, { key: 'i' });
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    expect(screen.getByRole('listbox', { name: "Alice Smith's tasks" })).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement!, { key: 'j' });
+    fireEvent.keyDown(document.activeElement!, { key: 'k' });
+    expect(taskRows()[0]).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'l' });
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(screen.getByTestId('standup-wrapup')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'i' });
+    await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+  });
+  it('leaves typing, modified shortcuts and covering layers in control', () => {
+    renderStandup();
+    fireEvent.keyDown(document.body, { key: 'l' });
+    fireEvent.keyDown(document.body, { key: 'u' });
+    const input = screen.getByLabelText('Add an update to T-4');
+    for (const key of ['i', 'l']) fireEvent.keyDown(input, { key });
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+      for (const key of ['i', 'l']) fireEvent.keyDown(document.body, { key, [modifier]: true });
+    }
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: '?' });
+    for (const key of ['i', 'l']) fireEvent.keyDown(document.body, { key });
+    expect(screen.queryByTestId('standup-wrapup')).not.toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: "Bob Jones's tasks" })).toBeInTheDocument();
+    const help = screen.getByRole('dialog', { name: 'Standup keyboard shortcuts' });
+    expect(within(help).getByText('Previous developer / back from wrap-up')).toBeInTheDocument();
+    expect(within(help).getByText('Next developer (past the last → wrap-up)')).toBeInTheDocument();
   });
 });

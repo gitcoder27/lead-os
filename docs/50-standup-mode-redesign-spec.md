@@ -140,7 +140,7 @@ through `useStatusUpdate`, `useAddCheckIn`, `useSetCurrentItem`,
 `CaptureBox`. Test hooks (`standup-mode`, `status-suggestion`, listbox names,
 `Standup` heading, `24h window`) are preserved.
 
-New keys: `f` flag, `w` wrap-up. In wrap-up only `←/p`, `w`, `?`, `Esc`,
+New keys: `f` flag, `w` wrap-up. In wrap-up only `←/i`, `w`, `?`, `Esc`,
 `Enter` (end) are live.
 
 ## 8. Motion & visual
@@ -321,3 +321,13 @@ The wrap-up passes scoped axe WCAG A/AA checks, has no horizontal overflow, and
 supports action editing and suggestion selection. The existing roster's colored
 avatars still produce light-theme contrast findings outside the wrap-up scope.
 No runtime database, authenticated production session or Jira was used.
+
+
+## 2026-10-05 — letter navigation (STANDUP-05)
+
+`i` moves to the previous developer and `l` to the next, alongside `←` / `→`.
+`j` / `k` continue to move down / up through that developer's tasks. The existing
+visit recording, task focus and end-of-roster wrap-up behavior apply to both
+forms of navigation; `i` also returns from wrap-up. The footer and shortcut sheet
+show the aliases. Typing, modifiers and higher layers retain their existing
+keyboard guards, so Ctrl/Cmd+I continues to open global quick capture.

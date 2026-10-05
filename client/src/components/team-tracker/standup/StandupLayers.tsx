@@ -7,12 +7,13 @@ import { Dialog } from '@/components/ui/Dialog';
 import { CheckInVisibilityChoice } from '../CheckInVisibilityChoice';
 
 // docs/54 K1: the shared grammar — e done, a assign, n new, . current;
-// people move on ← →. Same format as every other sheet (ShortcutList).
+// people move on i/l or ←/→. Same format as every other sheet (ShortcutList).
 export const keyHelp = (note: boolean): ShortcutGroup[] => [
   {
     group: 'Navigate',
     keys: [
-      ['← / →', 'Previous / next developer (past the last → wrap-up)'],
+      ['i / ←', 'Previous developer / back from wrap-up'],
+      ['l / →', 'Next developer (past the last → wrap-up)'],
       ['j / k', 'Next / previous task'],
       ['Enter', 'Open task drawer'],
     ],

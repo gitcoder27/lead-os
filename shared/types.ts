@@ -1229,6 +1229,7 @@ export interface TaskViewFilters {
    *  or an explicit account-id list. */
   owner?: "me" | "team" | "inbox" | string[];
   status?: TaskStatus[];
+  priority?: ManagerTask["priority"];
   /** All listed labels must be present. */
   labels?: string[];
   linkedJira?: boolean;
@@ -1477,6 +1478,7 @@ export const taskViewDefinitionSchema = z.object({
   filters: z.object({
     owner: z.union([z.enum(["me", "team", "inbox"]), z.array(z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
     status: z.array(z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
+    priority: z.enum(["normal", "high"]).optional(),
     labels: z.array(z.string().trim().min(1).max(64)).min(1).max(20).optional(),
     linkedJira: z.boolean().optional(),
     kind: z.enum(["task", "meeting"]).optional(),

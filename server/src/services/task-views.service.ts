@@ -57,6 +57,8 @@ export function builtinTaskViews(today: string): { id: string; name: string; sec
     // last two weeks, grouped Today / Upcoming / Needs outcome / Recent.
     { id: "meetings", name: "Meetings", section: "plan", definition: { filters: { kind: "meeting", withClosed: { from: shiftDays(today, -13) } }, sort: "scheduled", group: "meeting" } },
     { id: "later", name: "Later", section: "plan", definition: { filters: { later: true }, sort: "created" } },
+    // Priority spans every open lane and date, including deliberately parked work.
+    { id: "high-priority", name: "High priority", section: "review", definition: { filters: { priority: "high", status: openish }, sort: "scheduled" } },
     // §8.1 drift, overdue plan dates, and stale work in one review queue.
     // docs/51 F2: parked work is deliberate, and idle developer-owned tasks
     // belong to /team — neither belongs in this queue.
@@ -214,6 +216,7 @@ export function matchesTaskViewFilters(
     if (!ok) return false;
   }
   if (filters.status?.length && !filters.status.includes(row.status as TaskStatus)) return false;
+  if (filters.priority && row.priority !== filters.priority) return false;
   if (filters.kind && row.kind !== filters.kind) return false;
   if (filters.later !== undefined) {
     // docs/57 §1: a Later task past its resurface date is no longer parked.
@@ -350,6 +353,7 @@ export class TaskViewsService {
       );
     }
     if (filters.status?.length) conditions.push(inArray(tasks.status, filters.status));
+    if (filters.priority) conditions.push(eq(tasks.priority, filters.priority));
     if (filters.kind) conditions.push(eq(tasks.kind, filters.kind));
     if (filters.waitingOn !== undefined) {
       // Same privacy rule as `hasVisibleWaitingOn`: another manager's party does not count. `IS` is

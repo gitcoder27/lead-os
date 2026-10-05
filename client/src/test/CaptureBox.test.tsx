@@ -624,5 +624,15 @@ describe('progressive capture guidance', () => {
     fireEvent.click(summary);
     expect(details.open).toBe(true); expect(input).toHaveValue('Keep my draft');
     expect(screen.getByText('Review the rollout checklist !tomorrow')).toBeInTheDocument();
+    expect(screen.getByText('Prepare the release update !!')).toBeInTheDocument();
+  });
+
+  it('previews and submits high priority through the documented capture token', () => {
+    const { input } = renderBox('Prepare the release update !!');
+    expect(within(screen.getByTestId('capture-summary')).getByText('High priority')).toBeVisible();
+    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    expect(lastBody().text).toBe('Prepare the release update !!');
+    expect(lastBody().tz).toBeTruthy();
+    expect(lastBody().clientToday).toBe(getLocalIsoDate());
   });
 });

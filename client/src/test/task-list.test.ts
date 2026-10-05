@@ -188,6 +188,25 @@ describe('scheduled grouping (docs/49 §3)', () => {
 });
 
 describe('URL contract (docs/49 §9, D6)', () => {
+  it.each(['high', 'normal', 'all'])('round-trips the priority override %s', (priority) => {
+    const params = new URLSearchParams(`view=high-priority&priority=${priority}`);
+    const state = taskViewStateFromParams(params);
+    expect(state.overrides).toEqual({ priority });
+    expect(taskViewParamsFromState(state).toString()).toBe(params.toString());
+  });
+
+  it('drops invalid priority values', () => {
+    expect(taskViewStateFromParams(new URLSearchParams('priority=urgent')).overrides).toEqual({});
+  });
+
+  it('overrides and clears an inherited priority without changing other filters', () => {
+    const base = { filters: { priority: 'high' as const, owner: 'me' as const }, sort: 'scheduled' as const };
+    expect(applyTaskViewOverrides(base, { priority: 'normal' }).filters).toEqual({ priority: 'normal', owner: 'me' });
+    expect(applyTaskViewOverrides(base, { priority: 'all' }).filters).toEqual({ owner: 'me' });
+    expect(applyTaskViewOverrides(base, {}).filters).toEqual(base.filters);
+    expect(base.filters.priority).toBe('high');
+  });
+
   it('round-trips existing and new params', () => {
     const params = new URLSearchParams('view=my-tasks&owner=dev-1,dev-2&status=open,blocked&label=x&group=none&sort=updated&kind=meeting&q=review');
     const state = taskViewStateFromParams(params);
@@ -458,6 +477,11 @@ describe('inline add as capture defaults (docs/57 P3-05)', () => {
     expect(inlineCaptureDefaults('my-tasks', {}, { mode: 'scheduled', bucket: 'Unscheduled' }, TODAY)).toEqual({ scheduledOn: null });
     // No context at all: a bare capture, which is Inbox until triaged.
     expect(inlineCaptureDefaults(undefined, undefined, { mode: 'none' }, TODAY)).toEqual({});
+  });
+
+  it.each(['high', 'normal'] as const)('inherits %s priority for inline capture in built-in and saved views', (priority) => {
+    expect(inlineCaptureDefaults('high-priority', { filters: { priority } }, { mode: 'none' }, TODAY)).toEqual({ priority });
+    expect(inlineCaptureDefaults('saved:7', { filters: { priority } }, { mode: 'scheduled', bucket: 'Today' }, TODAY)).toEqual({ priority, scheduledOn: TODAY });
   });
 
   it('a Later view never asks for a developer owner or a date together with later', () => {

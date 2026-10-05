@@ -100,7 +100,10 @@ Changes to `shared/capture-grammar.ts`. The header comment at `:9-28` is updated
 | `today` | Planned today | adds **`waitingOn: false`** to today's definition (`:44`). P3-03 deviation: this is a new filter meaning "no explicit waiting-on party". `waiting: false` would also have dropped my own blocked tasks. | — |
 | `waiting` | Waiting | `{ **lane: "waiting"**, later: false }` plus the legacy clause (below), sort **`checkBy`**, group **`party`** | the `waiting` view (`:47`) and the `/follow-ups` page |
 | `meetings` | Meetings | `{ kind: "meeting", **withClosed: { from: today-13 }** }`, sort `scheduled`, group **`meeting`** | the `/meetings` page and the `my-tasks` + `kind` alias |
+| `high-priority` | High priority | `{ priority: "high", status: ["open", "active", "blocked"] }`, sort `scheduled`; Review section, all visible owners/dates/lanes including Later | — |
 | `my-tasks`, `later`, `attention`, `closed-week` | unchanged | — | — |
+
+**Priority visibility (2026-10-05, TASKS-02).** View options offers All priorities / High priority / Normal priority. The server accepts `filters.priority: "high" | "normal"`, and saved views keep it. URL overrides use `priority=high|normal|all`; `all` removes an inherited filter, while Reset/Revert restores the view's definition. Inline capture inherits the effective priority through structured defaults; an explicit `!!` still wins. High priority has its own count and `g → h` shortcut; it neither schedules a task nor adds an attention exception. The flag stays visible and in the row's accessible name in every view, including Needs attention. Capture examples document `!!`.
 
 **How Waiting differs from today's view** (`:186-193`, blocked OR `kind:waiting` OR a follow-up on someone else's task, grouped by owner, sorted by updated):
 

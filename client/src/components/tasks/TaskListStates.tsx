@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { TriangleAlert, CalendarCheck, CheckCheck, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
+import { TriangleAlert, CalendarCheck, CheckCheck, Flag, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
 import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -97,6 +97,8 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
       return { title: 'No meetings in the last two weeks or ahead.', body: 'Capture one with /m, for example "/m Design review !fri".', Icon: CalendarCheck };
     case 'later':
       return { title: 'Nothing parked for later.', Icon: Inbox };
+    case 'high-priority':
+      return { title: 'No open high-priority tasks', body: 'Add one below, or include !! when capturing a task.', Icon: Flag };
     case 'attention':
       if (signal?.length === 1 && signal[0] === 'drift') return { title: 'Jira and tasks agree.', Icon: CheckCheck, tone: 'success' };
       return { title: 'All clear — nothing overdue, stale, or drifting.', Icon: CheckCheck, tone: 'success' };
@@ -181,6 +183,7 @@ export const TASK_SHORTCUTS: ShortcutGroup[] = [
       ['g → m', 'My tasks'],
       ['g → w', 'Waiting'],
       ['g → l', 'Later'],
+      ['g → h', 'High priority'],
       ['g → a', 'Needs attention'],
       ['g → c', 'Closed'],
       ['/', 'Search'],

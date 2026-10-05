@@ -466,6 +466,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
         <details className="capture-examples"><summary>Examples</summary><ul>
           <li><strong>Just a task</strong><code>Prepare the release update</code></li>
           <li><strong>Plan for tomorrow</strong><code>Review the rollout checklist !tomorrow</code></li>
+          <li><strong>High priority</strong><code>Prepare the release update !!</code></li>
           <li><strong>Private daily note</strong><code>/note Decision: keep Friday for verification</code></li>
         </ul><p>Type @ to choose a person, # to link Jira or + to add a label.</p></details>
       </div>

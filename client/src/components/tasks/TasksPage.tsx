@@ -89,6 +89,7 @@ const GO_CHORD_VIEWS: Record<string, string> = {
   w: 'waiting',
   e: 'meetings',
   l: 'later',
+  h: 'high-priority',
   a: 'attention',
   c: 'closed-week',
 };
@@ -858,6 +859,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           query={state.q ?? ''}
           onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))}
           effectiveSort={definition?.sort}
+          effectivePriority={definition?.filters?.priority}
+          defaultPriority={selectedView?.definition.filters?.priority}
           effectiveGroup={definition?.group ?? 'none'}
           developers={assignableDevelopers}
           labels={labelRegistry}

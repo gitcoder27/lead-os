@@ -1,6 +1,6 @@
 import { forwardRef, useRef, useState, type MouseEvent } from 'react';
 import { Check, Keyboard, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
-import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type TaskStatus, type TaskViewCount, type TaskViewMeta, type TaskViewSort } from '@/types';
+import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type TaskStatus, type TaskViewCount, type TaskViewFilters, type TaskViewMeta, type TaskViewSort } from '@/types';
 import { OWNER_TOKENS, type TaskViewGroupOverride, type TaskViewOverrides } from '@/lib/task-views';
 import { labelChipStyle } from './label-colors';
 import { TASK_STATUS_META } from './TaskMenus';
@@ -10,6 +10,11 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Kbd } from '@/components/ui/Kbd';
 
 const STATUSES: TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
+const PRIORITIES = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'high', label: 'High priority' },
+  { value: 'normal', label: 'Normal priority' },
+] as const;
 const SIGNALS: { value: TaskAttentionSignal; label: string }[] = [
   { value: 'overdue', label: 'Overdue' },
   { value: 'stale', label: 'Stale' },
@@ -56,6 +61,8 @@ interface TaskToolbarProps {
   query: string;
   onQuery: (query: string) => void;
   effectiveSort: TaskViewSort | undefined;
+  effectivePriority?: TaskViewFilters['priority'];
+  defaultPriority?: TaskViewFilters['priority'];
   effectiveGroup: TaskViewGroupOverride;
   developers: { accountId: string; displayName: string }[];
   labels: TaskLabel[];
@@ -75,7 +82,7 @@ interface TaskToolbarProps {
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
     title, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
-    effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
+    effectiveSort, effectivePriority, defaultPriority, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
   const open = (kind: OpenMenu) => (event: MouseEvent<HTMLElement>) => {
@@ -208,6 +215,17 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
       {/* Shared combined sections preserve existing filter and display choices. */}
       {menu.kind === 'options' && menu.anchor && (
         <TaskPopover anchor={menu.anchor} onClose={close} label="View options" width={280}>
+          <MenuHeading>Priority</MenuHeading>
+          {PRIORITIES.map((priority) => (
+            <MenuItem
+              key={priority.value}
+              role="menuitemradio"
+              checked={priority.value === (effectivePriority ?? 'all')}
+              label={priority.label}
+              onSelect={() => onOverrides({ priority: priority.value === (defaultPriority ?? 'all') ? undefined : priority.value })}
+            />
+          ))}
+          <MenuDivider />
           <MenuHeading>Owner</MenuHeading>
           {[
             ...OWNER_TOKENS.map((token) => ({ value: token as string, label: ownerLabel(token) })),

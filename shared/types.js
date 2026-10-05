@@ -132,6 +132,7 @@ exports.taskViewDefinitionSchema = zod_1.z.object({
     filters: zod_1.z.object({
         owner: zod_1.z.union([zod_1.z.enum(["me", "team", "inbox"]), zod_1.z.array(zod_1.z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
         status: zod_1.z.array(zod_1.z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
+        priority: zod_1.z.enum(["normal", "high"]).optional(),
         labels: zod_1.z.array(zod_1.z.string().trim().min(1).max(64)).min(1).max(20).optional(),
         linkedJira: zod_1.z.boolean().optional(),
         kind: zod_1.z.enum(["task", "meeting"]).optional(),

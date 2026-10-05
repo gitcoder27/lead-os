@@ -97,12 +97,12 @@ export const TaskListRow = memo(function TaskListRow({
   // describe the same visible signals — compute the wording once.
   const attentionReasons: { label: string; tone: 'danger' | 'warning'; level: OverdueLevel }[] = [];
   const iconSignals: { label: string; color: string; icon: ReactNode }[] = [];
+  // Shape marks priority in every view; red stays reserved for missed deadlines.
+  if (task.priority === 'high') iconSignals.push({ label: 'High priority', color: 'var(--text-primary)', icon: <Flag size={12} fill="currentColor" /> });
   if (attentionMode && signals) {
     if (signals.stale) attentionReasons.push({ label: `Stale ${signals.staleDays}d`, tone: 'warning', level: 2 });
     if (signals.drift) attentionReasons.push({ label: 'Jira drift', tone: 'warning', level: 2 });
   } else {
-    // docs/51 D1: shape, not red, marks priority — red is reserved for missed deadlines.
-    if (task.priority === 'high') iconSignals.push({ label: 'High priority', color: 'var(--text-primary)', icon: <Flag size={12} fill="currentColor" /> });
     if (task.followUpAt || task.labels.includes(FOLLOW_UP_LABEL)) {
       iconSignals.push(signals?.followUpDue
         ? { label: 'Follow-up due', color: 'var(--task-warning-text)', icon: <BellRing size={12} /> }
@@ -116,7 +116,7 @@ export const TaskListRow = memo(function TaskListRow({
   const waitingText = waiting ? [waiting.check?.label, waiting.aging].filter((label): label is string => Boolean(label)) : [];
   // docs/57 §4 (P3-06): a meeting's action items are its child tasks — "2/3 actions".
   const actions = task.kind === 'meeting' && signals?.actions && signals.actions.total > 0 ? `${signals.actions.done}/${signals.actions.total} actions` : null;
-  const signalText = [...(actions ? [actions] : []), ...waitingText, ...(attentionMode ? attentionReasons.map((reason) => reason.label) : iconSignals.map((signal) => signal.label))];
+  const signalText = [...(actions ? [actions] : []), ...waitingText, ...attentionReasons.map((reason) => reason.label), ...iconSignals.map((signal) => signal.label)];
 
   const ariaLabel = [
     `${task.taskKey} ${task.title}`,

@@ -383,6 +383,7 @@ export function inlineAddDefaults(
 ): Partial<CreateTaskRequest> {
   const defaults: Partial<CreateTaskRequest> = {};
   const filters = definition?.filters ?? {};
+  if (filters.priority) defaults.priority = filters.priority;
   if (viewId === 'later' || filters.later === true) defaults.later = true;
   if (viewId === 'inbox' || filters.owner === 'inbox') { defaults.ownerType = null; defaults.ownerId = null; }
   if (Array.isArray(filters.owner) && filters.owner.length === 1) { defaults.ownerType = 'developer'; defaults.ownerId = filters.owner[0]!; }
@@ -434,6 +435,7 @@ export function inlineAddDefaults(
  */
 export function captureDefaultsFromTask(defaults: Partial<CreateTaskRequest>): CaptureDefaults {
   const out: CaptureDefaults = {};
+  if (defaults.priority) out.priority = defaults.priority;
   if (defaults.later) out.later = true;
   if (defaults.ownerType === null) out.ownerAccountId = null;
   else if (defaults.ownerType === 'developer' && defaults.ownerId) out.ownerAccountId = defaults.ownerId;

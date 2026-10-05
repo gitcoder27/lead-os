@@ -3,6 +3,7 @@ import type {
   TaskAttentionSignal,
   TaskStatus,
   TaskViewDefinition,
+  TaskViewFilters,
   TaskViewGroup,
   TaskViewSort,
   TaskWaitingOnInput,
@@ -34,6 +35,8 @@ export interface TaskViewOverrides {
   /** `me` | `team` | `inbox`, or a comma list of developer account ids. */
   owner?: string;
   status?: TaskStatus[];
+  /** `all` explicitly clears a built-in or saved view's priority filter. */
+  priority?: TaskViewFilters['priority'] | 'all';
   label?: string[];
   group?: TaskViewGroupOverride;
   sort?: TaskViewSort;
@@ -77,10 +80,12 @@ export function taskViewStateFromParams(params: URLSearchParams): TaskViewUrlSta
   const groupParam = params.get('group');
   const sortParam = params.get('sort');
   const kindParam = params.get('kind');
+  const priorityParam = params.get('priority');
   const q = params.get('q')?.trim();
   const overrides: TaskViewOverrides = {
     ...(owner ? { owner } : {}),
     ...(status.length ? { status } : {}),
+    ...(priorityParam === 'high' || priorityParam === 'normal' || priorityParam === 'all' ? { priority: priorityParam } : {}),
     ...(label.length ? { label } : {}),
     ...(groupParam && (TASK_VIEW_GROUPS as readonly string[]).includes(groupParam) ? { group: groupParam as TaskViewGroupOverride } : {}),
     ...(sortParam && (TASK_VIEW_SORTS as readonly string[]).includes(sortParam) ? { sort: sortParam as TaskViewSort } : {}),
@@ -106,6 +111,8 @@ export function applyTaskViewOverrides(base: TaskViewDefinition, overrides: Task
       : overrides.owner.split(',').filter(Boolean);
   }
   if (overrides.status) filters.status = overrides.status;
+  if (overrides.priority === 'all') delete filters.priority;
+  else if (overrides.priority) filters.priority = overrides.priority;
   if (overrides.label) filters.labels = overrides.label;
   if (overrides.kind) filters.kind = overrides.kind;
   if (overrides.signal?.length) filters.attention = overrides.signal;
@@ -120,9 +127,10 @@ export function applyTaskViewOverrides(base: TaskViewDefinition, overrides: Task
 export function taskViewParamsFromState(state: TaskViewUrlState): URLSearchParams {
   const params = new URLSearchParams();
   if (state.view) params.set('view', state.view);
-  const { owner, status, label, group, sort, kind, signal } = state.overrides;
+  const { owner, status, priority, label, group, sort, kind, signal } = state.overrides;
   if (owner) params.set('owner', owner);
   if (status?.length) params.set('status', status.join(','));
+  if (priority) params.set('priority', priority);
   if (label?.length) params.set('label', label.join(','));
   if (group) params.set('group', group);
   if (sort) params.set('sort', sort);

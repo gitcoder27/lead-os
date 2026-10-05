@@ -73,14 +73,15 @@ describe("task saved view routes (P3-D9/D10)", () => {
     const ids = response.body.views.map((view: { id: string }) => view.id);
     // docs/49 §3 + docs/51: consolidated rail order — Upcoming is retired
     // (a strict subset of My tasks) and the closed view is a rolling window.
-    expect(ids).toEqual(["today", "inbox", "my-tasks", "waiting", "meetings", "later", "attention", "closed-week"]);
-    expect(response.body.views.map((view: { section: string }) => view.section)).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "review", "review"]);
+    expect(ids).toEqual(["today", "inbox", "my-tasks", "waiting", "meetings", "later", "high-priority", "attention", "closed-week"]);
+    expect(response.body.views.map((view: { section: string }) => view.section)).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "review", "review", "review"]);
     const names = Object.fromEntries(response.body.views.map((view: { id: string; name: string }) => [view.id, view.name]));
     // docs/51 U1: the rail view is "Planned today" — Today is the command view at /.
     expect(names.today).toBe("Planned today");
     expect(names["closed-week"]).toBe("Closed · last 7 days");
     expect(names.waiting).toBe("Waiting");
     expect(names.meetings).toBe("Meetings");
+    expect(names["high-priority"]).toBe("High priority");
     expect(response.body.views.every((view: { builtin: boolean }) => view.builtin)).toBe(true);
   });
 
@@ -154,6 +155,71 @@ describe("task saved view routes (P3-D9/D10)", () => {
 });
 
 describe("GET /api/tasks?viewDef (P3-D9)", () => {
+  it("keeps all visible open high-priority work discoverable with matching counts", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    const today = todayIsoDate();
+    const high = { priority: "high", scheduledOn: null };
+    const expected = ["Undated", "Active", "Blocked", "Unowned", "Delegated", "Future", "Later"];
+    await createTask(headers, { title: "Undated", ...high });
+    await createTask(headers, { title: "Active", status: "active", ...high });
+    await createTask(headers, { title: "Blocked", status: "blocked", ...high });
+    await createTask(headers, { title: "Unowned", ownerType: null, ownerId: null, ...high });
+    await createTask(headers, { title: "Delegated", ownerType: "developer", ownerId: "dev-1", ...high });
+    await createTask(headers, { title: "Future", scheduledOn: "2099-01-01", ...high });
+    await createTask(headers, { title: "Later", later: true, hideUntil: "2099-01-01", ...high });
+    await createTask(headers, { title: "Normal", scheduledOn: null });
+    await createTask(headers, { title: "Done", status: "done", ...high });
+    await createTask(headers, { title: "Dropped", status: "dropped", ...high });
+    const deleted = await createTask(headers, { title: "Deleted", ...high });
+    await invoke(app, { method: "DELETE", url: `/api/tasks/${deleted.taskKey}`, headers });
+    await createTask({ cookie: await cookie("manager-b") }, { title: "Another manager's private task", ...high });
+
+    const views = await invoke(app, { method: "GET", url: `/api/task-views?today=${today}`, headers });
+    const view = views.body.views.find((entry: { id: string }) => entry.id === "high-priority");
+    expect(view).toMatchObject({ builtin: true, section: "review", definition: { filters: { priority: "high", status: ["open", "active", "blocked"] } } });
+    const url = `/api/tasks?viewDef=${encodeViewDef(view.definition)}&today=${today}`;
+    const listed = await invoke(app, { method: "GET", url, headers });
+    expect(listed.status).toBe(200);
+    expect(listed.body.tasks.map((task: { title: string }) => task.title).sort()).toEqual(expected.sort());
+    const counts = await invoke(app, { method: "GET", url: `/api/tasks/view-counts?today=${today}`, headers });
+    expect(counts.body.counts["high-priority"].count).toBe(expected.length);
+    // Priority alone neither schedules work nor creates an attention exception.
+    expect(counts.body.counts.today.count).toBe(0);
+    expect(counts.body.counts.attention.count).toBe(0);
+
+    const first = listed.body.tasks.find((task: { title: string }) => task.title === "Undated");
+    await invoke(app, { method: "PATCH", url: `/api/tasks/${first.taskKey}`, headers, body: { priority: "normal" } });
+    const after = await invoke(app, { method: "GET", url, headers });
+    expect(after.body.tasks.map((task: { title: string }) => task.title)).not.toContain("Undated");
+    const afterCounts = await invoke(app, { method: "GET", url: `/api/tasks/view-counts?today=${today}`, headers });
+    expect(afterCounts.body.counts["high-priority"].count).toBe(after.body.tasks.length);
+  });
+
+  it("validates priority and persists composable priority filters in private saved views", async () => {
+    await enablePhase3();
+    const headers = { cookie: await cookie("manager-a") };
+    await createTask(headers, { title: "My high", priority: "high" });
+    await createTask(headers, { title: "My normal" });
+    await createTask(headers, { title: "Dev high", priority: "high", ownerType: "developer", ownerId: "dev-1" });
+    for (const priority of ["high", "normal"]) {
+      const definition = { filters: { owner: "me", priority }, sort: "updated" };
+      const created = await invoke(app, { method: "POST", url: "/api/task-views", headers, body: { name: `My ${priority}`, definition } });
+      expect(created.status).toBe(201);
+      const id = `saved:${created.body.view.id}`;
+      const views = await invoke(app, { method: "GET", url: "/api/task-views", headers });
+      const saved = views.body.views.find((view: { id: string }) => view.id === id);
+      expect(saved.definition).toEqual(definition);
+      const listed = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef(saved.definition)}`, headers });
+      expect(listed.body.tasks.map((task: { title: string }) => task.title)).toEqual([`My ${priority}`]);
+      const counts = await invoke(app, { method: "GET", url: "/api/tasks/view-counts", headers });
+      expect(counts.body.counts[id].count).toBe(listed.body.tasks.length);
+    }
+    const invalid = { filters: { priority: "urgent" } };
+    expect((await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef(invalid)}`, headers })).status).toBe(400);
+    expect((await invoke(app, { method: "POST", url: "/api/task-views", headers, body: { name: "Bad priority", definition: invalid } })).status).toBe(400);
+  });
+
   it("404s while the flag is off", async () => {
     const headers = { cookie: await cookie("manager-a") };
     await db.insert(configTable).values({ key: "tasks_phase2_stage", value: "2c" });

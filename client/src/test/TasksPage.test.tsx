@@ -101,6 +101,7 @@ const BUILTIN_VIEWS: TaskViewMeta[] = [
   { id: 'my-tasks', name: 'My tasks', builtin: true, section: 'plan', definition: { filters: { owner: 'me', later: false }, sort: 'scheduled', group: 'scheduled' } },
   { id: 'waiting', name: 'Waiting on others', builtin: true, section: 'plan', definition: { filters: { waiting: true, later: false, status: [...OPENISH] }, sort: 'updated', group: 'owner' } },
   { id: 'meetings', name: 'Meetings', builtin: true, section: 'plan', definition: { filters: { kind: 'meeting', withClosed: { from: '2026-09-13' } }, sort: 'scheduled', group: 'meeting' } },
+  { id: 'high-priority', name: 'High priority', builtin: true, section: 'review', definition: { filters: { priority: 'high', status: [...OPENISH] }, sort: 'scheduled' } },
   { id: 'attention', name: 'Needs attention', builtin: true, section: 'review', definition: { filters: { attention: ['overdue', 'stale', 'drift'], later: false }, sort: 'scheduled' } },
 ];
 
@@ -167,6 +168,66 @@ beforeEach(async () => {
 });
 
 describe('TasksPage rail and views (docs/49 §3/§4)', () => {
+  it('opens High priority from the rail and the mobile picker with a count', () => {
+    mockUseTaskViewCounts.mockReturnValue({ data: { today: TODAY, counts: { 'high-priority': { count: 3, overdue: 0 } } } });
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'High priority, 3 tasks' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'High priority' })).toBeVisible();
+    expect(lastDefinition()).toEqual(BUILTIN_VIEWS.find((view) => view.id === 'high-priority')!.definition);
+    const picker = screen.getByRole('combobox', { name: 'Task view' });
+    expect(within(picker).getByRole('option', { name: 'High priority (3)' })).toBeInTheDocument();
+    fireEvent.change(picker, { target: { value: 'inbox' } });
+    fireEvent.change(picker, { target: { value: 'high-priority' } });
+    expect(lastDefinition().filters.priority).toBe('high');
+    fireEvent.change(picker, { target: { value: 'inbox' } });
+    press('g');
+    press('h');
+    expect(lastDefinition().filters.priority).toBe('high');
+  });
+
+  it('filters priority and saves it with the current view context', async () => {
+    window.history.replaceState(null, '', '/tasks?view=my-tasks');
+    mockSaveView.mockResolvedValue({ id: 11, name: 'My high priority', definition: {}, position: 0, createdAt: '', updatedAt: '' });
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    expect(screen.getByRole('menuitemradio', { name: 'All priorities' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'High priority' }));
+    expect(lastDefinition().filters).toMatchObject({ priority: 'high', owner: 'me', later: false });
+    expect(screen.getByRole('button', { name: 'View options (1)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Save current view' }));
+    fireEvent.change(screen.getByLabelText('Saved view name'), { target: { value: 'My high priority' } });
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: 'Save view' })).getByRole('button', { name: 'Save view' })); });
+    expect(mockSaveView).toHaveBeenCalledWith({ name: 'My high priority', definition: { ...BUILTIN_VIEWS[2]!.definition, filters: { ...BUILTIN_VIEWS[2]!.definition.filters, priority: 'high' } } });
+  });
+
+  it.each(['high-priority', 'saved:7'])('reflects, overrides and restores the inherited priority in %s', (viewId) => {
+    window.history.replaceState(null, '', `/tasks?view=${viewId}`);
+    mockUseTaskViews.mockReturnValue({ data: { views: [...BUILTIN_VIEWS, { id: 'saved:7', name: 'Saved high', builtin: false, definition: { filters: { priority: 'high', owner: 'me' } } }] }, isLoading: false });
+    render(<TasksPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    expect(screen.getByRole('menuitemradio', { name: 'High priority' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'All priorities' }));
+    expect(lastDefinition().filters.priority).toBeUndefined();
+    expect(screen.getByRole('menuitemradio', { name: 'All priorities' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Normal priority' }));
+    expect(lastDefinition().filters.priority).toBe('normal');
+    fireEvent.click(screen.getByRole('menuitem', { name: viewId === 'saved:7' ? 'Revert' : 'Reset' }));
+    expect(lastDefinition().filters.priority).toBe('high');
+    expect(screen.getByRole('button', { name: 'View options' })).toBeInTheDocument();
+  });
+
+  it('explains an empty High priority view and adds with high priority defaults', async () => {
+    window.history.replaceState(null, '', '/tasks?view=high-priority');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([]));
+    render(<TasksPage />);
+    expect(screen.getByText('No open high-priority tasks')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
+    const input = screen.getByLabelText('New task');
+    fireEvent.change(input, { target: { value: 'Critical release follow-through' } });
+    await act(async () => { fireEvent.submit(input.closest('form')!); });
+    expect(mockCreate).toHaveBeenCalledWith({ text: 'Critical release follow-through', defaults: { priority: 'high' } });
+  });
+
   it.each(['today', 'inbox'].flatMap((viewId) =>
     ['button', 'outside', 'escape'].map((dismiss) => ({ viewId, dismiss })),
   ))('reopens View options after $dismiss dismissal in $viewId', async ({ viewId, dismiss }) => {
@@ -335,7 +396,7 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     fireEvent.click(screen.getByRole('button', { name: /View options/ }));
     const menu = screen.getByRole('menu', { name: 'View options' });
     const groups = within(menu).getAllByRole('menuitemradio').map((item) => item.textContent);
-    expect(groups).toEqual(['Schedule', 'Recently updated', 'Recently created', 'Priority', 'Check-by date', 'None', 'Schedule', 'Owner', 'Status', 'Waiting on']);
+    expect(groups).toEqual(['All priorities', 'High priority', 'Normal priority', 'Schedule', 'Recently updated', 'Recently created', 'Priority', 'Check-by date', 'None', 'Schedule', 'Owner', 'Status', 'Waiting on']);
   });
 
   it('saves, deletes, and updates saved views', async () => {
@@ -1043,6 +1104,16 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
 });
 
 describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
+  it('keeps high priority visible and announced alongside Needs attention reasons', () => {
+    window.history.replaceState(null, '', '/tasks?view=attention');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ priority: 'high', signals: { ...NO_SIGNALS, stale: true, staleDays: 9, drift: true } })]));
+    render(<TasksPage />);
+    expect(within(row('T-1')).getByRole('img', { name: 'High priority' })).toBeVisible();
+    expect(within(row('T-1')).getByText('Stale 9d')).toBeVisible();
+    expect(within(row('T-1')).getByText('Jira drift')).toBeVisible();
+    expect(openRow('T-1')).toHaveAccessibleName(expect.stringContaining('High priority'));
+  });
+
   const styleOf = (element: Element | null) => element?.getAttribute('style') ?? '';
 
   it('rail badge, Overdue label and row agree: a slipped plan date is amber, not red (D1)', () => {

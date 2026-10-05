@@ -1,14 +1,13 @@
 import { PlacementPicker } from './PlacementPicker';
 import { useLocalDate } from '@/hooks/useLocalDate';
-import type { TaskPlacement } from '@/types';
-import { useRef, useState } from 'react';
+import type { TaskPlacement , TaskChildRef, TaskDetailResponse, TaskLink } from '@/types';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronRight, ExternalLink, Globe, Link2, ListTree, Plus, Ticket, UserRound, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
 import { useCaptureTask } from '@/hooks/useCapture';
 import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
 import { TokenSuggestionList } from '@/components/capture/TokenSuggestionList';
-import type { TaskChildRef, TaskDetailResponse, TaskLink } from '@/types';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { TaskStatusGlyph } from './TaskMenus';
 import { MenuItem, TaskPopover } from '@/components/ui/Popover';
@@ -321,11 +320,13 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   const { addToast } = useToast();
   const createChild = useCaptureTask();
   const today = useLocalDate();
+  const [showPlacement, setShowPlacement] = useState(false);
   const [placement, setPlacement] = useState<TaskPlacement | null | undefined>();
   const [draft, setDraft] = useState('');
   const [caret, setCaret] = useState(0);
   const draftRef = useRef<HTMLInputElement>(null);
   const typeahead = useCaptureTypeahead(draft, caret);
+  useEffect(() => { setPlacement(undefined); setShowPlacement(false); setDraft(''); setCaret(0); }, [task.taskKey]);
   const isMeeting = task.kind === 'meeting';
   const canAdd = mode === 'manager' && !readOnly;
   const done = task.children.filter((child) => child.status === 'done').length;
@@ -341,6 +342,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
       const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey, ...(placement !== undefined && { placement }) } });
       setDraft('');
       setCaret(0);
+      setPlacement(undefined);
       if (warnings.length) addToast(warnings.map((warning) => warning.message).join(' '), 'warning');
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Could not add the action item', 'error');
@@ -377,7 +379,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           ))}
         </ul>
       )}
-      {canAdd && <details className="text-xs"><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary><PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} /></details>}
+      {canAdd && <details className="text-xs" onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</details>}
       {canAdd && (
         <form
           className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"

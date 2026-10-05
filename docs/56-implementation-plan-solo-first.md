@@ -727,7 +727,7 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 - [x] HIER-03 — Projects workspace and lifecycle.
 - [x] HIER-04 — placement capture and subtasks.
 - [x] HIER-05 — Today and maintenance.
-- [ ] HIER-06 — synthetic verification and handoff.
+- [x] HIER-06 — synthetic verification and handoff.
 
 | Date | Item | Validation / progress |
 |---|---|---|
@@ -736,3 +736,4 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | 2026-10-05 | HIER-03 | Projects rail/mobile entry, overview, project/track drill-down, private dated summaries, archive/restore previews and saved-view placement filters; client typecheck passed. |
 | 2026-10-05 | HIER-04 | Searchable guarded placement dialog in drawer/row/bulk actions, contextual capture and child inheritance/clearing, ordinary subtask add and visible completion tallies. 64 backend and 82 frontend tests passed; typecheck passed. |
 | 2026-10-05 | HIER-05 | Today labels preserve ranking/pins; scoped cache refresh; task purge, manager-private and workspace cleanup, team preservation and reset previews. 91 targeted backend tests passed. |
+| 2026-10-05 | HIER-06 | Full suites: 1,505 backend and 1,832 frontend tests passed; final focused checks: 14 project backend and 256 frontend tests passed. Typecheck, build checks, lint (0 errors), data guard and tracked JSON/YAML formatting passed. Synthetic isolated-database browser checks passed for creation/editing, summaries, project/track archive/restore, moves/Undo, contextual capture, subtasks, deep links, Back/Forward, keyboard focus, saved placement filters, Today context and desktop/mobile light/dark. Login-switch mutation guards passed regression tests. Hardened workspace foreign keys, visible descendant traversal and private follow-up facts. Repository format check is blocked only by pre-existing local `.claude/settings.local.json`, left untouched. Runtime data and Jira were not used; no push/deploy. |

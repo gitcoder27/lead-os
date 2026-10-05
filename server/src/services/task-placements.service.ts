@@ -1,6 +1,13 @@
 import { SelfIdentityService } from "./self-identity.service";
-import { and, eq, inArray } from "drizzle-orm";
-import type { PlacementBulkRequest, PlacementBulkResponse, PlacementPreview, PlacementPreviewRequest, TaskPlacement, TaskPlacementContext } from "shared/types";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import type {
+  PlacementBulkRequest,
+  PlacementBulkResponse,
+  PlacementPreview,
+  PlacementPreviewRequest,
+  TaskPlacement,
+  TaskPlacementContext,
+} from "shared/types";
 import { db } from "../db/connection";
 import { projects, projectTracks, taskPlacements, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
@@ -10,16 +17,40 @@ import type { TaskPrincipal, TaskRow } from "./task.service";
 import { taskVisibilityPredicate, visibleTaskRows } from "./task-visibility";
 import { normalizeWorkspaceId } from "./workspace.service";
 
-export const readTaskPlacements = async (actor: TaskPrincipal, ids: number[]): Promise<Map<number, TaskPlacementContext>> => {
+export const readTaskPlacements = async (
+  actor: TaskPrincipal,
+  ids: number[],
+): Promise<Map<number, TaskPlacementContext>> => {
   if (!ids.length || actor.type === "developer") return new Map();
-  const selfDeveloperId = actor.selfDeveloperId ?? await new SelfIdentityService().linkedDeveloperId(actor.accountId, actor.workspaceId);
-  const rows = await db.select({ taskId: taskPlacements.taskId, projectId: projects.id, projectName: projects.name, trackId: taskPlacements.trackId, trackName: projectTracks.name }).from(taskPlacements)
-    .innerJoin(tasks, eq(tasks.id, taskPlacements.taskId)).innerJoin(projects, eq(projects.id, taskPlacements.projectId)).leftJoin(projectTracks, eq(projectTracks.id, taskPlacements.trackId))
-    .where(and(eq(taskPlacements.workspaceId, normalizeWorkspaceId(actor.workspaceId)), eq(taskPlacements.managerAccountId, actor.accountId), inArray(taskPlacements.taskId, ids), taskVisibilityPredicate({ ...actor, selfDeveloperId: selfDeveloperId ?? undefined })));
+  const selfDeveloperId =
+    actor.selfDeveloperId ?? (await new SelfIdentityService().linkedDeveloperId(actor.accountId, actor.workspaceId));
+  const rows = await db
+    .select({
+      taskId: taskPlacements.taskId,
+      projectId: projects.id,
+      projectName: projects.name,
+      trackId: taskPlacements.trackId,
+      trackName: projectTracks.name,
+    })
+    .from(taskPlacements)
+    .innerJoin(tasks, eq(tasks.id, taskPlacements.taskId))
+    .innerJoin(projects, eq(projects.id, taskPlacements.projectId))
+    .leftJoin(projectTracks, eq(projectTracks.id, taskPlacements.trackId))
+    .where(
+      and(
+        eq(taskPlacements.workspaceId, normalizeWorkspaceId(actor.workspaceId)),
+        eq(tasks.workspaceId, normalizeWorkspaceId(actor.workspaceId)),
+        eq(taskPlacements.managerAccountId, actor.accountId),
+        inArray(taskPlacements.taskId, ids),
+        taskVisibilityPredicate({ ...actor, selfDeveloperId: selfDeveloperId ?? undefined }),
+      ),
+    );
   return new Map(rows.map(({ taskId, ...placement }) => [taskId, placement]));
 };
-const placementOf = (placement: TaskPlacement | null | undefined): TaskPlacement | null => placement ? { projectId: placement.projectId, trackId: placement.trackId } : null;
-const same = (a: TaskPlacement | null, b: TaskPlacement | null) => a?.projectId === b?.projectId && a?.trackId === b?.trackId;
+const placementOf = (placement: TaskPlacement | null | undefined): TaskPlacement | null =>
+  placement ? { projectId: placement.projectId, trackId: placement.trackId } : null;
+const same = (a: TaskPlacement | null, b: TaskPlacement | null) =>
+  a?.projectId === b?.projectId && a?.trackId === b?.trackId;
 
 export class TaskPlacementsService {
   private readonly containers = new ProjectsService();
@@ -35,34 +66,95 @@ export class TaskPlacementsService {
       selected.set(row.id, row);
     }
     if (input.includeSubtasks) {
-      // Traverse visible edges only: a hidden parent's children are never disclosed.
+      // Walk ancestry without disclosing inaccessible nodes; include every visible descendant.
+      const graph = await db
+        .select({ id: tasks.id, parentId: tasks.parentId })
+        .from(tasks)
+        .where(eq(tasks.workspaceId, normalizeWorkspaceId(actor.workspaceId)));
+      const descendantIds = new Set(selected.keys());
       let added = true;
       while (added) {
         added = false;
-        for (const row of rows) if (row.parentId && selected.has(row.parentId) && !selected.has(row.id)) { selected.set(row.id, row); added = true; }
+        for (const row of graph)
+          if (row.parentId && descendantIds.has(row.parentId) && !descendantIds.has(row.id)) {
+            descendantIds.add(row.id);
+            added = true;
+          }
       }
+      for (const row of rows) if (descendantIds.has(row.id)) selected.set(row.id, row);
     }
     if (!selected.size || selected.size > 200) throw new HttpError(400, "Select between 1 and 200 visible tasks");
     const placements = await readTaskPlacements(actor, [...selected.keys()]);
-    return { keys, includeSubtasks: input.includeSubtasks ?? false, tasks: [...selected.values()].sort((a, b) => a.taskKey.localeCompare(b.taskKey)).map((row) => ({ taskKey: row.taskKey, title: row.title, placement: placementOf(placements.get(row.id)) })) };
+    return {
+      keys,
+      includeSubtasks: input.includeSubtasks ?? false,
+      tasks: [...selected.values()]
+        .sort((a, b) => a.taskKey.localeCompare(b.taskKey))
+        .map((row) => ({ taskKey: row.taskKey, title: row.title, placement: placementOf(placements.get(row.id)) })),
+    };
   }
   async set(actor: TaskPrincipal, taskId: number, placement: TaskPlacement | null) {
+    return runInTransaction(async () => {
+      const scope = this.containers.scope(actor);
+      const selfDeveloperId = await new SelfIdentityService().linkedDeveloperId(actor.accountId, actor.workspaceId);
+      const [visible] = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, scope.workspaceId),
+            eq(tasks.id, taskId),
+            isNull(tasks.deletedAt),
+            taskVisibilityPredicate({ ...actor, selfDeveloperId: selfDeveloperId ?? undefined }),
+          ),
+        );
+      if (!visible) throw new HttpError(404, "Task unavailable");
+      await this.containers.validateDestination(actor, placement);
+      await this.store(actor, taskId, placement);
+    });
+  }
+  private async store(actor: TaskPrincipal, taskId: number, placement: TaskPlacement | null) {
     const scope = this.containers.scope(actor);
-    await this.containers.validateDestination(actor, placement);
-    await db.delete(taskPlacements).where(and(eq(taskPlacements.workspaceId, scope.workspaceId), eq(taskPlacements.managerAccountId, scope.managerAccountId), eq(taskPlacements.taskId, taskId)));
+    await db
+      .delete(taskPlacements)
+      .where(
+        and(
+          eq(taskPlacements.workspaceId, scope.workspaceId),
+          eq(taskPlacements.managerAccountId, scope.managerAccountId),
+          eq(taskPlacements.taskId, taskId),
+        ),
+      );
     if (placement) await db.insert(taskPlacements).values({ ...scope, taskId, ...placement });
   }
   async bulk(actor: TaskPrincipal, input: PlacementBulkRequest): Promise<PlacementBulkResponse> {
     return runInTransaction(async () => {
       const current = await this.preview(actor, input.preview);
-      if (current.tasks.length !== input.preview.tasks.length || current.tasks.some((task, index) => task.taskKey !== input.preview.tasks[index]?.taskKey || !same(task.placement, input.preview.tasks[index]!.placement))) throw new HttpError(409, "Placement preview changed. Nothing was moved.");
-      const destinations = input.restore ?? current.tasks.map((task) => ({ taskKey: task.taskKey, placement: input.placement ?? null }));
-      if (destinations.length !== current.tasks.length || new Set(destinations.map((task) => task.taskKey)).size !== current.tasks.length || destinations.some((task) => !current.tasks.some((entry) => entry.taskKey === task.taskKey))) throw new HttpError(400, "Destinations must match the preview");
+      if (
+        current.tasks.length !== input.preview.tasks.length ||
+        current.tasks.some(
+          (task, index) =>
+            task.taskKey !== input.preview.tasks[index]?.taskKey ||
+            !same(task.placement, input.preview.tasks[index]!.placement),
+        )
+      )
+        throw new HttpError(409, "Placement preview changed. Nothing was moved.");
+      const destinations =
+        input.restore ?? current.tasks.map((task) => ({ taskKey: task.taskKey, placement: input.placement ?? null }));
+      if (
+        destinations.length !== current.tasks.length ||
+        new Set(destinations.map((task) => task.taskKey)).size !== current.tasks.length ||
+        destinations.some((task) => !current.tasks.some((entry) => entry.taskKey === task.taskKey))
+      )
+        throw new HttpError(400, "Destinations must match the preview");
       for (const target of destinations) await this.containers.validateDestination(actor, target.placement);
       const rows = await visibleTaskRows(actor);
-      for (const target of destinations) await this.set(actor, rows.find((row) => row.taskKey === target.taskKey)!.id, target.placement);
+      for (const target of destinations)
+        await this.store(actor, rows.find((row) => row.taskKey === target.taskKey)!.id, target.placement);
       const post = await this.preview(actor, { keys: current.tasks.map((task) => task.taskKey) });
-      return { count: current.tasks.length, undo: { preview: post, restore: current.tasks.map(({ taskKey, placement }) => ({ taskKey, placement })) } };
+      return {
+        count: current.tasks.length,
+        undo: { preview: post, restore: current.tasks.map(({ taskKey, placement }) => ({ taskKey, placement })) },
+      };
     });
   }
 }

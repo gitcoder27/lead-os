@@ -1,8 +1,7 @@
 import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
-import type { TaskPlacementContext } from '@/types';
+import type { TaskPlacementContext , TodayActionCommand, TodayActionSeverity, TodayActionTarget } from '@/types';
 import { Bell, CalendarClock, Rows3, type LucideIcon } from 'lucide-react';
 import type { TodayRunCommand } from './TodayActionRow';
-import type { TodayActionCommand, TodayActionSeverity, TodayActionTarget } from '@/types';
 
 interface TodayCompactRowProps {
   title: string;

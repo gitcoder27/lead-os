@@ -550,6 +550,7 @@ export const tasks = sqliteTable("tasks", {
   closedAt: text("closed_at"),
   deletedAt: text("deleted_at"),
 }, (table) => [
+  uniqueIndex("idx_tasks_workspace_identity").on(table.workspaceId, table.id),
   uniqueIndex("idx_tasks_workspace_key").on(table.workspaceId, table.taskKey),
   index("idx_tasks_workspace_owner_status").on(table.workspaceId, table.ownerType, table.ownerId, table.status),
   index("idx_tasks_workspace_tracked").on(table.workspaceId, table.trackedByManagerId, table.status),

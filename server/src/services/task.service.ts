@@ -2,8 +2,8 @@ import { visibleTaskRows } from "./task-visibility";
 import { TaskPlacementsService, readTaskPlacements } from "./task-placements.service";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
-import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
+import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields } from "shared/types";
+import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest, TaskExpectedState, TaskGuardField, TaskWaitingOn, TaskWaitingOnInput, TaskWaitingOnType, TaskPlacement } from "shared/types";
 import { db } from "../db/connection";
 import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, taskPlacements, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
@@ -359,7 +359,7 @@ export class TaskService {
    * `options.untriaged` (docs/57 §1): only a bare capture — no date, owner or
    * later — lands in Inbox; every other create path is triaged by default.
    */
-  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one"; untriaged?: boolean; placement?: import("shared/types").TaskPlacement | null } = {}): Promise<TaskRow> {
+  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one"; untriaged?: boolean; placement?: TaskPlacement | null } = {}): Promise<TaskRow> {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);

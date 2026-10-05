@@ -1,4 +1,4 @@
-import type { ManagerTask } from '@/types';
+import type { ManagerTask , TaskDetailResponse, UpdateTaskRequest } from '@/types';
 import { TaskProjectField } from './TaskProjectField';
 import { clearTaskUpdateDraftsForTask } from '@/lib/task-update-drafts';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -23,7 +23,6 @@ import { useToast } from '@/context/ToastContext';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import { useDeleteTaskDetail, useTaskDetail, useUpdateTaskDetail } from '@/hooks/useTaskDetail';
 import { formatRelativeTime, getLocalIsoDate } from '@/lib/utils';
-import type { TaskDetailResponse, UpdateTaskRequest } from '@/types';
 import {
   useAttachOneOnOneAgendaItemToSeries,
   useOneOnOneEnabled,

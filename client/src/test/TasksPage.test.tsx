@@ -41,6 +41,8 @@ vi.mock('@/hooks/useGlobalSearch', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useProjects', () => ({ useProject: () => ({ data: undefined }), useProjects: () => ({ data: { projects: [] } }), useProjectWrites: () => ({ isPending: false }) }));
+
 vi.mock('@/hooks/useTaskViews', () => ({
   useTaskViews: (...args: unknown[]) => mockUseTaskViews(...args),
   useTaskViewTasks: (...args: unknown[]) => mockUseTaskViewTasks(...args),
@@ -1243,4 +1245,15 @@ describe('R5 native row controls and readable context', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /Schedule/ }));
     expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeInTheDocument();
   });
+});
+
+it('opens Projects from the rail and mobile picker without changing the default view', () => {
+  render(<TasksPage />);
+  expect(screen.getByRole('button', { name: /Planned today/ })).toHaveAttribute('aria-current', 'page');
+  fireEvent.click(screen.getByRole('button', { name: 'Projects', exact: true }));
+  expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
+  const picker = screen.getByRole('combobox', { name: 'Task view' });
+  expect(picker).toHaveValue('projects');
+  fireEvent.change(picker, { target: { value: 'today' } });
+  expect(screen.queryByText(/No projects yet/)).not.toBeInTheDocument();
 });

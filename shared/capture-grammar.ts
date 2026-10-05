@@ -46,7 +46,7 @@
  * with its own and rejects a drift of more than one day.
  */
 
-import type { DailyNoteKind, DailyNoteResponse, ManagerTask, TaskEvent, TaskWaitingOnInput } from "./types";
+import type { TaskPlacement, DailyNoteKind, DailyNoteResponse, ManagerTask, TaskEvent, TaskWaitingOnInput } from "./types";
 
 export type CaptureIntent = "create" | "update" | "note";
 
@@ -200,7 +200,7 @@ export interface ResolvedCapture {
  */
 export interface CaptureDefaults {
   /** Private placement; null explicitly clears inherited parent placement. */
-  placement?: import("./types").TaskPlacement | null;
+  placement?: TaskPlacement | null;
   /** Developer account id that owns the task; `null` leaves it unowned (Inbox). Never applies to a Later task. */
   ownerAccountId?: string | null;
   waitingOn?: TaskWaitingOnInput | null;

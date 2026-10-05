@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS task_placements (
  PRIMARY KEY(workspace_id, manager_account_id, task_id),
  FOREIGN KEY(workspace_id, manager_account_id, project_id) REFERENCES projects(workspace_id, manager_account_id, id) ON DELETE CASCADE,
  FOREIGN KEY(workspace_id, manager_account_id, project_id, track_id) REFERENCES project_tracks(workspace_id, manager_account_id, project_id, id),
- FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+ FOREIGN KEY(workspace_id, task_id) REFERENCES tasks(workspace_id, id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS task_placements_project ON task_placements(workspace_id, manager_account_id, project_id, track_id);
 
@@ -438,6 +438,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   FOREIGN KEY (parent_id) REFERENCES tasks(id)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_workspace_identity ON tasks(workspace_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_workspace_key ON tasks(workspace_id, task_key);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace_owner_status ON tasks(workspace_id, owner_type, owner_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace_tracked ON tasks(workspace_id, tracked_by_manager_id, status);

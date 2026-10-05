@@ -166,6 +166,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
     const project = Number(params.get('project')); const track = Number(params.get('track'));
     return Number.isSafeInteger(project) && project > 0 ? { projectId: project, trackId: Number.isSafeInteger(track) && track > 0 ? track : null } : undefined;
   });
+  const [showPlacement, setShowPlacement] = useState(Boolean(placement));
   const hintId = useId();
   const { addToast } = useToast();
   const capture = useCapture();
@@ -456,7 +457,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
             border: '1px solid var(--border)',
           }}
         />
-        {(!resolved || resolved.intent === 'create') && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}
+        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-xs" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project placement' : 'Add project placement'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
         {typeahead.open && typeahead.fragment ? (
           <TokenSuggestionList
             trigger={typeahead.fragment.trigger}

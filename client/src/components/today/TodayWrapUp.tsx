@@ -1,4 +1,4 @@
-import type { TaskPlacementContext } from '@/types';
+import type { TaskPlacementContext , TodayActionCommand, TodayActionItem, TodayActionTarget, TodayFocusPerson, TodayPlanFocus, TodayPlanItem, TodayWrapUpFocus } from '@/types';
 import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
 import { useState } from 'react';
 import { Bell, CalendarArrowUp, CircleCheck, ListTodo, NotebookPen, Pin, PinOff, Rows3, type LucideIcon } from 'lucide-react';
@@ -6,7 +6,6 @@ import { firstName, formatClock, rowContext } from '@/lib/today-layout';
 import { planDetail } from './TodayPlanPanel';
 import type { TodayRunCommand } from './TodayActionRow';
 import { TODAY_TOP_LIMIT } from '@/types';
-import type { TodayActionCommand, TodayActionItem, TodayActionTarget, TodayFocusPerson, TodayPlanFocus, TodayPlanItem, TodayWrapUpFocus } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { shiftLocalIsoDate } from '@/lib/utils';
 

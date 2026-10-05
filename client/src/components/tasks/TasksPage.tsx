@@ -231,7 +231,9 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const showTaskList = (!projectsMode || Boolean(projectId)) && !projectUnavailable;
   const tasks = useTaskViewTasks(definition, Boolean(definition) && showTaskList, today);
   const taskList = useMemo(() => tasks.data?.tasks ?? [], [tasks.data]);
+  const toolbarOverrides = projectsMode ? { ...state.overrides, project: undefined, track: undefined } : state.overrides;
   const overridesActive = hasTaskViewOverrides(state.overrides);
+  const listNarrowed = hasTaskViewOverrides(toolbarOverrides) || Boolean(state.q);
 
   // docs/51 F5: the Today view appends a collapsed "Done today" group — tasks
   // closed today stay visible as progress instead of vanishing. Hidden while
@@ -757,7 +759,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     window.dispatchEvent(new PopStateEvent('popstate'));
     setState(next);
   };
-  const clearFilters = () => setState((current) => ({ view: current.view, overrides: {} }));
+  const clearFilters = () => setState((current) => ({ view: current.view, overrides: projectsMode ? { ...(projectId && { project: projectId }), ...(trackId && { track: trackId }) } : {} }));
 
   const savedSelected = selectedView && !selectedView.builtin ? selectedView : undefined;
 
@@ -864,14 +866,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
         <TaskToolbar
           ref={searchRef}
           title={selectedView?.name ?? 'Tasks'}
-          count={visibleCount}
-          narrowed={overridesActive || Boolean(state.q)}
+          count={showTaskList ? visibleCount : undefined}
+          narrowed={listNarrowed}
           updating={updating}
           views={allViews}
           counts={countData}
           viewId={selectedView?.id ?? selectedId}
           onSelectView={(id) => setView(id)}
-          overrides={state.overrides}
+          overrides={toolbarOverrides}
           onOverrides={setOverrides}
           query={state.q ?? ''}
           onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))}
@@ -882,7 +884,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           developers={assignableDevelopers}
           labels={labelRegistry}
           isSavedView={Boolean(savedSelected)}
-          hasOverrides={overridesActive}
+          hasOverrides={hasTaskViewOverrides(toolbarOverrides)}
           // A CSV is read by others, so the manager stays "Me" there.
           onExport={() => downloadCsv(tasksCsv(baseGroups.flatMap((group) => group.tasks), (type, id) => { const name = ownerName(type, id); return name === 'You' ? 'Me' : name; }, today), csvFileName('tasks', selectedId, today))}
           canExport={Boolean(tasks.data) && !tasks.isPlaceholderData}
@@ -919,11 +921,11 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             <>
               <TaskListEmpty
                 viewId={selectedView?.id}
-                filtered={overridesActive || Boolean(state.q)}
+                filtered={listNarrowed}
                 signal={state.overrides.signal}
                 candidates={candidates}
                 onPlanDay={() => setView('my-tasks')}
-                onClearFilters={() => setState((current) => ({ view: current.view, overrides: {} }))}
+                onClearFilters={clearFilters}
               />
               {/* docs/51 F14: a real add row, not a fake second task list — `n` opens it. */}
               {canAddToEmptyView && (

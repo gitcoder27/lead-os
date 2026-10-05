@@ -115,7 +115,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
     return next.length ? next : undefined;
   };
   const activeFilterCount = Object.values(overrides).filter((value) => value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0)).length;
-  const summary = Object.entries(overrides).filter(([, value]) => value !== undefined).map(([key, value]) => `${key}: ${key === 'owner' ? String(value).split(',').map(ownerLabel).join(', ') : Array.isArray(value) ? value.map(String).join(', ') : value}`).join('; ');
+  const summary = Object.entries(overrides).filter(([, value]) => value !== undefined).map(([key, value]) => key === 'project' || key === 'track' ? `${key === 'project' ? 'Project' : 'Track'} filter` : `${key}: ${key === 'owner' ? String(value).split(',').map(ownerLabel).join(', ') : Array.isArray(value) ? value.map(String).join(', ') : value}`).join('; ');
   const save = async () => {
     if (!name.trim() || saving) return;
     setSaveError(false);

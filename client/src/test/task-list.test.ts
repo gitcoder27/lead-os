@@ -535,3 +535,20 @@ describe('Meetings lens grouping (docs/57 §4, P3-06)', () => {
     expect(inlineAddDefaults('meetings', view, { mode: 'meeting', bucket: 'Needs outcome' }, TODAY)).toMatchObject({ scheduledOn: TODAY });
   });
 });
+
+describe('project filters and contextual capture', () => {
+  it('roundtrips project, track, archive and search filters', () => {
+    const input = { view: 'projects', overrides: { project: 7, track: 'none' as const, priority: 'high' as const }, archived: true, q: 'rollback' };
+    expect(taskViewStateFromParams(taskViewParamsFromState(input))).toEqual(input);
+    expect(taskViewStateFromParams(new URLSearchParams('project=bogus&track=-1')).overrides).toEqual({});
+  });
+  it('clears saved placement filters with explicit all and preserves other filters', () => {
+    expect(applyTaskViewOverrides({ filters: { project: 7, track: 3, priority: 'high' } }, { project: 'all', track: 'all' }).filters).toEqual({ priority: 'high' });
+  });
+  it('capture inside a track preselects placement and no project clears it', () => {
+    expect(inlineCaptureDefaults('projects', { filters: { project: 7, track: 3 } }, { mode: 'none' }, TODAY).placement).toEqual({ projectId: 7, trackId: 3 });
+    expect(inlineCaptureDefaults('projects', { filters: { project: 7, track: 'none' } }, { mode: 'none' }, TODAY).placement).toEqual({ projectId: 7, trackId: null });
+    expect(inlineCaptureDefaults('my-tasks', { filters: { project: 'none' } }, { mode: 'none' }, TODAY).placement).toBeNull();
+    expect(inlineCaptureDefaults('inbox', {}, { mode: 'none' }, TODAY)).not.toHaveProperty('placement');
+  });
+});

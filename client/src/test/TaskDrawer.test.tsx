@@ -736,3 +736,13 @@ describe('R3 real drawer composer lifecycle', () => {
   });
 
 });
+
+it('creates ordinary subtasks through capture with parent context', async () => {
+  mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+  render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+  const input = screen.getByLabelText('New subtask') as HTMLInputElement;
+  fireEvent.change(input, { target: { value: 'Validate child step' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true })); });
+  expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Validate child step', defaults: { parentKey: 'T-7' } });
+  expect(input.value).toBe('');
+});

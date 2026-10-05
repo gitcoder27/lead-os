@@ -2,7 +2,7 @@ import { taskVisibilityPredicate } from "./task-visibility";
 import { readTaskPlacements } from "./task-placements.service";
 import { oneOnOneTaskIds } from "./one-on-one-tasks";
 import { and, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
-import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
+import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskPlacementContext, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
 import { db } from "../db/connection";
 import { taskLinks, taskSavedViews, tasks } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
@@ -134,7 +134,7 @@ interface RowFacts {
   lastActivity: Map<number, string>;
   drifted: Set<number>;
   jiraLinked: Set<number> | null;
-  placements?: Map<number, import("shared/types").TaskPlacementContext>;
+  placements?: Map<number, TaskPlacementContext>;
 }
 
 export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string): TaskSignals {

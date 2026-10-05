@@ -116,7 +116,7 @@ export const TaskListRow = memo(function TaskListRow({
   const waiting = context.mode === 'party' || definition?.filters?.waiting === true ? waitingChips(task, today) : null;
   const waitingText = waiting ? [waiting.check?.label, waiting.aging].filter((label): label is string => Boolean(label)) : [];
   // docs/57 §4 (P3-06): a meeting's action items are its child tasks — "2/3 actions".
-  const actions = task.kind === 'meeting' && signals?.actions && signals.actions.total > 0 ? `${signals.actions.done}/${signals.actions.total} actions` : null;
+  const actions = signals?.actions && signals.actions.total > 0 ? `${signals.actions.done}/${signals.actions.total} ${task.kind === 'meeting' ? 'actions' : 'subtasks'}` : null;
   const signalText = [...(actions ? [actions] : []), ...waitingText, ...attentionReasons.map((reason) => reason.label), ...iconSignals.map((signal) => signal.label)];
 
   const ariaLabel = [

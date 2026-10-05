@@ -1,3 +1,4 @@
+import { notifyTaskChange } from '@/lib/task-change-notifications';
 import { clearTaskUpdateDraftsForScope } from '@/lib/task-update-drafts';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within, waitFor } from '@testing-library/react';
@@ -1408,5 +1409,46 @@ describe('StandupMode', () => {
     // Still on dev-1 — n typed into the field, not handled as a key.
     const rail = screen.getByRole('listbox', { name: 'Standup order' });
     expect(within(rail).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+
+describe('STANDUP-04 actionable wrap-up integration', () => {
+  it('persists an edited action and seals the visible title and check-by date', async () => {
+    const view = renderStandup();
+    flagFocusedPerson('Ask infrastructure to unblock access');
+    fireEvent.keyDown(document.body, { key: 'w' });
+    fireEvent.change(screen.getByLabelText('Next action for Alice Smith'), { target: { value: 'Ask infrastructure for API access' } });
+    fireEvent.change(screen.getByLabelText('Check by for Alice Smith'), { target: { value: '2026-03-09' } });
+    view.unmount();
+    renderStandup();
+    expect(screen.getByLabelText('Next action for Alice Smith')).toHaveValue('Ask infrastructure for API access');
+    expect(screen.getByLabelText('Check by for Alice Smith')).toHaveValue('2026-03-09');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Finish standup' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Finish standup' }));
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    const request = mockApiPost.mock.calls.find(([url]) => url === '/team-tracker/standup/session')![1] as { followUpPlans: unknown; summary: string };
+    expect(request.followUpPlans).toEqual({ 'dev-1': { title: 'Ask infrastructure for API access', followUpAt: new Date('2026-03-09T09:00:00').toISOString() } });
+    expect(request.summary).toContain('Your follow-through');
+    expect(request.summary).toContain('Current: T-1 · Ship migration');
+  });
+  it('journals drawer writes once and retains changed task titles through refetch', () => {
+    const view = renderStandup();
+    const change = { id: 'drawer-done', scope: 'standup-scope', startedAt: new Date(Date.now() + 1000).toISOString(), before: { taskKey: 'T-1', title: 'Ship migration', ownerType: 'developer' as const, ownerId: 'dev-1', status: 'active' as const }, task: { taskKey: 'T-1', title: 'Ship migration', ownerType: 'developer' as const, ownerId: 'dev-1', status: 'done' as const }, fields: ['status' as const] };
+    act(() => { notifyTaskChange(change); notifyTaskChange(change); });
+    const refreshed = buildBoard();
+    refreshed.developers[0]!.tasks = refreshed.developers[0]!.tasks!.filter((task) => task.taskKey !== 'T-1');
+    view.rerender(<TestWrapper><StandupMode date="2026-03-07" board={refreshed} onClose={mockOnClose} onOpenTask={mockOnOpenTask} /></TestWrapper>);
+    fireEvent.keyDown(document.body, { key: 'w' });
+    expect(screen.getAllByText('Closed T-1 · Ship migration')).toHaveLength(1);
+  });
+  it('does not allow the Enter shortcut to seal an empty action', async () => {
+    renderStandup();
+    flagFocusedPerson();
+    fireEvent.keyDown(document.body, { key: 'w' });
+    fireEvent.change(screen.getByLabelText('Next action for Alice Smith'), { target: { value: '  ' } });
+    await waitFor(() => expect(screen.queryByText('Visits are still being saved. If this does not clear, use Retry in the banner above.')).not.toBeInTheDocument());
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(mockApiPost.mock.calls.some(([url]) => url === '/team-tracker/standup/session')).toBe(false);
   });
 });

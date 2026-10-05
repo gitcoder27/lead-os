@@ -10,6 +10,8 @@ import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerChe
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import { useStandupRound } from '@/hooks/useStandupRound';
+import { useStandupTaskJournal } from '@/hooks/useStandupTaskJournal';
+import { buildTeamRecap, buildFollowThrough, followUpPlan } from '@/lib/standup-wrapup';
 import { useStandupTaskSelection } from '@/hooks/useStandupTaskSelection';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import './standup/standup.css';
@@ -109,6 +111,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     const entry = board.developers.find((person) => person.developer.accountId === id);
     return entry ? [entry] : [];
   }), [session.order, initialOrder, board.developers]);
+  useStandupTaskJournal(draftScope, session, ordered, ownsRound, dispatch);
   const reviewed = useMemo(() => new Set(session.reviewed), [session.reviewed]);
   const flagged = useMemo(() => new Set(session.flagged), [session.flagged]);
 
@@ -279,7 +282,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const addCheckIn = useAddCheckIn(date);
   const setCurrent = useSetCurrentItem(date);
   const reassign = useReassignTrackerItem(date);
-  const updateTask = useUpdateTaskDetail(focusedTask?.taskKey);
+  const updateTask = useUpdateTaskDetail(focusedTask?.taskKey, 'standup');
   const developers = useDevelopers(date);
 
   // Resolve a stored accountId to a display name for the previous-round view —
@@ -292,9 +295,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     [ordered, developers.data],
   );
 
-  const log = useCallback((target: string, kind: StandupLogKind, taskKey?: string, detail?: string) => {
-    dispatch({ type: 'log', entry: { accountId: target, kind, taskKey, detail, at: new Date().toISOString() } });
-  }, [dispatch]);
+  const log = useCallback((target: string, kind: StandupLogKind, taskKey?: string, detail?: string, isPrivate = false, title?: string) => {
+    const task = ordered.flatMap((entry) => entry.tasks ?? []).find((entry) => entry.taskKey === taskKey);
+    const taskTitle = title ?? task?.title ?? ordered.flatMap((entry) => openTasksFor(entry)).find((entry) => entry.taskKey === taskKey)?.title;
+    dispatch({ type: 'log', entry: { accountId: target, kind, taskKey, detail, ...(taskTitle && { taskTitle }), ...((isPrivate || (task && task.ownerType !== 'developer')) && { private: true }), at: new Date().toISOString() } });
+  }, [dispatch, ordered]);
 
   const focusRow = useCallback((taskKey?: string) => {
     if (!taskKey || isCoveredByLaterLayer(rootRef.current)) return;
@@ -430,18 +435,19 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     }
   };
 
-  const copySummary = useCallback(() => {
-    const text = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
+  const copyText = useCallback((text: string, title: string) => {
     const write = navigator.clipboard?.writeText(text);
     if (!write) {
       addToast('Clipboard is unavailable in this browser.', 'error');
       return;
     }
     write.then(
-      () => addToast({ type: 'success', title: 'Standup summary copied' }),
+      () => addToast({ type: 'success', title }),
       () => addToast('Could not copy the summary.', 'error'),
     );
-  }, [date, ordered, session, dayUsesCheckIn, addToast]);
+  }, [addToast]);
+  const fullSummary = useCallback(() => [buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn }), buildFollowThrough(ordered, session), buildTeamRecap(date, ordered, session)].join('\n\n'), [date, ordered, session, dayUsesCheckIn]);
+  const copySummary = () => copyText(session.request?.summary ?? fullSummary(), 'Standup summary copied');
 
   /**
    * docs/50 v2: "End standup" seals the round — one durable session record
@@ -461,6 +467,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       setFinishError('There is unsent work. Save or clear the drafts before finishing.');
       return;
     }
+    if (ordered.some((entry) => session.flagged.includes(entry.developer.accountId) && !followUpPlan(entry, session).title.trim())) {
+      setFinishError('Give each follow-up a next action before finishing.');
+      return;
+    }
     // Ending an untouched session is just exit — an empty seal would anchor
     // everyone's feed to a meaningless timestamp.
     if (!session.reviewed.length && !session.flagged.length && !session.log.length) {
@@ -471,7 +481,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     sealingRef.current = true;
     setFinishError('');
     try {
-      const summary = buildStandupSummary({ date, days: ordered, session, usesCheckIn: dayUsesCheckIn });
+      const summary = fullSummary();
       const request = session.request ?? {
         date,
         startedAt: session.startedAt ?? new Date().toISOString(),
@@ -479,6 +489,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         feedSeenThrough: session.feedSeenThrough,
         flagged: session.flagged,
         ...(session.flagReasons && { flagReasons: session.flagReasons }),
+        followUpPlans: Object.fromEntries(ordered.filter((entry) => session.flagged.includes(entry.developer.accountId)).map((entry) => [entry.developer.accountId, { ...followUpPlan(entry, session), title: followUpPlan(entry, session).title.trim() }])),
         log: session.log,
         summary,
         requestId: session.roundId,
@@ -518,7 +529,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       setSealing(false);
       sealingRef.current = false;
     }
-  }, [ownsRound, saveToNote, date, ordered, session, taskDrafts.length, dayUsesCheckIn, clear, dispatch, queryClient, addToast, onClose]);
+  }, [ownsRound, saveToNote, date, ordered, session, taskDrafts.length, fullSummary, clear, dispatch, queryClient, addToast, onClose]);
 
   // ── Actions: shared by the keymap and the action bar (S7) ──────────────
   const actions = {
@@ -849,6 +860,11 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                 onBack={() => moveDeveloper(-1)}
                 onEnd={() => void endStandup()}
                 onCopy={copySummary}
+                onCopyTeam={() => copyText(buildTeamRecap(date, ordered, session), 'Team recap copied')}
+                onCopyActions={() => copyText(buildFollowThrough(ordered, session), 'Your actions copied')}
+                onToggleFollowUp={(id) => { if (!session.request && !sealing) dispatch({ type: 'toggle_flag', accountId: id, at: new Date().toISOString() }); }}
+                onPlanChange={(id, plan) => { if (!session.request && !sealing) dispatch({ type: 'patch', patch: { followUpPlans: { ...session.followUpPlans, [id]: plan } } }); }}
+                onOpenTask={onOpenTask}
               />
             </div>
           ) : (
@@ -899,7 +915,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
                           registerComposer={(api) => {
                             composerApi.current = api;
                           }}
-                          onPosted={(event) => log(event.accountId ?? day.developer.accountId, 'update', focusedTask.taskKey)}
+                          onPosted={(event) => log(event.accountId ?? day.developer.accountId, 'update', focusedTask.taskKey, undefined, event.private)}
                         />
                       ) : null
                     }
@@ -941,7 +957,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       <AnimatePresence>
         {layer === 'taskdraft' && recoverTaskKey && <LayerShell onClose={closeLayer} label={`Draft for ${recoverTaskKey}`}>
           <div className="p-4"><TaskUpdateComposer taskKey={recoverTaskKey} mode="manager" via="standup" autoFocus onPosted={(event) => {
-            if (event.accountId) log(event.accountId, 'update', recoverTaskKey);
+            if (event.accountId) log(event.accountId, 'update', recoverTaskKey, undefined, event.private);
             closeLayer();
           }} /></div>
         </LayerShell>}
@@ -950,9 +966,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <CaptureBox
               assignee={{ accountId: day.developer.accountId, displayName: day.developer.displayName }}
               onClose={closeLayer}
-              onCaptured={({ intent, taskKey }) => {
+              onCaptured={({ intent, taskKey, taskTitle, accountId: ownerId, private: isPrivate }) => {
                 if (intent === 'note') return;
-                log(day.developer.accountId, intent === 'update' ? 'update' : 'added', taskKey);
+                log(ownerId ?? day.developer.accountId, intent === 'update' ? 'update' : 'added', taskKey, undefined, isPrivate, taskTitle);
               }}
             />
           </LayerShell>

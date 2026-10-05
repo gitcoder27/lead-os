@@ -282,3 +282,42 @@ light/dark contrast, narrow viewports, DST transitions and visual clipping remai
 manual checks. No runtime data, Jira sync/write, production deployment, new branch
 or commit was performed. Repository formatting is blocked by the unrelated local
 `.claude/settings.local.json`; it was not changed.
+
+## 2026-10-05 — actionable wrap-up (STANDUP-04)
+
+Wrap-up now serves two purposes: the manager's follow-through and a shareable
+team recap. The composition uses the existing Geist typography, theme tokens
+and restrained cyan accent: a compact coverage line, divided action/person rows,
+and two unequal columns that stack on narrow screens. Hover and field focus
+retain existing affordances; the review itself has no new entrance animation.
+
+- **Your follow-through:** flagged people have an editable action title and
+  check-by date, owned by **You**. Blocked tasks and blocked/at-risk/waiting people
+  offer optional follow-up suggestions; nothing is selected automatically.
+  Finish creates or updates the same-day, person-linked manager task. Dates
+  resolve to 09:00 in the browser's zone; an omitted date means check by now.
+  Action edits persist in the tab's existing round state, and blank titles block
+  both the Finish button and Enter shortcut.
+- **Team recap:** each person shows board status, visited state, current work,
+  the first remaining nonblocked task as next work, blocked work, and task changes
+  acknowledged in this round. Next work is board order, not a new commitment.
+  Unvisited people are explicitly labelled. Task links open the existing drawer.
+  The journal retains titles after completion/reassignment and includes drawer
+  task PATCHes and manager timeline posts, without treating refetches as actions.
+  Failed writes, other auth scopes, pre-round writes and duplicate event receipts
+  are excluded. Link-only writes are not separately journalled.
+- **Copy team recap** excludes private updates, person notes, flag reasons,
+  drafts and manager-owned tasks on the self row. **Copy your actions** is the
+  private manager list. Existing **Copy summary** and optional Notes → Standups
+  archive contain coverage, personal actions and team work together.
+- The existing immutable seal request, follow-up receipt, draft recovery, review
+  acknowledgements and archive retry remain. Actions lock once a seal is attempted;
+  retries reuse its original payload and do not create duplicate follow-ups.
+  Older API callers without action plans keep their default follow-up behavior.
+
+Browser validation used a temporary frontend-only fixture with synthetic people
+and tasks, inspected in Chromium at desktop/mobile sizes and in both themes.
+The wrap-up passes scoped axe WCAG A/AA checks, has no horizontal overflow, and
+supports action editing and suggestion selection. The existing roster's colored
+avatars still produce light-theme contrast findings outside the wrap-up scope.
+No runtime database, authenticated production session or Jira was used.

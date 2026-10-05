@@ -477,7 +477,7 @@ describe('CaptureBox (P3-D8)', () => {
       expect(mockMutate).toHaveBeenCalledTimes(1);
       succeed(lastBody());
 
-      expect(onCaptured).toHaveBeenCalledWith({ intent: 'create', taskKey: 'T-5' });
+      expect(onCaptured).toHaveBeenCalledWith({ intent: 'create', taskKey: 'T-5', taskTitle: 'thing' });
       expect(onClose).not.toHaveBeenCalled();
       expect(input.value).toBe('#PROJ-1 ');
 

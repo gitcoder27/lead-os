@@ -2,6 +2,7 @@ import type {
   RecordStandupSessionRequest,
   RecordStandupSessionResponse,
   StandupFeedEntry,
+  StandupFollowUpPlan,
   SurfaceTask,
   TaskEventSummary,
   TrackerDeveloperDay,
@@ -101,6 +102,8 @@ export interface StandupLogEntry {
   accountId: string;
   kind: StandupLogKind;
   taskKey?: string;
+  taskTitle?: string;
+  private?: boolean;
   /** Short human detail, e.g. the new status label or reassignee name. */
   detail?: string;
   at: string;
@@ -122,6 +125,7 @@ export interface StandupSession {
   flagged: string[];
   /** docs/56 P1-07: optional one-line reason per flagged account. */
   flagReasons?: Record<string, string>;
+  followUpPlans?: Record<string, StandupFollowUpPlan>;
   log: StandupLogEntry[];
   /** ISO timestamp of the first session action — sent as startedAt on seal. */
   startedAt?: string;
@@ -219,6 +223,15 @@ function parseFlagReasons(value: unknown): Record<string, string> | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+function parseFollowUpPlans(value: unknown): StandupSession['followUpPlans'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return Object.fromEntries(Object.entries(value).flatMap(([id, raw]) => {
+    if (!raw || typeof raw !== 'object' || !('title' in raw) || typeof raw.title !== 'string') return [];
+    const at = 'followUpAt' in raw && typeof raw.followUpAt === 'string' && Number.isFinite(Date.parse(raw.followUpAt)) ? raw.followUpAt : undefined;
+    return [[id, { title: raw.title.slice(0, 500), ...(at && { followUpAt: at }) }]];
+  }));
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
@@ -242,6 +255,7 @@ export function loadStandupSession(key: string): StandupSession {
       ...(parsed.receipt?.session?.id && { receipt: parsed.receipt }),
       reviewed: isStringArray(parsed.reviewed) ? parsed.reviewed : [],
       flagged: isStringArray(parsed.flagged) ? parsed.flagged : [],
+      ...(parseFollowUpPlans(parsed.followUpPlans) && { followUpPlans: parseFollowUpPlans(parsed.followUpPlans) }),
       ...(parseFlagReasons(parsed.flagReasons) && { flagReasons: parseFlagReasons(parsed.flagReasons) }),
       log: Array.isArray(parsed.log)
         ? parsed.log.filter((entry): entry is StandupLogEntry => Boolean(entry && typeof entry.accountId === 'string' && typeof entry.kind === 'string'))

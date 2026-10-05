@@ -13,7 +13,9 @@ vi.mock('@/lib/api', () => ({ api: { post: (...args: unknown[]) => mockPost(...a
 vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'scope', useAuth: () => ({ user: { role: 'manager', accountId: 'm' } }) }));
 vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast: mockAddToast }) }));
 
+import { subscribeTaskChanges } from '@/lib/task-change-notifications';
 import { useTaskListMutations } from '@/hooks/useTaskListMutations';
+import { useAddTaskEvent } from '@/hooks/useTasks';
 import { useUpdateTaskDetail } from '@/hooks/useTaskDetail';
 
 function task(overrides: Partial<ManagerTask> = {}): ManagerTask {
@@ -108,4 +110,56 @@ describe('list and drawer writes on one task', () => {
     await act(async () => { await detail.current.mutateAsync({ title: 'Second' }); });
     expect(mockPatch).toHaveBeenCalledTimes(2);
   });
+});
+
+
+describe('acknowledged drawer changes for standup', () => {
+  it('notifies only after successful writes and excludes private task details', async () => {
+    const receive = vi.fn();
+    const unsubscribe = subscribeTaskChanges(receive);
+    const saved = task({ title: 'Changed', status: 'done', details: 'Secret body' });
+    mockPatch.mockRejectedValueOnce(new Error('Failed')).mockResolvedValueOnce(saved);
+    const { detail } = setup();
+    try {
+      await act(async () => { await detail.current.mutateAsync({ status: 'done' }).catch(() => undefined); });
+      expect(receive).not.toHaveBeenCalled();
+      await act(async () => { await detail.current.mutateAsync({ title: 'Changed', details: 'Secret body' }); });
+      expect(receive).toHaveBeenCalledOnce();
+      expect(receive.mock.calls[0]![0]).toMatchObject({ scope: 'scope', before: { title: 'One' }, task: { title: 'Changed', status: 'done' }, fields: ['title', 'details'] });
+      expect(JSON.stringify(receive.mock.calls)).not.toContain('Secret body');
+    } finally { unsubscribe(); }
+  });
+  it('suppresses notifications for standup actions which already log their success', async () => {
+    const receive = vi.fn();
+    const unsubscribe = subscribeTaskChanges(receive);
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const { result } = renderHook(() => useUpdateTaskDetail('T-1', 'standup'), { wrapper });
+    mockPatch.mockResolvedValue(task({ status: 'done' }));
+    try {
+      await act(async () => { await result.current.mutateAsync({ status: 'done' }); });
+      expect(receive).not.toHaveBeenCalled();
+    } finally { unsubscribe(); }
+  });
+});
+
+
+it('journals acknowledged drawer events privately, and ignores failed or direct standup events', async () => {
+  const receive = vi.fn();
+  const unsubscribe = subscribeTaskChanges(receive);
+  const { client } = setup();
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const { result } = renderHook(() => useAddTaskEvent('T-1'), { wrapper });
+  mockPost.mockRejectedValueOnce(new Error('Failed')).mockResolvedValue({ id: 17, type: 'update', visibility: 'private', body: 'Secret note' });
+  const input = { type: 'update' as const, body: 'Secret note', visibility: 'private' as const, via: 'task_drawer' as const, requestId: 'r' };
+  try {
+    await act(async () => { await result.current.mutateAsync(input).catch(() => undefined); });
+    expect(receive).not.toHaveBeenCalled();
+    await act(async () => { await result.current.mutateAsync(input); });
+    expect(receive).toHaveBeenCalledOnce();
+    expect(receive.mock.calls[0]![0]).toMatchObject({ id: 'task-event:17', eventType: 'update', private: true, task: { taskKey: 'T-1' } });
+    expect(JSON.stringify(receive.mock.calls)).not.toContain('Secret note');
+    await act(async () => { await result.current.mutateAsync({ ...input, via: 'standup' }); });
+    expect(receive).toHaveBeenCalledOnce();
+  } finally { unsubscribe(); }
 });

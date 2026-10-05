@@ -431,6 +431,42 @@ describe("flag reasons and person links on the sealed follow-up (docs/56 P1-07)"
     return db.select().from(taskLinks).where(eq(taskLinks.taskId, task!.id));
   }
 
+  it("saves a specific manager action and check-by date and reuses it across retries", async () => {
+    await enablePhase3();
+    const followUpAt = "2026-10-06T03:30:00.000Z";
+    const payload = sessionPayload({ followUpPlans: { "dev-2": { title: "Get the API decision from Priya", followUpAt } },
+      log: [{ accountId: "dev-2", kind: "done", taskKey: "T-9", taskTitle: "Deployment checks", private: true, at: new Date().toISOString() }],
+    });
+    const first = await invoke("POST", "/api/team-tracker/standup/session", payload);
+    expect(first.status).toBe(201);
+    expect((await invoke("POST", "/api/team-tracker/standup/session", payload)).body).toEqual(first.body);
+    const [task] = await db.select().from(tasks).where(eq(tasks.taskKey, first.body.followUps[0].taskKey));
+    expect(task).toMatchObject({ title: "Get the API decision from Priya", followUpAt, ownerType: "manager", ownerId: "manager-1" });
+    expect(await personLinks(task!.taskKey)).toHaveLength(1);
+    const latest = await invoke("GET", "/api/team-tracker/standup/session/latest");
+    expect(latest.body.session.log[0]).toMatchObject({ taskTitle: "Deployment checks", private: true });
+    const second = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ followUpPlans: {
+      "dev-2": { title: "Send the agreed API decision", followUpAt: "2026-10-07T03:30:00.000Z" },
+    } }));
+    expect(second.body.followUps).toEqual(first.body.followUps);
+    expect(await db.select().from(tasks)).toHaveLength(1);
+    expect((await db.select().from(tasks))[0]).toMatchObject({ title: "Send the agreed API decision", followUpAt: "2026-10-07T03:30:00.000Z" });
+    const third = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ followUpPlans: { "dev-2": { title: "Check the decision now" } } }));
+    expect(third.body.followUps).toEqual(first.body.followUps);
+    expect((await db.select().from(tasks))[0]!.followUpAt).not.toBe("2026-10-07T03:30:00.000Z");
+  });
+
+  it.each([
+    { "dev-2": { title: "" } },
+    { "dev-2": { title: "Check progress", followUpAt: "tomorrow" } },
+    { "dev-1": { title: "Not flagged" } },
+  ])("rejects invalid follow-up plans without creating tasks %j", async (followUpPlans) => {
+    await enablePhase3();
+    expect((await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ followUpPlans }))).status).toBe(400);
+    expect(await db.select().from(tasks)).toHaveLength(0);
+    expect(await db.select().from(standupSessions)).toHaveLength(0);
+  });
+
   it("links the follow-up to the developer, with or without a reason", async () => {
     await enablePhase3();
     const response = await invoke("POST", "/api/team-tracker/standup/session", sessionPayload({ flagged: ["dev-1", "dev-2"] }));

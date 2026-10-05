@@ -368,16 +368,24 @@ export function createTeamTrackerRouter(
         flagged: z.array(z.string().trim().min(1)).max(500),
         // docs/56 P1-07: optional one-line reason per flagged account (trimmed and capped server-side).
         flagReasons: z.record(z.string().min(1), z.string().max(500)).optional(),
+        followUpPlans: z.record(z.string().min(1), z.object({
+          title: z.string().trim().min(1).max(500),
+          followUpAt: isoDateTimeSchema.optional(),
+        }).strict()).optional(),
         log: z.array(z.object({
           accountId: z.string().min(1),
           kind: z.enum(["update", "checkin", "status", "current", "done", "blocked", "reassign", "added"]),
           taskKey: z.string().trim().min(1).optional(),
+          taskTitle: z.string().max(500).optional(),
+          private: z.boolean().optional(),
           detail: z.string().max(500).optional(),
           at: isoDateTimeSchema,
         }).strict()).max(2000),
         summary: z.string().max(20000),
         requestId: z.string().uuid(),
-      }).strict().refine((value) => value.reviewed.length + value.flagged.length + value.log.length > 0, "An empty round cannot be saved"),
+      }).strict()
+        .refine((value) => value.reviewed.length + value.flagged.length + value.log.length > 0, "An empty round cannot be saved")
+        .refine((value) => Object.keys(value.followUpPlans ?? {}).every((id) => value.flagged.includes(id)), "Follow-up plans must belong to flagged people"),
     })),
     async (req, res, next) => {
       try {

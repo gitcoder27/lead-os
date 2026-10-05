@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import type { AddTaskEventRequest, TaskEvent, TaskResolution } from '@/types';
+import { notifyTaskChange, taskChangeFacts } from '@/lib/task-change-notifications';
+import type { AddTaskEventRequest, TaskDetailResponse, TaskEvent, TaskResolution } from '@/types';
 
 interface TaskEventsPage {
   events: TaskEvent[];
@@ -81,8 +82,18 @@ export type AddTaskEventInput = Omit<AddTaskEventRequest, 'requestId'> & { reque
 
 export function useAddTaskEvent(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const scope = useAuthScopeKey();
   return useMutation({
-    mutationFn: (input: AddTaskEventInput) => api.post<TaskEvent>(`/tasks/${encodeURIComponent(taskKey!)}/events`, input),
+    mutationFn: async (input: AddTaskEventInput) => {
+      const startedAt = new Date().toISOString();
+      const task = qc.getQueryData<TaskDetailResponse>(['task-detail', scope, 'manager', taskKey]);
+      const event = await api.post<TaskEvent>(`/tasks/${encodeURIComponent(taskKey!)}/events`, input);
+      if (input.via !== 'standup' && task && event) notifyTaskChange({
+        id: `task-event:${event.id}`, scope, startedAt, task: taskChangeFacts(task),
+        eventType: event.type, private: event.visibility === 'private',
+      });
+      return event;
+    },
     onSuccess: () => invalidateTaskSurfaces(qc),
   });
 }

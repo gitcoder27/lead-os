@@ -67,7 +67,7 @@ interface CaptureBoxProps {
   assignee?: { accountId: string; displayName?: string };
   onClose: () => void;
   /** Fires after a successful capture, before close (standup session log, docs/50). */
-  onCaptured?: (result: { intent: string; taskKey?: string }) => void;
+  onCaptured?: (result: { intent: string; taskKey?: string; taskTitle?: string; accountId?: string; private?: boolean }) => void;
   /**
    * docs/56 UX-10: structured context a caller adds to every capture from this box (a note
    * source, links, a private first update). The assignee pill's owner is merged on top.
@@ -295,7 +295,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
           }
           if (attempt.current?.requestId === requestId) attempt.current = null;
           const key = res.task?.taskKey ?? res.event?.taskKey;
-          onCaptured?.({ intent: res.intent, taskKey: key });
+          onCaptured?.({ intent: res.intent, taskKey: key, ...(res.task?.title && { taskTitle: res.task.title }), ...(res.task?.ownerType === 'developer' && res.task.ownerId && { accountId: res.task.ownerId }), ...((res.task?.ownerType === 'manager' || res.event?.visibility === 'private') && { private: true }) });
           addToast({
             type: 'success',
             title: res.intent === 'note' ? 'Saved to today\u2019s note' : res.intent === 'update' ? `Logged update on ${key}` : `Captured ${key}`,

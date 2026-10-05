@@ -1986,8 +1986,18 @@ export interface StandupSessionLogEntry {
   accountId: string;
   kind: StandupLogKind;
   taskKey?: string;
+  /** Task title at the acknowledged change, retained after completion or reassignment. */
+  taskTitle?: string;
+  /** Excluded from the shareable team recap. */
+  private?: boolean;
   detail?: string;
   at: string;
+}
+
+export interface StandupFollowUpPlan {
+  title: string;
+  /** ISO check-by time, resolved in the manager's browser zone. Omitted means due now. */
+  followUpAt?: string;
 }
 
 /** `POST /api/team-tracker/standup/session` — seals one standup round. */
@@ -2001,6 +2011,8 @@ export interface RecordStandupSessionRequest {
   flagged: string[];
   /** docs/56 P1-07: optional one-line reason per flagged accountId. */
   flagReasons?: Record<string, string>;
+  /** Manager-owned actions for flagged people; older callers keep the default follow-up. */
+  followUpPlans?: Record<string, StandupFollowUpPlan>;
   log: StandupSessionLogEntry[];
   /** Pre-rendered markdown summary shown in the wrap-up. */
   summary: string;

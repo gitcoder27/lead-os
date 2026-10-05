@@ -5,6 +5,7 @@ import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { patchCachedTasks, taskWrites, type CacheShape, type CachedTaskRow } from '@/lib/task-writes';
 import { getLocalIsoDate } from '@/lib/utils';
+import { notifyTaskChange, taskChangeFacts } from '@/lib/task-change-notifications';
 import { prefetchMyDayTaskEvents } from './useTasks';
 import type { FormerOwnerTaskDetail, ManagerTask, TaskDetailResponse, TaskLink, UpdateTaskRequest } from '@/types';
 
@@ -83,7 +84,7 @@ const detailShape: CacheShape<TaskDetailResponse | FormerOwnerTaskDetail> = {
  * (one at a time, in order), and a failure gives back only the text fields it patched,
  * only where they still read as it wrote them.
  */
-export function useUpdateTaskDetail(taskKey: string | undefined) {
+export function useUpdateTaskDetail(taskKey: string | undefined, source: 'detail' | 'standup' = 'detail') {
   const { user } = useAuth();
   const scope = useAuthScopeKey();
   const qc = useQueryClient();
@@ -91,8 +92,12 @@ export function useUpdateTaskDetail(taskKey: string | undefined) {
   const isDeveloper = user?.role === 'developer';
   return useMutation({
     onMutate: counts.submittedScope,
-    mutationFn: (updates: UpdateTaskRequest) =>
-      taskWrites(qc, scope).run(taskKey ? [taskKey] : [], async () => {
+    mutationFn: (updates: UpdateTaskRequest) => {
+      const startedAt = new Date().toISOString();
+      const coordinator = taskWrites(qc, scope);
+      const submitted = coordinator.mark();
+      return coordinator.run(taskKey ? [taskKey] : [], async () => {
+        const before = (taskKey && coordinator.latest(taskKey, submitted)) || qc.getQueryData<TaskDetailResponse>(['task-detail', scope, isDeveloper ? 'developer' : 'manager', taskKey]);
         const text = Object.fromEntries(OPTIMISTIC_FIELDS.filter((field) => field in updates).map((field) => [field, updates[field]]));
         let rollback = () => {};
         if (taskKey && Object.keys(text).length) {
@@ -106,12 +111,17 @@ export function useUpdateTaskDetail(taskKey: string | undefined) {
             : await api.patch<TaskDetailResponse>(`/tasks/${encodeURIComponent(taskKey!)}`, updates);
           // Writes queued behind this one act on what the server now holds.
           if (!isDeveloper && saved && 'taskKey' in saved) taskWrites(qc, scope).acknowledge([saved as unknown as ManagerTask]);
+          if (!isDeveloper && source !== 'standup' && saved?.taskKey) notifyTaskChange({
+            scope, startedAt, task: taskChangeFacts(saved), ...(before && { before: taskChangeFacts(before) }),
+            fields: Object.keys(updates).filter((field) => field !== 'expected') as Array<keyof UpdateTaskRequest>,
+          });
           return saved;
         } catch (error) {
           rollback();
           throw error;
         }
-      }),
+      });
+    },
     onSuccess: (_data, _variables, scope) => counts.recount(scope),
     onSettled: () => invalidateTaskDetailSurfaces(qc, taskKey),
   });

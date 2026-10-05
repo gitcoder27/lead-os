@@ -527,11 +527,13 @@ Source: [docs/UX-REVIEW.md](UX-REVIEW.md) (evidence, screenshots in `docs/ux-rev
 
 Parked, not proposed here: calendar awareness (read-only ICS).
 
-## Standup bug fixes (2026-10-05)
+## Standup improvements (2026-10-05)
 
 - [x] **STANDUP-01** Restore Ctrl/Cmd+I quick capture while standup is open, retaining the standup session when capture closes.
 - [x] **STANDUP-02** Accept standup visits when the browser clock leads the server, and verify acknowledged ticks and Retry for click/keyboard navigation.
 - [x] **STANDUP-03** Keep task selection and keyboard focus together through navigation, task updates, completion, reassignment and closing the drawer; continue with the next surviving task (previous at the end).
+
+- [x] **STANDUP-04** Give wrap-up a readable manager action list with editable titles/check-by dates and a shareable team recap, including acknowledged drawer changes.
 
 ## Application review
 
@@ -542,6 +544,7 @@ Parked, not proposed here: calendar awareness (read-only ICS).
 
 | Date | Item | Branch / PR | Agent | Notes |
 |---|---|---|---|---|
+| 2026-10-05 | STANDUP-04 | main (this commit) | Codex | Replaced the sparse wrap-up with responsive manager actions and a shareable team recap. Actions have editable titles/check-by dates, persist in the round and become manager-owned person-linked tasks on Finish; optional suggestions cover blocked/at-risk/waiting work. Recap shows current/next/blocked work, coverage and acknowledged changes with retained task titles, including drawer PATCHes/timeline posts. Team copy excludes private notes/flags/drafts and the manager plan. Existing seal/archive retries and same-day follow-up reuse remain. 235 targeted client and 48 isolated server cases pass; typecheck, build:check, data guard, diff check and touched lint pass (existing warnings). Synthetic Chromium desktop/mobile/light/dark preview inspected; scoped wrap-up axe reports zero A/AA violations, no horizontal overflow; existing roster avatar contrast findings remain outside this scope. No runtime data, Jira, push or deployment. |
 | 2026-10-05 | STANDUP-03 | main (this commit) | Codex | Removed the delayed j/k focus move so rapid Enter opens the highlighted task; native row focus now updates selection. Selection is reconciled by task identity per person/round, with next-surviving then previous fallback after removal, and the chosen task/person is persisted in the existing tab session. Closing a layer restores task focus; drafts and covering dialogs retain focus during refresh. Six new regressions failed first; nine new scenarios cover rapid navigation, native focus, reordered data/drafts, completion in middle/end, empty work, and edited/reassigned drawer return using the shared Dialog shell. Standup/TaskDrawer/TeamTracker/round-lock/standup-logic suites: 244 tests pass; typecheck, build:check, guard:data, diff check and touched lint pass (one existing test warning). No live browser validation or runtime/Jira access; no push or deployment. |
 | 2026-10-05 | STANDUP-02 | main (this commit) | Codex | Reproduced HTTP 400 with visit times just 1 ms ahead of the server. Review writes now cap future browser timestamps at receipt and normalize UTC; older delayed retries keep the original touch time. Click/arrow navigation tests verify the tick only after acknowledgment; Retry retains the request and selected person. New server regressions failed first; standup/freshness 69 and four client suites 161 pass (client files run sequentially to avoid the existing lazy developer-startup timeout under parallel load). typecheck, build:check, guard:data and touched lint pass (existing warnings). No runtime data, Jira, push or deployment; the live browser/server clock difference was not inspected. |
 | 2026-10-05 | STANDUP-01 | main (this commit) | Codex | Global quick capture handles Ctrl/Cmd+I before the standup shortcut guard, opens the existing capture dialog and returns to standup on close. Both regressions failed before the fix; App 63, Standup and GlobalCaptureDialog 94 cases pass. typecheck, build:check, guard:data and touched lint pass (existing warnings). Runtime data and Jira untouched; no push or deployment. |

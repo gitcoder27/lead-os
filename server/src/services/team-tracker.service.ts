@@ -1413,18 +1413,7 @@ export class TeamTrackerService {
 
   private async sealStandupSession(
     managerAccountId: string,
-    input: {
-      date: string;
-      startedAt: string;
-      reviewed: string[];
-      feedSeenThrough?: Record<string, string>;
-      flagged: string[];
-      /** docs/56 P1-07: optional one-line reason per flagged account. */
-      flagReasons?: Record<string, string>;
-      log: { accountId: string; kind: string; taskKey?: string; detail?: string; at: string }[];
-      summary: string;
-      requestId: string;
-    },
+    input: RecordStandupSessionRequest,
     workspaceId?: string,
   ): Promise<RecordStandupSessionResponse> {
     const scope = normalizeWorkspaceId(workspaceId);
@@ -1467,7 +1456,8 @@ export class TeamTrackerService {
         // A stale/unknown flagged id must not block sealing the round.
         try {
           const dev = await this.getDeveloperByAccountId(accountId, scope);
-          const title = `Standup follow-up: ${dev.displayName}`;
+          const plan = input.followUpPlans?.[accountId];
+          const title = plan?.title ?? `Standup follow-up: ${dev.displayName}`;
           const reason = reasons[accountId];
           const reasonLine = reason ? `Flagged in standup: ${reason}` : undefined;
           // docs/51 D6: sealing a second same-day round for the same person
@@ -1493,14 +1483,17 @@ export class TeamTrackerService {
             // A round sealed before follow-ups were linked still gains the link;
             // a new reason is appended, an unchanged one is not repeated.
             await this.tasks.addLink(existing.taskKey, { kind: "person", ref: accountId }, principal);
-            if (reasonLine && !(existing.details ?? "").includes(reasonLine)) {
-              await this.tasks.update(existing.taskKey, { details: existing.details ? `${existing.details}\n${reasonLine}` : reasonLine }, principal);
-            }
+            const details = reasonLine && !(existing.details ?? "").includes(reasonLine)
+              ? { details: existing.details ? `${existing.details}\n${reasonLine}` : reasonLine } : {};
+            if (plan || Object.keys(details).length) await this.tasks.update(existing.taskKey, {
+              ...details,
+              ...(plan && { title: plan.title, followUpAt: plan.followUpAt ?? now }),
+            }, principal);
             followUps.push({ accountId, taskKey: existing.taskKey });
             continue;
           }
           const task = await this.tasks.create(
-            { title, scheduledOn: input.date, followUpAt: now, labels: ["category:follow_up"], ...(reasonLine && { details: reasonLine }) },
+            { title, scheduledOn: input.date, followUpAt: plan?.followUpAt ?? now, labels: ["category:follow_up"], ...(reasonLine && { details: reasonLine }) },
             principal,
           );
           // docs/56 P1-07: the follow-up belongs to the person, so it shows in their linked work.

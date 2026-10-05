@@ -1068,7 +1068,15 @@ function AppContent() {
       return;
     }
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || document.querySelector('[data-testid="standup-mode"]')) return;
+      if (event.defaultPrevented) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        if (!captureOpen) {
+          openCapture();
+        }
+        return;
+      }
+      if (document.querySelector('[data-testid="standup-mode"]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((open) => !open);
@@ -1076,12 +1084,6 @@ function AppContent() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'j') {
         event.preventDefault();
         setAssistantOpen((open) => !open);
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'i') {
-        event.preventDefault();
-        if (!captureOpen) {
-          openCapture();
-        }
       }
     };
     window.addEventListener('keydown', handler);

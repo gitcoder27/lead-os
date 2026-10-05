@@ -99,9 +99,9 @@ vi.mock('@/components/review/WeeklyReviewMode', () => ({
 }));
 
 vi.mock('@/components/team-tracker/TeamTrackerPage', () => ({
-  TeamTrackerPage: (props: { initialDeveloperAccountId?: string; initialTaskKey?: string }) => {
+  TeamTrackerPage: (props: { initialDeveloperAccountId?: string; initialTaskKey?: string; standupMode?: boolean }) => {
     teamTrackerPropsSpy(props);
-    return <div>Team loaded</div>;
+    return <div data-testid={props.standupMode ? 'standup-mode' : undefined}>Team loaded</div>;
   },
 }));
 
@@ -752,6 +752,26 @@ describe('App', () => {
       expect(window.location.search).toContain('mode=standup');
     });
     expect(teamTrackerPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ standupMode: true }));
+  });
+
+  it.each([{ ctrlKey: true }, { metaKey: true }])('opens quick capture over standup with %j+I', async (modifier) => {
+    window.history.pushState(null, '', '/team?mode=standup');
+    useAuthMock.mockReturnValue({
+      user: { username: 'manager', displayName: 'Manager', role: 'manager', workspaceId: 'default' },
+      isLoading: false,
+      isAuthenticated: true,
+    });
+    render(<App />);
+    await screen.findByTestId('standup-mode');
+
+    const event = new KeyboardEvent('keydown', { key: 'i', ...modifier, bubbles: true, cancelable: true });
+    fireEvent(window, event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(await screen.findByRole('dialog', { name: 'Quick capture' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close capture' }));
+    expect(screen.queryByRole('dialog', { name: 'Quick capture' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('standup-mode')).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe('/team?mode=standup');
   });
 
   it('restores the developer drawer target from /team?dev= on cold load (docs/53 F2)', async () => {

@@ -88,3 +88,21 @@ it("counts only visible direct children and excludes dropped work", async () => 
   const detail = await service.detail(parent.taskKey, a);
   expect("children" in detail && detail.children.map((task) => task.title)).toEqual(["Done", "Dropped"]);
 });
+
+it("purges membership with tasks and respects manager, team and workspace reset scopes", async () => {
+  const { WorkspaceMaintenanceService } = await import("../src/services/workspace-maintenance.service");
+  const pa = await containers.write(a, { name: "A" }); const pb = await containers.write(b, { name: "B" });
+  const task = await service.create({ title: "Owned" }, a);
+  await placements.set(a, task.id, { projectId: pa.id, trackId: null });
+  const maintenance = new WorkspaceMaintenanceService();
+  expect((await maintenance.getResetPreview(a.accountId)).projectData?.workspace.projects).toBe(2);
+  await maintenance.reset(a.accountId, "team_tracker");
+  expect(await containers.list(a)).toHaveLength(1);
+  await service.purge([task.id]);
+  expect(await db.select().from(taskPlacements)).toHaveLength(0);
+  await maintenance.reset(a.accountId, "manager_desk");
+  expect(await containers.list(a)).toHaveLength(0);
+  expect((await containers.list(b))[0]?.id).toBe(pb.id);
+  await maintenance.reset(a.accountId, "workspace");
+  expect(await containers.list(b)).toHaveLength(0);
+});

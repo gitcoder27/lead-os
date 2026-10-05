@@ -1,3 +1,4 @@
+import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
 import { memo } from 'react';
 import {
   TriangleAlert,
@@ -101,7 +102,7 @@ export const TodayActionRow = memo(function TodayActionRow({
       >
         {featured ? <span className="sr-only">Start here: </span> : null}
         <span className="today-row-title-line">
-          <span className="today-row-title">{item.title}</span>
+          <span className="today-row-title">{item.title}</span><TaskPlacementLabel placement={item.placement} />
           {chips.map((chip, index) => (
             <span key={chip} className="ui-chip" data-quiet={index > 0 ? 'true' : undefined}>
               {chip}
@@ -180,7 +181,7 @@ export function TodayGroupRow({ item, group, expanded, featured = false, isActiv
           {featured ? <span className="sr-only">Start here: </span> : null}
           <span className="today-row-title-line">
             <ChevronRight size={13} aria-hidden="true" className="today-group-chevron" data-open={expanded ? 'true' : undefined} />
-            <span className="today-row-title">{item.title}</span>
+            <span className="today-row-title">{item.title}</span><TaskPlacementLabel placement={item.placement} />
             <span className="ui-chip">{group.reason}</span>
           </span>
           <span className="today-row-meta">{[item.context, item.freshness].filter(Boolean).join(' · ')}</span>

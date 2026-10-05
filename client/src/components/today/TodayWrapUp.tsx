@@ -1,3 +1,5 @@
+import type { TaskPlacementContext } from '@/types';
+import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
 import { useState } from 'react';
 import { Bell, CalendarArrowUp, CircleCheck, ListTodo, NotebookPen, Pin, PinOff, Rows3, type LucideIcon } from 'lucide-react';
 import { firstName, formatClock, rowContext } from '@/lib/today-layout';
@@ -117,7 +119,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
         <div role="group" aria-label={`Done today (${plan.doneToday.count})`}>
           <h3 className="today-subhead">Done today · {plan.doneToday.count}</h3>
           {doneRows.map((item) => (
-            <TodayDoneRow key={item.taskKey} title={item.title} onOpen={() => onOpenTarget(item.target)} />
+            <TodayDoneRow key={item.taskKey} title={item.title} placement={item.placement} onOpen={() => onOpenTarget(item.target)} />
           ))}
           {plan.doneToday.count > PREVIEW && done.length > PREVIEW ? (
             <MoreToggle total={done.length} open={showAllDone} onToggle={() => setShowAllDone((value) => !value)} />
@@ -181,7 +183,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
               <WrapUpRow
                 key={item.id}
                 icon={Rows3}
-                title={item.title}
+                title={item.title} placement={item.placement}
                 detail={rowContext(item, today)}
                 severity={item.severity}
                 target={item.target}
@@ -220,12 +222,12 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
   );
 }
 
-function TodayDoneRow({ title, onOpen }: { title: string; onOpen: () => void }) {
+function TodayDoneRow({ title, placement, onOpen }: { title: string; placement?: TaskPlacementContext; onOpen: () => void }) {
   return (
     <div className="today-row today-tone-success" data-testid="today-done-row">
       <span className="today-row-icon" aria-hidden="true"><CircleCheck size={14} /></span>
       <button type="button" className="today-row-link" onClick={onOpen}>
-        <span className="today-row-title-line"><span className="today-row-title">{title}</span></span>
+        <span className="today-row-title-line"><span className="today-row-title">{title}</span><TaskPlacementLabel placement={placement} /></span>
       </button>
     </div>
   );
@@ -244,6 +246,7 @@ function tomorrowCommand(target: TodayActionTarget, carry: TodayActionItem | und
 function WrapUpRow({
   icon: Icon,
   title,
+  placement,
   detail,
   detailWarning = false,
   severity,
@@ -255,6 +258,7 @@ function WrapUpRow({
 }: {
   icon: LucideIcon;
   title: string;
+  placement?: TaskPlacementContext;
   detail?: string;
   detailWarning?: boolean;
   severity: string;
@@ -272,7 +276,7 @@ function WrapUpRow({
     <div className={`today-row today-wrapup-row today-tone-${severity}`} data-testid="today-wrapup-row">
       <span className="today-row-icon" aria-hidden="true"><Icon size={14} /></span>
       <button type="button" className="today-row-link" onClick={() => onRunCommand({ kind: 'open', label: 'Open', target })}>
-        <span className="today-row-title-line"><span className="today-row-title">{title}</span></span>
+        <span className="today-row-title-line"><span className="today-row-title">{title}</span><TaskPlacementLabel placement={placement} /></span>
         {detail ? <span className="today-row-meta" style={detailWarning ? { color: 'var(--warning-text)' } : undefined}>{detail}</span> : null}
       </button>
       <span className="today-row-actions">
@@ -316,7 +320,7 @@ function StillOpenRow({
     <div data-testid="tomorrow-top3-candidate">
       <WrapUpRow
         icon={ListTodo}
-        title={item.title}
+        title={item.title} placement={item.placement}
         detail={detail?.text}
         detailWarning={detail?.overdue}
         severity={item.priority === 'high' ? 'warning' : 'neutral'}
@@ -364,7 +368,7 @@ function TomorrowTopThree({
         <div key={item.taskKey} className="today-row today-tone-info" data-testid="tomorrow-top3-row">
           <span className="today-row-icon" aria-hidden="true"><Pin size={14} /></span>
           <button type="button" className="today-row-link" onClick={() => onOpenTarget(item.target)}>
-            <span className="today-row-title-line"><span className="today-row-title">{item.title}</span></span>
+            <span className="today-row-title-line"><span className="today-row-title">{item.title}</span><TaskPlacementLabel placement={item.placement} /></span>
           </button>
           <span className="today-row-actions">
             <button

@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { encodeTaskViewDefinition } from '@/lib/task-views';
@@ -33,7 +33,7 @@ export function useTaskViews(enabled: boolean, today?: string) {
     queryFn: () => api.get<TaskViewsResponse>(`/task-views${today ? `?today=${today}` : ''}`),
     enabled,
     staleTime: 30_000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === scope ? previous : undefined,
   });
 }
 
@@ -47,7 +47,7 @@ export function useTaskViewTasks(definition: TaskViewDefinition | undefined, ena
     enabled: enabled && Boolean(definition),
     staleTime: 10_000,
     // docs/49 R5: keep the previous list on screen while a new view loads.
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === scope ? previous : undefined,
   });
 }
 
@@ -59,7 +59,7 @@ export function useTaskViewCounts(enabled: boolean, today: string) {
     queryFn: () => api.get<TaskViewCountsResponse>(`/tasks/view-counts?today=${today}${zoneParam()}`),
     enabled,
     staleTime: 15_000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === scope ? previous : undefined,
   });
 }
 

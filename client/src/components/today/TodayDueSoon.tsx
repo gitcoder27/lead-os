@@ -18,6 +18,7 @@ export function TodayDueSoon({ items, onRunCommand }: { items: TodayPromiseItem[
             <TodayCompactRow
               key={item.id}
               title={item.title}
+              placement={item.placement}
               detail={item.detail}
               severity={item.severity}
               target={item.target}

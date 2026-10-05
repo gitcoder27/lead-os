@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
 import type { CreateTaskRequest, DeveloperSurfaceTask, DeveloperTask, FormerOwnerTaskDetail, ManagerDeskAssignee, ManagerSurfaceTask, ManagerTask, SurfaceTask, TaskChildRef, TaskDetailResponse, TaskLink, TaskOwnerType, TaskStatus, UpdateTaskRequest } from "shared/types";
 import { db } from "../db/connection";
-import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, tasks } from "../db/schema";
+import { checkinTaskRefs, configTable, dailyNoteFollowUps, dailyNoteTaskRefs, dayFocus, developers, issues, taskLegacyMap, taskLinks, taskPlacements, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskKeysService } from "./task-keys.service";
@@ -616,6 +616,7 @@ export class TaskService {
       const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, scope), inArray(tasks.id, taskIds)));
       const ids = rows.map((row) => row.id);
       if (!ids.length) return;
+      await db.delete(taskPlacements).where(and(eq(taskPlacements.workspaceId, scope), inArray(taskPlacements.taskId, ids)));
       await this.events.deleteForTasks(scope, ids);
       await db.delete(checkinTaskRefs).where(and(eq(checkinTaskRefs.workspaceId, scope), inArray(checkinTaskRefs.taskId, ids)));
       await db.delete(dailyNoteTaskRefs).where(and(eq(dailyNoteTaskRefs.workspaceId, scope), inArray(dailyNoteTaskRefs.taskId, ids)));

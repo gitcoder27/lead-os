@@ -351,6 +351,7 @@ export interface TodayActionCommand {
 }
 
 export interface TodayActionItem {
+  placement?: TaskPlacementContext;
   id: string;
   type: TodayActionItemType;
   title: string;
@@ -485,6 +486,7 @@ export const TODAY_TOP_LIMIT = 3;
 
 /** One of the manager's own tasks on today's plan (or pinned for tomorrow). */
 export interface TodayPlanItem {
+  placement?: TaskPlacementContext;
   taskKey: string;
   title: string;
   status: TaskStatus;
@@ -504,6 +506,7 @@ export interface TodayPlanItem {
 
 /** A task the manager closed today — from real `closed_at`, not the session. */
 export interface TodayDoneItem {
+  placement?: TaskPlacementContext;
   taskKey: string;
   title: string;
   closedAt: string;
@@ -640,6 +643,7 @@ export interface TodayTeamPulseItem {
 }
 
 export interface TodayPromiseItem {
+  placement?: TaskPlacementContext;
   id: string;
   title: string;
   detail: string;
@@ -659,6 +663,7 @@ export interface TodayStandupPrompt {
 }
 
 export interface TodayMeetingPrompt {
+  placement?: TaskPlacementContext;
   id: string;
   title: string;
   detail: string;
@@ -811,7 +816,9 @@ export interface TeamTrackerMaintenancePreview {
   linkedManagerDeskItemCount: number;
 }
 
+export interface ProjectDataCounts { projects: number; tracks: number; memberships: number }
 export interface WorkspaceMaintenancePreviewResponse {
+  projectData?: { manager: ProjectDataCounts; workspace: ProjectDataCounts };
   backupBeforeReset: boolean;
   managerDesk: ManagerDeskMaintenancePreview;
   teamTracker: TeamTrackerMaintenancePreview;

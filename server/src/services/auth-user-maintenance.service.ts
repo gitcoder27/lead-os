@@ -1,3 +1,4 @@
+import { clearProjectData, projectDataCounts } from "./project-maintenance";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { UserRole } from "shared/types";
 import { db } from "../db/connection";
@@ -41,6 +42,7 @@ export interface AuthUserDeletionPrivateDataPreview {
   managerDeskHistoryCount: number;
   linkedTrackerItemCount: number;
   privateTaskEventCount: number;
+  projectCount?: number; trackCount?: number; placementCount?: number;
 }
 
 export interface AuthUserDeletionPreview {
@@ -214,18 +216,19 @@ export class AuthUserMaintenanceService {
     }
 
     const managerDesk = await this.getManagerDeskPrivateDataPreview(user);
+    const projectData = await projectDataCounts(user.workspaceId, user.username);
     return {
       sessionCount: sessionRows.length,
       alertDismissalCount: alertRows.length,
       teamTrackerSavedViewCount: savedViewRows.length,
-      ...managerDesk,
+      ...managerDesk, projectCount: projectData.projects, trackCount: projectData.tracks, placementCount: projectData.memberships,
       privateTaskEventCount: await this.eventsService.countPrivateForAuthor(user.workspaceId, user.username),
     };
   }
 
   private async getManagerDeskPrivateDataPreview(
     user: PersistedAuthUser
-  ): Promise<Omit<AuthUserDeletionPrivateDataPreview, "sessionCount" | "alertDismissalCount" | "teamTrackerSavedViewCount" | "privateTaskEventCount">> {
+  ): Promise<Omit<AuthUserDeletionPrivateDataPreview, "sessionCount" | "alertDismissalCount" | "teamTrackerSavedViewCount" | "privateTaskEventCount" | "projectCount" | "trackCount" | "placementCount">> {
     if (await new TaskKeysService().canonicalEnabled(user.workspaceId)) {
       const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, user.workspaceId), or(eq(tasks.trackedByManagerId, user.username), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, user.username)))));
       const links = await new TaskService().listLinks(rows.filter((row) => row.ownerType !== "developer").map((row) => row.id), user.workspaceId);
@@ -292,6 +295,7 @@ export class AuthUserMaintenanceService {
     await db
       .delete(weeklyReviews)
       .where(and(eq(weeklyReviews.workspaceId, user.workspaceId), eq(weeklyReviews.managerAccountId, user.username)));
+    await clearProjectData(user.workspaceId, user.username);
     await this.eventsService.deletePrivateForAuthor(user.workspaceId, user.username);
     if (await new TaskKeysService().canonicalEnabled(user.workspaceId)) {
       const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, user.workspaceId), or(eq(tasks.trackedByManagerId, user.username), and(eq(tasks.ownerType, "manager"), eq(tasks.ownerId, user.username)))));

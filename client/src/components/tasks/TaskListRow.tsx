@@ -1,3 +1,4 @@
+import { TaskPlacementLabel } from './TaskPlacementLabel';
 import { memo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Bell, BellRing, Ellipsis, Flag, GitCompareArrows, Hourglass } from 'lucide-react';
 import { taskLabelDisplayName, type TaskSignals, type TaskViewDefinition } from '@/types';
@@ -163,6 +164,7 @@ export const TaskListRow = memo(function TaskListRow({
             <span className="task-row-title text-[13px] font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
           </button>
           <span className="task-row-metadata">
+            <TaskPlacementLabel placement={task.placement} />
             {labels.slice(0, 2).map((label) => <span key={label} className="task-row-label hidden max-w-[120px] truncate rounded-md px-1.5 py-px text-[11px] font-semibold sm:inline" title={taskLabelDisplayName(label)} style={labelChipStyle(labelColor(label))}>{taskLabelDisplayName(label)}</span>)}
             {labels.length > 2 && <span className="hidden shrink-0 text-[11px] sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>+{labels.length - 2}</span>}
             {task.lingering && isOpenStatus(task.status) && <span className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>}

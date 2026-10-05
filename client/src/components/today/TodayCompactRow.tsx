@@ -1,9 +1,12 @@
+import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
+import type { TaskPlacementContext } from '@/types';
 import { Bell, CalendarClock, Rows3, type LucideIcon } from 'lucide-react';
 import type { TodayRunCommand } from './TodayActionRow';
 import type { TodayActionCommand, TodayActionSeverity, TodayActionTarget } from '@/types';
 
 interface TodayCompactRowProps {
   title: string;
+  placement?: TaskPlacementContext;
   detail?: string;
   severity: TodayActionSeverity;
   target: TodayActionTarget;
@@ -20,7 +23,7 @@ const iconByTarget: Partial<Record<TodayActionTarget['type'], LucideIcon>> = {
 };
 
 /** One-link rows for promises, meetings, due-soon and wrap-up lists. */
-export function TodayCompactRow({ title, detail, severity, target, primary, secondary, icon, onRunCommand }: TodayCompactRowProps) {
+export function TodayCompactRow({ title, placement, detail, severity, target, primary, secondary, icon, onRunCommand }: TodayCompactRowProps) {
   const Icon = icon ?? iconByTarget[target.type] ?? Bell;
   return (
     <div className={`today-row today-tone-${severity}`} data-testid="today-compact-row">
@@ -31,6 +34,7 @@ export function TodayCompactRow({ title, detail, severity, target, primary, seco
         <span className="today-row-title-line">
           <span className="today-row-title">{title}</span>
         </span>
+        <TaskPlacementLabel placement={placement} />
         {detail ? <span className="today-row-meta">{detail}</span> : null}
       </button>
       <span className="today-row-actions">

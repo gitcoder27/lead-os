@@ -38,6 +38,9 @@ export function SettingsMaintenanceSection({
             formatCount(previewQuery.data.managerDesk.itemCount, 'desk task'),
             formatCount(previewQuery.data.teamTracker.itemCount, 'tracker item'),
             formatCount(previewQuery.data.teamTracker.checkInCount, 'check-in'),
+            formatCount(previewQuery.data.projectData?.workspace.projects ?? 0, 'private project'),
+            formatCount(previewQuery.data.projectData?.workspace.tracks ?? 0, 'track'),
+            formatCount(previewQuery.data.projectData?.workspace.memberships ?? 0, 'placement'),
           ]
         : [],
     [previewQuery.data]
@@ -168,10 +171,13 @@ export function SettingsMaintenanceSection({
         <MaintenanceActionCard
           target="manager_desk"
           title="Reset my tasks"
-          description="Clear your tasks, their days, links, and history. Team board tasks created from them are removed too."
+          description="Clear your tasks, projects, tracks, placements, days, links, and history. Team board tasks created from them are removed too."
           counts={[
             formatCount(preview.managerDesk.itemCount, 'task'),
             formatCount(preview.managerDesk.dayCount, 'day'),
+            formatCount(preview.projectData?.manager.projects ?? 0, 'project'),
+            formatCount(preview.projectData?.manager.tracks ?? 0, 'track'),
+            formatCount(preview.projectData?.manager.memberships ?? 0, 'placement'),
             formatCount(preview.managerDesk.historyCount, 'history row'),
             formatCount(preview.managerDesk.linkedTrackerItemCount, 'linked tracker item'),
           ]}

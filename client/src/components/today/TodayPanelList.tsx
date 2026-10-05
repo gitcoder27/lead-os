@@ -42,6 +42,7 @@ export function TodayPanelList({ title, items, today, icon, bulk, onRunCommand }
             key={item.id}
             icon={icons[icon]}
             title={item.title}
+              placement={item.placement}
             detail={rowContext(item, today)}
             severity={item.severity}
             target={item.target}

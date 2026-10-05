@@ -1,3 +1,4 @@
+import { clearProjectData, projectDataCounts } from "./project-maintenance";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type {
   ManagerDeskMaintenancePreview,
@@ -58,6 +59,7 @@ export class WorkspaceMaintenanceService {
     ]);
 
     return {
+      projectData: { manager: await projectDataCounts(normalizedWorkspaceId, managerAccountId), workspace: await projectDataCounts(normalizedWorkspaceId) },
       backupBeforeReset,
       managerDesk: managerDesk.preview,
       teamTracker: teamTracker.preview,
@@ -75,6 +77,7 @@ export class WorkspaceMaintenanceService {
       : null;
 
     await runInTransaction(async () => {
+      if (target !== "team_tracker") await clearProjectData(normalizedWorkspaceId, target === "workspace" ? undefined : managerAccountId);
       if (await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)) {
         const rows = await db.select().from(tasks).where(eq(tasks.workspaceId, normalizedWorkspaceId));
         const selected = rows.filter((row) => target === "workspace" || (target === "team_tracker" ? row.ownerType === "developer" : row.trackedByManagerId === managerAccountId || (row.ownerType === "manager" && row.ownerId === managerAccountId)));

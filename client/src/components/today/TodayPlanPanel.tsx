@@ -1,3 +1,4 @@
+import { TaskPlacementLabel } from '@/components/tasks/TaskPlacementLabel';
 import { useState } from 'react';
 import { Circle, CircleCheck, Inbox, ListTodo, Pin, PinOff, Plus } from 'lucide-react';
 import { relativeTaskDate } from '@/lib/task-list';
@@ -84,7 +85,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
                   {item.pinned ? <Pin size={14} /> : <ListTodo size={14} />}
                 </span>
                 <button type="button" className="today-row-link" onClick={() => onRunCommand(openCommand(item.target))}>
-                  <span className="today-row-title-line"><span className="today-row-title">{item.title}</span></span>
+                  <span className="today-row-title-line"><span className="today-row-title">{item.title}</span><TaskPlacementLabel placement={item.placement} /></span>
                   {detail ? (
                     <span className="today-row-meta" style={detail.overdue ? { color: 'var(--warning-text)' } : undefined}>{detail.text}</span>
                   ) : null}

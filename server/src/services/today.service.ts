@@ -1,3 +1,4 @@
+import { addTodayProjectContext } from "./today-project-context";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
 import { WeeklyReviewService } from "./weekly-review.service";
@@ -562,6 +563,7 @@ export class TodayService {
         }
         : {}),
     };
+    if (canonical) await addTodayProjectContext(today, { type: "manager", accountId: managerAccountId, workspaceId });
     const buildDurationMs = performance.now() - buildStartedAt;
     const sourceTimings = {
       issues: issueResult.durationMs,

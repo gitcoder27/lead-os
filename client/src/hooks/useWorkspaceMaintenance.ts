@@ -34,6 +34,11 @@ export function useWorkspaceMaintenanceReset() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['config', 'maintenance-reset-preview'] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['project'] }),
+        queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['task-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['today'] }),
         queryClient.invalidateQueries({ queryKey: ['manager-desk'] }),
         queryClient.invalidateQueries({ queryKey: ['team-tracker'] }),
         queryClient.invalidateQueries({ queryKey: ['my-day'] }),

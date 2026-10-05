@@ -4,6 +4,7 @@ import type { ActiveAppView, AppView } from '@/App';
 import { interceptWorkspaceLink, WorkspaceNavLink } from './WorkspaceNavLink';
 import { useNavPreferences } from '@/hooks/useNavPreferences';
 import { useNavAvailability } from '@/hooks/useNavAvailability';
+import { TodayCountBadge } from './TodayCountLink';
 import { NAV_PAGE_META, applyNavAvailability } from '@/lib/nav-pages';
 import { Popover } from '@/components/ui/Popover';
 import type { NavPageId } from '@/types';
@@ -22,8 +23,9 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
   useEffect(() => { if (morePages.length === 0) setMoreOpen(false); }, [morePages.length]);
   const moreIsActive = morePages.some((id) => Boolean(activeView && NAV_PAGE_META[id].matches.includes(activeView)));
   return (
-    <nav aria-label="Workspace navigation" className="flex min-w-0 flex-wrap items-center gap-0.5 rounded-xl p-0.5" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-      <WorkspaceNavLink label="Today" icon={Home} active={activeView === 'today'} accentColor="var(--accent)" onClick={() => onViewChange('today')} href="/" />
+    <nav aria-label="Workspace navigation" className="flex min-w-0 flex-wrap items-center gap-0.5">
+      <WorkspaceNavLink label="Today" icon={Home} active={activeView === 'today'} accentColor="var(--accent)" onClick={() => onViewChange('today')} href="/"
+        badge={isManager && activeView !== 'today' ? <TodayCountBadge /> : undefined} />
       {topPages.map((id) => {
         const meta = NAV_PAGE_META[id];
         return <WorkspaceNavLink key={id} label={meta.label} icon={meta.icon} active={Boolean(activeView && meta.matches.includes(activeView))} accentColor={meta.accentColor} onClick={() => onViewChange(meta.view)} href={meta.href} />;
@@ -31,8 +33,8 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
       {isManager && morePages.length > 0 && (
         <>
           <button ref={moreRef} type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More workspaces"
-            className="flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
-            style={{ background: moreIsActive ? 'var(--bg-elevated)' : 'transparent', color: moreIsActive ? 'var(--accent-text)' : 'var(--text-muted)' }}>
+            className="header-ghost flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-[12.5px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+            style={moreIsActive || moreOpen ? { background: 'var(--bg-tertiary)', color: moreIsActive ? 'var(--accent-text)' : 'var(--text-primary)' } : undefined}>
             <MoreHorizontal size={13} /><span className="hidden sm:inline">More</span>
           </button>
           {moreOpen && <Popover anchor={moreRef.current} onClose={() => setMoreOpen(false)} label="More workspaces" width={192}>

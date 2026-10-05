@@ -11,7 +11,6 @@ import type { ManagerActionTarget } from '@/types';
 import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
-import { TodayCountLink } from '@/components/layout/TodayCountLink';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { Kbd } from '@/components/ui/Kbd';
 
@@ -84,7 +83,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
         className="relative z-header shrink-0 px-1 pt-0.5 md:px-1.5"
       >
         <div
-          className="header-panel dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 xl:flex-row xl:items-center xl:justify-between"
+          className="header-panel dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between"
           style={{ borderColor: 'var(--border-strong)' }}
         >
           <div className="header-identity-nav flex min-w-0 flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-3">
@@ -119,13 +118,27 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
             )}
           </div>
 
-          <div className="header-actions flex min-w-0 flex-wrap items-center justify-between gap-1.5 xl:flex-nowrap xl:justify-end">
-            <div className="flex items-center gap-1.5">
-              {/* docs/56 UX-30: one pointer to Today ("Today N") off Today, and the updates inbox on every page;
-                  Jira attention signals live on Work. Both step aside below 480px, where the nav already has Today. */}
-              {user?.role === 'manager' && onViewChange && activeView !== 'today' ? (
-                <span className="header-wide-only"><TodayCountLink onOpenToday={() => onViewChange('today')} /></span>
-              ) : null}
+          <div className="header-actions flex min-w-0 items-center justify-between gap-2 lg:flex-1 lg:gap-3">
+            {/* One search field in the middle; below md it collapses to an icon. */}
+            {canQuickCapture && (
+              <div className="flex md:flex-1 md:justify-center">
+                <button
+                  type="button"
+                  onClick={() => openCommandPalette()}
+                  className="header-search inline-flex h-8 w-8 items-center justify-center gap-2 rounded-xl text-[12.5px] md:w-full md:max-w-[420px] md:justify-start md:px-3"
+                  title="Search and jump anywhere (Ctrl/⌘+K)"
+                  aria-label="Open command palette"
+                >
+                  <Search size={14} className="shrink-0" />
+                  <span className="hidden md:inline">Search or jump to…</span>
+                  <Kbd variant="bare" className="ml-auto hidden md:inline">⌘K</Kbd>
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 lg:gap-1.5">
+              {/* docs/56 UX-30: Today's count rides on the nav's Today tab; the updates inbox shows on every page.
+                  Jira attention signals live on Work. The inbox steps aside below 480px. */}
               {user?.role === 'manager' && onViewChange && features?.tasksPhase3 && features.teamMode === 'collab' ? (
                 <span className="header-wide-only"><ManagerActionInbox updatesOnly onOpenTarget={openActionTarget} onViewChange={onViewChange} /></span>
               ) : null}
@@ -134,37 +147,35 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 <button
                   type="button"
                   onClick={toggleAssistant}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[12px] font-medium transition-all"
-                  style={{
-                    background: assistantOpen ? 'var(--bg-elevated)' : 'var(--bg-tertiary)',
-                    color: assistantOpen ? 'var(--accent)' : 'var(--text-secondary)',
-                    border: '1px solid var(--border)',
-                  }}
+                  className="header-ghost header-icon-btn"
+                  aria-pressed={assistantOpen}
+                  style={assistantOpen ? { color: 'var(--accent-text)', background: 'var(--accent-glow)' } : undefined}
                   title="LeadOS Copilot (Ctrl/⌘+J)"
                   aria-label="Open Copilot"
                 >
-                  <CopilotMark size={13} monochrome />
-                  <span className="hidden sm:inline">Copilot</span>
-                  <Kbd variant="bare" className="hidden lg:inline">⌘J</Kbd>
+                  <CopilotMark size={15} monochrome />
                 </button>
               )}
 
-              {canQuickCapture && (
+              <button
+                onClick={toggleTheme}
+                className="header-ghost header-icon-btn"
+                title="Toggle theme"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+
+              {user?.role === 'manager' && onViewChange && (
                 <button
-                  type="button"
-                  onClick={() => openCommandPalette()}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-[12px] font-medium transition-all"
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    color: 'var(--text-secondary)',
-                    border: '1px solid var(--border)',
-                  }}
-                  title="Search and jump anywhere (Ctrl/⌘+K)"
-                  aria-label="Open command palette"
+                  onClick={() => onViewChange('settings')}
+                  className="header-ghost header-icon-btn"
+                  style={activeView === 'settings' ? { color: 'var(--accent-text)', background: 'var(--accent-glow)' } : undefined}
+                  title="Settings"
+                  aria-label="Open settings"
+                  aria-current={activeView === 'settings' ? 'page' : undefined}
                 >
-                  <Search size={13} />
-                  <span className="hidden sm:inline">Search</span>
-                  <Kbd variant="bare" className="hidden lg:inline">⌘K</Kbd>
+                  <Settings size={16} />
                 </button>
               )}
 
@@ -177,56 +188,14 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                       defaultTarget: captureContext?.defaultTarget ?? defaultCaptureTarget,
                     })
                   }
-                  className="inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-[12px] font-semibold transition-all"
-                  style={{
-                    background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
-                    color: 'var(--accent)',
-                    border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)',
-                  }}
+                  className="header-primary-btn ml-1 inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold"
                   title="Quick capture (Ctrl/⌘+I)"
                   aria-label="Capture"
                 >
-                  <Plus size={12} />
+                  <Plus size={14} strokeWidth={2.5} />
                   <span className="hidden sm:inline">Capture</span>
-                  <Kbd variant="bare" className="hidden lg:inline">⌘I</Kbd>
                 </button>
               )}
-
-              <div
-                className="rounded-xl p-0.5 flex items-center gap-0.5"
-                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}
-              >
-                <button
-                  onClick={toggleTheme}
-                  className="h-8 w-8 rounded-lg transition-colors duration-150 flex items-center justify-center"
-                  style={{ background: 'transparent' }}
-                  title="Toggle theme"
-                >
-                  {theme === 'dark' ? (
-                    <Sun size={16} style={{ color: 'var(--text-secondary)' }} />
-                  ) : (
-                    <Moon size={16} style={{ color: 'var(--text-secondary)' }} />
-                  )}
-                </button>
-
-                {user?.role === 'manager' && onViewChange && (
-                  <button
-                    onClick={() => onViewChange('settings')}
-                    className="h-8 w-8 rounded-lg transition-colors duration-150 flex items-center justify-center"
-                    style={{
-                      background: activeView === 'settings' ? 'var(--bg-elevated)' : 'transparent',
-                      boxShadow: activeView === 'settings' ? 'var(--soft-shadow)' : 'none',
-                    }}
-                    title="Settings"
-                    aria-label="Open settings"
-                  >
-                    <Settings
-                      size={16}
-                      style={{ color: activeView === 'settings' ? 'var(--accent)' : 'var(--text-secondary)' }}
-                    />
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </div>

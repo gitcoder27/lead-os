@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkAttentionSignals } from '@/components/work/WorkAttentionSignals';
-import { TodayCountLink } from '@/components/layout/TodayCountLink';
+import { TodayCountBadge } from '@/components/layout/TodayCountLink';
 import { TestWrapper } from './wrapper';
 import type { Alert } from '@/types';
 
@@ -42,15 +42,12 @@ describe('header inbox becomes updates-only (UX-30)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('"Today N" links to Today and hides at zero', () => {
-    const onOpenToday = vi.fn();
-    const { rerender } = render(<TodayCountLink onOpenToday={onOpenToday} />);
-    const link = screen.getByRole('link', { name: 'Today: 14 to look at' });
-    expect(link).toHaveAttribute('href', '/');
-    fireEvent.click(link);
-    expect(onOpenToday).toHaveBeenCalled();
+  it('the Today tab carries the queue count and hides it at zero', () => {
+    const { rerender } = render(<TodayCountBadge />);
+    expect(screen.getByText('14')).toBeInTheDocument();
+    expect(screen.getByText(', 14 to look at')).toBeInTheDocument();
     todayTotal = 0;
-    rerender(<TodayCountLink onOpenToday={onOpenToday} />);
-    expect(screen.queryByRole('link')).toBeNull();
+    rerender(<TodayCountBadge />);
+    expect(screen.queryByText('14')).toBeNull();
   });
 });

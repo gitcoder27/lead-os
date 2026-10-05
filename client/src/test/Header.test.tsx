@@ -48,7 +48,7 @@ vi.mock('@/components/actions/ManagerActionInbox', () => ({
 }));
 
 vi.mock('@/components/layout/TodayCountLink', () => ({
-  TodayCountLink: () => <a data-testid="today-count-link" href="/">Today 14</a>,
+  TodayCountBadge: () => <span data-testid="today-count-badge">14</span>,
 }));
 
 describe('Header', () => {
@@ -112,7 +112,7 @@ describe('Header', () => {
   it('uses native destination links on active and inactive workspaces', () => {
     render(<Header activeView="team" onViewChange={vi.fn()} />);
 
-    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /^Today/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Desk' })).toHaveAttribute('href', '/desk');
 
@@ -291,16 +291,16 @@ describe('Header', () => {
     const { rerender } = render(
       <Header activeView="work" onViewChange={vi.fn()} />
     );
-    expect(screen.getByTestId('today-count-link')).toBeInTheDocument();
+    expect(screen.getByTestId('today-count-badge')).toBeInTheDocument();
     // Solo: there are no task updates, so no inbox at all.
     expect(screen.queryByTestId('manager-action-inbox')).not.toBeInTheDocument();
 
     rerender(<Header activeView="team" onViewChange={vi.fn()} />);
-    expect(screen.getByTestId('today-count-link')).toBeInTheDocument();
+    expect(screen.getByTestId('today-count-badge')).toBeInTheDocument();
 
     // On `/` Today is the page itself.
     rerender(<Header activeView="today" onViewChange={vi.fn()} />);
-    expect(screen.queryByTestId('today-count-link')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('today-count-badge')).not.toBeInTheDocument();
   });
 
   it('shows the updates-only inbox on every page in collaborative mode (UX-30)', () => {

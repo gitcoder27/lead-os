@@ -1538,8 +1538,12 @@ export class TeamTrackerService {
     const recorded = known.map((row) => row.accountId);
     const now = new Date().toISOString();
     for (const developerAccountId of recorded) {
-      const reviewedAt = input.reviewedAt?.[developerAccountId] ?? now;
-      if (!Number.isFinite(Date.parse(reviewedAt)) || Date.parse(reviewedAt) > Date.parse(now)) throw new HttpError(400, "Invalid review time");
+      const visitTime = Date.parse(input.reviewedAt?.[developerAccountId] ?? now);
+      if (!Number.isFinite(visitTime)) throw new HttpError(400, "Invalid review time");
+      // Browser clocks can lead the server. A visit still happened; cap its touch
+      // at receipt time, retaining older times so delayed retries do not freshen them.
+      // Canonical UTC also keeps SQLite's MAX comparison chronological.
+      const reviewedAt = new Date(Math.min(visitTime, Date.parse(now))).toISOString();
       await db.insert(standupReviews).values({
         workspaceId: scope,
         managerAccountId,

@@ -2029,6 +2029,7 @@ export interface StandupSessionRecord {
 export interface RecordStandupReviewsRequest {
   date: string;
   accountIds: string[];
+  /** Original visit times; the server normalizes to UTC and caps future browser times at receipt. */
   reviewedAt?: Record<string, string>;
 }
 

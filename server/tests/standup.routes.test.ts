@@ -541,6 +541,48 @@ describe("POST /api/team-tracker/standup/reviews (docs/56 P1-07)", () => {
     expect(empty.body).toEqual({ recorded: [] });
   });
 
+  it.each([1, 5 * 60 * 1000])("acknowledges visits when the browser clock is %i ms ahead", async (skewMs) => {
+    await enablePhase3();
+    const now = "2026-10-05T06:00:00.000Z";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(now));
+    const reviewedAt = new Date(Date.parse(now) + skewMs).toISOString();
+
+    const response = await invoke("POST", "/api/team-tracker/standup/reviews", body({
+      reviewedAt: { "dev-1": reviewedAt },
+    }));
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ recorded: ["dev-1"] });
+    const [row] = await db.select().from(standupReviews);
+    expect(row!.reviewedAt).toBe(now);
+    expect((await touchOf("dev-1")).lastManagerTouchAt).toBe(now);
+  });
+
+  it("preserves the actual visit time on a delayed retry and normalizes timestamp offsets", async () => {
+    await enablePhase3();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-05T06:00:00.000Z"));
+    const payload = body({ reviewedAt: { "dev-1": "2026-10-05T11:00:00+05:30" } });
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", payload)).status).toBe(201);
+    vi.setSystemTime(new Date("2026-10-05T07:00:00.000Z"));
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", payload)).status).toBe(201);
+    expect((await db.select().from(standupReviews))[0]!.reviewedAt).toBe("2026-10-05T05:30:00.000Z");
+
+    // An older retry must never replace a newer acknowledged visit.
+    await invoke("POST", "/api/team-tracker/standup/reviews", body({ reviewedAt: { "dev-1": "2026-10-05T05:00:00.000Z" } }));
+    expect((await db.select().from(standupReviews))[0]!.reviewedAt).toBe("2026-10-05T05:30:00.000Z");
+  });
+
+  it("still rejects malformed visit times in the route and service", async () => {
+    await enablePhase3();
+    const payload = body({ reviewedAt: { "dev-1": "not-a-time" } });
+    expect((await invoke("POST", "/api/team-tracker/standup/reviews", payload)).status).toBe(400);
+    await expect(trackerService.recordStandupReviews("manager-1", {
+      date: todayIsoDate(), accountIds: ["dev-1"], reviewedAt: { "dev-1": "not-a-time" },
+    })).rejects.toThrow("Invalid review time");
+    expect(await db.select().from(standupReviews)).toHaveLength(0);
+  });
+
   it("does not count for a developer who checks in (their clock is the check-in)", async () => {
     await enablePhase3();
     await enableCollabParticipation(["dev-1"]);

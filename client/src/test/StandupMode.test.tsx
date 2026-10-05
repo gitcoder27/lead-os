@@ -1005,6 +1005,39 @@ describe('StandupMode', () => {
     });
 
     describe('docs/56 P1-07: manager-owned standup follow-through', () => {
+      it.each(['click', 'keyboard'])('shows the visited tick after saving a %s navigation', async (navigation) => {
+        let acknowledge!: () => void;
+        mockRecordReviewsMutate.mockImplementationOnce((body, options) => {
+          acknowledge = () => options?.onSuccess?.({ recorded: body.accountIds });
+        });
+        renderStandup();
+        const roster = within(screen.getByRole('listbox', { name: 'Standup order' }));
+        if (navigation === 'click') fireEvent.click(roster.getByRole('option', { name: 'Bob Jones' }));
+        else fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+
+        const alice = roster.getByRole('option', { name: 'Alice Smith, visited, not saved' });
+        expect(alice.querySelector('.lucide-check')).not.toBeInTheDocument();
+        await act(async () => acknowledge());
+        expect(alice).toHaveAccessibleName('Alice Smith, visited');
+        expect(alice.querySelector('.lucide-check')).toBeInTheDocument();
+        expect(screen.queryByTestId('standup-saving')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Visits not saved/)).not.toBeInTheDocument();
+      });
+
+      it('acknowledges a failed visit using Retry without refreshing or losing the current person', async () => {
+        mockRecordReviewsMutate.mockImplementationOnce((_body, options) => options?.onError?.());
+        renderStandup();
+        fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+        await screen.findByText(/Visits not saved/);
+        const request = mockRecordReviewsMutate.mock.calls[0]![0];
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByText(/Visits not saved/)).not.toBeInTheDocument());
+        expect(mockRecordReviewsMutate).toHaveBeenLastCalledWith(request, expect.anything());
+        const roster = within(screen.getByRole('listbox', { name: 'Standup order' }));
+        expect(roster.getByRole('option', { name: 'Alice Smith, visited' }).querySelector('.lucide-check')).toBeInTheDocument();
+        expect(roster.getByRole('option', { name: 'Bob Jones' })).toHaveAttribute('aria-selected', 'true');
+      });
+
       it('records a review as a manager touch the moment someone is reviewed, without sealing', async () => {
         renderStandup();
         expect(mockRecordReviewsMutate).not.toHaveBeenCalled();

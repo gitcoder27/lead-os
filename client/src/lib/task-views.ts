@@ -32,6 +32,8 @@ export type TaskViewGroupOverride = TaskViewGroup | 'none';
 
 /** Transient overrides expressed as flat URL params alongside `?view=`. */
 export interface TaskViewOverrides {
+  project?: number | 'none' | 'all';
+  track?: number | 'none' | 'all';
   /** `me` | `team` | `inbox`, or a comma list of developer account ids. */
   owner?: string;
   status?: TaskStatus[];
@@ -51,6 +53,7 @@ const TASK_SIGNALS: readonly TaskAttentionSignal[] = ['overdue', 'stale', 'drift
 export const OWNER_TOKENS = ['me', 'team', 'inbox'] as const;
 
 export interface TaskViewUrlState {
+  archived?: boolean;
   view?: string;
   overrides: TaskViewOverrides;
   /** docs/49 D7: transient text search, never saved into a view. */
@@ -82,7 +85,10 @@ export function taskViewStateFromParams(params: URLSearchParams): TaskViewUrlSta
   const kindParam = params.get('kind');
   const priorityParam = params.get('priority');
   const q = params.get('q')?.trim();
+  const placementFilter = (key: string): number | 'none' | 'all' | undefined => { const value = params.get(key); return value === 'none' || value === 'all' ? value : value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined; };
   const overrides: TaskViewOverrides = {
+    ...(placementFilter('project') !== undefined && { project: placementFilter('project') }),
+    ...(placementFilter('track') !== undefined && { track: placementFilter('track') }),
     ...(owner ? { owner } : {}),
     ...(status.length ? { status } : {}),
     ...(priorityParam === 'high' || priorityParam === 'normal' || priorityParam === 'all' ? { priority: priorityParam } : {}),
@@ -95,6 +101,7 @@ export function taskViewStateFromParams(params: URLSearchParams): TaskViewUrlSta
   const view = params.get('view')?.trim() || undefined;
   const retired = view ? RETIRED_TASK_VIEWS[view] : undefined;
   return {
+    ...(params.get('archived') === 'true' && { archived: true }),
     view: retired ? retired.view : view,
     // Explicit URL params win over the alias's implied overrides.
     overrides: retired ? { ...retired.overrides, ...overrides } : overrides,
@@ -105,6 +112,7 @@ export function taskViewStateFromParams(params: URLSearchParams): TaskViewUrlSta
 /** Compose the effective definition: base view + URL overrides. */
 export function applyTaskViewOverrides(base: TaskViewDefinition, overrides: TaskViewOverrides): TaskViewDefinition {
   const filters = { ...(base.filters ?? {}) };
+  for (const key of ['project', 'track'] as const) { const value = overrides[key]; if (value === 'all') delete filters[key]; else if (value !== undefined) filters[key] = value; }
   if (overrides.owner) {
     filters.owner = (OWNER_TOKENS as readonly string[]).includes(overrides.owner)
       ? (overrides.owner as 'me' | 'team' | 'inbox')
@@ -127,6 +135,8 @@ export function applyTaskViewOverrides(base: TaskViewDefinition, overrides: Task
 export function taskViewParamsFromState(state: TaskViewUrlState): URLSearchParams {
   const params = new URLSearchParams();
   if (state.view) params.set('view', state.view);
+  if (state.archived) params.set('archived', 'true');
+  for (const key of ['project', 'track'] as const) if (state.overrides[key] !== undefined) params.set(key, String(state.overrides[key]));
   const { owner, status, priority, label, group, sort, kind, signal } = state.overrides;
   if (owner) params.set('owner', owner);
   if (status?.length) params.set('status', status.join(','));

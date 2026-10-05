@@ -1,3 +1,7 @@
+import { ProjectsPanel } from './ProjectsPanel';
+import { ProjectFilters } from './ProjectFilters';
+import { useProject } from '@/hooks/useProjects';
+import { taskViewParamsFromState } from '@/lib/task-views';
 import { csvFileName, downloadCsv, tasksCsv } from '@/lib/csv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
@@ -210,7 +214,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   }, []);
 
   // ── View + data ──────────────────────────────────────────────────────────
-  const allViews = useMemo(() => views.data?.views ?? [], [views.data]);
+  const allViews = useMemo<TaskViewMeta[]>(() => [...(views.data?.views ?? []), { id: 'projects', name: 'Projects', builtin: true, section: 'plan', definition: { sort: 'scheduled' } }], [views.data]);
   const selectedId = state.view ?? DEFAULT_TASK_VIEW_ID;
   const selectedView: TaskViewMeta | undefined =
     allViews.find((view) => view.id === selectedId) ?? allViews.find((view) => view.id === DEFAULT_TASK_VIEW_ID) ?? allViews[0];
@@ -218,7 +222,13 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     () => (selectedView ? applyTaskViewOverrides(selectedView.definition, state.overrides) : undefined),
     [selectedView, state.overrides],
   );
-  const tasks = useTaskViewTasks(definition, Boolean(definition), today);
+  const projectId = typeof definition?.filters?.project === 'number' ? definition.filters.project : undefined;
+  const trackId = typeof definition?.filters?.track === 'number' ? definition.filters.track : undefined;
+  const projectDetail = useProject(projectId, today);
+  const projectsMode = selectedId === 'projects';
+  const projectUnavailable = Boolean(projectId && (projectDetail.isError || (trackId && projectDetail.data && !projectDetail.data.tracks.some((track) => track.id === trackId))));
+  const showTaskList = (!projectsMode || Boolean(projectId)) && !projectUnavailable;
+  const tasks = useTaskViewTasks(definition, Boolean(definition) && showTaskList, today);
   const taskList = useMemo(() => tasks.data?.tasks ?? [], [tasks.data]);
   const overridesActive = hasTaskViewOverrides(state.overrides);
 
@@ -740,6 +750,12 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       for (const field of Object.keys(merged) as (keyof TaskViewOverrides)[]) if (merged[field] === undefined) delete merged[field];
       return { ...current, overrides: merged };
     });
+  const navigateProject = (project?: number, track?: number) => {
+    const next: TaskViewUrlState = { view: 'projects', overrides: { ...(project && { project }), ...(track && { track }) } };
+    window.history.pushState(null, '', `/tasks?${taskViewParamsFromState(next)}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    setState(next);
+  };
   const clearFilters = () => setState((current) => ({ view: current.view, overrides: {} }));
 
   const savedSelected = selectedView && !selectedView.builtin ? selectedView : undefined;
@@ -825,7 +841,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const updating = tasks.isFetching && tasks.isPlaceholderData;
   // docs/51 F14: add is offered on empty views unless filters/search narrowed
   // the result or the view is a read-only queue.
-  const canAddToEmptyView = !overridesActive && !state.q && selectedView?.id !== 'attention' && selectedView?.id !== 'closed-week';
+  const canAddToEmptyView = !(projectDetail.data?.project.archivedAt || projectDetail.data?.tracks.find((track) => track.id === trackId)?.archivedAt) && (!overridesActive || projectsMode) && !state.q && selectedView?.id !== 'attention' && selectedView?.id !== 'closed-week';
   const visibleCount = tasks.data
     ? flatRows.filter((row) => !row.lingering && !doneTodayKeys.has(row.taskKey)).length
     : undefined;
@@ -889,13 +905,14 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             if (pointerPins.current) releasePointerPins();
           }}
         >
-          {tasks.isError && (
+          {projectsMode ? <ProjectsPanel today={today} projectId={projectId} trackId={trackId} archived={state.archived ?? false} onNavigate={navigateProject} onArchiveFilter={(archived) => setState((current) => ({ ...current, archived }))} openTask={(key) => { setDrawerTaskKey(key); writeTaskParam(key); }} /> : <ProjectFilters today={today} definition={definition} onChange={setOverrides} />}
+          {showTaskList && tasks.isError && (
             <TaskListError
               message={tasks.error instanceof Error ? tasks.error.message : 'Could not load tasks'}
               onRetry={() => void tasks.refetch()}
             />
           )}
-          {firstLoad ? (
+          {!showTaskList ? null : firstLoad ? (
             <TaskListSkeleton grouped={Boolean(definition?.group)} />
           ) : !tasks.data ? null : flatRows.length === 0 && !doneTodayRows.length ? (
             <>

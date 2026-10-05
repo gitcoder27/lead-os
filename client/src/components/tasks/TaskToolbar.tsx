@@ -7,6 +7,7 @@ import { TASK_STATUS_META } from './TaskMenus';
 import { TASK_LIST_CONTAINER } from './TaskList';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { Dialog } from '@/components/ui/Dialog';
+import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
 import { Kbd } from '@/components/ui/Kbd';
 
 const STATUSES: TaskStatus[] = ['open', 'active', 'blocked', 'done', 'dropped'];
@@ -43,6 +44,7 @@ type OpenMenu = 'options' | null;
 
 interface TaskToolbarProps {
   title: string;
+  projectContext?: boolean;
   count: number | undefined;
   /**
    * docs/51 D2: filters or search narrow the list below the rail's count, so
@@ -81,7 +83,7 @@ interface TaskToolbarProps {
 /** Search, consolidated options and keyboard help at every width. */
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
-    title, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
+    title, projectContext = false, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
     effectiveSort, effectivePriority, defaultPriority, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
@@ -123,34 +125,20 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
     else setSaveError(true);
   };
 
+  const Heading = projectContext ? 'h2' : 'h1';
   return (
     <header className="shrink-0 pb-3 pt-4" style={{ borderBottom: '1px solid var(--border)' }}>
       {/* docs/51 D5: same centered column as the list; px-2 puts the title on the rows' glyph edge. */}
       <div className={TASK_LIST_CONTAINER}>
         <div className="px-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <select
-              value={viewId}
-              onChange={(event) => onSelectView(event.target.value)}
-              className="rounded-lg px-2 py-1 text-[12px] md:hidden"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-              aria-label="Task view"
-            >
-              {views.map((view) => {
-                const count = counts?.[view.id]?.count;
-                return (
-                  <option key={view.id} value={view.id}>
-                    {count ? `${view.name} (${count})` : view.name}
-                  </option>
-                );
-              })}
-            </select>
-            <h1 className="ui-page-title flex items-center gap-2">
+            {!projectContext && <TaskWorkspaceSelect {...{ views, counts, viewId, onSelectView }} />}
+            <Heading className={`${projectContext ? 'text-[13px] font-semibold' : 'ui-page-title'} flex items-center gap-2`}>
               {title}
               {isSavedView && hasOverrides && (
                 <span className="h-2 w-2 rounded-full" style={{ background: 'var(--warning)' }} title="Unsaved filter changes" aria-label="Unsaved filter changes" />
               )}
-            </h1>
+            </Heading>
             {count !== undefined && (
               <span className={`text-[12px] tabular-nums ${narrowed ? '' : 'md:hidden'}`} style={{ color: 'var(--text-muted)' }}>
                 {narrowed ? `${count} matching` : `${count} task${count === 1 ? '' : 's'}`}
@@ -179,7 +167,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
                     event.currentTarget.blur();
                   }
                 }}
-                placeholder="Search this view"
+                placeholder={projectContext ? 'Search project tasks…' : 'Search this view'}
                 aria-label="Search tasks"
                 className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
                 style={{ color: 'var(--text-primary)' }}

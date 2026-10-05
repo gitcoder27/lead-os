@@ -741,9 +741,11 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 ## Projects UX redesign (docs/69)
 
 - [x] PROJ-UX-01 — screenshot/code review and design plan.
-- [ ] PROJ-UX-02 — project directory, detail hierarchy and lifecycle workflows.
+- [x] PROJ-UX-02 — project directory, detail hierarchy and lifecycle workflows.
 - [ ] PROJ-UX-03 — task organization workflow and final browser validation.
 
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-05 | PROJ-UX-01 | Reviewed six supplied screenshots and related Tasks components/hooks; saved audit, direction, workflows and validation plan in docs/69. Initial checkout has only user-supplied untracked screenshots; these stay untouched. |
+
+| 2026-10-05 | PROJ-UX-02 | Searchable Active/Archived directory, single page heading, project/track breadcrumbs, optional Tracks section, quiet dated summary disclosure, nonzero attention facts, contextual task controls, explanatory forms, create-and-open navigation, archive/restore impact and recovery states. 168 focused frontend tests passed; client typecheck and lint passed (0 errors). Playwright checked directory search and detail at desktop/390px in both themes with no overflow or browser errors; mobile title/control spacing corrected. Synthetic DB only. |

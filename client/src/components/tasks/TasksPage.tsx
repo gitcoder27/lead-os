@@ -1,4 +1,5 @@
 import { PlacementDialog } from './PlacementDialog';
+import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
 import { ProjectsPanel } from './ProjectsPanel';
 import { ProjectFilters } from './ProjectFilters';
 import { useProject } from '@/hooks/useProjects';
@@ -228,7 +229,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const projectDetail = useProject(projectId, today);
   const projectsMode = selectedId === 'projects';
   const projectUnavailable = Boolean(projectId && (projectDetail.isError || (trackId && projectDetail.data && !projectDetail.data.tracks.some((track) => track.id === trackId))));
-  const showTaskList = (!projectsMode || Boolean(projectId)) && !projectUnavailable;
+  const showTaskList = (!projectsMode || Boolean(projectId && projectDetail.data)) && !projectUnavailable;
   const tasks = useTaskViewTasks(definition, Boolean(definition) && showTaskList, today);
   const taskList = useMemo(() => tasks.data?.tasks ?? [], [tasks.data]);
   const toolbarOverrides = projectsMode ? { ...state.overrides, project: undefined, track: undefined } : state.overrides;
@@ -737,7 +738,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       if (active && active !== document.body && !mainRef.current?.contains(active)) return;
       if (active && isEditable(active)) return;
       // Let focused buttons (chips, rail items) keep Space/Enter.
-      if ((active?.tagName === 'BUTTON' || (active instanceof HTMLInputElement && active.type === 'checkbox')) && (event.key === ' ' || event.key === 'Enter')) return;
+      if ((['BUTTON', 'SUMMARY'].includes(active?.tagName ?? '') || (active instanceof HTMLInputElement && active.type === 'checkbox')) && (event.key === ' ' || event.key === 'Enter')) return;
       keyHandler.current(event);
     };
     document.addEventListener('keydown', onKeyDown);
@@ -746,7 +747,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
 
   // ── View state setters ───────────────────────────────────────────────────
   const setView = (view: string | undefined) =>
-    setState((current) => (view === current.view ? current : { view, overrides: {} }));
+    setState((current) => (view === current.view && view !== 'projects' ? current : { view, overrides: {} }));
   const setOverrides = (overrides: Partial<TaskViewOverrides>) =>
     setState((current) => {
       const merged: TaskViewOverrides = { ...current.overrides, ...overrides };
@@ -851,21 +852,11 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const menuTarget = menuTargets[0];
   const orderedKeys = useMemo(() => flatRows.map((row) => row.taskKey), [flatRows]);
 
-  return (
-    <main ref={mainRef} className="flex min-h-0 flex-1 overflow-hidden" aria-label="Tasks">
-      <TaskViewRail
-        views={allViews}
-        counts={countData}
-        selectedId={selectedView?.id ?? selectedId}
-        onSelect={(id) => setView(id)}
-        onRename={handleRenameSaved}
-        onDelete={handleDeleteSaved}
-      />
-
-      <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TaskToolbar
+  const taskToolbar = (
+    <TaskToolbar
           ref={searchRef}
-          title={selectedView?.name ?? 'Tasks'}
+          projectContext={projectsMode}
+          title={projectsMode ? (trackId ? 'Track tasks' : 'Project tasks · all tracks') : selectedView?.name ?? 'Tasks'}
           count={showTaskList ? visibleCount : undefined}
           narrowed={listNarrowed}
           updating={updating}
@@ -895,6 +886,22 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onRevert={clearFilters}
           onShowShortcuts={(anchor) => setShortcutsAnchor(anchor)}
         />
+  );
+
+  return (
+    <main ref={mainRef} className="flex min-h-0 flex-1 overflow-hidden" aria-label="Tasks">
+      <TaskViewRail
+        views={allViews}
+        counts={countData}
+        selectedId={selectedView?.id ?? selectedId}
+        onSelect={(id) => setView(id)}
+        onRename={handleRenameSaved}
+        onDelete={handleDeleteSaved}
+      />
+
+      <section className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        {!projectsMode && taskToolbar}
+        {projectsMode && <div className="px-5 pt-3 md:hidden"><TaskWorkspaceSelect views={allViews} counts={countData} viewId={selectedId} onSelectView={setView} /></div>}
 
         <div
           className="min-h-0 flex-1 overflow-y-auto"
@@ -908,7 +915,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             if (pointerPins.current) releasePointerPins();
           }}
         >
-          {projectsMode ? <ProjectsPanel today={today} projectId={projectId} trackId={trackId} archived={state.archived ?? false} onNavigate={navigateProject} onArchiveFilter={(archived) => setState((current) => ({ ...current, archived }))} openTask={(key) => { setDrawerTaskKey(key); writeTaskParam(key); }} /> : <ProjectFilters today={today} definition={definition} onChange={setOverrides} />}
+          {projectsMode ? <ProjectsPanel query={state.q ?? ''} searchRef={searchRef} onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))} today={today} projectId={projectId} trackId={trackId} archived={state.archived ?? false} onNavigate={navigateProject} onArchiveFilter={(archived) => setState((current) => ({ ...current, archived }))} openTask={(key) => { setDrawerTaskKey(key); writeTaskParam(key); }} /> : <ProjectFilters today={today} definition={definition} onChange={setOverrides} />}
+          {projectsMode && showTaskList && taskToolbar}
           {showTaskList && tasks.isError && (
             <TaskListError
               message={tasks.error instanceof Error ? tasks.error.message : 'Could not load tasks'}
@@ -921,6 +929,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             <>
               <TaskListEmpty
                 viewId={selectedView?.id}
+                archived={projectsMode && Boolean(projectDetail.data?.project.archivedAt || projectDetail.data?.tracks.find((track) => track.id === trackId)?.archivedAt)}
                 filtered={listNarrowed}
                 signal={state.overrides.signal}
                 candidates={candidates}

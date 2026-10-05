@@ -6,6 +6,7 @@ import type { TaskViewMeta, TaskViewTask } from '@/types';
 const mockCsvDownload = vi.fn();
 vi.mock('@/lib/csv', async (original) => ({ ...await original<typeof Csv>(), downloadCsv: (...args: unknown[]) => mockCsvDownload(...args) }));
 const mockUseTaskViews = vi.fn();
+const mockUseProject = vi.fn();
 const mockUseTaskViewTasks = vi.fn();
 const mockUseTaskViewCounts = vi.fn();
 const mockSaveView = vi.fn();
@@ -41,7 +42,7 @@ vi.mock('@/hooks/useGlobalSearch', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useProjects', () => ({ useProject: () => ({ data: undefined }), useProjects: () => ({ data: { projects: [] } }), useProjectWrites: () => ({ isPending: false }) }));
+vi.mock('@/hooks/useProjects', () => ({ useProject: (...args: unknown[]) => mockUseProject(...args), useProjects: () => ({ data: { projects: [] } }), useProjectWrites: () => ({ isPending: false }) }));
 
 vi.mock('@/hooks/useTaskViews', () => ({
   useTaskViews: (...args: unknown[]) => mockUseTaskViews(...args),
@@ -152,6 +153,7 @@ beforeEach(async () => {
   // Flush focus frames scheduled by the previous test's rows.
   await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
   vi.clearAllMocks();
+  mockUseProject.mockReturnValue({ data: undefined });
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
   window.history.replaceState(null, '', '/tasks');
   mockApply.mockResolvedValue(true);
@@ -1250,10 +1252,33 @@ describe('R5 native row controls and readable context', () => {
 it('opens Projects from the rail and mobile picker without changing the default view', () => {
   render(<TasksPage />);
   expect(screen.getByRole('button', { name: /Planned today/ })).toHaveAttribute('aria-current', 'page');
-  fireEvent.click(screen.getByRole('button', { name: 'Projects', exact: true }));
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Task views' })).getByRole('button', { name: 'Projects', exact: true }));
   expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
   const picker = screen.getByRole('combobox', { name: 'Task view' });
   expect(picker).toHaveValue('projects');
   fireEvent.change(picker, { target: { value: 'today' } });
   expect(screen.queryByText(/No projects yet/)).not.toBeInTheDocument();
+});
+
+
+it('places task controls under the project and returns to the directory from the rail', () => {
+  window.history.replaceState(null, '', '/tasks?view=projects&project=1');
+  mockUseProject.mockReturnValue({ data: { project: { id: 1, name: 'Platform migration', archivedAt: null }, tracks: [], facts: { open: 2, blocked: 0, overdue: 0, followUpDue: 0, nextCheck: null } } });
+  render(<TasksPage />);
+  expect(screen.getByRole('heading', { name: 'Platform migration', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Project tasks · all tracks', level: 2 })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Search tasks' })).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'Task views' })).getByRole('button', { name: 'Projects', exact: true }));
+  expect(screen.getByRole('textbox', { name: 'Search projects' })).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Search tasks' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'View options' })).not.toBeInTheDocument();
+});
+
+it('waits for project context before offering tasks or contextual capture', () => {
+  window.history.replaceState(null, '', '/tasks?view=projects&project=1');
+  mockUseProject.mockReturnValue({ isLoading: true });
+  render(<TasksPage />);
+  expect(screen.getByText('Loading project…')).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Search tasks' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Add task')).not.toBeInTheDocument();
 });

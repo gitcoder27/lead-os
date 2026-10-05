@@ -114,6 +114,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
 export function TaskListEmpty({
   viewId,
   filtered,
+  archived = false,
   signal,
   candidates,
   onPlanDay,
@@ -121,6 +122,7 @@ export function TaskListEmpty({
 }: {
   viewId: string | undefined;
   filtered: boolean;
+  archived?: boolean;
   signal?: string[];
   candidates: number;
   onPlanDay: () => void;
@@ -137,7 +139,9 @@ export function TaskListEmpty({
       </div>
     );
   }
-  const copy = emptyCopy(viewId, signal, candidates);
+  const copy = viewId === 'projects' && archived
+    ? { title: 'No open tasks', body: 'Restore this project or track to add new tasks.', Icon: Inbox }
+    : emptyCopy(viewId, signal, candidates);
   return (
     <EmptyState
       icon={<copy.Icon size={22} />}

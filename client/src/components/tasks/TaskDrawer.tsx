@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { navigateToTaskPage } from '@/lib/task-nav';
+import { oneOnOneHref, oneOnOnePerson } from '@/lib/one-on-one-link';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
@@ -293,7 +294,7 @@ interface TaskDetailViewProps {
 }
 
 function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClose, onBack, onOpenFullPage, onNavigateTask, orderedKeys, onStepTask }: TaskDetailViewProps) {
-  const { user } = useAuth();
+  const { user, features } = useAuth();
   const rootRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const [condensed, setCondensed] = useState(false);
@@ -398,7 +399,29 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
 
   const properties = <TaskProperties task={task} mode={mode} readOnly={deleted} onPatch={onPatch} people={people} />;
   const details = <TaskDetailsSection task={task} mode={mode} editable={canEditDetails} onPatch={onPatch} people={people} />;
-  const outcome = task.kind === 'meeting' && <MeetingOutcome task={task} editable={managerEditable} onPatch={onPatch} />;
+  // docs/56 UX-35 (decision 2): a 1:1 meeting task bridges to that person's 1:1 workspace.
+  const oneOnOneWith = mode === 'manager' && features?.oneOnOne ? oneOnOnePerson(task, people.developers) : null;
+  const outcome = task.kind === 'meeting' && (
+    <>
+      {oneOnOneWith ? (
+        <a
+          href={oneOnOneHref(oneOnOneWith.accountId)}
+          onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+            event.preventDefault();
+            window.history.pushState(null, '', oneOnOneHref(oneOnOneWith.accountId));
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }}
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium"
+          style={{ background: 'var(--accent-glow)', color: 'var(--accent-text)', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)' }}
+        >
+          <Users size={14} aria-hidden="true" />
+          Open the 1:1 workspace with {oneOnOneWith.displayName}
+        </a>
+      ) : null}
+      <MeetingOutcome task={task} editable={managerEditable} onPatch={onPatch} />
+    </>
+  );
   const relations = (
     <>
       <TaskChildrenSection task={task} mode={mode} readOnly={deleted} onNavigateTask={onNavigateTask} people={people} />

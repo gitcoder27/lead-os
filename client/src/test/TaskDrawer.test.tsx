@@ -10,8 +10,9 @@ const mockDelete = vi.fn();
 const mockUser = vi.fn();
 const mockToast = vi.fn();
 
+const mockFeatures = vi.hoisted(() => vi.fn((): Record<string, unknown> | undefined => undefined));
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: mockUser() }),
+  useAuth: () => ({ user: mockUser(), features: mockFeatures() }),
   useAuthScopeKey: () => 'ws:manager:manager',
 }));
 
@@ -66,6 +67,7 @@ vi.mock('@/components/JiraIssueLink', () => ({
 }));
 
 import { TaskDetailBody, TaskDrawer } from '@/components/tasks/TaskDrawer';
+import { TestWrapper } from './wrapper';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 
 function managerTask(overrides: Partial<TaskDetailResponse> = {}): TaskDetailResponse {
@@ -164,6 +166,21 @@ describe('TaskDrawer body (P3-D2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Waiting on: no one' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Dev One/ }));
     expect(mockMutate).toHaveBeenCalledWith({ waitingOn: { type: 'developer', ref: 'dev-1', label: 'Dev One' } }, expect.anything());
+  });
+
+  it('a 1:1 meeting task links to that person\'s 1:1 workspace when 1:1s are on (UX-35)', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ kind: 'meeting', title: '1:1 with Dev', ownerType: 'manager' })));
+    mockFeatures.mockReturnValue({ oneOnOne: true });
+    try {
+      // 1:1s on also turns on the drawer's agenda reads, which need a query client.
+      const { unmount } = render(<TestWrapper><TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} /></TestWrapper>);
+      expect(screen.getByRole('link', { name: 'Open the 1:1 workspace with Dev One' })).toHaveAttribute('href', '/team?dev=dev-1&panel=one-on-one');
+      unmount();
+    } finally {
+      mockFeatures.mockReturnValue(undefined);
+    }
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.queryByRole('link', { name: /1:1 workspace/ })).toBeNull();
   });
 
   it('j/k are inert without the list order', () => {

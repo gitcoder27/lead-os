@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkAttentionSignals } from '@/components/work/WorkAttentionSignals';
 import { TodayCountBadge } from '@/components/layout/TodayCountLink';
@@ -51,16 +51,16 @@ describe('header inbox becomes updates-only (UX-30)', () => {
     expect(screen.queryByText('14')).toBeNull();
   });
 
-  it('keeps the badge mounted across page changes while omitting the hidden count from the accessible name', () => {
+  it('collapses the badge and its spacing on Today while omitting the hidden accessible count', async () => {
     const { rerender } = render(<TodayCountBadge />);
     const badge = screen.getByText('14');
     rerender(<TodayCountBadge hidden />);
     expect(screen.getByText('14')).toBe(badge);
-    expect(badge).toHaveStyle({ opacity: 0 });
+    await waitFor(() => expect(badge.parentElement).toHaveStyle({ width: '0px', marginLeft: '0px', opacity: 0 }));
     expect(screen.queryByText(', 14 to look at')).toBeNull();
     rerender(<TodayCountBadge />);
     expect(screen.getByText('14')).toBe(badge);
-    expect(badge).toHaveStyle({ opacity: 1 });
+    await waitFor(() => expect(badge.parentElement).toHaveStyle({ marginLeft: '6px', opacity: 1 }));
     expect(screen.getByText(', 14 to look at')).toBeInTheDocument();
   });
 });

@@ -35,8 +35,7 @@ export function WorkspaceNavLink({ label, icon: Icon, active, accentColor, onCli
           transition={{ type: 'spring', stiffness: 520, damping: 40 }}
         />
       )}
-      <Icon size={14} className="relative hidden shrink-0 sm:block" /><span className="relative">{label}</span>
-      {badge}
+      <Icon size={14} className="relative hidden shrink-0 sm:block" /><span className="relative inline-flex items-center">{label}{badge}</span>
     </a>
   );
 }

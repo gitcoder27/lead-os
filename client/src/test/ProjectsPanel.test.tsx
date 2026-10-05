@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectsPanel } from '@/components/tasks/ProjectsPanel';
 import { TaskListEmpty } from '@/components/tasks/TaskListStates';
@@ -58,9 +58,25 @@ describe('Projects browsing and lifecycle', () => {
     expect(within(dialog).getByRole('button', { name: 'Create project' })).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: '  Mobile launch  ' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create project' }));
+    expect(within(dialog).getByRole('textbox', { name: 'Outcome (optional)', exact: true })).toHaveAccessibleDescription('Describe the result you’re working toward.');
     expect(hooks.write.mock.calls[0]?.[0].changes.name).toBe('Mobile launch');
-    hooks.write.mock.calls[0]?.[1].onSuccess({ ...project, id: 8 });
+    act(() => hooks.write.mock.calls[0]?.[1].onSuccess({ ...project, id: 8 }));
     expect(props.onNavigate).toHaveBeenCalledWith(8, undefined);
+  });
+
+
+  it('edits private summaries without navigating away or changing placement', () => {
+    render(<ProjectsPanel {...props} projectId={1} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit details' }));
+    const dialog = screen.getByRole('dialog');
+    const summary = within(dialog).getByRole('textbox', { name: 'Summary', exact: true });
+    expect(summary).toHaveAccessibleDescription('A private snapshot of progress. LeadOS records when you update it.');
+    fireEvent.change(summary, { target: { value: 'Ready for rollout' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    expect(hooks.write.mock.calls[0]?.[0]).toMatchObject({ id: 1, changes: { name: project.name, outcome: project.outcome, summary: 'Ready for rollout' } });
+    act(() => hooks.write.mock.calls[0]?.[1].onSuccess(project));
+    expect(props.onNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('makes tracks optional, filters archived tracks, and creates in project context', () => {
@@ -78,7 +94,7 @@ describe('Projects browsing and lifecycle', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Validation' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create track' }));
     expect(hooks.write.mock.calls[0]?.[0]).toMatchObject({ projectId: 1, track: true });
-    hooks.write.mock.calls[0]?.[1].onSuccess({ ...project, id: 7, projectId: 1 });
+    act(() => hooks.write.mock.calls[0]?.[1].onSuccess({ ...project, id: 7, projectId: 1 }));
     expect(props.onNavigate).toHaveBeenCalledWith(1, 7);
   });
 
@@ -99,6 +115,9 @@ describe('Projects browsing and lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Archive', exact: true }));
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('3 open tasks remain actionable');
+    hooks.detail.mockReturnValue({ data: { ...detail, facts: { ...facts, open: 4 } } });
+    rerender(<ProjectsPanel {...props} projectId={1} />);
+    expect(dialog).toHaveTextContent('4 open tasks remain actionable');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Archive project' }));
     expect(hooks.write.mock.calls[0]?.[0]).toMatchObject({ id: 1, changes: { archived: true } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));

@@ -22,6 +22,9 @@ export function ProjectsPanel({ today, projectId, trackId, archived, query, sear
   const detail = useProject(projectId, today);
   const [edit, setEdit] = useState<{ item?: Project | ProjectTrack; projectId?: number } | null>(null);
   const [archive, setArchive] = useState<ProjectArchiveTarget | null>(null);
+  const archiveFacts = archive?.projectId
+    ? detail.data?.tracks.find((entry) => entry.id === archive.item.id)?.facts
+    : detail.data?.project.id === archive?.item.id ? detail.data?.facts : undefined;
   const unavailable = detail.isError || Boolean(trackId && detail.data && !detail.data.tracks.some((entry) => entry.id === trackId));
   return (
     <div className="projects-workspace">
@@ -33,7 +36,7 @@ export function ProjectsPanel({ today, projectId, trackId, archived, query, sear
         </>
       )}
       {edit && <ProjectEditor {...edit} onClose={() => setEdit(null)} onCreated={(created) => { setEdit(null); onNavigate(edit.projectId ?? created.id, edit.projectId ? created.id : undefined); }} />}
-      {archive && <ProjectArchiveDialog {...archive} onClose={() => setArchive(null)} />}
+      {archive && <ProjectArchiveDialog {...archive} facts={archiveFacts ?? archive.facts} onClose={() => setArchive(null)} />}
     </div>
   );
 }

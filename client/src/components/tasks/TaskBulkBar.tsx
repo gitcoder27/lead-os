@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Ban, CalendarClock, Check, Tag, UserRound, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, Folder, Tag, UserRound, X } from 'lucide-react';
 import { Kbd } from '@/components/ui/Kbd';
 
 /** docs/49 §6/§12: floating bulk toolbar for the multi-selection. */
@@ -31,7 +31,7 @@ export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
       <BulkButton label="Schedule" hint="s" onClick={(event) => onMenu('schedule', event.currentTarget)}><CalendarClock size={13} /></BulkButton>
       <BulkButton label="Assign" hint="a" onClick={(event) => onMenu('assign', event.currentTarget)}><UserRound size={13} /></BulkButton>
       <BulkButton label="Label" hint="l" onClick={(event) => onMenu('label', event.currentTarget)}><Tag size={13} /></BulkButton>
-      <BulkButton label="Project" hint="" onClick={(event) => onMenu('project', event.currentTarget)}><Tag size={13} /></BulkButton>
+      <BulkButton label="Project" hint="" onClick={(event) => onMenu('project', event.currentTarget)}><Folder size={13} /></BulkButton>
       <BulkButton label="Drop" hint="#" onClick={onDrop} danger><Ban size={13} /></BulkButton>
       <span className="h-4 w-px" style={{ background: 'var(--border)' }} />
       <button type="button" onClick={onClear} className="flex h-7 items-center gap-1 rounded-lg px-2 text-[12px]" style={{ color: 'var(--text-muted)' }} aria-label="Clear selection (Esc)" title="Clear selection (Esc)">
@@ -52,8 +52,8 @@ function BulkButton({ label, hint, onClick, danger, children }: {
     <button
       type="button"
       onClick={onClick}
-      title={`${label} (${hint})`}
-      aria-label={`${label} (${hint})`}
+      title={hint ? `${label} (${hint})` : label}
+      aria-label={hint ? `${label} (${hint})` : label}
       className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
       style={{ color: danger ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
@@ -61,7 +61,7 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       {/* docs/51 R2: icon-only below sm — the title/aria-label carry the name. */}
       <span className="hidden sm:inline">{label}</span>
       {/* docs/51 U3: the key is shown where there is room, not only in a tooltip. */}
-      <span className="hidden lg:inline-flex" aria-hidden="true"><Kbd variant="subtle">{hint}</Kbd></span>
+      {hint && <span className="hidden lg:inline-flex" aria-hidden="true"><Kbd variant="subtle">{hint}</Kbd></span>}
     </button>
   );
 }

@@ -30,4 +30,4 @@ Focused frontend tests for directory search, navigation, creation, tracks, archi
 
 ## Handoff
 
-Implementation and validation results are recorded in the Projects UX section of docs/56.
+All three items are complete. Implementation and validation results are recorded in the Projects UX section of docs/56. Existing APIs, placement guards, private ownership, task capture and Undo are preserved; no server or data-model changes were needed.

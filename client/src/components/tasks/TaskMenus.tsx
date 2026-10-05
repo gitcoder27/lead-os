@@ -14,6 +14,7 @@ import {
   CircleX,
   Circle,
   Flag,
+  Folder,
   Hourglass,
   Link2,
   Moon,
@@ -379,7 +380,7 @@ export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLa
       <MenuItem icon={<CircleDashed size={13} />} label="Status…" onSelect={onStatus} />
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
-      {onProject && <MenuItem icon={<Tag size={13} />} label="Project…" onSelect={onProject} />}
+      {onProject && <MenuItem icon={<Folder size={13} />} label="Move to project…" onSelect={onProject} />}
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
       <MenuItem icon={<Hourglass size={13} />} label="Waiting on…" hint="w" onSelect={onWaiting} />
       <MenuItem icon={<CalendarClock size={13} />} label="Check by…" hint="c" onSelect={onCheckBy} />

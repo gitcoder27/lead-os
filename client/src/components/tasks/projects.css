@@ -40,3 +40,11 @@
   .project-track-list { grid-template-columns: minmax(0, 1fr); }
   .project-controls .ui-btn, .project-controls .ui-btn-secondary, .project-controls .ui-btn-quiet, .project-empty .ui-btn { min-height: 40px; }
 }
+
+.placement-option { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.placement-option:hover { background: var(--bg-tertiary); }
+.placement-option[data-selected='true'] { background: var(--accent-glow); }
+.placement-option:focus-within { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.placement-option input { flex-shrink: 0; accent-color: var(--accent-solid); }
+.placement-option svg { flex-shrink: 0; }
+fieldset:disabled .placement-option { cursor: default; opacity: .65; }

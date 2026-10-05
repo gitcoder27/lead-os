@@ -856,7 +856,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     <TaskToolbar
           ref={searchRef}
           projectContext={projectsMode}
-          title={projectsMode ? (trackId ? 'Track tasks' : 'Project tasks · all tracks') : selectedView?.name ?? 'Tasks'}
+          title={projectsMode ? (trackId ? 'Track tasks' : definition?.filters?.track === 'none' ? 'Project tasks · no track' : 'Project tasks · all tracks') : selectedView?.name ?? 'Tasks'}
           count={showTaskList ? visibleCount : undefined}
           narrowed={listNarrowed}
           updating={updating}

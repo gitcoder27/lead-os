@@ -742,10 +742,12 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 
 - [x] PROJ-UX-01 — screenshot/code review and design plan.
 - [x] PROJ-UX-02 — project directory, detail hierarchy and lifecycle workflows.
-- [ ] PROJ-UX-03 — task organization workflow and final browser validation.
+- [x] PROJ-UX-03 — task organization workflow and final browser validation.
 
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-05 | PROJ-UX-01 | Reviewed six supplied screenshots and related Tasks components/hooks; saved audit, direction, workflows and validation plan in docs/69. Initial checkout has only user-supplied untracked screenshots; these stay untouched. |
 
 | 2026-10-05 | PROJ-UX-02 | Searchable Active/Archived directory, single page heading, project/track breadcrumbs, optional Tracks section, quiet dated summary disclosure, nonzero attention facts, contextual task controls, explanatory forms, create-and-open navigation, archive/restore impact and recovery states. 168 focused frontend tests passed; client typecheck and lint passed (0 errors). Playwright checked directory search and detail at desktop/390px in both themes with no overflow or browser errors; mobile title/control spacing corrected. Synthetic DB only. |
+
+| 2026-10-05 | PROJ-UX-03 | Searchable project radio list, optional track selector, selected-destination context, exact move/subtask preview, explicit removal, guarded retry with fresh preview and preserved scope-safe Undo. Capture, row and bulk entry points use consistent wording/icons; empty keyboard badges removed. Browser findings fixed: accessible field descriptions, live archive impact after delayed recount, and no-track scope label. 265 frontend tests across 9 files passed; recovery and bulk checks rerun after final fixes (8 and 96 tests). Root typecheck, build checks, lint (0 errors; 297 existing warnings), data guard and diff whitespace checks passed. Playwright passed creation/editing, keyboard summaries, inline/global contextual capture, project/track archive/restore, descendant move/Undo, row/bulk actions, guarded conflict recovery, Back/Forward and unavailable deep links. Visual matrix: directory/detail/track/editor/move in light/dark at 1440/390/320px; no overflow or page errors. Browser artifacts in `/tmp/projects-ux-browser/`; isolated synthetic SQLite and refused Jira sync only. No push/deploy. |

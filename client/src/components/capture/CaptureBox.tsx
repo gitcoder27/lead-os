@@ -457,7 +457,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
             border: '1px solid var(--border)',
           }}
         />
-        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-xs" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project placement' : 'Add project placement'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
+        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-xs" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project and track' : 'Add to a project'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
         {typeahead.open && typeahead.fragment ? (
           <TokenSuggestionList
             trigger={typeahead.fragment.trigger}

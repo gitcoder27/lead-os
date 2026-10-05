@@ -60,7 +60,7 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
               ))}
             </ul>
           ) : <p className="project-caption mt-2">{isArchived ? 'No tracks in this project.' : 'Add tasks directly below. Use tracks to group work, such as Design or Rollout.'}</p>}
-          {detail.tracks.some((entry) => entry.archivedAt) && !project.archivedAt && <label className="project-caption mt-3 flex items-center gap-2"><input type="checkbox" checked={archived} onChange={(event) => onArchiveFilter(event.target.checked)} />Show archived tracks</label>}
+          {detail.tracks.some((entry) => entry.archivedAt) && !project.archivedAt && <label className="project-caption mt-3 flex items-center gap-2"><input type="checkbox" className="accent-[var(--accent-solid)]" checked={archived} onChange={(event) => onArchiveFilter(event.target.checked)} />Show archived tracks</label>}
         </section>
       )}
     </section>

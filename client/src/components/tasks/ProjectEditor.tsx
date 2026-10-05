@@ -18,6 +18,8 @@ export function ProjectEditor({ item, projectId, onClose, onCreated }: {
   const [summary, setSummary] = useState(item?.summary ?? '');
   const write = useProjectWrites();
   const hintId = useId();
+  const outcomeId = `${hintId}-outcome`;
+  const summaryId = `${hintId}-summary`;
   const kind = projectId ? 'track' : 'project';
   const save = () => {
     if (!name.trim() || write.isPending) return;
@@ -36,18 +38,18 @@ export function ProjectEditor({ item, projectId, onClose, onCreated }: {
           Name
           <input data-autofocus className="ui-field" maxLength={120} value={name} placeholder={projectId ? 'e.g. Rollout' : 'e.g. Platform migration'} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); save(); } }} />
         </label>
-        <label className="flex flex-col gap-2 text-[13px] font-medium">
-          Outcome (optional)
-          <textarea className="ui-field resize-y" rows={2} maxLength={4000} value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="What will be different when this is done?" aria-describedby={hintId} />
+        <div className="flex flex-col gap-2 text-[13px] font-medium">
+          <label htmlFor={outcomeId}>Outcome (optional)</label>
+          <textarea id={outcomeId} className="ui-field resize-y" rows={2} maxLength={4000} value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="What will be different when this is done?" aria-describedby={hintId} />
           <span id={hintId} className="project-field-hint">Describe the result you’re working toward.</span>
-        </label>
+        </div>
         <details open={item ? true : undefined}>
           <summary className="ui-link cursor-pointer">{item ? 'Summary' : 'Add a summary (optional)'}</summary>
-          <label className="mt-3 flex flex-col gap-2 text-[13px] font-medium">
-            Summary
-            <textarea className="ui-field resize-y" rows={4} maxLength={10000} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Where things stand, decisions, and what’s next." />
-            <span className="project-field-hint">A private snapshot of progress. LeadOS records when you update it.</span>
-          </label>
+          <div className="mt-3 flex flex-col gap-2 text-[13px] font-medium">
+            <label htmlFor={summaryId}>Summary</label>
+            <textarea id={summaryId} className="ui-field resize-y" rows={4} maxLength={10000} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Where things stand, decisions, and what’s next." aria-describedby={`${summaryId}-hint`} />
+            <span id={`${summaryId}-hint`} className="project-field-hint">A private snapshot of progress. LeadOS records when you update it.</span>
+          </div>
         </details>
         {write.error && <p role="alert" className="text-sm" style={{ color: 'var(--danger)' }}>{write.error.message}</p>}
       </div>

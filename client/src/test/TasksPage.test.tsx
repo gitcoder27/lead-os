@@ -167,6 +167,36 @@ beforeEach(async () => {
 });
 
 describe('TasksPage rail and views (docs/49 §3/§4)', () => {
+  it.each(['today', 'inbox'].flatMap((viewId) =>
+    ['button', 'outside', 'escape'].map((dismiss) => ({ viewId, dismiss })),
+  ))('reopens View options after $dismiss dismissal in $viewId', async ({ viewId, dismiss }) => {
+    window.history.replaceState(null, '', `/tasks?view=${viewId}`);
+    render(<TasksPage />);
+    const options = screen.getByRole('button', { name: 'View options' });
+    options.focus();
+
+    for (let cycle = 0; cycle < 3; cycle++) {
+      fireEvent.mouseDown(options);
+      fireEvent.click(options);
+      const menu = screen.getByRole('menu', { name: 'View options' });
+      expect(within(menu).getByRole('menuitemcheckbox', { name: 'You' })).toBeVisible();
+      expect(within(menu).getByRole('menuitemcheckbox', { name: 'Open' })).toBeVisible();
+
+      if (dismiss === 'button') {
+        fireEvent.mouseDown(options);
+        fireEvent.click(options);
+      } else if (dismiss === 'outside') {
+        fireEvent.mouseDown(document.body);
+        fireEvent.click(document.body);
+      } else {
+        fireEvent.keyDown(menu, { key: 'Escape' });
+      }
+      expect(screen.queryByRole('menu', { name: 'View options' })).not.toBeInTheDocument();
+      // Allow any focus restoration to settle before the next interaction.
+      await act(() => new Promise((resolve) => requestAnimationFrame(() => resolve(null))));
+    }
+  });
+
   it('exports the searched current rows, excluding private agenda and other rows', () => {
     mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ title: 'Match ordinary', details: 'PRIVATE BODY' }), task({ id: 2, taskKey: 'T-2', title: 'Other title' }), task({ id: 3, taskKey: 'T-3', title: 'Match private agenda', oneOnOne: true })]));
     render(<TasksPage />);

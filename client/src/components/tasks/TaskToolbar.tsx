@@ -78,8 +78,11 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
     effectiveSort, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
-  const open = (kind: OpenMenu) => (event: MouseEvent<HTMLElement>) =>
-    setMenu((current) => (current.kind === kind ? { kind: null, anchor: null } : { kind, anchor: event.currentTarget }));
+  const open = (kind: OpenMenu) => (event: MouseEvent<HTMLElement>) => {
+    // React clears currentTarget after dispatch; the updater can run later.
+    const anchor = event.currentTarget;
+    setMenu((current) => (current.kind === kind ? { kind: null, anchor: null } : { kind, anchor }));
+  };
   const close = () => setMenu({ kind: null, anchor: null });
 
   const optionsRef = useRef<HTMLButtonElement>(null);

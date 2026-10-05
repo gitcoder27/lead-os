@@ -15,6 +15,16 @@ const mockDeleteTagMutate = vi.fn();
 const mockRefetchTagUsage = vi.fn(async () => ({ data: undefined }));
 const mockRefetch = vi.fn(async () => ({ data: {} }));
 const mockAddToast = vi.fn();
+
+vi.mock('framer-motion', async () => {
+  const actual = await vi.importActual('framer-motion');
+  return {
+    ...actual,
+    // Section behavior should not wait for exit animations in jsdom.
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
+
 const mockConfig = {
   jiraBaseUrl: 'https://acme.atlassian.net',
   jiraEmail: 'manager@example.com',

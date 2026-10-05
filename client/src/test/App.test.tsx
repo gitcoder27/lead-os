@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App, { legacyTaskViewRedirect } from '@/App';
 import { api, ApiRequestError } from '@/lib/api';
@@ -148,6 +148,12 @@ vi.mock('@/components/settings/SettingsPanel', () => ({
 }));
 
 describe('App', () => {
+  beforeAll(async () => {
+    // Keep the real developer page, but load its dependencies before UI assertions.
+    // A cold import under parallel load can exceed findBy's one-second wait.
+    await import('@/components/my-day/MyDayPage');
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState(null, '', '/');

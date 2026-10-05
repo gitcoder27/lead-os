@@ -103,7 +103,7 @@ const rowEl = (key: string) => document.querySelector<HTMLElement>(`[data-review
 beforeEach(() => {
   vi.clearAllMocks();
   for (const fn of [apiGet, apiPut, apiPost, apiPatch]) fn.mockReset();
-  apiPut.mockResolvedValue({});
+  apiPut.mockResolvedValue({ saved: saved('people') });
   apiPost.mockResolvedValue({ tasks: [] });
   apiPatch.mockResolvedValue({});
 });
@@ -348,6 +348,10 @@ describe('Next week step (docs/59 §5.3 step 5)', () => {
     expect(within(first).getByText('Slipped plan')).toBeInTheDocument();
     expect(within(first).getByText('Moved to Mon')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Planned tasks per day' })).getAllByRole('listitem')[0]).toHaveTextContent(/^Mon2/);
+    // Let the debounced progress save settle while the review is still mounted.
+    // Its response must include `saved`, just like the real endpoint.
+    await waitFor(() => expect(apiPut).toHaveBeenCalledWith('/review/week/2026-09-28', expect.objectContaining({ step: 'next_week' })));
+    expect(screen.getByRole('heading', { level: 2, name: "Monday's top 3" })).toBeInTheDocument();
   });
 });
 

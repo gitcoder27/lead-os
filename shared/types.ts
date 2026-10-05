@@ -1091,6 +1091,7 @@ export interface PersonCommitmentsResponse {
   tasks: ManagerTask[];
 }
 export interface ManagerTask extends DeveloperTask {
+  placement?: TaskPlacementContext | null;
   /** Compatibility surface ID: mapped legacy desk ID, or canonical task ID when no mapping exists. */
   legacyDeskItemId?: number;
   later: boolean;
@@ -3386,3 +3387,16 @@ export interface WeeklyReviewPastWeek {
 export interface WeeklyReviewWeeksResponse {
   weeks: WeeklyReviewPastWeek[];
 }
+
+/** Manager-private containers, independent of task ownership and parentage. */
+export interface TaskPlacement { projectId: number; trackId: number | null }
+export interface TaskPlacementContext extends TaskPlacement { projectName: string; trackName: string | null }
+export interface Project { id: number; name: string; outcome: string | null; summary: string | null; summaryUpdatedAt: string | null; archivedAt: string | null; createdAt: string; updatedAt: string }
+export interface ProjectTrack extends Project { projectId: number }
+export interface ProjectWrite { name?: string; outcome?: string | null; summary?: string | null; archived?: boolean }
+export interface ProjectFacts { open: number; blocked: number; overdue: number; followUpDue: number; nextCheck: { taskKey: string; title: string; at: string } | null }
+export interface ProjectDetail { project: Project; tracks: (ProjectTrack & { facts: ProjectFacts })[]; facts: ProjectFacts }
+export interface PlacementPreviewRequest { keys: string[]; includeSubtasks?: boolean }
+export interface PlacementPreview { keys: string[]; includeSubtasks: boolean; tasks: { taskKey: string; title: string; placement: TaskPlacement | null }[] }
+export interface PlacementBulkRequest { preview: PlacementPreview; placement: TaskPlacement | null }
+export interface PlacementBulkResponse { undo: PlacementBulkRequest; count: number }

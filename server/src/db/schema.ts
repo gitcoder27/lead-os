@@ -781,3 +781,15 @@ export const weeklyReviews = sqliteTable("weekly_reviews", {
 }, (table) => [
   uniqueIndex("idx_weekly_reviews_unique").on(table.workspaceId, table.managerAccountId, table.weekStart),
 ]);
+
+export const projects = sqliteTable("projects", {
+  id: integer("id").primaryKey({ autoIncrement: true }), workspaceId: text("workspace_id").notNull(), managerAccountId: text("manager_account_id").notNull(),
+  name: text("name").notNull(), outcome: text("outcome"), summary: text("summary"), summaryUpdatedAt: text("summary_updated_at"), archivedAt: text("archived_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (table) => [uniqueIndex("projects_name").on(table.workspaceId, table.managerAccountId, table.name)]);
+export const projectTracks = sqliteTable("project_tracks", {
+  id: integer("id").primaryKey({ autoIncrement: true }), workspaceId: text("workspace_id").notNull(), managerAccountId: text("manager_account_id").notNull(), projectId: integer("project_id").notNull(),
+  name: text("name").notNull(), outcome: text("outcome"), summary: text("summary"), summaryUpdatedAt: text("summary_updated_at"), archivedAt: text("archived_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (table) => [uniqueIndex("project_tracks_name").on(table.workspaceId, table.managerAccountId, table.projectId, table.name)]);
+export const taskPlacements = sqliteTable("task_placements", {
+  workspaceId: text("workspace_id").notNull(), managerAccountId: text("manager_account_id").notNull(), taskId: integer("task_id").notNull(), projectId: integer("project_id").notNull(), trackId: integer("track_id"),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.managerAccountId, table.taskId] }), index("task_placements_project").on(table.workspaceId, table.managerAccountId, table.projectId, table.trackId)]);

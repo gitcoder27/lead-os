@@ -5,6 +5,26 @@ import { startCanonicalTasksForEmptyWorkspaces } from "./canonical-start";
 const DEFAULT_WORKSPACE_ID = "default";
 
 const ddl = `
+CREATE TABLE IF NOT EXISTS projects (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL,
+ name TEXT NOT NULL, outcome TEXT, summary TEXT, summary_updated_at TEXT, archived_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ UNIQUE(workspace_id, manager_account_id, name), UNIQUE(workspace_id, manager_account_id, id)
+);
+CREATE TABLE IF NOT EXISTS project_tracks (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL, project_id INTEGER NOT NULL,
+ name TEXT NOT NULL, outcome TEXT, summary TEXT, summary_updated_at TEXT, archived_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ UNIQUE(workspace_id, manager_account_id, project_id, name), UNIQUE(workspace_id, manager_account_id, project_id, id),
+ FOREIGN KEY(workspace_id, manager_account_id, project_id) REFERENCES projects(workspace_id, manager_account_id, id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS task_placements (
+ workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL, task_id INTEGER NOT NULL, project_id INTEGER NOT NULL, track_id INTEGER,
+ PRIMARY KEY(workspace_id, manager_account_id, task_id),
+ FOREIGN KEY(workspace_id, manager_account_id, project_id) REFERENCES projects(workspace_id, manager_account_id, id) ON DELETE CASCADE,
+ FOREIGN KEY(workspace_id, manager_account_id, project_id, track_id) REFERENCES project_tracks(workspace_id, manager_account_id, project_id, id),
+ FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS task_placements_project ON task_placements(workspace_id, manager_account_id, project_id, track_id);
+
 CREATE TABLE IF NOT EXISTS workspaces (
   id               TEXT PRIMARY KEY,
   name             TEXT NOT NULL,

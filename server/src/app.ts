@@ -1,3 +1,4 @@
+import { createProjectsRouter, createProjectTracksRouter } from "./routes/projects";
 import { createTaskInboxRouter } from "./routes/task-inbox";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
@@ -217,6 +218,8 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     createManagerDeskRouter(services.managerDeskService, services.authService)
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
+  app.use("/api/projects", requireManager(services.authService), clearTodayCacheOnWrite, createProjectsRouter());
+  app.use("/api/project-tracks", requireManager(services.authService), clearTodayCacheOnWrite, createProjectTracksRouter());
   app.use("/api/tasks", requireManager(services.authService), clearTodayCacheOnWrite, createTasksRouter(taskKeysService, taskEventsService));
   // docs/48: 1:1 workspace API — manager-only mount, flag-gated to 404 inside.
   app.use("/api/one-on-ones", requireManager(services.authService), createOneOnOnesRouter(services.oneOnOneService));

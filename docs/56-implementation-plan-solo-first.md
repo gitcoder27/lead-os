@@ -719,3 +719,16 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 - The review did not run the app. Items marked "inferred" in docs/55 (phone nav clipping, standup card with zero developers) need a live check before or during their item.
 - Removing the Follow-ups and Meetings pages (P3-06) depends on the canonical Tasks model being on wherever the app runs. Do not start it until P0-V3 is recorded.
 - The `team_mode` migration must be tested against a copy of the production database before deploy. Do not run it against production data directly.
+
+## Private projects and tracks (docs/68)
+
+- [x] HIER-01 — contracts, additive tables, scoped container APIs.
+- [ ] HIER-02 — placement, filters, aggregates.
+- [ ] HIER-03 — Projects workspace and lifecycle.
+- [ ] HIER-04 — placement capture and subtasks.
+- [ ] HIER-05 — Today and maintenance.
+- [ ] HIER-06 — synthetic verification and handoff.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-05 | HIER-01 | Private scoped persistence, additive migration and manager-only container endpoints; server typecheck. |

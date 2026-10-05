@@ -1,3 +1,4 @@
+import { readTaskPlacements } from "./task-placements.service";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
@@ -215,10 +216,7 @@ export class TaskService {
   }
 
   async toDto(row: TaskRow, principal: TaskPrincipal): Promise<DeveloperTask | ManagerTask> {
-    const links = await this.listLinks([row.id], row.workspaceId);
-    if (principal.type === "developer") return this.rowToDto(row, links, undefined, principal);
-    const mapped = (await db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, row.workspaceId), eq(taskLegacyMap.taskId, row.id), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))).limit(1))[0];
-    return this.rowToDto(row, links, mapped?.sourceId, principal);
+    return (await this.toDtos([row], principal))[0]!;
   }
 
   /**
@@ -229,11 +227,12 @@ export class TaskService {
     if (!rows.length) return [];
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const ids = rows.map((row) => row.id);
-    const [linkRows, mappedRows] = await Promise.all([
+    const [linkRows, mappedRows, placements] = await Promise.all([
       this.listLinks(ids, scope),
       principal.type === "developer"
         ? Promise.resolve([])
         : db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, scope), inArray(taskLegacyMap.taskId, ids), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))),
+      readTaskPlacements(principal, ids),
     ]);
     const linksByTask = new Map<number, TaskLinkRow[]>();
     for (const link of linkRows) {
@@ -242,7 +241,7 @@ export class TaskService {
       else linksByTask.set(link.taskId, [link]);
     }
     const legacyByTask = new Map(mappedRows.map((entry) => [entry.taskId, entry.sourceId]));
-    return rows.map((row) => this.rowToDto(row, linksByTask.get(row.id) ?? [], legacyByTask.get(row.id), principal));
+    return rows.map((row) => ({ ...this.rowToDto(row, linksByTask.get(row.id) ?? [], legacyByTask.get(row.id), principal), ...(principal.type !== "developer" && { placement: placements.get(row.id) ?? null }) }));
   }
 
   async list(principal: TaskPrincipal, filter: { view?: "desk" | "follow-ups" | "meetings" | "developer" | "all"; ownerId?: string; date?: string; closedFrom?: string; closedTo?: string } = {}): Promise<TaskRow[]> {

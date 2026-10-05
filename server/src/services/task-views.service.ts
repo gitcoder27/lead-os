@@ -1,3 +1,5 @@
+import { taskVisibilityPredicate } from "./task-visibility";
+import { readTaskPlacements } from "./task-placements.service";
 import { oneOnOneTaskIds } from "./one-on-one-tasks";
 import { and, eq, gte, inArray, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { TASK_STALE_DAYS, isTaskHidden, taskLane, taskViewDefinitionSchema, type TaskLane, type ManagerTask, type TaskSavedView, type TaskSignals, type TaskStatus, type TaskViewCount, type TaskViewDefinition, type TaskViewFilters, type TaskViewMeta, type TaskViewTask } from "shared/types";
@@ -132,6 +134,7 @@ interface RowFacts {
   lastActivity: Map<number, string>;
   drifted: Set<number>;
   jiraLinked: Set<number> | null;
+  placements?: Map<number, import("shared/types").TaskPlacementContext>;
 }
 
 export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string): TaskSignals {
@@ -207,6 +210,9 @@ export function matchesTaskViewFilters(
 ): boolean {
   const { principal, today, facts, signals, tz } = context;
   if (row.deletedAt) return false;
+  const placement = facts.placements?.get(row.id);
+  if (filters.project !== undefined && (filters.project === "none" ? Boolean(placement) : placement?.projectId !== filters.project)) return false;
+  if (filters.track !== undefined && (filters.track === "none" ? !placement || placement.trackId !== null : placement?.trackId !== filters.track)) return false;
   if (filters.owner !== undefined) {
     const owner = filters.owner;
     const ok = owner === "me" ? selfOwned(row, principal)
@@ -325,10 +331,7 @@ export class TaskViewsService {
    * memory afterwards.
    */
   private scopePredicate(principal: TaskPrincipal): SQL {
-    if (principal.type === "developer") return and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId))!;
-    // The roster record I marked as mine is mine even when I do not track its tasks.
-    const own = principal.selfDeveloperId ? sql` OR (${tasks.ownerType} = 'developer' AND ${tasks.ownerId} = ${principal.selfDeveloperId})` : sql``;
-    return sql`(${tasks.trackedByManagerId} = ${principal.accountId} OR (${tasks.ownerType} = 'manager' AND ${tasks.ownerId} = ${principal.accountId}) OR ${tasks.ownerType} IS NULL${own})`;
+    return taskVisibilityPredicate(principal);
   }
 
   /** Adds the manager's "This is me" roster record; every public read starts here. */
@@ -406,15 +409,16 @@ export class TaskViewsService {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     if (!rows.length) return { lastActivity: new Map(), drifted: new Set(), jiraLinked: withJiraLinks ? new Set() : null };
     const ids = rows.map((row) => row.id);
-    const [lastActivity, drift, links] = await Promise.all([
+    const [lastActivity, drift, links, placements] = await Promise.all([
       this.events.latestActivityByTask(ids, scope),
       this.drift.list(principal, scope, today, ids),
       withJiraLinks
         ? db.selectDistinct({ taskId: taskLinks.taskId }).from(taskLinks).where(and(eq(taskLinks.workspaceId, scope), eq(taskLinks.kind, "jira"), inArray(taskLinks.taskId, ids)))
         : Promise.resolve(null),
+      readTaskPlacements(principal, ids),
     ]);
     return {
-      lastActivity,
+      lastActivity, placements,
       drifted: new Set(drift.map((entry) => entry.taskId)),
       jiraLinked: links ? new Set(links.map((link) => link.taskId)) : null,
     };

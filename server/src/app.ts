@@ -1,3 +1,4 @@
+import { createTaskPlacementsRouter } from "./routes/task-placements";
 import { createProjectsRouter, createProjectTracksRouter } from "./routes/projects";
 import { createTaskInboxRouter } from "./routes/task-inbox";
 import express from "express";
@@ -218,6 +219,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     createManagerDeskRouter(services.managerDeskService, services.authService)
   );
   app.use("/api/search", requireManager(services.authService), createSearchRouter(services.searchService));
+  app.use("/api/task-placements", requireManager(services.authService), clearTodayCacheOnWrite, createTaskPlacementsRouter());
   app.use("/api/projects", requireManager(services.authService), clearTodayCacheOnWrite, createProjectsRouter());
   app.use("/api/project-tracks", requireManager(services.authService), clearTodayCacheOnWrite, createProjectTracksRouter());
   app.use("/api/tasks", requireManager(services.authService), clearTodayCacheOnWrite, createTasksRouter(taskKeysService, taskEventsService));

@@ -1224,6 +1224,8 @@ export interface TaskViewDateRange {
 }
 
 export interface TaskViewFilters {
+  project?: number | "none";
+  track?: number | "none";
   /** "me" = tasks owned by my account id — manager-owned rows plus, for a
    *  linked manager, rows on my own developer account (docs/51 F3).
    *  "team" = tasks owned by other developers, "inbox" = unowned,
@@ -1477,6 +1479,8 @@ const taskViewDateRange = z.object({
  */
 export const taskViewDefinitionSchema = z.object({
   filters: z.object({
+    project: z.union([z.number().int().positive(), z.literal("none")]).optional(),
+    track: z.union([z.number().int().positive(), z.literal("none")]).optional(),
     owner: z.union([z.enum(["me", "team", "inbox"]), z.array(z.string().trim().min(1).max(128)).min(1).max(50)]).optional(),
     status: z.array(z.enum(["open", "active", "blocked", "done", "dropped"])).min(1).max(5).optional(),
     priority: z.enum(["normal", "high"]).optional(),
@@ -3398,5 +3402,5 @@ export interface ProjectFacts { open: number; blocked: number; overdue: number; 
 export interface ProjectDetail { project: Project; tracks: (ProjectTrack & { facts: ProjectFacts })[]; facts: ProjectFacts }
 export interface PlacementPreviewRequest { keys: string[]; includeSubtasks?: boolean }
 export interface PlacementPreview { keys: string[]; includeSubtasks: boolean; tasks: { taskKey: string; title: string; placement: TaskPlacement | null }[] }
-export interface PlacementBulkRequest { preview: PlacementPreview; placement: TaskPlacement | null }
+export interface PlacementBulkRequest { preview: PlacementPreview; placement?: TaskPlacement | null; restore?: { taskKey: string; placement: TaskPlacement | null }[] }
 export interface PlacementBulkResponse { undo: PlacementBulkRequest; count: number }

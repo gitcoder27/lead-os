@@ -1,3 +1,4 @@
+import { placementSchema } from "../services/projects.service";
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate";
@@ -9,6 +10,7 @@ const taskKey = z.string().regex(/^[Tt]-\d{1,9}$/);
 
 /** docs/57 §3 (P3-05): structured context that only fills what the text leaves open. */
 const defaultsSchema = z.object({
+  placement: placementSchema.nullable().optional(),
   ownerAccountId: z.string().trim().min(1).max(200).nullable().optional(),
   waitingOn: z.object({
     type: z.enum(["developer", "contact", "text"]),

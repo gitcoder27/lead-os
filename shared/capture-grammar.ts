@@ -199,6 +199,8 @@ export interface ResolvedCapture {
  * check-by or deadline) makes the capture triaged, so it skips Inbox.
  */
 export interface CaptureDefaults {
+  /** Private placement; null explicitly clears inherited parent placement. */
+  placement?: import("./types").TaskPlacement | null;
   /** Developer account id that owns the task; `null` leaves it unowned (Inbox). Never applies to a Later task. */
   ownerAccountId?: string | null;
   waitingOn?: TaskWaitingOnInput | null;

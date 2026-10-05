@@ -1,3 +1,5 @@
+import { PlacementPicker } from '@/components/tasks/PlacementPicker';
+import type { TaskPlacement } from '@/types';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowRight, CalendarClock, CalendarDays, Flag, Hash, Hourglass, Inbox, Link2, NotebookPen, Repeat, Tags, UserRound, Users, X, Zap } from 'lucide-react';
@@ -157,6 +159,13 @@ function summarize(resolved: ResolvedCapture, developerNames: Map<string, string
  * submit. Errors block the submit; warnings may need a confirm press.
  */
 export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaults: baseDefaults }: CaptureBoxProps) {
+  const [placement, setPlacement] = useState<TaskPlacement | null | undefined>(() => {
+    if (baseDefaults?.placement !== undefined) return baseDefaults.placement;
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname !== '/tasks' || params.get('view') !== 'projects') return undefined;
+    const project = Number(params.get('project')); const track = Number(params.get('track'));
+    return Number.isSafeInteger(project) && project > 0 ? { projectId: project, trackId: Number.isSafeInteger(track) && track > 0 ? track : null } : undefined;
+  });
   const hintId = useId();
   const { addToast } = useToast();
   const capture = useCapture();
@@ -272,7 +281,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
     const ownerDefault: CaptureDefaults | undefined = activeAssignee && resolved.intent === 'create' && !resolved.owner && !resolved.later
       ? { ownerAccountId: activeAssignee.accountId }
       : undefined;
-    const defaults: CaptureDefaults | undefined = baseDefaults || ownerDefault ? { ...baseDefaults, ...ownerDefault } : undefined;
+    const defaults: CaptureDefaults | undefined = baseDefaults || ownerDefault || placement !== undefined ? { ...baseDefaults, ...ownerDefault, ...(placement !== undefined && { placement }) } : undefined;
     const tz = getLocalTimeZone();
     const clientToday = getLocalIsoDate();
     // docs/56 UX-05: the box shows `@Marcus`; the server gets the picked person's id.
@@ -447,6 +456,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
             border: '1px solid var(--border)',
           }}
         />
+        {(!resolved || resolved.intent === 'create') && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}
         {typeahead.open && typeahead.fragment ? (
           <TokenSuggestionList
             trigger={typeahead.fragment.trigger}

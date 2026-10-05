@@ -58,3 +58,33 @@ describe("private project placement", () => {
     expect(await db.select().from(taskPlacements)).toHaveLength(2);
   });
 });
+
+it("creates with capture placement, inherits children, clears explicitly and replays once", async () => {
+  const { CaptureService } = await import("../src/services/capture.service");
+  const capture = new CaptureService();
+  const project = await containers.write(a, { name: "Capture" });
+  const request = { text: "Rehearsal", requestId: "placement-replay", clientToday: "2026-10-05", tz: "Asia/Kolkata", defaults: { placement: { projectId: project.id, trackId: null } } };
+  const first = await capture.run(request, a);
+  expect(first.task?.placement?.projectId).toBe(project.id);
+  expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
+  const child = await capture.run({ text: "Child", defaults: { parentKey: first.task!.taskKey } }, a);
+  expect(child.task?.placement?.projectId).toBe(project.id);
+  const clear = await capture.run({ text: "Direct child", defaults: { parentKey: first.task!.taskKey, placement: null } }, a);
+  expect(clear.task?.placement).toBeNull();
+  await containers.write(a, { archived: true }, project.id);
+  await expect(capture.run({ text: "Must rollback", defaults: { parentKey: first.task!.taskKey } }, a)).rejects.toMatchObject({ status: 409 });
+  expect((await db.select().from(tasks)).map((task) => task.title)).not.toContain("Must rollback");
+  expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
+  expect(await db.select().from(tasks)).toHaveLength(3);
+});
+
+it("counts only visible direct children and excludes dropped work", async () => {
+  const parent = await service.create({ title: "Ordinary parent" }, a);
+  await service.create({ title: "Done", status: "done", parentId: parent.id }, a);
+  await service.create({ title: "Dropped", status: "dropped", parentId: parent.id }, a);
+  await service.create({ title: "Hidden", parentId: parent.id }, b);
+  const rows = await new TaskViewsService().run(a, {});
+  expect(rows.find((task) => task.id === parent.id)?.signals.actions).toEqual({ done: 1, total: 1 });
+  const detail = await service.detail(parent.taskKey, a);
+  expect("children" in detail && detail.children.map((task) => task.title)).toEqual(["Done", "Dropped"]);
+});

@@ -1,4 +1,5 @@
-import { readTaskPlacements } from "./task-placements.service";
+import { visibleTaskRows } from "./task-visibility";
+import { TaskPlacementsService, readTaskPlacements } from "./task-placements.service";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { TASK_GUARD_FIELDS, TODAY_TOP_LIMIT, isTaskHidden, taskGuardFields, type TaskExpectedState, type TaskGuardField, type TaskWaitingOn, type TaskWaitingOnInput, type TaskWaitingOnType } from "shared/types";
@@ -358,7 +359,7 @@ export class TaskService {
    * `options.untriaged` (docs/57 §1): only a bare capture — no date, owner or
    * later — lands in Inbox; every other create path is triaged by default.
    */
-  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one"; untriaged?: boolean } = {}): Promise<TaskRow> {
+  async create(input: CreateTaskRequest, principal: TaskPrincipal, options: { requestId?: string; source?: "capture" | "one_on_one"; untriaged?: boolean; placement?: import("shared/types").TaskPlacement | null } = {}): Promise<TaskRow> {
     const data = parseInput(taskCreateSchema, input);
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(principal.workspaceId);
@@ -384,6 +385,11 @@ export class TaskService {
       const row = (await db.insert(tasks).values(values).returning())[0]!;
       await this.focus(row, row.scheduledOn ?? todayIsoDate());
       const parent = row.parentId ? await this.getById(row.parentId, scope) : undefined;
+      if (principal.type !== "developer") {
+        const inherited = parent ? (await readTaskPlacements(principal, [parent.id])).get(parent.id) : undefined;
+        const placement = options.placement !== undefined ? options.placement : inherited ? { projectId: inherited.projectId, trackId: inherited.trackId } : null;
+        if (placement) await new TaskPlacementsService().set(principal, row.id, placement);
+      }
       await this.emit(row, { type: "created", body: null, requestId: options.requestId, meta: { source: options.source ?? (principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk"), ownerType, ownerId, title: row.title, ...(parent && { parentKey: parent.taskKey }) } }, principal);
       if (row.status !== "open") await this.emit(row, { type: "status", body: null, meta: { domain: "task_status", from: "open", to: row.status, reason: "user" } }, principal);
       if (row.status === "active") await this.emit(row, { type: "focus", body: null, meta: { action: "set_current", date: todayIsoDate() } }, principal);
@@ -581,15 +587,16 @@ export class TaskService {
     }
     const dto = await this.toDto(row, principal);
     const scope = row.workspaceId;
-    const childRows = await db.select().from(tasks).where(and(
+    const visibleIds = principal.type !== "developer" ? new Set((await visibleTaskRows(principal)).map((task) => task.id)) : null;
+    const childRows = (await db.select().from(tasks).where(and(
       eq(tasks.workspaceId, scope), eq(tasks.parentId, row.id), isNull(tasks.deletedAt),
       principal.type === "developer" ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId)) : undefined,
-    )).orderBy(tasks.createdAt, tasks.id);
+    )).orderBy(tasks.createdAt, tasks.id)).filter((child) => !visibleIds || visibleIds.has(child.id));
     const parentRow = row.parentId ? await this.getById(row.parentId, scope) : undefined;
     return {
       ...dto,
       children: childRows.map((child) => this.childRef(child)),
-      parent: parentRow ? this.childRef(parentRow) : null,
+      parent: parentRow && (!visibleIds || visibleIds.has(parentRow.id)) ? this.childRef(parentRow) : null,
     };
   }
 

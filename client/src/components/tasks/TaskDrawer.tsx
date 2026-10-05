@@ -1,3 +1,5 @@
+import type { ManagerTask } from '@/types';
+import { TaskProjectField } from './TaskProjectField';
 import { clearTaskUpdateDraftsForTask } from '@/lib/task-update-drafts';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -397,7 +399,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
     </div>
   );
 
-  const properties = <TaskProperties task={task} mode={mode} readOnly={deleted} onPatch={onPatch} people={people} />;
+  const properties = <><TaskProperties task={task} mode={mode} readOnly={deleted} onPatch={onPatch} people={people} />{mode === 'manager' && <TaskProjectField task={task as ManagerTask} readOnly={deleted} />}</>;
   const details = <TaskDetailsSection task={task} mode={mode} editable={canEditDetails} onPatch={onPatch} people={people} />;
   // docs/56 UX-35 (decision 2): a 1:1 meeting task bridges to that person's 1:1 workspace.
   const oneOnOneWith = mode === 'manager' && features?.oneOnOne ? oneOnOnePerson(task, people.developers) : null;

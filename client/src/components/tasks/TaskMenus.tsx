@@ -61,7 +61,7 @@ export function TaskStatusGlyph({ status, size = 15 }: { status: TaskStatus; siz
   );
 }
 
-export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'priority' | 'waiting' | 'checkBy' | 'more';
+export type TaskMenuKind = 'status' | 'schedule' | 'assign' | 'label' | 'priority' | 'waiting' | 'checkBy' | 'project' | 'more';
 
 export function StatusMenu({ anchor, current, onClose, onSelect }: {
   anchor: HTMLElement;
@@ -357,7 +357,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   );
 }
 
-export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater }: {
+export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater, onProject }: {
   anchor: HTMLElement;
   onClose: () => void;
   onSchedule: () => void;
@@ -371,6 +371,7 @@ export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLa
   onDrop: () => void;
   onCopyLink: () => void;
   canLater: boolean;
+  onProject?: () => void;
 }) {
   return (
     <TaskPopover anchor={anchor} onClose={onClose} label="More actions" width={210}>
@@ -378,6 +379,7 @@ export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLa
       <MenuItem icon={<CircleDashed size={13} />} label="Status…" onSelect={onStatus} />
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
+      {onProject && <MenuItem icon={<Tag size={13} />} label="Project…" onSelect={onProject} />}
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
       <MenuItem icon={<Hourglass size={13} />} label="Waiting on…" hint="w" onSelect={onWaiting} />
       <MenuItem icon={<CalendarClock size={13} />} label="Check by…" hint="c" onSelect={onCheckBy} />

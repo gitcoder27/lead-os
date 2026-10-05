@@ -454,5 +454,10 @@ export function inlineCaptureDefaults(
   context: TaskGroupContext,
   today: string,
 ): CaptureDefaults {
-  return captureDefaultsFromTask(inlineAddDefaults(viewId, definition, context, today));
+  const defaults = captureDefaultsFromTask(inlineAddDefaults(viewId, definition, context, today));
+  const project = definition?.filters?.project;
+  const track = definition?.filters?.track;
+  if (typeof project === 'number') defaults.placement = { projectId: project, trackId: typeof track === 'number' ? track : null };
+  else if (project === 'none') defaults.placement = null;
+  return defaults;
 }

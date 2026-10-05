@@ -21,6 +21,7 @@ const RULE = 'color-mix(in srgb, var(--border) 55%, transparent)';
 
 interface TaskListProps {
   groups: RenderGroup[];
+  allowAdd?: boolean;
   definition: TaskViewDefinition | undefined;
   today: string;
   attentionMode: boolean;
@@ -47,6 +48,7 @@ interface TaskListProps {
  */
 export function TaskList({
   groups,
+  allowAdd = true,
   definition,
   today,
   attentionMode,
@@ -84,7 +86,7 @@ export function TaskList({
                 collapsed={collapsed}
                 today={today}
                 ownerName={ownerName}
-                onAdd={() => onStartAdd(group.key)}
+                onAdd={allowAdd ? () => onStartAdd(group.key) : undefined}
                 onMoveOverdueToToday={onMoveOverdueToToday}
                 onToggle={() => onToggleGroup?.(group.key)}
               />
@@ -122,7 +124,7 @@ export function TaskList({
               </ul>
             )}
             {/* Labeled groups add from the label's "+"; unlabeled lists keep a footer row. Collapsed groups keep both hidden. */}
-            {!collapsed && !group.collapsible && (addingGroup === group.key || !group.label) && (
+            {allowAdd && !collapsed && !group.collapsible && (addingGroup === group.key || !group.label) && (
               <div className="border-t" style={{ borderColor: RULE }}>
                 <InlineAddRow
                   active={addingGroup === group.key}
@@ -154,7 +156,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
   collapsed: boolean;
   today: string;
   ownerName: (ownerType: string | null, ownerId: string | null) => string;
-  onAdd: () => void;
+  onAdd?: () => void;
   onMoveOverdueToToday: (tasks: RowTask[]) => void;
   onToggle: () => void;
 }) {
@@ -231,7 +233,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
           <CalendarClock size={12} /> Move all to today
         </button>
       )}
-      {!group.collapsible && (
+      {!group.collapsible && onAdd && (
         <button
           type="button"
           onClick={onAdd}

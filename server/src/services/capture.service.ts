@@ -1,3 +1,4 @@
+import { visibleTaskRows } from "./task-visibility";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
@@ -184,7 +185,7 @@ export class CaptureService {
       if (parentRef) {
         const parentKey = await this.keys.resolve(scope, parentRef);
         const parent = parentKey ? await this.taskService.getByKey(parentKey, scope) : undefined;
-        if (!parent || parent.deletedAt) throw new HttpError(400, "Parent task not found");
+        if (!parent || parent.deletedAt || !(await visibleTaskRows(principal)).some((row) => row.id === parent.id)) throw new HttpError(400, "Parent task not found");
         parentId = parent.id;
       }
 
@@ -235,7 +236,7 @@ export class CaptureService {
           waitingOn,
         },
         principal,
-        { requestId, source: "capture", untriaged: isUntriaged(resolved, defaults) },
+        { requestId, source: "capture", placement: defaults.placement, untriaged: isUntriaged(resolved, defaults) },
       );
       const jiraKeys = new Set(resolved.jiraLinks.map((link) => link.key));
       for (const link of resolved.jiraLinks) {

@@ -725,7 +725,7 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 - [x] HIER-01 — contracts, additive tables, scoped container APIs.
 - [x] HIER-02 — placement, filters, aggregates.
 - [x] HIER-03 — Projects workspace and lifecycle.
-- [ ] HIER-04 — placement capture and subtasks.
+- [x] HIER-04 — placement capture and subtasks.
 - [ ] HIER-05 — Today and maintenance.
 - [ ] HIER-06 — synthetic verification and handoff.
 
@@ -734,3 +734,4 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | 2026-10-05 | HIER-01 | Private scoped persistence, additive migration and manager-only container endpoints; server typecheck. |
 | 2026-10-05 | HIER-02 | Shared Tasks visibility, exact descendant previews, atomic guarded moves/Undo, private DTO enrichment, filter/list/count agreement and Later-aware facts. 24 targeted backend tests passed. |
 | 2026-10-05 | HIER-03 | Projects rail/mobile entry, overview, project/track drill-down, private dated summaries, archive/restore previews and saved-view placement filters; client typecheck passed. |
+| 2026-10-05 | HIER-04 | Searchable guarded placement dialog in drawer/row/bulk actions, contextual capture and child inheritance/clearing, ordinary subtask add and visible completion tallies. 64 backend and 82 frontend tests passed; typecheck passed. |

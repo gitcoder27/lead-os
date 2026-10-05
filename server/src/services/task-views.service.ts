@@ -449,10 +449,10 @@ export class TaskViewsService {
     const matched = await this.evaluate(principal, definition, today, tz);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
     // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
-    const meetingIds = matched.filter((entry) => entry.row.kind === "meeting").map((entry) => entry.row.id);
+    const meetingIds = matched.map((entry) => entry.row.id);
     if (meetingIds.length) {
       const children = await db.select({ parentId: tasks.parentId, status: tasks.status }).from(tasks)
-        .where(and(eq(tasks.workspaceId, normalizeWorkspaceId(principal.workspaceId)), inArray(tasks.parentId, meetingIds), isNull(tasks.deletedAt)));
+        .where(and(eq(tasks.workspaceId, normalizeWorkspaceId(principal.workspaceId)), inArray(tasks.parentId, meetingIds), isNull(tasks.deletedAt), this.scopePredicate(principal)));
       const byParent = new Map<number, { done: number; total: number }>(meetingIds.map((id) => [id, { done: 0, total: 0 }]));
       for (const child of children) {
         const entry = byParent.get(child.parentId!)!;
@@ -461,7 +461,7 @@ export class TaskViewsService {
         entry.total += 1;
         if (child.status === "done") entry.done += 1;
       }
-      for (const [id, actions] of byParent) signalsById.get(id)!.actions = actions;
+      for (const [id, actions] of byParent) if (actions.total || matched.find((entry) => entry.row.id === id)?.row.kind === "meeting") signalsById.get(id)!.actions = actions;
     }
     const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, tz);
     const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];

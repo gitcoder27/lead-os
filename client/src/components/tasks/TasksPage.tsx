@@ -1,3 +1,4 @@
+import { PlacementDialog } from './PlacementDialog';
 import { ProjectsPanel } from './ProjectsPanel';
 import { ProjectFilters } from './ProjectFilters';
 import { useProject } from '@/hooks/useProjects';
@@ -939,6 +940,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             </>
           ) : (
             <TaskList
+              allowAdd={!(projectDetail.data?.project.archivedAt || projectDetail.data?.tracks.find((track) => track.id === trackId)?.archivedAt)}
               groups={displayGroups}
               definition={definition}
               today={today}
@@ -973,6 +975,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
         </div>
       </section>
 
+      {menu?.kind === 'project' && <PlacementDialog keys={menu.keys} initial={menuTargets.length === 1 ? menuTargets[0]?.placement : null} onClose={closeMenu} />}
       {menu?.kind === 'status' && (
         <StatusMenu
           anchor={menu.anchor}
@@ -1072,6 +1075,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onSchedule={() => setMenu({ ...menu, kind: 'schedule' })}
           onStatus={() => setMenu({ ...menu, kind: 'status' })}
           onAssign={() => setMenu({ ...menu, kind: 'assign' })}
+          onProject={() => setMenu({ ...menu, kind: 'project' })}
           onLabels={() => setMenu({ ...menu, kind: 'label' })}
           onPriority={() => setMenu({ ...menu, kind: 'priority' })}
           onWaiting={() => setMenu({ ...menu, kind: 'waiting' })}

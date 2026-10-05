@@ -1,3 +1,6 @@
+import { PlacementPicker } from './PlacementPicker';
+import { useLocalDate } from '@/hooks/useLocalDate';
+import type { TaskPlacement } from '@/types';
 import { useRef, useState } from 'react';
 import { ArrowUpRight, ChevronRight, ExternalLink, Globe, Link2, ListTree, Plus, Ticket, UserRound, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
@@ -317,13 +320,15 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
 }) {
   const { addToast } = useToast();
   const createChild = useCaptureTask();
+  const today = useLocalDate();
+  const [placement, setPlacement] = useState<TaskPlacement | null | undefined>();
   const [draft, setDraft] = useState('');
   const [caret, setCaret] = useState(0);
   const draftRef = useRef<HTMLInputElement>(null);
   const typeahead = useCaptureTypeahead(draft, caret);
   const isMeeting = task.kind === 'meeting';
-  const canAdd = isMeeting && mode === 'manager' && !readOnly;
-  const done = task.children.filter((child) => child.status === 'done' || child.status === 'dropped').length;
+  const canAdd = mode === 'manager' && !readOnly;
+  const done = task.children.filter((child) => child.status === 'done').length;
 
   if (!task.children.length && !canAdd) return null;
 
@@ -333,7 +338,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
     const text = typeahead.toWire(draft.trim());
     if (!text || createChild.isPending) return;
     try {
-      const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey } });
+      const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey, ...(placement !== undefined && { placement }) } });
       setDraft('');
       setCaret(0);
       if (warnings.length) addToast(warnings.map((warning) => warning.message).join(' '), 'warning');
@@ -351,7 +356,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
     });
   };
 
-  const total = task.children.length;
+  const total = task.children.filter((child) => child.status !== 'dropped').length;
   return (
     <section aria-labelledby={`children-${task.taskKey}`} className="space-y-2">
       <SectionHeader
@@ -372,6 +377,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           ))}
         </ul>
       )}
+      {canAdd && <details className="text-xs"><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary><PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} /></details>}
       {canAdd && (
         <form
           className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
@@ -393,10 +399,10 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
                 if (chosen) { event.preventDefault(); applyEdit(chosen); }
               }
             }}
-            placeholder="Add an action item — @dev for owner, !fri for a date…"
+            placeholder={isMeeting ? 'Add an action item — @dev for owner, !fri for a date…' : 'Add subtask — @dev for owner, !fri for a date…'}
             className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
-            aria-label="New action item"
+            aria-label={isMeeting ? 'New action item' : 'New subtask'}
           />
           {typeahead.open && typeahead.fragment ? (
             <TokenSuggestionList
@@ -427,7 +433,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
 }
 
 function ChildRow({ child, people, onOpen }: { child: TaskChildRef; people: TaskPeople; onOpen: (key: string) => void }) {
-  const closed = child.status === 'done' || child.status === 'dropped';
+  const closed = child.status === 'done';
   const owner = child.ownerId ? people.nameFor(child.ownerId) : undefined;
   return (
     <li>

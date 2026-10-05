@@ -76,6 +76,7 @@ export function StandupTaskList({
                 aria-selected={focused}
                 tabIndex={focused ? 0 : -1}
                 ref={(el) => registerRow(task.taskKey, el)}
+                onFocus={() => onFocusIndex(index)}
                 onClick={() => onFocusIndex(index)}
                 onDoubleClick={() => onOpen(task.taskKey)}
                 onKeyDown={(event) => {

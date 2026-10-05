@@ -10,6 +10,7 @@ import type { RecordStandupSessionResponse, TeamTrackerBoardResponse, TrackerChe
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import { useStandupRound } from '@/hooks/useStandupRound';
+import { useStandupTaskSelection } from '@/hooks/useStandupTaskSelection';
 import { isCoveredByLaterLayer, useModalFocus } from '@/hooks/useModalFocus';
 import './standup/standup.css';
 import { api } from '@/lib/api';
@@ -204,25 +205,34 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   const openTasks = useMemo(() => openTasksFor(day), [day]);
   const doneToday = useMemo(() => doneTodayFor(day), [day]);
   const stats = useMemo(() => (day ? dayStats(day, date) : null), [day, date]);
-  const taskIndex = Math.max(0, openTasks.findIndex((task) => task.taskKey === selectedTaskKey));
+  const selectTaskKey = useCallback((taskKey: string | undefined) => {
+    if (!ownsRound || taskKey === selectedTaskKey) return;
+    setSelectedTaskKey(taskKey);
+    dispatch({ type: 'patch', patch: { taskKey, currentId: accountId } });
+  }, [selectedTaskKey, accountId, dispatch, ownsRound]);
+  const taskIndex = useStandupTaskSelection(`${session.roundId}:${accountId}`, openTasks, selectedTaskKey, selectTaskKey);
   const focusedTask = openTasks[taskIndex];
   // Moving to a person puts the keyboard on their first task (the current one, which sorts first), so j/k, e, u
   // and Enter work at once. The name only takes focus where there is no task to land on (and in the wrap-up).
   const landingTaskKey = useRef<string | undefined>(undefined);
   landingTaskKey.current = view === 'person' ? focusedTask?.taskKey : undefined;
-  // Also re-land when the first row appears (the board arriving after the screen, or a person's first task added).
+  // Re-land on the replacement task or after a layer closes; a refresh alone must not steal focus from input.
   const hasLandingRow = Boolean(landingTaskKey.current);
   useEffect(() => {
+    if (!ownsRound || suspended || layer !== 'none') return;
     const focus = window.setTimeout(() => {
+      if (isCoveredByLaterLayer(rootRef.current)) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && rootRef.current?.contains(active)
+        && (active.matches('input, textarea, select') || active.isContentEditable)) return;
       const row = landingTaskKey.current ? taskRowRefs.current.get(landingTaskKey.current) : undefined;
       (row ?? rootRef.current?.querySelector<HTMLElement>('[data-standup-person]'))?.focus({ preventScroll: true });
+      row?.scrollIntoView?.({ block: 'nearest' });
     }, 0);
     return () => window.clearTimeout(focus);
-  }, [rootRef, currentId, view, hasLandingRow]);
+  }, [rootRef, currentId, view, hasLandingRow, focusedTask?.taskKey, ownsRound, suspended, layer]);
   const setTaskIndex = (index: number) => {
-    const taskKey = openTasks[index]?.taskKey;
-    setSelectedTaskKey(taskKey);
-    dispatch({ type: 'patch', patch: { taskKey } });
+    selectTaskKey(openTasks[index]?.taskKey);
   };
   const suggestion = day?.statusSuggestion;
   const pickerTasks: TaskPickerTask[] = openTasks.map((task) => ({ taskKey: task.taskKey, title: task.title }));
@@ -287,17 +297,16 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
   }, [dispatch]);
 
   const focusRow = useCallback((taskKey?: string) => {
-    window.setTimeout(() => {
-      if (taskKey) taskRowRefs.current.get(taskKey)?.focus();
-      if (taskKey) taskRowRefs.current.get(taskKey)?.scrollIntoView?.({ block: 'nearest' });
-    }, 30);
-  }, []);
+    if (!taskKey || isCoveredByLaterLayer(rootRef.current)) return;
+    const row = taskRowRefs.current.get(taskKey);
+    row?.focus({ preventScroll: true });
+    row?.scrollIntoView?.({ block: 'nearest' });
+  }, [rootRef]);
 
   const closeLayer = useCallback(() => {
     setLayer('none');
     setPendingStatus(null);
-    focusRow(focusedTask?.taskKey);
-  }, [focusedTask?.taskKey, focusRow]);
+  }, []);
 
   const goToDeveloper = useCallback(
     (id: string) => {
@@ -353,11 +362,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     (delta: number) => {
       if (!openTasks.length) return;
       const taskKey = openTasks[Math.min(Math.max(taskIndex + delta, 0), openTasks.length - 1)]?.taskKey;
-      setSelectedTaskKey(taskKey);
-      dispatch({ type: 'patch', patch: { taskKey } });
+      selectTaskKey(taskKey);
       focusRow(taskKey);
     },
-    [openTasks, taskIndex, dispatch, focusRow],
+    [openTasks, taskIndex, selectTaskKey, focusRow],
   );
 
   const focusTaskByKey = useCallback(
@@ -367,11 +375,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         onOpenTask(taskKey);
         return;
       }
-      setSelectedTaskKey(taskKey);
-      dispatch({ type: 'patch', patch: { taskKey } });
+      selectTaskKey(taskKey);
       focusRow(taskKey);
     },
-    [openTasks, onOpenTask, focusRow, dispatch],
+    [openTasks, onOpenTask, focusRow, selectTaskKey],
   );
 
   const openStatusDialog = useCallback((status: TrackerDeveloperStatus, preselect: string[] = []) => {

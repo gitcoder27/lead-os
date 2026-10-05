@@ -4,6 +4,8 @@ import { act, render, screen, fireEvent, within, waitFor } from '@testing-librar
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { QueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Dialog } from '@/components/ui/Dialog';
 import { TestWrapper } from '@/test/wrapper';
 import type {
   ManagerSurfaceTask,
@@ -254,6 +256,14 @@ function taskRows() {
   return within(screen.getByRole('listbox', { name: /Alice Smith's tasks|Bob Jones's tasks/ })).getAllByRole('option');
 }
 
+function longTaskBoard() {
+  const board = buildBoard();
+  board.developers[0]!.tasks = Array.from({ length: 10 }, (_, index) => surfaceTask({
+    id: index + 11, taskKey: `T-${index + 11}`, title: `Work ${index + 1}`, position: index,
+  }));
+  return board;
+}
+
 beforeEach(() => {
   teamModeMock.mode = 'collab';
   feedFor = null;
@@ -266,6 +276,116 @@ beforeEach(() => {
 });
 
 describe('StandupMode', () => {
+  describe('task selection through actions and refreshes', () => {
+    it('moves focus immediately with j/k and arrows so Enter opens the highlighted row', async () => {
+      renderStandup(longTaskBoard());
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      for (const key of ['j', 'j', 'k', 'ArrowDown']) fireEvent.keyDown(document.activeElement!, { key });
+      expect(taskRows()[2]).toHaveAttribute('aria-selected', 'true');
+      expect(taskRows()[2]).toHaveFocus();
+      fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+      expect(mockOnOpenTask).toHaveBeenCalledWith('T-13');
+    });
+
+    it('selects a task when native keyboard focus reaches its row', async () => {
+      renderStandup(longTaskBoard());
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      act(() => taskRows()[2]!.focus());
+      expect(taskRows()[2]).toHaveAttribute('aria-selected', 'true');
+      fireEvent.keyDown(document.activeElement!, { key: 'j' });
+      expect(taskRows()[3]).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('keeps task identity through reorder and refresh without taking focus from an update draft', async () => {
+      const board = longTaskBoard();
+      const view = renderStandup(board);
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      fireEvent.keyDown(document.activeElement!, { key: 'j' });
+      fireEvent.keyDown(document.activeElement!, { key: 'j' });
+      fireEvent.keyDown(document.activeElement!, { key: 'u' });
+      const input = screen.getByLabelText('Add an update to T-13');
+      await waitFor(() => expect(input).toHaveFocus());
+      fireEvent.change(input, { target: { value: 'Keep this context' } });
+      const reordered = { ...board, developers: board.developers.map((person, index) => index ? person : {
+        ...person, tasks: [...person.tasks!].reverse().map((task, position) => ({ ...task, position })),
+      }) };
+      view.rerender(<TestWrapper><StandupMode date="2026-03-07" board={reordered} onClose={mockOnClose} onOpenTask={mockOnOpenTask} /></TestWrapper>);
+      expect(within(taskRows().find((row) => row.getAttribute('aria-selected') === 'true')!).getByText('T-13')).toBeInTheDocument();
+      expect(input).toHaveValue('Keep this context');
+      expect(input).toHaveFocus();
+      fireEvent.keyDown(input, { key: 'Escape' });
+      fireEvent.keyDown(document.body, { key: 'j' });
+      expect(within(taskRows().find((row) => row.getAttribute('aria-selected') === 'true')!).getByText('T-12')).toBeInTheDocument();
+    });
+
+    it('focuses the person after their last task leaves, and the first new task when work arrives', async () => {
+      const board = longTaskBoard();
+      const view = renderStandup(board);
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      fireEvent.keyDown(document.activeElement!, { key: 'j' });
+      const empty = { ...board, developers: board.developers.map((person, index) => index ? person : { ...person, tasks: [] }) };
+      view.rerender(<TestWrapper><StandupMode date="2026-03-07" board={empty} onClose={mockOnClose} onOpenTask={mockOnOpenTask} /></TestWrapper>);
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Alice Smith' })).toHaveFocus());
+      view.rerender(<TestWrapper><StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={mockOnOpenTask} /></TestWrapper>);
+      expect(taskRows()[0]).toHaveAttribute('aria-selected', 'true');
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+    });
+
+    it.each([{ index: 2, nextKey: 'T-14' }, { index: 8, nextKey: 'T-20' }, { index: 9, nextKey: 'T-19' }])(
+      'keeps a nearby selection after completing task at index $index', async ({ index, nextKey }) => {
+        const board = longTaskBoard();
+        const view = renderStandup(board);
+        fireEvent.click(taskRows()[index]!);
+        fireEvent.keyDown(document.body, { key: 'e' });
+        expect(mockUpdateTaskMutate).toHaveBeenCalledWith({ status: 'done' }, expect.anything());
+        const updated = { ...board, developers: board.developers.map((person, personIndex) => personIndex ? person : {
+          ...person, tasks: person.tasks!.map((task, taskIndex) => taskIndex === index ? { ...task, status: 'done' as const } : task),
+        }) };
+        view.rerender(<TestWrapper><StandupMode date="2026-03-07" board={updated} onClose={mockOnClose} onOpenTask={mockOnOpenTask} /></TestWrapper>);
+        const selected = taskRows().find((row) => row.getAttribute('aria-selected') === 'true')!;
+        expect(within(selected).getByText(nextKey)).toBeInTheDocument();
+        await waitFor(() => expect(selected).toHaveFocus());
+        // Persist the fallback, so a later refresh does not bounce to a different task.
+        view.unmount();
+        renderStandup(updated);
+        expect(within(taskRows().find((row) => row.getAttribute('aria-selected') === 'true')!).getByText(nextKey)).toBeInTheDocument();
+      },
+    );
+
+    it.each([false, true])('returns to the selected task or its neighbor after a drawer edit (reassigned: %s)', async (reassigned) => {
+      function DrawerScenario() {
+        const [board, setBoard] = useState(longTaskBoard);
+        const [taskKey, setTaskKey] = useState<string | null>(null);
+        return <>
+          <StandupMode date="2026-03-07" board={board} onClose={mockOnClose} onOpenTask={setTaskKey} suspended={!!taskKey} />
+          {taskKey && <Dialog title={taskKey} ariaLabel="Task drawer" onClose={() => setTaskKey(null)}>
+            <button onClick={() => setBoard((previous) => ({ ...previous, developers: previous.developers.map((person, index) => index ? person : {
+              ...person, tasks: person.tasks!.filter((task) => !reassigned || task.taskKey !== taskKey).map((task) => ({ ...task, title: `${task.title} edited` })),
+            }) }))}>Save edit</button>
+          </Dialog>}
+        </>;
+      }
+      render(<TestWrapper><DrawerScenario /></TestWrapper>);
+      await waitFor(() => expect(taskRows()[0]).toHaveFocus());
+      fireEvent.click(taskRows()[2]!);
+      act(() => taskRows()[2]!.focus());
+      fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+      const drawer = screen.getByRole('dialog', { name: 'Task drawer' });
+      expect(drawer).toHaveTextContent('T-13');
+      fireEvent.click(within(drawer).getByRole('button', { name: 'Save edit' }));
+      expect(drawer).toHaveFocus();
+      fireEvent.keyDown(drawer, { key: 'j' });
+      fireEvent.keyDown(drawer, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Task drawer' })).not.toBeInTheDocument());
+      const expectedKey = reassigned ? 'T-14' : 'T-13';
+      const selected = taskRows().find((row) => row.getAttribute('aria-selected') === 'true')!;
+      expect(within(selected).getByText(expectedKey)).toBeInTheDocument();
+      await waitFor(() => expect(selected).toHaveFocus());
+      fireEvent.keyDown(document.activeElement!, { key: 'k' });
+      expect(within(taskRows()[1]!).getByText('T-12')).toBeInTheDocument();
+      expect(taskRows()[1]).toHaveAttribute('aria-selected', 'true');
+    });
+  });
   it('keeps roster and selected task identities stable when polling reorders them', () => {
     const board = buildBoard();
     const view = renderStandup(board);

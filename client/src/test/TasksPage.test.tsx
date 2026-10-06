@@ -1282,3 +1282,60 @@ it('waits for project context before offering tasks or contextual capture', () =
   expect(screen.queryByRole('textbox', { name: 'Search tasks' })).not.toBeInTheDocument();
   expect(screen.queryByText('Add task')).not.toBeInTheDocument();
 });
+
+
+describe('Tasks viewport window (P02)', () => {
+  it('retains the starting row when range key events share a render batch', () => {
+    mockUseTaskViewTasks.mockReturnValue(tasksResult([task(), task({ id: 2, taskKey: 'T-2' }), task({ id: 3, taskKey: 'T-3' })]));
+    render(<TasksPage />);
+    act(() => {
+      openRow('T-1').focus();
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown', shiftKey: true });
+      fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown', shiftKey: true });
+    });
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    expect(row('T-3')).toHaveAttribute('data-focused', 'true');
+  });
+
+  it('bounds grouped mounts, preserves offscreen range selection, and exports all tasks', async () => {
+    if (!HTMLElement.prototype.scrollTo) HTMLElement.prototype.scrollTo = () => {};
+    const all = Array.from({ length: 1000 }, (_, index) => task({ id: index + 1, taskKey: `T-${index + 1}`, title: `Synthetic ${index + 1}`, scheduledOn: index < 500 ? TODAY : '2026-09-27' }));
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => definition?.filters?.closed ? tasksResult([]) : tasksResult(all));
+    const { container } = render(<TasksPage />);
+    expect(container.querySelectorAll('[data-task-row]').length).toBeLessThan(40);
+    expect(screen.queryByText('Synthetic 1000')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export CSV' }));
+    expect(mockCsvDownload.mock.calls.at(-1)![0]).toContain('Synthetic 1000');
+    press('j');
+    act(() => {
+      for (let i = 0; i < 35; i++) fireEvent.keyDown(document.activeElement ?? document.body, { key: 'j', shiftKey: true });
+    });
+    await waitFor(() => expect(row('T-36')).toHaveAttribute('data-focused', 'true'));
+    expect(container.querySelectorAll('[data-task-row]').length).toBeLessThan(40);
+    expect(screen.getByText('36 selected')).toBeInTheDocument();
+    expect(row('T-30')).toBeNull();
+    await act(async () => { fireEvent.click(within(screen.getByRole('toolbar', { name: 'Bulk actions' })).getByRole('button', { name: 'Done (e)' })); });
+    expect(mockApply.mock.calls.at(-1)![0]).toHaveLength(36);
+    expect(mockApply.mock.calls.at(-1)![0].map((item: { task: TaskViewTask }) => item.task.taskKey)).toContain('T-30');
+  });
+
+  it('keeps whole-group actions complete when most rows are outside the viewport', async () => {
+    const all = Array.from({ length: 150 }, (_, index) => task({ id: index + 1, taskKey: `T-${index + 1}`, title: `Overdue ${index + 1}`, scheduledOn: '2026-09-23', signals: { ...NO_SIGNALS, overdue: true, overdueSource: 'scheduled', overdueDays: 3 } }));
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => definition?.filters?.closed ? tasksResult([]) : tasksResult(all));
+    const { container } = render(<TasksPage />);
+    expect(container.querySelectorAll('[data-task-row]').length).toBeLessThan(40);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Move all to today/ })); });
+    expect(mockApply.mock.calls.at(-1)![0]).toHaveLength(150);
+    expect(mockApply.mock.calls.at(-1)![0].at(-1).task.taskKey).toBe('T-150');
+  });
+
+  it('opens a drawer deep link for an offscreen task without mounting the backlog', async () => {
+    window.history.replaceState(null, '', '/tasks?view=my-tasks&task=T-1000');
+    mockUseTaskViewTasks.mockReturnValue(tasksResult(Array.from({ length: 1000 }, (_, index) => task({ id: index + 1, taskKey: `T-${index + 1}`, title: `Synthetic ${index + 1}` }))));
+    const { container } = render(<TasksPage />);
+    await waitFor(() => expect(mockDrawerProps?.taskKey).toBe('T-1000'));
+    expect(container.querySelectorAll('[data-task-row]').length).toBeLessThan(40);
+    expect(row('T-1000')).toBeNull();
+  });
+});

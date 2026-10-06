@@ -143,6 +143,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const labels = useTaskLabels();
   const mutations = useTaskListMutations();
 
+  const listScrollRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<TaskViewUrlState>(() =>
@@ -342,6 +343,9 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const focusDom = useCallback((key: string | undefined) => {
     if (!key) return;
     requestAnimationFrame(() => {
+      // Fast repeated keys can queue several focus frames. A stale frame must
+      // not focus an older row and rewind the logical keyboard position.
+      if (focusedKeyRef.current !== key) return;
       const element = rowElement(key)?.querySelector<HTMLElement>('[data-task-open]');
       element?.focus({ preventScroll: true });
       element?.scrollIntoView?.({ block: 'nearest' });
@@ -654,9 +658,10 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       const nextIndex = index < 0 ? 0 : Math.max(0, Math.min(flatRows.length - 1, index + delta));
       const nextKey = flatRows[nextIndex]!.taskKey;
       if (extend) {
+        const previousKey = focusedKeyRef.current;
         setSelected((current) => {
           const next = new Set(current);
-          if (focusedKeyRef.current) next.add(focusedKeyRef.current);
+          if (previousKey) next.add(previousKey);
           next.add(nextKey);
           return next;
         });
@@ -904,6 +909,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
         {projectsMode && <div className="px-5 pt-3 md:hidden"><TaskWorkspaceSelect views={allViews} counts={countData} viewId={selectedId} onSelectView={setView} /></div>}
 
         <div
+          ref={listScrollRef}
           className="min-h-0 flex-1 overflow-y-auto"
           // docs/51 U6: track the row under the pointer so mouse pins release once it moves on.
           onPointerMove={(event) => {
@@ -951,6 +957,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             </>
           ) : (
             <TaskList
+              scrollRef={listScrollRef}
               allowAdd={!(projectDetail.data?.project.archivedAt || projectDetail.data?.tracks.find((track) => track.id === trackId)?.archivedAt)}
               groups={displayGroups}
               definition={definition}

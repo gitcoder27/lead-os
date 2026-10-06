@@ -480,3 +480,30 @@ it("keeps all nine built-in lists, signals and rail counts aligned in different 
     expect(titles["closed-week"]).toEqual(["Closed"]);
   }
 });
+
+
+it("pages Tasks without truncating counts and keeps detail deep links independent", async () => {
+  await enablePhase3();
+  const headers = { cookie: await cookie("manager-a") };
+  const created = await createTask(headers, { title: "First", priority: "high", scheduledOn: "2026-10-06" });
+  await createTask(headers, { title: "Second", priority: "high", scheduledOn: "2026-10-06" });
+  const view = encodeViewDef({ filters: { priority: "high" }, sort: "scheduled" });
+  const first = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${view}&today=2026-10-06&limit=1`, headers });
+  expect(first.body).toMatchObject({ total: 2, nextOffset: 1 });
+  expect(first.body.tasks).toHaveLength(1);
+  const second = await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${view}&today=2026-10-06&limit=1&offset=1`, headers });
+  expect(second.body).toMatchObject({ total: 2, nextOffset: null });
+  expect(second.body.tasks).toHaveLength(1);
+  expect(first.body.tasks[0].taskKey).not.toBe(second.body.tasks[0].taskKey);
+  const detail = await invoke(app, { method: "GET", url: `/api/tasks/${second.body.tasks[0].taskKey}/detail`, headers });
+  expect(detail.status).toBe(200);
+  expect(detail.body.taskKey).toBe(second.body.tasks[0].taskKey);
+  const legacy = await invoke(app, { method: "GET", url: "/api/tasks?view=all&limit=1&offset=1", headers });
+  expect(legacy.body).toMatchObject({ total: 2, nextOffset: null });
+  expect(legacy.body.tasks).toHaveLength(1);
+  expect((await invoke(app, { method: "GET", url: "/api/tasks/view-counts?today=2026-10-06", headers })).body.counts["high-priority"].count).toBe(2);
+  for (const query of ["limit=0", "limit=501", "offset=-1", "offset=NaN"]) {
+    expect((await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${view}&${query}`, headers })).status).toBe(400);
+  }
+  expect(created.taskKey).toBeDefined();
+});

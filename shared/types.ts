@@ -1430,7 +1430,7 @@ export interface TaskSignals {
 
 export type TaskViewTask = ManagerTask & { signals: TaskSignals; oneOnOne?: true };
 
-export interface TaskViewTasksResponse {
+export interface TaskViewTasksResponse extends ListPageMetadata {
   tasks: TaskViewTask[];
 }
 

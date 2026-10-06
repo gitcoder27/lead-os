@@ -1,3 +1,4 @@
+import { listPage, listPageSchema, type ListPageRequest } from "./list-page";
 import { taskVisibilityPredicate } from "./task-visibility";
 import { readTaskPlacements } from "./task-placements.service";
 import { oneOnOneTaskIds } from "./one-on-one-tasks";
@@ -485,12 +486,24 @@ export class TaskViewsService {
    * manager's IANA zone: deadlines and timestamps are bucketed on their day, not the server's.
    */
   async run(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string, agendaTaskIds?: ReadonlySet<number>): Promise<TaskViewTask[]> {
+    return (await this.execute(viewer, definition, today, tz, agendaTaskIds)).tasks;
+  }
+
+  async runPage(viewer: TaskPrincipal, definition: TaskViewDefinition, page: Partial<ListPageRequest> = {}, today = todayIsoDate(), tz?: string) {
+    return this.execute(viewer, definition, today, tz, undefined, listPageSchema.parse(page));
+  }
+
+  private async execute(viewer: TaskPrincipal, definition: TaskViewDefinition, today: string, tz?: string, agendaTaskIds?: ReadonlySet<number>, page?: ListPageRequest) {
     const principal = await this.withSelf(viewer);
     const prepared = new Map<number, PreparedRow>();
     const matched = await this.evaluate(principal, definition, today, tz, prepared);
-    const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
+    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, prepared);
+    const result = page ? listPage(sorted, page) : { rows: sorted, total: sorted.length, nextOffset: null };
+    const pageIds = new Set(result.rows.map((row) => row.id));
+    const signalsById = new Map(matched.filter((entry) => pageIds.has(entry.row.id)).map((entry) => [entry.row.id, entry.signals]));
+    const rowsById = new Map(result.rows.map((row) => [row.id, row]));
     // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
-    const meetingIds = matched.map((entry) => entry.row.id);
+    const meetingIds = result.rows.map((row) => row.id);
     if (meetingIds.length) {
       const children = await db.select({ parentId: tasks.parentId, status: tasks.status }).from(tasks)
         .where(and(eq(tasks.workspaceId, normalizeWorkspaceId(principal.workspaceId)), inArray(tasks.parentId, meetingIds), isNull(tasks.deletedAt), this.scopePredicate(principal)));
@@ -502,12 +515,15 @@ export class TaskViewsService {
         entry.total += 1;
         if (child.status === "done") entry.done += 1;
       }
-      for (const [id, actions] of byParent) if (actions.total || matched.find((entry) => entry.row.id === id)?.row.kind === "meeting") signalsById.get(id)!.actions = actions;
+      for (const [id, actions] of byParent) if (actions.total || rowsById.get(id)?.kind === "meeting") signalsById.get(id)!.actions = actions;
     }
-    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, prepared);
-    const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
+    const dtos = (await this.taskService.toDtos(result.rows, principal)) as ManagerTask[];
     const agendaIds = agendaTaskIds ?? await oneOnOneTaskIds(principal.workspaceId);
-    return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)!, ...(agendaIds.has(dto.id) && { oneOnOne: true as const }) }));
+    return {
+      tasks: dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)!, ...(agendaIds.has(dto.id) && { oneOnOne: true as const }) })),
+      total: result.total,
+      nextOffset: result.nextOffset,
+    };
   }
 
   /** How many tasks a definition matches, without building DTOs. */

@@ -50,7 +50,7 @@ function deferred<T = unknown>() {
 
 function setup(tasks: ManagerTask[] = [ONE], client?: QueryClient) {
   const qc = client ?? new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  if (!client) qc.setQueryData<TaskViewTasksResponse>(VIEW_KEY, { tasks: tasks.map((entry) => ({ ...entry, signals: {} as never })) });
+  if (!client) qc.setQueryData<TaskViewTasksResponse>(VIEW_KEY, { tasks: tasks.map((entry) => ({ ...entry, signals: {} as never })), total: tasks.length, nextOffset: null });
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   const hook = renderHook(() => useTaskListMutations(), { wrapper });
   return { client: qc, result: hook.result, rerender: hook.rerender };
@@ -259,7 +259,7 @@ describe('overlapping writes (docs/61 TS-01, D1)', () => {
     act(() => { pending = result.current.apply([{ task: ONE, changes: { status: 'done' } }], { label: 'A' }); });
     await vi.waitFor(() => expect(cached(client, 'T-1').status).toBe('done'));
     // A refetch lands with fresher server data before A fails.
-    act(() => { client.setQueryData<TaskViewTasksResponse>(VIEW_KEY, { tasks: [{ ...task({ status: 'blocked' }), signals: {} as never }] }); });
+    act(() => { client.setQueryData<TaskViewTasksResponse>(VIEW_KEY, { tasks: [{ ...task({ status: 'blocked' }), signals: {} as never }], total: 1, nextOffset: null }); });
     await act(async () => { a.reject(new Error('T-1: nope')); await pending; });
     expect(cached(client, 'T-1').status).toBe('blocked');
   });
@@ -271,7 +271,7 @@ describe('overlapping writes (docs/61 TS-01, D1)', () => {
     let pending!: Promise<boolean>;
     act(() => { pending = result.current.apply([{ task: ONE, changes: { status: 'done' } }], { label: 'A' }); });
     await vi.waitFor(() => expect(cached(client, 'T-1').status).toBe('done'));
-    act(() => { client.setQueryData<TaskViewTasksResponse>(VIEW_KEY, (old) => ({ tasks: old!.tasks.map((entry) => ({ ...entry, title: 'Renamed elsewhere' })) })); });
+    act(() => { client.setQueryData<TaskViewTasksResponse>(VIEW_KEY, (old) => ({ ...old!, tasks: old!.tasks.map((entry) => ({ ...entry, title: 'Renamed elsewhere' })) })); });
     await act(async () => { a.reject(new Error('T-1: nope')); await pending; });
     expect(cached(client, 'T-1')).toMatchObject({ status: 'open', title: 'Renamed elsewhere' });
   });

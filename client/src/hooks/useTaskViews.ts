@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { readListPages } from '@/lib/list-pages';
 import { encodeTaskViewDefinition } from '@/lib/task-views';
 import { getLocalTimeZone } from '@/lib/utils';
 import type {
@@ -9,7 +10,7 @@ import type {
   TaskViewCountsResponse,
   TaskViewDefinition,
   TaskViewsResponse,
-  TaskViewTasksResponse,
+  TaskViewTask,
   UpdateTaskViewRequest,
 } from '@/types';
 
@@ -42,8 +43,10 @@ export function useTaskViewTasks(definition: TaskViewDefinition | undefined, ena
   const encoded = definition ? encodeTaskViewDefinition(definition) : '';
   return useQuery({
     queryKey: ['tasks', scope, 'view', encoded, today ?? null],
-    queryFn: () =>
-      api.get<TaskViewTasksResponse>(`/tasks?viewDef=${encodeURIComponent(encoded)}${today ? `&today=${today}` : ''}${zoneParam()}`),
+    queryFn: async ({ signal }) => {
+      const tasks = await readListPages<TaskViewTask>(`/tasks?viewDef=${encodeURIComponent(encoded)}${today ? `&today=${today}` : ''}${zoneParam()}`, 'tasks', signal);
+      return { tasks, total: tasks.length, nextOffset: null };
+    },
     enabled: enabled && Boolean(definition),
     staleTime: 10_000,
     // docs/49 R5: keep the previous list on screen while a new view loads.

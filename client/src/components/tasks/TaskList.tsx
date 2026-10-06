@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Fragment, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useTaskListWindow } from '@/hooks/useTaskListWindow';
 import { CalendarClock, ChevronDown, ChevronRight, Plus, UserRound } from 'lucide-react';
 import type { TaskViewDefinition } from '@/types';
 import type { TaskGroupContext } from '@/lib/task-views';
@@ -20,6 +20,7 @@ export const TASK_LIST_CONTAINER = 'mx-auto w-full max-w-[1180px] px-3 sm:px-5';
 const RULE = 'color-mix(in srgb, var(--border) 55%, transparent)';
 
 interface TaskListProps {
+  scrollRef: RefObject<HTMLElement | null>;
   groups: RenderGroup[];
   allowAdd?: boolean;
   definition: TaskViewDefinition | undefined;
@@ -44,9 +45,10 @@ interface TaskListProps {
  * docs/49 §5/§6.1 + docs/51 D2: grouped, dense list. Groups are flat
  * sections — a quiet sticky label (indicator · name · count) over hairline-
  * divided rows — not bordered cards, so chrome never outweighs a three-task
- * day. Each section owns a labelled native list with exit-only row motion.
+ * day. Each visible section owns a labelled native list; measured spacers preserve its sticky label.
  */
 export function TaskList({
+  scrollRef,
   groups,
   allowAdd = true,
   definition,
@@ -65,79 +67,58 @@ export function TaskList({
   onToggleGroup,
   footer,
 }: TaskListProps) {
-  const reduceMotion = useReducedMotion();
+  const dateColumns = useMemo(() => groups.map((group) => groupShowsDate(definition, group.context, group.tasks, today)), [groups, definition, today]);
+  const { anchorRef, model, virtualizer, sections, scrollMargin } = useTaskListWindow(groups, scrollRef, focusedKey, addingGroup, allowAdd);
   return (
     <div className={`${TASK_LIST_CONTAINER} pb-28 pt-2`}>
-      {groups.map((group, index) => {
-        const collapsed = group.collapsed === true;
-        const dateColumn = groupShowsDate(definition, group.context, group.tasks, today);
-        return (
-          <section
-            key={group.key}
-            role="group"
-            aria-labelledby={group.label ? `task-group-${group.key}` : undefined}
-            aria-label={group.label ? undefined : 'Tasks'}
-            className={`group/section ${index > 0 && group.label ? 'mt-5' : ''}`}
-          >
-            {group.label && (
-              <GroupLabel
-                group={group}
-                headerId={`task-group-${group.key}`}
-                collapsed={collapsed}
-                today={today}
-                ownerName={ownerName}
-                onAdd={allowAdd ? () => onStartAdd(group.key) : undefined}
-                onMoveOverdueToToday={onMoveOverdueToToday}
-                onToggle={() => onToggleGroup?.(group.key)}
-              />
-            )}
-            {!collapsed && (
-              <ul
-                aria-label={group.label || 'Tasks'}
-                className="divide-y"
-                style={{ borderColor: RULE }}
-              >
-                <AnimatePresence initial={false}>
-                  {group.tasks.map((task) => (
-                    <motion.li
-                      key={task.taskKey}
-                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                      transition={{ duration: reduceMotion ? 0 : 0.15 }}
-                      style={{ borderColor: RULE, overflow: 'hidden' }}
-                    >
-                      <TaskListRow
-                        task={task as RowTask}
-                        context={group.context}
-                        definition={definition}
-                        today={today}
-                        attentionMode={attentionMode}
-                        focused={task.taskKey === focusedKey}
-                        selected={selected.has(task.taskKey)}
-                        dateColumn={dateColumn}
-                        ownerName={ownerName}
-                        labelColor={labelColor}
-                        handlers={handlers}
-                      />
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
-            )}
-            {/* Labeled groups add from the label's "+"; unlabeled lists keep a footer row. Collapsed groups keep both hidden. */}
-            {allowAdd && !collapsed && !group.collapsible && (addingGroup === group.key || !group.label) && (
-              <div className="border-t" style={{ borderColor: RULE }}>
-                <InlineAddRow
-                  active={addingGroup === group.key}
-                  onStart={() => onStartAdd(group.key)}
-                  onCancel={onCancelAdd}
-                  onSubmit={(title) => onSubmitAdd(group.context, title)}
-                  groupLabel={group.label}
-                />
-              </div>
-            )}
-          </section>
-        );
-      })}
+      <div ref={anchorRef}>
+        {sections.map(({ group, groupIndex, items, start, end }, sectionIndex) => {
+          const header = items[0]!;
+          const dateColumn = dateColumns[groupIndex]!;
+          const gap = start - (sections[sectionIndex - 1]?.end ?? 0);
+          const body = items.filter((item) => model.entries[item.index]!.kind !== 'header');
+          return (
+            <Fragment key={group.key}>
+              {gap > 0 && <div aria-hidden="true" style={{ height: gap }} />}
+              <section role="group" aria-labelledby={group.label ? `task-group-${group.key}` : undefined} aria-label={group.label ? undefined : 'Tasks'} className="group/section" style={{ paddingTop: group.label && groupIndex ? 20 : 0 }}>
+                {group.label ? (
+                  <GroupLabel group={group} headerId={`task-group-${group.key}`} collapsed={group.collapsed === true}
+                    today={today} ownerName={ownerName} onAdd={allowAdd ? () => onStartAdd(group.key) : undefined}
+                    onMoveOverdueToToday={onMoveOverdueToToday} onToggle={() => onToggleGroup?.(group.key)}
+                    measureRef={virtualizer.measureElement} virtualIndex={header.index} />
+                ) : <div aria-hidden="true" ref={virtualizer.measureElement} data-index={header.index} style={{ height: 1 }} />}
+                {body.length > 0 && (
+                  <ul aria-label={group.label || 'Tasks'} className="divide-y" style={{ borderColor: RULE }}>
+                    {body.map((item, bodyIndex) => {
+                      const entry = model.entries[item.index]!;
+                      const before = item.start - (body[bodyIndex - 1]?.end ?? header.end);
+                      const task = entry.kind === 'task' ? group.tasks[entry.taskIndex!]! : undefined;
+                      return (
+                        <Fragment key={entry.key}>
+                          {before > 0 && <li aria-hidden="true" style={{ height: before, border: 0 }} />}
+                          <li ref={virtualizer.measureElement} data-index={item.index} style={{ borderColor: RULE }}
+                            aria-posinset={task ? entry.taskIndex! + 1 : undefined} aria-setsize={task ? group.tasks.length : undefined}>
+                            {task ? (
+                              <TaskListRow task={task as RowTask} context={group.context} definition={definition} today={today}
+                                attentionMode={attentionMode} focused={task.taskKey === focusedKey} selected={selected.has(task.taskKey)}
+                                dateColumn={dateColumn} ownerName={ownerName} labelColor={labelColor} handlers={handlers} />
+                            ) : (
+                              <InlineAddRow active={addingGroup === group.key} onStart={() => onStartAdd(group.key)} onCancel={onCancelAdd}
+                                onSubmit={(title) => onSubmitAdd(group.context, title)} groupLabel={group.label} />
+                            )}
+                          </li>
+                        </Fragment>
+                      );
+                    })}
+                  </ul>
+                )}
+                <div aria-hidden="true" style={{ height: Math.max(0, end - (items.at(-1)!.end - scrollMargin)) }} />
+              </section>
+            </Fragment>
+          );
+        })}
+        <div aria-hidden="true" style={{ height: Math.max(0, virtualizer.getTotalSize() - (sections.at(-1)?.end ?? 0)) }} />
+      </div>
       {footer}
     </div>
   );
@@ -150,7 +131,9 @@ export function TaskList({
  * numeral, not a pill. docs/51 D1: the Overdue label takes the loudest tone of
  * its rows — red only when one of them missed a deadline.
  */
-function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMoveOverdueToToday, onToggle }: {
+function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMoveOverdueToToday, onToggle, measureRef, virtualIndex }: {
+  measureRef: (element: HTMLElement | null) => void;
+  virtualIndex: number;
   group: RenderGroup;
   headerId: string;
   collapsed: boolean;
@@ -207,6 +190,8 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
 
   return (
     <header
+      ref={measureRef}
+      data-index={virtualIndex}
       className="sticky top-0 z-[1] flex h-9 items-center gap-2 border-b px-2"
       // Translucent + blur so the stuck label matches the panel's tint while rows scroll under it.
       style={{ background: 'color-mix(in srgb, var(--bg-primary) 90%, transparent)', backdropFilter: 'blur(8px)', borderColor: RULE }}

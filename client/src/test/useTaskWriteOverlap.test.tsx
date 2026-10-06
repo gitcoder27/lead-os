@@ -41,7 +41,7 @@ const DETAIL_KEY = ['task-detail', 'scope', 'manager', 'T-1'];
 
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  client.setQueryData<TaskViewTasksResponse>(LIST_KEY, { tasks: [{ ...task(), signals: {} as never }] });
+  client.setQueryData<TaskViewTasksResponse>(LIST_KEY, { tasks: [{ ...task(), signals: {} as never }], total: 1, nextOffset: null });
   client.setQueryData(DETAIL_KEY, { ...task(), children: [], parent: null });
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   const list = renderHook(() => useTaskListMutations(), { wrapper });

@@ -1,3 +1,4 @@
+import { listPage, listPageSchema } from "../services/list-page";
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../middleware/validate";
@@ -42,7 +43,7 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
   const assertCanonical = async (req: Request) => {
     if (!(await keys.canonicalEnabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Canonical tasks are not enabled");
   };
-  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional(), viewDef: z.string().max(8000).optional(), today: isoDate.optional(), tz: z.string().max(64).optional() }) })), async (req, res, next) => {
+  router.get("/", validate(z.object({ params: z.any().optional(), body: z.any().optional(), query: z.object({ ...listPageSchema.shape, view: z.enum(["desk", "follow-ups", "meetings", "developer", "all"]).optional(), ownerId: z.string().optional(), date: z.string().optional(), closedFrom: z.string().optional(), closedTo: z.string().optional(), viewDef: z.string().max(8000).optional(), today: isoDate.optional(), tz: z.string().max(64).optional() }) })), async (req, res, next) => {
     try {
       await assertCanonical(req);
       const actor = principal(req);
@@ -50,11 +51,12 @@ export function createTasksRouter(keys: TaskKeysService, events: TaskEventsServi
       // over the legacy `view` enum and is gated on tasks_phase3_enabled.
       if (req.query.viewDef) {
         if (!(await keys.phase3Enabled(req.auth!.user.workspaceId))) throw new HttpError(404, "Task views are not enabled");
-        res.json({ tasks: await views.run(actor, decodeTaskViewDefinition(req.query.viewDef as string), req.query.today as string | undefined, viewZone(req)) });
+        res.json(await views.runPage(actor, decodeTaskViewDefinition(req.query.viewDef as string), listPageSchema.parse(req.query), req.query.today as string | undefined, viewZone(req)));
         return;
       }
       const rows = await tasks.list(actor, req.query as Parameters<TaskService["list"]>[1]);
-      res.json({ tasks: await tasks.toDtos(rows, actor) });
+      const page = listPage(rows, listPageSchema.parse(req.query));
+      res.json({ tasks: await tasks.toDtos(page.rows, actor), total: page.total, nextOffset: page.nextOffset });
     } catch (error) { next(error); }
   });
   router.get("/person/:accountId", validate(z.object({ params: z.object({ accountId: z.string().trim().min(1).max(128) }), body: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {

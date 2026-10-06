@@ -6,7 +6,7 @@ This plan covers the seven improvements selected from two parallel repository re
 
 ## Scope and execution
 
-- This document is the planning step only. Application implementation has not started.
+- Application implementation status is recorded in the checklist and Progress log below.
 - Implement sequentially on `main` in the development checkout, in the order below. No agents, task branches or worktrees are needed.
 - Each item is independently finishable and verifiable. Make one commit per completed item, using `fix(scope): summary (WQ-0N)` or `feat(scope): summary (WQ-0N)`.
 - After each item, show the changes, verification results and any limitations, then stop. Wait for the user's confirmation before moving to the next item or proposing another round.
@@ -31,7 +31,7 @@ These items have no implementation dependencies on one another. The order follow
 
 ## WQ-01 — Resilient theme preference
 
-- [ ] Implement and verify WQ-01.
+- [x] Implement and verify WQ-01.
 
 **Problem:** [ThemeContext.tsx](../client/src/context/ThemeContext.tsx) catches storage reads but writes to `localStorage` without a guard in its layout effect. A blocked write can throw during rendering. With no saved choice, the provider always selects Light. [index.html](../client/index.html) hard-codes `class="dark"` on `<html>`, so Light users see a dark first paint until the bundle runs.
 
@@ -210,3 +210,4 @@ The handoff for each item includes the commit, changed files, user-visible behav
 | --- | --- | --- | --- |
 | 2026-10-06 | WQ-00 | Planning complete | Recorded all five scopes, code evidence, acceptance criteria, test commands and item-by-item stopping rule. Relative document links, five-item tracker coverage and diff whitespace checks pass. No application changes or implementation tests run. |
 | 2026-10-06 | WQ-00 | Plan amended | Merged the second review's unique items: WQ-06 (last good sync, readable errors, Retry) and WQ-07 (unreferenced code), plus the WQ-01 first-paint fix. Overlapping theme, palette and Team-sort items keep this plan's scope, including the Name default. Documentation only. |
+| 2026-10-06 | WQ-01 | Complete | Saved Light/Dark wins; otherwise follow device preference until a manual toggle. Automatic selection is not persisted; blocked storage retains the manual choice in memory. The head script resolves the same theme before first paint. `npm run test --workspace=client -- ThemeContext.test.tsx`: PASS, 27 tests (provider and actual head script). `npm run typecheck`, `npm run build:check`, `npm run lint`, `npm run guard:data`, `git diff --check`: PASS; lint has 0 errors and 298 warnings in unchanged files, and Vite reports existing native-config compatibility warnings. `node /tmp/lead-os-wq01-jdst0rn2/check.cjs`: PASS, six Chromium scenarios at 1440×900 and 390×900: fresh dark, throwing localStorage, saved Light on a dark device; correct DOMContentLoaded classes, Today loaded, device following/manual precedence and repeated toggles verified, 0 page errors/external requests. First browser attempt timed out on an incorrect exact Today heading selector; corrected and rerun successfully. New scratch DB `/tmp/lead-os-wq01-jdst0rn2/fixture.db`, mocked sync engine, no scheduler or real Jira; browser artifacts remain under that scratch directory. No runtime data, screenshots directory, push or deployment touched; later items remain unstarted. |

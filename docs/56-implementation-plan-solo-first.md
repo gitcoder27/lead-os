@@ -840,7 +840,7 @@ Final Medium-finding regression: all **1,526 backend / 1,878 frontend tests** pa
 Scope, acceptance criteria and verification commands: [implementation plan](70-workspace-quality-implementation-plan.md). Implement sequentially; after each item show changes/results and stop for user confirmation before continuing. The planning step does not start application implementation.
 
 - [x] WQ-00 — Record the five-item implementation plan.
-- [ ] WQ-01 — Resilient theme storage and device preference.
+- [x] WQ-01 — Resilient theme storage and device preference.
 - [ ] WQ-02 — Reliable, accessible palette search with Retry.
 - [ ] WQ-03 — Visible bulk Priority and Check-by actions in Tasks.
 - [ ] WQ-04 — Consistent Team defaults and URL sorting.
@@ -852,3 +852,4 @@ Scope, acceptance criteria and verification commands: [implementation plan](70-w
 |---|---|---|
 | 2026-10-06 | WQ-00 | Created docs/70 with current-code evidence, scoped files, acceptance criteria, focused tests and completion gates for all five selected improvements. Relative document links, five-item tracker coverage and diff whitespace checks pass. Documentation only; application implementation has not started. No runtime data, external services, Jira, push or deployment. |
 | 2026-10-06 | WQ-00 | Plan amended with WQ-06 and WQ-07 from the parallel review, plus the WQ-01 first-paint fix. Documentation only. |
+| 2026-10-06 | WQ-01 | Completed resilient theme preference and matching first-paint resolution: valid saved choice wins; automatic device preference follows changes until a manual toggle; storage failures keep toggles working in memory. `npm run test --workspace=client -- ThemeContext.test.tsx`: PASS (27 tests). `npm run typecheck`, `npm run build:check`, `npm run lint`, `npm run guard:data`, `git diff --check`: PASS (lint: 0 errors, 298 warnings in unchanged files; existing Vite native-config warnings). `node /tmp/lead-os-wq01-jdst0rn2/check.cjs`: PASS, six Chromium checks at 1440×900/390×900 for fresh dark, throwing localStorage and saved Light on a dark device: correct DOMContentLoaded theme, Today renders, device changes/manual precedence and repeated toggles work, 0 page errors/external requests. Initial browser selector timeout corrected before successful rerun. Used only new `/tmp/lead-os-wq01-jdst0rn2/fixture.db`, mocked sync and no scheduler; artifacts in that scratch directory. No runtime data, user screenshots, push or deployment; WQ-02 onward not started. |

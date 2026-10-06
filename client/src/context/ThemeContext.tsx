@@ -20,25 +20,53 @@ function applyTheme(theme: Theme) {
   }
 }
 
+const readSavedTheme = (): Theme | null => {
+  try {
+    const stored = localStorage.getItem('theme');
+    return stored === 'light' || stored === 'dark' ? stored : null;
+  } catch {
+    return null;
+  }
+};
+
+const deviceThemeQuery = (): MediaQueryList | null => {
+  try {
+    return window.matchMedia?.('(prefers-color-scheme: dark)') ?? null;
+  } catch {
+    return null;
+  }
+};
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      const stored = localStorage.getItem('theme');
-      if (stored === 'light' || stored === 'dark') {
-        return stored;
-      }
-      return 'light';
-    } catch {
-      return 'light';
-    }
-  });
+  const [preference, setPreference] = useState(readSavedTheme);
+  const [deviceTheme, setDeviceTheme] = useState<Theme>(() =>
+    deviceThemeQuery()?.matches ? 'dark' : 'light',
+  );
+  const theme = preference ?? deviceTheme;
 
   useLayoutEffect(() => {
     applyTheme(theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    if (preference === null) return;
+    try {
+      localStorage.setItem('theme', preference);
+    } catch {
+      // The explicit choice still works for this session when storage is blocked.
+    }
+  }, [theme, preference]);
 
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  useLayoutEffect(() => {
+    if (preference !== null) return;
+    const query = deviceThemeQuery();
+    if (!query) return;
+
+    const followDevice = () => setDeviceTheme(query.matches ? 'dark' : 'light');
+    followDevice();
+    query.addEventListener?.('change', followDevice);
+    return () => query.removeEventListener?.('change', followDevice);
+  }, [preference]);
+
+  const toggleTheme = () =>
+    setPreference((previous) => (previous ?? deviceTheme) === 'dark' ? 'light' : 'dark');
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

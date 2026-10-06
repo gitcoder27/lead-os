@@ -3,15 +3,16 @@ import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCapture } from '@/hooks/useCapture';
-import { useUpdateTaskDetail, useDeleteTaskDetail, useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
+import { useTaskDetail, useUpdateTaskDetail, useDeleteTaskDetail, useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
 import { invalidateTaskViewCounts } from '@/lib/task-count-invalidation';
 
 let scope = 'workspace:manager:manager:';
+const get = vi.fn();
 const post = vi.fn();
 const patch = vi.fn();
 const remove = vi.fn();
 vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => scope, useAuth: () => ({ user: { role: scope.includes(':developer:') ? 'developer' : 'manager' } }) }));
-vi.mock('@/lib/api', () => ({ api: { post: (...args: unknown[]) => post(...args), patch: (...args: unknown[]) => patch(...args), delete: (...args: unknown[]) => remove(...args) } }));
+vi.mock('@/lib/api', () => ({ api: { get: (...args: unknown[]) => get(...args), post: (...args: unknown[]) => post(...args), patch: (...args: unknown[]) => patch(...args), delete: (...args: unknown[]) => remove(...args) } }));
 
 const clients: QueryClient[] = [];
 const key = (value = scope) => ['task-view-counts', value, '2026-10-02'];
@@ -108,5 +109,44 @@ describe('R2 scoped task count invalidation', () => {
     await advance();
     expect(client.getQueryState(key(original))?.isInvalidated).toBe(false);
     expect(client.getQueryState(key())?.isInvalidated).toBe(false);
+  });
+});
+
+describe('P07 detail refetches', () => {
+  it('refetches once and leaves unrelated details and scopes fresh', async () => {
+    const { result, client } = setup();
+    const detailKey = ['task-detail', scope, 'manager', 'T-1'];
+    client.setQueryData(detailKey, { taskKey: 'T-1', children: [] });
+    const unrelated = ['task-detail', scope, 'manager', 'T-2'];
+    const otherScope = ['task-detail', 'other', 'manager', 'T-1'];
+    const parent = ['task-detail', scope, 'manager', 'T-3'];
+    client.setQueryData(unrelated, { children: [] });
+    client.setQueryData(otherScope, {});
+    client.setQueryData(parent, { children: [{ taskKey: 'T-1' }] });
+    const board = ['team-tracker', '2026-10-06', {}, scope];
+    client.setQueryData(board, {});
+    const read = vi.fn().mockResolvedValue({ taskKey: 'T-1', children: [] });
+    const observer = new QueryObserver(client, { queryKey: detailKey, queryFn: read, staleTime: Infinity });
+    const unsubscribe = observer.subscribe(() => {});
+    await act(async () => { await result.current.detail.mutateAsync({ status: 'done' }); });
+    await advance(0);
+    expect(read).toHaveBeenCalledOnce();
+    expect(client.getQueryState(unrelated)?.isInvalidated).toBe(false);
+    expect(client.getQueryState(otherScope)?.isInvalidated).toBe(false);
+    expect(client.getQueryState(parent)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(board)?.isInvalidated).toBe(true);
+    unsubscribe();
+  });
+
+  it('forwards cancellation to the detail GET', async () => {
+    get.mockImplementation(() => new Promise(() => {}));
+    const { client } = setup();
+    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    const hook = renderHook(() => useTaskDetail('T-1'), { wrapper });
+    expect(get).toHaveBeenCalledOnce();
+    const signal = get.mock.calls[0]![1].signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    hook.unmount();
+    expect(signal.aborted).toBe(true);
   });
 });

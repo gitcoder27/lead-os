@@ -21,11 +21,12 @@ type DetailRole = 'manager' | 'developer';
 function taskDetailQuery(scope: string, role: DetailRole, taskKey: string | undefined) {
   return {
     queryKey: ['task-detail', scope, role, taskKey],
-    queryFn: () =>
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
       api.get<TaskDetailResponse | FormerOwnerTaskDetail>(
         role === 'developer'
           ? `/my-day/tasks/${encodeURIComponent(taskKey!)}/detail`
           : `/tasks/${encodeURIComponent(taskKey!)}/detail`,
+        { signal },
       ),
     retry: false,
     staleTime: 5_000,
@@ -61,11 +62,20 @@ export function usePrefetchTaskDetail() {
   );
 }
 
-function invalidateTaskDetailSurfaces(qc: ReturnType<typeof useQueryClient>, taskKey?: string) {
-  for (const key of ['task-detail', 'tasks', 'task-events', 'task-inbox', 'task-inbox-event', 'task-resolution', 'manager-desk', 'team-tracker', 'my-day', 'today', 'workload']) {
-    qc.invalidateQueries({ queryKey: [key] });
+function invalidateTaskDetailSurfaces(qc: ReturnType<typeof useQueryClient>, scope: string | undefined, taskKey?: string) {
+  if (!scope) return;
+  for (const key of ['task-detail', 'task-events', 'task-resolution', 'task-inbox-event']) {
+    void qc.invalidateQueries({ queryKey: [key, scope], predicate: (query) => {
+      if (key === 'task-inbox-event') return query.queryKey[2] === taskKey;
+      if (query.queryKey[3] === taskKey) return true;
+      if (key !== 'task-detail') return false;
+      const detail = query.state.data as TaskDetailResponse | undefined;
+      return detail?.parent?.taskKey === taskKey || Boolean(detail?.children?.some((child) => child.taskKey === taskKey));
+    } });
   }
-  if (taskKey) qc.invalidateQueries({ queryKey: ['task-detail'], exact: false });
+  for (const key of ['tasks', 'task-inbox', 'manager-desk', 'team-tracker', 'my-day', 'today', 'workload']) {
+    void qc.invalidateQueries({ queryKey: [key], predicate: (query) => query.queryKey.includes(scope) });
+  }
 }
 
 /** Plain text fields with no server-side side effects — safe to show before the PATCH lands. */
@@ -123,7 +133,7 @@ export function useUpdateTaskDetail(taskKey: string | undefined, source: 'detail
       });
     },
     onSuccess: (_data, _variables, scope) => counts.recount(scope),
-    onSettled: () => invalidateTaskDetailSurfaces(qc, taskKey),
+    onSettled: (_data, _error, _variables, submittedScope) => invalidateTaskDetailSurfaces(qc, submittedScope, taskKey),
   });
 }
 
@@ -133,7 +143,7 @@ export function useDeleteTaskDetail(taskKey: string | undefined) {
   return useMutation({
     onMutate: counts.submittedScope,
     mutationFn: () => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}`),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
   });
 }
 
@@ -144,7 +154,7 @@ export function useAddTaskDetailLink(taskKey: string | undefined) {
     onMutate: counts.submittedScope,
     mutationFn: (input: { kind: TaskLink['kind']; ref: string; role?: TaskLink['role'] }) =>
       api.post<TaskLink>(`/tasks/${encodeURIComponent(taskKey!)}/links`, input),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
   });
 }
 
@@ -154,6 +164,6 @@ export function useRemoveTaskDetailLink(taskKey: string | undefined) {
   return useMutation({
     onMutate: counts.submittedScope,
     mutationFn: (linkId: number) => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}/links/${linkId}`),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, taskKey); },
+    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
   });
 }

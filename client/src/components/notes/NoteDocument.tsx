@@ -1,6 +1,8 @@
 import { useDeferredValue, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, History, Lock, Sun } from 'lucide-react';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useToast } from '@/context/ToastContext';
 import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor, type DailyNoteEditor } from '@/hooks/useDailyNoteEditor';
 import { useManagerDeskDeveloperLookup } from '@/hooks/useManagerDesk';
@@ -61,6 +63,7 @@ export function NoteDocument({
   onOpenHistory,
   jumpTerms,
 }: NoteDocumentProps) {
+  const { openKeyboardShortcuts } = useQuickActions();
   const editor = useDailyNoteEditor(date, kind);
   const { addToast } = useToast();
   const lookups = useNoteEntityLookups();
@@ -182,9 +185,9 @@ export function NoteDocument({
 
   // `?` opens the shortcut legend from anywhere on the page that isn't a text field.
   useEffect(() => {
-    if (hidden) return;
+    if (hidden || openKeyboardShortcuts) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      if (event.key !== '?' || shouldIgnoreShortcutHelp(event)) return;
       const active = document.activeElement;
       if (active && isEditable(active)) return;
       if (event.target instanceof Element && isEditable(event.target)) return;
@@ -194,7 +197,7 @@ export function NoteDocument({
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [hidden]);
+  }, [hidden, openKeyboardShortcuts]);
 
   // ── Header ──────────────────────────────────────────────────────────
 

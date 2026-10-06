@@ -1,4 +1,5 @@
 import type * as Csv from '@/lib/csv';
+import { QuickActionsProvider } from '@/context/QuickActionsContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TaskViewMeta, TaskViewTask } from '@/types';
@@ -1422,4 +1423,16 @@ describe('WQ-03 visible bulk Priority and Check-by', () => {
       .toEqual([{ key: 'T-1', changes: { followUpAt } }, { key: 'T-2', changes: { followUpAt } }]);
     expect(within(row('T-3')).getByRole('checkbox')).not.toBeChecked();
   });
+});
+
+
+it('routes the Tasks help button to app help and ignores composing question marks', () => {
+  const openKeyboardShortcuts = vi.fn();
+  render(<QuickActionsProvider value={{ openCapture: vi.fn(), openCommandPalette: vi.fn(), openKeyboardShortcuts }}><TasksPage /></QuickActionsProvider>);
+  fireEvent.keyDown(document.body, { key: '?', isComposing: true });
+  expect(openKeyboardShortcuts).not.toHaveBeenCalled();
+  const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+  fireEvent.click(button);
+  expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
+  expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
 });

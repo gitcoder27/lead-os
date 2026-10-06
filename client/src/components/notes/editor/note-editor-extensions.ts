@@ -6,6 +6,7 @@
  * over that text; nothing is serialized differently, so revisions, appends,
  * merges, and FTS search keep working on the exact same string.
  */
+import { NOTE_ACTION_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   autocompletion,
   completionKeymap,
@@ -79,15 +80,7 @@ export interface NoteEditorHandlers {
   onSave: () => void;
 }
 
-export const NOTE_ACTION_SHORTCUTS: Record<NoteLineAction, { key: string; label: string }> = {
-  // ⌘⇧T is reserved by Chrome/Firefox (reopen closed tab) and never reaches
-  // the page, so Create task lives on ⌘⇧E; ⌘⇧T is still bound for browsers
-  // that pass it through.
-  task: { key: 'Mod-Shift-e', label: '⌘⇧E' },
-  update: { key: 'Mod-Shift-u', label: '⌘⇧U' },
-  // ⌘⇧F is the page-wide note search (docs/52 F14), so follow-up takes ⌘⇧L.
-  'follow-up': { key: 'Mod-Shift-l', label: '⌘⇧L' },
-};
+export { NOTE_ACTION_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 
 // ── Entity context + search highlight state ──────────────────────────
 

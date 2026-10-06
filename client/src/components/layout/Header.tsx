@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Moon, Sun, PanelLeftOpen, Search, Settings, Plus } from 'lucide-react';
+import { Moon, Sun, PanelLeftOpen, Search, Settings, Plus, Keyboard } from 'lucide-react';
 import { CopilotMark } from '@/components/brand/CopilotMark';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
@@ -25,7 +25,7 @@ interface HeaderProps {
 export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenActionTarget, captureContext }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { user, features } = useAuth();
-  const { openCapture, openCommandPalette } = useQuickActions();
+  const { openCapture, openCommandPalette, openKeyboardShortcuts, keyboardShortcutsOpen } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
   const headerRef = useRef<HTMLElement | null>(null);
   const canQuickCapture = user?.role === 'manager';
@@ -154,6 +154,14 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   aria-label="Open Copilot"
                 >
                   <CopilotMark size={15} monochrome />
+                </button>
+              )}
+
+              {canQuickCapture && (
+                <button type="button" className="header-ghost header-icon-btn" data-global-shortcuts-anchor=""
+                  aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-expanded={Boolean(keyboardShortcutsOpen)}
+                  onClick={(event) => openKeyboardShortcuts?.(event.currentTarget)}>
+                  <Keyboard size={16} />
                 </button>
               )}
 

@@ -11,16 +11,7 @@ export type TodayTriageIntent =
   | { type: 'command'; command: TodayActionCommand; preset?: 'tomorrow' }
   | { type: 'undo' };
 
-export const TODAY_TRIAGE_KEYS: Array<{ keys: string[]; label: string }> = [
-  { keys: ['j', 'k', '↓', '↑'], label: 'Move down / up' },
-  { keys: ['Enter'], label: 'Open (a focused button keeps its own action)' },
-  { keys: ['e'], label: 'Primary action' },
-  { keys: ['Space'], label: 'Primary action when no button is focused' },
-  { keys: ['s'], label: 'Snooze to tomorrow' },
-  { keys: ['f'], label: 'Follow up' },
-  { keys: ['c'], label: 'Check-in' },
-  { keys: ['z'], label: 'Undo' },
-];
+export { TODAY_TRIAGE_KEYS } from './keyboard-shortcuts';
 
 function findCommand(item: TodayActionItem, kind: TodayActionCommand['kind']): TodayActionCommand | undefined {
   if (item.primaryAction.kind === kind) return item.primaryAction;

@@ -140,11 +140,11 @@ function mockFetch(response: TodayResponse) {
   return fetchMock;
 }
 
-function renderToday(response = todayResponse(), onOpenTodayTarget = vi.fn(), openCapture = vi.fn()) {
+function renderToday(response = todayResponse(), onOpenTodayTarget = vi.fn(), openCapture = vi.fn(), openKeyboardShortcuts?: (anchor?: HTMLElement) => void) {
   const queryClient = createTestQueryClient();
   render(
     <QueryClientProvider client={queryClient}>
-      <QuickActionsProvider value={{ openCapture, openCommandPalette: vi.fn() }}>
+      <QuickActionsProvider value={{ openCapture, openCommandPalette: vi.fn(), openKeyboardShortcuts }}>
         <ToastProvider>
           <TodayPage onViewChange={vi.fn()} onOpenTodayTarget={onOpenTodayTarget} />
         </ToastProvider>
@@ -1392,6 +1392,18 @@ describe('TodayPage V2', () => {
       const done = await screen.findByText('No urgent exceptions');
       expect(done.closest('[role="status"]')).toHaveTextContent('Next: Wrap-up at 16:00');
       expect(screen.queryAllByTestId('today-action-row')).toHaveLength(0);
+    });
+
+    it('uses app help from the Today button and ignores composing question marks', async () => {
+      mockFetch(todayResponse());
+      const openKeyboardShortcuts = vi.fn();
+      renderToday(todayResponse(), vi.fn(), vi.fn(), openKeyboardShortcuts);
+      const button = await screen.findByRole('button', { name: 'Keyboard shortcuts' });
+      fireEvent.keyDown(window, { key: '?', isComposing: true });
+      expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+      fireEvent.click(button);
+      expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
+      expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
     });
 
     it('? opens the shortcuts sheet', async () => {

@@ -46,7 +46,6 @@ import {
 import type { AppView } from '@/App';
 import type {
   TeamTrackerBoardQuery,
-  TeamMode,
   TeamTrackerBoardResponse,
   TrackerAttentionActionItem,
   TrackerDeveloperDay,
@@ -54,14 +53,9 @@ import type {
   TrackerWorkItem,
 } from '@/types';
 import { UNDO_WINDOW_MS } from '@/lib/undo';
-import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
-
-/** docs/56 P1-04: solo has no check-ins, so the drawer's `c` is a note. */
-const teamBoardShortcuts = (teamMode: TeamMode): ShortcutGroup[] => [
-  { group: 'Board', keys: [['j / k', 'Next / previous person'], ['Enter / o', 'Open their drawer'], ['/', 'Search']] },
-  { group: 'Day', keys: [['[ / ]', 'Previous / next day'], ['t', 'Today'], ['?', 'This sheet']] },
-  { group: 'In the drawer', keys: [['⇧ s', 'Status'], ['n', 'New task'], ['u', 'Update'], ['c', teamMode === 'solo' ? 'Note' : 'Check-in'], ['Esc', 'Close']] },
-];
+import { teamBoardShortcuts, shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 
 interface TeamTrackerPageProps {
   onViewChange?: (view: AppView) => void;
@@ -463,11 +457,13 @@ export function TeamTrackerPage({
   // docs/54 K2: the board speaks the shared grammar — j/k move between
   // people, Enter opens, / searches, [ ] t step days, ? shows the sheet.
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  const { openKeyboardShortcuts } = useQuickActions();
   const shortcutsButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (oneOnOnePanel || standupMode) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === '?' && shouldIgnoreShortcutHelp(event)) return;
       const target = event.target as HTMLElement | null;
       if (target && (isEditable(target) || target.closest('[role="menu"], [role="dialog"], [data-popover-layer]'))) return;
       if (document.querySelector('[aria-modal="true"]')) return;
@@ -498,6 +494,7 @@ export function TeamTrackerPage({
           setDate(getLocalIsoDate());
           break;
         case '?':
+          if (openKeyboardShortcuts) return;
           setShortcutsAnchor(shortcutsButtonRef.current ?? document.body);
           break;
         default:
@@ -507,7 +504,7 @@ export function TeamTrackerPage({
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [oneOnOnePanel, standupMode]);
+  }, [oneOnOnePanel, standupMode, openKeyboardShortcuts]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -551,7 +548,7 @@ export function TeamTrackerPage({
               <button
                 ref={shortcutsButtonRef}
                 type="button"
-                onClick={(event) => setShortcutsAnchor(event.currentTarget)}
+                onClick={(event) => openKeyboardShortcuts ? openKeyboardShortcuts(event.currentTarget) : setShortcutsAnchor(event.currentTarget)}
                 className={`hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] md:flex ${FOCUS_RING}`}
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Keyboard shortcuts"

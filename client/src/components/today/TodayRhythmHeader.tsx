@@ -2,7 +2,9 @@ import { useRef } from 'react';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { Keyboard, Loader2, RefreshCw } from 'lucide-react';
 import { formatClock, metricLabel, todayHeaderMetrics } from '@/lib/today-layout';
-import { TODAY_TRIAGE_KEYS } from '@/lib/today-triage';
+import { todayShortcuts } from '@/lib/keyboard-shortcuts';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { useTeamMode } from '@/hooks/useTeamMode';
 import type { TodayFreshness } from '@/lib/today-freshness';
 import type { TodayActionTarget, TodayResponse } from '@/types';
 import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
@@ -38,6 +40,8 @@ export function TodayRhythmHeader({
   onFocusQueue,
   onFocusPlan,
 }: TodayRhythmHeaderProps) {
+  const { openKeyboardShortcuts } = useQuickActions();
+  const teamMode = useTeamMode();
   const shortcutsRef = useRef<HTMLButtonElement>(null);
   const date = parseISO(today.date);
   const until = formatClock(today.rhythm.nextStage?.startsAt);
@@ -94,7 +98,7 @@ export function TodayRhythmHeader({
         <button
           ref={shortcutsRef}
           type="button"
-          onClick={() => onToggleShortcuts(!shortcutsOpen)}
+          onClick={(event) => openKeyboardShortcuts ? openKeyboardShortcuts(event.currentTarget) : onToggleShortcuts(!shortcutsOpen)}
           className="ui-icon-btn hidden md:inline-flex"
           aria-label="Keyboard shortcuts"
           aria-expanded={shortcutsOpen}
@@ -106,7 +110,7 @@ export function TodayRhythmHeader({
       {shortcutsOpen ? (
         <ShortcutSheet
           anchor={shortcutsRef.current}
-          groups={[{ group: 'Queue', keys: [...TODAY_TRIAGE_KEYS.map((entry): [string, string] => [entry.keys.join(' / '), entry.label]), ['?', 'This sheet']] }]}
+          groups={todayShortcuts(teamMode)}
           onClose={() => onToggleShortcuts(false)}
         />
       ) : null}

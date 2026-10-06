@@ -7,6 +7,8 @@ import { taskViewParamsFromState } from '@/lib/task-views';
 import { csvFileName, downloadCsv, tasksCsv } from '@/lib/csv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useDevelopers } from '@/hooks/useDevelopers';
@@ -167,8 +169,12 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   // The sheet anchors to the toolbar's keyboard button (docs/54 K2).
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  const { openKeyboardShortcuts } = useQuickActions();
   const showShortcuts = shortcutsAnchor !== null;
-  const openShortcuts = () => setShortcutsAnchor(mainRef.current?.querySelector<HTMLElement>('[data-shortcuts-anchor]') ?? document.body);
+  const openShortcuts = (anchor = mainRef.current?.querySelector<HTMLElement>('[data-shortcuts-anchor]') ?? document.body) => {
+    if (openKeyboardShortcuts) openKeyboardShortcuts(anchor);
+    else setShortcutsAnchor(anchor);
+  };
   const [doneTodayOpen, setDoneTodayOpen] = useState(false);
   // docs/51 U6: which input drove the last action, and the mouse-pinned rows.
   const lastInput = useRef<'pointer' | 'keyboard'>('keyboard');
@@ -723,7 +729,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       }
       case '/': searchRef.current?.focus(); break;
       case 'z': if (!mutations.undoLast()) handled = false; break;
-      case '?': openShortcuts(); break;
+      case '?': if (!openKeyboardShortcuts) openShortcuts(); else handled = false; break;
       case 'Escape':
         if (selected.size) setSelected(new Set());
         else if (state.q) setState((current) => ({ ...current, q: undefined }));
@@ -736,7 +742,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey) return;
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey) return;
+      if (event.key === '?' && shouldIgnoreShortcutHelp(event)) return;
       // docs/51 F7: Alt pairs only with ↑/↓ — every other Alt combo is ignored.
       if (event.altKey && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
       const active = document.activeElement as HTMLElement | null;
@@ -889,7 +896,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           canSave={Boolean(definition)}
           onUpdateView={handleUpdateSaved}
           onRevert={clearFilters}
-          onShowShortcuts={(anchor) => setShortcutsAnchor(anchor)}
+          onShowShortcuts={openShortcuts}
         />
   );
 

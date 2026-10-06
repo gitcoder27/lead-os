@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } fr
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
 import { useTeamMode } from '@/hooks/useTeamMode';
+import { shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { useTodayActions } from '@/hooks/useTodayActions';
@@ -9,7 +10,7 @@ import { useTodayKeyboardTriage } from '@/hooks/useTodayKeyboardTriage';
 import { useTodayTop3 } from '@/hooks/useTodayTop3';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useLocalDate } from '@/hooks/useLocalDate';
-import { buildTodayQueueView, shouldIgnoreTriageEvent } from '@/lib/today-triage';
+import { buildTodayQueueView } from '@/lib/today-triage';
 import {
   checkInPlaceholder,
   deltaChips,
@@ -112,7 +113,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
 
   const today = useToday(date);
   const teamMode = useTeamMode();
-  const { openCapture } = useQuickActions();
+  const { openCapture, openKeyboardShortcuts } = useQuickActions();
   // docs/56 P2-02: the first-run card is dismissible; a per-viewer choice, so storage is best-effort.
   const dismissedKey = useScopedStorageKey(GETTING_STARTED_DISMISSED_KEY);
   const [gettingStartedDismissed, setGettingStartedDismissed] = useState(() => {
@@ -360,15 +361,15 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
 
   // `?` opens the shortcuts sheet (the map lives there, not in copy).
   useEffect(() => {
-    if (!snapshot || dialogOpen) return undefined;
+    if (!snapshot || dialogOpen || openKeyboardShortcuts) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== '?' || shouldIgnoreTriageEvent(event)) return;
+      if (event.key !== '?' || shouldIgnoreShortcutHelp(event)) return;
       event.preventDefault();
       setShortcutsOpen((open) => !open);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [snapshot, dialogOpen]);
+  }, [snapshot, dialogOpen, openKeyboardShortcuts]);
 
   const closeDialog = (close: () => void) => {
     close();

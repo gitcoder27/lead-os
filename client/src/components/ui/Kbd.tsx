@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 
 /**
  * docs/54 V9: the one key cap. `default` for sheets and legends, `subtle` for
@@ -13,7 +14,7 @@ export function Kbd({ children, variant = 'default', className = '' }: {
   if (variant === 'bare') {
     return (
       <kbd className={`font-mono text-[11px] font-medium ${className}`} style={{ color: 'var(--text-muted)' }}>
-        {children}
+        {typeof children === 'string' ? formatShortcutKeys(children) : children}
       </kbd>
     );
   }
@@ -26,7 +27,7 @@ export function Kbd({ children, variant = 'default', className = '' }: {
         border: '1px solid var(--border)',
       }}
     >
-      {children}
+      {typeof children === 'string' ? formatShortcutKeys(children) : children}
     </kbd>
   );
 }

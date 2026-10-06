@@ -1,3 +1,4 @@
+import { QuickActionsProvider } from '@/context/QuickActionsContext';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { TestWrapper } from '@/test/wrapper';
@@ -653,6 +654,21 @@ describe('TeamTrackerPage', () => {
       expect(link.closest('[role="button"]')).toBeNull();
       expect(link.querySelector('button')).toBeNull();
     }
+  });
+
+  it('routes Team help to the app and ignores composing keys and open Display menus', () => {
+    const openKeyboardShortcuts = vi.fn();
+    render(<TestWrapper><QuickActionsProvider value={{ openCapture: vi.fn(), openCommandPalette: vi.fn(), openKeyboardShortcuts }}><TeamTrackerPage /></QuickActionsProvider></TestWrapper>);
+    fireEvent.keyDown(document.body, { key: '?', isComposing: true });
+    expect(openKeyboardShortcuts).not.toHaveBeenCalled();
+    const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    fireEvent.click(button);
+    expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+    openKeyboardShortcuts.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Display' }));
+    fireEvent.keyDown(document.body, { key: '?' });
+    expect(openKeyboardShortcuts).not.toHaveBeenCalled();
   });
 
   it('speaks the shared keyboard grammar on the board (docs/54 K2)', () => {

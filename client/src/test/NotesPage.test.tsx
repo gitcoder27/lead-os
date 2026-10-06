@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QuickActionsProvider } from '@/context/QuickActionsContext';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 import { NotesPage } from '@/components/notes/NotesPage';
 import type { DailyNoteDayContext, DailyNoteRef, DailyNoteSummary } from '@/types';
 
@@ -493,7 +495,7 @@ describe('NotesPage', () => {
     fireEvent.keyDown(document.body, { key: '?' });
     const legend = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
     expect(within(legend).getByText('A task')).toBeInTheDocument();
-    expect(within(legend).getByText('⌘⇧E')).toBeInTheDocument();
+    expect(within(legend).getByText(formatShortcutKeys('⌘⇧E'))).toBeInTheDocument();
   });
 
   // ── Search (F12) ────────────────────────────────────────────────────
@@ -836,5 +838,21 @@ describe('NotesPage', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe('Notes shared keyboard help', () => {
+  it('uses global help from the footer without creating a second sheet', () => {
+    const openKeyboardShortcuts = vi.fn();
+    render(<QuickActionsProvider value={{ openCapture: vi.fn(), openCommandPalette: vi.fn(), openKeyboardShortcuts }}>
+      {wrap(<NotesPage date="2026-09-12" kind="scratchpad" onDateChange={vi.fn()} onKindChange={vi.fn()} onOpenTarget={vi.fn()} />)}
+    </QuickActionsProvider>);
+    const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    fireEvent.click(button);
+    expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: '?' });
+    expect(openKeyboardShortcuts).toHaveBeenCalledTimes(1);
   });
 });

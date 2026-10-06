@@ -106,7 +106,7 @@ export function SavedViewsMenu<TView extends SavedViewOption>({
       </button>
 
       {open && (
-        <div
+        <div data-popover-layer=""
           // docs/54 V4: the shared popover surface.
           className="absolute right-0 top-full mt-1 z-popover w-[260px] overflow-hidden rounded-xl"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}

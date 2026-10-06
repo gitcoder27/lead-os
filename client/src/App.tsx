@@ -35,6 +35,9 @@ import {
 } from '@/lib/task-views';
 import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
+import { globalShortcuts, pageShortcuts, shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
+import { useAssistantConfig } from '@/hooks/useAssistantConfig';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
 import type { DailyNoteKind, TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
@@ -548,6 +551,11 @@ function AppContent() {
         : undefined,
     nonce: 0,
   }));
+  const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  const assistantConfig = useAssistantConfig({ enabled: isAuthenticatedManager && shortcutsAnchor !== null });
+  const openKeyboardShortcuts = useCallback((anchor?: HTMLElement) => {
+    setShortcutsAnchor(anchor ?? document.querySelector<HTMLElement>('[data-global-shortcuts-anchor]') ?? document.body);
+  }, []);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureContext, setCaptureContext] = useState<GlobalCaptureContext>({});
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -1058,11 +1066,13 @@ function AppContent() {
   const quickActions = useMemo<QuickActionsValue>(
     () => ({
       openCapture,
+      openKeyboardShortcuts,
+      keyboardShortcutsOpen: shortcutsAnchor !== null,
       openCommandPalette: () => setPaletteOpen(true),
       openNotes: handleOpenNotes,
       openTask: (taskKey: string) => setGlobalTaskKey(taskKey),
     }),
-    [openCapture, handleOpenNotes],
+    [openCapture, handleOpenNotes, openKeyboardShortcuts, shortcutsAnchor],
   );
 
   useEffect(() => {
@@ -1070,7 +1080,7 @@ function AppContent() {
       return;
     }
     const handler = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || event.isComposing || shortcutsAnchor) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'i') {
         event.preventDefault();
         if (!captureOpen) {
@@ -1090,7 +1100,20 @@ function AppContent() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isAuthenticatedManager, captureOpen, openCapture]);
+  }, [isAuthenticatedManager, captureOpen, openCapture, shortcutsAnchor]);
+
+  useEffect(() => {
+    if (!isAuthenticatedManager) return;
+    const onHelpKey = (event: KeyboardEvent) => {
+      if (event.key !== '?' || shortcutsAnchor || captureOpen || paletteOpen || assistantOpen || globalTaskKey
+        || (activeView === 'team' && teamMode === 'standup') || shouldIgnoreShortcutHelp(event)) return;
+      event.preventDefault();
+      openKeyboardShortcuts();
+    };
+    // Own ? before page listeners; the existing global action listener stays in bubble phase.
+    window.addEventListener('keydown', onHelpKey, true);
+    return () => window.removeEventListener('keydown', onHelpKey, true);
+  }, [isAuthenticatedManager, shortcutsAnchor, openKeyboardShortcuts, captureOpen, paletteOpen, assistantOpen, globalTaskKey, activeView, teamMode]);
 
   const renderActiveView = () => {
     if (!authLoading && !isAuthenticated && !bootstrapState && bootstrapQuery.isError) {
@@ -1330,6 +1353,14 @@ function AppContent() {
         onOpenTarget={handleOpenTodayTarget}
       >
         {renderActiveView()}
+        {isAuthenticatedManager && shortcutsAnchor && (
+          <ShortcutSheet anchor={shortcutsAnchor} onClose={() => setShortcutsAnchor(null)}
+            groups={[globalShortcuts(Boolean(assistantConfig.data?.enabled && assistantConfig.data.hasApiKey)),
+              ...pageShortcuts(activeView === 'desk' && features?.tasksPhase3 ? 'tasks'
+                : (activeView === 'today' && reviewMode) || (activeView === 'team' && teamPanel) ? '' : activeView,
+                features?.teamMode ?? 'solo')]}
+            footnote="Page shortcuts work in their workspace. Help stays closed while you type or another menu or dialog is open." />
+        )}
         {isAuthenticatedManager && captureOpen && (
           <Suspense fallback={null}>
           <GlobalCaptureDialog

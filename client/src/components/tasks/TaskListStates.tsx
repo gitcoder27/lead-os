@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { TriangleAlert, CalendarCheck, CheckCheck, Flag, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
-import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+import { TASK_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 const SKELETON_TITLE_WIDTHS = ['46%', '32%', '54%', '38%', '28%', '44%'];
@@ -154,50 +155,7 @@ export function TaskListEmpty({
 }
 
 // docs/54 K2: grouped, key-left, lowercase — the same format as every sheet.
-export const TASK_SHORTCUTS: ShortcutGroup[] = [
-  {
-    group: 'Move',
-    keys: [
-      ['j / k', 'Next / previous task'],
-      ['Enter / o', 'Open task'],
-      ['x', 'Select / deselect'],
-      ['⇧ j / ⇧ k', 'Extend selection'],
-      ['⌥ ↑ / ⌥ ↓', 'Reorder within the day'],
-    ],
-  },
-  {
-    group: 'Act',
-    keys: [
-      ['e', 'Toggle done'],
-      ['Space', 'Activate focused control'],
-      ['s', 'Schedule — then t m w l c or 1–7'],
-      ['a', 'Assign'],
-      ['l', 'Labels'],
-      ['p', 'Priority'],
-      ['w', 'Waiting on…'],
-      ['c', 'Check-by date'],
-      ['#', 'Drop'],
-      ['n', 'New task in this group'],
-      ['z', 'Undo last change'],
-    ],
-  },
-  {
-    group: 'Views',
-    keys: [
-      ['g → t', 'Planned today'],
-      ['g → i', 'Inbox'],
-      ['g → m', 'My tasks'],
-      ['g → w', 'Waiting'],
-      ['g → l', 'Later'],
-      ['g → h', 'High priority'],
-      ['g → a', 'Needs attention'],
-      ['g → c', 'Closed'],
-      ['/', 'Search'],
-      ['?', 'This sheet'],
-      ['Esc', 'Close menu, clear selection, clear search'],
-    ],
-  },
-];
+export { TASK_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 
 export function TaskShortcutsDialog({ anchor, onClose }: { anchor: HTMLElement | null; onClose: () => void }) {
   return (

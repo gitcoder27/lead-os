@@ -1,13 +1,9 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { MenuHeading, TaskPopover } from '@/components/ui/Popover';
 import { KeySpec } from './Kbd';
 
-export interface ShortcutGroup {
-  /** Optional group label ("Navigate", "Task"); omit for a single flat list. */
-  group?: string;
-  /** [key spec, what it does] — keys are written as they are pressed (lowercase). */
-  keys: Array<[string, string]>;
-}
+import type { ShortcutGroup } from '@/lib/keyboard-shortcuts';
+export type { ShortcutGroup } from '@/lib/keyboard-shortcuts';
 
 /**
  * docs/54 K2: every surface's keyboard map reads the same — grouped, key on
@@ -44,11 +40,21 @@ export function ShortcutSheet({ anchor, groups, footnote, onClose, width = 300 }
   onClose: () => void;
   width?: number;
 }) {
+  // Keep the original opener across Strict Mode's layout/effect replay.
+  const opener = useRef(document.activeElement as HTMLElement | null);
+  const close = () => {
+    onClose();
+    const target = opener.current;
+    if (target && document.contains(target)) requestAnimationFrame(() => target.focus());
+  };
   return (
-    <TaskPopover anchor={anchor} role="dialog" label="Keyboard shortcuts" width={width} onClose={onClose}>
+    <TaskPopover anchor={anchor} role="dialog" label="Keyboard shortcuts" width={width} onClose={close}>
       {/* Focus lands in the sheet so Esc and Tab belong to it. */}
       <div className="px-1 pb-1.5 pt-1 outline-none" tabIndex={-1} data-autofocus="">
-        <p className="px-2 pb-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Keyboard shortcuts</p>
+        <div className="flex items-center justify-between px-2 pb-1.5">
+          <p className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Keyboard shortcuts</p>
+          <button type="button" className="ui-icon-btn" aria-label="Close keyboard shortcuts" onClick={close}>×</button>
+        </div>
         <ShortcutList groups={groups} footnote={footnote} />
       </div>
     </TaskPopover>

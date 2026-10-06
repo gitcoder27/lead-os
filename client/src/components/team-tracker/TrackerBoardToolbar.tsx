@@ -277,7 +277,7 @@ function ViewOptionsMenu({
       </ToolbarButton>
 
       {open && (
-        <div
+        <div data-popover-layer=""
           className="absolute right-0 top-full z-popover mt-1.5 w-[240px] overflow-hidden rounded-xl p-1.5"
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
         >

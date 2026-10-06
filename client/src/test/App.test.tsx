@@ -1,11 +1,15 @@
+import { StrictMode } from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App, { legacyTaskViewRedirect } from '@/App';
+import { useQuickActions } from '@/context/QuickActionsContext';
 import { api, ApiRequestError } from '@/lib/api';
 import type { TaskResolution, TeamTrackerBoardQuery } from '@/types';
 
 const useBootstrapStateMock = vi.fn();
 const useAuthMock = vi.fn();
+const useAssistantConfigMock = vi.fn();
+vi.mock('@/hooks/useAssistantConfig', () => ({ useAssistantConfig: () => useAssistantConfigMock() }));
 const dashboardLayoutSpy = vi.fn();
 const useTaskResolutionMock = vi.fn();
 
@@ -57,12 +61,15 @@ vi.mock('@/components/layout/DashboardLayout', () => ({
 }));
 
 vi.mock('@/components/layout/Header', () => ({
-  Header: ({ onViewChange }: { onViewChange?: (view: 'work') => void }) => (
+  Header: ({ onViewChange }: { onViewChange?: (view: 'work') => void }) => {
+    const { openKeyboardShortcuts } = useQuickActions();
+    return (
     <div>
       <div>Shared header</div>
+      <button data-global-shortcuts-anchor="" onClick={(event) => openKeyboardShortcuts?.(event.currentTarget)}>Keyboard shortcuts</button>
       {onViewChange && <button onClick={() => onViewChange('work')}>Open Work</button>}
     </div>
-  ),
+  ); },
 }));
 
 const todayPagePropsSpy = vi.fn();
@@ -156,6 +163,7 @@ describe('App', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useAssistantConfigMock.mockReturnValue({ data: { enabled: false, hasApiKey: false } });
     window.history.pushState(null, '', '/');
 
     useBootstrapStateMock.mockReturnValue({
@@ -174,6 +182,80 @@ describe('App', () => {
     });
 
     useTaskResolutionMock.mockReturnValue({ data: undefined, isLoading: true, isError: false, error: null });
+  });
+
+  it.each([
+    ['/', 'Move down / up'], ['/tasks', 'Next / previous task'], ['/team', 'Next / previous person'],
+    ['/notes', 'Search notes'], ['/work', null], ['/settings', null],
+  ])('opens exactly one global sheet with applicable content on %s', async (path, pageLabel) => {
+    window.history.replaceState(null, '', path);
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, isAuthenticated: true, isLoading: false, features: { tasksPhase3: true, teamMode: 'solo' } });
+    render(<App />);
+    await screen.findByText(/loaded/);
+    fireEvent.keyDown(window, { key: '?' });
+    const sheet = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    expect(screen.getAllByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveLength(1);
+    expect(within(sheet).getByText('Quick capture')).toBeInTheDocument();
+    expect(within(sheet).getByText('Command palette')).toBeInTheDocument();
+    expect(within(sheet).queryByText('Toggle Copilot')).not.toBeInTheDocument();
+    if (pageLabel) expect(within(sheet).getByText(pageLabel)).toBeInTheDocument();
+    else expect(sheet.querySelectorAll('dl')).toHaveLength(1);
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+  });
+
+  it('opens from the header, returns focus on Escape, and blocks global actions through help', async () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, isAuthenticated: true, isLoading: false });
+    useAssistantConfigMock.mockReturnValue({ data: { enabled: true, hasApiKey: true } });
+    render(<StrictMode><App /></StrictMode>);
+    const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    button.focus(); fireEvent.click(button);
+    const sheet = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    expect(within(sheet).getByText('Toggle Copilot')).toBeInTheDocument();
+    for (const key of ['i', 'k', 'j']) fireEvent.keyDown(window, { key, ctrlKey: true });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+    await waitFor(() => expect(button).toHaveFocus());
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Close keyboard shortcuts' }));
+    await waitFor(() => expect(button).toHaveFocus());
+  });
+
+  it('does not open help while typing, composing, or another keyboard layer is active', async () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, isAuthenticated: true, isLoading: false });
+    render(<App />);
+    await screen.findByText('Today loaded');
+    const input = document.createElement('textarea'); document.body.append(input);
+    input.focus(); fireEvent.keyDown(input, { key: '?' });
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+    input.remove();
+    fireEvent.keyDown(window, { key: '?', isComposing: true });
+    for (const role of ['dialog', 'menu', 'alertdialog']) {
+      const layer = document.createElement('div'); layer.setAttribute('role', role); document.body.append(layer);
+      fireEvent.keyDown(window, { key: '?' }); layer.remove();
+    }
+    const standup = document.createElement('div'); standup.dataset.testid = 'standup-mode'; document.body.append(standup);
+    fireEvent.keyDown(window, { key: '?' }); standup.remove();
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+  });
+
+  it('reserves help ownership as soon as lazy capture starts opening', async () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, isAuthenticated: true, isLoading: false });
+    render(<App />);
+    await screen.findByText('Today loaded');
+    fireEvent.keyDown(window, { key: 'i', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Quick capture' })).toBeInTheDocument();
+  });
+
+  it('does not offer global help to an unauthenticated user', async () => {
+    render(<App />);
+    await screen.findByText('Manager login');
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
   });
 
   it('offers retry after an initial bootstrap failure instead of loading forever', () => {

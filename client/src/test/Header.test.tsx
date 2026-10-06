@@ -250,6 +250,7 @@ describe('Header', () => {
       render(<Header activeView="today" onViewChange={vi.fn()} />);
       expect(navText()).toContain('Work');
       expect(navText()).toContain('Team');
+      expect(screen.queryByRole('button', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
     });
   });
 
@@ -383,4 +384,17 @@ describe('Header', () => {
       unmount();
     }
   });
+
+  it('exposes manager help at phone widths and passes its opener to the app', () => {
+    const openKeyboardShortcuts = vi.fn();
+    render(<QuickActionsProvider value={{ openCapture: vi.fn(), openCommandPalette: vi.fn(), openKeyboardShortcuts, keyboardShortcutsOpen: true }}>
+      <Header activeView="notes" onViewChange={vi.fn()} />
+    </QuickActionsProvider>);
+    const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    expect(button.className).not.toMatch(/hidden|md:/);
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(button);
+    expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
+  });
+
 });

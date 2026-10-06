@@ -1,39 +1,13 @@
 import { forwardRef, useState } from 'react';
 import { CalendarClock, CheckCheck, ChevronDown, ListPlus, SquarePlus } from 'lucide-react';
 import { MenuItem, TaskPopover } from '@/components/ui/Popover';
-import { NOTE_ACTION_SHORTCUTS, type NoteLineAction } from './editor/note-editor-extensions';
-import { ShortcutSheet, type ShortcutGroup } from '@/components/ui/ShortcutSheet';
+import type { NoteLineAction } from './editor/note-editor-extensions';
+import { NOTE_ACTION_SHORTCUTS, NOTES_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { useQuickActions } from '@/context/QuickActionsContext';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 
 // docs/54 K2: grouped, key-left — the same sheet format as every surface.
-export const NOTES_SHORTCUTS: ShortcutGroup[] = [
-  {
-    group: 'Turn a line into',
-    keys: [
-      [NOTE_ACTION_SHORTCUTS.task.label, 'A task'],
-      [NOTE_ACTION_SHORTCUTS.update.label, 'An update on a task'],
-      [NOTE_ACTION_SHORTCUTS['follow-up'].label, 'A follow-up'],
-    ],
-  },
-  {
-    group: 'Write',
-    keys: [
-      ['/', 'Commands (at line start)'],
-      ['@ · T- · #', 'Mention a person · task · Jira issue'],
-      ['⌘-click', 'Open a chip'],
-      ['⌘S', 'Save now'],
-    ],
-  },
-  {
-    group: 'Day',
-    keys: [
-      ['⌥[ / ⌥]', 'Previous / next day (⌥↑ ⌥↓ also work)'],
-      ['⌥T', 'Today'],
-      ['⌘⇧F', 'Search notes'],
-      ['⌘⏎', 'Wrap up the day'],
-      ['?', 'This sheet'],
-    ],
-  },
-];
+export { NOTES_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 
 interface NotesDocFooterProps {
   saveLabel: string;
@@ -77,6 +51,7 @@ export const NotesDocFooter = forwardRef<HTMLButtonElement, NotesDocFooterProps>
   },
   shortcutsRef,
 ) {
+  const { openKeyboardShortcuts } = useQuickActions();
   const [menuAnchor, setMenuAnchor] = useState<HTMLButtonElement | null>(null);
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLButtonElement | null>(null);
   const disabled = actionsDisabledReason !== null;
@@ -144,7 +119,7 @@ export const NotesDocFooter = forwardRef<HTMLButtonElement, NotesDocFooterProps>
         aria-label="Keyboard shortcuts"
         title="Keyboard shortcuts (?)"
         aria-expanded={shortcutsOpen}
-        onClick={() => onShortcutsOpenChange(!shortcutsOpen)}
+        onClick={(event) => openKeyboardShortcuts ? openKeyboardShortcuts(event.currentTarget) : onShortcutsOpenChange(!shortcutsOpen)}
       >
         <span aria-hidden="true">?</span>
       </button>

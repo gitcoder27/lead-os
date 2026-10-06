@@ -790,3 +790,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P05 | Needs attention/drift SQL now selects open tasks and the inclusive seven-day UTC closed window before event/link hydration; explicit closed and withClosed ranges keep their timezone bounds. 34 backend service/route tests pass, covering cutoff, future rows and historical closed views. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P06 — One roster regex per analysis, deferred footer counts, 250 ms coalesced draft writes with pagehide/hidden/unmount flushing, cancellation on clear, and deferred cap cleanup. 94 focused frontend tests pass; 20-edit fixture makes 1 storage write instead of 20. Synthetic 1,000-bullet analysis median 96.03 → 6.07 ms (scripts/benchmark-notes.cjs); candidate counts unchanged.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P06 | One roster regex per analysis, deferred footer counts, 250 ms coalesced draft writes with pagehide/hidden/unmount flushing, cancellation on clear, and deferred cap cleanup. 94 focused frontend tests pass; 20-edit fixture makes 1 storage write instead of 20. Synthetic 1,000-bullet analysis median 96.03 → 6.07 ms (scripts/benchmark-notes.cjs); candidate counts unchanged. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

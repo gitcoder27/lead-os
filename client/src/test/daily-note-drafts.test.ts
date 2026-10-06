@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  queueDailyNoteDraft,
+  flushDailyNoteDraft,
   clearDailyNoteCaptureDraft,
   clearDailyNoteDraft,
   clearDailyNoteDraftsForScope,
@@ -17,9 +19,14 @@ const REQUEST_ID_2 = '22222222-2222-4222-8222-222222222222';
 
 describe('daily-note drafts', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    clearDailyNoteDraftsForScope(SCOPE);
+    clearDailyNoteDraftsForScope(OTHER_SCOPE);
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
+
+  afterEach(() => { clearDailyNoteDraftsForScope(SCOPE); clearDailyNoteDraftsForScope(OTHER_SCOPE); vi.useRealTimers(); });
 
   it('round-trips a scoped draft', () => {
     const draft = { body: 'draft body', baseBody: 'saved body', revision: 3 };
@@ -140,6 +147,7 @@ describe('daily-note drafts', () => {
     }
     expect(writeDailyNoteDraft(SCOPE, DATE, { body: 'newest', baseBody: '', revision: 0 })).toBe(true);
 
+    vi.advanceTimersByTime(1000);
     let surviving = 0;
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
@@ -190,5 +198,32 @@ describe('daily-note drafts', () => {
     });
     expect(readDailyNoteDraft(SCOPE, DATE)).toBeNull();
     getSpy.mockRestore();
+  });
+});
+
+describe('P06 coalesced persistence', () => {
+  beforeEach(() => { vi.useFakeTimers(); localStorage.clear(); });
+  afterEach(() => { clearDailyNoteDraftsForScope(SCOPE); vi.useRealTimers(); });
+  it('writes a typing burst once, reads the pending text, and defers cap scans', () => {
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    const scans = vi.spyOn(Storage.prototype, 'key');
+    for (let i = 0; i < 20; i++) queueDailyNoteDraft(SCOPE, DATE, { body: String(i), baseBody: '', revision: 0 }, 'scratchpad', vi.fn());
+    expect(readDailyNoteDraft(SCOPE, DATE)?.body).toBe('19');
+    expect(writes).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(250);
+    expect(writes).toHaveBeenCalledOnce();
+    expect(scans).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(scans).toHaveBeenCalled();
+    writes.mockRestore(); scans.mockRestore();
+  });
+  it('flushes immediately and clearing prevents a queued draft from resurrecting', () => {
+    queueDailyNoteDraft(SCOPE, DATE, { body: 'last edit', baseBody: '', revision: 0 }, 'scratchpad', vi.fn());
+    flushDailyNoteDraft(SCOPE, DATE);
+    expect(localStorage.getItem(`lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:${DATE}`)).toContain('last edit');
+    queueDailyNoteDraft(SCOPE, DATE, { body: 'discard', baseBody: '', revision: 0 }, 'scratchpad', vi.fn());
+    clearDailyNoteDraft(SCOPE, DATE);
+    vi.advanceTimersByTime(500);
+    expect(readDailyNoteDraft(SCOPE, DATE)).toBeNull();
   });
 });

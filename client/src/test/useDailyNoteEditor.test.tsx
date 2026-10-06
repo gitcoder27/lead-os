@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDailyNoteEditor } from '@/hooks/useDailyNoteEditor';
 import { ApiRequestError } from '@/lib/api';
-import { readDailyNoteDraft, writeDailyNoteDraft } from '@/lib/daily-note-drafts';
+import { clearDailyNoteDraftsForScope, readDailyNoteDraft, writeDailyNoteDraft } from '@/lib/daily-note-drafts';
 import type { DailyNote, DailyNoteResponse } from '@/types';
 
 const apiMocks = vi.hoisted(() => ({
@@ -93,6 +93,7 @@ async function until(cond: () => boolean) {
 describe('useDailyNoteEditor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    clearDailyNoteDraftsForScope(SCOPE);
     window.localStorage.clear();
     window.sessionStorage.clear();
     scopeRef.current = SCOPE;
@@ -611,8 +612,25 @@ describe('useDailyNoteEditor', () => {
       throw new Error('denied');
     });
     act(() => result.current.changeBody('still here'));
+    await advance(250);
     expect(result.current.recoveryUnavailable).toBe(true);
     expect(result.current.body).toBe('still here');
     setSpy.mockRestore();
   });
+  it.each(['pagehide', 'visibilitychange', 'unmount'])('flushes the last edit on %s before the debounce', async (event) => {
+    const { result, unmount } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'idle');
+    act(() => result.current.changeBody('last edit'));
+    const key = `lead-os:daily-note-draft:${encodeURIComponent(SCOPE)}:${DATE}`;
+    expect(localStorage.getItem(key)).toBeNull();
+    if (event === 'unmount') unmount();
+    else if (event === 'pagehide') act(() => window.dispatchEvent(new Event(event)));
+    else {
+      const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      act(() => document.dispatchEvent(new Event(event)));
+      visibility.mockRestore();
+    }
+    expect(JSON.parse(localStorage.getItem(key)!).body).toBe('last edit');
+  });
+
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, History, Lock, Sun } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
@@ -8,7 +8,7 @@ import { useNoteEntityLookups } from '@/hooks/useNoteEntityLookups';
 import { DatePickerPopover } from '@/components/tasks/TaskDetailPrimitives';
 import { isEditable } from '@/components/ui/focus';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
-import { CARRIED_PATTERN, inferFromText, prettyNoteDate, wrapUpCandidates, type WrapUpCandidate } from '@/lib/note-markdown';
+import { CARRIED_PATTERN, inferFromText, mentionPattern, prettyNoteDate, wrapUpCandidates, type WrapUpCandidate } from '@/lib/note-markdown';
 import { isValidIsoDate } from '@/lib/view-params';
 import type { DailyNoteKind, DailyNoteRef, TodayActionTarget } from '@/types';
 import { NoteEditor, type NoteActionSource, type NoteEditorHandle, type NoteLineEdit } from './editor/NoteEditor';
@@ -151,7 +151,9 @@ export function NoteDocument({
     editorRef.current?.applyLineEdits(edits);
   }, []);
 
-  const openItems = useMemo(() => wrapUpCandidates(editor.body, developers), [developers, editor.body]);
+  const footerBody = useDeferredValue(editor.body);
+  const rosterMentions = useMemo(() => mentionPattern(developers), [developers]);
+  const openItems = useMemo(() => wrapUpCandidates(footerBody, developers, rosterMentions), [developers, footerBody, rosterMentions]);
   const openCheckboxes = openItems.filter((item) => item.kind === 'checkbox').length;
 
   // ── Editor handlers (read through a ref inside CodeMirror) ──────────

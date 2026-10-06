@@ -212,10 +212,40 @@ function enforceDraftCap(scope: string): void {
   }
 }
 
+const pendingDrafts = new Map<string, { timer: ReturnType<typeof setTimeout>; write: () => void; draft: DailyNoteDraft }>();
+const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Coalesce typing; synchronous lifecycle flushes preserve the last edit. */
+export function queueDailyNoteDraft(scope: string, date: string, draft: DailyNoteDraft, kind: DailyNoteKind, onFailure: () => void): void {
+  const key = draftKey(scope, date, kind);
+  const prior = pendingDrafts.get(key);
+  if (prior) clearTimeout(prior.timer);
+  const write = () => {
+    pendingDrafts.delete(key);
+    if (!writeDailyNoteDraft(scope, date, draft, kind)) onFailure();
+  };
+  pendingDrafts.set(key, { draft, write, timer: setTimeout(write, 250) });
+}
+
+export function flushDailyNoteDraft(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): void {
+  const pending = pendingDrafts.get(draftKey(scope, date, kind));
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  pending.write();
+}
+
+function cancelDraft(key: string): void {
+  const pending = pendingDrafts.get(key);
+  if (pending) clearTimeout(pending.timer);
+  pendingDrafts.delete(key);
+}
+
 export function readDailyNoteDraft(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): DailyNoteDraft | null {
   if (!scope || !date) {
     return null;
   }
+  const pending = pendingDrafts.get(draftKey(scope, date, kind));
+  if (pending) return pending.draft;
   const draft = readStored(draftKey(scope, date, kind), isDailyNoteDraftFields);
   return draft ? { body: draft.body, baseBody: draft.baseBody, revision: draft.revision } : null;
 }
@@ -225,13 +255,17 @@ export function writeDailyNoteDraft(scope: string, date: string, draft: DailyNot
     return false;
   }
   const ok = writeStored(draftKey(scope, date, kind), draft);
-  if (ok) {
-    enforceDraftCap(scope);
+  if (ok && !cleanupTimers.has(scope)) {
+    cleanupTimers.set(scope, setTimeout(() => {
+      cleanupTimers.delete(scope);
+      enforceDraftCap(scope);
+    }, 1000));
   }
   return ok;
 }
 
 export function clearDailyNoteDraft(scope: string, date: string, kind: DailyNoteKind = 'scratchpad'): void {
+  cancelDraft(draftKey(scope, date, kind));
   removeStored(draftKey(scope, date, kind));
 }
 
@@ -259,6 +293,10 @@ export function clearDailyNoteDraftsForScope(scope: string): void {
     return;
   }
   const prefix = scopePrefix(scope);
+  for (const key of pendingDrafts.keys()) if (key.startsWith(prefix)) cancelDraft(key);
+  const timer = cleanupTimers.get(scope);
+  if (timer) clearTimeout(timer);
+  cleanupTimers.delete(scope);
   for (const storage of [store(), legacyStore()]) {
     if (!storage) {
       continue;

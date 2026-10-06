@@ -5,7 +5,8 @@ import { api, ApiRequestError } from '@/lib/api';
 import {
   clearDailyNoteDraft,
   readDailyNoteDraft,
-  writeDailyNoteDraft,
+  queueDailyNoteDraft,
+  flushDailyNoteDraft,
 } from '@/lib/daily-note-drafts';
 import { mergeNoteBodies } from '@/lib/daily-note-merge';
 import {
@@ -98,14 +99,13 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
 
   const persistDraft = useCallback(
     (nextBody: string) => {
-      const ok = writeDailyNoteDraft(scope, date, {
+      queueDailyNoteDraft(scope, date, {
         body: nextBody,
         baseBody: baseBodyRef.current,
         revision: baseRevisionRef.current,
-      }, kind);
-      if (!ok) {
-        setRecoveryUnavailable(true);
-      }
+      }, kind, () => {
+        if (mountedRef.current && scopeRef.current === scope) setRecoveryUnavailable(true);
+      });
     },
     [date, kind, scope],
   );
@@ -416,16 +416,21 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
       }
     };
     const onOffline = () => setOffline(true);
+    const flushDraft = () => flushDailyNoteDraft(scope, date, kind);
     const onVisible = () => {
+      if (document.visibilityState === 'hidden') flushDraft();
       if (document.visibilityState === 'visible' && saveStateRef.current === 'error') {
         scheduleSave(0);
       }
     };
+    window.addEventListener('pagehide', flushDraft);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
+      flushDraft();
       mountedRef.current = false;
+      window.removeEventListener('pagehide', flushDraft);
       cancelPendingTimer();
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
@@ -451,7 +456,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
         }
       }
     };
-  }, [cancelPendingTimer, date, kind, scheduleSave]);
+  }, [cancelPendingTimer, date, kind, scheduleSave, scope]);
 
   useEffect(() => {
     if (!['dirty', 'saving', 'error', 'conflict'].includes(saveState)) {

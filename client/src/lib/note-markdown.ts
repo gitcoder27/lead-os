@@ -161,8 +161,7 @@ export function resolveMention(name: string, developers: NoteDeveloper[]): NoteD
   );
 }
 
-export function mentionsIn(text: string, developers: NoteDeveloper[]): NoteDeveloper[] {
-  const pattern = mentionPattern(developers);
+export function mentionsIn(text: string, developers: NoteDeveloper[], pattern = mentionPattern(developers)): NoteDeveloper[] {
   if (!pattern) return [];
   const found = new Map<string, NoteDeveloper>();
   for (const match of text.matchAll(pattern)) {
@@ -209,8 +208,13 @@ export interface WrapUpCandidate {
  * take notes, so they never count; nor do prose, headings, struck-through,
  * checked, or already-converted lines.
  */
-export function wrapUpCandidates(body: string, developers: NoteDeveloper[] = []): WrapUpCandidate[] {
+export function wrapUpCandidates(body: string, developers: NoteDeveloper[] = [], pattern = mentionPattern(developers)): WrapUpCandidate[] {
   const out: WrapUpCandidate[] = [];
+  const hasMention = (text: string) => {
+    if (!pattern) return false;
+    pattern.lastIndex = 0;
+    return pattern.test(text);
+  };
   body.split('\n').forEach((raw, line) => {
     if (HEADING.test(raw) || hasProvenance(raw)) return;
     const list = parseListPrefix(raw);
@@ -221,7 +225,7 @@ export function wrapUpCandidates(body: string, developers: NoteDeveloper[] = [])
     if (!text) return;
     if (CHECKBOX_OPEN.test(raw)) {
       out.push({ line, raw, text, kind: 'checkbox' });
-    } else if (proseTaskKeys(rest).length > 0 || mentionsIn(rest, developers).length > 0) {
+    } else if (proseTaskKeys(rest).length > 0 || hasMention(rest)) {
       out.push({ line, raw, text, kind: 'item' });
     }
   });

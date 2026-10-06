@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 import {
   appendProvenance,
   carryText,
@@ -120,4 +120,13 @@ describe('note-markdown', () => {
     ]);
     expect(searchTerms('vendor, late!')).toEqual(['vendor', 'late']);
   });
+});
+
+it('P06 compiles one mention regex for a whole wrap-up analysis', () => {
+  const original = RegExp;
+  const constructor = vi.spyOn(globalThis, 'RegExp').mockImplementation(function (pattern, flags) { return new original(pattern, flags); } as typeof RegExp);
+  const roster = [{ accountId: 'd1', displayName: 'Alice Smith' }];
+  expect(wrapUpCandidates(Array.from({ length: 1000 }, () => '- Ask @Alice').join('\n'), roster)).toHaveLength(1000);
+  expect(constructor.mock.calls.filter(([pattern]) => typeof pattern === 'string' && pattern.startsWith('@('))).toHaveLength(1);
+  constructor.mockRestore();
 });

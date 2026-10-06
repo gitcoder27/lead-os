@@ -1,3 +1,4 @@
+import { listPageSchema } from "../services/list-page";
 import { Router } from "express";
 import { z } from "zod";
 import { ISSUE_BULK_LIMIT, type IssueCommentResponse } from "shared/types";
@@ -99,6 +100,7 @@ const commentSchema = z.object({
 
 const listQuerySchema = z.object({
   query: z.object({
+    ...listPageSchema.shape,
     filter: filterSchema.optional(),
     assignee: z.string().optional(),
     priority: z.string().optional(),
@@ -118,7 +120,7 @@ export function createIssuesRouter(issueService: IssueService): Router {
 
   router.get("/", validate(listQuerySchema), async (req, res, next) => {
     try {
-      const query = req.query as z.infer<typeof listQuerySchema>["query"];
+      const query = listQuerySchema.shape.query.parse(req.query);
       const tagsParam = typeof query.tags === 'string' ? query.tags : undefined;
       const trackerDate = typeof query.trackerDate === 'string' ? query.trackerDate : undefined;
       const tagIds = tagsParam
@@ -126,7 +128,7 @@ export function createIssuesRouter(issueService: IssueService): Router {
         : undefined;
       const noTags = query.noTags === 'true';
 
-      const issues = await issueService.getAll({
+      const page = await issueService.getPage({
         filter: query.filter,
         assignee: query.assignee,
         priority: query.priority,
@@ -136,8 +138,8 @@ export function createIssuesRouter(issueService: IssueService): Router {
         order: query.order,
         tagIds,
         noTags,
-      }, req.auth!.user.workspaceId);
-      res.json({ issues });
+      }, listPageSchema.parse(query), req.auth!.user.workspaceId);
+      res.json(page);
     } catch (error) {
       next(error);
     }

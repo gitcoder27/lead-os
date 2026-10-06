@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+import type { Virtualizer } from '@tanstack/react-virtual';
 import { format, parseISO } from 'date-fns';
 import type { Issue } from '@/types';
 import { isDueToday, isOverdue } from '@/lib/utils';
@@ -6,20 +8,26 @@ import { isDueToday, isOverdue } from '@/lib/utils';
  * docs/56 UX-25: Work on a phone — one card per defect (title, assignee, due date, status) instead
  * of a table that needs sideways scrolling. Same rows, order and selection as the table.
  */
-export function DefectCardList({ issues, selectedKey, onSelectIssue }: {
+export function DefectCardList({ issues, selectedKey, onSelectIssue, virtualRows }: {
   issues: Issue[];
   selectedKey?: string | null;
   onSelectIssue: (jiraKey: string) => void;
+  virtualRows: Virtualizer<HTMLElement, HTMLElement>;
 }) {
+  const items = virtualRows.getVirtualItems();
   return (
-    <ul className="space-y-1.5 p-1" aria-label="Defects">
-      {issues.map((issue) => {
+    <ul className="p-1" aria-label="Defects">
+      {items.map((item, index) => {
+        const issue = issues[item.index]!;
+        const gap = item.start - (items[index - 1]?.end ?? 0);
         const due = issue.developmentDueDate ?? issue.dueDate;
         const overdue = isOverdue(due);
         const today = isDueToday(due);
         const dueLabel = due ? `${overdue ? 'Overdue · ' : today ? 'Due today · ' : 'Due '}${format(parseISO(due), 'EEE d MMM')}` : 'No due date';
         return (
-          <li key={issue.jiraKey}>
+          <Fragment key={issue.jiraKey}>
+          {gap > 0 && <li aria-hidden="true" style={{ height: gap }} />}
+          <li ref={virtualRows.measureElement} data-index={item.index} className="pb-1.5" aria-posinset={item.index + 1} aria-setsize={issues.length}>
             <button
               type="button"
               onClick={() => onSelectIssue(issue.jiraKey)}
@@ -45,8 +53,10 @@ export function DefectCardList({ issues, selectedKey, onSelectIssue }: {
               </span>
             </button>
           </li>
+          </Fragment>
         );
       })}
+      <li aria-hidden="true" style={{ height: Math.max(0, virtualRows.getTotalSize() - (items.at(-1)?.end ?? 0)) }} />
     </ul>
   );
 }

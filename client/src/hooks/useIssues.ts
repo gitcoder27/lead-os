@@ -1,12 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { readListPages } from '@/lib/list-pages';
 import type { DeveloperIssue, Issue, FilterType } from '@/types';
 import { getLocalIsoDate } from '@/lib/utils';
-
-interface IssuesResponse {
-  issues: Issue[];
-}
 
 interface DeveloperIssuesResponse {
   issues: DeveloperIssue[];
@@ -38,10 +35,7 @@ export function useIssuesWithOptions(
 
   return useQuery<Issue[]>({
     queryKey: ['issues', filter, assignee, tagId, noTags, trackerDate, authScopeKey],
-    queryFn: async () => {
-      const res = await api.get<IssuesResponse>(`/issues${qs ? `?${qs}` : ''}`);
-      return res.issues;
-    },
+    queryFn: ({ signal }) => readListPages<Issue>(`/issues${qs ? `?${qs}` : ''}`, 'issues', signal),
     refetchInterval: enabled ? 30_000 : false,
     enabled,
   });

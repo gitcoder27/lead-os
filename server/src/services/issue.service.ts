@@ -1,3 +1,4 @@
+import { listPage, listPageSchema, type ListPageRequest } from "./list-page";
 import { HttpError } from '../middleware/errorHandler';
 import { IssueExecutionService, type JiraMutationClient } from './jira-execution.service';
 import { and, desc, eq, ne, or, isNull, lte } from "drizzle-orm";
@@ -79,7 +80,7 @@ export class IssueService {
       .select()
       .from(issues)
       .where(eq(issues.workspaceId, normalizedWorkspaceId))
-      .orderBy(desc(issues.updatedAt));
+      .orderBy(desc(issues.updatedAt), issues.jiraKey);
     const tagMap = await this.getTagMapForAll(normalizedWorkspaceId);
     const managerJiraAccountId = await this.settings.getManagerJiraAccountId(normalizedWorkspaceId);
     const jiraSyncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
@@ -118,6 +119,13 @@ export class IssueService {
 
 
     return this.sortIssues(result, query.sort ?? "priority", query.order ?? "desc");
+  }
+
+  /** Public lists are bounded; getAll remains the whole-filter service path. */
+  async getPage(query: IssueQuery = {}, page: Partial<ListPageRequest> = {}, workspaceId?: string) {
+    const request = listPageSchema.parse(page);
+    const result = listPage(await this.getAll(query, workspaceId), request);
+    return { issues: result.rows, total: result.total, nextOffset: result.nextOffset };
   }
 
   /**

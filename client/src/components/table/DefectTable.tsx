@@ -3,7 +3,7 @@ import { WorkIssueMenu } from '@/components/work/WorkIssueMenu';
 import { ISSUE_BULK_LIMIT } from '@/types';
 import '@/components/work/work-execution.css';
 import { csvFileName, downloadCsv, workCsv } from '@/lib/csv';
-import { useMemo, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useEffect, useCallback, useRef, Fragment, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import {
   useReactTable,
@@ -24,6 +24,7 @@ import { InlineEditAssignee } from './InlineEditAssignee';
 import { InlineEditDueDate } from './InlineEditDueDate';
 import { InlineEditTags } from './InlineEditTags';
 import { DismissCell } from './DismissCell';
+import { useVirtualRows } from '@/hooks/useVirtualRows';
 import { useIssues } from '@/hooks/useIssues';
 import { useConfig } from '@/hooks/useConfig';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
@@ -400,14 +401,6 @@ export function DefectTable({
 
     persistExcludedStatuses(statusStorageKey, excludedStatuses);
   }, [excludedStatuses, statusStorageKey]);
-
-  // Auto-scroll to focused row
-  useEffect(() => {
-    if (focusedIndex >= 0 && tableRef.current) {
-      const rows = tableRef.current.querySelectorAll('tbody tr');
-      rows[focusedIndex]?.scrollIntoView({ block: 'nearest' });
-    }
-  }, [focusedIndex]);
 
   const handleCellClick = useCallback(
     (issueKey: string, column: 'assignee' | 'dueDate', e: React.MouseEvent) => {
@@ -817,6 +810,13 @@ export function DefectTable({
     setSorting,
   });
 
+  const virtualRows = useVirtualRows<HTMLElement>(tableRef, visibleIssueKeys, isPhone ? 100 : 36,
+    [focusedIndex, editingCell ? visibleIssueKeys.indexOf(editingCell.rowKey) : -1], isPhone ? 0 : 32);
+  const viewportRows = virtualRows.getVirtualItems();
+  useEffect(() => {
+    if (focusedIndex >= 0) virtualRows.scrollToIndex(focusedIndex, { align: 'auto' });
+  }, [focusedIndex, virtualRows]);
+
   useEffect(() => {
     onVisibleIssueKeysChange?.(visibleIssueKeys);
   }, [onVisibleIssueKeysChange, visibleIssueKeys]);
@@ -1106,9 +1106,10 @@ export function DefectTable({
               issues={table.getRowModel().rows.map((row) => row.original)}
               selectedKey={selectedKey}
               onSelectIssue={onSelectIssue}
+              virtualRows={virtualRows}
             />
           ) : (
-            <table className="min-w-full border-separate border-spacing-y-0">
+            <table className="min-w-full border-separate border-spacing-y-0" aria-rowcount={visibleIssueKeys.length + 1}>
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id}>
@@ -1149,7 +1150,10 @@ export function DefectTable({
                 ))}
               </thead>
               <tbody>
-                {table.getRowModel().rows.map((row, i) => {
+                {viewportRows.map((virtualRow, virtualIndex) => {
+            const i = virtualRow.index;
+            const row = table.getRowModel().rows[i]!;
+            const gap = virtualRow.start - (viewportRows[virtualIndex - 1]?.end ?? 32);
             const issue = row.original;
             const isSelected = issue.jiraKey === selectedKey;
             const isHighlighted = issue.jiraKey === highlightedKey;
@@ -1204,8 +1208,13 @@ export function DefectTable({
               Math.min(i, INITIAL_ROW_STAGGER_CAP) * INITIAL_ROW_ANIMATION_STAGGER + INITIAL_ROW_ANIMATION_DELAY;
 
                 return (
+                  <Fragment key={`${theme}-${issue.jiraKey}`}>
+                    {gap > 0 && <tr aria-hidden="true"><td colSpan={row.getVisibleCells().length} style={{ height: gap, padding: 0, border: 0 }} /></tr>}
                   <motion.tr
-                    key={`${theme}-${issue.jiraKey}`}
+                    ref={virtualRows.measureElement}
+                    data-index={i}
+                    data-issue-key={issue.jiraKey}
+                    aria-rowindex={i + 2}
                     initial={shouldAnimate ? { opacity: 0, y: 6 } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={shouldAnimate ? { duration: 0.2, delay: animationDelay } : undefined}
@@ -1237,8 +1246,10 @@ export function DefectTable({
                       </td>
                     ))}
                   </motion.tr>
+                  </Fragment>
                 );
               })}
+                <tr aria-hidden="true"><td colSpan={table.getVisibleLeafColumns().length} style={{ height: Math.max(0, virtualRows.getTotalSize() - (viewportRows.at(-1)?.end ?? 32)), padding: 0, border: 0 }} /></tr>
               </tbody>
             </table>
           )}

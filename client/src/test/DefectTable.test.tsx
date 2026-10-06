@@ -198,6 +198,44 @@ describe('DefectTable', () => {
     mockSyncStatus = undefined;
   });
 
+  it.each([false, true])('mounts a viewport window and exports the entire filter (phone=%s)', async (phone) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ media: query, matches: phone && query === '(max-width: 640px)', addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    if (!HTMLElement.prototype.scrollTo) HTMLElement.prototype.scrollTo = () => {};
+    const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(function (options) {
+      if (typeof options === 'object') this.scrollTop = options.top ?? 0;
+      this.dispatchEvent(new Event('scroll'));
+    });
+    try {
+      currentIssues = Array.from({ length: 1000 }, (_, index) => ({ ...mockIssues[0]!, jiraKey: `PROJ-${1000 + index}`, summary: `Synthetic defect ${index}` }));
+      const { container, rerender } = render(<TestWrapper><DefectTable {...defaultProps} /></TestWrapper>);
+      const mounted = () => container.querySelectorAll(phone ? '[data-testid="defect-card"]' : '[data-issue-key]').length;
+      expect(mounted()).toBeGreaterThan(0);
+      expect(mounted()).toBeLessThan(50);
+      expect(screen.queryByText('Synthetic defect 999')).toBeNull();
+      mockCsvDownload.mockClear();
+      fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+      expect(mockCsvDownload.mock.calls[0]![0]).toContain('Synthetic defect 999');
+      // Keyboard focus can jump to a row not in the original viewport.
+      rerender(<TestWrapper><DefectTable {...defaultProps} focusedIndex={800} /></TestWrapper>);
+      await waitFor(() => expect(screen.getByText('Synthetic defect 800')).toBeInTheDocument());
+      expect(mounted()).toBeLessThan(50);
+      const scroller = container.querySelector<HTMLElement>('.overflow-auto')!;
+      scroller.scrollTop = phone ? 80000 : 28800;
+      fireEvent.scroll(scroller);
+      await waitFor(() => expect(screen.queryByText('Synthetic defect 0')).toBeNull());
+      if (!phone) {
+        fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Select first 20 visible defects' }));
+        expect(screen.getByText('20 selected · up to 20')).toBeInTheDocument();
+        // These selected rows are outside the viewport and still selected.
+        expect(screen.queryByRole('checkbox', { name: 'Select PROJ-1000' })).toBeNull();
+      }
+    } finally {
+      scrollTo.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   describe('empty states (docs/56 P2-03)', () => {
     const openCapture = vi.fn();
     const renderEmpty = (props: Partial<React.ComponentProps<typeof DefectTable>> = {}) => {

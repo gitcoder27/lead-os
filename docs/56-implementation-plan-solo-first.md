@@ -756,7 +756,11 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 
 - [x] P01 — task-view CPU: cached formatters and request-local row preparation.
 - [ ] P02 — bounded API pages and virtual Work/Tasks rendering.
+- [x] P02-WORK — Work desktop/mobile virtualization and bounded issues API.
+- [ ] P02-TASKS — grouped Tasks virtualization and bounded Tasks API.
 
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P01 | Formatters cached per zone; dates, labels, lane, waiting membership, signals and plan sort keys prepared once per task per request, including saved-view fallbacks. Nine built-in lists/signals/counts verified across UTC, Honolulu and Tokyo; formatter construction and invalid/date-only behavior covered. 26 focused backend tests pass. Synthetic CPU medians: nine views × 1,000 tasks 3,162 → 32 ms; 10,000 date conversions 946 → 56 ms (script in scripts/benchmark-task-views.cjs; no DB/Jira). Typecheck, build checks and lint pass (297 existing warnings). Format check still reports only pre-existing .claude/settings.local.json, left untouched. No runtime data, Jira, push or deploy. |
+
+| 2026-10-06 | P02-WORK | TanStack Virtual measures desktop rows/mobile cards and retains keyboard focus/active editors. Issues API defaults to 200, max 500 rows, validates offsets and returns full-filter total/nextOffset; whole-filter service reads/counts stay intact. Client follows cancellable bounded pages and publishes complete lists atomically, preserving search, sort, selection, CSV and saved/URL filters. 54 focused client and 27 backend tests pass; typecheck, build checks, lint (0 errors) and data guard pass. Format check flags only unchanged local .claude/settings.local.json. Synthetic browser: 1,000 defects mount 25 desktop rows / 13 mobile cards; end scrolling, offscreen selection, fifth-page search, complete CSV and layout switch pass without page errors. No runtime data/Jira/push/deploy. |

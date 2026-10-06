@@ -29,7 +29,7 @@ function createTestApp(issueService: Partial<IssueService>) {
 describe("issues routes", () => {
   it("rejects invalid issue list query values with 400", async () => {
     const issueService = {
-      getAll: vi.fn(async () => []),
+      getPage: vi.fn(async () => ({ issues: [], total: 0, nextOffset: null })),
     };
     const app = createTestApp(issueService);
 
@@ -39,12 +39,12 @@ describe("issues routes", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(issueService.getAll).not.toHaveBeenCalled();
+    expect(issueService.getPage).not.toHaveBeenCalled();
   });
 
   it("passes validated issue list query values into the service", async () => {
     const issueService = {
-      getAll: vi.fn(async () => []),
+      getPage: vi.fn(async () => ({ issues: [], total: 0, nextOffset: null })),
     };
     const app = createTestApp(issueService);
 
@@ -54,7 +54,7 @@ describe("issues routes", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(issueService.getAll).toHaveBeenCalledWith(
+    expect(issueService.getPage).toHaveBeenCalledWith(
       expect.objectContaining({
         filter: "blocked",
         sort: "updated",
@@ -63,6 +63,7 @@ describe("issues routes", () => {
         tagIds: [1, 2],
         noTags: false,
       }),
+      { limit: 200, offset: 0 },
       "default"
     );
   });
@@ -120,4 +121,16 @@ describe('execution validation', () => {
     expect((await invoke(app, { method: 'POST', url: '/api/issues/AB2-1/transition', body })).status).toBe(200);
     expect(transition).toHaveBeenCalledWith('AB2-1', '21', body.expectedStatus, 'default');
   });
+});
+
+
+it("validates bounded paging and returns filter-wide totals", async () => {
+  const getPage = vi.fn(async () => ({ issues: [{ jiraKey: "AM-2" }], total: 8, nextOffset: 2 }));
+  const app = createTestApp({ getPage } as unknown as Partial<IssueService>);
+  const response = await invoke(app, { method: "GET", url: "/api/issues?filter=blocked&limit=1&offset=1" });
+  expect(response.body).toEqual({ issues: [{ jiraKey: "AM-2" }], total: 8, nextOffset: 2 });
+  expect(getPage).toHaveBeenCalledWith(expect.objectContaining({ filter: "blocked" }), { limit: 1, offset: 1 }, "default");
+  for (const query of ["limit=0", "limit=501", "offset=-1", "offset=1.5", "limit=NaN"]) {
+    expect((await invoke(app, { method: "GET", url: `/api/issues?${query}` })).status).toBe(400);
+  }
 });

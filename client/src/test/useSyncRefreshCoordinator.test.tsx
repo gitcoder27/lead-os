@@ -251,7 +251,7 @@ describe('sync refresh regression', () => {
       if (url === '/sync/status') {
         return syncStatus;
       }
-      if (url === `/issues?trackerDate=${trackerDate}`) {
+      if (url === `/issues?trackerDate=${trackerDate}&limit=200&offset=0`) {
         return { issues: [currentIssue] };
       }
       if (url === `/issues/PROJ-101?trackerDate=${trackerDate}`) {

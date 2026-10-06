@@ -3411,3 +3411,13 @@ export interface PlacementPreviewRequest { keys: string[]; includeSubtasks?: boo
 export interface PlacementPreview { keys: string[]; includeSubtasks: boolean; tasks: { taskKey: string; title: string; placement: TaskPlacement | null }[] }
 export interface PlacementBulkRequest { preview: PlacementPreview; placement?: TaskPlacement | null; restore?: { taskKey: string; placement: TaskPlacement | null }[] }
 export interface PlacementBulkResponse { undo: PlacementBulkRequest; count: number }
+
+/** Bounded list responses; total always covers the complete matching filter. */
+export interface ListPageMetadata {
+  total: number;
+  nextOffset: number | null;
+}
+
+export interface IssueListResponse extends ListPageMetadata {
+  issues: Issue[];
+}

@@ -362,6 +362,20 @@ describe("IssueService", () => {
     vi.useRealTimers();
   });
 
+  it("pages the fully filtered and sorted result while preserving whole-filter reads", async () => {
+    for (const query of [{}, { filter: "highPriority" as const }, { tagIds: [10] }, { noTags: true }]) {
+      const whole = await service.getAll(query);
+      const first = await service.getPage(query, { limit: 1 });
+      const remaining = await service.getPage(query, { limit: 500, offset: 1 });
+      expect(first.total).toBe(whole.length);
+      expect([...first.issues, ...remaining.issues]).toEqual(whole);
+      expect(first.nextOffset).toBe(whole.length > 1 ? 1 : null);
+      expect(remaining.nextOffset).toBeNull();
+      expect((await service.getPage(query, { offset: 100 })).issues).toEqual([]);
+    }
+    await expect(service.getPage({}, { limit: 501 })).rejects.toThrow();
+  });
+
   it("applies all supported filters", async () => {
     expect((await service.getAll({ filter: "unassigned" })).map((i) => i.jiraKey)).toEqual(["PROJ-1"]);
     expect((await service.getAll({ filter: "dueToday" })).map((i) => i.jiraKey)).toContain("PROJ-1");

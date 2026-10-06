@@ -7,8 +7,6 @@ import type {
   TeamTrackerBoardResponse,
   TeamTrackerBoardQuery,
   TrackerIssueAssignment,
-  TrackerCarryForwardContextResponse,
-  TrackerCarryForwardPreviewResponse,
   StandupFeedResponse,
   LatestStandupSessionResponse,
 } from '@/types';
@@ -104,36 +102,6 @@ export function useLatestStandupSession(enabled = true) {
     queryKey: ['team-tracker', 'standup-session', 'latest', authScopeKey],
     queryFn: () => api.get<LatestStandupSessionResponse>('/team-tracker/standup/session/latest'),
     enabled,
-  });
-}
-
-export function useCarryForwardPreview(fromDate: string, toDate: string, enabled = true) {
-  const authScopeKey = useAuthScopeKey();
-
-  return useQuery<TrackerCarryForwardPreviewResponse>({
-    queryKey: ['team-tracker', 'carry-forward-preview', fromDate, toDate, authScopeKey],
-    queryFn: async () => {
-      const params = new URLSearchParams({ fromDate, toDate });
-      return api.get<TrackerCarryForwardPreviewResponse>(
-        `/team-tracker/carry-forward-preview?${params.toString()}`
-      );
-    },
-    enabled,
-    staleTime: 30_000,
-  });
-}
-
-export function useCarryForwardContext(toDate: string, enabled = true) {
-  const authScopeKey = useAuthScopeKey();
-
-  return useQuery<TrackerCarryForwardContextResponse>({
-    queryKey: ['team-tracker', 'carry-forward-context', toDate, authScopeKey],
-    queryFn: () =>
-      api.get<TrackerCarryForwardContextResponse>(
-        `/team-tracker/carry-forward-context?toDate=${encodeURIComponent(toDate)}`
-      ),
-    enabled,
-    staleTime: 30_000,
   });
 }
 

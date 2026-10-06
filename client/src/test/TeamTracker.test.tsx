@@ -2,7 +2,7 @@ import { QuickActionsProvider } from '@/context/QuickActionsContext';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { TestWrapper } from '@/test/wrapper';
-import type { TeamTrackerBoardResponse, TeamTrackerBoardQuery, TeamTrackerSavedView, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse, TaskResolution } from '@/types';
+import type { TeamTrackerBoardResponse, TeamTrackerBoardQuery, TeamTrackerSavedView, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TaskResolution } from '@/types';
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { teamBoardQueryFromParams, teamBoardQueryToSearch } from '@/lib/view-params';
@@ -28,10 +28,6 @@ const mockAddTrackerItemMutate = vi.fn();
 const mockAddCheckInMutate = vi.fn();
 const mockStatusUpdateMutate = vi.fn();
 const mockRefetchBoard = vi.fn();
-const mockRefetchCarryForwardPreview = vi.fn();
-const mockRefetchCarryForwardContext = vi.fn();
-let mockCarryForwardPreviewValue: TrackerCarryForwardPreviewResponse | undefined;
-let mockCarryForwardContextValue: TrackerCarryForwardContextResponse | undefined;
 let mockIssues: Issue[] = [];
 let mockTrackerIssueAssignments: TrackerIssueAssignment[] = [];
 let mockManagerDeskDay: ManagerDeskDayResponse;
@@ -354,20 +350,6 @@ vi.mock('@/hooks/useTeamTracker', () => ({
       refetch: mockRefetchBoard,
     };
   },
-  useCarryForwardPreview: () => ({
-    data: mockCarryForwardPreviewValue,
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: mockRefetchCarryForwardPreview,
-  }),
-  useCarryForwardContext: () => ({
-    data: mockCarryForwardContextValue,
-    isLoading: false,
-    isError: false,
-    isFetching: false,
-    refetch: mockRefetchCarryForwardContext,
-  }),
   useTrackerIssueAssignments: () => ({
     data: mockTrackerIssueAssignments,
     isLoading: false,
@@ -510,10 +492,6 @@ describe('TeamTrackerPage', () => {
     mockAddTrackerItemMutate.mockReset();
     mockAddCheckInMutate.mockReset();
     mockRefetchBoard.mockReset();
-    mockRefetchCarryForwardPreview.mockReset();
-    mockRefetchCarryForwardContext.mockReset();
-    mockCarryForwardPreviewValue = undefined;
-    mockCarryForwardContextValue = undefined;
     mockIssues = [];
     mockTrackerIssueAssignments = [];
     mockManagerDeskDay = {
@@ -1218,8 +1196,6 @@ describe('TeamTrackerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /refresh team tracker/i }));
 
     expect(mockRefetchBoard).toHaveBeenCalled();
-    expect(mockRefetchCarryForwardContext).not.toHaveBeenCalled();
-    expect(mockRefetchCarryForwardPreview).not.toHaveBeenCalled();
   });
 
   it('shows "No current item" warning for developer without active work', () => {

@@ -17,7 +17,12 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
   const [unreadOnly, setUnreadOnly] = useState(true);
   const query = useTaskInbox(unreadOnly);
   const markRead = useMarkTaskInboxRead();
-  const items = query.isError ? [] : (query.data?.pages.flatMap((page) => page.events) ?? []);
+  const seen = new Set<number>();
+  const items = query.isError ? [] : (query.data?.pages.flatMap((page) => page.events) ?? []).filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
   const unreadCount = query.data?.pages[0]?.unreadCount;
   const shownUnread = items.filter((item) => !item.readAt);
   const changeRead = (ids: number[], read: boolean) => {
@@ -34,6 +39,7 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
       <div className="task-inbox-heading">
         <h2>Updates{unreadCount !== undefined ? ` · ${unreadCount} unread` : ''}</h2>
         <div className="task-inbox-tabs" aria-label="Show updates">
+          <button type="button" onClick={() => void query.refetch()}>Refresh updates</button>
           <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>
             Unread
           </button>

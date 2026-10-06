@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, renderHook, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { useTaskInbox, useTaskInboxLatest } from '@/hooks/useTaskInbox';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TaskInboxContent } from '@/components/actions/TaskInboxContent';
@@ -264,4 +266,39 @@ describe('task inbox', () => {
     );
     expect(screen.queryByRole('region', { name: 'Opened task update' })).not.toBeInTheDocument();
   });
+});
+
+it('P08 polls one latest page after three history pages and releases bounded history on close', async () => {
+  vi.useFakeTimers();
+  get.mockImplementation(async (url) => {
+    const cursor = Number(new URL(url, 'https://fixture.invalid').searchParams.get('cursor') ?? 0);
+    return { enabled: true, unreadCount: 200, events: [{ ...item, id: cursor + 1 }], nextCursor: String(cursor + 1) };
+  });
+  const qc = createTestQueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  const badge = renderHook(() => useTaskInboxLatest(), { wrapper });
+  const content = renderHook(() => useTaskInbox(), { wrapper });
+  const settle = async () => { await act(async () => { await vi.advanceTimersByTimeAsync(0); }); };
+  await settle(); await settle();
+  expect(get).toHaveBeenCalledOnce();
+  for (let i = 0; i < 3; i++) {
+    await act(async () => { await content.result.current.fetchNextPage(); });
+    await settle(); await settle();
+  }
+  expect(content.result.current.data?.pages).toHaveLength(4);
+  get.mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  expect(get).toHaveBeenCalledOnce();
+  expect(get.mock.calls[0]![0]).not.toContain('cursor');
+  for (let i = 0; i < 5; i++) {
+    await act(async () => { await content.result.current.fetchNextPage(); });
+    await settle();
+  }
+  expect(content.result.current.data?.pages).toHaveLength(6); // latest + at most five older pages
+  content.unmount(); await settle();
+  expect(qc.getQueryCache().findAll({ predicate: (query) => query.queryKey[2] === 'history' })).toHaveLength(0);
+  get.mockClear();
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  expect(get).toHaveBeenCalledOnce();
+  badge.unmount(); qc.clear(); vi.useRealTimers();
 });

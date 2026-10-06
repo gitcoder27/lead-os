@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -6,31 +6,53 @@ import { authEpoch } from '@/lib/auth-epoch';
 import { api } from '@/lib/api';
 import type { TaskEvent, TaskInboxReadRequest, TaskInboxResponse } from '@/types';
 
-export function useTaskInbox(unreadOnly = true) {
+/** Badge and latest page share one bounded request, regardless of history depth. */
+export function useTaskInboxLatest(unreadOnly = true) {
   const scope = useAuthScopeKey();
   const { user, features } = useAuth();
-  const enabled = Boolean(
-    user &&
-    features?.tasksPhase3 &&
-    features.teamMode === 'collab' &&
-    (user.role === 'manager' || user.role === 'developer'),
-  );
-  const query = useInfiniteQuery({
-    queryKey: ['task-inbox', scope, unreadOnly],
-    queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams({ unread: String(unreadOnly), limit: '20' });
-      if (pageParam) params.set('cursor', pageParam);
-      return api.get<TaskInboxResponse>(`/task-inbox?${params}`, { signal });
-    },
-    initialPageParam: null as string | null,
-    getNextPageParam: (last) => last.nextCursor,
-    enabled,
-    retry: false,
-    refetchInterval: 30_000,
-    staleTime: 10_000,
-    refetchOnWindowFocus: true,
+  const enabled = Boolean(user && features?.tasksPhase3 && features.teamMode === 'collab' && (user.role === 'manager' || user.role === 'developer'));
+  const query = useQuery({
+    queryKey: ['task-inbox', scope, 'latest', unreadOnly],
+    queryFn: ({ signal }) => api.get<TaskInboxResponse>(`/task-inbox?unread=${unreadOnly}&limit=20`, { signal }),
+    enabled, retry: false, staleTime: 10_000, refetchInterval: 30_000,
   });
-  return { ...query, enabled: enabled && query.data?.pages[0]?.enabled !== false };
+  return { ...query, enabled: enabled && query.data?.enabled !== false };
+}
+
+/** History starts only on Load older, is never polled, and lives only while open. */
+export function useTaskInbox(unreadOnly = true) {
+  const scope = useAuthScopeKey();
+  const latest = useTaskInboxLatest(unreadOnly);
+  const [anchor, setAnchor] = useState<{ scope: string; unreadOnly: boolean; cursor: string } | null>(null);
+  const cursor = anchor?.scope === scope && anchor.unreadOnly === unreadOnly ? anchor.cursor : null;
+  const history = useInfiniteQuery({
+    queryKey: ['task-inbox', scope, 'history', unreadOnly, cursor],
+    queryFn: ({ pageParam, signal }) => api.get<TaskInboxResponse>(`/task-inbox?${new URLSearchParams({ unread: String(unreadOnly), limit: '20', cursor: pageParam ?? '' })}`, { signal }),
+    initialPageParam: cursor,
+    getNextPageParam: (last) => last.nextCursor,
+    enabled: latest.enabled && Boolean(cursor),
+    maxPages: 5,
+    gcTime: 0,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const older = cursor ? history.data?.pages ?? [] : [];
+  return {
+    enabled: latest.enabled,
+    data: latest.data ? { pages: [latest.data, ...older] } : undefined,
+    isLoading: latest.isLoading,
+    isError: latest.isError || (Boolean(cursor) && history.isError),
+    isFetchingNextPage: Boolean(cursor) && history.isFetching,
+    hasNextPage: cursor ? history.hasNextPage : Boolean(latest.data?.nextCursor),
+    fetchNextPage: () => {
+      if (cursor) return history.fetchNextPage();
+      if (latest.data?.nextCursor) setAnchor({ scope, unreadOnly, cursor: latest.data.nextCursor });
+      return Promise.resolve();
+    },
+    refetch: () => { setAnchor(null); return latest.refetch(); },
+  };
 }
 
 export function useMarkTaskInboxRead() {

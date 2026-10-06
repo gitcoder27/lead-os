@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useManagerActions } from '@/hooks/useManagerActions';
-import { useTaskInbox } from '@/hooks/useTaskInbox';
+import { useTaskInboxLatest } from '@/hooks/useTaskInbox';
 import { TaskInboxContent } from './TaskInboxContent';
 import { useTodayActions } from '@/hooks/useTodayActions';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
@@ -104,8 +104,8 @@ export function ManagerActionInbox({
     preset?: SnoozePreset;
     error?: string;
   } | null>(null);
-  const updates = useTaskInbox();
-  const unreadCount = updates.data?.pages[0]?.unreadCount ?? 0;
+  const updates = useTaskInboxLatest();
+  const unreadCount = updates.data?.unreadCount ?? 0;
   const managerActions = useManagerActions({ date, surface: 'header', limit: 8, enabled: enabled && !updatesOnly });
   const actionsData = updatesOnly ? undefined : managerActions.data;
   const actionsLoading = managerActions.isLoading;

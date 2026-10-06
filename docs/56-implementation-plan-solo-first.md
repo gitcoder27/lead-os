@@ -802,3 +802,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P03 | Team no longer mounts the full-issue polling hook. Editable Jira picker debounces cancellable lean SQL suggestions (maximum 8, five fields), preserving visibility, priority order, literal substring and Unicode case behavior; detail bodies stay out of suggestions. 91 frontend and 10 backend tests pass. Synthetic 60-second closed-picker fixture: 3 full-list GETs → 0; opening fetches one bounded suggestion page. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P08 — Badge/latest polling uses one bounded shared query; older history loads on demand without polling, retains at most five pages, and is released on close. Explicit Refresh returns to latest; overlaps are deduplicated. 24 focused inbox/header tests pass. Three-page synthetic poll: 3 sequential requests → 1, also after closing; retention capped at 100 history rows plus 20 latest.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P08 | Badge/latest polling uses one bounded shared query; older history loads on demand without polling, retains at most five pages, and is released on close. Explicit Refresh returns to latest; overlaps are deduplicated. 24 focused inbox/header tests pass. Three-page synthetic poll: 3 sequential requests → 1, also after closing; retention capped at 100 history rows plus 20 latest. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Bell } from 'lucide-react';
-import { useTaskInbox } from '@/hooks/useTaskInbox';
+import { useTaskInboxLatest } from '@/hooks/useTaskInbox';
 import { TaskInboxContent } from './TaskInboxContent';
 
 /** The developer's personal inbox; it never queries manager attention endpoints. */
 export function TaskInboxPopover() {
   const [open, setOpen] = useState(false);
-  const query = useTaskInbox();
+  const query = useTaskInboxLatest();
   if (!query.enabled) return null;
-  const count = query.data?.pages[0]?.unreadCount ?? 0;
+  const count = query.data?.unreadCount ?? 0;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>

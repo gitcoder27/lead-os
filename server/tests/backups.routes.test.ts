@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import express from "express";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configTable } from "../src/db/schema";
 import { db, rawDb } from "../src/db/connection";
 import { migrate } from "../src/db/migrate";
@@ -138,4 +138,18 @@ describe("backups routes", () => {
     expect(list.body.backups.every((backup: { name: string }) => backup.name.endsWith(".db"))).toBe(true);
     expect((await invoke(app, { method: "GET", url: "/api/backups/notes.txt/download" })).status).toBe(400);
   });
+});
+
+it('P12 cleans a prepared copy when the response has already disconnected', async () => {
+  const cleanup = vi.fn().mockResolvedValue(undefined);
+  const service = { createDownloadCopy: vi.fn().mockResolvedValue({ name: 'snapshot.db', path: 'unused', sizeBytes: 1, cleanup }) } as unknown as BackupService;
+  const app = express();
+  app.use((_req, res, next) => {
+    Object.defineProperty(res, 'destroyed', { value: true });
+    res.end();
+    next();
+  });
+  app.use('/api/backups', createBackupsRouter(service));
+  await invoke(app, { method: 'GET', url: '/api/backups/snapshot.db/download' });
+  await vi.waitFor(() => expect(cleanup).toHaveBeenCalledOnce());
 });

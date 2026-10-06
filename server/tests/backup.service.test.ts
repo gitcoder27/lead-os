@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configTable, developers, issues } from "../src/db/schema";
 import { db, rawDb } from "../src/db/connection";
 import { migrate } from "../src/db/migrate";
@@ -221,4 +221,15 @@ describe("BackupService", () => {
     const stoppedStatus = await backupService.getRuntimeStatus();
     expect(stoppedStatus.nextRunAt).toBeUndefined();
   });
+});
+
+it('P12 cleans temporary download directories when worker sanitization fails', async () => {
+  const service = createBackupService();
+  const backup = await service.createManualBackup('corrupt-fixture');
+  await fs.promises.writeFile(backup.path, 'not sqlite');
+  const mkdtemp = vi.spyOn(fs.promises, 'mkdtemp');
+  await expect(service.createDownloadCopy(backup.name)).rejects.toThrow();
+  const directory = await mkdtemp.mock.results[0]!.value;
+  expect(fs.existsSync(directory)).toBe(false);
+  mkdtemp.mockRestore();
 });

@@ -1,3 +1,4 @@
+import { sanitizeBackupCopy, withBackupSanitization } from "./backup-sanitizer";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -168,29 +169,20 @@ export class BackupService {
     if (!backup) {
       return undefined;
     }
-    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "lead-os-backup-download-"));
-    const cleanup = () => fs.promises.rm(directory, { recursive: true, force: true });
-    try {
-      const copyPath = path.join(directory, backup.name);
-      await fs.promises.copyFile(backup.path, copyPath);
-      const copy = new Database(copyPath, { fileMustExist: true });
+    return withBackupSanitization(async () => {
+      const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "lead-os-backup-download-"));
+      const cleanup = () => fs.promises.rm(directory, { recursive: true, force: true });
       try {
-        copy.pragma("journal_mode = DELETE");
-        const hasSessions = copy.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_sessions'").get();
-        if (hasSessions) {
-          copy.exec("DELETE FROM app_sessions");
-        }
-        // VACUUM rewrites the file so deleted session rows do not linger in free pages.
-        copy.exec("VACUUM");
-      } finally {
-        copy.close();
+        const copyPath = path.join(directory, backup.name);
+        await fs.promises.copyFile(backup.path, copyPath);
+        await sanitizeBackupCopy(copyPath);
+        const stats = await fs.promises.stat(copyPath);
+        return { name: backup.name, path: copyPath, sizeBytes: stats.size, cleanup };
+      } catch (error) {
+        await cleanup();
+        throw error;
       }
-      const stats = await fs.promises.stat(copyPath);
-      return { name: backup.name, path: copyPath, sizeBytes: stats.size, cleanup };
-    } catch (error) {
-      await cleanup();
-      throw error;
-    }
+    });
   }
 
   async getRuntimeStatus(): Promise<BackupRuntimeStatus> {

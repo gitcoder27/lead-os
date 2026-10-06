@@ -55,14 +55,19 @@ export function createBackupsRouter(backupService: BackupService): Router {
       if (!download) {
         throw new HttpError(404, "Backup not found");
       }
-      // Remove the temporary copy once it has been read, or when the client goes away first.
+      // A client may disconnect while its copy is queued or being sanitized.
+      if (res.destroyed || res.writableEnded) {
+        await download.cleanup();
+        return;
+      }
+      // Remove the temporary copy once read, or when the client goes away.
       const cleanup = () => void download.cleanup();
-      res.on("close", cleanup);
       res.setHeader("Content-Type", "application/octet-stream");
       res.setHeader("Content-Length", String(download.sizeBytes));
       res.setHeader("Content-Disposition", `attachment; filename="${download.name}"`);
       res.setHeader("Cache-Control", "no-store");
       const stream = fs.createReadStream(download.path);
+      res.on("close", () => { stream.destroy(); cleanup(); });
       stream.on("error", next);
       stream.on("close", cleanup);
       stream.pipe(res);

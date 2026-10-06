@@ -121,6 +121,17 @@ export class SyncEngine {
     return rows[0];
   }
 
+  async getLastSuccessfulSyncLog(workspaceId?: string): Promise<typeof syncLog.$inferSelect | undefined> {
+    const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    const rows = await db
+      .select()
+      .from(syncLog)
+      .where(and(eq(syncLog.workspaceId, normalizedWorkspaceId), eq(syncLog.status, "success")))
+      .orderBy(desc(syncLog.id))
+      .limit(1);
+    return rows[0];
+  }
+
   async syncNow(workspaceId?: string): Promise<SyncResult> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
     // docs/56 P2-03: no Jira, nothing to sync. That is not a failure, so no error row and no red state.

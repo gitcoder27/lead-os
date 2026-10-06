@@ -3,6 +3,7 @@ import { CloudOff, RefreshCw } from 'lucide-react';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { formatRelativeTime } from '@/lib/utils';
+import { describeSyncError } from '@/lib/sync-error';
 
 /**
  * docs/56 UX-18: Jira sync state and the manual sync button live in the Work toolbar, so the global
@@ -27,14 +28,14 @@ export function WorkSyncControls() {
   const syncLabel = isSyncing
     ? 'Syncing…'
     : hasError
-      ? 'Sync issue'
+      ? `Sync issue · ${sync?.lastSuccessAt ? `last good ${formatRelativeTime(sync.lastSuccessAt)}` : 'never synced'}`
       : autoSyncOff
         ? 'Sync off'
         : sync?.lastSyncedAt
           ? `Synced ${formatRelativeTime(sync.lastSyncedAt)}`
           : 'Not synced';
   const syncTitle = hasError
-    ? `Sync issue${sync?.errorMessage ? `: ${sync.errorMessage}` : ''}${autoSyncOff ? ' Jira auto-sync is off; manual sync is still available.' : ''}`
+    ? `${describeSyncError(sync?.errorMessage)}${autoSyncOff ? ' Jira auto-sync is off; manual sync is still available.' : ''}`
     : autoSyncOff
       ? 'Jira auto-sync is off. Manual sync is still available; turn it back on in Settings → Sync Scope.'
       : syncLabel;

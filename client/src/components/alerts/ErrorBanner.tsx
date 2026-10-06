@@ -1,11 +1,15 @@
 import { TriangleAlert } from 'lucide-react';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useOverview } from '@/hooks/useOverview';
+import { useTriggerSync } from '@/hooks/useTriggerSync';
+import { describeSyncError } from '@/lib/sync-error';
+import { formatRelativeTime } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export function ErrorBanner() {
   const { error: overviewError } = useOverview();
   const { data: syncStatus } = useSyncStatus();
+  const triggerSync = useTriggerSync();
 
   const isApiDown = !!overviewError;
   // docs/56 P2-03: a workspace without Jira has nothing to fail; no red banner for it.
@@ -17,7 +21,7 @@ export function ErrorBanner() {
     : isApiDown
     ? 'Cannot reach server. Showing last known data.'
     : isSyncError
-    ? `Sync error: ${syncStatus.errorMessage}`
+    ? describeSyncError(syncStatus.errorMessage)
     : null;
 
   if (!message) return null;
@@ -48,6 +52,37 @@ export function ErrorBanner() {
           <div className="text-[13px]" style={{ color: isWarning ? 'var(--warning)' : 'var(--danger)' }}>
             {message}
           </div>
+          {!isWarning && (
+            <>
+              {syncStatus?.lastSuccessAt && (
+                <p className="mt-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                  Data last updated {formatRelativeTime(syncStatus.lastSuccessAt)}
+                </p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => triggerSync.mutate()}
+                  disabled={syncStatus?.status === 'syncing' || triggerSync.isPending}
+                  className="rounded-md border border-current px-2 py-1 disabled:opacity-50"
+                >
+                  Retry
+                </button>
+                <a
+                  href="/settings?section=connection"
+                  onClick={(event) => {
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    window.history.pushState({}, '', '/settings?section=connection');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
+                  className="underline underline-offset-2"
+                >
+                  Open Settings
+                </a>
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>

@@ -34,6 +34,7 @@ import { useToast } from '@/context/ToastContext';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { isOverdue, isDueToday, getLocalIsoDate } from '@/lib/utils';
+import { describeSyncError } from '@/lib/sync-error';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { DefectCardList } from './DefectCardList';
 import type { Issue, FilterType } from '@/types';
@@ -1030,7 +1031,7 @@ export function DefectTable({
             Jira defects could not be refreshed
           </p>
           <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            {syncErrorMessage}
+            {describeSyncError(syncErrorMessage)}
           </p>
           <p className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
             Check the saved Jira API token in Settings, then run Save &amp; Sync.

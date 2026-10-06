@@ -19,6 +19,7 @@ vi.mock('@/hooks/useOverview', () => ({
 vi.mock('@/hooks/useSyncStatus', () => ({
   useSyncStatus: () => mockUseSyncStatus(),
 }));
+vi.mock('@/hooks/useTriggerSync', () => ({ useTriggerSync: () => ({ mutate: vi.fn(), isPending: false }) }));
 
 vi.mock('@/hooks/useDevelopers', () => ({
   useDevelopers: (...args: unknown[]) => mockUseDevelopers(...args),
@@ -74,7 +75,7 @@ describe('interactive utility components', () => {
       data: { status: 'error', errorMessage: 'Invalid JQL' },
     });
     render(<ErrorBanner />);
-    expect(screen.getByText('Sync error: Invalid JQL')).toBeInTheDocument();
+    expect(screen.getByText('Jira sync failed.')).toBeInTheDocument();
   });
 
   it('requires a second click before dismissing an issue', async () => {

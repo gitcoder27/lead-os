@@ -326,7 +326,7 @@ describe('SettingsPage', () => {
 
   it('keeps the user on the page when sync fails after save succeeds', async () => {
     mockPut.mockResolvedValue({ success: true });
-    mockMutateAsync.mockRejectedValueOnce(new Error('Sync unavailable'));
+    mockMutateAsync.mockRejectedValueOnce(new Error('Jira API error (500): {"errorMessages":["private response"]}'));
 
     render(
       <TestWrapper>
@@ -340,7 +340,19 @@ describe('SettingsPage', () => {
       expect(mockPut).toHaveBeenCalledTimes(1);
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
       expect(screen.getByText('Settings')).toBeInTheDocument();
+      expect(mockAddToast).toHaveBeenCalledWith({ type: 'error', title: 'Jira returned an error (500).', message: 'Could not sync with updated settings.' });
     });
+  });
+
+  it('keeps the full sync diagnostic in Jira Connection settings', async () => {
+    const diagnostic = 'Jira API error (500): {"errorMessages":["synthetic private diagnostic"]}';
+    const originalGet = mockGet.getMockImplementation();
+    mockGet.mockImplementation((path: string) => path === '/sync/status'
+      ? Promise.resolve({ status: 'error', errorMessage: diagnostic })
+      : originalGet?.(path));
+    render(<TestWrapper><SettingsPage /></TestWrapper>);
+    expect(await screen.findByText(diagnostic)).toBeInTheDocument();
+    expect(screen.getByText('Jira sync is failing')).toBeInTheDocument();
   });
 
   it('saves and syncs without navigating away', async () => {
@@ -653,7 +665,7 @@ describe('SettingsPage', () => {
   });
 
   it('reports when add succeeds but the immediate sync fails', async () => {
-    mockMutateAsync.mockRejectedValueOnce(new Error('Sync unavailable'));
+    mockMutateAsync.mockRejectedValueOnce(new Error('Jira API error (500): {"errorMessages":["private response"]}'));
 
     render(
       <TestWrapper>
@@ -681,7 +693,7 @@ describe('SettingsPage', () => {
       expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({
         type: 'error',
         title: 'Team updated but sync failed',
-        message: 'The membership change was saved, but the immediate sync failed: Sync unavailable',
+        message: 'The membership change was saved. Jira returned an error (500).',
       }));
     });
   });

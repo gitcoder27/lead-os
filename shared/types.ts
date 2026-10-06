@@ -225,6 +225,8 @@ export interface SyncRunResponse {
 
 export interface SyncStatus {
   lastSyncedAt?: string;
+  /** When the workspace's Jira data was last successfully refreshed. */
+  lastSuccessAt?: string;
   status: "idle" | "syncing" | "error";
   issuesSynced?: number;
   errorMessage?: string;

@@ -20,6 +20,7 @@ export function createSyncRouter(syncEngine: SyncEngine): Router {
   router.get("/status", async (req, res, next) => {
     try {
       const latest = await syncEngine.getLastSyncLog(req.auth!.user.workspaceId);
+      const latestSuccess = await syncEngine.getLastSuccessfulSyncLog(req.auth!.user.workspaceId);
       const runtime = syncEngine.getRuntimeStatus(req.auth!.user.workspaceId);
       const autoSyncEnabled = await syncEngine.isAutoSyncEnabled(req.auth!.user.workspaceId);
       const jiraConfigured = await syncEngine.isJiraConfigured(req.auth!.user.workspaceId);
@@ -31,6 +32,7 @@ export function createSyncRouter(syncEngine: SyncEngine): Router {
         : "idle";
       res.json({
         lastSyncedAt: latest?.completedAt,
+        lastSuccessAt: latestSuccess?.completedAt ?? undefined,
         status,
         issuesSynced: latest?.issuesSynced,
         errorMessage: runtime.errorMessage ?? latest?.errorMessage ?? undefined,

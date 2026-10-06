@@ -273,6 +273,19 @@ describe('DefectTable', () => {
       expect(screen.queryByText(/Missing jira_project_key/)).not.toBeInTheDocument();
     });
 
+    it('describes a sync failure in plain language without exposing the Jira response body (WQ-06)', () => {
+      mockSyncStatus = {
+        status: 'error', jiraConfigured: true,
+        errorMessage: 'Jira API error (500): {"errorMessages":["synthetic private diagnostic"]}',
+      };
+      const { container } = renderEmpty();
+
+      expect(screen.getByText('Jira defects could not be refreshed')).toBeInTheDocument();
+      expect(screen.getByText('Jira returned an error (500).')).toBeInTheDocument();
+      expect(container.textContent).not.toContain('{');
+      expect(container.textContent).not.toContain('synthetic private diagnostic');
+    });
+
     it('connected but never synced: says what was tried instead of "clean"', () => {
       mockSyncStatus = { status: 'idle', jiraConfigured: true };
       const onOpenSyncSettings = vi.fn();

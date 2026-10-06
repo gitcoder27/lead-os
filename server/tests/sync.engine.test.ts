@@ -15,6 +15,24 @@ describe("SyncEngine", () => {
     vi.restoreAllMocks();
   });
 
+  it("finds the newest successful run in the requested workspace, ignoring later failures", async () => {
+    const engine = new SyncEngine();
+    const insert = rawDb.prepare("INSERT INTO sync_log (workspace_id, started_at, completed_at, status) VALUES (?, ?, ?, ?)");
+    insert.run("default", "2026-03-10T09:00:00Z", "2026-03-10T09:01:00Z", "success");
+    insert.run("default", "2026-03-11T09:00:00Z", "2026-03-11T09:01:00Z", "success");
+    insert.run("default", "2026-03-12T09:00:00Z", "2026-03-12T09:01:00Z", "error");
+    insert.run("other", "2026-03-12T10:00:00Z", "2026-03-12T10:01:00Z", "success");
+
+    expect(await engine.getLastSuccessfulSyncLog()).toMatchObject({ workspaceId: "default", completedAt: "2026-03-11T09:01:00Z", status: "success" });
+    expect(await engine.getLastSuccessfulSyncLog("other")).toMatchObject({ workspaceId: "other", completedAt: "2026-03-12T10:01:00Z" });
+    expect(await engine.getLastSuccessfulSyncLog("empty")).toBeUndefined();
+  });
+
+  it("returns no successful run when the workspace has only errors or running rows", async () => {
+    rawDb.exec(`INSERT INTO sync_log (started_at, status) VALUES ('2026-03-12T09:00:00Z', 'error'), ('2026-03-12T09:01:00Z', 'running')`);
+    expect(await new SyncEngine().getLastSuccessfulSyncLog()).toBeUndefined();
+  });
+
   it("schedules syncs using the persisted interval", async () => {
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 120_000),

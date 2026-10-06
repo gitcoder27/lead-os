@@ -38,9 +38,22 @@ describe('WorkSyncControls', () => {
     });
     render(<WorkSyncControls />);
 
-    expect(screen.getByText('Sync issue')).toBeInTheDocument();
+    expect(screen.getByText('Sync issue · never synced')).toBeInTheDocument();
     expect(screen.queryByText('Sync off')).not.toBeInTheDocument();
-    expect(screen.getByTitle(/Jira authentication failed \(401\)/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Jira rejected the saved credentials\./)).toBeInTheDocument();
+  });
+
+  it('reports the last successful sync rather than the newer failure time and hides raw diagnostics', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: {
+        status: 'error', lastSuccessAt: new Date(Date.now() - 120_000).toISOString(),
+        lastSyncedAt: new Date().toISOString(), errorMessage: 'Jira API error (500): {"errorMessages":["private response"]}',
+      },
+    });
+    const { container } = render(<WorkSyncControls />);
+    expect(screen.getByText('Sync issue · last good 2 minutes ago')).toBeInTheDocument();
+    expect(screen.getByTitle('Jira returned an error (500).')).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain('private response');
   });
 
   it('hides the sync chip and manual sync when Jira is not connected (docs/56 P2-03)', () => {

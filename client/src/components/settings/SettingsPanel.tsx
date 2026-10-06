@@ -34,6 +34,7 @@ import {
 import { useConfig } from '@/hooks/useConfig';
 import { useSyncStatus } from '@/hooks/useSyncStatus';
 import { useTriggerSync } from '@/hooks/useTriggerSync';
+import { describeSyncError } from '@/lib/sync-error';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
@@ -451,7 +452,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       await triggerSync.mutateAsync();
       addToast({ type: 'success', title: 'Sync triggered with new settings', message: 'Issue sync has started.' });
     } catch (err) {
-      addToast({ type: 'error', title: err instanceof Error ? err.message : 'Sync failed', message: 'Could not sync with updated settings.' });
+      addToast({ type: 'error', title: describeSyncError(err instanceof Error ? err.message : undefined), message: 'Could not sync with updated settings.' });
     }
   };
 
@@ -556,9 +557,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       addToast({
         type: 'error',
         title: 'Team updated but sync failed',
-        message: err instanceof Error
-          ? `The membership change was saved, but the immediate sync failed: ${err.message}`
-          : 'The membership change was saved, but the immediate sync failed.',
+        message: `The membership change was saved. ${describeSyncError(err instanceof Error ? err.message : undefined)}`,
       });
     }
   }, [addToast, invalidateTeamScopeData, triggerSync]);

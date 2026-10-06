@@ -5,6 +5,12 @@ import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssue
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 
+const oneOnOneLazy = vi.hoisted(() => ({ enabled: false, imports: 0 }));
+vi.mock('@/hooks/useOneOnOne', async (original) => ({ ...await original<typeof import('@/hooks/useOneOnOne')>(), useOneOnOneEnabled: () => oneOnOneLazy.enabled }));
+vi.mock('@/components/team-tracker/OneOnOneWorkspace', () => {
+  oneOnOneLazy.imports += 1;
+  return { OneOnOneWorkspace: ({ developerAccountId }: { developerAccountId: string }) => <div>Lazy 1:1 {developerAccountId}</div> };
+});
 let mockPersonCanonical = false;
 vi.mock('@/hooks/useTasksPhase3', () => ({ useTasksPhase3: () => mockPersonCanonical }));
 vi.mock('@/hooks/usePersonCommitments', () => ({ usePersonCommitments: () => ({ data: { tasks: [] }, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() }) }));
@@ -2607,5 +2613,20 @@ describe('describeLatestEvent', () => {
     expect(describeLatestEvent({ ...base, type: 'title', excerpt: 'title' }).text).toBe('Renamed');
     expect(describeLatestEvent({ ...base, type: 'update', excerpt: 'Patch is in review' }).text).toBe('Patch is in review');
     expect(describeLatestEvent({ ...base, type: 'blocker', excerpt: 'API down' })).toEqual({ text: 'Blocker: API down', tone: 'danger' });
+  });
+});
+
+describe('P09 optional 1:1 loading', () => {
+  it('does not import the workspace until both the feature and panel are active', async () => {
+    oneOnOneLazy.enabled = false;
+    const view = render(<TestWrapper><TeamTrackerPage oneOnOnePanel="one-on-one" oneOnOneDeveloperId="dev-1" /></TestWrapper>);
+    expect(oneOnOneLazy.imports).toBe(0);
+    oneOnOneLazy.enabled = true;
+    view.rerender(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    expect(oneOnOneLazy.imports).toBe(0);
+    view.rerender(<TestWrapper><TeamTrackerPage oneOnOnePanel="one-on-one" oneOnOneDeveloperId="dev-1" /></TestWrapper>);
+    expect(await screen.findByText('Lazy 1:1 dev-1')).toBeInTheDocument();
+    expect(oneOnOneLazy.imports).toBe(1);
+    oneOnOneLazy.enabled = false;
   });
 });

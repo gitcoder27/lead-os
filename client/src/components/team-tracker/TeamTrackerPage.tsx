@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { Calendar, ChevronLeft, ChevronRight, History, Keyboard, RefreshCw } from 'lucide-react';
@@ -31,7 +31,7 @@ import { TrackerTaskDetailDrawer } from './TrackerTaskDetailDrawer';
 import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import { StandupMode } from './StandupMode';
 import { OneOnOneSeriesPanel } from './OneOnOneSeriesPanel';
-import { OneOnOneWorkspace } from './OneOnOneWorkspace';
+const OneOnOneWorkspace = lazy(() => import('./OneOnOneWorkspace').then((module) => ({ default: module.OneOnOneWorkspace })));
 import { useOneOnOneEnabled } from '@/hooks/useOneOnOne';
 import type { TeamPanel } from '@/lib/view-params';
 import { StatusRationaleDialog } from './StatusRationaleDialog';
@@ -628,11 +628,13 @@ export function TeamTrackerPage({
           </div>
         ) : oneOnOneEnabled && oneOnOnePanel === 'one-on-one' && oneOnOneDeveloperId ? (
           <div className="mx-auto h-full max-w-[1600px]">
+            <Suspense fallback={<div role="status">Loading 1:1 workspace…</div>}>
             <OneOnOneWorkspace
               developerAccountId={oneOnOneDeveloperId}
               onClose={() => onOneOnOnePanelChange?.(undefined)}
               onOpenTask={(taskKey) => workflow.setSelectedTask({ trackerItemId: null, taskKey })}
             />
+            </Suspense>
           </div>
         ) : isLoading ? (
           <TeamTrackerSkeleton />

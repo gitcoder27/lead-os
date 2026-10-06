@@ -772,3 +772,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P07 | Detail invalidation runs once per affected task/scope, including cached parent/child references; GETs consume AbortSignal. Active observer regression measured 2 → 1 GET per mutation; unrelated details stay fresh and unmount cancels requests. 19 focused frontend tests pass. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P09 — Lazy 1:1 workspace stays behind both existing feature/panel gates; 121 focused Team/1:1 tests pass. Manifest-based static Team closure: 1,680,071 → 1,241,587 bytes raw; 494,303 → 356,127 gzip. Reproduce with a Vite manifest build and scripts/measure-client-bundle.cjs. No shared runtime exports changed.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P09 | Lazy 1:1 workspace stays behind both existing feature/panel gates; 121 focused Team/1:1 tests pass. Manifest-based static Team closure: 1,680,071 → 1,241,587 bytes raw; 494,303 → 356,127 gzip. Reproduce with a Vite manifest build and scripts/measure-client-bundle.cjs. No shared runtime exports changed. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

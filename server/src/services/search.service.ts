@@ -21,7 +21,7 @@ import {
   teamTrackerItems,
   tasks as canonicalTasks,
 } from "../db/schema";
-import { isVisibleWorkIssue } from "./issue-rules";
+import { visibleWorkIssuePredicate } from "./issue-visibility";
 import { DailyNotesService } from "./daily-notes.service";
 import { SettingsService } from "./settings.service";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -155,10 +155,10 @@ export class SearchService {
 
   private async searchIssues(workspaceId: string, pattern: string): Promise<GlobalSearchIssueItem[]> {
     // Search follows the Work board's visibility rules (open, active, in-scope
-    // issues only) so the palette never surfaces closed defects the dashboard
-    // hides. Filtering happens after the LIKE match, so no SQL limit here.
-    const [rows, jiraSyncScopeMode] = await Promise.all([
-      db
+    // issues only). Apply visibility before LIMIT so hidden matches cannot
+    // crowd out the six visible results or allocate historical text rows.
+    const mode = await this.settings.getJiraSyncScopeMode(workspaceId);
+    const rows = await db
         .select({
           jiraKey: issues.jiraKey,
           summary: issues.summary,
@@ -168,15 +168,12 @@ export class SearchService {
           assigneeName: issues.assigneeName,
           dueDate: issues.dueDate,
           updatedAt: issues.updatedAt,
-          excluded: issues.excluded,
-          snoozedUntil: issues.snoozedUntil,
-          teamScopeState: issues.teamScopeState,
-          syncScopeState: issues.syncScopeState,
         })
         .from(issues)
         .where(
           and(
             eq(issues.workspaceId, workspaceId),
+            visibleWorkIssuePredicate(mode),
             or(
               like(issues.jiraKey, pattern),
               like(issues.summary, pattern),
@@ -184,13 +181,10 @@ export class SearchService {
             )
           )
         )
-        .orderBy(desc(issues.updatedAt)),
-      this.settings.getJiraSyncScopeMode(workspaceId),
-    ]);
+        .orderBy(desc(issues.updatedAt))
+        .limit(ISSUE_LIMIT);
 
     return rows
-      .filter((row) => isVisibleWorkIssue(row, jiraSyncScopeMode))
-      .slice(0, ISSUE_LIMIT)
       .map((row) => ({
         jiraKey: row.jiraKey,
         summary: row.summary,

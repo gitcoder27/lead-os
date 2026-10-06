@@ -814,3 +814,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P04 | Indexed correlated latest-visible-event SQL returns summary fields only, preserving canonical/legacy identity, manager/developer/former-owner visibility, redaction, UTF-16 excerpts and timestamp/ID ties. Reuses existing indexes; no schema change. 71 backend service/route tests pass. A 1,002-event synthetic history returns 1 summary row; EXPLAIN confirms the existing task/time index. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P13 — Palette issue search applies equivalent visibility and LIMIT 6 in SQL and projects result fields only. 29 service/route tests cover hidden newest matches, expired/future snoozes, scopes and SQL LIMIT. Substring matching is preserved; FTS is not introduced because the finding is addressed without changing matching semantics (substring scans remain).
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P13 | Palette issue search applies equivalent visibility and LIMIT 6 in SQL and projects result fields only. 29 service/route tests cover hidden newest matches, expired/future snoozes, scopes and SQL LIMIT. Substring matching is preserved; FTS is not introduced because the finding is addressed without changing matching semantics (substring scans remain). Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

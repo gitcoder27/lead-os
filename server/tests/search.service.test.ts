@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
+import { rawDb } from "../src/db/connection";
 import { db, resetDatabase } from "./helpers/db";
 import {
   configTable,
@@ -578,4 +579,22 @@ describe("SearchService.search", () => {
       });
     });
   });
+});
+
+it('P13 applies visibility and SQL LIMIT before materializing common issue matches', async () => {
+  await resetDatabase();
+  for (let i = 0; i < 12; i++) await seedIssue({ jiraKey: `LIMIT-${i}`, summary: 'Common payment term', updatedAt: `2026-03-${String(i + 1).padStart(2, '0')}T00:00:00Z` });
+  for (const [index, patch] of [
+    { statusCategory: 'done' }, { excluded: 1 }, { teamScopeState: 'out_of_team' }, { syncScopeState: 'out_of_scope' },
+    { snoozedUntil: '2999-01-01T00:00:00+05:30' },
+  ].entries()) await seedIssue({ jiraKey: `HIDDEN-${index}`, summary: 'Common payment term', updatedAt: '2999-01-01', ...patch });
+  await seedIssue({ jiraKey: 'EXPIRED', summary: 'Common payment term', updatedAt: '2026-03-13', snoozedUntil: '2000-01-01T00:00:00Z' });
+  const prepare = vi.spyOn(rawDb, 'prepare');
+  const result = await searchService.search('payment');
+  expect(result.issues.map((row) => row.jiraKey)).toEqual(['EXPIRED', 'LIMIT-11', 'LIMIT-10', 'LIMIT-9', 'LIMIT-8', 'LIMIT-7']);
+  const query = prepare.mock.calls.map(([sql]) => sql).find((sql) => sql.includes('from "issues"'))!;
+  expect(query).toContain('limit ?');
+  expect(query).toContain('julianday');
+  expect(query).not.toContain('"description"');
+  prepare.mockRestore();
 });

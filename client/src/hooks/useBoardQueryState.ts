@@ -40,7 +40,7 @@ export function useBoardQueryState(
   addToast: AddToastFn,
   initialQuery?: TeamTrackerBoardQuery,
 ): BoardQueryState {
-  const [boardQuery, setBoardQuery] = useState<TeamTrackerBoardQuery>(initialQuery ?? { sortBy: 'attention' });
+  const [boardQuery, setBoardQuery] = useState<TeamTrackerBoardQuery>(initialQuery ?? { sortBy: 'name' });
   const activeViewSnapshot = useRef<TeamTrackerSavedView | undefined>();
 
   const { data: savedViews, isLoading: isViewsLoading } = useTeamTrackerViews();
@@ -70,8 +70,11 @@ export function useBoardQueryState(
   }, [patchQuery]);
 
   const handleSummaryFilterChange = useCallback((filter: TrackerBoardSummaryFilter) => {
-    patchQuery({ summaryFilter: filter === 'all' ? undefined : filter });
-  }, [patchQuery]);
+    setBoardQuery((prev) => ({
+      ...prev,
+      summaryFilter: filter === 'all' && prev.viewId === undefined ? undefined : filter,
+    }));
+  }, []);
 
   const handleSortChange = useCallback((sortBy: TeamTrackerBoardSort) => {
     patchQuery({ sortBy });
@@ -94,7 +97,7 @@ export function useBoardQueryState(
 
   const handleClearView = useCallback(() => {
     activeViewSnapshot.current = undefined;
-    setBoardQuery({ sortBy: 'attention' });
+    setBoardQuery({ sortBy: 'name' });
   }, []);
 
   const handleSaveNewView = useCallback((name: string) => {

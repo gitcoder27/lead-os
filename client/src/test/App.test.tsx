@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App, { legacyTaskViewRedirect } from '@/App';
 import { api, ApiRequestError } from '@/lib/api';
-import type { TaskResolution } from '@/types';
+import type { TaskResolution, TeamTrackerBoardQuery } from '@/types';
 
 const useBootstrapStateMock = vi.fn();
 const useAuthMock = vi.fn();
@@ -606,6 +606,76 @@ describe('App', () => {
 
     fireEvent.click(screen.getByText('Open Work'));
     expect(await screen.findByText('Work filter: blocked')).toBeInTheDocument();
+  });
+
+  describe('WQ-04 Team URL sorting', () => {
+    beforeEach(() => {
+      useAuthMock.mockReturnValue({ user: { role: 'manager' }, isLoading: false, isAuthenticated: true });
+    });
+
+    const teamProps = () => teamTrackerPropsSpy.mock.calls.at(-1)![0] as {
+      initialBoardQuery: TeamTrackerBoardQuery;
+      urlBoardQuery: TeamTrackerBoardQuery;
+      urlBoardQueryNonce: number;
+      onBoardQueryChange: (query: TeamTrackerBoardQuery) => void;
+      oneOnOnePanel?: string;
+      oneOnOneDeveloperId?: string;
+      initialDeveloperAccountId?: string;
+      initialTaskKey?: string;
+    };
+
+    it.each([
+      ['', undefined, undefined],
+      ['?sort=attention', 'attention', undefined],
+      ['?view=12&sort=name&group=none&filter=all', 'name', 12],
+      ['?view=13&sort=attention', 'attention', 13],
+      ['?view=12', undefined, 12],
+    ])('keeps the Team sort and saved-view inheritance on reload of /team%s', async (search, sortBy, viewId) => {
+      window.history.pushState(null, '', `/team${search}`);
+      const first = render(<App />);
+      await screen.findByText('Team loaded');
+      expect(teamProps().initialBoardQuery).toEqual(expect.objectContaining({ sortBy, viewId }));
+      const initial = teamProps().initialBoardQuery;
+      act(() => teamProps().onBoardQueryChange(initial));
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      expect(new URLSearchParams(window.location.search).get('sort')).toBe(sortBy ?? null);
+      first.unmount();
+      render(<App />);
+      await screen.findByText('Team loaded');
+      expect(teamProps().initialBoardQuery).toEqual(initial);
+    });
+
+    it('debounces query updates and restores Back/Forward with panel and drawer parameters', async () => {
+      window.history.pushState(null, '', '/team?q=release&filter=blocked&sort=name&group=status&view=12&panel=one-on-one&dev=dev-7&task=T-5');
+      render(<App />);
+      await screen.findByText('Team loaded');
+      const initial = teamProps().initialBoardQuery;
+      const length = window.history.length;
+      act(() => teamProps().onBoardQueryChange({ ...initial, sortBy: 'attention', groupBy: 'none', summaryFilter: 'all' }));
+      expect(new URLSearchParams(window.location.search).get('sort')).toBe('name');
+      await waitFor(() => expect(new URLSearchParams(window.location.search).get('sort')).toBe('attention'));
+      expect(window.history.length).toBe(length);
+      const updatedUrl = window.location.pathname + window.location.search;
+      expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+        q: 'release', filter: 'all', sort: 'attention', group: 'none', view: '12',
+        panel: 'one-on-one', dev: 'dev-7', task: 'T-5',
+      });
+
+      act(() => {
+        window.history.pushState(null, '', '/team?sort=blocked_first&dev=dev-2');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await waitFor(() => expect(teamProps().urlBoardQuery.sortBy).toBe('blocked_first'));
+      expect(teamProps().initialDeveloperAccountId).toBe('dev-2');
+      act(() => window.history.back());
+      await waitFor(() => expect(teamProps().urlBoardQuery.sortBy).toBe('attention'));
+      expect(window.location.pathname + window.location.search).toBe(updatedUrl);
+      expect(teamProps()).toEqual(expect.objectContaining({ oneOnOnePanel: 'one-on-one', oneOnOneDeveloperId: 'dev-7', initialTaskKey: 'T-5' }));
+      act(() => window.history.forward());
+      await waitFor(() => expect(teamProps().urlBoardQuery.sortBy).toBe('blocked_first'));
+      expect(new URLSearchParams(window.location.search).get('dev')).toBe('dev-2');
+      expect(teamProps().urlBoardQueryNonce).toBeGreaterThan(1);
+    });
   });
 
   it('redirects /t/:key to the team view with ?task= for delegated tasks', async () => {

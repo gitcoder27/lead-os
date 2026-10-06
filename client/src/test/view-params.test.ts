@@ -47,9 +47,31 @@ describe('dashboardFilterState serialization', () => {
 
 describe('teamBoardQuery serialization', () => {
   it('omits default sort and grouping', () => {
-    expect(teamBoardQueryToSearch({ sortBy: 'attention', q: 'priya', summaryFilter: 'blocked' })).toBe(
+    expect(teamBoardQueryToSearch({ sortBy: 'name', groupBy: 'none', q: 'priya', summaryFilter: 'blocked' })).toBe(
       '?q=priya&filter=blocked',
     );
+  });
+
+  it.each(['attention', 'stale_age', 'load', 'blocked_first'] as const)(
+    'keeps the nondefault %s sort through reload', (sortBy) => {
+      const search = teamBoardQueryToSearch({ sortBy });
+      expect(search).toBe(`?sort=${sortBy}`);
+      expect(teamBoardQueryFromParams(paramsFromSearch(search)).sortBy).toBe(sortBy);
+    },
+  );
+
+  it.each(['name', 'attention'] as const)('retains saved-view overrides including %s', (sortBy) => {
+    const query = { viewId: 12, sortBy, groupBy: 'none' as const, summaryFilter: 'all' as const };
+    const search = teamBoardQueryToSearch(query);
+    expect(search).toBe(`?filter=all&sort=${sortBy}&group=none&view=12`);
+    expect(teamBoardQueryFromParams(paramsFromSearch(search))).toEqual({ ...query, q: undefined });
+  });
+
+  it('leaves absent saved-view overrides absent so the view can supply them', () => {
+    expect(teamBoardQueryToSearch({ viewId: 12 })).toBe('?view=12');
+    expect(teamBoardQueryFromParams(paramsFromSearch('?view=12'))).toEqual({
+      viewId: 12, q: undefined, summaryFilter: undefined, sortBy: undefined, groupBy: undefined,
+    });
   });
 
   it('round-trips a saved-view query', () => {

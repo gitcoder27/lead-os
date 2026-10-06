@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import { TestWrapper } from '@/test/wrapper';
-import type { TeamTrackerBoardResponse, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse, TaskResolution } from '@/types';
+import type { TeamTrackerBoardResponse, TeamTrackerBoardQuery, TeamTrackerSavedView, TrackerDeveloperDay, Issue, TrackerIssueAssignment, TrackerCarryForwardContextResponse, TrackerCarryForwardPreviewResponse, TaskResolution } from '@/types';
 import type { ManagerDeskDayResponse } from '@/types/manager-desk';
 import { formatAbsoluteDateTime } from '@/lib/utils';
+import { teamBoardQueryFromParams, teamBoardQueryToSearch } from '@/lib/view-params';
 
 const oneOnOneLazy = vi.hoisted(() => ({ enabled: false, imports: 0 }));
 vi.mock('@/hooks/useOneOnOne', async (original) => ({ ...await original<typeof import('@/hooks/useOneOnOne')>(), useOneOnOneEnabled: () => oneOnOneLazy.enabled }));
@@ -310,6 +311,16 @@ function buildMockBoard(): TeamTrackerBoardResponse {
 }
 
 let mockBoard: TeamTrackerBoardResponse = buildMockBoard();
+let mockResolveBoardQuery = false;
+let mockSavedViews: TeamTrackerSavedView[] = [];
+const mockBoardQuery = vi.fn();
+const mockSaveView = vi.fn();
+vi.mock('@/hooks/useTeamTrackerViews', () => ({
+  useTeamTrackerViews: () => ({ data: mockSavedViews, isLoading: false }),
+  useCreateTeamTrackerView: () => ({ mutate: mockSaveView, isPending: false }),
+  useUpdateTeamTrackerView: () => ({ mutate: mockSaveView, isPending: false }),
+  useDeleteTeamTrackerView: () => ({ mutate: mockSaveView }),
+}));
 let mockBoardQueryState = {
   isLoading: false,
   isError: false,
@@ -325,14 +336,23 @@ vi.mock('@/hooks/useTeamMode', () => ({
 }));
 
 vi.mock('@/hooks/useTeamTracker', () => ({
-  useTeamTracker: () => ({
-    data: mockBoard,
-    isLoading: mockBoardQueryState.isLoading,
-    isError: mockBoardQueryState.isError,
-    error: mockBoardQueryState.error,
-    isFetching: mockBoardQueryState.isFetching,
-    refetch: mockRefetchBoard,
-  }),
+  useTeamTracker: (_date: string, query: TeamTrackerBoardQuery) => {
+    mockBoardQuery(query);
+    const saved = mockSavedViews.find((view) => view.id === query.viewId);
+    const resolved = {
+      q: query.q ?? saved?.q ?? '', summaryFilter: query.summaryFilter ?? saved?.summaryFilter ?? 'all',
+      sortBy: query.sortBy ?? saved?.sortBy ?? 'name', groupBy: query.groupBy ?? saved?.groupBy ?? 'none',
+      viewId: query.viewId,
+    };
+    return {
+      data: mockResolveBoardQuery ? { ...mockBoard, query: resolved } : mockBoard,
+      isLoading: mockBoardQueryState.isLoading,
+      isError: mockBoardQueryState.isError,
+      error: mockBoardQueryState.error,
+      isFetching: mockBoardQueryState.isFetching,
+      refetch: mockRefetchBoard,
+    };
+  },
   useCarryForwardPreview: () => ({
     data: mockCarryForwardPreviewValue,
     isLoading: false,
@@ -467,6 +487,10 @@ describe('TeamTrackerPage', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T12:00:00.000Z'));
     mockBoard = buildMockBoard();
+    mockResolveBoardQuery = false;
+    mockSavedViews = [];
+    mockBoardQuery.mockClear();
+    mockSaveView.mockClear();
     mockBoardQueryState = {
       isLoading: false,
       isError: false,
@@ -523,6 +547,77 @@ describe('TeamTrackerPage', () => {
       </TestWrapper>
     );
     expect(screen.getByRole('heading', { name: 'Team' })).toBeInTheDocument();
+  });
+
+  describe('WQ-04 Team defaults and saved-view reloads', () => {
+    beforeEach(() => { mockResolveBoardQuery = true; });
+
+    const expectSort = (label: string) => {
+      const toggle = screen.getByTitle(new RegExp(`^Sort: ${label} ·`));
+      if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+      expect(screen.getByRole('radio', { name: label, exact: true })).toHaveAttribute('aria-checked', 'true');
+    };
+
+    it('opens a bare Team URL with Name and keeps an explicit Attention choice on reload', () => {
+      const first = render(<TestWrapper><TeamTrackerPage initialBoardQuery={teamBoardQueryFromParams(new URLSearchParams())} /></TestWrapper>);
+      expect(mockBoardQuery.mock.calls.at(-1)![0].sortBy).toBeUndefined();
+      expectSort('Name');
+      fireEvent.click(screen.getByRole('radio', { name: 'Attention', exact: true }));
+      expectSort('Attention');
+      const query = mockBoardQuery.mock.calls.at(-1)![0] as TeamTrackerBoardQuery;
+      const search = teamBoardQueryToSearch(query);
+      expect(search).toBe('?sort=attention');
+      first.unmount();
+      window.history.replaceState(null, '', `/team${search}`);
+      render(<TestWrapper><TeamTrackerPage initialBoardQuery={teamBoardQueryFromParams(new URLSearchParams(search))} /></TestWrapper>);
+      expectSort('Attention');
+      const roster = document.querySelectorAll('[data-roster-row]');
+      expect(roster[0]).toHaveTextContent('Bob Jones');
+      expect(roster[1]).toHaveTextContent('Alice Smith');
+    });
+
+    it.each([
+      ['attention', 'name', 'Name'], ['name', 'attention', 'Attention'],
+    ] as const)('keeps saved %s overridden to %s, All and no grouping on reload', (inherited, override, label) => {
+      mockSavedViews = [{
+        id: 12, name: 'Saved team', q: '', summaryFilter: 'blocked', sortBy: inherited,
+        groupBy: 'status', createdAt: '2026-03-07T08:00:00Z', updatedAt: '2026-03-07T08:00:00Z',
+      }];
+      const original = { ...mockSavedViews[0]! };
+      const first = render(<TestWrapper><TeamTrackerPage initialBoardQuery={{ viewId: 12 }} /></TestWrapper>);
+      expectSort(inherited === 'name' ? 'Name' : 'Attention');
+      fireEvent.click(screen.getByRole('radio', { name: label, exact: true }));
+      fireEvent.click(screen.getByRole('radio', { name: 'No grouping' }));
+      fireEvent.click(screen.getByRole('button', { name: /2 total/i }));
+      const query = mockBoardQuery.mock.calls.at(-1)![0] as TeamTrackerBoardQuery;
+      expect(query).toEqual({ viewId: 12, sortBy: override, groupBy: 'none', summaryFilter: 'all' });
+      const search = teamBoardQueryToSearch(query);
+      expect(search).toContain(`sort=${override}`);
+      expect(search).toContain('group=none');
+      expect(search).toContain('filter=all');
+      first.unmount();
+      render(<TestWrapper><TeamTrackerPage initialBoardQuery={teamBoardQueryFromParams(new URLSearchParams(search))} /></TestWrapper>);
+      expectSort(label);
+      expect(screen.getByRole('radio', { name: 'No grouping' })).toHaveAttribute('aria-checked', 'true');
+      const roster = document.querySelectorAll('[data-roster-row]');
+      expect(roster[0]).toHaveTextContent(override === 'name' ? 'Alice Smith' : 'Bob Jones');
+      expect(mockSavedViews[0]).toEqual(original);
+      expect(mockSaveView).not.toHaveBeenCalled();
+    });
+
+    it('Clear view returns a saved Attention view to Name and clears its filters', () => {
+      mockSavedViews = [{
+        id: 12, name: 'Saved team', q: 'release', summaryFilter: 'blocked', sortBy: 'attention',
+        groupBy: 'status', createdAt: '2026-03-07T08:00:00Z', updatedAt: '2026-03-07T08:00:00Z',
+      }];
+      render(<TestWrapper><TeamTrackerPage initialBoardQuery={{ viewId: 12 }} /></TestWrapper>);
+      fireEvent.click(screen.getByRole('button', { name: 'Saved team' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear view' }));
+      expect(mockBoardQuery).toHaveBeenLastCalledWith({ sortBy: 'name' });
+      expectSort('Name');
+      expect(teamBoardQueryToSearch(mockBoardQuery.mock.calls.at(-1)![0])).toBe('');
+      expect(screen.getByLabelText('Search team')).toHaveValue('');
+    });
   });
 
   it('does not hardcode a dark native color scheme on the board date input', () => {

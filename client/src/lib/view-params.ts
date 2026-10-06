@@ -106,8 +106,9 @@ export function teamBoardQueryToParams(query: TeamTrackerBoardQuery): Record<str
   return {
     q: query.q || undefined,
     filter: query.summaryFilter,
-    sort: query.sortBy !== 'attention' ? query.sortBy : undefined,
-    group: query.groupBy !== 'none' ? query.groupBy : undefined,
+    // Saved-view overrides must stay explicit; absence means inherit.
+    sort: query.viewId !== undefined || query.sortBy !== 'name' ? query.sortBy : undefined,
+    group: query.viewId !== undefined || query.groupBy !== 'none' ? query.groupBy : undefined,
     view: query.viewId !== undefined ? String(query.viewId) : undefined,
   };
 }

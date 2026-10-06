@@ -425,7 +425,11 @@ export class TaskViewsService {
       if (filters.withClosed.from) inRange.push(gte(closedDate, shiftDays(filters.withClosed.from, -1)));
       if (filters.withClosed.to) inRange.push(lte(closedDate, shiftDays(filters.withClosed.to, 1)));
       conditions.push(or(isNull(tasks.closedAt), and(...inRange))!);
-    } else if (filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
+    } else if (filters.jiraDrift === true || filters.attention?.includes("drift")) {
+      // Drift compares the stored UTC date and has no upper bound. Keep the
+      // same inclusive floor here, before event/link/DTO hydration.
+      conditions.push(or(isNull(tasks.closedAt), gte(sql`substr(${tasks.closedAt}, 1, 10)`, shiftDays(today, -JIRA_DRIFT_CLOSED_WINDOW_DAYS)))!);
+    } else {
       conditions.push(isNull(tasks.closedAt));
     }
     return db.select().from(tasks).where(and(...conditions));

@@ -784,3 +784,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P10 | App overlays load on first use with local Suspense boundaries; the task drawer remains mounted after closing, preserving its existing state lifecycle. 175 focused App/palette/capture/drawer tests pass. Static entry closure: 932,795 → 756,866 bytes raw; 277,055 → 228,454 gzip (18.9% / 17.5% reduction). No shared runtime exports changed. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P05 — Needs attention/drift SQL now selects open tasks and the inclusive seven-day UTC closed window before event/link hydration; explicit closed and withClosed ranges keep their timezone bounds. 34 backend service/route tests pass, covering cutoff, future rows and historical closed views.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P05 | Needs attention/drift SQL now selects open tasks and the inclusive seven-day UTC closed window before event/link hydration; explicit closed and withClosed ranges keep their timezone bounds. 34 backend service/route tests pass, covering cutoff, future rows and historical closed views. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

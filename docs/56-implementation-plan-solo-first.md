@@ -834,3 +834,18 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | 2026-10-06 | P12 | Download-copy session deletion and VACUUM run in a worker with one global rewrite slot, timeout/error handling, and temporary cleanup on failure/completion/disconnect. 18 focused service/route tests pass, including session bytes, event-loop responsiveness, concurrency, worker failure and an already-disconnected response. Synthetic 46,104,576-byte snapshot: maximum 5 ms timer gap 982.9 → 34.8 ms; job duration 977.5 → 1,202.5 ms (worker overhead; responsiveness improves). Reproduce with scripts/benchmark-backup-sanitizer.cjs. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
 
 Final Medium-finding regression: all **1,526 backend / 1,878 frontend tests** pass. Typecheck, lint (0 errors), build checks, data guard and diff whitespace checks pass. Each finding has its own commit and focused tests. The requested format check reports only unchanged local `.claude/settings.local.json`. Existing untracked screenshots remain untouched.
+
+## Workspace reliability and usability (docs/70)
+
+Scope, acceptance criteria and verification commands: [implementation plan](70-workspace-quality-implementation-plan.md). Implement sequentially; after each item show changes/results and stop for user confirmation before continuing. The planning step does not start application implementation.
+
+- [x] WQ-00 — Record the five-item implementation plan.
+- [ ] WQ-01 — Resilient theme storage and device preference.
+- [ ] WQ-02 — Reliable, accessible palette search with Retry.
+- [ ] WQ-03 — Visible bulk Priority and Check-by actions in Tasks.
+- [ ] WQ-04 — Consistent Team defaults and URL sorting.
+- [ ] WQ-05 — Global and page keyboard help, including phones.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | WQ-00 | Created docs/70 with current-code evidence, scoped files, acceptance criteria, focused tests and completion gates for all five selected improvements. Relative document links, five-item tracker coverage and diff whitespace checks pass. Documentation only; application implementation has not started. No runtime data, external services, Jira, push or deployment. |

@@ -9,8 +9,7 @@ import { AssistantProvider } from '@/context/AssistantContext';
 import { useBootstrapState } from '@/hooks/useBootstrapState';
 import { useSyncRefreshCoordinator } from '@/hooks/useSyncRefreshCoordinator';
 import { TodayPage } from '@/components/today/TodayPage';
-import { GlobalCaptureDialog, type GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
-import { CommandPalette } from '@/components/palette/CommandPalette';
+import type { GlobalCaptureContext } from '@/components/capture/GlobalCaptureDialog';
 import { DEFAULT_DASHBOARD_FILTER_STATE, type DashboardFilterState } from '@/components/layout/dashboard-state';
 import {
   dashboardFilterStateFromParams,
@@ -38,7 +37,6 @@ import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { TaskLinkResolver } from '@/components/tasks/TaskLinkResolver';
-import { TaskDrawer } from '@/components/tasks/TaskDrawer';
 import type { DailyNoteKind, TaskResolution, TeamTrackerBoardQuery, TodayActionTarget } from '@/types';
 
 export type CanonicalAppView = 'today' | 'work' | 'team' | 'desk' | 'notes' | 'my-day' | 'settings';
@@ -48,6 +46,10 @@ export type ActiveAppView = AppView | 'not-found' | 'task';
 type ResolvedAppView = CanonicalAppView | 'not-found' | 'task';
 
 const TASK_LINK_PATH_PATTERN = /^\/t\/([Tt]-\d{1,9})\/?$/;
+
+const GlobalCaptureDialog = lazy(() => import('@/components/capture/GlobalCaptureDialog').then((module) => ({ default: module.GlobalCaptureDialog })));
+const CommandPalette = lazy(() => import('@/components/palette/CommandPalette').then((module) => ({ default: module.CommandPalette })));
+const TaskDrawer = lazy(() => import('@/components/tasks/TaskDrawer').then((module) => ({ default: module.TaskDrawer })));
 
 const loadTeamTrackerPage = () => import('@/components/team-tracker/TeamTrackerPage');
 const loadDashboardLayout = () => import('@/components/layout/DashboardLayout');
@@ -1329,6 +1331,7 @@ function AppContent() {
       >
         {renderActiveView()}
         {isAuthenticatedManager && captureOpen && (
+          <Suspense fallback={null}>
           <GlobalCaptureDialog
             onClose={() => setCaptureOpen(false)}
             onOpenManagerDesk={() => handleViewChange('desk')}
@@ -1336,17 +1339,22 @@ function AppContent() {
             onOpenNotes={(targetDate) => handleOpenNotes(targetDate)}
             context={{ ...captureContext, defaultTarget: captureContext.defaultTarget ?? defaultCaptureTarget }}
           />
+          </Suspense>
         )}
         {isAuthenticatedManager && paletteOpen && (
+          <Suspense fallback={null}>
           <CommandPalette
             onClose={() => setPaletteOpen(false)}
             onOpenTarget={handleOpenTodayTarget}
             onViewChange={handleViewChange}
           />
+          </Suspense>
         )}
         {/* docs/54 J1: one task drawer for in-app "open T-n" from Today, ⌘K and Copilot. */}
         {isAuthenticatedManager && (globalTaskKey || globalTaskDrawerUsed.current) && (
+          <Suspense fallback={null}>
           <TaskDrawer taskKey={globalTaskKey} onClose={() => setGlobalTaskKey(null)} onNavigateTask={setGlobalTaskKey} />
+          </Suspense>
         )}
         {isAuthenticatedManager && (
           <Suspense fallback={null}>

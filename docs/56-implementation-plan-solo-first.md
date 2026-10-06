@@ -778,3 +778,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P09 | Lazy 1:1 workspace stays behind both existing feature/panel gates; 121 focused Team/1:1 tests pass. Manifest-based static Team closure: 1,680,071 → 1,241,587 bytes raw; 494,303 → 356,127 gzip. Reproduce with a Vite manifest build and scripts/measure-client-bundle.cjs. No shared runtime exports changed. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P10 — App overlays load on first use with local Suspense boundaries; the task drawer remains mounted after closing, preserving its existing state lifecycle. 175 focused App/palette/capture/drawer tests pass. Static entry closure: 932,795 → 756,866 bytes raw; 277,055 → 228,454 gzip (18.9% / 17.5% reduction). No shared runtime exports changed.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P10 | App overlays load on first use with local Suspense boundaries; the task drawer remains mounted after closing, preserving its existing state lifecycle. 175 focused App/palette/capture/drawer tests pass. Static entry closure: 932,795 → 756,866 bytes raw; 277,055 → 228,454 gzip (18.9% / 17.5% reduction). No shared runtime exports changed. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

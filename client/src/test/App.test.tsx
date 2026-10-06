@@ -136,9 +136,9 @@ vi.mock('@/components/tasks/TaskPage', () => ({
 
 const taskDrawerPropsSpy = vi.fn();
 vi.mock('@/components/tasks/TaskDrawer', () => ({
-  TaskDrawer: (props: { taskKey: string | null }) => {
+  TaskDrawer: (props: { taskKey: string | null; onClose: () => void }) => {
     taskDrawerPropsSpy(props);
-    return props.taskKey ? <div role="dialog" aria-label={`Task ${props.taskKey}`}>drawer</div> : null;
+    return props.taskKey ? <div role="dialog" aria-label={`Task ${props.taskKey}`}>drawer<button onClick={props.onClose}>Close task drawer</button></div> : null;
   },
   navigateToTaskPage: vi.fn(),
 }));
@@ -745,6 +745,7 @@ describe('App', () => {
 
     render(<App />);
     expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    expect(taskDrawerPropsSpy).not.toHaveBeenCalled();
     const onOpenTodayTarget = todayPagePropsSpy.mock.calls.at(-1)?.[0]?.onOpenTodayTarget as
       | ((target: import('@/types').TodayActionTarget) => void)
       | undefined;
@@ -946,5 +947,10 @@ describe('App', () => {
     // Today keeps its place — no navigation to the owner's surface.
     expect(window.location.pathname).toBe('/');
     expect(screen.getByText('Today loaded')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close task drawer' }));
+    expect(screen.queryByRole('dialog', { name: 'Task T-5' })).not.toBeInTheDocument();
+    expect(taskDrawerPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({ taskKey: null }));
+    act(() => onOpenTodayTarget({ type: 'tracker_item', view: 'team', taskKey: 'T-6', trackerItemId: 11 }));
+    expect(await screen.findByRole('dialog', { name: 'Task T-6' })).toBeInTheDocument();
   });
 });

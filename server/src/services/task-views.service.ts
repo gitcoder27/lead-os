@@ -91,8 +91,7 @@ function daysBetween(from: string, to: string): number {
  * docs/49 D1: the plan date is the earlier of `scheduledOn` and the local
  * date of `dueAt`. A tie counts as the deadline so it drives the overdue tone.
  */
-export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">, timeZone?: string): { date: string | null; source: "due" | "scheduled" | null } {
-  const due = isoDatePart(row.dueAt, timeZone) ?? null;
+export function taskPlanDate(row: Pick<TaskRow, "scheduledOn" | "dueAt">, timeZone?: string, due = isoDatePart(row.dueAt, timeZone) ?? null): { date: string | null; source: "due" | "scheduled" | null } {
   const scheduled = row.scheduledOn;
   if (due && (!scheduled || due <= scheduled)) return { date: due, source: "due" };
   if (scheduled) return { date: scheduled, source: "scheduled" };
@@ -137,16 +136,43 @@ interface RowFacts {
   placements?: Map<number, TaskPlacementContext>;
 }
 
-export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string): TaskSignals {
+interface RowDates {
+  plan: ReturnType<typeof taskPlanDate>;
+  dueDate: string | null;
+  lastActivity: string;
+  followUpDate: string | undefined;
+  waitingSince: string | undefined;
+  closedDate: string | undefined;
+}
+
+interface PreparedRow extends RowDates {
+  signals: TaskSignals;
+  labels: string[];
+  lane: TaskLane;
+  waiting: boolean;
+  planKey: string;
+}
+
+function rowDates(row: TaskRow, facts: RowFacts, tz?: string): RowDates {
+  const dueDate = isoDatePart(row.dueAt, tz) ?? null;
+  return {
+    plan: taskPlanDate(row, tz, dueDate),
+    dueDate,
+    lastActivity: isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!,
+    followUpDate: isoDatePart(row.followUpAt, tz),
+    waitingSince: isoDatePart(row.waitingSince, tz),
+    closedDate: isoDatePart(row.closedAt, tz),
+  };
+}
+
+export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: string, dates = rowDates(row, facts, tz)): TaskSignals {
   const open = OPEN_STATUSES.has(row.status);
-  const plan = taskPlanDate(row, tz);
+  const { plan, lastActivity, followUpDate, waitingSince } = dates;
   // docs/56 UX-08: a meeting is never overdue — a past one without an outcome "needs outcome" instead.
   const overdue = open && row.kind !== "meeting" && plan.date !== null && plan.date < today;
-  const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
   const idleDays = daysBetween(lastActivity, today);
   const stale = open && idleDays >= TASK_STALE_DAYS;
-  const followUpDate = isoDatePart(row.followUpAt, tz);
-  const waitingSince = isoDatePart(row.waitingSince, tz);
+
   return {
     overdue,
     overdueDays: overdue ? daysBetween(plan.date!, today) : null,
@@ -160,8 +186,8 @@ export function taskSignals(row: TaskRow, facts: RowFacts, today: string, tz?: s
   };
 }
 
-function followUpMatch(row: TaskRow): boolean {
-  return row.followUpAt !== null || labelsOf(row).includes(FOLLOW_UP_LABEL);
+function followUpMatch(row: TaskRow, labels = labelsOf(row)): boolean {
+  return row.followUpAt !== null || labels.includes(FOLLOW_UP_LABEL);
 }
 
 /** Every id that is "me": the login, and the roster record the manager marked as theirs. */
@@ -188,11 +214,11 @@ function selfOwned(row: TaskRow, principal: TaskPrincipal): boolean {
  * - legacy (docs/51 F1), so existing data keeps showing: blocked, the
  *   `kind:waiting` label, or a follow-up on somebody else's task.
  */
-function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSignals): boolean {
+function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSignals, labels = labelsOf(row)): boolean {
   if (hasVisibleWaitingOn(row, principal)) return true;
-  if (row.status === "blocked" || labelsOf(row).includes(WAITING_LABEL)) return true;
+  if (row.status === "blocked" || labels.includes(WAITING_LABEL)) return true;
   const othersTask = row.ownerType !== null && !selfOwned(row, principal);
-  if (followUpMatch(row) && othersTask) return true;
+  if (followUpMatch(row, labels) && othersTask) return true;
   const delegated = row.ownerType === "developer" && othersTask && row.trackedByManagerId === principal.accountId;
   return delegated && (signals.followUpDue || signals.stale);
 }
@@ -206,9 +232,9 @@ function waitingMatch(row: TaskRow, principal: TaskPrincipal, signals: TaskSigna
 export function matchesTaskViewFilters(
   row: TaskRow,
   filters: TaskViewFilters,
-  context: { principal: TaskPrincipal; today: string; facts: RowFacts; signals: TaskSignals; tz?: string },
+  context: { principal: TaskPrincipal; today: string; facts: RowFacts; signals: TaskSignals; tz?: string; prepared?: PreparedRow },
 ): boolean {
-  const { principal, today, facts, signals, tz } = context;
+  const { principal, today, facts, signals, tz, prepared } = context;
   if (row.deletedAt) return false;
   const placement = facts.placements?.get(row.id);
   if (filters.project !== undefined && (filters.project === "none" ? Boolean(placement) : placement?.projectId !== filters.project)) return false;
@@ -235,41 +261,41 @@ export function matchesTaskViewFilters(
     if (filters.scheduled.to && row.scheduledOn > filters.scheduled.to) return false;
   }
   if (filters.linkedJira !== undefined && (facts.jiraLinked?.has(row.id) ?? false) !== filters.linkedJira) return false;
-  if (filters.followUp !== undefined && followUpMatch(row) !== filters.followUp) return false;
+  if (filters.followUp !== undefined && followUpMatch(row, prepared?.labels) !== filters.followUp) return false;
   // Closed tasks are only reachable through a bounded closed range (§5.2) or
   // the drift signal's own 7-day window (§8.1).
   if (filters.closed) {
     if (!row.closedAt) return false;
     // docs/51 F6: the local close date, not the UTC slice — same convention
     // as `dueAt` bucketing via isoDatePart.
-    const closedDate = isoDatePart(row.closedAt, tz)!;
+    const closedDate = (prepared ? prepared.closedDate : isoDatePart(row.closedAt, tz))!;
     if (filters.closed.from && closedDate < filters.closed.from) return false;
     if (filters.closed.to && closedDate > filters.closed.to) return false;
   } else if (filters.withClosed && row.closedAt) {
     // Open rows always match; a closed row only inside the bounded range.
-    const closedDate = isoDatePart(row.closedAt, tz)!;
+    const closedDate = (prepared ? prepared.closedDate : isoDatePart(row.closedAt, tz))!;
     if (filters.withClosed.from && closedDate < filters.withClosed.from) return false;
     if (filters.withClosed.to && closedDate > filters.withClosed.to) return false;
   } else if (row.closedAt && filters.jiraDrift !== true && !filters.attention?.includes("drift")) {
     return false;
   }
   if (filters.labels?.length) {
-    const labels = labelsOf(row);
+    const labels = prepared?.labels ?? labelsOf(row);
     if (!filters.labels.every((label) => labels.includes(label))) return false;
   }
   if (filters.jiraDrift !== undefined && signals.drift !== filters.jiraDrift) return false;
   if (filters.staleDays !== undefined) {
-    const lastActivity = isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
+    const lastActivity = prepared?.lastActivity ?? isoDatePart(facts.lastActivity.get(row.id) ?? row.updatedAt, tz)!;
     if (lastActivity > shiftDays(today, -filters.staleDays)) return false;
   }
-  if (filters.lane && taskRowLane(row, today, principal, tz) !== filters.lane) return false;
+  if (filters.lane && (prepared?.lane ?? taskRowLane(row, today, principal, tz)) !== filters.lane) return false;
   if (filters.horizon) {
-    const plan = taskPlanDate(row, tz).date;
+    const plan = prepared ? prepared.plan.date : taskPlanDate(row, tz).date;
     if (!plan) return false;
     if (filters.horizon === "today" ? plan > today : plan <= today) return false;
   }
   if (filters.waitingOn !== undefined && hasVisibleWaitingOn(row, principal) !== filters.waitingOn) return false;
-  if (filters.waiting !== undefined && waitingMatch(row, principal, signals) !== filters.waiting) return false;
+  if (filters.waiting !== undefined && (prepared?.waiting ?? waitingMatch(row, principal, signals)) !== filters.waiting) return false;
   if (filters.attention?.length) {
     // docs/51 F2: the stale signal only applies to manager-owned and inbox
     // tasks — idle developer-owned work is the Team page's job.
@@ -280,8 +306,8 @@ export function matchesTaskViewFilters(
   return true;
 }
 
-function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"], tz?: string): TaskRow[] {
-  const planKey = (row: TaskRow) => taskPlanDate(row, tz).date ?? "9999-12-31";
+function sortRows(rows: TaskRow[], sort: TaskViewDefinition["sort"], prepared: Map<number, PreparedRow>): TaskRow[] {
+  const planKey = (row: TaskRow) => prepared.get(row.id)!.planKey;
   // docs/51 F7: inside a plan-date bucket a manual rank wins; rows that were
   // never ordered (NULL) keep their startsAt/createdAt order after it.
   const byPosition = (a: TaskRow, b: TaskRow) => {
@@ -424,20 +450,34 @@ export class TaskViewsService {
     };
   }
 
-  private matching(principal: TaskPrincipal, rows: TaskRow[], definition: TaskViewDefinition, facts: RowFacts, today: string, tz?: string) {
+  private prepare(principal: TaskPrincipal, rows: TaskRow[], facts: RowFacts, today: string, tz?: string, prepared = new Map<number, PreparedRow>()) {
+    for (const row of rows) {
+      if (prepared.has(row.id)) continue;
+      const dates = rowDates(row, facts, tz);
+      const signals = taskSignals(row, facts, today, tz, dates);
+      const labels = labelsOf(row);
+      const lane = taskLane({ status: row.status, later: row.later === 1, hideUntil: row.hideUntil,
+        scheduledOn: row.scheduledOn, dueDate: dates.dueDate, ownerType: row.ownerType,
+        needsTriage: row.needsTriage === 1, waiting: hasVisibleWaitingOn(row, principal) }, today);
+      prepared.set(row.id, { ...dates, signals, labels, lane, waiting: waitingMatch(row, principal, signals, labels), planKey: dates.plan.date ?? "9999-12-31" });
+    }
+    return prepared;
+  }
+
+  private matching(principal: TaskPrincipal, rows: TaskRow[], definition: TaskViewDefinition, facts: RowFacts, today: string, tz?: string, prepared = this.prepare(principal, rows, facts, today, tz)) {
     const filters = definition.filters ?? {};
     const matched: { row: TaskRow; signals: TaskSignals }[] = [];
     for (const row of rows) {
-      const signals = taskSignals(row, facts, today, tz);
-      if (matchesTaskViewFilters(row, filters, { principal, today, facts, signals, tz })) matched.push({ row, signals });
+      const signals = prepared.get(row.id)!.signals;
+      if (matchesTaskViewFilters(row, filters, { principal, today, facts, signals, tz, prepared: prepared.get(row.id)! })) matched.push({ row, signals });
     }
     return matched;
   }
 
-  private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string, tz?: string) {
+  private async evaluate(principal: TaskPrincipal, definition: TaskViewDefinition, today: string, tz?: string, prepared = new Map<number, PreparedRow>()) {
     const rows = await this.candidateRows(principal, definition.filters ?? {}, today);
     const facts = await this.facts(principal, rows, today, needsJiraLinks([definition]));
-    return this.matching(principal, rows, definition, facts, today, tz);
+    return this.matching(principal, rows, definition, facts, today, tz, this.prepare(principal, rows, facts, today, tz, prepared));
   }
 
   /**
@@ -446,7 +486,8 @@ export class TaskViewsService {
    */
   async run(viewer: TaskPrincipal, definition: TaskViewDefinition, today = todayIsoDate(), tz?: string, agendaTaskIds?: ReadonlySet<number>): Promise<TaskViewTask[]> {
     const principal = await this.withSelf(viewer);
-    const matched = await this.evaluate(principal, definition, today, tz);
+    const prepared = new Map<number, PreparedRow>();
+    const matched = await this.evaluate(principal, definition, today, tz, prepared);
     const signalsById = new Map(matched.map((entry) => [entry.row.id, entry.signals]));
     // docs/57 §4 (P3-06): a meeting's action items are its child tasks — count them in one query.
     const meetingIds = matched.map((entry) => entry.row.id);
@@ -463,7 +504,7 @@ export class TaskViewsService {
       }
       for (const [id, actions] of byParent) if (actions.total || matched.find((entry) => entry.row.id === id)?.row.kind === "meeting") signalsById.get(id)!.actions = actions;
     }
-    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, tz);
+    const sorted = sortRows(matched.map((entry) => entry.row), definition.sort, prepared);
     const dtos = (await this.taskService.toDtos(sorted, principal)) as ManagerTask[];
     const agendaIds = agendaTaskIds ?? await oneOnOneTaskIds(principal.workspaceId);
     return dtos.map((dto) => ({ ...dto, signals: signalsById.get(dto.id)!, ...(agendaIds.has(dto.id) && { oneOnOne: true as const }) }));
@@ -496,12 +537,13 @@ export class TaskViewsService {
       sql`(${tasks.closedAt} IS NULL OR substr(${tasks.closedAt}, 1, 10) >= ${shiftDays(closedFloor, -1)})`,
     ));
     const facts = await this.facts(principal, universe, today, needsJiraLinks(views.map((view) => view.definition)));
+    const prepared = this.prepare(principal, universe, facts, today, tz);
     const counts: Record<string, TaskViewCount> = {};
     for (const view of views) {
       const closed = view.definition.filters?.closed;
       const matched = closed && !closed.from
-        ? await this.evaluate(principal, view.definition, today, tz)
-        : this.matching(principal, universe, view.definition, facts, today, tz);
+        ? await this.evaluate(principal, view.definition, today, tz, prepared)
+        : this.matching(principal, universe, view.definition, facts, today, tz, prepared);
       counts[view.id] = {
         count: matched.length,
         overdue: matched.filter((entry) => entry.signals.overdue).length,

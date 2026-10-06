@@ -13,6 +13,7 @@ import { AuthService, serializeSessionCookie } from "../src/services/auth.servic
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
 import { todayIsoDate } from "../src/utils/date";
+import * as dateUtils from "../src/utils/date";
 
 const auth = new AuthService();
 const keys = new TaskKeysService();
@@ -436,4 +437,46 @@ describe("GET /api/tasks?viewDef (P3-D9)", () => {
     expect(await counts("Asia/Tokyo")).toBe(0);
     expect(await counts("Pacific/Honolulu")).toBe(1);
   });
+});
+
+
+it("keeps all nine built-in lists, signals and rail counts aligned in different zones (P01)", async () => {
+  await enablePhase3();
+  const headers = { cookie: await cookie("manager-a") };
+  await createTask(headers, { title: "Planned", scheduledOn: "2026-10-06", priority: "high" });
+  await createTask(headers, { title: "Inbox", ownerType: null, ownerId: null, scheduledOn: null });
+  await createTask(headers, { title: "Waiting", scheduledOn: null, waitingOn: { type: "text", label: "Reply" }, followUpAt: "2026-10-06T01:00:00Z" });
+  await createTask(headers, { title: "Meeting", kind: "meeting", scheduledOn: "2026-10-06" });
+  await createTask(headers, { title: "Later", later: true, hideUntil: "2026-11-01", scheduledOn: null });
+  await createTask(headers, { title: "Boundary", dueAt: "2026-10-06T01:00:00Z", scheduledOn: null });
+  await createTask(headers, { title: "Closed", status: "done" });
+  await db.update(tasks).set({ updatedAt: "2026-10-06T01:00:00Z" });
+  await db.update(tasks).set({ closedAt: "2026-10-06T01:00:00Z" }).where(eq(tasks.title, "Closed"));
+  for (const tz of ["UTC", "Pacific/Honolulu", "Asia/Tokyo"]) {
+    const suffix = `today=2026-10-06&tz=${encodeURIComponent(tz)}`;
+    const views = (await invoke(app, { method: "GET", url: `/api/task-views?${suffix}`, headers })).body.views;
+    const conversions = vi.spyOn(dateUtils, "isoDatePart");
+    const counts = (await invoke(app, { method: "GET", url: `/api/tasks/view-counts?${suffix}`, headers })).body.counts;
+    expect(conversions.mock.calls.length).toBeLessThanOrEqual(50);
+    conversions.mockRestore();
+    const titles: Record<string, string[]> = {};
+    for (const view of views) {
+      const list = (await invoke(app, { method: "GET", url: `/api/tasks?viewDef=${encodeViewDef(view.definition)}&${suffix}`, headers })).body.tasks;
+      titles[view.id] = list.map((task: { title: string }) => task.title).sort();
+      expect(counts[view.id]).toEqual({
+        count: list.length,
+        overdue: list.filter((task: { signals: { overdue: boolean } }) => task.signals.overdue).length,
+        missed: list.filter((task: { signals: { overdue: boolean; overdueSource: string } }) => task.signals.overdue && task.signals.overdueSource === "due").length,
+      });
+    }
+    expect(titles.today).toEqual(["Boundary", "Meeting", "Planned"]);
+    expect(titles.inbox).toEqual(["Inbox"]);
+    expect(titles["my-tasks"]).toEqual(["Boundary", "Meeting", "Planned", "Waiting"]);
+    expect(titles.waiting).toEqual(["Waiting"]);
+    expect(titles.meetings).toEqual(["Meeting"]);
+    expect(titles.later).toEqual(["Later"]);
+    expect(titles["high-priority"]).toEqual(["Planned"]);
+    expect(titles.attention).toEqual(tz === "Pacific/Honolulu" ? ["Boundary"] : []);
+    expect(titles["closed-week"]).toEqual(["Closed"]);
+  }
 });

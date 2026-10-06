@@ -1,11 +1,20 @@
-function formatIsoDate(date: Date, timeZone?: string): string {
+const dateFormatters = new Map<string | undefined, Intl.DateTimeFormat>();
+
+function formatterFor(timeZone?: string): Intl.DateTimeFormat {
+  const cached = dateFormatters.get(timeZone);
+  if (cached) return cached;
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  const parts = formatter.formatToParts(date);
+  dateFormatters.set(timeZone, formatter);
+  return formatter;
+}
+
+function formatIsoDate(date: Date, timeZone?: string): string {
+  const parts = formatterFor(timeZone).formatToParts(date);
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
   const day = parts.find((part) => part.type === "day")?.value;

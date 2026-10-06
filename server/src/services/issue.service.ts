@@ -1,8 +1,10 @@
+import { visibleWorkIssuePredicate } from "./issue-visibility";
 import { listPage, listPageSchema, type ListPageRequest } from "./list-page";
 import { HttpError } from '../middleware/errorHandler';
 import { IssueExecutionService, type JiraMutationClient } from './jira-execution.service';
-import { and, desc, eq, ne, or, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, ne, or, isNull, lte, sql } from "drizzle-orm";
 import type {
+  IssueSuggestion,
   DeveloperIssue,
   FilterType,
   Issue as SharedIssue,
@@ -73,6 +75,22 @@ export class IssueService {
     private readonly settings = new SettingsService(),
     private readonly teamTrackerService = new TeamTrackerService(),
   ) {}
+
+  async suggestions(query: string, workspaceId?: string): Promise<IssueSuggestion[]> {
+    const scope = normalizeWorkspaceId(workspaceId);
+    const mode = await this.settings.getJiraSyncScopeMode(scope);
+    const term = query.trim().toLowerCase();
+    return db.select({
+      jiraKey: issues.jiraKey, summary: issues.summary, priorityName: issues.priorityName,
+      dueDate: issues.dueDate, developmentDueDate: issues.developmentDueDate,
+    }).from(issues).where(and(
+      eq(issues.workspaceId, scope), visibleWorkIssuePredicate(mode),
+      term ? or(sql`instr(lead_os_lower(${issues.jiraKey}), ${term}) > 0`, sql`instr(lead_os_lower(${issues.summary}), ${term}) > 0`) : undefined,
+    )).orderBy(
+      sql`CASE ${issues.priorityName} WHEN 'Highest' THEN 5 WHEN 'High' THEN 4 WHEN 'Medium' THEN 3 WHEN 'Low' THEN 2 WHEN 'Lowest' THEN 1 ELSE 0 END DESC`,
+      desc(issues.updatedAt), issues.jiraKey,
+    ).limit(8);
+  }
 
   async getAll(query: IssueQuery = {}, workspaceId?: string): Promise<SharedIssue[]> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);

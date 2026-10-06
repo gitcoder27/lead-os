@@ -118,6 +118,14 @@ const listQuerySchema = z.object({
 export function createIssuesRouter(issueService: IssueService): Router {
   const router = Router();
 
+  const suggestionsSchema = z.object({ query: z.object({ q: z.string().max(500).default("") }), params: z.unknown().optional(), body: z.unknown().optional() });
+  router.get("/suggestions", validate(suggestionsSchema), async (req, res, next) => {
+    try {
+      const { q } = suggestionsSchema.shape.query.parse(req.query);
+      res.json({ issues: await issueService.suggestions(q, req.auth!.user.workspaceId) });
+    } catch (error) { next(error); }
+  });
+
   router.get("/", validate(listQuerySchema), async (req, res, next) => {
     try {
       const query = listQuerySchema.shape.query.parse(req.query);

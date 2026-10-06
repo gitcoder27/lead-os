@@ -1,0 +1,43 @@
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { expect, it, vi } from 'vitest';
+import { useIssues } from '@/hooks/useIssues';
+import { useIssueSuggestions } from '@/hooks/useIssueSuggestions';
+const get = vi.fn().mockResolvedValue({ issues: [] });
+vi.mock('@/lib/api', () => ({ api: { get: (...args: unknown[]) => get(...args) } }));
+vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'scope' }));
+it('P03 only reads bounded suggestions when the picker opens; no 30s full-issue poll', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const hook = renderHook(({ open, search }) => useIssueSuggestions(search, open), { wrapper, initialProps: { open: false, search: '' } });
+  expect(get).not.toHaveBeenCalled();
+  hook.rerender({ open: true, search: '' });
+  await waitFor(() => expect(get).toHaveBeenCalledOnce());
+  expect(get.mock.calls[0]![0]).toBe('/issues/suggestions?q=');
+  expect(get.mock.calls[0]![1].signal).toBeInstanceOf(AbortSignal);
+  vi.useFakeTimers();
+  hook.rerender({ open: true, search: 'APP-19' });
+  await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+  expect(get.mock.calls.at(-1)![0]).toBe('/issues/suggestions?q=APP-19');
+  hook.rerender({ open: false, search: 'APP-19' });
+  const count = get.mock.calls.length;
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(get).toHaveBeenCalledTimes(count);
+  hook.unmount(); client.clear(); vi.useRealTimers();
+});
+
+it('measures the old Team full-list polling versus a closed picker over 60 seconds', async () => {
+  vi.useFakeTimers(); get.mockClear();
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const old = renderHook(() => useIssues('all'), { wrapper });
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(get).toHaveBeenCalledTimes(3);
+  old.unmount(); client.clear(); get.mockClear();
+  const next = renderHook(() => useIssueSuggestions('', false), { wrapper });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(get).not.toHaveBeenCalled();
+  next.unmount(); client.clear(); vi.useRealTimers();
+});

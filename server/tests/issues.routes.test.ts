@@ -134,3 +134,13 @@ it("validates bounded paging and returns filter-wide totals", async () => {
     expect((await invoke(app, { method: "GET", url: `/api/issues?${query}` })).status).toBe(400);
   }
 });
+
+it('P03 serves validated scoped lean suggestions ahead of the issue-key route', async () => {
+  const suggestions = vi.fn().mockResolvedValue([{ jiraKey: 'APP-1', summary: 'One', priorityName: 'High', dueDate: null, developmentDueDate: null }]);
+  const app = createTestApp({ suggestions });
+  const response = await invoke(app, { method: 'GET', url: '/api/issues/suggestions?q=login' });
+  expect(response.status).toBe(200);
+  expect(suggestions).toHaveBeenCalledWith('login', 'default');
+  expect(Object.keys(response.body.issues[0])).toHaveLength(5);
+  expect((await invoke(app, { method: 'GET', url: `/api/issues/suggestions?q=${'x'.repeat(501)}` })).status).toBe(400);
+});

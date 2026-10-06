@@ -3421,3 +3421,13 @@ export interface ListPageMetadata {
 export interface IssueListResponse extends ListPageMetadata {
   issues: Issue[];
 }
+
+/** Lean metadata for the editable Team Jira picker; no issue text bodies. */
+export interface IssueSuggestion {
+  jiraKey: string;
+  summary: string;
+  priorityName: string;
+  dueDate?: string | null;
+  developmentDueDate?: string | null;
+}
+export interface IssueSuggestionsResponse { issues: IssueSuggestion[] }

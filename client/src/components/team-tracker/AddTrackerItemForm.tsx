@@ -1,3 +1,5 @@
+import { useIssueSuggestions } from '@/hooks/useIssueSuggestions';
+import type { IssueSuggestion } from '@/types';
 import { useMemo, useState } from 'react';
 import { Link, Plus, Search, X } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
@@ -9,13 +11,7 @@ interface AddTrackerItemFormProps {
   date: string;
   targetAccountId: string;
   onOpenExistingAssignment: (itemId: number) => void;
-  issues?: Array<{
-    jiraKey: string;
-    summary: string;
-    priorityName?: string;
-    dueDate?: string;
-    developmentDueDate?: string;
-  }>;
+  issues?: IssueSuggestion[];
   isPending?: boolean;
 }
 
@@ -38,16 +34,18 @@ export function AddTrackerItemForm({
     summary: string;
   } | null>(null);
 
+  const suggestions = useIssueSuggestions(jiraSearch, isOpen && jiraPickerOpen && !issues);
+  const issueList = issues ?? suggestions.data?.issues;
   const filteredIssues = useMemo(
     () =>
-      issues
+      issueList
         ?.filter(
           (issue) =>
             issue.jiraKey.toLowerCase().includes(jiraSearch.toLowerCase()) ||
             issue.summary.toLowerCase().includes(jiraSearch.toLowerCase())
         )
         .slice(0, 8) ?? [],
-    [issues, jiraSearch]
+    [issueList, jiraSearch]
   );
 
   const resetForm = () => {

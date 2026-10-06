@@ -3,7 +3,7 @@ import { PersonCommitments } from './PersonCommitments';
 import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, UserMinus, Users } from 'lucide-react';
-import type { Issue, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
+import type { IssueSuggestion, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
 import { ManagerDeskCaptureDialog } from '@/components/manager-desk/ManagerDeskCaptureDialog';
@@ -58,7 +58,7 @@ interface DeveloperTrackerDrawerProps {
   onOpenManagerDesk?: () => void;
   /** docs/48 §4.3: opens the 1:1 workspace panel for this developer. */
   onOpenOneOnOne?: (accountId: string) => void;
-  issues?: Issue[];
+  issues?: IssueSuggestion[];
   isAddItemPending?: boolean;
   readOnly?: boolean;
 }
@@ -278,14 +278,6 @@ export function DeveloperTrackerDrawer({
         ['Esc', 'Close'],
       ];
 
-  const issueList = issues?.map((i) => ({
-    jiraKey: i.jiraKey,
-    summary: i.summary,
-    priorityName: i.priorityName,
-    dueDate: i.dueDate,
-    developmentDueDate: i.developmentDueDate,
-  })) ?? [];
-
   const menuActions: DrawerMenuAction[] = [];
   if (day && !readOnly) {
     menuActions.push({ key: 'capture', label: 'Capture follow-up', icon: <Bell size={13} />, onSelect: () => setDeskCaptureOpen(true) });
@@ -456,7 +448,7 @@ export function DeveloperTrackerDrawer({
                       date={date}
                       targetAccountId={day.developer.accountId}
                       onOpenExistingAssignment={(itemId) => onOpenTaskDetail(itemId)}
-                      issues={issueList}
+                      issues={issues}
                       isPending={isAddItemPending}
                     />
                   )}

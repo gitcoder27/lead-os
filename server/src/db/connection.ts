@@ -10,6 +10,8 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
+// Team picker search follows JavaScript Unicode case folding, including literal %/_ terms.
+sqlite.function("lead_os_lower", { deterministic: true }, (value: unknown) => typeof value === "string" ? value.toLowerCase() : null);
 
 export const rawDb = sqlite;
 export const db = drizzle(sqlite);

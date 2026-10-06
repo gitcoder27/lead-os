@@ -376,8 +376,8 @@ vi.mock('@/hooks/useManagerDesk', () => ({
   useUpdateManagerDeskItem: () => ({ mutate: mockUpdateManagerDeskItemMutate, isPending: false }),
 }));
 
-vi.mock('@/hooks/useIssues', () => ({
-  useIssues: () => ({ data: mockIssues }),
+vi.mock('@/hooks/useIssueSuggestions', () => ({
+  useIssueSuggestions: () => ({ data: { issues: mockIssues } }),
 }));
 
 vi.mock('@/hooks/useConfig', () => ({

@@ -15,7 +15,6 @@ import {
   useStatusUpdate,
 } from '@/hooks/useTeamTrackerMutations';
 import { useBoardQueryState } from '@/hooks/useBoardQueryState';
-import { useIssues } from '@/hooks/useIssues';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import { useToast } from '@/context/ToastContext';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
@@ -353,7 +352,6 @@ export function TeamTrackerPage({
   // Feed resolved query back to qs for derived values
   const resolvedQuery = board?.query;
 
-  const { data: issues } = useIssues('all');
   const isToday = date === getLocalIsoDate();
   const nextDate = useMemo(() => shiftLocalIsoDate(date, 1), [date]);
 
@@ -674,7 +672,6 @@ export function TeamTrackerPage({
                     ? (day) => setSuggestionTarget(day)
                     : undefined
                 }
-                issues={issues}
                 attentionItems={workflow.attentionItems}
                 attentionSorted={resolvedSortBy === 'attention'}
                 readOnly={readOnly}
@@ -773,7 +770,6 @@ export function TeamTrackerPage({
         onMarkInactive={workflow.handleMarkInactive}
         onOpenManagerDesk={onViewChange ? () => onViewChange('desk') : undefined}
         onOpenOneOnOne={oneOnOneEnabled ? (accountId) => onOneOnOnePanelChange?.('one-on-one', accountId) : undefined}
-        issues={issues}
         isAddItemPending={addTrackerItem.isPending}
         readOnly={readOnly}
       />

@@ -796,3 +796,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P06 | One roster regex per analysis, deferred footer counts, 250 ms coalesced draft writes with pagehide/hidden/unmount flushing, cancellation on clear, and deferred cap cleanup. 94 focused frontend tests pass; 20-edit fixture makes 1 storage write instead of 20. Synthetic 1,000-bullet analysis median 96.03 → 6.07 ms (scripts/benchmark-notes.cjs); candidate counts unchanged. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P03 — Team no longer mounts the full-issue polling hook. Editable Jira picker debounces cancellable lean SQL suggestions (maximum 8, five fields), preserving visibility, priority order, literal substring and Unicode case behavior; detail bodies stay out of suggestions. 91 frontend and 10 backend tests pass. Synthetic 60-second closed-picker fixture: 3 full-list GETs → 0; opening fetches one bounded suggestion page.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P03 | Team no longer mounts the full-issue polling hook. Editable Jira picker debounces cancellable lean SQL suggestions (maximum 8, five fields), preserving visibility, priority order, literal substring and Unicode case behavior; detail bodies stay out of suggestions. 91 frontend and 10 backend tests pass. Synthetic 60-second closed-picker fixture: 3 full-list GETs → 0; opening fetches one bounded suggestion page. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

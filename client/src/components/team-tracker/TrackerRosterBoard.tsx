@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { CircleDashed, Lock, MessageSquarePlus, TriangleAlert, Users } from 'lucide-react';
-import type { Issue, TrackerAttentionItem, TrackerDeveloperDay, TrackerDeveloperGroup, TrackerWorkItem } from '@/types';
+import type { TrackerAttentionItem, TrackerDeveloperDay, TrackerDeveloperGroup, TrackerWorkItem } from '@/types';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { usesCheckIns } from '@/lib/participation';
 import { useTeamMode } from '@/hooks/useTeamMode';
@@ -34,7 +34,6 @@ interface TrackerRosterBoardProps {
   onCaptureFollowUp: (day: TrackerDeveloperDay) => void;
   /** Phase 3 (P3-D11): accept the hybrid person-day status suggestion. */
   onAcceptSuggestion?: (day: TrackerDeveloperDay) => void;
-  issues?: Issue[];
   attentionItems?: TrackerAttentionItem[];
   attentionSorted?: boolean;
   readOnly?: boolean;

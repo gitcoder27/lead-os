@@ -93,6 +93,12 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
   const queryClient = useQueryClient();
   const authScopeKey = useAuthScopeKey();
   const [conversationId, setConversationId] = useState<number | null>(null);
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const detailEpoch = useRef(0);
+  const olderPending = useRef(false);
+  const currentScope = useRef(authScopeKey);
+  currentScope.current = authScopeKey;
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [streaming, setStreaming] = useState<AssistantStreamingTurn | null>(null);
   const [proposals, setProposals] = useState<AssistantActionProposal[]>([]);
@@ -358,6 +364,9 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
   }, []);
 
   const newChat = useCallback(() => {
+    detailEpoch.current += 1;
+    setOlderCursor(null);
+    setLoadingOlder(false);
     abortRef.current?.abort();
     abortRef.current = null;
     setConversationId(null);
@@ -374,7 +383,12 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
 
   const loadConversation = useCallback(
     async (id: number) => {
+      const epoch = ++detailEpoch.current;
+      const scope = authScopeKey;
+      setLoadingOlder(false);
       const detail = await api.get<AssistantConversationDetail>(`/assistant/conversations/${id}`);
+      if (epoch !== detailEpoch.current || scope !== currentScope.current) return;
+      setOlderCursor(detail.nextCursor ?? null);
       abortRef.current?.abort();
       abortRef.current = null;
       const visible = detail.messages.filter((message) => message.role !== 'tool');
@@ -399,8 +413,30 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
       applyProposals(() => derived);
       setStatus(derived.length > 0 ? 'awaiting_confirmation' : 'idle');
     },
-    [applyProposals],
+    [applyProposals, authScopeKey],
   );
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!conversationId || !olderCursor || olderPending.current || status === 'streaming') return;
+    const epoch = detailEpoch.current;
+    const scope = authScopeKey;
+    olderPending.current = true;
+    setLoadingOlder(true);
+    try {
+      const detail = await api.get<AssistantConversationDetail>(`/assistant/conversations/${conversationId}?cursor=${encodeURIComponent(olderCursor)}`);
+      if (epoch !== detailEpoch.current || scope !== currentScope.current) return;
+      setMessages((current) => {
+        const ids = new Set(current.map((message) => message.id));
+        return [...detail.messages.filter((message) => message.role !== 'tool' && !ids.has(message.id)), ...current];
+      });
+      setOlderCursor(detail.nextCursor ?? null);
+    } catch (error) {
+      if (epoch === detailEpoch.current && scope === currentScope.current) setError(error instanceof Error ? error.message : 'Could not load older messages');
+    } finally {
+      olderPending.current = false;
+      if (epoch === detailEpoch.current && scope === currentScope.current) setLoadingOlder(false);
+    }
+  }, [authScopeKey, conversationId, olderCursor, status]);
 
   const conversationsQuery = useQuery<AssistantConversationsResponse>({
     queryKey: ['assistant', 'conversations', authScopeKey],
@@ -441,6 +477,9 @@ export function useAssistantThread(options?: UseAssistantThreadOptions) {
     stop,
     newChat,
     loadConversation,
+    loadOlderMessages,
+    hasOlderMessages: Boolean(olderCursor),
+    loadingOlder,
     conversationsQuery,
     deleteConversation,
   };

@@ -114,6 +114,8 @@ function ThinkingBlock({
 
 interface MessageListProps {
   messages: AssistantMessage[];
+  onLoadOlder?: () => void;
+  loadingOlder?: boolean;
   /** Live-session reasoning traces keyed by message id — rendered collapsed. */
   reasoningTraces?: Record<number, string>;
   streaming: AssistantStreamingTurn | null;
@@ -132,6 +134,8 @@ interface MessageListProps {
 
 export function MessageList({
   messages,
+  onLoadOlder,
+  loadingOlder,
   reasoningTraces,
   streaming,
   proposals,
@@ -147,19 +151,26 @@ export function MessageList({
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = useReducedMotion();
+  const previousMessages = useRef(messages);
+  const previousHeight = useRef(0);
   const isEmpty = messages.length === 0 && !streaming;
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
 
   useEffect(() => {
     const container = scrollRef.current;
     if (container) {
-      container.scrollTop = container.scrollHeight;
+      const old = previousMessages.current;
+      const prepended = old.length > 0 && messages.length > old.length && messages[0]?.id !== old[0]?.id && messages.some((message) => message.id === old[0]?.id);
+      container.scrollTop = prepended ? container.scrollTop + container.scrollHeight - previousHeight.current : container.scrollHeight;
+      previousHeight.current = container.scrollHeight;
+      previousMessages.current = messages;
     }
-  }, [messages.length, streaming?.content, streaming?.reasoning, streaming?.tools.length, proposals.length]);
+  }, [messages, streaming?.content, streaming?.reasoning, streaming?.tools.length, proposals.length]);
 
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
       <div className={expanded ? 'mx-auto w-full max-w-[880px] space-y-3' : 'space-y-3'}>
+      {onLoadOlder ? <button type="button" onClick={onLoadOlder} disabled={loadingOlder || Boolean(streaming)} className="ui-btn-ghost w-full">{loadingOlder ? 'Loading older messages…' : 'Load older messages'}</button> : null}
       {isEmpty ? (
         <div className="space-y-3 pt-6">
           <p className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>

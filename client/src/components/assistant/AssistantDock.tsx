@@ -96,6 +96,8 @@ export function AssistantDock() {
           ) : null}
           <MessageList
             messages={thread.messages}
+            onLoadOlder={thread.hasOlderMessages ? () => void thread.loadOlderMessages() : undefined}
+            loadingOlder={thread.loadingOlder}
             reasoningTraces={config?.showThinkingTrace === false ? undefined : thread.reasoningTraces}
             streaming={thread.streaming}
             proposals={thread.proposals}

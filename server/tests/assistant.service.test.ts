@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssistantStreamEvent } from "shared/types";
 import { db, resetDatabase } from "./helpers/db";
-import { developers } from "../src/db/schema";
+import { rawDb } from "../src/db/connection";
+import { assistantConversations, assistantMessages, developers } from "../src/db/schema";
 import type { LlmClient, LlmMessage } from "../src/assistant/llm-client";
 import { AssistantService, type AssistantAuth } from "../src/assistant/service";
 import { AlertService } from "../src/services/alert.service";
@@ -547,4 +548,42 @@ describe("AssistantService", () => {
       service.chat(AUTH, { message: "Hello", date: DATE }, collectEvents().emit)
     ).rejects.toMatchObject({ status: 502 });
   });
+  it('P11 reads a bounded model window and preserves complete user/tool turns', async () => {
+    const { client } = createScriptedClient([{ content: 'done' }]);
+    const service = buildService(client);
+    const [conversation] = await db.insert(assistantConversations).values({ workspaceId: 'default', managerAccountId: AUTH.managerAccountId, title: 'Long history', createdAt: DATE, updatedAt: DATE }).returning();
+    await db.insert(assistantMessages).values(Array.from({ length: 1002 }, (_, index) => ({
+      conversationId: conversation!.id,
+      role: ['user', 'assistant', 'tool', 'assistant'][index % 4]!,
+      content: String(index), createdAt: DATE,
+      toolCalls: index % 4 === 1 ? JSON.stringify([{ id: `call-${index}`, name: 'read', arguments: {}, status: 'executed', summary: 'read' }]) : null,
+      toolCallId: index % 4 === 2 ? `call-${index - 1}` : null,
+    })));
+    const prepare = vi.spyOn(rawDb, 'prepare');
+    const history = await (service as unknown as { loadHistory: (id: number, budget?: number) => Promise<LlmMessage[]> }).loadHistory(conversation!.id);
+    expect(history[0]!.content).toContain('truncated');
+    expect(history[2]!.role).toBe('user');
+    expect(history.length).toBeLessThanOrEqual(62);
+    history.forEach((message, index) => {
+      if (message.role === 'tool') expect(history[index - 1]!.tool_calls?.[0]?.id).toBe(message.tool_call_id);
+    });
+    expect(prepare.mock.calls.some(([sql]) => sql.includes('from "assistant_messages"') && sql.includes('limit ?'))).toBe(true);
+    prepare.mockRestore();
+    const latest = await service.getConversation(AUTH, conversation!.id, { limit: 200 });
+    expect(latest.messages).toHaveLength(200);
+    expect(latest.conversation.messageCount).toBe(1002);
+    let cursor = latest.nextCursor;
+    const ids = latest.messages.map((message) => message.id);
+    while (cursor) {
+      const page = await service.getConversation(AUTH, conversation!.id, { limit: 200, cursor });
+      ids.unshift(...page.messages.map((message) => message.id));
+      cursor = page.nextCursor;
+    }
+    expect(ids).toHaveLength(1002);
+    expect(new Set(ids).size).toBe(1002);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+    await expect(service.getConversation(AUTH, conversation!.id, { cursor: 'bad' })).rejects.toMatchObject({ status: 400 });
+    await expect(service.getConversation({ ...AUTH, managerAccountId: 'another' }, conversation!.id)).rejects.toMatchObject({ status: 404 });
+  });
+
 });

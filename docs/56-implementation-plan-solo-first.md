@@ -820,3 +820,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P13 | Palette issue search applies equivalent visibility and LIMIT 6 in SQL and projects result fields only. 29 service/route tests cover hidden newest matches, expired/future snoozes, scopes and SQL LIMIT. Substring matching is preserved; FTS is not introduced because the finding is addressed without changing matching semantics (substring scans remain). Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P11 — Model history selects at most 61 recent rows in SQL before existing whole-user/tool-turn and character-budget trimming; detail uses separately bounded keyset pages (100 default/200 max), complete counts and explicit Load older with preserved scroll position. 26 backend and 20 frontend tests pass; a 1,002-message fixture hydrates at most 61 model rows and paginates all detail messages without gaps/duplicates. Existing indexes suffice.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P11 | Model history selects at most 61 recent rows in SQL before existing whole-user/tool-turn and character-budget trimming; detail uses separately bounded keyset pages (100 default/200 max), complete counts and explicit Load older with preserved scroll position. 26 backend and 20 frontend tests pass; a 1,002-message fixture hydrates at most 61 model rows and paginates all detail messages without gaps/duplicates. Existing indexes suffice. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

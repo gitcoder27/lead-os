@@ -533,4 +533,24 @@ describe('AssistantDock', () => {
     expect(screen.queryByLabelText('Message Copilot')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
   });
+  it('P11 opens recent messages and loads older conversation detail on demand', async () => {
+    const original = mockGet.getMockImplementation()!;
+    const conversation = { id: 1, title: 'Paginated thread', createdAt: '2026-10-06', updatedAt: '2026-10-06' };
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/assistant/conversations') return Promise.resolve({ conversations: [conversation] });
+      if (url === '/assistant/conversations/1') return Promise.resolve({ conversation, messages: [{ id: 2, conversationId: 1, role: 'assistant', content: 'Recent reply', createdAt: '' }], nextCursor: 'older' });
+      if (url === '/assistant/conversations/1?cursor=older') return Promise.resolve({ conversation, messages: [{ id: 1, conversationId: 1, role: 'user', content: 'Earlier context', createdAt: '' }], nextCursor: null });
+      return original(url);
+    });
+    renderDock();
+    await screen.findByText('Brief me on today');
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation history' }));
+    fireEvent.click(await screen.findByText('Paginated thread'));
+    expect(await screen.findByText('Recent reply')).toBeInTheDocument();
+    expect(screen.queryByText('Earlier context')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load older messages' }));
+    expect(await screen.findByText('Earlier context')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load older messages' })).not.toBeInTheDocument();
+  });
+
 });

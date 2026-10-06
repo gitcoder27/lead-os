@@ -3008,6 +3008,8 @@ export interface AssistantConversation {
 export interface AssistantConversationDetail {
   conversation: AssistantConversation;
   messages: AssistantMessage[];
+  /** Keyset cursor for older detail messages; independent of model history. */
+  nextCursor?: string | null;
 }
 
 export interface AssistantConversationsResponse {

@@ -1,6 +1,6 @@
 import { TaskKeysService } from "../services/task-keys.service";
 import { OneOnOneService } from "../services/one-on-one.service";
-import { and, count, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type {
   AssistantActionConfirmRequest,
   AssistantChatRequest,
@@ -297,22 +297,34 @@ export class AssistantService {
     }));
   }
 
-  async getConversation(auth: AssistantAuth, conversationId: number): Promise<AssistantConversationDetail> {
+  async getConversation(auth: AssistantAuth, conversationId: number, page: { limit?: number; cursor?: string } = {}): Promise<AssistantConversationDetail> {
     const conversation = await this.getOwnedConversation(auth, conversationId);
-    const rows = await db
-      .select()
-      .from(assistantMessages)
-      .where(eq(assistantMessages.conversationId, conversation.id))
-      .orderBy(assistantMessages.createdAt, assistantMessages.id);
+    const limit = page.limit ?? 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) throw new HttpError(400, "Invalid message page size");
+    let before: { at: string; id: number } | undefined;
+    if (page.cursor) {
+      try {
+        const parsed = JSON.parse(Buffer.from(page.cursor, "base64url").toString("utf8")) as { at: unknown; id: unknown };
+        if (typeof parsed.at !== "string" || !parsed.at || parsed.at.length > 50 || !Number.isSafeInteger(parsed.id) || Number(parsed.id) < 1) throw new Error("Invalid cursor");
+        before = { at: parsed.at, id: Number(parsed.id) };
+      } catch { throw new HttpError(400, "Invalid message cursor"); }
+    }
+    const [rows, total] = await Promise.all([
+      db.select().from(assistantMessages).where(and(
+        eq(assistantMessages.conversationId, conversation.id),
+        before ? sql`(${assistantMessages.createdAt}, ${assistantMessages.id}) < (${before.at}, ${before.id})` : undefined,
+      )).orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id)).limit(limit + 1),
+      db.select({ count: count() }).from(assistantMessages).where(eq(assistantMessages.conversationId, conversation.id)),
+    ]);
+    const visible = rows.slice(0, limit).reverse();
+    const oldest = visible[0];
     return {
       conversation: {
-        id: conversation.id,
-        title: conversation.title,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt,
-        messageCount: rows.length,
+        id: conversation.id, title: conversation.title, createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt, messageCount: total[0]?.count ?? 0,
       },
-      messages: rows.map(toAssistantMessage),
+      messages: visible.map(toAssistantMessage),
+      nextCursor: rows.length > limit && oldest ? Buffer.from(JSON.stringify({ at: oldest.createdAt, id: oldest.id })).toString("base64url") : null,
     };
   }
 
@@ -557,7 +569,9 @@ export class AssistantService {
       .select()
       .from(assistantMessages)
       .where(eq(assistantMessages.conversationId, conversationId))
-      .orderBy(assistantMessages.createdAt, assistantMessages.id);
+      .orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id))
+      .limit(MAX_HISTORY_ROWS + 1);
+    rows.reverse();
 
     let truncated = false;
     if (rows.length > MAX_HISTORY_ROWS) {

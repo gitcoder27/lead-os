@@ -127,9 +127,10 @@ export function createAssistantRouter(assistantService: AssistantService): Route
     }
   });
 
-  router.get("/conversations/:id", validate(conversationParamsSchema), async (req, res, next) => {
+  const detailSchema = conversationParamsSchema.extend({ query: z.object({ limit: z.coerce.number().int().min(1).max(200).optional(), cursor: z.string().min(1).max(512).optional() }) });
+  router.get("/conversations/:id", validate(detailSchema), async (req, res, next) => {
     try {
-      const detail = await assistantService.getConversation(requestAuth(req), Number(req.params.id));
+      const detail = await assistantService.getConversation(requestAuth(req), Number(req.params.id), detailSchema.shape.query.parse(req.query));
       res.json(detail);
     } catch (error) {
       next(error);

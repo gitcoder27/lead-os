@@ -274,6 +274,14 @@ describe("assistant routes", () => {
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.messages.map((row: { role: string }) => row.role)).toEqual(["user", "assistant"]);
 
+    const firstPage = await invoke(app, { method: "GET", url: "/api/assistant/conversations/1?limit=1" });
+    expect(firstPage.body.messages.map((row: { role: string }) => row.role)).toEqual(["assistant"]);
+    expect(firstPage.body.conversation.messageCount).toBe(2);
+    const older = await invoke(app, { method: "GET", url: `/api/assistant/conversations/1?limit=1&cursor=${firstPage.body.nextCursor}` });
+    expect(older.body.messages.map((row: { role: string }) => row.role)).toEqual(["user"]);
+    expect(older.body.nextCursor).toBeNull();
+    expect((await invoke(app, { method: "GET", url: "/api/assistant/conversations/1?limit=201" })).status).toBe(400);
+    expect((await invoke(app, { method: "GET", url: "/api/assistant/conversations/1?cursor=bad" })).status).toBe(400);
     const deleteRes = await invoke(app, { method: "DELETE", url: "/api/assistant/conversations/1" });
     expect(deleteRes.status).toBe(204);
 

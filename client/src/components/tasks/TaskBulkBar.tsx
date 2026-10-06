@@ -1,13 +1,13 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Ban, CalendarClock, Check, Folder, Tag, UserRound, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, Flag, Folder, Tag, UserRound, X } from 'lucide-react';
 import { Kbd } from '@/components/ui/Kbd';
 
 /** docs/49 §6/§12: floating bulk toolbar for the multi-selection. */
 export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
   count: number;
   onDone: () => void;
-  onMenu: (kind: 'schedule' | 'assign' | 'label' | 'project', anchor: HTMLElement) => void;
+  onMenu: (kind: 'schedule' | 'assign' | 'label' | 'project' | 'priority' | 'checkBy', anchor: HTMLElement) => void;
   onDrop: () => void;
   onClear: () => void;
 }) {
@@ -29,6 +29,8 @@ export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
       <span className="h-4 w-px" style={{ background: 'var(--border)' }} />
       <BulkButton label="Done" hint="e" onClick={onDone}><Check size={13} /></BulkButton>
       <BulkButton label="Schedule" hint="s" onClick={(event) => onMenu('schedule', event.currentTarget)}><CalendarClock size={13} /></BulkButton>
+      <BulkButton label="Priority" hint="p" onClick={(event) => onMenu('priority', event.currentTarget)}><Flag size={13} /></BulkButton>
+      <BulkButton label="Check-by" hint="c" onClick={(event) => onMenu('checkBy', event.currentTarget)}><CalendarClock size={13} /></BulkButton>
       <BulkButton label="Assign" hint="a" onClick={(event) => onMenu('assign', event.currentTarget)}><UserRound size={13} /></BulkButton>
       <BulkButton label="Label" hint="l" onClick={(event) => onMenu('label', event.currentTarget)}><Tag size={13} /></BulkButton>
       <BulkButton label="Project" hint="" onClick={(event) => onMenu('project', event.currentTarget)}><Folder size={13} /></BulkButton>

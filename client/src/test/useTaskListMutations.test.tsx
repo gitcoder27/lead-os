@@ -322,3 +322,46 @@ describe('overlapping writes (docs/61 TS-01, D1)', () => {
     expect(mockAddToast).not.toHaveBeenCalled();
   });
 });
+
+describe('WQ-03 guarded bulk Priority and Check-by Undo', () => {
+  it.each([
+    { field: 'priority' as const, before: [ONE, TWO], changes: { priority: 'high' as const } },
+    { field: 'followUpAt' as const, before: [task({ followUpAt: '2026-09-20T03:30:00.000Z' }), TWO], changes: { followUpAt: '2026-09-27T03:30:00.000Z' } },
+    { field: 'followUpAt' as const, before: [task({ followUpAt: '2026-09-20T03:30:00.000Z' }), task({ ...TWO, followUpAt: '2026-09-22T03:30:00.000Z' })], changes: { followUpAt: null } },
+  ])('restores each previous $field after a successful bulk write and Undo', async ({ field, before, changes }) => {
+    const untouched = task({ id: 3, taskKey: 'T-3', title: 'Unselected' });
+    const after = before.map((entry) => task({ ...entry, ...changes }));
+    mockPost.mockResolvedValueOnce({ tasks: after }).mockResolvedValueOnce({ tasks: before });
+    const { client, result } = setup([...before, untouched]);
+    const untouchedSnapshot = cached(client, 'T-3');
+    await act(async () => { await result.current.apply(before.map((entry) => ({ task: entry, changes })), { label: 'Bulk update' }); });
+    expect(mockPost).toHaveBeenCalledWith('/tasks/bulk', {
+      items: before.map((entry) => ({ key: entry.taskKey, changes, expected: { [field]: entry[field] } })),
+    });
+    for (const entry of after) expect(cached(client, entry.taskKey)[field]).toBe(entry[field]);
+    expect(cached(client, 'T-3')).toEqual(untouchedSnapshot);
+    await act(async () => { undoToast().action.onClick(); });
+    expect(mockPost).toHaveBeenLastCalledWith('/tasks/bulk', {
+      items: before.map((entry, index) => ({ key: entry.taskKey, changes: { [field]: entry[field] }, expected: { [field]: after[index]![field] } })),
+    });
+    for (const entry of before) expect(cached(client, entry.taskKey)[field]).toBe(entry[field]);
+    expect(cached(client, 'T-3')).toEqual(untouchedSnapshot);
+  });
+
+  it.each([{ priority: 'high' as const }, { followUpAt: '2026-09-27T03:30:00.000Z' }])('rolls back a refused bulk %j and announces the failure without Undo', async (changes) => {
+    const write = deferred();
+    mockPost.mockReturnValueOnce(write.promise);
+    const untouched = task({ id: 3, taskKey: 'T-3', title: 'Unselected' });
+    const { client, result } = setup([ONE, TWO, untouched]);
+    const untouchedSnapshot = cached(client, 'T-3');
+    let pending!: Promise<boolean>;
+    act(() => { pending = result.current.apply([ONE, TWO].map((entry) => ({ task: entry, changes })), { label: 'Bulk update' }); });
+    await vi.waitFor(() => expect(cached(client, 'T-1')).toMatchObject(changes));
+    await act(async () => { write.reject(new ApiRequestError('T-2 changed. Nothing was updated.', 409)); expect(await pending).toBe(false); });
+    expect(cached(client, 'T-1')).toMatchObject({ priority: ONE.priority, followUpAt: ONE.followUpAt });
+    expect(cached(client, 'T-2')).toMatchObject({ priority: TWO.priority, followUpAt: TWO.followUpAt });
+    expect(cached(client, 'T-3')).toEqual(untouchedSnapshot);
+    expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error', title: 'Could not update tasks', message: 'T-2 changed. Nothing was updated.' }));
+    expect(undoToast()).toBeUndefined();
+  });
+});

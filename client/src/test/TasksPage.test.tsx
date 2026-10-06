@@ -1339,3 +1339,87 @@ describe('Tasks viewport window (P02)', () => {
     expect(row('T-1000')).toBeNull();
   });
 });
+
+describe('WQ-03 visible bulk Priority and Check-by', () => {
+  const tomorrowAtNine = new Date('2026-09-27T09:00:00').toISOString();
+
+  function selectAcrossGroups(overrides: Partial<TaskViewTask> = {}) {
+    const rows = [
+      task({ followUpAt: new Date('2026-09-25T09:00:00').toISOString(), ...overrides }),
+      task({ id: 2, taskKey: 'T-2', title: 'Selected overdue', scheduledOn: '2026-09-23', priority: 'high', followUpAt: new Date('2026-09-27T15:00:00').toISOString() }),
+      task({ id: 3, taskKey: 'T-3', title: 'Unselected tomorrow', scheduledOn: '2026-09-27' }),
+    ];
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) =>
+      definition?.filters?.closed ? tasksResult([]) : tasksResult(rows),
+    );
+    render(<TasksPage />);
+    expect(row('T-1').closest('[role="group"]')).not.toBe(row('T-2').closest('[role="group"]'));
+    for (const key of ['T-1', 'T-2']) fireEvent.click(within(row(key)).getByRole('checkbox', { name: `Select ${key}` }));
+    return within(screen.getByRole('toolbar', { name: 'Bulk actions' }));
+  }
+
+  function openBulkMenu(source: 'button' | 'keyboard', name: 'Priority (p)' | 'Check-by (c)') {
+    if (source === 'button') {
+      // A toolbar action must still use the selection when another row has focus.
+      act(() => { openRow('T-3').focus(); });
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Bulk actions' })).getByRole('button', { name }));
+      return;
+    }
+    act(() => { openRow('T-1').focus(); });
+    press(name === 'Priority (p)' ? 'p' : 'c');
+  }
+
+  it.each(['button', 'keyboard'] as const)('%s sets selected priorities, skipping identical values', async (source) => {
+    selectAcrossGroups();
+    openBulkMenu(source, 'Priority (p)');
+    await act(async () => { fireEvent.click(within(screen.getByRole('menu', { name: 'Set priority' })).getByRole('menuitemradio', { name: 'High' })); });
+    expect(mockApply).toHaveBeenCalledOnce();
+    expect(mockApply.mock.calls[0]![0].map((item: { task: TaskViewTask; changes: unknown }) => ({ key: item.task.taskKey, changes: item.changes })))
+      .toEqual([{ key: 'T-1', changes: { priority: 'high' } }]);
+    expect(mockApply.mock.calls[0]![1]).toMatchObject({ label: '1 task → High priority · skipped 1' });
+    expect(within(row('T-3')).queryByRole('img', { name: 'High priority' })).not.toBeInTheDocument();
+    expect(within(row('T-3')).getByRole('checkbox')).not.toBeChecked();
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
+  it('does nothing when all selected priorities already match', async () => {
+    const toolbar = selectAcrossGroups({ priority: 'high' });
+    fireEvent.click(toolbar.getByRole('button', { name: 'Priority (p)' }));
+    await act(async () => { fireEvent.click(screen.getByRole('menuitemradio', { name: 'High' })); });
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(mockAddToast).not.toHaveBeenCalled();
+  });
+
+  it.each(['button', 'keyboard'] as const)('%s sets Check-by at local 09:00 and skips the same local day', async (source) => {
+    selectAcrossGroups();
+    openBulkMenu(source, 'Check-by (c)');
+    await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: 'Check by' })).getByRole('menuitem', { name: /Tomorrow/ })); });
+    expect(mockApply).toHaveBeenCalledOnce();
+    expect(mockApply.mock.calls[0]![0].map((item: { task: TaskViewTask; changes: unknown }) => ({ key: item.task.taskKey, changes: item.changes })))
+      .toEqual([{ key: 'T-1', changes: { followUpAt: tomorrowAtNine } }]);
+    expect(mockApply.mock.calls[0]![1]).toMatchObject({ label: 'Check Sun · 1 task · skipped 1' });
+    expect(within(row('T-3')).getByRole('checkbox')).not.toBeChecked();
+    expect(row('T-3')).not.toHaveTextContent('Check');
+  });
+
+  it('clears selected check dates and leaves an already empty date unchanged', async () => {
+    const toolbar = selectAcrossGroups({ followUpAt: null });
+    fireEvent.click(toolbar.getByRole('button', { name: 'Check-by (c)' }));
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /No check date/ })); });
+    expect(mockApply.mock.calls[0]![0].map((item: { task: TaskViewTask; changes: unknown }) => ({ key: item.task.taskKey, changes: item.changes })))
+      .toEqual([{ key: 'T-2', changes: { followUpAt: null } }]);
+    expect(mockApply.mock.calls[0]![1]).toMatchObject({ label: 'Check date cleared · 1 task · skipped 1' });
+  });
+
+  it('applies a custom Check-by date to the exact selected tasks', async () => {
+    const toolbar = selectAcrossGroups();
+    fireEvent.click(toolbar.getByRole('button', { name: 'Check-by (c)' }));
+    const picker = within(screen.getByRole('dialog', { name: 'Check by' }));
+    fireEvent.change(picker.getByLabelText('Pick a date'), { target: { value: '2026-10-02' } });
+    await act(async () => { fireEvent.click(picker.getByRole('button', { name: 'Apply check by' })); });
+    const followUpAt = new Date('2026-10-02T09:00:00').toISOString();
+    expect(mockApply.mock.calls[0]![0].map((item: { task: TaskViewTask; changes: unknown }) => ({ key: item.task.taskKey, changes: item.changes })))
+      .toEqual([{ key: 'T-1', changes: { followUpAt } }, { key: 'T-2', changes: { followUpAt } }]);
+    expect(within(row('T-3')).getByRole('checkbox')).not.toBeChecked();
+  });
+});

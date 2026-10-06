@@ -845,7 +845,10 @@ Scope, acceptance criteria and verification commands: [implementation plan](70-w
 - [ ] WQ-03 — Visible bulk Priority and Check-by actions in Tasks.
 - [ ] WQ-04 — Consistent Team defaults and URL sorting.
 - [ ] WQ-05 — Global and page keyboard help, including phones.
+- [ ] WQ-06 — Last good Jira sync time and plain-language sync errors with Retry.
+- [ ] WQ-07 — Remove unreferenced components and hooks.
 
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | WQ-00 | Created docs/70 with current-code evidence, scoped files, acceptance criteria, focused tests and completion gates for all five selected improvements. Relative document links, five-item tracker coverage and diff whitespace checks pass. Documentation only; application implementation has not started. No runtime data, external services, Jira, push or deployment. |
+| 2026-10-06 | WQ-00 | Plan amended with WQ-06 and WQ-07 from the parallel review, plus the WQ-01 first-paint fix. Documentation only. |

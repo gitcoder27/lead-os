@@ -2,7 +2,7 @@
 
 Created: 2026-10-06. Reviewed baseline: `92daf04`.
 
-This plan covers the five improvements selected from the repository review. Recent performance findings P01–P13 are already complete; no TODO/FIXME markers were found in application source. The evidence below comes from current code, not just unchecked entries in the older plan.
+This plan covers the seven improvements selected from two parallel repository reviews (WQ-06 and WQ-07 were merged in from the second review). Recent performance findings P01–P13 are already complete; no TODO/FIXME markers were found in application source. The evidence below comes from current code, not just unchecked entries in the older plan.
 
 ## Scope and execution
 
@@ -24,14 +24,16 @@ This plan covers the five improvements selected from the repository review. Rece
 | 3 | WQ-03 | Bulk Priority and Check-by buttons in Tasks | Remaining bulk-edit slice of P3-09 |
 | 4 | WQ-04 | Consistent Team defaults and shareable sorting | Default-sort slice of P7-08 |
 | 5 | WQ-05 | Global and page keyboard help, including phones | P7-03 |
+| 6 | WQ-06 | Last good Jira sync time and plain-language sync errors with Retry | Part of P5-03 |
+| 7 | WQ-07 | Remove unreferenced components and hooks | Safe slice of P7-11 |
 
-These items have no implementation dependencies on one another. The order follows expected impact. Completing a slice does not mark the wider older item complete: recents/ranking/show-more in P7-02, keymap changes in P3-09, and other Team workflows in P7-08 remain outside this plan.
+These items have no implementation dependencies on one another. The order follows expected impact. Completing a slice does not mark the wider older item complete: recents/ranking/show-more in P7-02, keymap changes in P3-09, other Team workflows in P7-08, the Today sync chip and Jira 5xx retries in P5-03, and the behaviour-changing legacy cutover in P7-11 remain outside this plan.
 
 ## WQ-01 — Resilient theme preference
 
 - [ ] Implement and verify WQ-01.
 
-**Problem:** [ThemeContext.tsx](../client/src/context/ThemeContext.tsx) catches storage reads but writes to `localStorage` without a guard in its layout effect. A blocked write can throw during rendering. With no saved choice, the provider always selects Light.
+**Problem:** [ThemeContext.tsx](../client/src/context/ThemeContext.tsx) catches storage reads but writes to `localStorage` without a guard in its layout effect. A blocked write can throw during rendering. With no saved choice, the provider always selects Light. [index.html](../client/index.html) hard-codes `class="dark"` on `<html>`, so Light users see a dark first paint until the bundle runs.
 
 **Implementation:**
 
@@ -40,10 +42,11 @@ These items have no implementation dependencies on one another. The order follow
 3. Follow device preference changes until the user toggles manually. Persist only an explicit user choice so the first automatic selection does not become a permanent override.
 4. Guard all storage writes. If persistence fails, retain the explicit choice in memory for the session and keep toggling functional.
 5. Clean up media-query listeners and preserve the existing root classes and context API.
+6. In `client/index.html`, replace the hard-coded `class="dark"` with a small inline `<head>` script that applies the same resolution (valid saved choice → device preference → Light) before first paint, with every storage access inside `try`. No CSP blocks inline scripts today.
 
-**Files:** `client/src/context/ThemeContext.tsx`; `client/src/test/ThemeContext.test.tsx`.
+**Files:** `client/src/context/ThemeContext.tsx`; `client/index.html`; `client/src/test/ThemeContext.test.tsx`.
 
-**Acceptance and proof:** Mock Light/Dark device preferences and changes; valid/invalid saved preferences; missing preference APIs; throwing storage reads and writes. Verify root classes, continued rendering, toggling, manual-choice precedence and listener cleanup.
+**Acceptance and proof:** Mock Light/Dark device preferences and changes; valid/invalid saved preferences; missing preference APIs; throwing storage reads and writes. Verify root classes, continued rendering, toggling, manual-choice precedence and listener cleanup. Update the existing "defaults to light … stores light" test, which encodes the old write-on-load behaviour. Browser check: a fresh profile with dark `colorScheme` opens dark; a profile whose `window.localStorage` throws loads Today and toggles with no page errors; a saved Light choice on a dark device is light at `domcontentloaded`.
 
 ```bash
 npm run test --workspace=client -- ThemeContext.test.tsx
@@ -139,6 +142,50 @@ npm run test --workspace=client -- view-params.test.ts useBoardQueryState.test.t
 npm run test --workspace=client -- keyboard-shortcuts.test.ts App.test.tsx Header.test.tsx TasksPage.test.tsx TodayPage.test.tsx TeamTracker.test.tsx NotesPage.test.tsx
 ```
 
+## WQ-06 — Last good Jira sync and readable sync errors
+
+- [ ] Implement and verify WQ-06.
+
+**Problem:** `GET /api/sync/status` returns `lastSyncedAt` from the newest `sync_log` row whatever its status ([routes/sync.ts](../server/src/routes/sync.ts), `getLastSyncLog` in [engine.ts](../server/src/sync/engine.ts)). Failed runs also write `completedAt`, so after a failure nothing reports when data was last good. [WorkSyncControls.tsx](../client/src/components/work/WorkSyncControls.tsx) shows only "Sync issue". [ErrorBanner.tsx](../client/src/components/alerts/ErrorBanner.tsx) prints `Sync error: ${errorMessage}`; for non-401/403/404 failures [jira/client.ts](../server/src/jira/client.ts) builds `Jira API error (<status>): <raw body>`, so raw Jira JSON reaches the page. The banner has no Retry and no route to Settings.
+
+**Implementation:**
+
+1. Server: add `getLastSuccessfulSyncLog(workspaceId)` to the sync engine (newest `status = 'success'` row for the workspace). `/api/sync/status` adds `lastSuccessAt`. Keep `lastSyncedAt` unchanged; `useSyncRefreshCoordinator` keys refreshes on it. No schema change.
+2. `shared/types.ts`: `SyncStatus.lastSuccessAt?: string` (type only; no `types.js` regeneration).
+3. New `client/src/lib/sync-error.ts` with `describeSyncError(message)`: 401 → "Jira rejected the saved credentials."; 403 → "Jira denied access to the configured project or query."; 404 → "Jira could not find the configured site or query."; timeout/network → "Jira did not respond."; rate limit → the banner's existing copy; otherwise "Jira returned an error (<status>)." or "Jira sync failed." Never include the raw body.
+4. Work chip in the error state: `Sync issue · last good <relative>` or `Sync issue · never synced`; tooltip uses `describeSyncError`.
+5. Banner sync-error state: `describeSyncError(...)`, "Data last updated <relative>" when `lastSuccessAt` exists, a **Retry** button (`useTriggerSync`, disabled while syncing) and an **Open Settings** link to `/settings?section=connection` using the in-app navigation pattern in `TeamRosterEmpty.tsx`. Server-down and rate-limit variants are unchanged.
+6. The sync-failure toast in `SettingsPanel.tsx` uses `describeSyncError`. Settings → Jira Connection keeps showing the full error text as the one diagnostic place.
+
+**Files:** `server/src/sync/engine.ts`; `server/src/routes/sync.ts`; `shared/types.ts`; new `client/src/lib/sync-error.ts`; `client/src/components/work/WorkSyncControls.tsx`; `client/src/components/alerts/ErrorBanner.tsx`; `client/src/components/settings/SettingsPanel.tsx`.
+
+**Acceptance and proof:** Route test for a success → failure sequence: `lastSuccessAt` equals the success run's `completedAt` while `lastSyncedAt`/`status` report the failure; failures-only and other-workspace cases have no borrowed `lastSuccessAt`. Engine test for newest-success and workspace scoping. Unit tests for each error category, including a `Jira API error (500): {"errorMessages":[...]}` input whose output has no `{`. Banner tests: plain text, last-updated line, Retry triggers sync, Settings link target, no raw body; the existing four banner tests still pass. Chip tests with and without `lastSuccessAt`. `grep -rn 'Sync error: ${' client/src` returns nothing. Browser check on an isolated DB with one seeded `success` row and Jira pointed at `http://127.0.0.1:9`: banner, Retry, Open Settings and the chip at desktop/390px in Light/Dark with no page errors. Jira stays mocked or unreachable.
+
+```bash
+npm run test --workspace=server -- tests/sync.routes.test.ts tests/sync.engine.test.ts
+npm run test --workspace=client -- sync-error.test.ts ErrorBanner.test.tsx WorkSyncControls.test.tsx
+```
+
+## WQ-07 — Remove unreferenced components and hooks
+
+- [ ] Implement and verify WQ-07.
+
+**Problem:** No production code imports `client/src/components/team-tracker/QuickAddTaskModal.tsx` (472 lines), `client/src/components/manager-desk/DeskSection.tsx` (95) or `client/src/components/manager-desk/ItemDetailPrimitives.tsx` (277), nor `useCarryForwardPreview` / `useCarryForwardContext` in [useTeamTracker.ts](../client/src/hooks/useTeamTracker.ts). The only other reference is two mocks in `client/src/test/TeamTracker.test.tsx`.
+
+**Implementation:**
+
+1. Re-run the unreferenced check first; stop and report if anything now imports these.
+2. Delete the three files and two hooks, plus imports/types that become unused, and remove the two mocks.
+3. Do not touch the `ManagerDeskPage` fallback, `canonicalEnabled` branches or `tasks:drop-legacy`; those change behaviour or delete data and need a separate decision.
+
+**Files:** the three files above; `client/src/hooks/useTeamTracker.ts`; `client/src/test/TeamTracker.test.tsx`.
+
+**Acceptance and proof:** No new tests; typecheck, the production build and the full client suite are the proof. `grep -rnE "QuickAddTaskModal|DeskSection\b|ItemDetailPrimitives|useCarryForwardPreview|useCarryForwardContext" client/src shared` returns nothing. Record the deleted line count.
+
+```bash
+npm run test --workspace=client
+```
+
 ## Completion gates and handoff
 
 For each implementation item, run its focused tests and:
@@ -153,7 +200,7 @@ git diff --check
 
 Record commands and actual pass/fail results, not planned outcomes. Report pre-existing failures separately; do not edit unrelated local configuration to make a gate green. Browser checks use isolated fixtures and report the viewport/theme and observed result. Automated accessibility assertions prove DOM semantics; they do not claim a real screen-reader session was tested.
 
-After WQ-05, run the full client suite once for interactions across all five changes. The scoped work is frontend-only; add backend tests only if an actual backend behavior change becomes necessary. If a runtime shared export changes, regenerate its committed CommonJS artifact per AGENTS.md.
+After the last item, run the full client suite once for interactions across all changes, and the full server suite after WQ-06. WQ-06 is the only item with backend changes; elsewhere add backend tests only if an actual backend behavior change becomes necessary. If a runtime shared export changes, regenerate its committed CommonJS artifact per AGENTS.md.
 
 The handoff for each item includes the commit, changed files, user-visible behavior, focused tests, quality-gate results and any remaining limitation. Stop after reporting that item, as requested.
 
@@ -162,3 +209,4 @@ The handoff for each item includes the commit, changed files, user-visible behav
 | Date | Item | Status | Verification / notes |
 | --- | --- | --- | --- |
 | 2026-10-06 | WQ-00 | Planning complete | Recorded all five scopes, code evidence, acceptance criteria, test commands and item-by-item stopping rule. Relative document links, five-item tracker coverage and diff whitespace checks pass. No application changes or implementation tests run. |
+| 2026-10-06 | WQ-00 | Plan amended | Merged the second review's unique items: WQ-06 (last good sync, readable errors, Retry) and WQ-07 (unreferenced code), plus the WQ-01 first-paint fix. Overlapping theme, palette and Team-sort items keep this plan's scope, including the Name default. Documentation only. |

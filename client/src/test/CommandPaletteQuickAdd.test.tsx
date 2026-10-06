@@ -17,7 +17,7 @@ vi.mock('@/hooks/useTaskViews', () => ({ useTaskViews: () => ({ data: { views: [
 vi.mock('@/hooks/useModalFocus', () => ({ useModalFocus: () => ({ current: null }) }));
 vi.mock('@/hooks/useGlobalSearch', () => ({
   GLOBAL_SEARCH_MIN_LENGTH: 2,
-  useGlobalSearch: () => ({ data: undefined, isFetching: false }),
+  useGlobalSearch: () => ({ data: undefined, isFetching: false, isSearching: false, isError: false }),
 }));
 vi.mock('@/hooks/useCapture', () => ({
   useCaptureTask: () => ({ create: mockCreate, isPending: false }),
@@ -48,9 +48,9 @@ describe('CommandPalette commands (UX-21)', () => {
   it('finds "1:1 with <name>" and a Settings section by name', () => {
     const { input } = open();
     fireEvent.change(input, { target: { value: '1:1 priya' } });
-    expect(screen.getByRole('button', { name: /1:1 with Priya Raman/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /1:1 with Priya Raman/ })).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'attention rules' } });
-    expect(screen.getByRole('button', { name: /Settings › Attention Rules/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Settings › Attention Rules/ })).toBeInTheDocument();
   });
 });
 
@@ -58,7 +58,7 @@ describe('CommandPalette quick add', () => {
   it('captures the typed text, tokens and all, and closes on success', async () => {
     const { onClose, input } = open();
     fireEvent.change(input, { target: { value: 'Send the deck to @dev-1 !fri' } });
-    fireEvent.click(screen.getByRole('button', { name: /Add to Tasks/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Add to Tasks/ }));
 
     expect(mockCreate).toHaveBeenCalledWith({ text: 'Send the deck to @dev-1 !fri' });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -78,7 +78,7 @@ describe('CommandPalette quick add', () => {
     mockCreate.mockRejectedValueOnce(new Error('Nobody matches @ghost'));
     const { onClose, input } = open();
     fireEvent.change(input, { target: { value: 'Ask @ghost about it' } });
-    fireEvent.click(screen.getByRole('button', { name: /Add to Tasks/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Add to Tasks/ }));
     await waitFor(() => expect(mockToast).toHaveBeenCalledWith('Nobody matches @ghost', 'error'));
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -87,7 +87,7 @@ describe('CommandPalette quick add', () => {
     phase3 = false;
     const { input } = open();
     fireEvent.change(input, { target: { value: 'zzz legacy thought' } });
-    fireEvent.click(screen.getByRole('button', { name: /Add to Desk/ }));
+    fireEvent.click(screen.getByRole('option', { name: /Add to Desk/ }));
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockLegacyMutate).toHaveBeenCalledWith(expect.objectContaining({ title: 'zzz legacy thought', status: 'inbox' }), expect.any(Object));
   });

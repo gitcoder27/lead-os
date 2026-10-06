@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import {
@@ -95,7 +95,9 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   // docs/54 V1: Tab stays inside the layer; focus returns to the opener on close.
   const modalRef = useModalFocus<HTMLDivElement>();
   const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [retryingQuery, setRetryingQuery] = useState<string | null>(null);
+  const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
@@ -111,8 +113,9 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
   const captureTask = useCaptureTask();
 
   const searchQuery = useGlobalSearch(query);
-  const isSearching = searchQuery.isFetching;
+  const isSearching = searchQuery.isSearching;
   const hasResults = query.trim().length >= GLOBAL_SEARCH_MIN_LENGTH;
+  const showSearchError = searchQuery.isError || retryingQuery === query.trim();
 
   const { features } = useAuth();
   const backups = features?.backups ?? false;
@@ -148,9 +151,17 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
     return pinExactTaskKey(placeQuickAddItem([...actions, ...resultRows], buildQuickAddItem(query, { tasksPhase3 })), query);
   }, [hasResults, navigationCommands, oneOnOneCommands, query, quickActions, searchQuery.data, settingsCommands, tasksPhase3, taskViews.data]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
+  // Resolve selection during render so result changes never leave aria-activedescendant
+  // pointing at a removed row. An untouched selection starts at the first result.
+  // Result builders append their array index; omit that ordinal from DOM IDs
+  // so the same entity keeps its option ID and selection when results reorder.
+  const optionId = useCallback(
+    (item: PaletteItem) =>
+      `${listId}-${encodeURIComponent(item.group === 'actions' ? item.id : item.id.replace(/-\d+$/, ''))}`,
+    [listId],
+  );
+  const activeIndex = Math.max(0, items.findIndex((item) => optionId(item) === activeItemId));
+  const activeItem = items[activeIndex];
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -180,7 +191,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex]);
+  }, [activeIndex, activeItem?.id]);
 
   const runItem = useCallback(
     (item: PaletteItem) => {
@@ -259,12 +270,14 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
     (event: React.KeyboardEvent) => {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
-        setActiveIndex((index) => (items.length === 0 ? 0 : (index + 1) % items.length));
+        const next = items[(activeIndex + 1) % items.length];
+        setActiveItemId(next ? optionId(next) : null);
         return;
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault();
-        setActiveIndex((index) => (items.length === 0 ? 0 : (index - 1 + items.length) % items.length));
+        const previous = items[(activeIndex - 1 + items.length) % items.length];
+        setActiveItemId(previous ? optionId(previous) : null);
         return;
       }
       if (event.key === 'Enter') {
@@ -275,7 +288,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         }
       }
     },
-    [activeIndex, items, runItem],
+    [activeIndex, items, optionId, runItem],
   );
 
   let lastGroup: PaletteItem['group'] | null = null;
@@ -314,19 +327,54 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActiveItemId(null);
+              setRetryingQuery(null);
+            }}
             onKeyDown={handleInputKeyDown}
             placeholder={`Search, or type to add to ${surfaceLabel}…`}
             className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-placeholder"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Search"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={activeItem ? optionId(activeItem) : undefined}
           />
           {isSearching ? <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} /> : null}
           <Kbd variant="subtle">esc</Kbd>
         </div>
 
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-1.5">
-          {items.length === 0 ? (
+        {showSearchError && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2">
+            <p role="alert" className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              Search failed. Try again.
+            </p>
+            <button
+              type="button"
+              disabled={searchQuery.isFetching || retryingQuery !== null}
+              onClick={() => {
+                inputRef.current?.focus();
+                setRetryingQuery(query.trim());
+                void searchQuery.refetch().finally(() => setRetryingQuery(null));
+              }}
+              className="text-[13px] disabled:opacity-50"
+              style={{ color: 'var(--accent-text)' }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {isSearching && (
+          <p role="status" className="px-4 py-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            Searching…
+          </p>
+        )}
+
+        <div ref={listRef} id={listId} role="listbox" aria-label="Commands and search results" aria-busy={isSearching} className="max-h-[52vh] overflow-y-auto py-1.5">
+          {items.length === 0 && !isSearching && !showSearchError ? (
             <div className="px-4 py-8 text-center">
               <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
                 {hasResults ? 'No matches found.' : `Type to search, pick a destination, or start typing to add to ${surfaceLabel}.`}
@@ -346,9 +394,14 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
                     </div>
                   )}
                   <button
+                    id={optionId(item)}
+                    role="option"
+                    aria-selected={active}
+                    tabIndex={-1}
                     ref={active ? activeItemRef : undefined}
                     type="button"
-                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseEnter={() => setActiveItemId(optionId(item))}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => runItem(item)}
                     className="flex w-full items-center gap-3 px-4 py-2 text-left transition-colors"
                     style={{ background: active ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : 'transparent' }}

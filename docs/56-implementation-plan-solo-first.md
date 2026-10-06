@@ -808,3 +808,9 @@ Read the `config` table read-only (SQLite `mode=ro`, only the four flag keys; no
 | Date | Item | Validation / progress |
 |---|---|---|
 | 2026-10-06 | P08 | Badge/latest polling uses one bounded shared query; older history loads on demand without polling, retains at most five pages, and is released on close. Explicit Refresh returns to latest; overlaps are deduplicated. 24 focused inbox/header tests pass. Three-page synthetic poll: 3 sequential requests → 1, also after closing; retention capped at 100 history rows plus 20 latest. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |
+
+- [x] P04 — Indexed correlated latest-visible-event SQL returns summary fields only, preserving canonical/legacy identity, manager/developer/former-owner visibility, redaction, UTF-16 excerpts and timestamp/ID ties. Reuses existing indexes; no schema change. 71 backend service/route tests pass. A 1,002-event synthetic history returns 1 summary row; EXPLAIN confirms the existing task/time index.
+
+| Date | Item | Validation / progress |
+|---|---|---|
+| 2026-10-06 | P04 | Indexed correlated latest-visible-event SQL returns summary fields only, preserving canonical/legacy identity, manager/developer/former-owner visibility, redaction, UTF-16 excerpts and timestamp/ID ties. Reuses existing indexes; no schema change. 71 backend service/route tests pass. A 1,002-event synthetic history returns 1 summary row; EXPLAIN confirms the existing task/time index. Typecheck, lint and build checks pass; format check reports only pre-existing .claude/settings.local.json, left untouched. Synthetic fixtures/mocks only; no runtime data/Jira/push/deploy. |

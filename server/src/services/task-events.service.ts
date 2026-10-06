@@ -247,12 +247,32 @@ export class TaskEventsService {
     if (!keys.length || !(await this.keys.enabled(viewer.workspaceId))) return result;
     const canonical = await this.keys.canonicalEnabled(viewer.workspaceId);
     const canonicalRows = canonical ? await db.select({ id: tasks.id, taskKey: tasks.taskKey }).from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), inArray(tasks.taskKey, keys))) : [];
-    const keyById = new Map(canonicalRows.map((row) => [row.id, row.taskKey]));
-    if (canonical && !canonicalRows.length) return result;
-    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), canonical ? inArray(taskEvents.taskId, canonicalRows.map((row) => row.id)) : inArray(taskEvents.taskKey, keys), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
-    for (const row of rows) {
-      const key = canonical ? keyById.get(row.taskId!)! : row.taskKey;
-      if (!result.has(key)) result.set(key, { id: row.id, type: row.type as TaskEventType, excerpt: row.redactedAt ? "[redacted]" : (row.body ?? row.type).slice(0, 160), authorType: row.authorType as TaskEvent["author"]["type"], occurredAt: row.occurredAt, approximateTime: row.metaJson?.includes('"approximateTime":true') ?? false, visibility: row.visibility as TaskEventVisibility });
+    const wanted = canonical ? canonicalRows : [...new Set(keys)].map((taskKey) => ({ taskKey, id: null }));
+    if (!wanted.length) return result;
+    const visible = await this.visibility(viewer);
+    const rows = db.all<{
+      taskKey: string; id: number; type: TaskEventType; excerpt: string;
+      authorType: TaskEvent["author"]["type"]; occurredAt: string;
+      approximateTime: number; visibility: TaskEventVisibility;
+    }>(sql`
+      WITH wanted(task_key, task_id) AS (VALUES ${sql.join(wanted.map((row) => sql`(${row.taskKey}, ${row.id})`), sql`, `)})
+      SELECT wanted.task_key AS taskKey, ${taskEvents.id} AS id, ${taskEvents.type} AS type,
+        CASE WHEN COALESCE(${taskEvents.redactedAt}, '') <> '' THEN '[redacted]'
+          ELSE substr(COALESCE(${taskEvents.body}, ${taskEvents.type}), 1, 160) END AS excerpt,
+        ${taskEvents.authorType} AS authorType, ${taskEvents.occurredAt} AS occurredAt,
+        instr(COALESCE(${taskEvents.metaJson}, ''), '"approximateTime":true') > 0 AS approximateTime,
+        ${taskEvents.visibility} AS visibility
+      FROM wanted JOIN ${taskEvents} ON ${taskEvents.id} = (
+        SELECT ${taskEvents.id} FROM ${taskEvents}
+        WHERE ${taskEvents.workspaceId} = ${normalizeWorkspaceId(viewer.workspaceId)}
+          AND ${canonical ? sql`${taskEvents.taskId} = wanted.task_id` : sql`${taskEvents.taskKey} = wanted.task_key`}
+          AND ${visible}
+        ORDER BY ${taskEvents.occurredAt} DESC, ${taskEvents.id} DESC LIMIT 1
+      )
+    `);
+    for (const { taskKey, ...row } of rows) {
+      // SQLite substr counts code points; the final slice retains the existing UTF-16 excerpt length.
+      result.set(taskKey, { ...row, excerpt: row.excerpt.slice(0, 160), approximateTime: Boolean(row.approximateTime) });
     }
     return result;
   }

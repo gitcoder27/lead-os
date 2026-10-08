@@ -31,6 +31,7 @@ Routing is custom in `client/src/App.tsx` using `window.history.pushState` and `
 
 Canonical routes:
 
+- Without a session, `/` is the public landing page (`components/landing/`: positioning, a live capture demo running the real grammar on a fictional team, product replicas, no workspace API calls) with **Sign in** top right; `/login` opens it with the sign-in dialog up and becomes `/` after sign-in. Any other path without a session shows the focused sign-in (`my-day/LoginPage`) and then the page that was opened; `/my-day` is the engineer sign-in. All of them use `components/auth/SignInForm`. "Request access" appears only when `VITE_LEADOS_ACCESS_URL` (https: or mailto:, read at client build time) is set.
 - `/`: Today, the manager daily command view: my commitments plus actionable exceptions, not a team board (`focus.plan` is My plan and stays reachable through wrap-up as "Still open today"; up to three optional pins per day via `PUT /api/today/top3` lead My plan and are not repeated as queue rows; dates are calendar-validated and resolved in the client's `tz`). `sourceStatus` also reports `plan`/`state`/`review` when they fail, and queue rows past the server's 100-row cap are reported, not advertised.
 - `/work`: Jira defect and work triage dashboard.
 - `/team`: Team Tracker for day plans, current work, status, check-ins, attention signals, saved views, and carry-forward.
@@ -63,7 +64,8 @@ Feature folders under `client/src/components/`:
 - `tasks/`: the Tasks workspace (list, views rail, drawer, menus, task page).
 - `notes/`: private daily Notes workspace (sidebar history, editor, follow-up creation).
 - `assistant/`: Copilot dock, chat thread, tool chips, action confirm cards.
-- `capture/`: global capture dialogs and capture forms.
+- `capture/`: global capture dialogs and capture forms; `capture-preview.tsx` is the token colours and summary chips shared with the landing demo.
+- `landing/`: the public landing page and its replicas; `auth/`: the shared sign-in form.
 - `palette/`: Cmd+K command palette and global search results.
 - `settings/`, `setup/`: configuration, maintenance, users, bootstrap, onboarding.
 - `brand/`: LeadOS brand primitives.

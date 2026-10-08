@@ -35,6 +35,7 @@ import {
 } from '@/lib/task-views';
 import { navigateToTaskPage } from '@/lib/task-nav';
 import { getLocalIsoDate } from '@/lib/utils';
+import { hasSessionHint } from '@/lib/session-hint';
 import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 import { globalShortcuts, pageShortcuts, shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useAssistantConfig } from '@/hooks/useAssistantConfig';
@@ -59,6 +60,7 @@ const loadDashboardLayout = () => import('@/components/layout/DashboardLayout');
 const loadSetupWizard = () => import('@/components/setup/SetupWizard');
 const loadMyDayPage = () => import('@/components/my-day/MyDayPage');
 const loadLoginPage = () => import('@/components/my-day/LoginPage');
+const loadLandingPage = () => import('@/components/landing/LandingPage');
 const loadManagerDeskPage = () => import('@/components/manager-desk');
 const loadTasksPage = () => import('@/components/tasks/TasksPage');
 const loadTaskPage = () => import('@/components/tasks/TaskPage');
@@ -90,6 +92,11 @@ const MyDayPage = lazy(async () => {
 const LoginPage = lazy(async () => {
   const module = await loadLoginPage();
   return { default: module.LoginPage };
+});
+
+const LandingPage = lazy(async () => {
+  const module = await loadLandingPage();
+  return { default: module.LandingPage };
 });
 
 const ManagerDeskPage = lazy(async () => {
@@ -154,6 +161,10 @@ export function legacyTaskViewRedirect(pathname: string, search: string): string
   return `/tasks?${params.toString()}`;
 }
 
+function isSignInPath(pathname: string): boolean {
+  return pathname === '/login' || pathname === '/login/';
+}
+
 function pathToView(pathname: string): ResolvedAppView {
   if (TASK_LINK_PATH_PATTERN.test(pathname)) return 'task';
   if (pathname === '/my-day' || pathname === '/my-day/') return 'my-day';
@@ -166,6 +177,8 @@ function pathToView(pathname: string): ResolvedAppView {
   if (pathname === '/notes' || pathname === '/notes/') return 'notes';
   if (pathname === '/work' || pathname === '/work/' || pathname === '/dashboard' || pathname === '/dashboard/') return 'work';
   if (pathname === '/today' || pathname === '/today/' || pathname === '/' || pathname === '') return 'today';
+  // `/login` is the landing page with sign-in open; signed in, it is Today.
+  if (isSignInPath(pathname)) return 'today';
   if (pathname === '/settings' || pathname === '/settings/') return 'settings';
   return 'not-found';
 }
@@ -292,7 +305,8 @@ function replaceLegacyPathIfNeeded() {
     window.history.replaceState(null, '', redirect);
   }
   const currentView = pathToView(window.location.pathname);
-  if (currentView === 'not-found' || currentView === 'task') {
+  // `/login` stays put until someone signs in (the landing page reads it), then becomes `/`.
+  if (currentView === 'not-found' || currentView === 'task' || isSignInPath(window.location.pathname)) {
     return;
   }
   const canonicalPath = viewToPath(currentView);
@@ -311,6 +325,14 @@ function FullPageLoading() {
         />
         <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>Loading…</span>
       </div>
+    </div>
+  );
+}
+
+function LandingBootLoading() {
+  return (
+    <div className="h-full" role="status" aria-label="Loading LeadOS" style={{ background: 'var(--bg-primary)' }}>
+      <span className="sr-only">Loading LeadOS</span>
     </div>
   );
 }
@@ -853,6 +875,12 @@ function AppContent() {
     if (!authLoading) replaceLegacyPathIfNeeded();
   }, [authLoading, features?.tasksPhase3]);
 
+  // A first-time visitor at `/` is about to see the landing page: fetch it while the session check runs.
+  useEffect(() => {
+    if (activeView === 'today' && !hasSessionHint()) void loadLandingPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, for the first paint only
+  }, []);
+
   useEffect(() => {
     replaceLegacyPathIfNeeded();
 
@@ -1045,6 +1073,11 @@ function AppContent() {
       return;
     }
 
+    if (isAuthenticated && user?.role === 'manager' && isSignInPath(window.location.pathname)) {
+      replaceView('today');
+      return;
+    }
+
     if (isAuthenticated && user?.role === 'developer' && activeView !== 'task') {
       replaceView('my-day');
     }
@@ -1121,7 +1154,9 @@ function AppContent() {
     }
 
     if (authLoading || isBootstrapPending) {
-      return activeView === 'today' ? <TodayBootLoading /> : <FullPageLoading />;
+      if (activeView !== 'today') return <FullPageLoading />;
+      // A returning manager sees Today's skeleton; a first-time visitor is about to see the landing page.
+      return hasSessionHint() || reviewMode ? <TodayBootLoading /> : <LandingBootLoading />;
     }
 
   if (bootstrapState?.bootstrapOpen) {
@@ -1157,6 +1192,14 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
+    // `/` is the public front door; any other link (a task, a view, the weekly review) asks to sign in first.
+    if (activeView === 'today' && !reviewMode) {
+      return (
+        <Suspense fallback={<LandingBootLoading />}>
+          <LandingPage initialSignInOpen={isSignInPath(window.location.pathname)} />
+        </Suspense>
+      );
+    }
     return (
       <Suspense fallback={<FullPageLoading />}>
         <LoginPage role="manager" />

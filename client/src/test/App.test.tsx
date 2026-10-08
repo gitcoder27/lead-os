@@ -125,6 +125,10 @@ vi.mock('@/components/my-day/LoginPage', () => ({
   LoginPage: ({ role }: { role?: 'manager' | 'developer' }) => <div>{role === 'manager' ? 'Manager login' : 'Developer login'}</div>,
 }));
 
+vi.mock('@/components/landing/LandingPage', () => ({
+  LandingPage: ({ initialSignInOpen }: { initialSignInOpen?: boolean }) => <div>{initialSignInOpen ? 'Landing page with sign-in open' : 'Landing page'}</div>,
+}));
+
 vi.mock('@/components/manager-desk', () => ({
   ManagerDeskPage: () => <div>Desk loaded</div>,
 }));
@@ -165,6 +169,7 @@ describe('App', () => {
     vi.clearAllMocks();
     useAssistantConfigMock.mockReturnValue({ data: { enabled: false, hasApiKey: false } });
     window.history.pushState(null, '', '/');
+    window.localStorage.removeItem('lead-os:signed-in');
 
     useBootstrapStateMock.mockReturnValue({
       data: { bootstrapOpen: false, userCount: 1 },
@@ -253,7 +258,7 @@ describe('App', () => {
 
   it('does not offer global help to an unauthenticated user', async () => {
     render(<App />);
-    await screen.findByText('Manager login');
+    await screen.findByText('Landing page');
     fireEvent.keyDown(window, { key: '?' });
     expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
   });
@@ -275,9 +280,17 @@ describe('App', () => {
       refetch: vi.fn(),
     });
 
+    window.localStorage.setItem('lead-os:signed-in', '1');
     render(<App />);
     expect(screen.getByRole('status', { name: 'Loading workspace' })).toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+  });
+
+  it('boots a first-time visitor on / to a blank canvas, not the Today skeleton', () => {
+    useAuthMock.mockReturnValue({ user: null, isLoading: true, isAuthenticated: false, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() });
+    render(<App />);
+    expect(screen.getByRole('status', { name: 'Loading LeadOS' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading workspace' })).not.toBeInTheDocument();
   });
 
   it('renders setup wizard when bootstrap registration is still open', async () => {
@@ -314,9 +327,39 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/');
   });
 
-  it('renders manager login on / when bootstrap is closed and the user is unauthenticated', async () => {
+  it('renders the landing page on / when bootstrap is closed and the user is unauthenticated', async () => {
+    render(<App />);
+    expect(await screen.findByText('Landing page')).toBeInTheDocument();
+    expect(screen.queryByText('Manager login')).not.toBeInTheDocument();
+  });
+
+  it('opens the landing page with sign-in up on /login and keeps the URL until someone signs in', async () => {
+    window.history.pushState(null, '', '/login');
+    render(<App />);
+    expect(await screen.findByText('Landing page with sign-in open')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/login');
+  });
+
+  it.each(['/tasks?view=waiting', '/notes', '/?mode=review'])('asks an unauthenticated visitor on %s to sign in, not to read the landing page', async (path) => {
+    window.history.pushState(null, '', path);
     render(<App />);
     expect(await screen.findByText('Manager login')).toBeInTheDocument();
+    expect(screen.queryByText(/Landing page/)).not.toBeInTheDocument();
+  });
+
+  it('sends a signed-in manager on /login to Today at /', async () => {
+    window.history.pushState(null, '', '/login');
+    useAuthMock.mockReturnValue({
+      user: { username: 'manager', displayName: 'Manager', role: 'manager', workspaceId: 'default' },
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshSession: vi.fn(),
+    });
+    render(<App />);
+    expect(await screen.findByText('Today loaded')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
   });
 
   it('renders developer login on /my-day when bootstrap is closed and the user is unauthenticated', async () => {

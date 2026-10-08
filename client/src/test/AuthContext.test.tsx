@@ -156,4 +156,24 @@ describe('AuthProvider cache isolation', () => {
     expect(readTaskUpdateDraft(key).body).toBe('');
   });
 
+  it('keeps a session hint for the boot screen: set by a session or sign-in, cleared by sign-out or a lost session', async () => {
+    window.localStorage.removeItem('lead-os:signed-in');
+    renderAuthProbe(createQueryClient());
+    await waitFor(() => expect(apiMocks.get).toHaveBeenCalledWith('/auth/me'));
+    expect(window.localStorage.getItem('lead-os:signed-in')).toBeNull();
+
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+    expect(window.localStorage.getItem('lead-os:signed-in')).toBe('1');
+
+    fireEvent.click(screen.getByText('Logout'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
+    expect(window.localStorage.getItem('lead-os:signed-in')).toBeNull();
+
+    apiMocks.get.mockResolvedValueOnce({ user: managerA });
+    fireEvent.click(screen.getByText('Refresh session'));
+    await waitFor(() => expect(window.localStorage.getItem('lead-os:signed-in')).toBe('1'));
+    fireEvent.click(screen.getByText('Refresh session'));
+    await waitFor(() => expect(window.localStorage.getItem('lead-os:signed-in')).toBeNull());
+  });
 });

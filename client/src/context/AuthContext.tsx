@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { clearDailyNoteDraftsForScope } from '@/lib/daily-note-drafts';
 import { clearNavPreferencesCacheForScope } from '@/lib/nav-preferences-cache';
 import { clearTodaySnapshotsForScope } from '@/lib/today-snapshot-cache';
+import { setSessionHint } from '@/lib/session-hint';
 import { DEFAULT_TEAM_MODE, type AuthUser, type AuthSessionResponse, type SessionFeatures } from '@/types';
 
 const DEFAULT_FEATURES: SessionFeatures = { tasksPhase3: false, teamMode: DEFAULT_TEAM_MODE };
@@ -51,8 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.get<AuthSessionResponse>('/auth/me');
       setUser(res.user);
       setFeatures(res.features ?? DEFAULT_FEATURES);
+      setSessionHint(res.user !== null);
       return res.user;
     } catch {
+      setSessionHint(false);
       setUser(null);
       setFeatures(DEFAULT_FEATURES);
       return null;
@@ -82,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await api.post<AuthSessionResponse>('/auth/login', { username, password });
+    setSessionHint(true);
     setUser(res.user);
     setFeatures(res.features ?? DEFAULT_FEATURES);
   }, []);
@@ -92,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.post('/auth/logout');
     } finally {
+      setSessionHint(false);
       setUser(null);
       setFeatures(DEFAULT_FEATURES);
     }

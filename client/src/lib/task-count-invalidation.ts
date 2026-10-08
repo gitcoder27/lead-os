@@ -14,8 +14,6 @@ export function invalidateTaskViewCounts(client: QueryClient, scope: string) {
   timers.set(scope, setTimeout(() => {
     timers.delete(scope);
     void client.invalidateQueries({ queryKey: ['task-view-counts', scope] });
-    void client.invalidateQueries({ queryKey: ['projects', scope] });
-    void client.invalidateQueries({ queryKey: ['project', scope] });
   }, 500));
 }
 
@@ -27,6 +25,7 @@ export function useTaskCountInvalidation() {
   current.current = scope;
   return {
     submittedScope: () => scope,
+    isCurrent: (submittedScope: string | undefined): submittedScope is string => submittedScope !== undefined && submittedScope === current.current,
     recount: (submittedScope: string | undefined) => {
       if (submittedScope === current.current) invalidateTaskViewCounts(client, submittedScope);
     },

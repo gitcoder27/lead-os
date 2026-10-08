@@ -1,3 +1,4 @@
+import { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
 import { useTaskCountInvalidation } from '@/lib/task-count-invalidation';
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -62,22 +63,6 @@ export function usePrefetchTaskDetail() {
   );
 }
 
-function invalidateTaskDetailSurfaces(qc: ReturnType<typeof useQueryClient>, scope: string | undefined, taskKey?: string) {
-  if (!scope) return;
-  for (const key of ['task-detail', 'task-events', 'task-resolution', 'task-inbox-event']) {
-    void qc.invalidateQueries({ queryKey: [key, scope], predicate: (query) => {
-      if (key === 'task-inbox-event') return query.queryKey[2] === taskKey;
-      if (query.queryKey[3] === taskKey) return true;
-      if (key !== 'task-detail') return false;
-      const detail = query.state.data as TaskDetailResponse | undefined;
-      return detail?.parent?.taskKey === taskKey || Boolean(detail?.children?.some((child) => child.taskKey === taskKey));
-    } });
-  }
-  for (const key of ['tasks', 'task-inbox', 'manager-desk', 'team-tracker', 'my-day', 'today', 'workload']) {
-    void qc.invalidateQueries({ queryKey: [key], predicate: (query) => query.queryKey.includes(scope) });
-  }
-}
-
 /** Plain text fields with no server-side side effects — safe to show before the PATCH lands. */
 const OPTIMISTIC_FIELDS = ['title', 'details', 'outcome', 'participants'] as const;
 
@@ -101,7 +86,7 @@ export function useUpdateTaskDetail(taskKey: string | undefined, source: 'detail
   const counts = useTaskCountInvalidation();
   const isDeveloper = user?.role === 'developer';
   return useMutation({
-    onMutate: counts.submittedScope,
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (updates: UpdateTaskRequest) => {
       const startedAt = new Date().toISOString();
       const coordinator = taskWrites(qc, scope);
@@ -121,7 +106,7 @@ export function useUpdateTaskDetail(taskKey: string | undefined, source: 'detail
             : await api.patch<TaskDetailResponse>(`/tasks/${encodeURIComponent(taskKey!)}`, updates);
           // Writes queued behind this one act on what the server now holds.
           if (!isDeveloper && saved && 'taskKey' in saved) taskWrites(qc, scope).acknowledge([saved as unknown as ManagerTask]);
-          if (!isDeveloper && source !== 'standup' && saved?.taskKey) notifyTaskChange({
+          if (counts.isCurrent(scope) && !isDeveloper && source !== 'standup' && saved?.taskKey) notifyTaskChange({
             scope, startedAt, task: taskChangeFacts(saved), ...(before && { before: taskChangeFacts(before) }),
             fields: Object.keys(updates).filter((field) => field !== 'expected') as Array<keyof UpdateTaskRequest>,
           });
@@ -132,8 +117,8 @@ export function useUpdateTaskDetail(taskKey: string | undefined, source: 'detail
         }
       });
     },
-    onSuccess: (_data, _variables, scope) => counts.recount(scope),
-    onSettled: (_data, _error, _variables, submittedScope) => invalidateTaskDetailSurfaces(qc, submittedScope, taskKey),
+    onSuccess: (_data, _variables, context) => counts.recount(context?.scope),
+    onSettled: (_data, _error, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : [], [], false); },
   });
 }
 
@@ -141,9 +126,9 @@ export function useDeleteTaskDetail(taskKey: string | undefined) {
   const qc = useQueryClient();
   const counts = useTaskCountInvalidation();
   return useMutation({
-    onMutate: counts.submittedScope,
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: () => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}`),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }
 
@@ -151,10 +136,10 @@ export function useAddTaskDetailLink(taskKey: string | undefined) {
   const qc = useQueryClient();
   const counts = useTaskCountInvalidation();
   return useMutation({
-    onMutate: counts.submittedScope,
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (input: { kind: TaskLink['kind']; ref: string; role?: TaskLink['role'] }) =>
       api.post<TaskLink>(`/tasks/${encodeURIComponent(taskKey!)}/links`, input),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }
 
@@ -162,8 +147,8 @@ export function useRemoveTaskDetailLink(taskKey: string | undefined) {
   const qc = useQueryClient();
   const counts = useTaskCountInvalidation();
   return useMutation({
-    onMutate: counts.submittedScope,
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (linkId: number) => api.delete<{ deleted: boolean }>(`/tasks/${encodeURIComponent(taskKey!)}/links/${linkId}`),
-    onSuccess: (_data, _variables, scope) => { counts.recount(scope); invalidateTaskDetailSurfaces(qc, scope, taskKey); },
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }

@@ -1,9 +1,12 @@
+import type { ManagerTask } from '@/types';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCapture } from '@/hooks/useCapture';
 import { useTaskDetail, useUpdateTaskDetail, useDeleteTaskDetail, useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
+import { useAddTaskEvent, useAddMyDayTaskEvent } from '@/hooks/useTasks';
+import { useTaskListMutations } from '@/hooks/useTaskListMutations';
 import { invalidateTaskViewCounts } from '@/lib/task-count-invalidation';
 
 let scope = 'workspace:manager:manager:';
@@ -12,6 +15,7 @@ const post = vi.fn();
 const patch = vi.fn();
 const remove = vi.fn();
 vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => scope, useAuth: () => ({ user: { role: scope.includes(':developer:') ? 'developer' : 'manager' } }) }));
+vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
 vi.mock('@/lib/api', () => ({ api: { get: (...args: unknown[]) => get(...args), post: (...args: unknown[]) => post(...args), patch: (...args: unknown[]) => patch(...args), delete: (...args: unknown[]) => remove(...args) } }));
 
 const clients: QueryClient[] = [];
@@ -21,7 +25,7 @@ function setup() {
   clients.push(client);
   client.setQueryData(key(), { counts: { today: { count: 1 } } });
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-  const hook = renderHook(() => ({ capture: useCapture(), detail: useUpdateTaskDetail('T-1'), deletion: useDeleteTaskDetail('T-1'), addLink: useAddTaskDetailLink('T-1'), removeLink: useRemoveTaskDetailLink('T-1') }), { wrapper });
+  const hook = renderHook(() => ({ capture: useCapture(), detail: useUpdateTaskDetail('T-1'), deletion: useDeleteTaskDetail('T-1'), addLink: useAddTaskDetailLink('T-1'), removeLink: useRemoveTaskDetailLink('T-1'), event: useAddTaskEvent('T-1'), developerEvent: useAddMyDayTaskEvent('T-1'), list: useTaskListMutations() }), { wrapper });
   return { ...hook, client };
 }
 async function advance(ms = 500) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); }
@@ -149,4 +153,146 @@ describe('P07 detail refetches', () => {
     hook.unmount();
     expect(signal.aborted).toBe(true);
   });
+});
+
+
+describe('TR-02 activity and project refresh with active observers', () => {
+  const eventInput = { type: 'update' as const, body: 'Fresh update', visibility: 'shared' as const, requestId: 'retry-id' };
+  it('updates active stale/Waiting membership immediately and coalesces counts after an event', async () => {
+    const { result, client } = setup();
+    const tasksKey = ['tasks', scope, 'view', 'waiting'];
+    client.setQueryData(tasksKey, { tasks: [{ taskKey: 'T-1', signals: { stale: true } }] });
+    const readTasks = vi.fn().mockResolvedValue({ tasks: [] });
+    const readCounts = vi.fn().mockResolvedValue({ counts: { waiting: { count: 0 } } });
+    const observers = [new QueryObserver(client, { queryKey: tasksKey, queryFn: readTasks, staleTime: Infinity }), new QueryObserver(client, { queryKey: key(), queryFn: readCounts, staleTime: Infinity })];
+    const off = observers.map((observer) => observer.subscribe(() => {}));
+    await act(async () => { await result.current.event.mutateAsync(eventInput); });
+    await advance(0);
+    expect(client.getQueryData(tasksKey)).toEqual({ tasks: [] });
+    expect(readCounts).not.toHaveBeenCalled();
+    await advance();
+    expect(client.getQueryData(key())).toEqual({ counts: { waiting: { count: 0 } } });
+    expect(readCounts).toHaveBeenCalledOnce();
+    off.forEach((stop) => stop());
+  });
+
+  it.each(['capture', 'detail', 'list'] as const)('refreshes active directory/detail/track facts after %s; list Undo restores them', async (kind) => {
+    const { result, client } = setup();
+    let open = 1;
+    const facts = () => ({ open, blocked: open, followUpDue: open });
+    const directory = ['projects', scope, '2026-10-02'];
+    const detail = ['project', scope, 1, '2026-10-02'];
+    client.setQueryData(directory, { projects: [{ facts: facts() }] });
+    client.setQueryData(detail, { project: { facts: facts() }, tracks: [{ facts: facts() }] });
+    const directoryRead = vi.fn(async () => ({ projects: [{ facts: facts() }] }));
+    const detailRead = vi.fn(async () => ({ project: { facts: facts() }, tracks: [{ facts: facts() }] }));
+    const off = [new QueryObserver(client, { queryKey: directory, queryFn: directoryRead, staleTime: Infinity }).subscribe(() => {}), new QueryObserver(client, { queryKey: detail, queryFn: detailRead, staleTime: Infinity }).subscribe(() => {})];
+    const other = ['project', 'other-manager', 1]; client.setQueryData(other, {});
+    const inactive = ['projects', scope, 'older-day']; client.setQueryData(inactive, {});
+    open = 0;
+    const task = { taskKey: 'T-1', status: 'open', ownerType: 'manager', ownerId: 'm', later: false, labels: [], links: [] } as ManagerTask;
+    let receipt: Awaited<ReturnType<typeof result.current.list.applyWithReceipt>> = null;
+    if (kind === 'list') post.mockResolvedValue({ tasks: [{ ...task, status: 'done' }] });
+    await act(async () => {
+      if (kind === 'capture') await result.current.capture.mutateAsync(captureInput);
+      if (kind === 'detail') await result.current.detail.mutateAsync({ status: 'blocked', followUpAt: '2026-10-02T10:00:00Z' });
+      if (kind === 'list') receipt = await result.current.list.applyWithReceipt([{ task, changes: { status: 'done' } }], { label: 'Done', undoable: false });
+    });
+    await advance(0);
+    expect(client.getQueryData(directory)).toEqual({ projects: [{ facts: facts() }] });
+    expect(client.getQueryData(detail)).toEqual({ project: { facts: facts() }, tracks: [{ facts: facts() }] });
+    expect(directoryRead).toHaveBeenCalledOnce(); expect(detailRead).toHaveBeenCalledOnce();
+    expect(client.getQueryState(other)?.isInvalidated).toBe(false);
+    expect(client.getQueryState(inactive)?.isInvalidated).toBe(true);
+    if (kind === 'list') {
+      open = 1; post.mockResolvedValue({ tasks: [task] });
+      await act(async () => { expect(await receipt!.undo()).toBe('undone'); });
+      await advance(0);
+      expect(client.getQueryData(directory)).toEqual({ projects: [{ facts: facts() }] });
+      expect(client.getQueryData(detail)).toEqual({ project: { facts: facts() }, tracks: [{ facts: facts() }] });
+    }
+    off.forEach((stop) => stop());
+  });
+
+  it.each(['capture', 'detail', 'event', 'developerEvent'] as const)('ignores late %s completions across auth changes', async (kind) => {
+    let resolve!: (response: unknown) => void;
+    const deferred = new Promise((done) => { resolve = done; });
+    post.mockReturnValue(deferred); patch.mockReturnValue(deferred);
+    const { result, client, rerender } = setup();
+    const original = scope;
+    const surfaces = ['tasks', 'project', 'projects', 'task-detail', 'task-events'];
+    for (const name of surfaces) client.setQueryData([name, original, 'manager', 'T-1'], {});
+    let pending!: Promise<unknown>;
+    act(() => {
+      if (kind === 'capture') pending = result.current.capture.mutateAsync(captureInput);
+      if (kind === 'detail') pending = result.current.detail.mutateAsync({ status: 'done' });
+      if (kind === 'event') pending = result.current.event.mutateAsync(eventInput);
+      if (kind === 'developerEvent') pending = result.current.developerEvent.mutateAsync({ date: '2026-10-02', type: 'update', body: 'Update', requestId: 'id' });
+    });
+    await advance(0);
+    scope = 'workspace:next:manager:';
+    for (const name of surfaces) client.setQueryData([name, scope, 'manager', 'T-1'], {});
+    rerender();
+    await act(async () => { resolve({ task: { taskKey: 'T-1' }, diagnostics: [] }); await pending; });
+    await advance();
+    for (const name of surfaces) for (const account of [scope, original]) expect(client.getQueryState([name, account, 'manager', 'T-1'])?.isInvalidated).toBe(false);
+  });
+
+  it('does not refresh or recount after failed events, and developer events never wake manager queries', async () => {
+    const { result, client } = setup();
+    const tasks = ['tasks', scope, 'view']; client.setQueryData(tasks, {});
+    post.mockRejectedValue(new Error('offline'));
+    await act(async () => { await expect(result.current.event.mutateAsync(eventInput)).rejects.toThrow('offline'); });
+    await advance(); expect(client.getQueryState(tasks)?.isInvalidated).toBe(false); expect(client.getQueryState(key())?.isInvalidated).toBe(false);
+    scope = 'workspace:dev:developer:dev-1';
+    const developer = setup();
+    const manager = ['task-view-counts', 'workspace:manager:manager:', '2026-10-02']; developer.client.setQueryData(manager, {});
+    post.mockResolvedValue({ id: 1 });
+    await act(async () => { await developer.result.current.developerEvent.mutateAsync({ date: '2026-10-02', type: 'update', body: 'Fresh', requestId: 'id' }); });
+    await advance(); expect(developer.client.getQueryState(manager)?.isInvalidated).toBe(false);
+  });
+});
+
+
+it('TR-02 scopes daily keys accurately, refreshes capture parents and keeps unrelated details fresh', async () => {
+  const { result, client } = setup();
+  const parent = ['task-detail', scope, 'manager', 'T-9'];
+  const unrelated = ['task-detail', scope, 'manager', 'T-8'];
+  client.setQueryData(parent, { id: 9, taskKey: 'T-9', children: [] });
+  client.setQueryData(unrelated, { id: 8, taskKey: 'T-8', children: [] });
+  const scoped = [['today', '2026-10-02', scope], ['my-day', '2026-10-02', scope], ['manager-desk', 'task-detail', 9, null, scope], ['team-tracker', 'issue-assignment', '2026-10-02', 'JIRA-1', scope], ['workload', '2026-10-02', scope]];
+  for (const query of scoped) { client.setQueryData(query, {}); client.setQueryData([...query.slice(0, -1), 'other'], {}); }
+  post.mockResolvedValue({ diagnostics: [], task: { taskKey: 'T-1', parentId: 9 } });
+  await act(async () => { await result.current.capture.mutateAsync(captureInput); });
+  expect(client.getQueryState(parent)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(unrelated)?.isInvalidated).toBe(false);
+  for (const query of scoped) {
+    expect(client.getQueryState(query)?.isInvalidated).toBe(true);
+    expect(client.getQueryState([...query.slice(0, -1), 'other'])?.isInvalidated).toBe(false);
+  }
+});
+
+it.each([{ blocked: true }, { confirmRequired: true }])('TR-02 leaves project facts fresh for a non-writing capture %j', async (response) => {
+  const { result, client } = setup();
+  const project = ['project', scope, 1]; client.setQueryData(project, {});
+  post.mockResolvedValue({ ...response, diagnostics: [] });
+  await act(async () => { await result.current.capture.mutateAsync(captureInput); });
+  await advance(); expect(client.getQueryState(project)?.isInvalidated).toBe(false);
+});
+
+
+it('TR-02 refreshes the submitted task when the mounted detail switches keys during a write', async () => {
+  const { client } = setup();
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const form = renderHook(({ taskKey }) => useAddTaskEvent(taskKey), { wrapper, initialProps: { taskKey: 'T-1' } });
+  const first = ['task-detail', scope, 'manager', 'T-1']; const second = ['task-detail', scope, 'manager', 'T-2'];
+  client.setQueryData(first, {}); client.setQueryData(second, {});
+  let resolve!: (value: unknown) => void;
+  post.mockReturnValue(new Promise((done) => { resolve = done; }));
+  let pending!: Promise<unknown>;
+  act(() => { pending = form.result.current.mutateAsync({ type: 'update', body: 'Update', visibility: 'shared', requestId: 'id' }); });
+  await advance(0); form.rerender({ taskKey: 'T-2' });
+  await act(async () => { resolve({ id: 1 }); await pending; });
+  expect(client.getQueryState(first)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(second)?.isInvalidated).toBe(false);
 });

@@ -1,3 +1,5 @@
+import { useTaskCountInvalidation } from '@/lib/task-count-invalidation';
+import { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { api } from '@/lib/api';
@@ -68,50 +70,46 @@ export function prefetchMyDayTaskEvents(qc: ReturnType<typeof useQueryClient>, a
   return qc.prefetchInfiniteQuery({ ...myDayTaskEventsQuery(authScopeKey, key), staleTime: 10_000 });
 }
 
-function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: ['task-inbox'] });
-  qc.invalidateQueries({ queryKey: ['task-inbox-event'] });
-  qc.invalidateQueries({ queryKey: ['task-events'] });
-  qc.invalidateQueries({ queryKey: ['team-tracker'] });
-  qc.invalidateQueries({ queryKey: ['my-day'] });
-  qc.invalidateQueries({ queryKey: ['manager-desk'] });
-  qc.invalidateQueries({ queryKey: ['today'] });
-}
-
 export type AddTaskEventInput = Omit<AddTaskEventRequest, 'requestId'> & { requestId: string };
 
 export function useAddTaskEvent(taskKey: string | undefined) {
   const qc = useQueryClient();
   const scope = useAuthScopeKey();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: async (input: AddTaskEventInput) => {
       const startedAt = new Date().toISOString();
       const task = qc.getQueryData<TaskDetailResponse>(['task-detail', scope, 'manager', taskKey]);
       const event = await api.post<TaskEvent>(`/tasks/${encodeURIComponent(taskKey!)}/events`, input);
-      if (input.via !== 'standup' && task && event) notifyTaskChange({
+      if (counts.isCurrent(scope) && input.via !== 'standup' && task && event) notifyTaskChange({
         id: `task-event:${event.id}`, scope, startedAt, task: taskChangeFacts(task),
         eventType: event.type, private: event.visibility === 'private',
       });
       return event;
     },
-    onSuccess: () => invalidateTaskSurfaces(qc),
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }
 
 export function useUpdateTaskEventVisibility(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (params: { eventId: number; visibility: 'shared' | 'private' }) =>
       api.patch<TaskEvent>(`/tasks/${encodeURIComponent(taskKey!)}/events/${params.eventId}`, { visibility: params.visibility }),
-    onSuccess: () => invalidateTaskSurfaces(qc),
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }
 
 export function useRedactTaskEvent(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (eventId: number) => api.delete(`/tasks/${encodeURIComponent(taskKey!)}/events/${eventId}`),
-    onSuccess: () => invalidateTaskSurfaces(qc),
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }
 
@@ -125,9 +123,11 @@ export type AddMyDayTaskEventInput = {
 
 export function useAddMyDayTaskEvent(taskKey: string | undefined) {
   const qc = useQueryClient();
+  const counts = useTaskCountInvalidation();
   return useMutation({
+    onMutate: () => ({ scope: counts.submittedScope(), taskKey }),
     mutationFn: (input: AddMyDayTaskEventInput) =>
       api.post<TaskEvent>(`/my-day/tasks/${encodeURIComponent(taskKey!)}/events`, input),
-    onSuccess: () => invalidateTaskSurfaces(qc),
+    onSuccess: (_data, _variables, context) => { if (counts.isCurrent(context?.scope)) invalidateTaskSurfaces(qc, context.scope, context.taskKey ? [context.taskKey] : []); },
   });
 }

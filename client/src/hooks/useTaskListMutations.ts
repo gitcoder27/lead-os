@@ -1,4 +1,5 @@
-import { invalidateTaskViewCounts } from '@/lib/task-count-invalidation';
+import { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
+export { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
@@ -44,13 +45,6 @@ const UNDO_CONFLICT = 'Could not undo: a task changed since this action. Nothing
 interface GuardedItem extends TaskChangeItem {
   /** Set for an Undo, whose guard is the acknowledged postimage; forward writes derive theirs from `task`. */
   expected?: TaskExpectedState;
-}
-
-export function invalidateTaskSurfaces(qc: ReturnType<typeof useQueryClient>, scope: string) {
-  for (const key of ['tasks', 'task-detail', 'task-events', 'task-inbox', 'task-inbox-event', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload']) {
-    qc.invalidateQueries({ queryKey: [key] });
-  }
-  invalidateTaskViewCounts(qc, scope);
 }
 
 const listShape: CacheShape<TaskViewTasksResponse> = {
@@ -99,7 +93,7 @@ export function useTaskListMutations() {
           rollback();
           throw error;
         } finally {
-          if (scopeRef.current === scope) invalidateTaskSurfaces(qc, scope);
+          if (scopeRef.current === scope) invalidateTaskSurfaces(qc, scope, items.map((item) => item.task.taskKey));
         }
       });
     } finally {

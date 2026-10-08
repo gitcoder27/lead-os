@@ -1,3 +1,4 @@
+import { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
 import { useTaskCountInvalidation } from '@/lib/task-count-invalidation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { parseCapture, type CaptureDefaults, type CaptureDiagnostic, type CaptureRequestBody, type CaptureResponseBody } from 'shared/capture-grammar';
@@ -18,11 +19,16 @@ export function useCapture() {
     mutationFn: postCapture,
     onMutate: counts.submittedScope,
     onSuccess: (response, _variables, scope) => {
-      if (response.blocked || response.confirmRequired) return;
-      counts.recount(scope);
-      for (const key of ['tasks', 'task-detail', 'task-events', 'task-inbox', 'task-inbox-event', 'task-resolution', 'today', 'manager-desk', 'team-tracker', 'my-day', 'daily-notes', 'workload']) {
-        qc.invalidateQueries({ queryKey: [key] });
+      if (response.blocked || response.confirmRequired || !counts.isCurrent(scope)) return;
+      const keys = [response.task?.taskKey, response.event?.taskKey, _variables.defaults?.parentKey].filter((key): key is string => Boolean(key));
+      // A typed ^parent token may be resolved by the server rather than defaults.
+      if (response.task?.parentId) {
+        for (const query of qc.getQueryCache().findAll({ queryKey: ['task-detail', scope] })) {
+          const detail = query.state.data as ManagerTask | undefined;
+          if (detail?.id === response.task.parentId) keys.push(detail.taskKey);
+        }
       }
+      invalidateTaskSurfaces(qc, scope, keys, ['daily-notes']);
     },
   });
 }

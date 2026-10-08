@@ -10,6 +10,7 @@ import { Kbd } from '@/components/ui/Kbd';
 import { useTheme } from '@/context/ThemeContext';
 import { ACCESS_REQUEST_URL } from '@/lib/landing-config';
 import { CaptureDemo } from './CaptureDemo';
+import { CopilotShowcase } from './CopilotShowcase';
 import { DayTour } from './DayTour';
 import { StatusDot, TaskKey } from './replica';
 import './landing.css';
@@ -59,6 +60,7 @@ export function LandingPage({ initialSignInOpen = false }: LandingPageProps) {
         <main id="lp-main" tabIndex={-1}>
           <Hero onSignIn={openSignIn} />
           <FiveQuestions />
+          <CopilotSection />
           <DaySection />
           <TeamSection />
           <PrivacySection />
@@ -99,6 +101,7 @@ function LandingHeader({ headerRef, onSignIn }: { headerRef: React.RefObject<HTM
           <span className="lp-brand-name">LeadOS</span>
         </a>
         <nav className="lp-nav" aria-label="Sections">
+          <SectionLink to="copilot">Copilot</SectionLink>
           <SectionLink to="day">A day in LeadOS</SectionLink>
           <SectionLink to="team">Your team</SectionLink>
           <SectionLink to="privacy">Privacy</SectionLink>
@@ -140,7 +143,8 @@ function Hero({ onSignIn }: { onSignIn: () => void }) {
           <h1 id="lp-hero-title" className="lp-display">Lead your team without losing the thread.</h1>
           <p className="lp-lede">
             LeadOS is the daily workspace for engineering managers. Your plan, your people, the promises you made and your
-            team’s Jira work live in one place, from the morning plan to the Friday update.
+            team’s Jira work live in one place, from the morning plan to the Friday update. Copilot is one keystroke
+            away when you’d rather ask than click.
           </p>
           <PrimaryCtas
             onSignIn={onSignIn}
@@ -214,6 +218,58 @@ function FiveQuestions() {
             </div>
           ))}
         </dl>
+      </div>
+    </section>
+  );
+}
+
+const COPILOT_POINTS: { title: string; body: string }[] = [
+  {
+    title: 'Answers from your data',
+    body: 'It reads Today, the team board, your tasks, notes, 1:1 agendas and Jira before it answers, and shows you what it looked at.',
+  },
+  {
+    title: 'Acts when you say so',
+    body: 'Capture a task, add a 1:1 topic, update a note, carry work forward or change a Jira field. Each change arrives as a card, and nothing happens until you confirm.',
+  },
+  {
+    title: 'Knows where you are',
+    body: 'Open it on Team and it starts from your team; on Tasks, from your follow-ups. It suggests the next question when it’s done.',
+  },
+  {
+    title: 'Remembers how you work',
+    body: 'Tell it once that Priya prefers async updates or that deploys are on Fridays, and it keeps that in mind next time.',
+  },
+];
+
+function CopilotSection() {
+  return (
+    <section id="copilot" className="lp-section lp-copilot" aria-labelledby="copilot-title">
+      <div className="lp-copilot-glow" aria-hidden="true" />
+      <div className="lp-wrap lp-copilot-grid">
+        <div className="lp-copilot-copy">
+          <p className="lp-copilot-badge">
+            <CopilotMark size={14} />
+            Copilot
+          </p>
+          <h2 id="copilot-title" className="lp-h2" tabIndex={-1}>Or just ask. Copilot already knows your day.</h2>
+          <p className="lp-lede">
+            Ask the way you’d ask a chief of staff: who needs you, what slipped, what to cover in a 1:1. Copilot answers
+            from your own workspace, and does the follow-through when you confirm it.
+          </p>
+          <p className="lp-copilot-powered">Powered by Claude Sonnet 5.5</p>
+        </div>
+        <CopilotShowcase />
+      </div>
+      <div className="lp-wrap">
+        <ul className="lp-copilot-points">
+          {COPILOT_POINTS.map((point) => (
+            <li key={point.title}>
+              <h3 className="lp-h4">{point.title}</h3>
+              <p className="lp-body">{point.body}</p>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -329,7 +385,7 @@ const PRIVACY: { icon: ReactNode; title: string; body: string }[] = [
   {
     icon: <CopilotMark size={18} />,
     title: 'Copilot asks first.',
-    body: 'Ask about your team in plain language. Changes it proposes wait for your confirmation, and it runs on the model provider you choose.',
+    body: 'Every change Copilot proposes shows exactly what will change, and nothing happens until you confirm it.',
   },
   {
     icon: <DatabaseBackup size={18} />,

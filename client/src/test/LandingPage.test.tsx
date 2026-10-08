@@ -45,7 +45,7 @@ describe('LandingPage', () => {
     const { unmount } = render(<LandingPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Lead your team without losing the thread.' })).toBeInTheDocument();
     expect(screen.getByText(/the daily workspace for engineering managers/)).toBeInTheDocument();
-    for (const name of ['Every morning starts with the same five questions.', 'One day, start to finish.', 'Works with the team you have.', 'Private where it matters.', 'Start tomorrow with a plan.']) {
+    for (const name of ['Every morning starts with the same five questions.', 'Or just ask. Copilot already knows your day.', 'One day, start to finish.', 'Works with the team you have.', 'Private where it matters.', 'Start tomorrow with a plan.']) {
       expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
     }
     expect(document.title).toBe('LeadOS: the daily workspace for engineering managers');
@@ -118,6 +118,34 @@ describe('LandingPage', () => {
     expect(screen.getByRole('heading', { name: 'Finish the week with the update written' })).toBeInTheDocument();
     fireEvent.keyDown(within(tabs).getByRole('tab', { name: /Weekly review/ }), { key: 'ArrowRight' });
     expect(within(tabs).getByRole('tab', { name: /08:45/ })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+describe('Copilot section', () => {
+  beforeEach(() => {
+    reducedMotion.value = true;
+  });
+
+  it('names the model and shows Copilot answering from the workspace', () => {
+    render(<LandingPage />);
+    expect(screen.getByText('Powered by Claude Sonnet 5.5')).toBeInTheDocument();
+    const dock = screen.getByRole('figure', { name: 'Copilot answering “Brief me on today”' });
+    expect(within(dock).getByText('Read today snapshot')).toBeInTheDocument();
+    expect(within(dock).getByText('Marcus is blocked.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Brief me on today' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('switches questions and shows the change Copilot proposes before it acts', () => {
+    render(<LandingPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Remind me to chase Tom/ }));
+    const dock = screen.getByRole('figure', { name: /Remind me to chase Tom/ });
+    expect(within(dock).getByText('Capture a task')).toBeInTheDocument();
+    expect(within(dock).getByText('Tom Becker')).toBeInTheDocument();
+    expect(within(dock).getByText('Confirm')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Brief me on today' })).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prep my 1:1 with Lena' }));
+    expect(screen.getByText('Owning the on-call rota')).toBeInTheDocument();
   });
 });
 

@@ -1,5 +1,5 @@
 import type { ManagerTask } from "shared/types";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
 import { configTable, tasks, taskPlacements } from "../src/db/schema";
@@ -99,33 +99,40 @@ describe("private project placement", () => {
 });
 
 it("creates with capture placement, inherits children, clears explicitly and replays once", async () => {
-  const { CaptureService } = await import("../src/services/capture.service");
-  const capture = new CaptureService();
-  const project = await containers.write(a, { name: "Capture" });
-  const request = {
-    text: "Rehearsal",
-    requestId: "placement-replay",
-    clientToday: "2026-10-05",
-    tz: "Asia/Kolkata",
-    defaults: { placement: { projectId: project.id, trackId: null } },
-  };
-  const first = await capture.run(request, a);
-  expect(first.task?.placement?.projectId).toBe(project.id);
-  expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
-  const child = await capture.run({ text: "Child", defaults: { parentKey: first.task!.taskKey } }, a);
-  expect(child.task?.placement?.projectId).toBe(project.id);
-  const clear = await capture.run(
-    { text: "Direct child", defaults: { parentKey: first.task!.taskKey, placement: null } },
-    a,
-  );
-  expect(clear.task?.placement).toBeNull();
-  await containers.write(a, { archived: true }, project.id);
-  await expect(
-    capture.run({ text: "Must rollback", defaults: { parentKey: first.task!.taskKey } }, a),
-  ).rejects.toMatchObject({ status: 409 });
-  expect((await db.select().from(tasks)).map((task) => task.title)).not.toContain("Must rollback");
-  expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
-  expect(await db.select().from(tasks)).toHaveLength(3);
+  // Pin only Date; database/Express timers continue to run normally.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-10-05T04:30:00.000Z")); // 10:00 in Asia/Kolkata
+    const { CaptureService } = await import("../src/services/capture.service");
+    const capture = new CaptureService();
+    const project = await containers.write(a, { name: "Capture" });
+    const request = {
+      text: "Rehearsal",
+      requestId: "placement-replay",
+      clientToday: "2026-10-05",
+      tz: "Asia/Kolkata",
+      defaults: { placement: { projectId: project.id, trackId: null } },
+    };
+    const first = await capture.run(request, a);
+    expect(first.task?.placement?.projectId).toBe(project.id);
+    expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
+    const child = await capture.run({ text: "Child", defaults: { parentKey: first.task!.taskKey } }, a);
+    expect(child.task?.placement?.projectId).toBe(project.id);
+    const clear = await capture.run(
+      { text: "Direct child", defaults: { parentKey: first.task!.taskKey, placement: null } },
+      a,
+    );
+    expect(clear.task?.placement).toBeNull();
+    await containers.write(a, { archived: true }, project.id);
+    await expect(
+      capture.run({ text: "Must rollback", defaults: { parentKey: first.task!.taskKey } }, a),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await db.select().from(tasks)).map((task) => task.title)).not.toContain("Must rollback");
+    expect((await capture.run(request, a)).task?.taskKey).toBe(first.task?.taskKey);
+    expect(await db.select().from(tasks)).toHaveLength(3);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("counts only visible direct children and excludes dropped work", async () => {

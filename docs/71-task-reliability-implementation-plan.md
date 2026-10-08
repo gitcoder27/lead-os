@@ -23,7 +23,7 @@ This plan covers the five fixes selected after the repository review. No TODO/FI
 | 2 | TR-02 | Task activity, counts and project summaries refresh after the scoped writes | Complete |
 | 3 | TR-03 | The manager's linked roster identity is consistently shown as You in Tasks | Complete |
 | 4 | TR-04 | Temporary history failures preserve loaded task activity and offer targeted Retry | Complete |
-| 5 | TR-05 | The project capture/replay test passes independently of the real calendar date | Not started |
+| 5 | TR-05 | The project capture/replay test passes independently of the real calendar date | Complete |
 
 There are no implementation dependencies between items. TR-01 and TR-02 touch some of the same hooks; preserve the earlier item's behavior and regression tests. Do not mark wider backlog items complete merely because these fixes overlap them.
 
@@ -140,7 +140,7 @@ Include new timeline recovery tests. Check recovery with keyboard-accessible but
 
 ## TR-05 — Calendar-independent project capture test
 
-- [ ] Implement and verify TR-05.
+- [x] Implement and verify TR-05.
 
 **Problem:** The capture placement/inheritance/replay case in [projects.service.test.ts](../server/tests/projects.service.test.ts) supplies a fixed 2026-10-05 client day to the real clock. The [capture service](../server/src/services/capture.service.ts) correctly rejects a date more than one day away from the server's day in the supplied zone. The test's success therefore expires as time passes.
 
@@ -185,11 +185,8 @@ In the per-item handoff, report the commit hash, changed behavior and main files
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
 | 2026-10-07 | TR-00 | main (this commit) | Created this five-item plan and matching docs/56 tracking entries. Local links, five-item checklist/ID consistency, per-item commit messages and diff whitespace checks pass. Application implementation not started; no runtime data, external services, Jira, push or deployment. |
-
 | 2026-10-08 | TR-01 | main (this commit) | Reproduced three failing lost-response/pending UI checks against original code. Form-local attempts retain ID, defaults and client day/zone; edits/context/auth changes renew identity, pending resubmission is guarded, and late completion cannot clear changed/closed drafts. Client focused suites (useCapture, useCaptureAttempt, TasksPage, TaskDrawer): 165 passed; isolated capture.routes: 31 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external service access. Known date-sensitive project case remains unchanged for TR-05. |
-
 | 2026-10-08 | TR-02 | main (this commit) | Reproduced eight observer/auth failures before repair. Scoped refresh policy updates Tasks/activity and directory/detail/track facts immediately after capture, event and detail/list writes and Undo; counts remain coalesced, developer events never wake manager counts, and unrelated details/scopes remain fresh. Failed events and refused/confirmation captures do not recount; detail/list settlement policy is preserved. Required four client suites plus useCapture/useCaptureAttempt: 63 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated active-observer/mocked verification; no browser/runtime/external service access. Known project date failure remains for TR-05. |
-
 | 2026-10-08 | TR-03 | main (this commit) | Three final UI regressions fail against original code. Authoritative auth-scoped self-link reads label login/roster owners and people as You, merge owner groups with private manager inline context, and remove duplicate self choices. Explicit waiting-party refs and all task data remain unchanged. Suggestion/error fallback, unlink, manager switch, legacy equal IDs and developer no-manager-request behavior covered. TasksPage, TaskDrawer, SelfLink, task-list and new TaskIdentity suites: 238 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked verification only; no browser/runtime/external access. Known project date failure remains for TR-05. |
-
 | 2026-10-08 | TR-04 | main (this commit) | Reproduced two inbox and both-role timeline retention failures against original code. Loaded activity survives temporary older/refresh errors; announced targeted Retry preserves successful pages, pending controls block repeats, deduplication/read actions remain usable, and explicit Refresh updates resets inbox history. Authoritative 401/403/404/410 and server-disabled collaboration suppress protected content. TaskInbox, tasks and new TaskTimelineRecovery: 61 passed, including P08 latest-only polling/five-page retention/release and strict exact-event checks. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external access. Known project clock failure remains for TR-05. |
+| 2026-10-08 | TR-05 | main (this commit) | Reproduced unchanged baseline: projects 12 passed/1 failed because client 2026-10-05 differed from real 2026-10-08. Pinned only Date to 2026-10-05T04:30Z (10:00 Asia/Kolkata) in the capture case; finally restores real time. Production validation and all existing assertions unchanged. projects.service + capture.routes: 44 passed (13 project tests). Full isolated server: 1531 passed/106 files. Initial full client: 2054 passed/1 unchanged DefectTable viewport timeout under concurrent validation; isolated DefectTable: 47 passed; full rerun npm run test --workspace=client -- --maxWorkers=2: 2055 passed/147 files, with unchanged assertions/timeouts. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. All five items complete; automated DOM/mocked tests only, no browser/runtime/external service access. |

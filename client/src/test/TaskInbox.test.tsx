@@ -302,3 +302,101 @@ it('P08 polls one latest page after three history pages and releases bounded his
   expect(get).toHaveBeenCalledOnce();
   badge.unmount(); qc.clear(); vi.useRealTimers();
 });
+
+it('TR-04 retains latest and loaded older rows, retries only a failed cursor and keeps read actions usable', async () => {
+  let fail = '1';
+  get.mockImplementation(async (url) => {
+    const cursor = new URL(url, 'https://fixture.invalid').searchParams.get('cursor');
+    if (cursor === fail) throw new Error('Offline');
+    const n = Number(cursor ?? 0);
+    return { enabled: true, unreadCount: 4, events: [{ ...item, id: n + 7, taskKey: `T-${n + 2}`, title: `Page ${n}` }], nextCursor: String(n + 1) };
+  });
+  mount();
+  await screen.findByRole('link', { name: /Page 0/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Older updates' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('older');
+  expect(screen.getByRole('link', { name: /Page 0/ })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Mark T-2 update read' })).toBeEnabled();
+  fail = '';
+  get.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: /Retry older/ }));
+  await screen.findByRole('link', { name: /Page 1/ });
+  expect(get.mock.calls.map(([url]) => new URL(url, 'https://fixture.invalid').searchParams.get('cursor'))).toEqual(['1']);
+  fail = '2';
+  fireEvent.click(screen.getByRole('button', { name: 'Older updates' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('link', { name: /Page 0/ })).toBeVisible();
+  expect(screen.getByRole('link', { name: /Page 1/ })).toBeVisible();
+  fail = '';
+  get.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: /Retry older/ }));
+  await screen.findByRole('link', { name: /Page 2/ });
+  expect(get).toHaveBeenCalledOnce();
+  expect(new URL(get.mock.calls[0]![0], 'https://fixture.invalid').searchParams.get('cursor')).toBe('2');
+  expect(screen.getAllByRole('link')).toHaveLength(3);
+});
+
+it('TR-04 keeps loaded history after a latest refresh failure and retries latest without resetting history', async () => {
+  let offline = false;
+  get.mockImplementation(async (url) => {
+    const cursor = new URL(url, 'https://fixture.invalid').searchParams.get('cursor');
+    if (!cursor && offline) throw new Error('Offline');
+    return { enabled: true, unreadCount: 2, events: [{ ...item, id: cursor ? 8 : 7, title: cursor ? 'Older row' : 'Latest row' }], nextCursor: cursor ? null : 'older' };
+  });
+  const view = mount();
+  await screen.findByRole('link', { name: /Latest row/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Older updates' }));
+  await screen.findByRole('link', { name: /Older row/ });
+  offline = true;
+  await act(async () => { await view.qc.refetchQueries({ queryKey: ['task-inbox', 'default:lead:manager', 'latest'] }); });
+  expect(await screen.findByRole('alert')).toHaveTextContent('refresh');
+  expect(screen.getAllByRole('link')).toHaveLength(2);
+  offline = false; get.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: /Retry latest/ }));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  expect(screen.getAllByRole('link')).toHaveLength(2);
+  expect(get).toHaveBeenCalledOnce(); expect(get.mock.calls[0]![0]).not.toContain('cursor');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh updates' }));
+  await waitFor(() => expect(screen.getAllByRole('link')).toHaveLength(1));
+});
+
+it.each([401, 403, 404, 410])('TR-04 clears protected inbox rows after authoritative access loss (%s)', async (status) => {
+  const view = mount();
+  await screen.findByRole('link', { name: /Release checklist/ });
+  get.mockRejectedValue(Object.assign(new Error('Unavailable'), { status }));
+  await act(async () => { await view.qc.refetchQueries({ queryKey: ['task-inbox', 'default:lead:manager', 'latest'] }); });
+  expect(await screen.findByRole('alert')).toBeVisible();
+  expect(screen.queryByRole('link')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Mark shown as read' })).toBeNull();
+});
+
+it('TR-04 disables duplicate older retry while pending and drops rows when filter/account changes', async () => {
+  get.mockResolvedValueOnce({ enabled: true, unreadCount: 1, events: [item], nextCursor: 'older' }).mockRejectedValue(new Error('Offline'));
+  const view = mount();
+  await screen.findByRole('link', { name: /Release checklist/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Older updates' }));
+  await screen.findByRole('alert');
+  let resolve!: (value: unknown) => void;
+  get.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+  get.mockClear(); fireEvent.click(screen.getByRole('button', { name: /Retry older/ }));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Loading older'));
+  const older = screen.queryByRole('button', { name: /Retry older|Loading…/ });
+  expect(older).toBeDisabled(); fireEvent.click(older!); expect(get).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'All' }));
+  expect(screen.queryByRole('link')).toBeNull();
+  await screen.findByRole('alert');
+  await act(async () => { resolve({ enabled: true, unreadCount: 0, events: [], nextCursor: null }); });
+  expect(screen.queryByRole('link')).toBeNull();
+  user = { ...user, workspaceId: 'next', username: 'next' };
+  view.rerender(<QueryClientProvider client={view.qc}><TaskInboxContent onOpen={onOpen} /></QueryClientProvider>);
+  expect(screen.queryByRole('link')).toBeNull(); await screen.findByRole('alert');
+});
+
+it.each([403, 'disabled'] as const)('TR-04 hides inbox content when the older endpoint revokes access (%s)', async (status) => {
+  get.mockResolvedValueOnce({ enabled: true, unreadCount: 1, events: [item], nextCursor: 'older' });
+  mount(); await screen.findByRole('link', { name: /Release checklist/ });
+  if (status === 'disabled') get.mockResolvedValueOnce({ enabled: false, unreadCount: 0, events: [], nextCursor: null });
+  else get.mockRejectedValueOnce(Object.assign(new Error('Denied'), { status }));
+  fireEvent.click(screen.getByRole('button', { name: 'Older updates' }));
+  await waitFor(() => expect(screen.queryByRole('link')).toBeNull());
+});

@@ -22,7 +22,7 @@ This plan covers the five fixes selected after the repository review. No TODO/FI
 | 1 | TR-01 | Retrying an unchanged inline task/subtask submission cannot create a duplicate | Complete |
 | 2 | TR-02 | Task activity, counts and project summaries refresh after the scoped writes | Complete |
 | 3 | TR-03 | The manager's linked roster identity is consistently shown as You in Tasks | Complete |
-| 4 | TR-04 | Temporary history failures preserve loaded task activity and offer targeted Retry | Not started |
+| 4 | TR-04 | Temporary history failures preserve loaded task activity and offer targeted Retry | Complete |
 | 5 | TR-05 | The project capture/replay test passes independently of the real calendar date | Not started |
 
 There are no implementation dependencies between items. TR-01 and TR-02 touch some of the same hooks; preserve the earlier item's behavior and regression tests. Do not mark wider backlog items complete merely because these fixes overlap them.
@@ -114,7 +114,7 @@ Include any new grouping/identity regression suite.
 
 ## TR-04 — Recover history without hiding loaded activity
 
-- [ ] Implement and verify TR-04.
+- [x] Implement and verify TR-04.
 
 **Problem:** [useTaskInbox](../client/src/hooks/useTaskInbox.ts) combines latest-page and older-history errors into one `isError`. [TaskInboxContent](../client/src/components/actions/TaskInboxContent.tsx) then drops all rendered items. [TaskTimeline](../client/src/components/tasks/TaskTimeline.tsx) similarly returns only an error on any query failure, including a later page/refresh failure with already loaded activity.
 
@@ -191,3 +191,5 @@ In the per-item handoff, report the commit hash, changed behavior and main files
 | 2026-10-08 | TR-02 | main (this commit) | Reproduced eight observer/auth failures before repair. Scoped refresh policy updates Tasks/activity and directory/detail/track facts immediately after capture, event and detail/list writes and Undo; counts remain coalesced, developer events never wake manager counts, and unrelated details/scopes remain fresh. Failed events and refused/confirmation captures do not recount; detail/list settlement policy is preserved. Required four client suites plus useCapture/useCaptureAttempt: 63 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated active-observer/mocked verification; no browser/runtime/external service access. Known project date failure remains for TR-05. |
 
 | 2026-10-08 | TR-03 | main (this commit) | Three final UI regressions fail against original code. Authoritative auth-scoped self-link reads label login/roster owners and people as You, merge owner groups with private manager inline context, and remove duplicate self choices. Explicit waiting-party refs and all task data remain unchanged. Suggestion/error fallback, unlink, manager switch, legacy equal IDs and developer no-manager-request behavior covered. TasksPage, TaskDrawer, SelfLink, task-list and new TaskIdentity suites: 238 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked verification only; no browser/runtime/external access. Known project date failure remains for TR-05. |
+
+| 2026-10-08 | TR-04 | main (this commit) | Reproduced two inbox and both-role timeline retention failures against original code. Loaded activity survives temporary older/refresh errors; announced targeted Retry preserves successful pages, pending controls block repeats, deduplication/read actions remain usable, and explicit Refresh updates resets inbox history. Authoritative 401/403/404/410 and server-disabled collaboration suppress protected content. TaskInbox, tasks and new TaskTimelineRecovery: 61 passed, including P08 latest-only polling/five-page retention/release and strict exact-event checks. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external access. Known project clock failure remains for TR-05. |

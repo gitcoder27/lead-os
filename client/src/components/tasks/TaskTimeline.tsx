@@ -1,3 +1,4 @@
+import { isTaskActivityAccessLoss } from '@/lib/task-activity-recovery';
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useInboxTargetEvent } from '@/hooks/useTaskInbox';
@@ -316,7 +317,22 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
   const updateVisibility = useUpdateTaskEventVisibility(taskKey);
   const redactEvent = useRedactTaskEvent(taskKey);
 
-  const events = query.data?.pages.flatMap((page) => page.events) ?? [];
+  const accessLost = isTaskActivityAccessLoss(query.error);
+  const seen = new Set<number>();
+  const events = accessLost ? [] : (query.data?.pages.flatMap((page) => page.events) ?? []).filter((event) => {
+    if (seen.has(event.id)) return false;
+    seen.add(event.id);
+    return true;
+  });
+  const retryOlder = query.isFetchNextPageError && !accessLost;
+  const errorBanner = query.isError ? (
+    <div role="alert" className="py-3 text-[12px]" style={{ color: 'var(--danger)' }}>
+      {retryOlder ? 'Could not load older activity.' : query.data && !accessLost ? 'Could not refresh the timeline.' : 'Could not load the timeline.'}{' '}
+      <button type="button" disabled={query.isFetching} onClick={() => void (retryOlder ? query.fetchNextPage() : query.refetch())} style={{ color: 'var(--accent)' }}>
+        {retryOlder ? 'Retry older activity' : 'Retry'}
+      </button>
+    </div>
+  ) : null;
 
   if (query.isLoading) {
     return (
@@ -335,18 +351,9 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
     );
   }
 
-  if (query.isError) {
-    return (
-      <div className="py-3 text-[12px]" style={{ color: 'var(--danger)' }}>
-        Could not load the timeline.{' '}
-        <button type="button" onClick={() => void query.refetch()} style={{ color: 'var(--accent)' }}>
-          Retry
-        </button>
-      </div>
-    );
-  }
+  if (query.isError && (!query.data || accessLost)) return errorBanner;
 
-  if (events.length === 0) {
+  if (events.length === 0 && !query.isError) {
     return (
       <div className="py-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
         {emptyLabel}
@@ -355,7 +362,9 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
   }
 
   return (
-    <div>
+    <div aria-busy={Boolean(query.isFetching)}>
+      {errorBanner}
+      {query.isFetching && !query.isLoading ? <p role="status" className="py-2 text-[12px]">{query.isFetchingNextPage ? 'Loading older activity…' : 'Refreshing activity…'}</p> : null}
       <ol className="relative">
         {events.map((event, index) => {
           const typeLabel =
@@ -475,11 +484,11 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           );
         })}
       </ol>
-      {query.hasNextPage && (
+      {query.hasNextPage && !query.isFetchNextPageError && (
         <button
           type="button"
           onClick={() => void query.fetchNextPage()}
-          disabled={query.isFetchingNextPage}
+          disabled={query.isFetching}
           className="ml-9 mt-1 rounded-lg px-2 py-1 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >

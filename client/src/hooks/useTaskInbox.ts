@@ -1,3 +1,4 @@
+import { isTaskActivityAccessLoss } from '@/lib/task-activity-recovery';
 import { useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
@@ -16,7 +17,7 @@ export function useTaskInboxLatest(unreadOnly = true) {
     queryFn: ({ signal }) => api.get<TaskInboxResponse>(`/task-inbox?unread=${unreadOnly}&limit=20`, { signal }),
     enabled, retry: false, staleTime: 10_000, refetchInterval: 30_000,
   });
-  return { ...query, enabled: enabled && query.data?.enabled !== false };
+  return { ...query, data: isTaskActivityAccessLoss(query.error) ? undefined : query.data, enabled: enabled && query.data?.enabled !== false };
 }
 
 /** History starts only on Load older, is never polled, and lives only while open. */
@@ -39,18 +40,32 @@ export function useTaskInbox(unreadOnly = true) {
     retry: false,
   });
   const older = cursor ? history.data?.pages ?? [] : [];
+  const historyError = Boolean(cursor) && history.isError;
+  const accessLost = isTaskActivityAccessLoss(latest.error) || (historyError && isTaskActivityAccessLoss(history.error));
+  const enabled = latest.enabled && !older.some((page) => page.enabled === false);
+  const retryOlder = () => {
+    if (history.isFetching) return Promise.resolve();
+    return history.isFetchNextPageError ? history.fetchNextPage() : history.refetch();
+  };
   return {
-    enabled: latest.enabled,
-    data: latest.data ? { pages: [latest.data, ...older] } : undefined,
+    enabled,
+    data: enabled && !accessLost && latest.data ? { pages: [latest.data, ...older] } : undefined,
     isLoading: latest.isLoading,
-    isError: latest.isError || (Boolean(cursor) && history.isError),
+    isError: latest.isError || historyError,
+    latestError: latest.isError,
+    historyError,
+    accessLost,
+    isRefreshing: latest.isFetching,
     isFetchingNextPage: Boolean(cursor) && history.isFetching,
-    hasNextPage: cursor ? history.hasNextPage : Boolean(latest.data?.nextCursor),
+    hasNextPage: cursor ? (history.data ? history.hasNextPage : true) : Boolean(latest.data?.nextCursor),
     fetchNextPage: () => {
+      if (history.isFetching) return Promise.resolve();
       if (cursor) return history.fetchNextPage();
       if (latest.data?.nextCursor) setAnchor({ scope, unreadOnly, cursor: latest.data.nextCursor });
       return Promise.resolve();
     },
+    retryOlder,
+    retryLatest: () => latest.isFetching ? Promise.resolve() : latest.refetch(),
     refetch: () => { setAnchor(null); return latest.refetch(); },
   };
 }

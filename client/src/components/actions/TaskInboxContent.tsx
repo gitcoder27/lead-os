@@ -18,7 +18,7 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
   const query = useTaskInbox(unreadOnly);
   const markRead = useMarkTaskInboxRead();
   const seen = new Set<number>();
-  const items = query.isError ? [] : (query.data?.pages.flatMap((page) => page.events) ?? []).filter((item) => {
+  const items = (query.data?.pages.flatMap((page) => page.events) ?? []).filter((item) => {
     if (seen.has(item.id)) return false;
     seen.add(item.id);
     return true;
@@ -39,7 +39,7 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
       <div className="task-inbox-heading">
         <h2>Updates{unreadCount !== undefined ? ` · ${unreadCount} unread` : ''}</h2>
         <div className="task-inbox-tabs" aria-label="Show updates">
-          <button type="button" onClick={() => void query.refetch()}>Refresh updates</button>
+          <button type="button" disabled={query.isRefreshing} onClick={() => void query.refetch()}>Refresh updates</button>
           <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>
             Unread
           </button>
@@ -49,14 +49,22 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
         </div>
       </div>
       {query.isLoading ? <p aria-live="polite">Loading updates…</p> : null}
-      {query.isError ? (
+      {query.latestError ? (
         <p role="alert">
-          Updates unavailable.{' '}
-          <button type="button" onClick={() => void query.refetch()}>
-            Retry
+          {query.data ? 'Could not refresh latest updates.' : 'Updates unavailable.'}{' '}
+          <button type="button" disabled={query.isRefreshing} onClick={() => void query.retryLatest()}>
+            {query.data ? 'Retry latest updates' : 'Retry'}
           </button>
         </p>
       ) : null}
+      {query.historyError ? (
+        <p role="alert">
+          Could not load older updates.{' '}
+          <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.retryOlder()}>Retry older updates</button>
+        </p>
+      ) : null}
+      {query.isFetchingNextPage ? <p role="status">Loading older updates…</p> : null}
+      {query.isRefreshing && !query.isLoading ? <p role="status">Refreshing latest updates…</p> : null}
       {!query.isLoading && !query.isError && !items.length ? (
         <p>{unreadOnly ? 'No unread updates.' : 'No updates yet.'}</p>
       ) : null}
@@ -108,7 +116,7 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
           </li>
         ))}
       </ul>
-      {query.hasNextPage ? (
+      {query.hasNextPage && !query.historyError && !query.accessLost ? (
         <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
           {query.isFetchingNextPage ? 'Loading…' : 'Older updates'}
         </button>

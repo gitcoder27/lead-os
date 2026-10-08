@@ -1,3 +1,4 @@
+import { useTaskIdentity } from '@/hooks/useTaskIdentity';
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AlignLeft,
@@ -69,7 +70,7 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
   // Manager-only endpoint (P3 §3.3): developers skip the request.
   const developers = useDevelopers(undefined, { enabled: mode === 'manager' });
   const list = developers.data;
-  const userId = user?.accountId;
+  const { loginId: userId, isSelf } = useTaskIdentity(mode);
   const userName = user?.displayName || user?.username || 'You';
   return useMemo(() => {
     const byId = new Map<string, string>();
@@ -77,12 +78,12 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
     return {
       // docs/51 F3: my linked developer account is me — the "Me" option
       // already covers it, so the assign menu doesn't list self twice.
-      developers: (list ?? []).filter((dev) => dev.accountId !== userId).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
-      nameFor: (id) => (!id ? undefined : id === userId ? 'You' : byId.get(id)),
+      developers: (list ?? []).filter((dev) => !isSelf(dev.accountId)).map((dev) => ({ accountId: dev.accountId, displayName: dev.displayName })),
+      nameFor: (id) => (!id ? undefined : isSelf(id) ? 'You' : byId.get(id)),
       userId,
       userName,
     };
-  }, [list, userId, userName]);
+  }, [list, userId, userName, isSelf]);
 }
 
 // ── Status ──────────────────────────────────────────────────────────

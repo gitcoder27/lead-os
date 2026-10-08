@@ -1,3 +1,4 @@
+import { isTaskSelf } from './task-identity';
 import type {
   ManagerTask,
   TaskAttentionSignal,
@@ -223,6 +224,7 @@ export function taskParty(
   task: Pick<ManagerTask, 'waitingOn' | 'ownerType' | 'ownerId'>,
   ownerName: (ownerType: string | null, ownerId: string | null) => string,
   selfAccountId?: string,
+  selfDeveloperId?: string,
 ): { key: string; label: string; waitingOn: TaskWaitingOnInput | null } {
   const waiting = task.waitingOn;
   if (waiting) {
@@ -233,7 +235,7 @@ export function taskParty(
     if (waiting.type === 'contact' && waiting.ref) return { key: `party:contact:${waiting.ref}`, label, waitingOn: { type: 'contact', ref: waiting.ref, label } };
     return { key: `party:text:${label.toLowerCase()}`, label, waitingOn: { type: 'text', label } };
   }
-  if (task.ownerType === 'developer' && task.ownerId && task.ownerId !== selfAccountId) {
+  if (task.ownerType === 'developer' && task.ownerId && !isTaskSelf(task.ownerId, selfAccountId, selfDeveloperId)) {
     return { key: `party:developer:${task.ownerId}`, label: ownerName('developer', task.ownerId), waitingOn: { type: 'developer', ref: task.ownerId } };
   }
   return { key: PARTY_BLOCKED, label: 'Blocked', waitingOn: null };
@@ -241,8 +243,7 @@ export function taskParty(
 
 /**
  * Group task rows for the current `group` mode. Ungrouped → a single bucket.
- * docs/51 F3: `selfAccountId` resolves the manager's linked developer account —
- * tasks owned by it group under Me rather than a second self-named group.
+ * The login and confirmed roster link share one manager group and login creation context.
  */
 export function groupTaskViewTasks(
   tasks: ManagerTask[],
@@ -250,6 +251,7 @@ export function groupTaskViewTasks(
   today: string,
   ownerName: (ownerType: string | null, ownerId: string | null) => string,
   selfAccountId?: string,
+  selfDeveloperId?: string,
 ): TaskViewGroupBucket[] {
   if (!group) return [{ key: 'all', label: '', tasks, context: { mode: 'none' } }];
   const buckets = new Map<string, { tasks: ManagerTask[]; context: TaskGroupContext; label: string }>();
@@ -261,11 +263,11 @@ export function groupTaskViewTasks(
   for (const task of tasks) {
     switch (group) {
       case 'owner': {
-        const ownerType = task.ownerType === 'developer' && task.ownerId !== null && task.ownerId === selfAccountId
-          ? 'manager'
-          : task.ownerType;
-        const key = ownerType ? `${ownerType}:${task.ownerId}` : 'inbox';
-        push(key, ownerType ? ownerName(ownerType, task.ownerId) : 'Inbox', { mode: 'owner', ownerType, ownerId: task.ownerId }, task);
+        const self = isTaskSelf(task.ownerId, selfAccountId, selfDeveloperId);
+        const ownerType = self ? 'manager' : task.ownerType;
+        const ownerId = self ? selfAccountId ?? task.ownerId : task.ownerId;
+        const key = ownerType ? `${ownerType}:${ownerId}` : 'inbox';
+        push(key, ownerType ? ownerName(ownerType, ownerId) : 'Inbox', { mode: 'owner', ownerType, ownerId }, task);
         break;
       }
       case 'status':
@@ -281,7 +283,7 @@ export function groupTaskViewTasks(
         break;
       }
       case 'party': {
-        const party = taskParty(task, ownerName, selfAccountId);
+        const party = taskParty(task, ownerName, selfAccountId, selfDeveloperId);
         push(party.key, party.label, { mode: 'party', waitingOn: party.waitingOn }, task);
         break;
       }

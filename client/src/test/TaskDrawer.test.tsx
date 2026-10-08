@@ -1,3 +1,5 @@
+const mockSelfLink = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/useSelfLink', () => ({ useSelfLink: (...args: unknown[]) => mockSelfLink(...args) }));
 import { clearTaskUpdateDraftsForScope, readTaskUpdateDraft, taskUpdateDraftPrefix } from '@/lib/task-update-drafts';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -118,6 +120,7 @@ beforeEach(() => {
   mockToast.mockReset();
   mockCaptureCreate.mockReset();
   mockCaptureCreate.mockResolvedValue({ task: { taskKey: 'T-20' }, warnings: [] });
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: null, suggestedDeveloperAccountId: null }, isError: false });
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
 });
 
@@ -771,4 +774,20 @@ it.each(['task', 'meeting'] as const)('TR-01 retries a lost %s child response on
   expect(post.mock.calls[1]![0]).toEqual(post.mock.calls[0]![0]);
   expect(accepted.size).toBe(1);
   expect(input).toHaveValue('');
+});
+
+
+it('TR-03 shows a separate linked roster owner/person as You and follows unlinking without PATCH', () => {
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: 'dev-1', suggestedDeveloperAccountId: null }, isError: false });
+  mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ ownerType: 'developer', ownerId: 'dev-1', links: [{ id: 1, kind: 'person', ref: 'dev-1', role: null }] as never })));
+  const view = render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+  expect(screen.getByRole('button', { name: 'Owner: You' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Owner: You' }));
+  expect(screen.queryByRole('menuitem', { name: 'Dev One' })).toBeNull();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  expect(mockMutate).not.toHaveBeenCalled();
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: null, suggestedDeveloperAccountId: null }, isError: false });
+  view.rerender(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+  expect(screen.getByRole('button', { name: 'Owner: Dev One' })).toBeVisible();
+  expect(mockMutate).not.toHaveBeenCalled();
 });

@@ -21,7 +21,7 @@ This plan covers the five fixes selected after the repository review. No TODO/FI
 | --- | --- | --- | --- |
 | 1 | TR-01 | Retrying an unchanged inline task/subtask submission cannot create a duplicate | Complete |
 | 2 | TR-02 | Task activity, counts and project summaries refresh after the scoped writes | Complete |
-| 3 | TR-03 | The manager's linked roster identity is consistently shown as You in Tasks | Not started |
+| 3 | TR-03 | The manager's linked roster identity is consistently shown as You in Tasks | Complete |
 | 4 | TR-04 | Temporary history failures preserve loaded task activity and offer targeted Retry | Not started |
 | 5 | TR-05 | The project capture/replay test passes independently of the real calendar date | Not started |
 
@@ -88,7 +88,7 @@ Include new event/refresh tests in the run. This is a client refresh repair; a b
 
 ## TR-03 — Linked manager identity throughout Tasks
 
-- [ ] Implement and verify TR-03.
+- [x] Implement and verify TR-03.
 
 **Problem:** The server's [self-identity resolver](../server/src/services/self-identity.service.ts) and Tasks views recognize a manager's login plus their separately linked roster ID. [TasksPage](../client/src/components/tasks/TasksPage.tsx), [useTaskPeople](../client/src/components/tasks/TaskDetailFields.tsx), and [task grouping](../client/src/lib/task-views.ts) compare only one ID. Existing UI tests cover a legacy manager whose login already equals the roster ID, leaving the separate-ID case untested. The intended read-only identity model is documented in [docs/64](64-manager-identity.md).
 
@@ -189,3 +189,5 @@ In the per-item handoff, report the commit hash, changed behavior and main files
 | 2026-10-08 | TR-01 | main (this commit) | Reproduced three failing lost-response/pending UI checks against original code. Form-local attempts retain ID, defaults and client day/zone; edits/context/auth changes renew identity, pending resubmission is guarded, and late completion cannot clear changed/closed drafts. Client focused suites (useCapture, useCaptureAttempt, TasksPage, TaskDrawer): 165 passed; isolated capture.routes: 31 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external service access. Known date-sensitive project case remains unchanged for TR-05. |
 
 | 2026-10-08 | TR-02 | main (this commit) | Reproduced eight observer/auth failures before repair. Scoped refresh policy updates Tasks/activity and directory/detail/track facts immediately after capture, event and detail/list writes and Undo; counts remain coalesced, developer events never wake manager counts, and unrelated details/scopes remain fresh. Failed events and refused/confirmation captures do not recount; detail/list settlement policy is preserved. Required four client suites plus useCapture/useCaptureAttempt: 63 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated active-observer/mocked verification; no browser/runtime/external service access. Known project date failure remains for TR-05. |
+
+| 2026-10-08 | TR-03 | main (this commit) | Three final UI regressions fail against original code. Authoritative auth-scoped self-link reads label login/roster owners and people as You, merge owner groups with private manager inline context, and remove duplicate self choices. Explicit waiting-party refs and all task data remain unchanged. Suggestion/error fallback, unlink, manager switch, legacy equal IDs and developer no-manager-request behavior covered. TasksPage, TaskDrawer, SelfLink, task-list and new TaskIdentity suites: 238 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked verification only; no browser/runtime/external access. Known project date failure remains for TR-05. |

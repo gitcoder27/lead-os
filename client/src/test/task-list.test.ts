@@ -552,3 +552,25 @@ describe('project filters and contextual capture', () => {
     expect(inlineCaptureDefaults('inbox', {}, { mode: 'none' }, TODAY)).not.toHaveProperty('placement');
   });
 });
+
+
+describe('TR-03 linked manager grouping', () => {
+  const name = (_type: string | null, id: string | null) => id === 'login' || id === 'roster' ? 'You' : 'Colleague';
+  it('merges login and separate roster ownership while leaving task data intact', () => {
+    const rows = [task({ ownerId: 'login' }), task({ taskKey: 'T-2', ownerType: 'developer', ownerId: 'roster' }), task({ taskKey: 'T-3', ownerType: 'developer', ownerId: 'colleague' })];
+    const before = structuredClone(rows);
+    const groups = groupTaskViewTasks(rows, 'owner', TODAY, name, 'login', 'roster');
+    expect(groups.map((group) => [group.label, group.tasks.length])).toEqual([['You', 2], ['Colleague', 1]]);
+    expect(groups[0]!.context).toEqual({ mode: 'owner', ownerType: 'manager', ownerId: 'login' });
+    expect(inlineCaptureDefaults('my-tasks', {}, groups[0]!.context, TODAY)).toEqual({});
+    expect(rows).toEqual(before);
+  });
+  it('excludes implicit self delegation but preserves an explicit waiting party and its capture defaults', () => {
+    const own = task({ ownerType: 'developer', ownerId: 'roster', status: 'blocked' });
+    const explicit = task({ waitingOn: { type: 'developer', ref: 'roster', label: 'Self roster', since: null } });
+    expect(taskParty(own, name, 'login', 'roster')).toMatchObject({ label: 'Blocked', waitingOn: null });
+    const party = taskParty(explicit, name, 'login', 'roster');
+    expect(party).toMatchObject({ label: 'You', waitingOn: { type: 'developer', ref: 'roster' } });
+    expect(inlineCaptureDefaults('waiting', {}, { mode: 'party', waitingOn: party.waitingOn }, TODAY)).toEqual({ waitingOn: { type: 'developer', ref: 'roster' } });
+  });
+});

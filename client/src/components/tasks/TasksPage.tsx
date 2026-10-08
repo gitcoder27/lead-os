@@ -1,3 +1,4 @@
+import { useTaskIdentity } from '@/hooks/useTaskIdentity';
 import type { CreateViaCapture } from '@/hooks/useCapture';
 import { PlacementDialog } from './PlacementDialog';
 import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
@@ -259,33 +260,31 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   );
 
   const developerList = useMemo(() => developers.data ?? [], [developers.data]);
-  // docs/51 F3: my linked developer account is me — same identity the server
-  // uses (the session accountId IS the developer id for linked managers).
-  const selfAccountId = user?.accountId;
+  const { loginId: selfAccountId, developerId: selfDeveloperId, isSelf } = useTaskIdentity('manager');
   const contacts = useContacts();
   const assignableDevelopers = useMemo(
-    () => developerList.filter((dev) => dev.accountId !== selfAccountId),
-    [developerList, selfAccountId],
+    () => developerList.filter((dev) => !isSelf(dev.accountId)),
+    [developerList, isSelf],
   );
   const ownerName = useCallback(
     (ownerType: string | null, ownerId: string | null) => {
       if (ownerType === 'developer' && ownerId) {
         // docs/56 UX-09: the manager is "You" everywhere.
-        if (ownerId === selfAccountId) return 'You';
+        if (isSelf(ownerId)) return 'You';
         return developerList.find((dev) => dev.accountId === ownerId)?.displayName ?? 'Unknown owner';
       }
       if (!ownerType) return 'Unassigned';
-      return ownerId === selfAccountId ? 'You' : 'Another manager';
+      return isSelf(ownerId) ? 'You' : 'Another manager';
     },
-    [developerList, selfAccountId],
+    [developerList, isSelf],
   );
   const labelRegistry = useMemo(() => labels.data?.labels ?? [], [labels.data]);
   const labelColors = useMemo(() => new Map(labelRegistry.map((label) => [label.name, label.color])), [labelRegistry]);
   const labelColor = useCallback((name: string) => labelColors.get(name), [labelColors]);
 
   const baseGroups = useMemo<RenderGroup[]>(
-    () => groupTaskViewTasks(searchTasks(taskList, state.q), definition?.group, today, ownerName, selfAccountId),
-    [taskList, state.q, definition?.group, today, ownerName, selfAccountId],
+    () => groupTaskViewTasks(searchTasks(taskList, state.q), definition?.group, today, ownerName, selfAccountId, selfDeveloperId),
+    [taskList, state.q, definition?.group, today, ownerName, selfAccountId, selfDeveloperId],
   );
   const groups = useMemo(() => applyLingering(baseGroups, lingering), [baseGroups, lingering]);
   const displayGroups = useMemo<RenderGroup[]>(() => {

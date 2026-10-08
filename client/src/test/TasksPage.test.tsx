@@ -1,3 +1,5 @@
+const mockSelfLink = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/useSelfLink', () => ({ useSelfLink: (...args: unknown[]) => mockSelfLink(...args) }));
 import type * as Csv from '@/lib/csv';
 import { QuickActionsProvider } from '@/context/QuickActionsContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -155,6 +157,7 @@ beforeEach(async () => {
   await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
   vi.clearAllMocks();
   mockUseProject.mockReturnValue({ data: undefined });
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: null, suggestedDeveloperAccountId: null }, isError: false });
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
   window.history.replaceState(null, '', '/tasks');
   mockApply.mockResolvedValue(true);
@@ -1462,4 +1465,53 @@ it('TR-01 retries a lost inline response with the original identity; equal-title
   fireEvent.change(input, { target: { value: 'Retry me' } });
   await act(async () => { fireEvent.submit(input.closest('form')!); });
   expect(accepted.size).toBe(2);
+});
+
+
+it('TR-03 merges separate login/roster owners as You with private inline defaults and no duplicate choices', async () => {
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: 'dev-1', suggestedDeveloperAccountId: null }, isError: false });
+  window.history.replaceState(null, '', '/tasks?view=waiting');
+  mockUseTaskViewTasks.mockReturnValue(tasksResult([task(), task({ id: 2, taskKey: 'T-2', ownerType: 'developer', ownerId: 'dev-1' }), task({ id: 3, taskKey: 'T-3', ownerType: 'developer', ownerId: 'colleague' })]));
+  render(<TasksPage />);
+  expect([...document.querySelectorAll('section h2')].map((el) => el.textContent)).toEqual(['You', 'Unknown owner']);
+  expect(screen.getByRole('group', { name: 'You' })).toContainElement(row('T-1'));
+  expect(screen.getByRole('group', { name: 'You' })).toContainElement(row('T-2'));
+  expect(mockApply).not.toHaveBeenCalled();
+  press('j'); press('a');
+  const menu = screen.getByRole('menu', { name: 'Assign' });
+  expect(within(menu).getAllByRole('menuitem', { name: 'You' })).toHaveLength(1);
+  expect(within(menu).queryByRole('menuitem', { name: 'Dev One' })).toBeNull();
+  fireEvent.keyDown(menu, { key: 'Escape' });
+  fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+  expect(screen.queryByRole('menuitemcheckbox', { name: 'Dev One' })).toBeNull();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  const group = screen.getByRole('group', { name: 'You' });
+  fireEvent.click(within(group).getAllByRole('button', { name: 'Add task to You' })[0]!);
+  const input = screen.getByLabelText('New task in You');
+  fireEvent.change(input, { target: { value: 'My private task' } });
+  await act(async () => { fireEvent.submit(input.closest('form')!); });
+  expect(mockCreate.mock.calls[0]![0].defaults).not.toHaveProperty('ownerAccountId');
+});
+
+it.each([
+  { data: { developerAccountId: null, suggestedDeveloperAccountId: 'dev-1' }, isError: false },
+  { data: { developerAccountId: 'dev-1', suggestedDeveloperAccountId: null }, isError: true },
+])('TR-03 falls back to login for suggestion-only or failed link reads %j', (link) => {
+  mockSelfLink.mockReturnValue(link);
+  window.history.replaceState(null, '', '/tasks?view=high-priority');
+  mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ ownerType: 'developer', ownerId: 'dev-1' })]));
+  render(<TasksPage />);
+  expect(within(row('T-1')).getByText('Dev One')).toBeVisible();
+  expect(mockApply).not.toHaveBeenCalled();
+});
+
+
+it('TR-03 displays both self IDs as You in ungrouped row metadata', () => {
+  mockSelfLink.mockReturnValue({ data: { developerAccountId: 'dev-1' }, isError: false });
+  window.history.replaceState(null, '', '/tasks?view=high-priority');
+  mockUseTaskViewTasks.mockReturnValue(tasksResult([task(), task({ id: 2, taskKey: 'T-2', ownerType: 'developer', ownerId: 'dev-1' })]));
+  render(<TasksPage />);
+  expect(within(row('T-1')).getByLabelText('Owner: You')).toBeVisible();
+  expect(within(row('T-2')).getByLabelText('Owner: You')).toBeVisible();
+  expect(mockApply).not.toHaveBeenCalled();
 });

@@ -4,6 +4,9 @@ import { CalendarClock, ChevronDown, ChevronRight, Plus, UserRound } from 'lucid
 import type { TaskViewDefinition } from '@/types';
 import type { TaskGroupContext } from '@/lib/task-views';
 import { groupShowsDate, worstOverdueTone, type RenderGroup } from '@/lib/task-list';
+import { useCaptureAttempt } from '@/hooks/useCaptureAttempt';
+import type { CreateViaCapture } from '@/hooks/useCapture';
+import type { CaptureDefaults } from 'shared/capture-grammar';
 import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
 import { TokenSuggestionList } from '@/components/capture/TokenSuggestionList';
 import { Avatar } from './TaskDetailPrimitives';
@@ -34,7 +37,8 @@ interface TaskListProps {
   addingGroup: string | null;
   onStartAdd: (groupKey: string) => void;
   onCancelAdd: () => void;
-  onSubmitAdd: (context: TaskGroupContext, title: string) => Promise<boolean>;
+  addDefaults: (context: TaskGroupContext) => CaptureDefaults;
+  onSubmitAdd: (context: TaskGroupContext, input: CreateViaCapture) => Promise<boolean>;
   onMoveOverdueToToday: (tasks: RowTask[]) => void;
   onToggleGroup?: (groupKey: string) => void;
   /** Rendered after the last group, inside the list column (keyboard hint). */
@@ -63,6 +67,7 @@ export function TaskList({
   onStartAdd,
   onCancelAdd,
   onSubmitAdd,
+  addDefaults,
   onMoveOverdueToToday,
   onToggleGroup,
   footer,
@@ -104,7 +109,7 @@ export function TaskList({
                                 dateColumn={dateColumn} ownerName={ownerName} labelColor={labelColor} handlers={handlers} />
                             ) : (
                               <InlineAddRow active={addingGroup === group.key} onStart={() => onStartAdd(group.key)} onCancel={onCancelAdd}
-                                onSubmit={(title) => onSubmitAdd(group.context, title)} groupLabel={group.label} />
+                                defaults={addDefaults(group.context)} onSubmit={(input) => onSubmitAdd(group.context, input)} groupLabel={group.label} />
                             )}
                           </li>
                         </Fragment>
@@ -235,11 +240,12 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
 }
 
 /** docs/51 F14: exported so an empty view can host its own add row. */
-export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }: {
+export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel, defaults }: {
   active: boolean;
   onStart: () => void;
   onCancel: () => void;
-  onSubmit: (title: string) => Promise<boolean>;
+  onSubmit: (input: CreateViaCapture) => Promise<boolean>;
+  defaults?: CaptureDefaults;
   groupLabel: string;
 }) {
   if (!active) {
@@ -256,20 +262,22 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel }
       </button>
     );
   }
-  return <InlineAddForm onCancel={onCancel} onSubmit={onSubmit} groupLabel={groupLabel} />;
+  return <InlineAddForm onCancel={onCancel} onSubmit={onSubmit} groupLabel={groupLabel} defaults={defaults} />;
 }
 
 /** The open add row: a capture input, so tokens and the `@` / `#` / `+` typeahead work. */
-function InlineAddForm({ onCancel, onSubmit, groupLabel }: {
+function InlineAddForm({ onCancel, onSubmit, groupLabel, defaults }: {
   onCancel: () => void;
-  onSubmit: (title: string) => Promise<boolean>;
+  onSubmit: (input: CreateViaCapture) => Promise<boolean>;
+  defaults?: CaptureDefaults;
   groupLabel: string;
 }) {
   const [title, setTitle] = useState('');
   const [caret, setCaret] = useState(0);
-  const [pending, setPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const typeahead = useCaptureTypeahead(title, caret);
+  const attempt = useCaptureAttempt({ text: typeahead.toWire(title.trim()), defaults });
+  const pending = attempt.isPending;
   /** Put a typeahead choice into the input and park the caret after it. */
   const applyEdit = (next: { text: string; caret: number }) => {
     setTitle(next.text);
@@ -287,9 +295,7 @@ function InlineAddForm({ onCancel, onSubmit, groupLabel }: {
         event.preventDefault();
         const value = title.trim();
         if (!value || pending) return;
-        setPending(true);
-        const ok = await onSubmit(typeahead.toWire(value));
-        setPending(false);
+        const ok = await attempt.run(onSubmit);
         if (ok) { setTitle(''); setCaret(0); }
       }}
     >

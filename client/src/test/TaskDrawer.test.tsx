@@ -266,7 +266,7 @@ describe('TaskDrawer body (P3-D2)', () => {
       render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
       const input = type('Send summary @dev-1 !fri');
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })); });
-      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Send summary @dev-1 !fri', defaults: { parentKey: 'T-7' } });
+      expect(mockCaptureCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Send summary @dev-1 !fri', defaults: { parentKey: 'T-7' } }));
       expect(input.value).toBe('');
     });
 
@@ -287,7 +287,7 @@ describe('TaskDrawer body (P3-D2)', () => {
       const input = type('Send summary @de');
       fireEvent.keyDown(input, { key: 'Tab' });
       await act(async () => { fireEvent.submit(input.closest('form')!); });
-      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Send summary @dev-1', defaults: { parentKey: 'T-7' } });
+      expect(mockCaptureCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Send summary @dev-1', defaults: { parentKey: 'T-7' } }));
     });
 
     it('Enter submits the form', async () => {
@@ -295,7 +295,7 @@ describe('TaskDrawer body (P3-D2)', () => {
       render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
       const input = type('Book the room');
       await act(async () => { fireEvent.submit(input.closest('form')!); });
-      expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Book the room', defaults: { parentKey: 'T-7' } });
+      expect(mockCaptureCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Book the room', defaults: { parentKey: 'T-7' } }));
     });
 
     it('keeps the text and toasts the server\'s reason when the capture is rejected', async () => {
@@ -743,6 +743,32 @@ it('creates ordinary subtasks through capture with parent context', async () => 
   const input = screen.getByLabelText('New subtask') as HTMLInputElement;
   fireEvent.change(input, { target: { value: 'Validate child step' } });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true })); });
-  expect(mockCaptureCreate).toHaveBeenCalledWith({ text: 'Validate child step', defaults: { parentKey: 'T-7' } });
+  expect(mockCaptureCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Validate child step', defaults: { parentKey: 'T-7' } }));
   expect(input.value).toBe('');
+});
+
+
+it.each(['task', 'meeting'] as const)('TR-01 retries a lost %s child response once and guards pending Enter', async (kind) => {
+  const { createTaskViaCapture } = await vi.importActual<typeof import('@/hooks/useCapture')>('@/hooks/useCapture');
+  const accepted = new Map<string, unknown>();
+  let rejectFirst!: (error: Error) => void;
+  const post = vi.fn(async (body) => {
+    if (!accepted.has(body.requestId)) accepted.set(body.requestId, { taskKey: 'T-99' });
+    if (post.mock.calls.length === 1) await new Promise((_, reject) => { rejectFirst = reject; });
+    return { diagnostics: [], task: accepted.get(body.requestId) } as never;
+  });
+  mockCaptureCreate.mockImplementation((input) => createTaskViaCapture(post, input));
+  mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ kind })));
+  render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+  const input = screen.getByLabelText(kind === 'meeting' ? 'New action item' : 'New subtask');
+  fireEvent.change(input, { target: { value: 'Retry child' } });
+  fireEvent.submit(input.closest('form')!);
+  fireEvent.submit(input.closest('form')!);
+  expect(post).toHaveBeenCalledTimes(1);
+  await act(async () => { rejectFirst(new Error('Response lost')); });
+  expect(input).toHaveValue('Retry child');
+  await act(async () => { fireEvent.submit(input.closest('form')!); });
+  expect(post.mock.calls[1]![0]).toEqual(post.mock.calls[0]![0]);
+  expect(accepted.size).toBe(1);
+  expect(input).toHaveValue('');
 });

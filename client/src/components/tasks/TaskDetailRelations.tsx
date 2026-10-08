@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, ChevronRight, ExternalLink, Globe, Link2, ListTree, Plus, Ticket, UserRound, X } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useAddTaskDetailLink, useRemoveTaskDetailLink } from '@/hooks/useTaskDetail';
+import { useCaptureAttempt } from '@/hooks/useCaptureAttempt';
 import { useCaptureTask } from '@/hooks/useCapture';
 import { useCaptureTypeahead } from '@/hooks/useCaptureTypeahead';
 import { TokenSuggestionList } from '@/components/capture/TokenSuggestionList';
@@ -327,6 +328,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   const draftRef = useRef<HTMLInputElement>(null);
   const typeahead = useCaptureTypeahead(draft, caret);
   useEffect(() => { setPlacement(undefined); setShowPlacement(false); setDraft(''); setCaret(0); }, [task.taskKey]);
+  const attempt = useCaptureAttempt({ text: typeahead.toWire(draft.trim()), defaults: { parentKey: task.taskKey, ...(placement !== undefined && { placement }) } });
   const isMeeting = task.kind === 'meeting';
   const canAdd = mode === 'manager' && !readOnly;
   const done = task.children.filter((child) => child.status === 'done').length;
@@ -337,9 +339,11 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   // `@dev` is the owner, `!fri` the date, and the server reports anything it can't resolve.
   const submit = async () => {
     const text = typeahead.toWire(draft.trim());
-    if (!text || createChild.isPending) return;
+    if (!text || attempt.isPending) return;
     try {
-      const { warnings } = await createChild.create({ text, defaults: { parentKey: task.taskKey, ...(placement !== undefined && { placement }) } });
+      const result = await attempt.run(createChild.create);
+      if (!result) return;
+      const { warnings } = result;
       setDraft('');
       setCaret(0);
       setPlacement(undefined);
@@ -404,6 +408,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
             placeholder={isMeeting ? 'Add an action item — @dev for owner, !fri for a date…' : 'Add subtask — @dev for owner, !fri for a date…'}
             className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
+            readOnly={attempt.isPending}
             aria-label={isMeeting ? 'New action item' : 'New subtask'}
           />
           {typeahead.open && typeahead.fragment ? (
@@ -421,7 +426,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           {draft.trim() && (
             <button
               type="submit"
-              disabled={createChild.isPending}
+              disabled={attempt.isPending}
               className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold disabled:opacity-40 ${FOCUS_RING}`}
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >

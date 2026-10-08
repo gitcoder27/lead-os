@@ -1,3 +1,4 @@
+import type { CreateViaCapture } from '@/hooks/useCapture';
 import { PlacementDialog } from './PlacementDialog';
 import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
 import { ProjectsPanel } from './ProjectsPanel';
@@ -834,14 +835,11 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
     }
   };
 
-  const handleInlineAdd = async (context: TaskGroupContext, title: string): Promise<boolean> => {
+  const handleInlineAdd = async (_context: TaskGroupContext, input: CreateViaCapture): Promise<boolean> => {
     try {
       // docs/57 §3 (P3-05): inline add is a capture — tokens in the title work,
       // and the group's context (date, owner, waiting party…) fills the rest.
-      const { warnings } = await mutations.create.mutateAsync({
-        text: title,
-        defaults: inlineCaptureDefaults(selectedView?.id, definition, context, today),
-      });
+      const { warnings } = await mutations.create.mutateAsync(input);
       if (warnings.length) addToast({ type: 'warning', title: 'Added with warnings', message: warnings.map((warning) => warning.message).join(' ') });
       return true;
     } catch (error) {
@@ -956,7 +954,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
                     active={addingGroup === EMPTY_ADD_KEY}
                     onStart={() => setAddingGroup(EMPTY_ADD_KEY)}
                     onCancel={() => setAddingGroup(null)}
-                    onSubmit={(title) => handleInlineAdd({ mode: 'none' }, title)}
+                    defaults={inlineCaptureDefaults(selectedView?.id, definition, { mode: 'none' }, today)}
+                    onSubmit={(input) => handleInlineAdd({ mode: 'none' }, input)}
                     groupLabel=""
                   />
                 </div>
@@ -978,6 +977,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
               addingGroup={addingGroup}
               onStartAdd={setAddingGroup}
               onCancelAdd={() => setAddingGroup(null)}
+              addDefaults={(context) => inlineCaptureDefaults(selectedView?.id, definition, context, today)}
               onSubmitAdd={handleInlineAdd}
               onMoveOverdueToToday={(rows) => schedule(rows, 'today')}
               onToggleGroup={(key) => { if (key === 'done-today') setDoneTodayOpen((open) => !open); }}

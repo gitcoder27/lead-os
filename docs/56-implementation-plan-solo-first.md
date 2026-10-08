@@ -865,7 +865,7 @@ Scope, acceptance criteria and verification commands: [implementation plan](70-w
 Execution plan: [docs/71-task-reliability-implementation-plan.md](71-task-reliability-implementation-plan.md). The five fixes are selected for sequential implementation on main, one item per commit. After each completed item, show changes and verification, then stop for the user's confirmation. Existing untracked docs/screenshots/ remains untouched.
 
 - [x] TR-00 — Create the five-item implementation plan and tracking entries (documentation only).
-- [ ] TR-01 — Preserve retry identity for unchanged inline task/subtask submissions.
+- [x] TR-01 — Preserve retry identity for unchanged inline task/subtask submissions.
 - [ ] TR-02 — Refresh task activity, view counts and project summaries after scoped writes.
 - [ ] TR-03 — Resolve both manager login and linked roster identity as You in Tasks.
 - [ ] TR-04 — Retain loaded activity during temporary history failures with targeted Retry.
@@ -874,3 +874,5 @@ Execution plan: [docs/71-task-reliability-implementation-plan.md](71-task-reliab
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
 | 2026-10-07 | TR-00 | main (this commit) | Created docs/71 with current-code evidence, file scope, acceptance criteria, focused tests, known date-sensitive baseline failure, quality gates, one-commit-per-item tracking and stop/report rules. Local links, five-item checklist/ID consistency, per-item commit messages and diff whitespace checks pass. Application fixes remain unstarted; no runtime data, external services, Jira, push or deployment. |
+
+| 2026-10-08 | TR-01 | main (this commit) | Reproduced three failing lost-response/pending UI checks against original code. Form-local attempts retain ID, defaults and client day/zone; edits/context/auth changes renew identity, pending resubmission is guarded, and late completion cannot clear changed/closed drafts. Client focused suites (useCapture, useCaptureAttempt, TasksPage, TaskDrawer): 165 passed; isolated capture.routes: 31 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external service access. Known date-sensitive project case remains unchanged for TR-05. |

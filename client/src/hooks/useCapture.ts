@@ -40,6 +40,9 @@ export interface CreateViaCapture {
   defaults?: CaptureDefaults;
   /** Reuse across retries so a transport retry replays to the same task. */
   requestId?: string;
+  /** The original attempt day/zone must survive an uncertain transport result. */
+  clientToday?: string;
+  tz?: string;
 }
 
 export interface CreatedViaCapture {
@@ -58,24 +61,32 @@ export interface CreatedViaCapture {
  */
 export async function createTaskViaCapture(
   post: (body: CaptureRequestBody) => Promise<CaptureResponseBody>,
-  { text, defaults, requestId = crypto.randomUUID() }: CreateViaCapture,
+  { text, defaults, requestId = crypto.randomUUID(), clientToday, tz = getLocalTimeZone() }: CreateViaCapture,
 ): Promise<CreatedViaCapture> {
-  const today = getLocalIsoDate();
+  const today = clientToday ?? getLocalIsoDate();
   // These paths only make tasks: `T-n: …` and `/note …` belong to the capture box,
   // and must not be posted as an update or a note.
   if (parseCapture(text, today).intent !== 'create') {
     throw new Error('Start with a task title — "T-n:" updates and "/note" belong in Capture.');
   }
-  const tz = getLocalTimeZone();
   const body: CaptureRequestBody = { text, clientToday: today, ...(tz && { tz }), requestId, ...(defaults ? { defaults } : {}) };
-  let res = await post(body);
+  const submit = async (request: CaptureRequestBody) => {
+    try { return await post(request); }
+    catch (error) {
+      if (clientToday && clientToday !== getLocalIsoDate() && error instanceof Error && error.message.includes('out of sync')) {
+        throw new Error('The earlier submission is unresolved because its original day is too old to retry. Check Tasks before starting a new submission.');
+      }
+      throw error;
+    }
+  };
+  let res = await submit(body);
   if (res.confirmRequired) {
     // These paths have no confirm step, so they accept a past date on the manager's behalf — but never a
     // malformed @mention, which would become an unowned literal title (docs/63 #8). It is refused as an error.
     if (res.diagnostics.some((entry) => entry.code === 'malformed-mention')) {
       throw new CaptureRejectedError(res.diagnostics.map((entry) => (entry.code === 'malformed-mention' ? { ...entry, severity: 'error' as const } : entry)));
     }
-    res = await post({ ...body, confirm: true });
+    res = await submit({ ...body, confirm: true });
   }
   if (res.blocked) throw new CaptureRejectedError(res.diagnostics);
   if (!res.task) throw new Error('The task was not created.');

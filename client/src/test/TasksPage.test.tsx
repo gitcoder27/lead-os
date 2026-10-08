@@ -230,7 +230,7 @@ describe('TasksPage rail and views (docs/49 §3/§4)', () => {
     const input = screen.getByLabelText('New task');
     fireEvent.change(input, { target: { value: 'Critical release follow-through' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
-    expect(mockCreate).toHaveBeenCalledWith({ text: 'Critical release follow-through', defaults: { priority: 'high' } });
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Critical release follow-through', defaults: { priority: 'high' } }));
   });
 
   it.each(['today', 'inbox'].flatMap((viewId) =>
@@ -733,7 +733,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const input = screen.getByLabelText('New task in Today');
     fireEvent.change(input, { target: { value: 'Prep 1:1' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
-    expect(mockCreate).toHaveBeenCalledWith({ text: 'Prep 1:1', defaults: { scheduledOn: TODAY } });
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Prep 1:1', defaults: { scheduledOn: TODAY } }));
   });
 
   it('inline add sends the title as capture text, so tokens in it work (P3-05)', async () => {
@@ -742,7 +742,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     const input = screen.getByLabelText('New task in Today');
     fireEvent.change(input, { target: { value: 'Draft memo @dev-1 !fri !due:mon' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
-    expect(mockCreate).toHaveBeenCalledWith({ text: 'Draft memo @dev-1 !fri !due:mon', defaults: { scheduledOn: TODAY } });
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Draft memo @dev-1 !fri !due:mon', defaults: { scheduledOn: TODAY } }));
   });
 
   it('inline add keeps the row open with an error toast when the capture is rejected', async () => {
@@ -870,7 +870,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       const input = screen.getByLabelText('New task in Upcoming');
       fireEvent.change(input, { target: { value: 'Planning sync' } });
       await act(async () => { fireEvent.submit(input.closest('form')!); });
-      expect(mockCreate).toHaveBeenCalledWith({ text: 'Planning sync', defaults: { kind: 'meeting', scheduledOn: '2026-09-27' } });
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Planning sync', defaults: { kind: 'meeting', scheduledOn: '2026-09-27' } }));
     });
 
     it('an empty Meetings view says how to capture one', () => {
@@ -890,7 +890,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     fireEvent.change(input, { target: { value: 'Quick one' } });
     await act(async () => { fireEvent.submit(input.closest('form')!); });
     // The empty Today view's context still lands the task on today.
-    expect(mockCreate).toHaveBeenCalledWith({ text: 'Quick one', defaults: { scheduledOn: TODAY } });
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ text: 'Quick one', defaults: { scheduledOn: TODAY } }));
   });
 
   it('n stays dead on an empty view that cannot host adds (docs/51 F14)', () => {
@@ -1435,4 +1435,31 @@ it('routes the Tasks help button to app help and ignores composing question mark
   fireEvent.click(button);
   expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
   expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+});
+
+
+it('TR-01 retries a lost inline response with the original identity; equal-title new adds remain distinct', async () => {
+  const { createTaskViaCapture } = await import('@/hooks/useCapture');
+  const accepted = new Map<string, unknown>();
+  let loseResponse = true;
+  const post = vi.fn(async (body) => {
+    if (!accepted.has(body.requestId)) accepted.set(body.requestId, { taskKey: `T-${accepted.size + 1}` });
+    if (loseResponse) { loseResponse = false; throw new Error('Response lost'); }
+    return { diagnostics: [], task: accepted.get(body.requestId) };
+  });
+  mockCreate.mockImplementation((input) => createTaskViaCapture(post, input));
+  mockUseTaskViewTasks.mockReturnValue(tasksResult([]));
+  render(<TasksPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Add task', exact: true }));
+  const input = screen.getByLabelText('New task');
+  fireEvent.change(input, { target: { value: 'Retry me' } });
+  await act(async () => { fireEvent.submit(input.closest('form')!); });
+  expect(input).toHaveValue('Retry me');
+  await act(async () => { fireEvent.submit(input.closest('form')!); });
+  expect(post.mock.calls[1]![0]).toEqual(post.mock.calls[0]![0]);
+  expect(accepted.size).toBe(1);
+  expect(input).toHaveValue('');
+  fireEvent.change(input, { target: { value: 'Retry me' } });
+  await act(async () => { fireEvent.submit(input.closest('form')!); });
+  expect(accepted.size).toBe(2);
 });

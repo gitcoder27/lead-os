@@ -19,7 +19,7 @@ This plan covers the five fixes selected after the repository review. No TODO/FI
 
 | Order | Item | Outcome | Implementation status |
 | --- | --- | --- | --- |
-| 1 | TR-01 | Retrying an unchanged inline task/subtask submission cannot create a duplicate | Not started |
+| 1 | TR-01 | Retrying an unchanged inline task/subtask submission cannot create a duplicate | Complete |
 | 2 | TR-02 | Task activity, counts and project summaries refresh after the scoped writes | Not started |
 | 3 | TR-03 | The manager's linked roster identity is consistently shown as You in Tasks | Not started |
 | 4 | TR-04 | Temporary history failures preserve loaded task activity and offer targeted Retry | Not started |
@@ -35,7 +35,7 @@ Five disposable mocked checks confirmed these current behaviors: a creation retr
 
 ## TR-01 — Safe retries for inline task creation
 
-- [ ] Implement and verify TR-01.
+- [x] Implement and verify TR-01.
 
 **Problem:** [createTaskViaCapture](../client/src/hooks/useCapture.ts) generates a fresh `requestId` whenever its caller omits one. [InlineAddForm](../client/src/components/tasks/TaskList.tsx), [TasksPage](../client/src/components/tasks/TasksPage.tsx) and the child/action-item form in [TaskDetailRelations](../client/src/components/tasks/TaskDetailRelations.tsx) retain a failed draft but submit it again without its original ID. If the server committed the first request and its response was lost, the second request can create another task. The [server capture service](../server/src/services/capture.service.ts) already replays a repeated ID to the original task.
 
@@ -185,3 +185,5 @@ In the per-item handoff, report the commit hash, changed behavior and main files
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
 | 2026-10-07 | TR-00 | main (this commit) | Created this five-item plan and matching docs/56 tracking entries. Local links, five-item checklist/ID consistency, per-item commit messages and diff whitespace checks pass. Application implementation not started; no runtime data, external services, Jira, push or deployment. |
+
+| 2026-10-08 | TR-01 | main (this commit) | Reproduced three failing lost-response/pending UI checks against original code. Form-local attempts retain ID, defaults and client day/zone; edits/context/auth changes renew identity, pending resubmission is guarded, and late completion cannot clear changed/closed drafts. Client focused suites (useCapture, useCaptureAttempt, TasksPage, TaskDrawer): 165 passed; isolated capture.routes: 31 passed. typecheck, build:check, lint (0 errors; 299 existing warnings), guard:data and git diff --check pass. Automated DOM/mocked checks only; no browser/runtime/external service access. Known date-sensitive project case remains unchanged for TR-05. |

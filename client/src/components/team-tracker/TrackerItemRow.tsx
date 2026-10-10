@@ -262,9 +262,9 @@ function ClassicTrackerItemRow({
             <span
               className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-meta font-semibold"
               style={{
-                background: 'color-mix(in srgb, var(--md-accent) 10%, transparent)',
-                color: 'var(--md-accent, var(--warning))',
-                border: '1px solid color-mix(in srgb, var(--md-accent) 22%, transparent)',
+                background: 'var(--accent-glow)',
+                color: 'var(--accent-text)',
+                border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
               }}
               title="Managed from Manager Desk — title edits must be made there"
             >

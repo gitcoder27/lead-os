@@ -201,7 +201,7 @@ function eventVisual(event: TaskEvent): { Icon: typeof History; color: string } 
       return blockerAction(event) === 'cleared'
         ? { Icon: ShieldCheck, color: 'var(--success)' }
         : { Icon: OctagonAlert, color: 'var(--danger)' };
-    case 'note_ref': return { Icon: NotebookPen, color: 'var(--md-accent)' };
+    case 'note_ref': return { Icon: NotebookPen, color: 'var(--text-secondary)' };
     case 'checkin_ref': return { Icon: ClipboardCheck, color: 'var(--accent)' };
     case 'created': return { Icon: Sparkles, color: 'var(--text-muted)' };
     case 'status': return { Icon: CircleDot, color: 'var(--text-muted)' };

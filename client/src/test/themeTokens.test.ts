@@ -213,6 +213,18 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     expect(css).not.toContain('--scrim-soft-blur');
   });
 
+  it('keeps the amber Desk accent inside the legacy /desk (docs/73 UXD-08)', () => {
+    const walk = (dir: string): string[] => readdirSync(resolve(__dirname, '..', dir)).flatMap((name) => {
+      const rel = `${dir}/${name}`;
+      return statSync(resolve(__dirname, '..', rel)).isDirectory() ? walk(rel) : /\.(css|tsx?)$/.test(name) ? [rel] : [];
+    });
+    const offenders = [...walk('components'), ...walk('lib')]
+      .filter((file) => !file.startsWith('components/manager-desk/'))
+      // The Desk accent and its literal values; amber as the warning tone is fine.
+      .filter((file) => /--md-accent|#B8860B|#D9A94E|217, ?169, ?78|184, ?134, ?11/i.test(src(file)));
+    expect(offenders).toEqual([]);
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

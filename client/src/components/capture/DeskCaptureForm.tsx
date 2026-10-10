@@ -142,9 +142,9 @@ export function DeskCaptureForm({
                 aria-label={`${KIND_LABELS[opt]} kind`}
                 className="rounded-lg px-2.5 py-1 text-ui font-medium transition-all"
                 style={{
-                  background: active ? 'var(--md-accent-glow)' : 'var(--bg-tertiary)',
-                  color: active ? 'var(--md-accent)' : 'var(--text-muted)',
-                  border: `1px solid ${active ? 'color-mix(in srgb, var(--md-accent) 28%, transparent)' : 'var(--border)'}`,
+                  background: active ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
+                  color: active ? 'var(--accent-text)' : 'var(--text-muted)',
+                  border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 28%, transparent)' : 'var(--border)'}`,
                 }}
               >
                 {KIND_LABELS[opt]}
@@ -242,11 +242,7 @@ export function DeskCaptureForm({
             onClick={handleSubmit}
             disabled={!title.trim() || createItem.isPending}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-all disabled:opacity-40"
-            style={{
-              background: 'var(--md-accent)',
-              color: '#111',
-              boxShadow: '0 4px 12px color-mix(in srgb, var(--md-accent) 20%, transparent)',
-            }}
+            style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
           >
             <Briefcase size={11} />
             {createItem.isPending ? 'Saving…' : 'Add to Desk'}

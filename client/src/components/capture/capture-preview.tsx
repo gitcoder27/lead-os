@@ -10,7 +10,7 @@ import { taskLabelDisplayName } from '@/types';
 
 /** Per-kind token highlight colors — the live preview paints these in-place. */
 export const CAPTURE_TOKEN_COLORS: Record<CaptureTokenKind, string> = {
-  command: 'var(--md-accent)',
+  command: 'var(--text-secondary)',
   person: 'var(--accent)',
   jira: 'var(--info)',
   parent: 'var(--success)',
@@ -19,14 +19,14 @@ export const CAPTURE_TOKEN_COLORS: Record<CaptureTokenKind, string> = {
   due: 'var(--danger)',
   priority: 'var(--danger)',
   later: 'var(--text-muted)',
-  meeting: 'var(--md-accent)',
+  meeting: 'var(--info)',
   followup: 'var(--warning)',
   waiting: 'var(--warning)',
   label: 'var(--accent)',
 };
 
 export const CAPTURE_TOKEN_BG: Record<CaptureTokenKind, string> = {
-  command: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
+  command: 'var(--bg-tertiary)',
   person: 'var(--accent-glow)',
   jira: 'color-mix(in srgb, var(--info) 14%, transparent)',
   parent: 'color-mix(in srgb, var(--success) 12%, transparent)',
@@ -35,7 +35,7 @@ export const CAPTURE_TOKEN_BG: Record<CaptureTokenKind, string> = {
   due: 'color-mix(in srgb, var(--danger) 12%, transparent)',
   priority: 'color-mix(in srgb, var(--danger) 12%, transparent)',
   later: 'var(--bg-tertiary)',
-  meeting: 'color-mix(in srgb, var(--md-accent) 12%, transparent)',
+  meeting: 'color-mix(in srgb, var(--info) 14%, transparent)',
   followup: 'color-mix(in srgb, var(--warning) 12%, transparent)',
   waiting: 'color-mix(in srgb, var(--warning) 12%, transparent)',
   label: 'var(--accent-glow)',

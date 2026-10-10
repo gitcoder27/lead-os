@@ -13,17 +13,17 @@ export function TriageDeskSection({ issue, onCapture }: TriageDeskSectionProps) 
       <div
         className="rounded-lg px-3.5 py-2.5 flex items-center justify-between gap-3"
         style={{
-          background: 'linear-gradient(135deg, color-mix(in srgb, var(--md-accent-glow) 50%, var(--bg-tertiary) 50%), var(--bg-tertiary))',
-          border: '1px solid rgba(217,169,78,0.14)',
+          background: 'color-mix(in srgb, var(--accent) 6%, var(--bg-tertiary))',
+          border: '1px solid color-mix(in srgb, var(--accent) 16%, transparent)',
         }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <Briefcase size={13} style={{ color: 'var(--md-accent)', flexShrink: 0 }} />
+          <Briefcase size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
           <div className="flex flex-wrap gap-1 min-w-0">
             <JiraIssueLink
               issueKey={issue.jiraKey}
               className="rounded-full px-1.5 py-[1px] text-ui font-medium"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--md-accent)', border: '1px solid rgba(217,169,78,0.14)' }}
+              style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
               {issue.jiraKey}
             </JiraIssueLink>
@@ -40,12 +40,7 @@ export function TriageDeskSection({ issue, onCapture }: TriageDeskSectionProps) 
         <button
           type="button"
           onClick={onCapture}
-          className="shrink-0 rounded-md px-2.5 py-1.5 text-ui font-semibold transition-colors"
-          style={{
-            background: 'rgba(217,169,78,0.12)',
-            color: 'var(--md-accent)',
-            border: '1px solid rgba(217,169,78,0.2)',
-          }}
+          className="ui-btn shrink-0"
         >
           Add task
         </button>

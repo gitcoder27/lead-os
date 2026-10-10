@@ -139,7 +139,7 @@ export function TrackerDrawerItemRow({
   }
   if (isLinked && !isHistory) {
     meta.push(
-      <span key="delegated" className="inline-flex items-center gap-1" style={{ color: 'var(--md-accent, var(--warning))' }} title="Managed from Manager Desk — title edits must be made there">
+      <span key="delegated" className="inline-flex items-center gap-1" style={{ color: 'var(--accent-text)' }} title="Managed from Manager Desk — title edits must be made there">
         <Link2 size={11} />
         Delegated
       </span>,

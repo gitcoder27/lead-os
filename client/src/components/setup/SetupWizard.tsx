@@ -583,7 +583,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       <div
         className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-8"
         style={{
-          background: `radial-gradient(circle at 30% 20%, rgba(245, 158, 11, 0.18), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
+          background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
         }}
       >
         <OrbDecoration />
@@ -596,11 +596,11 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           <div
             className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[22px]"
             style={{
-              background: 'rgba(245, 158, 11, 0.14)',
-              boxShadow: '0 0 40px rgba(245, 158, 11, 0.12)',
+              background: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+              boxShadow: '0 0 40px color-mix(in srgb, var(--accent) 12%, transparent)',
             }}
           >
-            <Loader2 size={28} className="animate-spin" style={{ color: '#fbbf24' }} />
+            <Loader2 size={28} className="animate-spin" style={{ color: 'var(--accent)' }} />
           </div>
           <h2 className="text-display font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Syncing your workspace
@@ -617,7 +617,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     <div
       className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-8"
       style={{
-        background: `radial-gradient(circle at 30% 20%, rgba(245, 158, 11, 0.18), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
+        background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
       }}
     >
       <OrbDecoration />
@@ -652,15 +652,15 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             <div
               className="flex h-10 w-10 items-center justify-center rounded-[14px]"
               style={{
-                background: 'rgba(245, 158, 11, 0.18)',
-                color: '#fbbf24',
-                boxShadow: '0 0 24px rgba(245, 158, 11, 0.14)',
+                background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+                color: 'var(--accent-text)',
+                boxShadow: '0 0 24px color-mix(in srgb, var(--accent) 14%, transparent)',
               }}
             >
               <LeadOSMark size={26} />
             </div>
             <div className="text-left">
-              <div className="ui-label" style={{ color: '#fbbf24' }}>
+              <div className="ui-label" style={{ color: 'var(--accent-text)' }}>
                 Workspace setup
               </div>
               <div className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -690,17 +690,17 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     className="flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-ui font-semibold transition-all duration-300"
                     style={{
                       borderColor: isActive
-                        ? 'rgba(251, 191, 36, 0.5)'
+                        ? 'color-mix(in srgb, var(--accent) 50%, transparent)'
                         : isComplete
                           ? 'rgba(34, 197, 94, 0.35)'
                           : 'var(--border)',
                       background: isActive
-                        ? 'rgba(251, 191, 36, 0.12)'
+                        ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
                         : isComplete
                           ? 'rgba(34, 197, 94, 0.08)'
                           : 'transparent',
                       color: isActive
-                        ? '#fbbf24'
+                        ? 'var(--accent-text)'
                         : isComplete
                           ? '#4ade80'
                           : 'var(--text-muted)',
@@ -742,12 +742,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Accent line */}
           <div
             className="absolute inset-x-8 top-0 h-px"
-            style={{ background: 'linear-gradient(90deg, transparent, #fbbf24, transparent)' }}
+            style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)' }}
           />
 
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
-            <div className="ui-label" style={{ color: '#fbbf24' }}>
+            <div className="ui-label" style={{ color: 'var(--accent-text)' }}>
               {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira'}
             </div>
             <h2 className="mt-2 text-display font-semibold leading-tight tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -887,7 +887,7 @@ function OrbDecoration() {
           height: 500,
           top: '-10%',
           left: '-8%',
-          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.06), transparent 70%)',
+          background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 6%, transparent), transparent 70%)',
         }}
         animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
         transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
@@ -928,8 +928,8 @@ function StepContent(props: StepContentProps) {
                   key={option.value}
                   className="flex cursor-pointer items-start gap-3 rounded-[16px] border p-4 transition-colors"
                   style={{
-                    borderColor: selected ? 'rgba(251, 191, 36, 0.4)' : 'var(--border)',
-                    background: selected ? 'rgba(251, 191, 36, 0.06)' : 'var(--bg-tertiary)',
+                    borderColor: selected ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
+                    background: selected ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--bg-tertiary)',
                   }}
                 >
                   <input
@@ -938,7 +938,7 @@ function StepContent(props: StepContentProps) {
                     value={option.value}
                     checked={selected}
                     onChange={() => props.setWorkspaceKind(option.value)}
-                    className="mt-0.5 accent-amber-400"
+                    className="mt-0.5 accent-[var(--accent-solid)]"
                   />
                   <span>
                     <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{option.title}</span>
@@ -1052,8 +1052,8 @@ function StepContent(props: StepContentProps) {
           <label
             className="flex cursor-pointer items-start gap-3 rounded-[16px] border p-4 transition-colors"
             style={{
-              borderColor: props.includeManagerJira ? 'rgba(251, 191, 36, 0.4)' : 'var(--border)',
-              background: props.includeManagerJira ? 'rgba(251, 191, 36, 0.06)' : 'var(--bg-tertiary)',
+              borderColor: props.includeManagerJira ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
+              background: props.includeManagerJira ? 'color-mix(in srgb, var(--accent) 6%, transparent)' : 'var(--bg-tertiary)',
             }}
           >
             <input
@@ -1063,7 +1063,7 @@ function StepContent(props: StepContentProps) {
                 props.setIncludeManagerJira(e.target.checked);
                 if (!e.target.checked) props.setSelectedManagerJiraAccountId('');
               }}
-              className="mt-0.5 accent-amber-400"
+              className="mt-0.5 accent-[var(--accent-solid)]"
             />
             <span>
               <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -1279,7 +1279,7 @@ function StepContent(props: StepContentProps) {
                       <span
                         className="rounded-full px-2 py-0.5 text-ui font-semibold capitalize"
                         style={{
-                          background: account.role === 'manager' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(6, 182, 212, 0.14)',
+                          background: account.role === 'manager' ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'rgba(6, 182, 212, 0.14)',
                           color: account.role === 'manager' ? 'var(--warning)' : 'var(--accent)',
                         }}
                       >
@@ -1412,9 +1412,9 @@ function UserRow({
   accent: 'amber' | 'cyan';
   onClick: () => void;
 }) {
-  const colors = accent === 'amber'
-    ? { border: 'rgba(251, 191, 36, 0.45)', bg: 'rgba(251, 191, 36, 0.1)', check: '#fbbf24' }
-    : { border: 'rgba(6, 182, 212, 0.45)', bg: 'rgba(6, 182, 212, 0.1)', check: 'var(--accent)' };
+  // docs/73 UXD-08: one accent — both pickers use it (the `accent` prop is kept for callers).
+  void accent;
+  const colors = { border: 'color-mix(in srgb, var(--accent) 45%, transparent)', bg: 'var(--accent-glow)', check: 'var(--accent)' };
 
   return (
     <button
@@ -1496,10 +1496,10 @@ const fieldStyle = {
 };
 
 const primaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-5 py-3 text-body font-semibold transition-all disabled:opacity-40';
+// docs/73 UXD-08: the primary action is the app's one solid accent, not an amber gradient with a glow.
 const primaryBtnStyle = {
-  background: 'linear-gradient(135deg, var(--warning), color-mix(in srgb, var(--warning) 60%, white))',
-  color: '#111827',
-  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.18)',
+  background: 'var(--accent-solid)',
+  color: 'var(--on-accent)',
 };
 
 const secondaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-body font-semibold transition-colors disabled:opacity-40';

@@ -59,8 +59,8 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                 <span
                   className="relative z-[1] mt-[7px] h-[7px] w-[7px] rounded-full"
                   style={{
-                    background: fromLead ? 'var(--md-accent)' : idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
-                    boxShadow: idx === 0 ? `0 0 0 3px color-mix(in srgb, ${fromLead ? 'var(--md-accent)' : 'var(--accent)'} 18%, transparent)` : undefined,
+                    background: fromLead || idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
+                    boxShadow: idx === 0 ? '0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
                   }}
                 />
                 {!isLast && <span className="absolute bottom-0 top-[18px] w-px" style={{ background: HAIRLINE }} />}
@@ -69,7 +69,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
               <div className={`min-w-0 ${isLast ? '' : 'pb-4'}`}>
                 {(fromLead || status) && (
                   <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-ui font-medium leading-5">
-                    {fromLead && <span style={{ color: 'var(--md-accent)' }}>From your lead</span>}
+                    {fromLead && <span style={{ color: 'var(--accent-text)' }}>From your lead</span>}
                     {status && (
                       <span className="inline-flex items-center gap-1" style={{ color: status.color }}>
                         <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} aria-hidden="true" />
@@ -82,8 +82,8 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                   className={`whitespace-pre-line break-words text-body leading-5 ${fromLead ? 'rounded-lg px-2.5 py-1.5' : ''}`}
                   style={{
                     color: 'var(--text-primary)',
-                    background: fromLead ? 'var(--md-accent-dim)' : undefined,
-                    border: fromLead ? '1px solid color-mix(in srgb, var(--md-accent) 20%, transparent)' : undefined,
+                    background: fromLead ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : undefined,
+                    border: fromLead ? '1px solid color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
                   }}
                 >
                   {ci.summary}

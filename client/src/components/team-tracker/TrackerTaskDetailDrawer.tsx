@@ -359,7 +359,7 @@ function TrackerTaskDetailPlaceholder({
         style={{
           borderColor: 'var(--border)',
           background:
-            'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 94%, var(--md-accent-dim) 6%) 0%, color-mix(in srgb, var(--bg-secondary) 88%, transparent) 100%)',
+            'linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 94%, var(--accent-glow) 6%) 0%, color-mix(in srgb, var(--bg-secondary) 88%, transparent) 100%)',
         }}
       >
         <div className="flex items-start justify-between gap-3">

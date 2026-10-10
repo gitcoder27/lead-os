@@ -25,7 +25,7 @@ const managerDeskStatusLabels: Record<ManagerDeskItem['status'], string> = {
 
 const managerDeskStatusColors: Record<ManagerDeskItem['status'], string> = {
   inbox: 'var(--text-muted)',
-  planned: 'var(--md-accent)',
+  planned: 'var(--accent)',
   in_progress: 'var(--accent)',
   waiting: 'var(--info)',
   backlog: 'var(--text-muted)',
@@ -107,7 +107,7 @@ export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCaptur
 
   return (
     <DrawerSection
-      icon={<Briefcase size={14} style={{ color: 'var(--md-accent)' }} />}
+      icon={<Briefcase size={14} style={{ color: 'var(--accent)' }} />}
       title="Follow-ups"
       count={items.length > 0 ? openCount : undefined}
       hint="Private"
@@ -115,8 +115,8 @@ export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCaptur
         <button
           type="button"
           onClick={onCapture}
-          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--md-accent-glow)] ${FOCUS_RING}`}
-          style={{ color: 'var(--md-accent)' }}
+          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+          style={{ color: 'var(--accent-text)' }}
           title={`Capture a private follow-up linked to ${day.developer.displayName}`}
         >
           <Plus size={13} />

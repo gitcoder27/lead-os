@@ -36,7 +36,7 @@ export const NAV_PAGE_META: Record<NavPageId, NavPageMeta> = {
     view: 'desk',
     label: 'Desk',
     icon: Briefcase,
-    accentColor: 'var(--md-accent)',
+    accentColor: 'var(--accent)',
     href: '/desk',
     matches: ['desk', 'manager-desk'],
   },

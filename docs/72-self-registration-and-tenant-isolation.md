@@ -416,6 +416,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-04 | main (this commit) | Four mocked outbound regressions failed against original Jira/AI save/test/request paths and raw body reflection. Added one production https/public-DNS/IP policy using the existing ipaddr.js 1.9.1 parser, explicit operator exceptions and exact/leading-dot Jira host rules; request-time rechecks and manual redirect handling cover background Jira and streaming/nonstreaming Copilot. All proposed AI profile URLs validate before patch writes. Removed untrusted provider text from errors, retaining status-specific messages; updated the two prior body-reflection expectations. Current provider profiles extend the plan file list but share the same policy. Final six targeted suites: 86 PASS; typecheck, build:check, new-module/test lint, touched JSON format, guard:data and diff check PASS. DNS/fetch mocked; residual rebinding documented. Offline npm metadata cache was missing, so declared the already-locked parser directly without changing its version or artifacts. |
 
+| 2026-10-10 | SR-05 | main (this commit) | Explicit server-only install authority; active legacy default managers migrated once, new managers unprivileged, trusted CLI --install-admin. Backup list/run/download regressions and public flag stripping pass. Representative scratch-copy hashes unchanged and repeated migration preserves revocation. Real CLI scratch regression included. Seven targeted suites: 141 PASS; typecheck, build:check, touched lint, guard:data and diff check PASS. Production inspection remains operator-owned. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -436,7 +438,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Files:* `server/src/net/outbound-guard.ts` (new), `jira/client.ts`, `assistant/llm-client.ts`, `routes/config.ts`, `services/assistant-config.service.ts`, `.env.example` (`OUTBOUND_ALLOWED_HOSTS`, `JIRA_ALLOWED_HOSTS` suffix form), `docs/23`, tests `outbound-guard.test.ts`, `config.routes.test.ts`, `jira.client.test.ts`, `llm-client.test.ts`.
   - *Acceptance:* §8.3 guard cases; Jira errors carry status and a short message, not the body.
   - *Rollback:* revert. The owner's production AI URL is public (confirmed 2026-10-10), so no allow-list entry is needed for it. Before deploying, check `JIRA_ALLOWED_HOSTS` in the production `.env` (§10) and switch it to the suffix form if it is set.
-- [ ] **SR-05 Explicit install admin (F-04).**
+- [x] **SR-05 Explicit install admin (F-04).**
   - *Before starting:* production has at least one workspace besides `default` (owner, 2026-10-10). Run the §10 read-only checks on a copy first, so the migration's admin set and F-08 are reviewed against real data.
   - *Files:* `db/schema.ts`, `db/migrate.ts`, `middleware/auth.ts`, `services/auth.service.ts`, `scripts/create-auth-user.ts`, `routes/auth.ts`, tests `backups.routes.test.ts`, `config.routes.test.ts`, `db.migrate.test.ts`, `auth.routes.test.ts`.
   - *Acceptance:* the existing default managers keep backups; a later co-manager does not; the error message no longer says "default workspace".

@@ -5,6 +5,7 @@ import { validate } from "../middleware/validate";
 import { canManageInstall, requireAuth, requireManager } from "../middleware/auth";
 import {
   AuthService,
+  publicAuthUser,
   clearSessionCookie,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -121,7 +122,7 @@ export function createAuthRouter(authService: AuthService): Router {
   const oneOnOnes = new OneOnOneService();
   const settings = new SettingsService();
   const sessionResponse = async (user: AuthUser): Promise<AuthSessionResponse> => ({
-    user,
+    user: publicAuthUser(user),
     // docs/48: `oneOnOne` is manager-only — developer sessions never receive it.
     features: {
       tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId),
@@ -207,7 +208,7 @@ export function createAuthRouter(authService: AuthService): Router {
         );
       }
 
-      res.status(201).json({ user });
+      res.status(201).json({ user: publicAuthUser(user) });
     } catch (error) {
       next(error);
     }
@@ -232,7 +233,7 @@ export function createAuthRouter(authService: AuthService): Router {
   router.get("/users", requireManager(authService), async (req, res, next) => {
     try {
       const users = await authService.listUsers(req.auth!.user.workspaceId);
-      res.json({ users });
+      res.json({ users: users.map(publicAuthUser) });
     } catch (error) {
       next(error);
     }

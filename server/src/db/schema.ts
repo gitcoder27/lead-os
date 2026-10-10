@@ -62,6 +62,7 @@ export const appUsers = sqliteTable("app_users", {
   username: text("username").notNull().unique(),
   displayName: text("display_name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  isInstallAdmin: integer("is_install_admin").notNull().default(0),
   role: text("role").notNull(),
   developerAccountId: text("developer_account_id"),
   isActive: integer("is_active").notNull().default(1),

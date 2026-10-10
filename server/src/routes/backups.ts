@@ -21,7 +21,7 @@ const downloadSchema = z.object({
 });
 
 /**
- * docs/56 P6-01: mounted under `requireInstallManager` (a manager of the default workspace), because
+ * docs/56 P6-01: mounted under `requireInstallManager` (an explicitly marked install manager), because
  * a snapshot is the whole install. Responses never carry server paths, downloads leave out login
  * sessions, and "Back up now" is throttled. Restore is deliberately not an endpoint: it replaces the
  * live database, so it stays the `npm run backup:restore` CLI.

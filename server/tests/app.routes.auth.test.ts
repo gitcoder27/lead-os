@@ -222,7 +222,7 @@ describe("app route authorization", () => {
     const response = await invoke(app, { method, url, headers: { cookie: serializeSessionCookie(session.sessionId) } });
 
     expect(response.status).toBe(403);
-    expect(response.body?.error).toBe("Only a manager of the default workspace can manage backups");
+    expect(response.body?.error).toBe("Only the install owner can manage backups");
   });
 
   it("GET /api/my-day rejects manager access", async () => {

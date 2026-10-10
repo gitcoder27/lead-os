@@ -5,16 +5,16 @@ import crypto from "node:crypto";
 import { foreignTenantProbes, type TenantSeed } from "./tenant-probes";
 import { rawDb } from "../../src/db/connection";
 
-export function workspaceSnapshot(workspaceId: string) {
-  const tables = rawDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
+export function workspaceSnapshot(workspaceId: string, database = rawDb) {
+  const tables = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
   const result: Record<string, string> = {};
   for (const { name } of tables) {
-    const columns = rawDb.prepare(`PRAGMA table_info("${name}")`).all() as { name: string }[];
+    const columns = database.prepare(`PRAGMA table_info("${name}")`).all() as { name: string }[];
     let where = columns.some((column) => column.name === "workspace_id") ? "workspace_id = ?" : undefined;
     if (name === "assistant_messages") where = "conversation_id IN (SELECT id FROM assistant_conversations WHERE workspace_id = ?)";
     if (name === "workspaces") where = "id = ?";
     if (!where) continue;
-    const rows = rawDb.prepare(`SELECT * FROM "${name}" WHERE ${where} ORDER BY rowid`).all(workspaceId);
+    const rows = database.prepare(`SELECT * FROM "${name}" WHERE ${where} ORDER BY rowid`).all(workspaceId);
     result[name] = crypto.createHash("sha256").update(JSON.stringify(rows)).digest("hex");
   }
   return result;

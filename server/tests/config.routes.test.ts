@@ -97,6 +97,7 @@ function createTestApp(workspaceId = testWorkspaceId) {
         accountId: "manager-1",
         displayName: "Manager One",
         role: "manager",
+        isInstallAdmin: workspaceId === "default",
         workspaceId,
       },
     };

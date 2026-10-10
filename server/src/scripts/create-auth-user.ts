@@ -7,7 +7,7 @@ import { AuthService } from "../services/auth.service";
 function usage(): string {
   return [
     "Usage:",
-    "  npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <admin|manager|developer> [--developer-account-id <accountId>]",
+    "  npm run auth:create-user --workspace=server -- --username <name> --password <password> --display-name <display> --role <admin|manager|developer> [--developer-account-id <accountId>] [--install-admin]",
     "",
     "Examples:",
     "  npm run auth:create-user --workspace=server -- --username admin --password secret123 --display-name \"App Admin\" --role admin",
@@ -79,6 +79,7 @@ async function main(): Promise<void> {
     displayName,
     role,
     developerAccountId,
+    isInstallAdmin: args["install-admin"] === "true",
   });
 
   console.log(

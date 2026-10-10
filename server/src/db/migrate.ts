@@ -1,3 +1,4 @@
+import { migrateInstallAdmin } from "./install-admin";
 import BetterSqlite3 from "better-sqlite3";
 import { encryptSecretIfNeeded, isEncryptedSecret } from "../services/secret-crypto";
 import { startCanonicalTasksForEmptyWorkspaces } from "./canonical-start";
@@ -1521,6 +1522,7 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   // tolerateMissingTables: the Phase 2d contract renames legacy task tables
   // to legacy_* archives, after which these repair statements are inert.
   runConstraintRepairStatements(sqlite, true);
+  migrateInstallAdmin(sqlite);
   migrateSecretConfigValues(sqlite);
   backfillTeamMode(sqlite);
   pinLegacyJiraSyncScope(sqlite);

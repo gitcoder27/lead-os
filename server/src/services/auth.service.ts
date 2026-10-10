@@ -1,12 +1,20 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { and, eq, inArray } from "drizzle-orm";
-import type { AuthUser, UserRole } from "shared/types";
+import type { AuthUser as PublicAuthUser, UserRole } from "shared/types";
 import { db } from "../db/connection";
 import { runInTransaction } from "../db/transaction";
 import { appSessions, appUsers, developers } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId, WorkspaceService } from "./workspace.service";
+
+/** Authority belongs only to the server principal, never to a client payload. */
+export interface ServerAuthUser extends PublicAuthUser { isInstallAdmin: boolean; }
+type AuthUser = ServerAuthUser;
+
+export function publicAuthUser(user: PublicAuthUser): PublicAuthUser {
+  return { username: user.username, accountId: user.accountId, workspaceId: user.workspaceId, displayName: user.displayName, role: user.role, developerAccountId: user.developerAccountId };
+}
 
 /** Password rules shared by account creation (`/register`), reset and the admin CLI. */
 /** docs/56 P2-01: raised from 6. Applies to new passwords only; existing logins are unaffected. */
@@ -28,9 +36,11 @@ interface CreateUserParams {
   workspaceId?: string;
   developerAccountId?: string;
   isActive?: boolean;
+  isInstallAdmin?: boolean;
 }
 
 interface PersistedUser {
+  isInstallAdmin: number;
   id: number;
   workspaceId: string;
   username: string;
@@ -75,6 +85,7 @@ async function verifyPassword(password: string, encoded: string): Promise<boolea
 
 function mapAuthUser(user: PersistedUser): AuthUser {
   return {
+    isInstallAdmin: user.isInstallAdmin === 1,
     username: user.username,
     accountId: user.developerAccountId ?? user.username,
     workspaceId: user.workspaceId,
@@ -131,6 +142,7 @@ export class AuthService {
       throw new HttpError(400, `Password must be at most ${PASSWORD_MAX_LENGTH} characters`);
     }
 
+    if (params.isInstallAdmin && params.role !== "manager") throw new HttpError(400, "Install authority requires a manager account");
     const userCount = await this.getUserCount();
     if (userCount === 0 && params.role !== "manager") {
       throw new HttpError(403, "The first account must be a manager");
@@ -170,6 +182,7 @@ export class AuthService {
       .insert(appUsers)
       .values({
         workspaceId,
+        isInstallAdmin: params.role === "manager" && (userCount === 0 || params.isInstallAdmin === true) ? 1 : 0,
         username,
         displayName: params.displayName.trim(),
         passwordHash: await hashPassword(params.password),
@@ -193,6 +206,7 @@ export class AuthService {
       displayName: row.displayName,
       role: row.role as UserRole,
       developerAccountId: row.developerAccountId ?? undefined,
+      isInstallAdmin: row.isInstallAdmin,
     });
   }
 
@@ -232,6 +246,7 @@ export class AuthService {
         displayName: row.displayName,
         role: row.role as UserRole,
         developerAccountId: row.developerAccountId ?? undefined,
+      isInstallAdmin: row.isInstallAdmin,
       }),
     };
   }
@@ -247,6 +262,7 @@ export class AuthService {
         role: appUsers.role,
         developerAccountId: appUsers.developerAccountId,
         isActive: appUsers.isActive,
+        isInstallAdmin: appUsers.isInstallAdmin,
         expiresAt: appSessions.expiresAt,
         lastSeenAt: appSessions.lastSeenAt,
         teamMemberIsActive: developers.isActive,
@@ -295,6 +311,7 @@ export class AuthService {
       displayName: row.displayName,
       role: row.role as UserRole,
       developerAccountId: row.developerAccountId ?? undefined,
+      isInstallAdmin: row.isInstallAdmin,
     });
   }
 
@@ -375,6 +392,7 @@ export class AuthService {
         displayName: row.displayName,
         role: row.role as UserRole,
         developerAccountId: row.developerAccountId ?? undefined,
+      isInstallAdmin: row.isInstallAdmin,
       })
     );
   }

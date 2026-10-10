@@ -19,7 +19,7 @@ export function TodayCountBadge({ hidden = false }: { hidden?: boolean }) {
         animate={{ width: hidden ? 0 : 'auto', marginLeft: hidden ? 0 : 6, opacity: hidden ? 0 : 1 }}
         transition={{ duration: reduceMotion ? 0 : 0.18, ease: 'easeInOut' }}
       >
-        <span className="min-w-[18px] shrink-0 rounded-full px-1.5 text-center text-[10.5px] font-semibold leading-[18px] tabular-nums"
+        <span className="min-w-[18px] shrink-0 rounded-full px-1.5 text-center text-meta font-semibold leading-[18px] tabular-nums"
           style={{ background: 'var(--accent-glow)', color: 'var(--accent-text)' }}>
           {count}
         </span>

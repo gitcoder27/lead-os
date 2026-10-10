@@ -27,7 +27,7 @@ export function PropertyRow({ icon, label, children, align = 'center' }: {
       className={`grid grid-cols-[minmax(96px,34%)_minmax(0,1fr)] gap-2 ${align === 'start' ? 'items-start' : 'items-center'} min-h-[36px]`}
     >
       <dt
-        className={`flex items-center gap-2 text-[12.5px] font-medium ${align === 'start' ? 'pt-[9px]' : ''}`}
+        className={`flex items-center gap-2 text-body font-medium ${align === 'start' ? 'pt-[9px]' : ''}`}
         style={{ color: 'var(--text-muted)' }}
       >
         <span className="flex w-4 shrink-0 justify-center opacity-80">{icon}</span>
@@ -56,7 +56,7 @@ export const PropertyButton = forwardRef<HTMLButtonElement, PropertyButtonProps>
 ) {
   if (disabled) {
     return (
-      <span className="flex min-h-[32px] min-w-0 items-center gap-2 px-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+      <span className="flex min-h-[32px] min-w-0 items-center gap-2 px-2 text-body" style={{ color: 'var(--text-secondary)' }}>
         {children}
       </span>
     );
@@ -71,7 +71,7 @@ export const PropertyButton = forwardRef<HTMLButtonElement, PropertyButtonProps>
       aria-expanded={expanded}
       title={title}
       data-task-shortcut={shortcut}
-      className={`group/prop flex min-h-[32px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`group/prop flex min-h-[32px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
       style={{ color: 'var(--text-primary)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
@@ -94,7 +94,7 @@ export function DateValue({ display, empty }: { display: DateDisplay | null; emp
     <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="truncate font-medium" style={{ color: toneColor(display.tone) }}>{display.label}</span>
       {display.hint && (
-        <span className="shrink-0 text-[12px] font-medium" style={{ color: toneColor(display.tone), opacity: 0.8 }}>
+        <span className="shrink-0 text-ui font-medium" style={{ color: toneColor(display.tone), opacity: 0.8 }}>
           {display.hint}
         </span>
       )}
@@ -165,7 +165,7 @@ export function DatePickerPopover({ anchor, label, kind, value, presets, onCommi
           if (canApply) onCommit(draft);
         }}
       >
-        <label htmlFor={inputId} className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <label htmlFor={inputId} className="mb-1 block text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
           {kind === 'date' ? 'Pick a date' : 'Pick a date & time'}
         </label>
         <div className="flex items-center gap-1.5">
@@ -175,13 +175,13 @@ export function DatePickerPopover({ anchor, label, kind, value, presets, onCommi
             data-autofocus={showMenu ? undefined : ''}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[12.5px] tabular-nums ${FOCUS_RING}`}
+            className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-body tabular-nums ${FOCUS_RING}`}
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
           />
           <button
             type="submit"
             disabled={!canApply}
-            className={`flex h-[30px] items-center gap-1 rounded-lg px-2 text-[12px] font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
+            className={`flex h-[30px] items-center gap-1 rounded-lg px-2 text-ui font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             aria-label={`Apply ${label.toLowerCase()}`}
           >
@@ -210,7 +210,7 @@ export function InlineTextField({ value, placeholder, onCommit, ariaLabel, multi
 
   if (disabled) {
     return (
-      <span className={`block whitespace-pre-wrap px-2 py-1.5 text-[13px] ${className}`} style={{ color: value ? 'var(--text-secondary)' : 'var(--text-placeholder)' }}>
+      <span className={`block whitespace-pre-wrap px-2 py-1.5 text-body ${className}`} style={{ color: value ? 'var(--text-secondary)' : 'var(--text-placeholder)' }}>
         {value || '—'}
       </span>
     );
@@ -229,7 +229,7 @@ export function InlineTextField({ value, placeholder, onCommit, ariaLabel, multi
     placeholder,
     'aria-label': ariaLabel,
     onBlur: commit,
-    className: `w-full rounded-lg bg-transparent px-2 py-1.5 text-[13px] transition-colors placeholder:text-[var(--text-placeholder)] hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)] ${FOCUS_RING} ${className}`,
+    className: `w-full rounded-lg bg-transparent px-2 py-1.5 text-body transition-colors placeholder:text-[var(--text-placeholder)] hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)] ${FOCUS_RING} ${className}`,
     style: { color: 'var(--text-primary)' },
   };
 

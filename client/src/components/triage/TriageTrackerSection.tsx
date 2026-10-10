@@ -84,7 +84,7 @@ export function TriageTrackerSection({
         />
         <span className="triage-section-label"><Users size={11} /> Team board</span>
         {assignments.length > 0 && (
-          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full ml-1"
+          <span className="text-meta font-semibold px-1.5 py-0.5 rounded-full ml-1"
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
             {assignments.length} linked
           </span>
@@ -101,14 +101,14 @@ export function TriageTrackerSection({
               onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
               placeholder="Task description…"
               aria-label="Task"
-              className="flex-1 rounded-md px-2.5 py-1.5 text-[12.5px] outline-none transition-colors"
+              className="flex-1 rounded-md px-2.5 py-1.5 text-body outline-none transition-colors"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             />
             <button
               type="button"
               onClick={handleAdd}
               disabled={!selectedDev || isAdding || !taskTitle.trim()}
-              className="shrink-0 rounded-md px-2.5 py-1.5 text-[12px] font-semibold disabled:opacity-30 transition-colors"
+              className="shrink-0 rounded-md px-2.5 py-1.5 text-ui font-semibold disabled:opacity-30 transition-colors"
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' }}
             >
               {isAdding ? '…' : selectedDev ? `Add to ${firstName(selectedDev.displayName)}` : 'Add'}
@@ -124,7 +124,7 @@ export function TriageTrackerSection({
                   type="button"
                   onClick={() => setAccountId(dev.accountId)}
                   aria-pressed={isSelected}
-                  className="rounded-full px-2 py-0.5 text-[12px] font-medium transition-colors"
+                  className="rounded-full px-2 py-0.5 text-ui font-medium transition-colors"
                   style={{
                     background: isSelected ? 'var(--accent-glow)' : 'transparent',
                     color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
@@ -132,7 +132,7 @@ export function TriageTrackerSection({
                   }}
                 >
                   {dev.displayName}
-                  {(issueAssigneeId === dev.accountId || issueAssigneeId === dev.jiraAccountId) && <span className="text-[11px] opacity-60 ml-0.5">●</span>}
+                  {(issueAssigneeId === dev.accountId || issueAssigneeId === dev.jiraAccountId) && <span className="text-meta opacity-60 ml-0.5">●</span>}
                 </button>
               );
             })}
@@ -140,11 +140,11 @@ export function TriageTrackerSection({
 
           {assignments.length > 0 && (
             <div className="rounded-md px-2.5 py-2 space-y-0.5" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-meta font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
                 Linked Today
               </div>
               {assignments.map((a) => (
-                <div key={a.itemId} className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                <div key={a.itemId} className="text-ui" style={{ color: 'var(--text-secondary)' }}>
                   {a.developer.displayName} · {stateLabel(a.state)} · {a.title}
                 </div>
               ))}

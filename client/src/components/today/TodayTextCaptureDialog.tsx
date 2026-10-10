@@ -132,7 +132,7 @@ export function TodayTextCaptureDialog({
       ) : null}
       {presets && presets.length > 0 ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>Due</span>
+          <span className="text-ui font-medium" style={{ color: 'var(--text-muted)' }}>Due</span>
           <div className="ui-segment" role="group" aria-label="Due">
             {presets.map((option) => (
               <button

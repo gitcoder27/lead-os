@@ -872,7 +872,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const renderAddManually = (spacing: string) => (
     <div className={`${spacing} rounded-xl p-3`} style={{ border: 'var(--settings-inset-border)', background: 'var(--settings-inset-bg)' }}>
       <SettingsGroupLabel>Add Manually</SettingsGroupLabel>
-      <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Add a person before linking Jira. They can be used in Team, Desk, and developer access immediately.
       </p>
       <div className="mt-3 grid gap-2">
@@ -882,7 +882,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           onChange={(e) => setManualMemberName(e.target.value)}
           placeholder="Display name"
           aria-label="Manual team member name"
-          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-none"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <input
@@ -891,7 +891,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           onChange={(e) => setManualMemberEmail(e.target.value)}
           placeholder="Email optional"
           aria-label="Manual team member email"
-          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-none"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <input
@@ -900,14 +900,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           onChange={(e) => setManualMemberJiraAccountId(e.target.value)}
           placeholder="Jira account ID optional"
           aria-label="Manual team member Jira account ID"
-          className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-none"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <button
           type="button"
           onClick={handleAddManualMember}
           disabled={!manualMemberName.trim() || savingManualMember}
-          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-body font-semibold transition-colors disabled:opacity-50"
           style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
         >
           {savingManualMember ? <><Loader2 size={13} className="animate-spin" /> Adding…</> : <><UserPlus size={13} /> Add manual member</>}
@@ -1002,7 +1002,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
             >
               <Globe size={11} />
             </div>
-            <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-body font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               Settings
             </span>
           </div>
@@ -1029,12 +1029,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     {item.icon}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium leading-snug" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    <p className="text-body font-medium leading-snug" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                       {item.label}
                     </p>
                     {item.status ? (
                       <p
-                        className="mt-0.5 truncate text-[12px]"
+                        className="mt-0.5 truncate text-ui"
                         style={{ color: item.sv === 'success' ? 'var(--success-text)' : item.sv === 'warning' ? 'var(--warning-text)' : 'var(--text-muted)' }}
                       >
                         {item.status}
@@ -1051,10 +1051,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
             <div className="flex items-center gap-2">
               <Avatar name={user?.displayName || 'Manager'} seed={user?.accountId} size={24} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                <p className="truncate text-ui font-medium" style={{ color: 'var(--text-primary)' }}>
                   {user?.displayName || 'Manager'}
                 </p>
-                <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="truncate text-meta" style={{ color: 'var(--text-muted)' }}>
                   @{user?.username}
                 </p>
               </div>
@@ -1088,10 +1088,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <h2 className="text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                <h2 className="text-body font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                   {SECTION_LABELS[activeSection].title}
                 </h2>
-                <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                   {SECTION_LABELS[activeSection].description}
                 </p>
               </motion.div>
@@ -1146,16 +1146,16 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           className="flex items-start gap-4 px-4 py-2"
                           style={{ borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                         >
-                          <span className="w-[110px] shrink-0 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                          <span className="w-[110px] shrink-0 text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
                             {row.label}
                           </span>
-                          <span className="text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+                          <span className="text-body" style={{ color: 'var(--text-primary)' }}>
                             {row.value}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-2 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       {syncScopeMode === 'base_query'
                         ? 'The saved query defines the Jira defect universe for this workspace.'
                         : syncScopeMode === 'team_and_unassigned'
@@ -1172,10 +1172,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       <div className="flex items-start gap-2">
                         <TriangleAlert size={14} className="mt-0.5 shrink-0" style={{ color: 'var(--danger-muted)' }} />
                         <div className="min-w-0">
-                          <p className="text-[13px] font-semibold" style={{ color: 'var(--danger-muted)' }}>
+                          <p className="text-body font-semibold" style={{ color: 'var(--danger-muted)' }}>
                             Jira sync is failing
                           </p>
-                          <p className="mt-1 text-[12px] leading-relaxed" style={{ color: 'var(--danger-muted)' }}>
+                          <p className="mt-1 text-ui leading-relaxed" style={{ color: 'var(--danger-muted)' }}>
                             {syncErrorMessage}
                           </p>
                         </div>
@@ -1186,7 +1186,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Connection details */}
                   <div>
                     <SettingsGroupLabel>Connection Details</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Edit the Jira site and project used by this workspace. Save before running a sync.
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1197,7 +1197,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           value={jiraBaseUrl}
                           onChange={(e) => setJiraBaseUrl(e.target.value)}
                           placeholder="https://tenant.atlassian.net"
-                          className="w-full rounded-lg px-3 py-1.5 font-mono text-[12.5px] outline-none"
+                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </SettingsLabeledInput>
@@ -1208,7 +1208,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           value={jiraProjectKey}
                           onChange={(e) => setJiraProjectKey(e.target.value)}
                           placeholder="AM"
-                          className="w-full rounded-lg px-3 py-1.5 font-mono text-[12.5px] outline-none"
+                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </SettingsLabeledInput>
@@ -1221,7 +1221,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                             onChange={(e) => setJiraEmail(e.target.value)}
                             placeholder="manager@example.com"
                             autoComplete="email"
-                            className="w-full rounded-lg px-3 py-1.5 text-[12.5px] outline-none"
+                            className="w-full rounded-lg px-3 py-1.5 text-body outline-none"
                             style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                           />
                         </SettingsLabeledInput>
@@ -1232,7 +1232,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* API token */}
                   <div>
                     <SettingsGroupLabel>Jira API Token</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Paste a new token here when Jira access changes. The saved token is never displayed.
                     </p>
                     <div className="flex flex-col gap-2 sm:flex-row">
@@ -1243,21 +1243,21 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         onChange={(e) => setJiraApiTokenInput(e.target.value)}
                         placeholder={config?.jiraApiToken ? 'New API token' : 'API token'}
                         autoComplete="off"
-                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-[12.5px] outline-none"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-body outline-none"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                       <button
                         type="button"
                         onClick={() => void handleCheckJiraConnection()}
                         disabled={checkingJiraConnection || !canTestJiraConnection}
-                        className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                        className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         {checkingJiraConnection ? <Loader2 size={12} className="animate-spin" /> : <CircleCheck size={12} />}
                         {jiraApiTokenInput.trim() ? 'Test new token' : 'Check saved token'}
                       </button>
                     </div>
-                    <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-2 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       After testing a new token, use Save &amp; Sync to store it and refresh Jira defects.
                     </p>
                   </div>
@@ -1270,14 +1270,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         <button
                           type="button"
                           onClick={() => setManagerJiraAccountId('')}
-                          className="text-[12px] font-medium transition-opacity hover:opacity-70"
+                          className="text-ui font-medium transition-opacity hover:opacity-70"
                           style={{ color: 'var(--danger-muted)' }}
                         >
                           Clear
                         </button>
                       ) : null}
                     </div>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Link the manager account Jira should treat as the lead when assembling sync scope and your tasks.
                     </p>
                     <div className="space-y-2">
@@ -1287,7 +1287,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         value={managerJiraAccountId}
                         onChange={(e) => setManagerJiraAccountId(e.target.value)}
                         placeholder="Paste or edit the Jira account id"
-                        className="w-full rounded-lg px-3 py-1.5 font-mono text-[12.5px] outline-none"
+                        className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                       <div className="relative">
@@ -1297,18 +1297,18 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           value={managerSearch}
                           onChange={(e) => setManagerSearch(e.target.value)}
                           placeholder="Filter known Jira people"
-                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12.5px] outline-none"
+                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </div>
                     </div>
                     <div className="mt-3">
                       <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                           Directory picks
                         </p>
                         {discoveringTeam ? (
-                          <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          <span className="flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                             <Loader2 size={10} className="animate-spin" /> Refreshing
                           </span>
                         ) : null}
@@ -1328,28 +1328,28 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                             >
                               <IdentityAvatar user={u} selected={u.accountId === managerJiraAccountId} />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
-                                <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
+                                <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
+                                <p className="truncate text-ui" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
                               </div>
                               {u.accountId === managerJiraAccountId ? (
-                                <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
+                                <span className="rounded-full px-2 py-0.5 text-ui font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
                                   Active
                                 </span>
                               ) : null}
                             </button>
                           ))
                         ) : (
-                          <div className="px-4 py-3 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                          <div className="px-4 py-3 text-ui" style={{ color: 'var(--text-muted)' }}>
                             No profiles match. Paste an account id directly above.
                           </div>
                         )}
                       </div>
                       {selectedManagerProfile ? (
-                        <p className="mt-2 text-[12px]" style={{ color: 'var(--success)' }}>
+                        <p className="mt-2 text-ui" style={{ color: 'var(--success)' }}>
                           <span className="font-semibold">{selectedManagerProfile.displayName}</span> is linked as the manager Jira identity.
                         </p>
                       ) : managerJiraAccountId ? (
-                        <p className="mt-2 text-[12px]" style={{ color: 'var(--warning)' }}>
+                        <p className="mt-2 text-ui" style={{ color: 'var(--warning)' }}>
                           Account id saved manually — not in the current directory snapshot.
                         </p>
                       ) : null}
@@ -1369,7 +1369,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Auto sync */}
                   <div>
                     <SettingsGroupLabel>Auto Sync</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       When enabled, LeadOS refreshes Jira issues automatically on a schedule. Turn it off if you only
                       track people and daily work here — no Jira calls are made until you run a manual sync.
                     </p>
@@ -1378,10 +1378,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       style={{ background: 'var(--settings-input-bg)', border: 'var(--settings-inset-border)' }}
                     >
                       <div className="min-w-0">
-                        <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                           Scheduled Jira sync
                         </p>
-                        <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                           {autoSyncEnabled
                             ? 'On — Jira issues refresh automatically.'
                             : 'Off — manual sync only, via the refresh button.'}
@@ -1417,7 +1417,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Scope mode */}
                   <div>
                     <SettingsGroupLabel>Scope Mode</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Choose whether Jira sync covers the tracked roster (with or without unassigned issues) or is driven directly by the base query.
                     </p>
                     <div className="grid gap-2 sm:grid-cols-3">
@@ -1469,9 +1469,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 {option.icon}
                               </span>
                               <span className="min-w-0 flex-1">
-                                <span className="block text-[13px] font-semibold leading-5">{option.label}</span>
+                                <span className="block text-body font-semibold leading-5">{option.label}</span>
                                 <span
-                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase"
+                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-meta font-semibold uppercase"
                                   style={{
                                     letterSpacing: '0.08em',
                                     background: selected ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-tertiary)',
@@ -1483,7 +1483,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               </span>
                               {selected ? <Check size={14} style={{ color: 'var(--accent)' }} /> : null}
                             </span>
-                            <span className="mt-2 block text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+                            <span className="mt-2 block text-ui leading-5" style={{ color: 'var(--text-secondary)' }}>
                               {option.description}
                             </span>
                           </button>
@@ -1495,7 +1495,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Base query */}
                   <div>
                     <SettingsGroupLabel>Base JQL Query</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       {syncScopeMode === 'base_query'
                         ? 'This query is sent to Jira without LeadOS adding assignee filters.'
                         : 'Keep this query focused on the defect universe. LeadOS will append team assignees and manager lead logic.'}
@@ -1506,13 +1506,13 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       onChange={(e) => setJql(e.target.value)}
                       rows={7}
                       spellCheck={false}
-                      className="w-full resize-y rounded-lg px-3 py-2.5 font-mono text-[12.5px] leading-relaxed outline-none"
+                      className="w-full resize-y rounded-lg px-3 py-2.5 font-mono text-body leading-relaxed outline-none"
                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)', minHeight: '120px' }}
                       placeholder="project = PROJ AND issuetype = Bug AND statusCategory != Done"
                     />
-                    <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>
                       Use{' '}
-                      <code className="rounded px-1 py-0.5 font-mono text-[12px]" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
+                      <code className="rounded px-1 py-0.5 font-mono text-ui" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
                         {'{ PROJECT_KEY }'}
                       </code>{' '}
                       to insert the configured project key dynamically.
@@ -1522,7 +1522,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Custom fields */}
                   <div>
                     <SettingsGroupLabel>Custom Field Mapping</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Map custom Jira fields surfaced during triage. Use Discover to browse available fields.
                     </p>
                     <div className="space-y-2">
@@ -1556,7 +1556,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                         style={{ borderColor: 'color-mix(in srgb, var(--border-strong) 78%, transparent)' }}
                       >
-                        <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {fieldPickerTarget === 'aspenSeverity' ? 'ASPEN Severity' : 'Dev Due Date'} — field picker
                         </p>
                         <div className="flex items-center gap-2">
@@ -1567,14 +1567,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               value={fieldSearch}
                               onChange={(e) => setFieldSearch(e.target.value)}
                               placeholder="Search fields…"
-                              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[13px] outline-none"
+                              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </div>
                           <button
                             type="button"
                             onClick={() => setFieldPickerTarget(null)}
-                            className="rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors"
+                            className="rounded-lg px-3 py-1.5 text-ui font-medium transition-colors"
                             style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
                           >
                             Close
@@ -1589,10 +1589,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           <FieldListGroup title="Other custom fields" fields={otherFields.slice(0, 50)} currentFieldValue={currentFieldValue} onSelect={handleFieldSelection} />
                         ) : null}
                         {otherFields.length > 50 ? (
-                          <p className="px-4 py-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>+{otherFields.length - 50} more — narrow the search.</p>
+                          <p className="px-4 py-2 text-ui" style={{ color: 'var(--text-muted)' }}>+{otherFields.length - 50} more — narrow the search.</p>
                         ) : null}
                         {preferredFields.length === 0 && otherFields.length === 0 ? (
-                          <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>No custom fields match this search.</p>
+                          <p className="px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>No custom fields match this search.</p>
                         ) : null}
                       </div>
                     </div>
@@ -1611,7 +1611,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <div className="mb-2.5 flex items-center justify-between">
                       <SettingsGroupLabel>Tracked Team</SettingsGroupLabel>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-ui font-semibold"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         {developers.length}
@@ -1628,15 +1628,15 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         onChange={(e) => setTeamSearch(e.target.value)}
                         placeholder="Search team"
                         aria-label="Search current team"
-                        className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12.5px] outline-none"
+                        className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                     </div>
                     <div className="overflow-hidden rounded-xl" style={{ border: 'var(--settings-inset-border)' }}>
                       {loadingDevelopers ? (
-                        <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>Loading team…</p>
+                        <p className="px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>Loading team…</p>
                       ) : filteredDevelopers.length === 0 ? (
-                        <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>
                           {developers.length === 0 ? 'No team members yet.' : 'No members match this search.'}
                         </p>
                       ) : (
@@ -1659,7 +1659,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       value={editingMemberName}
                                       onChange={(e) => setEditingMemberName(e.target.value)}
                                       aria-label="Edit team member name"
-                                      className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                     <input
@@ -1668,7 +1668,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       onChange={(e) => setEditingMemberEmail(e.target.value)}
                                       placeholder="Email optional"
                                       aria-label="Edit team member email"
-                                      className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                     <input
@@ -1677,7 +1677,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       onChange={(e) => setEditingMemberJiraAccountId(e.target.value)}
                                       placeholder="Jira account ID optional"
                                       aria-label="Edit team member Jira account ID"
-                                      className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                   </div>
@@ -1687,7 +1687,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       onClick={() => void handleSaveEditedMember()}
                                       disabled={!editingMemberName.trim() || isSavingEdit}
                                       aria-label="Save team member changes"
-                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
+                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-ui font-semibold disabled:opacity-50"
                                       style={{ background: 'var(--settings-success-soft-bg)', color: 'var(--success)', border: 'var(--settings-success-soft-border)' }}
                                     >
                                       {isSavingEdit ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} Save
@@ -1696,7 +1696,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                       type="button"
                                       onClick={cancelEditingMember}
                                       disabled={isSavingEdit}
-                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-semibold disabled:opacity-50"
+                                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-ui font-semibold disabled:opacity-50"
                                       style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                                     >
                                       <X size={11} /> Cancel
@@ -1706,11 +1706,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               ) : (
                                 <>
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{member.displayName}</p>
+                                    <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{member.displayName}</p>
                                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                      <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{member.email ?? member.accountId}</p>
+                                      <p className="truncate text-ui" style={{ color: 'var(--text-muted)' }}>{member.email ?? member.accountId}</p>
                                       <span
-                                        className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold"
+                                        className="rounded-full px-1.5 py-0.5 text-meta font-semibold"
                                         style={{
                                           background: member.source === 'manual' ? 'var(--settings-neutral-chip-bg)' : 'var(--settings-accent-soft-bg)',
                                           color: member.source === 'manual' ? 'var(--text-muted)' : 'var(--accent)',
@@ -1761,7 +1761,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                         type="button"
                         onClick={() => handleDiscoverTeamMembers({ query: discoveredSearch.trim(), startAt: 0, append: false, silentEmpty: false })}
                         disabled={!canUseJiraDirectory || teamActionLoading || discoveringTeam}
-                        className="rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors disabled:opacity-50"
+                        className="rounded-full px-2.5 py-1 text-ui font-semibold transition-colors disabled:opacity-50"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         {discoveringTeam ? 'Refreshing…' : 'Refresh Jira'}
@@ -1776,12 +1776,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           onChange={(e) => setDiscoveredSearch(e.target.value)}
                           placeholder="Search Jira users"
                           aria-label="Search discoverable Jira users"
-                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12.5px] outline-none"
+                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </div>
                       <span
-                        className="flex items-center justify-center rounded-lg px-2.5 text-[12px] font-semibold"
+                        className="flex items-center justify-center rounded-lg px-2.5 text-ui font-semibold"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)', whiteSpace: 'nowrap' }}
                       >
                         {addableSelectionCount} sel.
@@ -1789,7 +1789,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     </div>
 
                     {discoverTeamError ? (
-                      <p className="mb-2 rounded-xl px-3 py-2 text-[12px]" style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}>
+                      <p className="mb-2 rounded-xl px-3 py-2 text-ui" style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}>
                         {discoverTeamError}{' '}
                         <button type="button" className="font-semibold underline" onClick={() => setActiveSection('connection')}>
                           Open Jira Connection
@@ -1798,17 +1798,17 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     ) : null}
 
                     {discoveringTeam ? (
-                      <div className="flex items-center gap-2 rounded-xl px-3 py-3 text-[13px]" style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)', color: 'var(--text-secondary)' }}>
+                      <div className="flex items-center gap-2 rounded-xl px-3 py-3 text-body" style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)', color: 'var(--text-secondary)' }}>
                         <Loader2 size={13} className="animate-spin" style={{ color: 'var(--accent)' }} />
                         Discovering users…
                       </div>
                     ) : discoveredUsers.length === 0 ? (
-                      <div className="rounded-xl border border-dashed px-4 py-5 text-[13px]" style={{ borderColor: 'color-mix(in srgb, var(--border-strong) 90%, transparent)', color: 'var(--text-muted)' }}>
+                      <div className="rounded-xl border border-dashed px-4 py-5 text-body" style={{ borderColor: 'color-mix(in srgb, var(--border-strong) 90%, transparent)', color: 'var(--text-muted)' }}>
                         Connect Jira to discover users, or add people manually from the tracked team panel.
                       </div>
                     ) : (
                       <>
-                        <div className="mb-1.5 flex flex-wrap items-center gap-3 text-[12px]">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-3 text-ui">
                           <button type="button" onClick={handleSelectAllDiscovered} className="font-semibold" style={{ color: 'var(--accent)' }}>All</button>
                           <button type="button" onClick={handleClearAddSelection} style={{ color: 'var(--text-muted)' }}>Clear</button>
                           <span className="ml-auto" style={{ color: 'var(--text-muted)' }}>{discoveredUsers.length} loaded</span>
@@ -1827,7 +1827,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 style={{ background: idx % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)', borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                               >
                                 <span
-                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[12px] font-semibold"
+                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-ui font-semibold"
                                   style={{
                                     borderWidth: 1, borderStyle: 'solid',
                                     borderColor: isAlready || isSel ? 'color-mix(in srgb, var(--accent) 26%, var(--border-strong))' : 'color-mix(in srgb, var(--border-strong) 88%, transparent)',
@@ -1839,11 +1839,11 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 </span>
                                 <IdentityAvatar user={u} selected={isSel} />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
-                                  <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
+                                  <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
+                                  <p className="truncate text-ui" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
                                 </div>
                                 {isAlready ? (
-                                  <span className="rounded-full px-1.5 py-0.5 text-[12px] font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>Added</span>
+                                  <span className="rounded-full px-1.5 py-0.5 text-ui font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>Added</span>
                                 ) : null}
                               </button>
                             );
@@ -1854,7 +1854,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                             type="button"
                             onClick={() => handleDiscoverTeamMembers({ query: discoveredSearch.trim(), startAt: discoverNextStartAt, append: true, silentEmpty: true })}
                             disabled={loadingMoreTeam || discoveringTeam}
-                            className="mt-2 w-full rounded-xl px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
+                            className="mt-2 w-full rounded-xl px-4 py-2 text-body font-medium transition-colors disabled:opacity-50"
                             style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
                           >
                             {loadingMoreTeam ? 'Loading more…' : 'Load more users'}
@@ -1864,7 +1864,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           type="button"
                           onClick={handleAddSelectedDevelopers}
                           disabled={addableSelectionCount === 0 || savingTeam}
-                          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
+                          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-body font-semibold transition-colors disabled:opacity-50"
                           style={{ background: 'var(--settings-cta-bg)', color: 'var(--settings-cta-text)', border: 'var(--settings-cta-border)' }}
                         >
                           {savingTeam ? (
@@ -1904,12 +1904,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Dev login link */}
                   <div>
                     <SettingsGroupLabel>Developer Login Link</SettingsGroupLabel>
-                    <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Share this URL with developers. They land directly in their My Day workspace after sign-in.
                     </p>
                     <div className="flex items-center gap-2">
                       <div
-                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-[12.5px]"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-body"
                         style={{ background: 'var(--settings-code-bg)', color: 'var(--text-primary)', border: 'var(--settings-inset-border)' }}
                       >
                         {DEVELOPER_LOGIN_URL}
@@ -1917,7 +1917,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                       <button
                         type="button"
                         onClick={handleCopyDevLink}
-                        className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors"
+                        className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors"
                         style={{
                           background: copiedLink ? 'var(--settings-success-soft-bg)' : 'var(--settings-accent-soft-bg)',
                           color: copiedLink ? 'var(--success)' : 'var(--accent)',
@@ -1935,7 +1935,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     <div className="mb-2.5 flex items-center justify-between">
                       <SettingsGroupLabel>App Accounts</SettingsGroupLabel>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-ui font-semibold"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                       >
                         {loadingUsers ? '…' : appUsers.length}
@@ -1943,7 +1943,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     </div>
                     <div className="overflow-hidden rounded-xl" style={{ border: 'var(--settings-inset-border)' }}>
                       {loadingUsers ? (
-                        <div className="flex items-center gap-2 px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                        <div className="flex items-center gap-2 px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>
                           <Loader2 size={13} className="animate-spin" /> Loading users…
                         </div>
                       ) : appUsers.length > 0 ? (
@@ -1957,20 +1957,20 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               <Avatar name={u.displayName} seed={u.developerAccountId ?? u.accountId} size={24} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
+                                  <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
                                   <span
-                                    className="rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em]"
+                                    className="rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.1em]"
                                     style={{ background: u.role === 'manager' ? 'var(--settings-warning-soft-bg)' : 'var(--settings-accent-soft-bg)', color: u.role === 'manager' ? 'var(--warning)' : 'var(--accent)' }}
                                   >
                                     {u.role}
                                   </span>
                                   {u.developerAccountId ? (
-                                    <span className="rounded-full px-1.5 py-0.5 text-[11px] font-medium" style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}>
+                                    <span className="rounded-full px-1.5 py-0.5 text-meta font-medium" style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}>
                                       Team linked
                                     </span>
                                   ) : null}
                                 </div>
-                                <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                                <p className="truncate text-ui" style={{ color: 'var(--text-muted)' }}>
                                   @{u.username}{u.developerAccountId ? ` · ${u.developerAccountId}` : ''}
                                 </p>
                               </div>
@@ -1993,7 +1993,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 />
                               ) : (
                                 <div
-                                  className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
+                                  className="rounded-full px-2.5 py-1 text-meta font-semibold uppercase tracking-[0.1em]"
                                   style={{ background: 'var(--settings-warning-soft-bg)', color: 'var(--warning)', border: 'var(--settings-warning-soft-border)' }}
                                 >
                                   Manager access
@@ -2003,7 +2003,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           </div>
                         ))
                       ) : (
-                        <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>No accounts found.</p>
+                        <p className="px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>No accounts found.</p>
                       )}
                     </div>
                   </div>
@@ -2020,7 +2020,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           setCopiedPw(false);
                           setShowPasswordGen(false);
                         }}
-                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors"
+                        className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
                       >
                         <UserPlus size={12} />
@@ -2029,7 +2029,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     ) : (
                       <div className="rounded-xl p-4" style={{ background: 'var(--settings-pane-bg)', border: 'var(--settings-accent-soft-border)' }}>
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--accent)' }}>New account</p>
+                          <p className="text-ui font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--accent)' }}>New account</p>
                           <button
                             type="button"
                             onClick={() => { setShowCreateUser(false); setNewUsername(''); setNewDisplayName(''); setNewPassword(''); setNewRole('developer'); setNewDevAccountId(''); }}
@@ -2049,7 +2049,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               onChange={(e) => setNewUsername(e.target.value)}
                               placeholder="username"
                               autoComplete="off"
-                              className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+                              className="w-full rounded-lg px-3 py-2 text-body outline-none"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </SettingsLabeledInput>
@@ -2061,7 +2061,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               onChange={(e) => setNewDisplayName(e.target.value)}
                               placeholder="Full name"
                               autoComplete="off"
-                              className="w-full rounded-lg px-3 py-2 text-[13px] outline-none"
+                              className="w-full rounded-lg px-3 py-2 text-body outline-none"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </SettingsLabeledInput>
@@ -2074,7 +2074,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 placeholder="Password"
                                 autoComplete="new-password"
-                                className="w-full rounded-lg py-2 pl-3 pr-20 font-mono text-[13px] outline-none"
+                                className="w-full rounded-lg py-2 pl-3 pr-20 font-mono text-body outline-none"
                                 style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                               />
                               <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
@@ -2086,8 +2086,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               </div>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Auto-generated · {pwLength} chars</span>
-                              <button type="button" onClick={() => setShowPasswordGen((v) => !v)} className="text-[12px] font-medium" style={{ color: 'var(--accent)' }}>
+                              <span className="text-ui" style={{ color: 'var(--text-muted)' }}>Auto-generated · {pwLength} chars</span>
+                              <button type="button" onClick={() => setShowPasswordGen((v) => !v)} className="text-ui font-medium" style={{ color: 'var(--accent)' }}>
                                 {showPasswordGen ? 'Hide options' : 'Customize'}
                               </button>
                             </div>
@@ -2101,18 +2101,18 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}
                               >
                                 <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>Generator options</span>
+                                  <span className="text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>Generator options</span>
                                   <button
                                     type="button"
                                     onClick={() => { setNewPassword(generateStrongPassword(pwLength, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
-                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium"
+                                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-ui font-medium"
                                     style={{ background: 'var(--settings-cta-bg)', color: 'var(--settings-cta-text)', border: 'var(--settings-cta-border)' }}
                                   >
                                     <RefreshCcw size={11} /> Regenerate
                                   </button>
                                 </div>
                                 <div className="mb-2">
-                                  <div className="flex items-center justify-between text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                                  <div className="flex items-center justify-between text-ui" style={{ color: 'var(--text-secondary)' }}>
                                     <span>Length</span>
                                     <span className="font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{pwLength}</span>
                                   </div>
@@ -2121,7 +2121,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                     onChange={(e) => { const len = Number(e.target.value); setPwLength(len); setNewPassword(generateStrongPassword(len, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
                                     className="mt-1 w-full accent-[var(--accent)]"
                                   />
-                                  <div className="flex justify-between text-[11px]" style={{ color: 'var(--text-muted)' }}><span>8</span><span>32</span></div>
+                                  <div className="flex justify-between text-meta" style={{ color: 'var(--text-muted)' }}><span>8</span><span>32</span></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-1.5">
                                   <ToggleChip label="A–Z" checked={pwUppercase} onChange={(v) => { setPwUppercase(v); setNewPassword(generateStrongPassword(pwLength, v, pwLowercase, pwDigits, pwSymbols)); setCopiedPw(false); }} disabled={!pwLowercase && !pwDigits && !pwSymbols} />
@@ -2140,7 +2140,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                   id="new-role"
                                   value={newRole}
                                   onChange={(e) => { setNewRole(e.target.value as CreatableUserRole); if (e.target.value === 'manager') setNewDevAccountId(''); }}
-                                  className="w-full appearance-none rounded-lg px-3 py-2 text-[13px] outline-none"
+                                  className="w-full appearance-none rounded-lg px-3 py-2 text-body outline-none"
                                   style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                 >
                                   <option value="developer">Developer</option>
@@ -2156,7 +2156,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                     id="new-jira-profile"
                                     value={newDevAccountId}
                                     onChange={(e) => setNewDevAccountId(e.target.value)}
-                                    className="w-full appearance-none rounded-lg px-3 py-2 text-[13px] outline-none"
+                                    className="w-full appearance-none rounded-lg px-3 py-2 text-body outline-none"
                                     style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                   >
                                     <option value="">Select…</option>
@@ -2170,7 +2170,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 </div>
                               </SettingsLabeledInput>
                             ) : (
-                              <div className="flex items-center rounded-lg px-3 py-2 text-[12px]" style={{ background: 'var(--settings-inset-bg)', color: 'var(--text-muted)', border: 'var(--settings-inset-border)' }}>
+                              <div className="flex items-center rounded-lg px-3 py-2 text-ui" style={{ background: 'var(--settings-inset-bg)', color: 'var(--text-muted)', border: 'var(--settings-inset-border)' }}>
                                 Managers do not need a team member link.
                               </div>
                             )}
@@ -2180,7 +2180,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           type="button"
                           onClick={handleCreateUser}
                           disabled={creatingUser || !newUsername.trim() || !newDisplayName.trim() || !newPassword.trim()}
-                          className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-colors disabled:opacity-50"
+                          className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-body font-semibold transition-colors disabled:opacity-50"
                           style={{ background: 'var(--settings-cta-bg)', color: 'var(--settings-cta-text)', border: 'var(--settings-cta-border)' }}
                         >
                           {creatingUser ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
@@ -2205,14 +2205,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         >
         {activeSection === 'maintenance' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="hidden text-[12px] sm:block" style={{ color: 'var(--text-muted)' }}>
+            <p className="hidden text-ui sm:block" style={{ color: 'var(--text-muted)' }}>
               Maintenance actions run immediately after typed confirmation. The standard Save footer is intentionally hidden here.
             </p>
             <button
               type="button"
               onClick={handleResetConfig}
               disabled={hasChanges}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors disabled:opacity-50"
               style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
             >
               <TriangleAlert size={12} />
@@ -2222,7 +2222,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* docs/56 UX-12: on phones the footer is one row of the two save actions. */}
-            <p className="hidden text-[12px] sm:block" style={{ color: 'var(--text-muted)' }}>
+            <p className="hidden text-ui sm:block" style={{ color: 'var(--text-muted)' }}>
               Save stores settings only. Save &amp; Sync also triggers an immediate Jira refresh.
             </p>
             <div className="ml-auto flex items-center gap-2">
@@ -2230,7 +2230,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 type="button"
                 onClick={handleResetConfig}
                 disabled={hasChanges}
-                className="hidden items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50 sm:flex"
+                className="hidden items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors disabled:opacity-50 sm:flex"
                 style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
               >
                 <TriangleAlert size={12} />
@@ -2240,7 +2240,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 type="button"
                 onClick={handleSave}
                 disabled={hasChanges}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-medium transition-colors disabled:opacity-50"
                 style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
               >
                 <Save size={12} />
@@ -2250,7 +2250,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 type="button"
                 onClick={handleSaveAndSync}
                 disabled={hasChanges || triggerSync.isPending}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                 style={{ background: 'var(--settings-cta-primary-bg)', color: 'var(--settings-cta-primary-text)' }}
               >
                 <RefreshCw size={12} className={triggerSync.isPending ? 'animate-spin' : ''} />
@@ -2282,7 +2282,7 @@ export const SettingsPanel = SettingsPage;
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );
@@ -2291,7 +2291,7 @@ function SettingsGroupLabel({ children }: { children: ReactNode }) {
 function SettingsLabeledInput({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="mb-1.5 block text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </label>
       {children}
@@ -2328,13 +2328,13 @@ function CompactFieldRow({
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
-          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>{description}</p>
+          <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</p>
+          <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>{description}</p>
         </div>
         <button
           type="button"
           onClick={onDiscover}
-          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
+          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-ui font-semibold transition-colors"
           style={{
             background: active ? 'var(--settings-accent-chip-bg)' : 'var(--settings-neutral-chip-bg)',
             color: active ? 'var(--accent)' : 'var(--text-secondary)',
@@ -2350,7 +2350,7 @@ function CompactFieldRow({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md px-2.5 py-1.5 font-mono text-[12.5px] outline-none"
+        className="w-full rounded-md px-2.5 py-1.5 font-mono text-body outline-none"
         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
       />
     </div>
@@ -2381,12 +2381,12 @@ function UserAccountDeleteAction({
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center gap-2"
       >
-        <span className="text-[12px] font-medium" style={{ color: 'var(--danger-muted)' }}>Delete access?</span>
+        <span className="text-ui font-medium" style={{ color: 'var(--danger-muted)' }}>Delete access?</span>
         <button
           type="button"
           onClick={onConfirm}
           disabled={deleting}
-          className="rounded-full px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50"
+          className="rounded-full px-2.5 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
           style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
           aria-label={`Confirm delete account for ${user.displayName}`}
         >
@@ -2396,7 +2396,7 @@ function UserAccountDeleteAction({
           type="button"
           onClick={onCancel}
           disabled={deleting}
-          className="rounded-full px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50"
+          className="rounded-full px-2.5 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
           style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
           aria-label={`Cancel deleting account for ${user.displayName}`}
         >
@@ -2410,7 +2410,7 @@ function UserAccountDeleteAction({
     <button
       type="button"
       onClick={onStartConfirm}
-      className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-semibold transition-colors"
+      className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-ui font-semibold transition-colors"
       style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
       aria-label={`Delete account for ${user.displayName}`}
     >
@@ -2530,7 +2530,7 @@ function FieldListGroup({
   return (
     <>
       <div
-        className="px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em]"
+        className="px-4 py-2 text-ui font-semibold uppercase tracking-[0.18em]"
         style={{ color: accent ? 'var(--accent)' : 'var(--text-muted)', background: 'var(--settings-neutral-chip-bg)' }}
       >
         {title}
@@ -2544,11 +2544,11 @@ function FieldListGroup({
           style={{ background: field.id === currentFieldValue ? 'var(--settings-accent-soft-bg)' : 'transparent', borderTop: 'var(--settings-row-divider)' }}
         >
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{field.name}</p>
-            <p className="truncate font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>{field.id}</p>
+            <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{field.name}</p>
+            <p className="truncate font-mono text-ui" style={{ color: 'var(--text-muted)' }}>{field.id}</p>
           </div>
           {field.id === currentFieldValue ? (
-            <span className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
+            <span className="rounded-full px-2 py-0.5 text-ui font-semibold uppercase tracking-[0.1em]" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
               Selected
             </span>
           ) : null}
@@ -2631,7 +2631,7 @@ function ToggleChip({
       onClick={() => { if (!disabled) onChange(!checked); }}
       aria-pressed={checked}
       disabled={disabled}
-      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-all"
+      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-ui font-medium transition-all"
       style={{
         background: checked ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--settings-neutral-chip-bg)',
         color: checked ? 'var(--accent)' : 'var(--text-muted)',
@@ -2641,7 +2641,7 @@ function ToggleChip({
       }}
     >
       <span
-        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-[11px] transition-colors"
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-meta transition-colors"
         style={{
           background: checked ? 'var(--accent)' : 'transparent',
           border: checked ? 'none' : '1.5px solid var(--border-strong)',

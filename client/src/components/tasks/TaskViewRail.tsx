@@ -79,7 +79,7 @@ export function TaskViewRail({
                   }}
                   onBlur={() => { void commitRename(view); }}
                   aria-label={`Rename ${view.name}`}
-                  className={`min-w-0 flex-1 rounded-lg px-2 py-1 text-[12.5px] ${FOCUS_RING}`}
+                  className={`min-w-0 flex-1 rounded-lg px-2 py-1 text-body ${FOCUS_RING}`}
                   style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
                 />
                 <button type="submit" disabled={!editingName.trim()} className="flex h-6 w-6 items-center justify-center rounded-md disabled:opacity-40" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }} aria-label="Save name">
@@ -99,14 +99,14 @@ export function TaskViewRail({
               onClick={() => onSelect(view.id)}
               aria-current={selected ? 'page' : undefined}
               aria-label={counts?.[view.id] ? `${view.name}, ${value} task${value === 1 ? '' : 's'}` : view.name}
-              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[12.5px] transition-colors hover:text-[var(--text-primary)]"
+              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-ui transition-colors hover:text-[var(--text-primary)]"
               style={{ color: selected ? 'var(--accent-text)' : 'var(--text-secondary)', fontWeight: selected ? 600 : 500 }}
             >
               <span className="truncate">{view.name}</span>
               <span className="flex-1" />
               {value > 0 && (
                 <span
-                  className={`min-w-[20px] rounded-full px-1.5 text-center text-[11px] tabular-nums ${tone ? 'font-bold' : 'font-medium'}`}
+                  className={`min-w-[20px] rounded-full px-1.5 text-center text-meta tabular-nums ${tone ? 'font-semibold' : 'font-medium'}`}
                   style={{
                     color: tone ?? 'var(--text-muted)',
                     background: tone ? `color-mix(in srgb, ${tone === 'var(--task-warning-text)' ? 'var(--warning)' : tone === 'var(--task-danger-text)' ? 'var(--danger)' : tone} 16%, transparent)` : 'transparent',
@@ -142,7 +142,7 @@ export function TaskViewRail({
   );
 
   const heading = (text: string) => (
-    <p className="px-2 pb-1.5 pt-5 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{text}</p>
+    <p className="px-2 pb-1.5 pt-5 text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{text}</p>
   );
 
   return (

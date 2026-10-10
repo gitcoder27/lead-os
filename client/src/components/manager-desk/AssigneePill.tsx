@@ -23,7 +23,7 @@ export function AssigneePill({
   if (!assignee) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+        className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-meta font-semibold uppercase tracking-[0.14em]"
         style={{
           borderColor: 'var(--border)',
           background: 'color-mix(in srgb, var(--bg-secondary) 92%, transparent)',
@@ -36,8 +36,8 @@ export function AssigneePill({
   }
 
   const avatarSize =
-    size === 'xs' ? 'h-4 w-4 text-[11px]' : size === 'sm' ? 'h-5 w-5 text-[11px]' : 'h-7 w-7 text-[12px]';
-  const textSize = size === 'xs' ? 'text-[11px]' : size === 'sm' ? 'text-[12px]' : 'text-[12px]';
+    size === 'xs' ? 'h-4 w-4 text-meta' : size === 'sm' ? 'h-5 w-5 text-meta' : 'h-7 w-7 text-ui';
+  const textSize = size === 'xs' ? 'text-meta' : size === 'sm' ? 'text-ui' : 'text-ui';
   const pillPadding =
     size === 'xs' ? 'gap-1 rounded-full border px-1 py-0.5 pr-1.5' : 'gap-2 rounded-full border px-1.5 py-1 pr-2.5';
   const toneStyle =
@@ -62,7 +62,7 @@ export function AssigneePill({
         : assignee.displayName}
     >
       <span
-        className={`inline-flex ${avatarSize} shrink-0 items-center justify-center rounded-full font-bold uppercase tracking-[0.08em]`}
+        className={`inline-flex ${avatarSize} shrink-0 items-center justify-center rounded-full font-semibold uppercase tracking-[0.08em]`}
         style={{
           background: 'linear-gradient(135deg, color-mix(in srgb, var(--md-accent) 84%, white) 0%, var(--md-accent) 100%)',
           color: '#1f1600',
@@ -74,7 +74,7 @@ export function AssigneePill({
       <span className={`truncate font-semibold ${textSize}`}>{assignee.displayName}</span>
       {assignee.availability?.state === 'inactive' && (
         <span
-          className="rounded-full px-1 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em]"
+          className="rounded-full px-1 py-0.5 text-meta font-semibold uppercase tracking-[0.12em]"
           style={{ background: 'rgba(245, 158, 11, 0.14)', color: 'var(--warning)' }}
         >
           Inactive

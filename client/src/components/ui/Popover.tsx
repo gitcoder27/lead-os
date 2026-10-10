@@ -174,7 +174,7 @@ export function MenuItem({
       aria-disabled={disabled || undefined}
       disabled={disabled}
       onClick={onSelect}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] outline-none transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)] disabled:opacity-40"
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-ui outline-none transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)] disabled:opacity-40"
       style={{ color: tone === 'danger' ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
       {role !== 'menuitem' && (
@@ -195,7 +195,7 @@ export function MenuDivider() {
 
 export function MenuHeading({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
+    <p className="px-2 pb-1 pt-1.5 text-meta font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </p>
   );

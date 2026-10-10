@@ -71,10 +71,10 @@ export function DrawerWorkflowActions({
     >
       <div className="flex flex-wrap items-center gap-2">
         <div className="mr-auto min-w-[136px]">
-          <div className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
             {hasLinkedWork ? 'My follow-through' : 'Workflow'}
           </div>
-          <div className="mt-0.5 text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          <div className="mt-0.5 text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
             {STATUS_LABELS[item.status]}
           </div>
         </div>
@@ -85,7 +85,7 @@ export function DrawerWorkflowActions({
         {moreActions.length > 0 && (
           <details className="relative" onClick={(event) => event.stopPropagation()}>
             <summary
-              className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] [&::-webkit-details-marker]:hidden"
+              className="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border px-2.5 text-ui font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] [&::-webkit-details-marker]:hidden"
               style={toneStyles.neutral}
               aria-label={`More workflow actions for ${item.title}`}
               title="More actions"
@@ -110,7 +110,7 @@ export function DrawerWorkflowActions({
                     action.onClick();
                   }}
                   disabled={action.disabled}
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-semibold uppercase tracking-[0.08em] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-ui font-semibold uppercase tracking-[0.08em] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
                   style={{ color: action.tone === 'danger' ? 'var(--danger)' : action.tone === 'success' ? 'var(--success)' : 'var(--text-secondary)' }}
                   aria-label={action.ariaLabel ?? action.label}
                 >
@@ -224,7 +224,7 @@ function WorkflowButton({ action, variant }: { action: WorkflowAction; variant: 
       onClick={action.onClick}
       disabled={action.disabled}
       className={[
-        'inline-flex h-8 items-center gap-1.5 rounded-lg border text-[12px] font-semibold uppercase tracking-[0.08em]',
+        'inline-flex h-8 items-center gap-1.5 rounded-lg border text-ui font-semibold uppercase tracking-[0.08em]',
         'transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45',
         variant === 'primary' ? 'px-3' : 'px-2.5',
       ].join(' ')}

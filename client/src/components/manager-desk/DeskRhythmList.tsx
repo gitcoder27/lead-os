@@ -202,7 +202,7 @@ function QuietDeskStrip({ sections }: { sections: DeskRhythmSection[] }) {
       {sections.map((section) => (
         <span
           key={section.key}
-          className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold uppercase tracking-[0.08em]"
+          className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-meta font-semibold uppercase tracking-[0.08em]"
           style={{ color: section.items.length > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}
         >
           {section.icon}
@@ -239,7 +239,7 @@ export function DeskSignalRail({
     >
       <div className="sticky top-2 space-y-3 py-1">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-meta font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             Pulse
           </div>
           <div className="mt-2 space-y-1.5">
@@ -250,20 +250,20 @@ export function DeskSignalRail({
         </div>
 
         <div className="border-t pt-3" style={{ borderColor: 'color-mix(in srgb, var(--border) 52%, transparent)' }}>
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-meta font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
             Next
           </div>
-          <div className="mt-2 text-[12px] font-semibold leading-5" style={{ color: 'var(--text-primary)' }}>
+          <div className="mt-2 text-ui font-semibold leading-5" style={{ color: 'var(--text-primary)' }}>
             {nextPrompt.title}
           </div>
-          <p className="mt-1 text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-1 text-ui leading-5" style={{ color: 'var(--text-secondary)' }}>
             {nextPrompt.subtitle}
           </p>
         </div>
 
         {continuedOpenCount > 0 && (
           <div className="border-t pt-3" style={{ borderColor: 'color-mix(in srgb, var(--border) 52%, transparent)' }}>
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-meta font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
               Carried
             </div>
             <button
@@ -277,10 +277,10 @@ export function DeskSignalRail({
                 background: carriedActive ? 'color-mix(in srgb, var(--md-accent-glow) 45%, transparent)' : 'transparent',
               }}
             >
-              <span className="font-mono text-[18px] font-semibold tabular-nums" style={{ color: 'var(--md-accent)' }}>
+              <span className="font-mono text-title-sm font-semibold tabular-nums" style={{ color: 'var(--md-accent)' }}>
                 {continuedOpenCount}
               </span>
-              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+              <span className="text-ui" style={{ color: 'var(--text-secondary)' }}>
                 from earlier
               </span>
             </button>
@@ -303,10 +303,10 @@ function RailMetric({
   const color = tone === 'active' ? 'var(--accent)' : tone === 'decision' ? 'var(--md-accent)' : 'var(--text-secondary)';
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+      <span className="text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </span>
-      <span className="font-mono text-[12px] font-semibold tabular-nums" style={{ color }}>
+      <span className="font-mono text-ui font-semibold tabular-nums" style={{ color }}>
         {value}
       </span>
     </div>

@@ -80,7 +80,7 @@ const sortByAttention = (developers: TrackerDeveloperDay[], ranks: Map<string, n
 
 function MobileLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="mr-1.5 text-[12px] md:hidden" style={{ color: 'var(--text-muted)' }}>
+    <span className="mr-1.5 text-ui md:hidden" style={{ color: 'var(--text-muted)' }}>
       {children}
     </span>
   );
@@ -108,7 +108,7 @@ function CurrentWork({
 }) {
   if (!item && next && !done) {
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-secondary)' }} title={next.title}>
+      <span className="flex min-w-0 items-center gap-1.5 text-body" style={{ color: 'var(--text-secondary)' }} title={next.title}>
         <CircleDashed size={13} className="shrink-0 opacity-70" aria-hidden="true" />
         <span className="truncate">Next: {next.title}</span>
       </span>
@@ -116,7 +116,7 @@ function CurrentWork({
   }
   if (!item) {
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+      <span className="flex min-w-0 items-center gap-1.5 text-body" style={{ color: 'var(--text-muted)' }}>
         <CircleDashed size={13} className="shrink-0 opacity-70" aria-hidden="true" />
         <span className="truncate">{done ? 'Done for the day' : solo ? 'Nothing planned' : 'No current item'}</span>
       </span>
@@ -127,14 +127,14 @@ function CurrentWork({
   const meta: ReactNode[] = [];
   if (item.taskKey) {
     meta.push(
-      <span key="task" className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-disabled)' }}>
+      <span key="task" className="shrink-0 font-mono text-ui font-semibold tabular-nums" style={{ color: 'var(--text-disabled)' }}>
         {item.taskKey}
       </span>,
     );
   }
   if (item.jiraKey) {
     meta.push(
-      <span key="jira" className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>
+      <span key="jira" className="shrink-0 font-mono text-ui font-semibold" style={{ color: 'var(--accent)' }}>
         {item.jiraKey}
       </span>,
     );
@@ -158,11 +158,11 @@ function CurrentWork({
 
   const content = (
     <>
-      <span className="block truncate text-[13px] font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
+      <span className="block truncate text-body font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
         {item.title}
       </span>
       {meta.length > 0 && (
-        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-ui leading-4" style={{ color: 'var(--text-muted)' }}>
           {meta.flatMap((node, index) => (index === 0 ? [node] : [<MetaSeparator key={`sep-${index}`} />, node]))}
         </span>
       )}
@@ -193,7 +193,7 @@ function UpNext({ items }: { items: TrackerWorkItem[] }) {
   const [first, ...rest] = items;
   if (!first) {
     return (
-      <span className="truncate text-[13px]" style={{ color: 'var(--text-placeholder)' }}>
+      <span className="truncate text-body" style={{ color: 'var(--text-placeholder)' }}>
         <MobileLabel>Next</MobileLabel>
         Nothing planned
       </span>
@@ -201,12 +201,12 @@ function UpNext({ items }: { items: TrackerWorkItem[] }) {
   }
   return (
     <div className="min-w-0" title={items.map((item) => item.title).join('\n')}>
-      <div className="truncate text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+      <div className="truncate text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
         <MobileLabel>Next</MobileLabel>
         {first.title}
       </div>
       {rest.length > 0 && (
-        <div className="mt-0.5 text-[12px] leading-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-0.5 text-ui leading-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
           +{rest.length} more planned
         </div>
       )}
@@ -222,7 +222,7 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
   return (
     <div className="flex items-center gap-2" title={`${load} open items — ${detail}; count, not effort or capacity`}>
       <MobileLabel>Open items</MobileLabel>
-      <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+      <span className="whitespace-nowrap text-body font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
         {load} open
       </span>
       <span aria-hidden="true" className="flex items-center gap-[2px]">
@@ -252,7 +252,7 @@ function Freshness({ day, touch, mixed }: { day: TrackerDeveloperDay; touch: boo
   if (touch) {
     const touched = getRosterTouch(day);
     return (
-      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
+      <div className="flex min-w-0 items-center gap-1.5 text-body">
         <MobileLabel>Last touched</MobileLabel>
         <span
           className="truncate tabular-nums"
@@ -267,7 +267,7 @@ function Freshness({ day, touch, mixed }: { day: TrackerDeveloperDay; touch: boo
   }
   const checkIn = getRosterCheckIn(day);
   return (
-    <div className="flex min-w-0 items-center gap-1.5 text-[12.5px]">
+    <div className="flex min-w-0 items-center gap-1.5 text-body">
       <MobileLabel>Check-in</MobileLabel>
       {checkIn.stale && (
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--warning)' }} title={checkIn.title} aria-hidden="true" />
@@ -288,7 +288,7 @@ function AttentionFlags({ attention }: { attention: RosterAttention }) {
   const [lead, ...rest] = attention.flags;
   if (!lead) {
     return (
-      <span className="text-[12.5px] max-md:hidden" style={{ color: 'var(--text-disabled)' }} title={attention.summary || 'Nothing needs you here'}>
+      <span className="text-body max-md:hidden" style={{ color: 'var(--text-disabled)' }} title={attention.summary || 'Nothing needs you here'}>
         <span aria-hidden="true">—</span>
         <span className="sr-only">No attention flags</span>
       </span>
@@ -297,14 +297,14 @@ function AttentionFlags({ attention }: { attention: RosterAttention }) {
   const leadColor = ROSTER_TONE_COLOR[lead.tone];
   return (
     <div className="min-w-0" title={attention.summary}>
-      <div className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium leading-5">
+      <div className="flex min-w-0 items-center gap-1.5 text-body font-medium leading-5">
         <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: leadColor }} />
         <span className="truncate" style={{ color: lead.tone === 'danger' ? leadColor : 'var(--text-primary)' }}>
           {lead.label}
         </span>
       </div>
       {rest.length > 0 && (
-        <div className="truncate pl-3 text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <div className="truncate pl-3 text-ui leading-4" style={{ color: 'var(--text-muted)' }}>
           {rest.map((flag) => flag.label).join(' · ')}
         </div>
       )}
@@ -366,7 +366,7 @@ function RosterRow({
       <div className={`flex min-w-0 items-center gap-3 max-md:col-start-1 max-md:row-start-1 ${done ? 'opacity-70' : ''}`}>
         <Avatar name={name} seed={day.developer.accountId} size={30} muted={done} />
         <div className="min-w-0">
-          <div className="truncate text-[13.5px] font-semibold leading-5 tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }} title={name}>
+          <div className="truncate text-body font-semibold leading-5 tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }} title={name}>
             <a
               href={`/team?dev=${encodeURIComponent(day.developer.accountId)}`}
               data-roster-row=""
@@ -384,7 +384,7 @@ function RosterRow({
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
             <TrackerStatusMark status={day.status} />
             {solo && attention.flags[0] ? (
-              <span className="truncate text-[12px]" style={{ color: attention.flags[0].tone === 'danger' ? ROSTER_TONE_COLOR.danger : 'var(--text-muted)' }} title={attention.summary}>
+              <span className="truncate text-ui" style={{ color: attention.flags[0].tone === 'danger' ? ROSTER_TONE_COLOR.danger : 'var(--text-muted)' }} title={attention.summary}>
                 · {attention.flags[0].label}
               </span>
             ) : null}
@@ -396,7 +396,7 @@ function RosterRow({
                   onAcceptSuggestion(day);
                 }}
                 onKeyDown={(event) => event.stopPropagation()}
-                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-[12px] font-medium leading-[18px] transition-colors hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] ${FOCUS_RING}`}
+                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-ui font-medium leading-[18px] transition-colors hover:bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] ${FOCUS_RING}`}
                 style={{ color: 'var(--warning)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent)' }}
                 title={`${day.statusSuggestion.reasonTaskKey} is blocked — set status to blocked`}
                 aria-label={`Accept suggested blocked status for ${name}`}
@@ -455,7 +455,7 @@ function RosterRow({
 function ColumnHeader({ freshnessLabel, solo }: { freshnessLabel: string; solo: boolean }) {
   return (
     <div
-      className={`hidden gap-3 px-4 py-2 text-[12px] font-medium md:grid ${rosterGrid(solo)}`}
+      className={`hidden gap-3 px-4 py-2 text-ui font-medium md:grid ${rosterGrid(solo)}`}
       style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
     >
       <span>Developer</span>

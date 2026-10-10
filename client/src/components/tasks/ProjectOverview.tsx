@@ -34,7 +34,7 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
           <button className="ui-btn-quiet" onClick={() => onArchive(item, facts, track?.projectId)}>{item.archivedAt ? 'Restore' : 'Archive'}</button>
         </div>
       </div>
-      {item.outcome && <div className="mt-4 max-w-[72ch]"><p className="project-caption">Outcome</p><p className="mt-1 whitespace-pre-wrap break-words text-[14px] leading-relaxed">{item.outcome}</p></div>}
+      {item.outcome && <div className="mt-4 max-w-[72ch]"><p className="project-caption">Outcome</p><p className="mt-1 whitespace-pre-wrap break-words text-body leading-relaxed">{item.outcome}</p></div>}
       <div className="mt-4"><ProjectFactsRow facts={facts} openTask={openTask} /></div>
       {isArchived && <p className="project-caption mt-3">Open tasks stay actionable. {project.archivedAt && track ? 'Restore the project to add tasks or tracks.' : `Restore this ${track ? 'track' : 'project'} to add new tasks${track ? '.' : ' or tracks.'}`}</p>}
       {item.summary && (
@@ -46,7 +46,7 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
       {!track && (
         <section className="project-tracks" aria-label="Tracks">
           <div className="project-controls flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2"><Layers size={14} aria-hidden="true" /><h2 className="text-[13px] font-semibold">Tracks</h2><span className="project-caption">Optional</span></div>
+            <div className="flex items-center gap-2"><Layers size={14} aria-hidden="true" /><h2 className="text-body font-semibold">Tracks</h2><span className="project-caption">Optional</span></div>
             {!isArchived && <button className="ui-btn-quiet" onClick={() => onEdit(undefined, project.id)}><Plus size={13} aria-hidden="true" /> New track</button>}
           </div>
           {tracks.length ? (

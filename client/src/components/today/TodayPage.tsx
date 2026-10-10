@@ -695,7 +695,7 @@ function TodayLoadingState({ isError, onRetry }: { isError: boolean; onRetry: ()
   return (
     <section className="flex min-h-0 flex-1 items-center justify-center px-5">
       <div className="text-center">
-        <p className="text-[14px] font-medium" style={{ color: 'var(--text-primary)' }}>Today didn&apos;t load</p>
+        <p className="text-body font-medium" style={{ color: 'var(--text-primary)' }}>Today didn&apos;t load</p>
         <button type="button" onClick={onRetry} className="ui-btn-solid mt-3">Retry</button>
       </div>
     </section>

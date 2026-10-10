@@ -38,7 +38,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
         />
         <span className="triage-section-label">Properties</span>
         {!expanded && (
-          <span className="ml-auto text-[12px] truncate max-w-[260px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="ml-auto text-ui truncate max-w-[260px]" style={{ color: 'var(--text-muted)' }}>
             {issue.statusName}
             {issue.component ? ` · ${issue.component}` : ''}
             {issue.reporterName ? ` · ${issue.reporterName}` : ''}
@@ -53,11 +53,11 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
         >
           {fields.map(({ label, value, accent, mono }) => (
             <div key={label} className="px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-meta font-semibold uppercase tracking-[0.08em] mb-0.5" style={{ color: 'var(--text-muted)' }}>
                 {label}
               </div>
               <div
-                className={`text-[12.5px] font-medium truncate ${mono ? 'font-mono' : ''}`}
+                className={`text-body font-medium truncate ${mono ? 'font-mono' : ''}`}
                 style={{ color: accent ?? 'var(--text-primary)' }}
               >
                 {accent && label === 'Status' && (
@@ -70,14 +70,14 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
 
           {issue.labels && issue.labels.length > 0 && (
             <div className="col-span-2 px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="text-[11px] font-bold uppercase tracking-[0.08em] mb-1" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-meta font-semibold uppercase tracking-[0.08em] mb-1" style={{ color: 'var(--text-muted)' }}>
                 Labels
               </div>
               <div className="flex flex-wrap gap-1">
                 {issue.labels.map((label) => (
                   <span
                     key={label}
-                    className="text-[12px] px-1.5 py-[1px] rounded-full"
+                    className="text-ui px-1.5 py-[1px] rounded-full"
                     style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                   >
                     {label}

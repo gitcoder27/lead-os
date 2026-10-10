@@ -94,7 +94,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
   return (
     <section className="one-on-one-column flex min-h-0 flex-col" aria-label="1:1 agenda">
       <SectionHeader as="h2" title="Agenda" count={openItems.length} />
-      <p className="mb-2.5 mt-0.5 text-[12px] leading-[17px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="mb-2.5 mt-0.5 text-ui leading-[17px]" style={{ color: 'var(--text-muted)' }}>
         Topics to raise with {firstName}. Each one stays on the agenda until you discuss it or its task closes.
       </p>
       <form
@@ -113,7 +113,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Add a topic…"
-            className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Add to agenda"
           />
@@ -160,7 +160,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
           <AgendaEmpty name={firstName} />
         )}
         {openItems.length > 1 && (
-          <div className="mt-1.5 flex items-center gap-1.5 px-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-1.5 flex items-center gap-1.5 px-1.5 text-meta" style={{ color: 'var(--text-muted)' }}>
             Drag to reorder, or <KeySpec keys="⌥ ↑ / ⌥ ↓" variant="subtle" />
           </div>
         )}
@@ -176,10 +176,10 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
 function AgendaEmpty({ name }: { name: string }) {
   return (
     <div className="rounded-xl px-3.5 py-3.5" style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }} data-testid="one-on-one-agenda-empty">
-      <p className="text-[13px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+      <p className="text-body font-semibold" style={{ color: 'var(--text-secondary)' }}>
         Nothing on the agenda yet
       </p>
-      <ul className="mt-1.5 space-y-1 text-[12px] leading-[17px]" style={{ color: 'var(--text-muted)' }}>
+      <ul className="mt-1.5 space-y-1 text-ui leading-[17px]" style={{ color: 'var(--text-muted)' }}>
         <li>Type a topic above: a question, feedback, or something to follow up on.</li>
         <li>Add a suggestion below, pulled from {name}&apos;s blocked, late, or quiet work.</li>
         <li>From the team board, hover a task in {name}&apos;s drawer and choose “Add to 1:1 agenda”.</li>
@@ -258,12 +258,12 @@ function AgendaRow({
         onClick={() => onOpenTask?.(item.task.taskKey)}
       >
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className="min-w-0 truncate text-[13px] leading-[18px]" style={{ color: 'var(--text-primary)' }}>
+          <span className="min-w-0 truncate text-body leading-[18px]" style={{ color: 'var(--text-primary)' }}>
             {item.task.title}
           </span>
           {high && <Flag size={11} className="shrink-0 self-center" style={{ color: 'var(--danger)' }} aria-label="High priority" />}
         </span>
-        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] leading-4" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-meta leading-4" style={{ color: 'var(--text-muted)' }}>
           <span className="font-mono tabular-nums" style={{ color: 'var(--text-disabled)' }}>{item.task.taskKey}</span>
           {live.status && <MetaText tone={live.status.tone}>{live.status.label}</MetaText>}
           {live.date && <MetaText tone={live.date.tone}>{live.date.label}</MetaText>}
@@ -305,7 +305,7 @@ function ResolvedGroup({ items, onOpenTask }: { items: OneOnOneAgendaItem[]; onO
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -322,7 +322,7 @@ function ResolvedGroup({ items, onOpenTask }: { items: OneOnOneAgendaItem[]; onO
                 className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
               >
                 <TaskStatusGlyph status={item.task.status} size={13} />
-                <span className="min-w-0 truncate text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{item.task.title}</span>
+                <span className="min-w-0 truncate text-body" style={{ color: 'var(--text-secondary)' }}>{item.task.title}</span>
               </button>
             </li>
           ))}
@@ -373,7 +373,7 @@ function Suggestions({
     <div className="mt-4" data-testid="one-on-one-suggestions">
       <div className="mb-1 flex items-center gap-1.5 px-1.5">
         <Lightbulb size={12} aria-hidden="true" style={{ color: 'var(--warning)' }} />
-        <h3 className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+        <h3 className="text-ui font-semibold" style={{ color: 'var(--text-secondary)' }}>
           Suggested from {firstName}&apos;s work
         </h3>
       </div>
@@ -408,7 +408,7 @@ function Suggestions({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className={`mt-0.5 rounded-md px-1.5 py-1 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`mt-0.5 rounded-md px-1.5 py-1 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           Show {hidden} more
@@ -469,15 +469,15 @@ function SuggestionRow({
       <span className="mt-[1px] shrink-0 opacity-70">{glyph}</span>
       <div className="min-w-0 flex-1">
         {onOpen ? (
-          <button type="button" onClick={onOpen} className={`block max-w-full truncate rounded text-left text-[12.5px] leading-[18px] ${FOCUS_RING}`} style={{ color: 'var(--text-secondary)' }}>
+          <button type="button" onClick={onOpen} className={`block max-w-full truncate rounded text-left text-ui leading-[18px] ${FOCUS_RING}`} style={{ color: 'var(--text-secondary)' }}>
             {title}
           </button>
         ) : (
-          <span className="block truncate text-[12.5px] leading-[18px]" style={{ color: 'var(--text-secondary)' }}>{title}</span>
+          <span className="block truncate text-body leading-[18px]" style={{ color: 'var(--text-secondary)' }}>{title}</span>
         )}
         <span className="mt-0.5 flex flex-wrap items-center gap-1">
           {taskKey && (
-            <span className="mr-0.5 font-mono text-[11px] tabular-nums" style={{ color: 'var(--text-disabled)' }}>{taskKey}</span>
+            <span className="mr-0.5 font-mono text-meta tabular-nums" style={{ color: 'var(--text-disabled)' }}>{taskKey}</span>
           )}
           {chips.map((chip) => (
             <span key={chip.label} className="ui-chip" style={{ ['--tone' as string]: toneColor(chip.tone) }}>

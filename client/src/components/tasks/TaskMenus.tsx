@@ -204,13 +204,13 @@ export function AssignMenu({ anchor, developers, onClose, onSelect }: {
         }}
         placeholder="Assign to…"
         aria-label="Filter people"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-[12.5px] outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {options.map((option) => (
         <MenuItem key={option.key} icon={<UserRound size={13} />} label={option.label} onSelect={() => onSelect(option.target)} />
       ))}
-      {options.length === 0 && <p className="px-2 py-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>No match</p>}
+      {options.length === 0 && <p className="px-2 py-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>No match</p>}
     </TaskPopover>
   );
 }
@@ -255,13 +255,13 @@ export function WaitingMenu({ anchor, developers, contacts, current, onClose, on
         }}
         placeholder="Waiting on…"
         aria-label="Waiting on"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-[12.5px] outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {options.map((option) => (
         <MenuItem key={option.key} icon={<Hourglass size={13} />} label={option.label} onSelect={() => onSelect(option.value)} />
       ))}
-      {options.length === 0 && <p className="px-2 py-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>Type a name</p>}
+      {options.length === 0 && <p className="px-2 py-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>Type a name</p>}
       {current && (
         <>
           <MenuDivider />
@@ -337,7 +337,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Filter labels…"
         aria-label="Filter labels"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-[12.5px] outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {visible.map((label) => {
@@ -353,7 +353,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
           />
         );
       })}
-      {visible.length === 0 && <p className="px-2 py-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>No labels</p>}
+      {visible.length === 0 && <p className="px-2 py-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>No labels</p>}
     </TaskPopover>
   );
 }

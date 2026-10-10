@@ -109,12 +109,12 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               <div className="min-w-0">
                 <div
                   id="manager-desk-reschedule-title"
-                  className="text-[16px] font-semibold"
+                  className="text-title-sm font-semibold"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   Carry Forward
                 </div>
-                <div className="text-[13px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                <div className="text-body truncate" style={{ color: 'var(--text-secondary)' }}>
                   Move this item to a later day.
                 </div>
               </div>
@@ -137,13 +137,13 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
             className="rounded-2xl px-3.5 py-3"
             style={{ background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)' }}
           >
-            <div className="text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-body font-medium" style={{ color: 'var(--text-primary)' }}>
               {item.title}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {!phase3 && (
                 <span
-                  className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase"
+                  className="rounded-full px-2 py-0.5 text-ui font-semibold uppercase"
                   style={{
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-muted)',
@@ -153,11 +153,11 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
                   {KIND_LABELS[item.kind]}
                 </span>
               )}
-              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+              <span className="text-ui" style={{ color: 'var(--text-secondary)' }}>
                 {STATUS_LABELS[item.status] ?? item.status.replace(/_/g, ' ')}
               </span>
               <span
-                className="inline-flex items-center gap-1 text-[12px]"
+                className="inline-flex items-center gap-1 text-ui"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <CalendarDays size={11} />
@@ -168,7 +168,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
 
           <div>
             <label
-              className="mb-1.5 block text-[12px] font-semibold uppercase"
+              className="mb-1.5 block text-ui font-semibold uppercase"
               style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}
             >
               Carry to date
@@ -178,7 +178,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               value={toDate}
               min={minDate}
               onChange={(event) => setToDate(event.target.value)}
-              className="w-full rounded-xl px-3 py-2 text-[13px] outline-none"
+              className="w-full rounded-xl px-3 py-2 text-body outline-none"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-primary)',
@@ -186,7 +186,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               }}
             />
             {!isValid && (
-              <p className="mt-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <p className="mt-1.5 text-ui" style={{ color: 'var(--danger)' }}>
                 Pick a date after {formattedFromDate}.
               </p>
             )}
@@ -200,7 +200,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
             }}
           >
             <Clock size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--md-accent)' }} />
-            <div className="text-[12px] leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="text-ui leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
               Scheduled times are rebased to the new day — the original time-of-day is preserved.
             </div>
           </div>
@@ -214,7 +214,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               }}
             >
               <User size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--warning)' }} />
-              <div className="text-[12px] leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
+              <div className="text-ui leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
                 Delegated to {assigneeName}. The linked team task moves to {formattedToDate ?? 'the new day'} and
                 restarts as planned.
               </div>
@@ -234,7 +234,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl px-3 py-2 text-[13px] font-medium transition-colors"
+              className="rounded-xl px-3 py-2 text-body font-medium transition-colors"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-secondary)',
@@ -247,7 +247,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               type="button"
               onClick={() => onConfirm(toDate)}
               disabled={!isValid || isPending}
-              className="rounded-xl px-4 py-2 text-[13px] font-bold uppercase tracking-wide transition-all disabled:opacity-40"
+              className="rounded-xl px-4 py-2 text-body font-semibold uppercase tracking-wide transition-all disabled:opacity-40"
               style={{ background: 'var(--md-accent)', color: '#000' }}
             >
               {isPending ? 'Moving…' : 'Carry forward'}

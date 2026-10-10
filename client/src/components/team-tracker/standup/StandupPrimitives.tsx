@@ -34,7 +34,7 @@ export function ToneChip({ tone, children, title }: { tone: FeedTone | ReasonTon
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <div className="mb-2 flex min-h-[28px] items-center justify-between gap-2">
-      <h3 className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
+      <h3 className="text-body font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
         {children}
       </h3>
       {right}

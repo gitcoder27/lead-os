@@ -27,7 +27,7 @@ export function TodayConfirmDialog({ title, description, confirmLabel, isSaving,
         </>
       )}
     >
-      <p className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>{description}</p>
+      <p className="text-body leading-5" style={{ color: 'var(--text-secondary)' }}>{description}</p>
       <TodayDialogError message={errorMessage} />
     </TodayDialog>
   );

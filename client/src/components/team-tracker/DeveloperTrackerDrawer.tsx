@@ -374,7 +374,7 @@ export function DeveloperTrackerDrawer({
                     />
                   ) : (
                     <div
-                      className="rounded-xl px-3.5 py-3 text-[12.5px] leading-5"
+                      className="rounded-xl px-3.5 py-3 text-body leading-5"
                       style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
                     >
                       {readOnly
@@ -714,14 +714,14 @@ function CheckInComposer({
             }}
             data-task-shortcut="c"
             placeholder={noun === 'note' ? 'Add a note…' : 'Add a check-in note…'}
-            className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
           />
           <button
             type="button"
             onClick={submit}
             disabled={!canSubmit}
-            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
+            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-ui font-semibold transition-opacity disabled:opacity-40 ${FOCUS_RING}`}
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             title={`Save ${noun} (Enter)`}
           >
@@ -864,7 +864,7 @@ function OneOnOneSectionBody({
           <button
             type="button"
             onClick={() => onOpenWorkspace(accountId)}
-            className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+            className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
             style={{ color: 'var(--accent)' }}
             data-testid="one-on-one-open-workspace"
           >
@@ -877,7 +877,7 @@ function OneOnOneSectionBody({
       {isLoading ? (
         <EmptyLine>Loading…</EmptyLine>
       ) : series ? (
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 text-[13px]">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 text-body">
           <span style={{ color: 'var(--text-secondary)' }}>
             {series.nextSessionDate ? (
               <>
@@ -891,18 +891,18 @@ function OneOnOneSectionBody({
             )}
           </span>
           {overdue && (
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--danger)' }}>
+            <span className="text-ui font-semibold" style={{ color: 'var(--danger)' }}>
               overdue {series.nextSessionOverdueDays}d
             </span>
           )}
           <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>·</span>
-          <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-body" style={{ color: 'var(--text-muted)' }}>
             {series.openAgendaCount} on agenda{series.active ? '' : ' · paused'}
           </span>
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-2 px-2">
-          <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-body" style={{ color: 'var(--text-muted)' }}>
             No recurring 1:1 yet — adding a task to the agenda starts one.
           </span>
           <button
@@ -918,7 +918,7 @@ function OneOnOneSectionBody({
               )
             }
             disabled={createSeries.isPending}
-            className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold transition-opacity disabled:opacity-50 ${FOCUS_RING}`}
+            className={`h-7 rounded-lg px-2.5 text-ui font-semibold transition-opacity disabled:opacity-50 ${FOCUS_RING}`}
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
           >
             {createSeries.isPending ? 'Starting…' : 'Start a 1:1 series'}

@@ -57,12 +57,12 @@ export function TriageNotesHistoryEntry({
           style={{ width: 4, height: 4, background: isExpanded ? 'var(--accent)' : 'var(--text-muted)' }}
         />
         <span className="flex-1 min-w-0">
-          <span className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+          <span className="text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
             {dateLabel}
           </span>
           {!isExpanded && (
             <span
-              className="block text-[12px] leading-snug truncate mt-0.5"
+              className="block text-ui leading-snug truncate mt-0.5"
               style={{ color: 'var(--text-muted)' }}
             >
               {preview}
@@ -97,7 +97,7 @@ export function TriageNotesHistoryEntry({
             onBlur={() => { isFocusedRef.current = false; onBlur(); }}
             readOnly={readOnly}
             placeholder="Notes for this day…"
-            className="w-full resize-none bg-transparent px-0 py-0 text-[13px] leading-[1.65] focus:outline-none read-only:cursor-default"
+            className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.65] focus:outline-none read-only:cursor-default"
             style={{ color: 'var(--text-primary)', minHeight: 48, maxHeight: 180, fontFamily: "'Geist Variable', sans-serif" }}
           />
         </div>

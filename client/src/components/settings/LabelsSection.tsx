@@ -77,7 +77,7 @@ export function LabelsSection() {
             }}
             placeholder="New label name…"
             aria-label="New label name"
-            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[12.5px] outline-none"
+            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
             style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
           />
         </div>
@@ -86,7 +86,7 @@ export function LabelsSection() {
           type="button"
           onClick={handleCreate}
           disabled={!draftName.trim() || createLabel.isPending}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors disabled:opacity-40"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-ui font-medium transition-colors disabled:opacity-40"
           style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
         >
           {createLabel.isPending ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
@@ -97,16 +97,16 @@ export function LabelsSection() {
       {/* Label list */}
       <div className="overflow-hidden rounded-xl" style={{ border: 'var(--settings-inset-border)' }}>
         {labels.isLoading ? (
-          <div className="flex items-center gap-2 px-4 py-5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center gap-2 px-4 py-5 text-body" style={{ color: 'var(--text-muted)' }}>
             <Loader2 size={13} className="animate-spin" />
             Loading labels…
           </div>
         ) : labels.isError ? (
-          <div className="px-4 py-5 text-[13px]" style={{ color: 'var(--danger)' }}>
+          <div className="px-4 py-5 text-body" style={{ color: 'var(--danger)' }}>
             Labels are unavailable{labels.error instanceof Error ? `: ${labels.error.message}` : '.'}
           </div>
         ) : rows.length === 0 ? (
-          <div className="px-4 py-5 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="px-4 py-5 text-body" style={{ color: 'var(--text-muted)' }}>
             No labels yet — add one above, or assign one from a task.
           </div>
         ) : (
@@ -130,14 +130,14 @@ export function LabelsSection() {
                       if (event.key === 'Enter') handleRename(label);
                       if (event.key === 'Escape') setEditing(null);
                     }}
-                    className="min-w-0 flex-1 rounded-lg px-2 py-1 text-[12.5px] outline-none"
+                    className="min-w-0 flex-1 rounded-lg px-2 py-1 text-body outline-none"
                     style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                     aria-label={`Rename ${label.name}`}
                   />
                   <button
                     type="button"
                     onClick={() => handleRename(label)}
-                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[12px] font-semibold"
+                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-ui font-semibold"
                     style={{ background: 'var(--settings-success-soft-bg)', color: 'var(--success)', border: 'var(--settings-success-soft-border)' }}
                     aria-label="Save rename"
                   >
@@ -146,7 +146,7 @@ export function LabelsSection() {
                   <button
                     type="button"
                     onClick={() => setEditing(null)}
-                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-[12px] font-semibold"
+                    className="flex shrink-0 items-center rounded-md px-2 py-1 text-ui font-semibold"
                     style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
                     aria-label="Cancel rename"
                   >
@@ -156,12 +156,12 @@ export function LabelsSection() {
               ) : (
                 <>
                   <TaskLabelChip name={label.name} color={label.color} />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="min-w-0 flex-1 truncate font-mono text-ui" style={{ color: 'var(--text-muted)' }}>
                     {label.name}
                   </span>
                   {label.system && (
                     <span
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-meta font-semibold uppercase tracking-[0.05em]"
                       style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                       title={`"${taskLabelDisplayName(label.name)}" is a system label`}
                     >
@@ -185,7 +185,7 @@ export function LabelsSection() {
                       <button
                         type="button"
                         onClick={() => setEditing({ name: label.name, draft: label.name })}
-                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
+                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-ui font-semibold transition-colors"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }}
                         aria-label={`Rename label ${label.name}`}
                       >
@@ -195,7 +195,7 @@ export function LabelsSection() {
                       <button
                         type="button"
                         onClick={() => handleDelete(label)}
-                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] font-semibold transition-colors"
+                        className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-ui font-semibold transition-colors"
                         style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
                         aria-label={`Delete label ${label.name}`}
                       >
@@ -211,7 +211,7 @@ export function LabelsSection() {
         )}
       </div>
 
-      <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>
         Renaming a label rewrites it on every task. Deleting removes it from every task and the registry.
         System labels can be recolored but not renamed or deleted.
       </p>

@@ -47,7 +47,7 @@ const KEEP_OPEN_HINT = '⌘/Ctrl+Enter captures and keeps this open';
 function DiagnosticRow({ diagnostic }: { diagnostic: CaptureDiagnostic }) {
   return (
     <div
-      className="flex items-start gap-1.5 text-[12px] leading-snug"
+      className="flex items-start gap-1.5 text-ui leading-snug"
       style={{ color: diagnostic.severity === 'error' ? 'var(--danger)' : 'var(--warning)' }}
     >
       <span className="mt-px shrink-0">{diagnostic.severity === 'error' ? '●' : '◐'}</span>
@@ -271,13 +271,13 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
     <div className="capture-box px-4 py-3 space-y-2.5">
       {showOwnerPill && (
         <div className="flex items-center gap-1.5" data-testid="capture-assignee">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-meta font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
             Assignee
           </span>
           {ownerPill ? (
             <>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-[12.5px] font-medium"
+                className="inline-flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 text-body font-medium"
                 style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 26%, transparent)' }}
               >
                 <Avatar name={ownerPillName} seed={ownerPill.accountId} size={16} />
@@ -295,13 +295,13 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
                   </button>
                 ) : null}
               </span>
-              <span className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-meta" style={{ color: 'var(--text-muted)' }}>
                 type @name to change
               </span>
             </>
           ) : (
             <>
-              <span className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Nobody — lands in Inbox</span>
+              <span className="text-body" style={{ color: 'var(--text-secondary)' }}>Nobody — lands in Inbox</span>
               <button type="button" className="ui-btn-ghost" onClick={() => setAssigneeCleared(false)}>
                 Assign to {assigneeName}
               </button>
@@ -316,7 +316,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
         <div
           ref={highlightRef}
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-[13px] leading-relaxed"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-body leading-relaxed"
           style={{ color: 'var(--text-primary)', border: '1px solid transparent' }}
         >
           {highlightSpans()}
@@ -353,7 +353,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
           placeholder="What do you need to do?"
           aria-describedby={hintId}
           aria-label="Capture"
-          className="capture-title-input relative w-full resize-none rounded-xl px-3 py-2 text-[13px] leading-relaxed outline-none"
+          className="capture-title-input relative w-full resize-none rounded-xl px-3 py-2 text-body leading-relaxed outline-none"
           style={{
             background: 'transparent',
             color: 'transparent',
@@ -361,7 +361,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
             border: '1px solid var(--border)',
           }}
         />
-        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-xs" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project and track' : 'Add to a project'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
+        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-ui leading-4" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project and track' : 'Add to a project'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
         {typeahead.open && typeahead.fragment ? (
           <TokenSuggestionList
             trigger={typeahead.fragment.trigger}
@@ -409,7 +409,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
                         key={candidate.accountId}
                         type="button"
                         onClick={() => chooseCandidate(d.tokenIndex, candidate.accountId)}
-                        className="rounded-md px-2 py-0.5 text-[12px] font-medium"
+                        className="rounded-md px-2 py-0.5 text-ui font-medium"
                         style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
                       >
                         {candidate.displayName}
@@ -423,7 +423,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
                       type="button"
                       disabled={createContact.isPending}
                       onClick={() => addContact(d.suggestContact!)}
-                      className="rounded-md px-2 py-0.5 text-[12px] font-medium"
+                      className="rounded-md px-2 py-0.5 text-ui font-medium"
                       style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 24%, transparent)' }}
                     >
                       Create contact @{d.suggestContact}
@@ -437,14 +437,14 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
       </div>
 
       {confirmArmed && (
-        <div className="text-[12px]" role="status" style={{ color: 'var(--warning-text)' }}>
+        <div className="text-ui" role="status" style={{ color: 'var(--warning-text)' }}>
           {confirmMessage(serverDiagnostics)}
         </div>
       )}
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
-        <span className="min-w-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="min-w-0 text-ui" style={{ color: 'var(--text-muted)' }}>
           {resolved?.intent === 'update' ? 'Logs a shared update on the task' : resolved?.intent === 'note' ? 'Appends to today\u2019s daily note' : 'Creates a task'}
           <span className="hidden sm:inline" data-testid="capture-keep-open-hint"> · {KEEP_OPEN_HINT}</span>
         </span>

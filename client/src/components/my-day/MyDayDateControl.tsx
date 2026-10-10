@@ -46,7 +46,7 @@ export function MyDayDateControl({ date, setDate }: MyDayDateControlProps) {
         type="button"
         onClick={() => setDate(today)}
         disabled={isToday}
-        className={`h-8 min-w-[92px] rounded-[9px] px-2.5 text-[13px] font-medium tabular-nums transition-colors enabled:hover:bg-[var(--bg-tertiary)] disabled:cursor-default ${FOCUS_RING}`}
+        className={`h-8 min-w-[92px] rounded-[9px] px-2.5 text-body font-medium tabular-nums transition-colors enabled:hover:bg-[var(--bg-tertiary)] disabled:cursor-default ${FOCUS_RING}`}
         style={{ color: isToday ? 'var(--text-primary)' : 'var(--accent)' }}
         aria-label={isToday ? 'Viewing today' : `Viewing ${label} — jump to today`}
         title={isToday ? undefined : 'Jump to today ( T )'}

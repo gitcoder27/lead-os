@@ -80,7 +80,7 @@ export function DrawerSection({ title, icon, count, hint, action, children }: Dr
 
 export function EmptyLine({ children }: { children: ReactNode }) {
   return (
-    <p className="px-2 py-1 text-[12.5px] leading-5" style={{ color: 'var(--text-muted)' }}>
+    <p className="px-2 py-1 text-body leading-5" style={{ color: 'var(--text-muted)' }}>
       {children}
     </p>
   );
@@ -125,7 +125,7 @@ export function DrawerToolbar({
     >
       <div className="relative flex min-w-0 flex-1 items-center">
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] font-semibold leading-[22px] transition-all duration-200"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 text-ui font-semibold leading-[22px] transition-all duration-200"
           style={{
             color: readOnly ? 'var(--warning)' : 'var(--text-secondary)',
             background: readOnly ? 'color-mix(in srgb, var(--warning) 10%, transparent)' : 'var(--bg-tertiary)',
@@ -144,7 +144,7 @@ export function DrawerToolbar({
           aria-hidden={!condensed}
         >
           <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={20} />
-          <span className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <span className="truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
             {day.developer.displayName}
           </span>
           <StatusDot status={day.status} />
@@ -210,7 +210,7 @@ function FreshnessLine({ day }: { day: TrackerDeveloperDay }) {
   if (!usesCheckIns(mode, day.participates)) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 text-[12.5px]"
+        className="inline-flex items-center gap-1.5 text-body"
         style={{ color: untouched ? 'var(--warning)' : 'var(--text-muted)' }}
         title={lastManagerTouchAt ? formatAbsoluteDateTime(lastManagerTouchAt) : undefined}
       >
@@ -223,7 +223,7 @@ function FreshnessLine({ day }: { day: TrackerDeveloperDay }) {
   const stale = day.signals.freshness.staleByTime;
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-[12.5px]"
+      className="inline-flex items-center gap-1.5 text-body"
       style={{ color: stale ? 'var(--warning)' : 'var(--text-muted)' }}
       title={day.lastCheckInAt ? formatAbsoluteDateTime(day.lastCheckInAt) : undefined}
     >
@@ -241,7 +241,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId, onFol
         <div className="min-w-0 flex-1">
           <h2
             id={titleId}
-            className="truncate text-[20px] font-semibold leading-7 tracking-[-0.012em]"
+            className="truncate text-title font-semibold leading-7 tracking-[-0.012em]"
             style={{ color: 'var(--text-primary)' }}
             title={day.developer.displayName}
           >
@@ -250,7 +250,7 @@ export function DeveloperHero({ day, date, tasks, load, readOnly, titleId, onFol
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
             <StatusControl day={day} date={date} tasks={tasks} readOnly={readOnly} />
-            <dl className="flex items-center gap-4 text-[12.5px]">
+            <dl className="flex items-center gap-4 text-body">
               <Counter label="Open items" value={load} title="Count of current and planned items; not effort or capacity" />
               <Counter label="Done" value={day.completedItems.length} title="Completed on this day" />
             </dl>
@@ -319,7 +319,7 @@ function AttentionNote({ day, date, readOnly = false, onFollowUp }: { day: Track
     >
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px]" style={{ background: accent }} />
       {badges.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body font-medium" style={{ color: 'var(--text-primary)' }}>
           <TriangleAlert size={13} className="shrink-0" style={{ color: accent }} aria-hidden="true" />
           {badges.map((badge) => (
             <span key={badge.key} className="inline-flex items-center gap-1.5">
@@ -330,13 +330,13 @@ function AttentionNote({ day, date, readOnly = false, onFollowUp }: { day: Track
         </div>
       )}
       {checkInClock && day.signals.freshness.staleByTime && (
-        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Last check-in exceeds the freshness window.</p>
+        <p className="text-body" style={{ color: 'var(--text-secondary)' }}>Last check-in exceeds the freshness window.</p>
       )}
       {!checkInClock && day.signals.freshness.untouched && (
-        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>No recent manager touch.</p>
+        <p className="text-body" style={{ color: 'var(--text-secondary)' }}>No recent manager touch.</p>
       )}
       {rationaleText && rationale && (
-        <p className="text-[12.5px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
           <span className="font-medium" style={{ color: STATUS_META[day.status].color }}>
             {STATUS_META[day.status].label}:
           </span>{' '}
@@ -350,17 +350,17 @@ function AttentionNote({ day, date, readOnly = false, onFollowUp }: { day: Track
         </p>
       )}
       {RATIONALE_STATUSES.includes(day.status) && day.statusUpdatedAt && (
-        <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-body" style={{ color: 'var(--text-secondary)' }}>
           Status since <time dateTime={day.statusUpdatedAt} title={formatAbsoluteDateTime(day.statusUpdatedAt)}>{formatCompactRelative(day.statusUpdatedAt)}</time>
         </p>
       )}
       {!followUp && (badges.length > 0 || RATIONALE_STATUSES.includes(day.status)) && (
         readOnly
-          ? <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Next check not scheduled.</p>
+          ? <p className="text-body" style={{ color: 'var(--text-muted)' }}>Next check not scheduled.</p>
           : <NextCheckActions day={day} date={date} onFollowUp={onFollowUp} />
       )}
       {followUp && (
-        <p className="flex items-center gap-1.5 text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>
+        <p className="flex items-center gap-1.5 text-body" style={{ color: 'var(--text-secondary)' }}>
           <BellRing size={12} style={{ color: toneColor(followUp.tone === 'default' ? 'muted' : followUp.tone) }} aria-hidden="true" />
           Next check {followUp.label}
           {followUp.hint && <span style={{ color: toneColor(followUp.tone) }}>· {followUp.hint}</span>}
@@ -429,7 +429,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
 
   if (readOnly) {
     return (
-      <span className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold" style={statusTint(day.status)}>
+      <span className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-ui font-semibold" style={statusTint(day.status)}>
         <StatusDot status={day.status} />
         {meta.label}
       </span>
@@ -459,7 +459,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
         aria-expanded={Boolean(anchor)}
         data-task-shortcut="shift+s"
         title={`Change status (S)${since}`}
-        className={`group inline-flex h-7 items-center gap-1.5 rounded-full pl-2.5 pr-2 text-[12px] font-semibold transition-[filter] hover:brightness-125 ${FOCUS_RING}`}
+        className={`group inline-flex h-7 items-center gap-1.5 rounded-full pl-2.5 pr-2 text-ui font-semibold transition-[filter] hover:brightness-125 ${FOCUS_RING}`}
         style={statusTint(day.status)}
       >
         <StatusDot status={day.status} />
@@ -490,7 +490,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
                 day.statusSuggestion?.status === status && status !== day.status ? (
                   <span className="flex items-center gap-1.5">
                     {STATUS_META[status].label}
-                    <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>suggested</span>
+                    <span className="text-ui" style={{ color: 'var(--text-muted)' }}>suggested</span>
                   </span>
                 ) : (
                   STATUS_META[status].label
@@ -500,7 +500,7 @@ function StatusControl({ day, date, tasks, readOnly }: { day: TrackerDeveloperDa
               onSelect={() => choose(status)}
             />
           ))}
-          <p className="px-2 pb-1 pt-1.5 text-[12px] leading-4" style={{ color: 'var(--text-muted)' }}>
+          <p className="px-2 pb-1 pt-1.5 text-ui leading-4" style={{ color: 'var(--text-muted)' }}>
             At risk, blocked and waiting ask for a short rationale.
           </p>
         </TaskPopover>
@@ -581,11 +581,11 @@ export function HistorySection({ title, items, open, onToggle }: HistorySectionP
           className={`shrink-0 transition-transform duration-150 ${open && hasItems ? 'rotate-90' : ''}`}
           style={{ color: 'var(--text-muted)', opacity: hasItems ? 1 : 0.4 }}
         />
-        <span className="text-[13px] font-semibold" style={{ color: hasItems ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+        <span className="text-body font-semibold" style={{ color: hasItems ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {title}
         </span>
         <span
-          className="rounded-full px-1.5 text-[12px] font-semibold tabular-nums leading-[18px]"
+          className="rounded-full px-1.5 text-ui font-semibold tabular-nums leading-[18px]"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
         >
           {items.length}
@@ -646,7 +646,7 @@ export function CheckInTimeline({ checkIns, recentCheckIns, readOnly, noun = 'ch
       {recentCheckIns.length > 0 && (
         <>
           <li className="flex items-center gap-3 pb-3 pt-1">
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-ui font-semibold" style={{ color: 'var(--text-muted)' }}>
               Earlier this week
             </span>
             <span className="h-px flex-1" style={{ background: 'color-mix(in srgb, var(--border) 70%, transparent)' }} />
@@ -690,12 +690,12 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-h-[24px] flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
             {author.label}
           </span>
           {checkIn.status && (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-1.5 text-[11px] font-semibold leading-[18px]"
+              className="inline-flex items-center gap-1 rounded-full px-1.5 text-meta font-semibold leading-[18px]"
               style={statusTint(checkIn.status)}
             >
               <StatusDot status={checkIn.status} size={5} />
@@ -704,16 +704,16 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
           )}
           {showDate && checkIn.date && (
             <span
-              className="rounded-full px-1.5 text-[11px] font-semibold leading-[18px]"
+              className="rounded-full px-1.5 text-meta font-semibold leading-[18px]"
               style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
             >
               {formatDate(checkIn.date)}
             </span>
           )}
-          <time className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} dateTime={checkIn.createdAt} title={absolute}>
+          <time className="text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} dateTime={checkIn.createdAt} title={absolute}>
             {formatCompactRelative(checkIn.createdAt)}
           </time>
-          <span className="ml-auto text-[12px] tabular-nums" style={{ color: 'var(--text-muted)', opacity: 0.85 }}>
+          <span className="ml-auto text-ui tabular-nums" style={{ color: 'var(--text-muted)', opacity: 0.85 }}>
             {absolute}
           </span>
         </div>
@@ -721,11 +721,11 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
           className="mt-1.5 rounded-xl px-3 py-2.5"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
         >
-          <p className="whitespace-pre-wrap break-words text-[13px] leading-5" style={{ color: 'var(--text-primary)' }}>
+          <p className="whitespace-pre-wrap break-words text-body leading-5" style={{ color: 'var(--text-primary)' }}>
             {checkIn.summary}
           </p>
           {rationale && (
-            <p className="mt-1 text-[12.5px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+            <p className="mt-1 text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Why: </span>
               {rationale}
             </p>
@@ -736,7 +736,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
                 <TaskKeyChip key={key} taskKey={key} />
               ))}
               {followUp && (
-                <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="inline-flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                   <BellRing size={11} aria-hidden="true" />
                   Next check {followUp.label}
                 </span>

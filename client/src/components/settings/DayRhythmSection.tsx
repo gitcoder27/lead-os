@@ -68,7 +68,7 @@ export function DayRhythmSection() {
 
   if (settings.isError) {
     return (
-      <p role="alert" className="text-[13px]" style={{ color: 'var(--danger)' }}>
+      <p role="alert" className="text-body" style={{ color: 'var(--danger)' }}>
         Could not load your day rhythm.{' '}
         <button type="button" className="underline" onClick={() => void settings.refetch()}>Retry</button>
       </p>
@@ -99,7 +99,7 @@ export function DayRhythmSection() {
           void save();
         }}
       >
-        <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Today changes with the time of day: morning plan, standup window, midday check, then wrap-up.
           Set when each one starts, in your own time zone.
         </p>
@@ -107,8 +107,8 @@ export function DayRhythmSection() {
         <div className="space-y-4">
           {FIELDS.map((field) => (
             <label key={field.key} className="block">
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{field.label}</span>
-              <span className="mt-0.5 block text-[12px]" style={{ color: 'var(--text-muted)' }}>{field.hint}</span>
+              <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{field.label}</span>
+              <span className="mt-0.5 block text-ui" style={{ color: 'var(--text-muted)' }}>{field.hint}</span>
               <input
                 type="time"
                 value={draft[field.key]}
@@ -122,7 +122,7 @@ export function DayRhythmSection() {
         </div>
 
         {error ? (
-          <p role="alert" className="text-[12.5px]" style={{ color: 'var(--danger)' }}>{error}</p>
+          <p role="alert" className="text-body" style={{ color: 'var(--danger)' }}>{error}</p>
         ) : null}
 
         <div className="flex items-center gap-2">
@@ -143,13 +143,13 @@ export function DayRhythmSection() {
 
     <section className="space-y-4" aria-labelledby="weekly-review-settings">
       <div>
-        <h3 id="weekly-review-settings" className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review</h3>
-        <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <h3 id="weekly-review-settings" className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review</h3>
+        <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
           A ten-minute close to the week, offered in Today on the day you pick.
         </p>
       </div>
       <label className="block">
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review day</span>
+        <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review day</span>
         <select
           className="ui-field mt-1.5 w-[180px]"
           value={reviewDay}
@@ -169,8 +169,8 @@ export function DayRhythmSection() {
           onChange={(event) => void saveReview({ weeklyReviewInWrapUp: event.target.checked })}
         />
         <span>
-          <span className="block text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Show it in wrap-up</span>
-          <span className="mt-0.5 block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="block text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Show it in wrap-up</span>
+          <span className="mt-0.5 block text-ui" style={{ color: 'var(--text-muted)' }}>
             Today offers the review that afternoon, and the catch-up on Monday and Tuesday if you skipped it.
           </span>
         </span>

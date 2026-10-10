@@ -9,6 +9,15 @@ const config: Config = {
         sans: ['Geist Variable', 'sans-serif'],
         mono: ['Geist Mono Variable', 'monospace'],
       },
+      // docs/73 UXD-02: the only font sizes in the app (the landing page is exempt).
+      fontSize: {
+        meta: 'var(--fs-11)',
+        ui: 'var(--fs-12)',
+        body: 'var(--fs-13)',
+        'title-sm': 'var(--fs-15)',
+        title: 'var(--fs-19)',
+        display: 'var(--fs-24)',
+      },
       colors: {
         bg: {
           primary: 'var(--bg-primary)',

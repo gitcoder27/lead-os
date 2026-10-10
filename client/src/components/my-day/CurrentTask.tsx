@@ -59,10 +59,10 @@ export function CurrentTask({
           style={{ ...surfaceStyle, borderStyle: 'dashed' }}
         >
           <div className="min-w-0">
-            <p className="text-[14px] font-medium" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-body font-medium" style={{ color: 'var(--text-primary)' }}>
               Nothing in focus
             </p>
-            <p className="mt-0.5 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-0.5 text-body" style={{ color: 'var(--text-muted)' }}>
               {readOnly
                 ? 'No task was in progress.'
                 : nextItem
@@ -74,7 +74,7 @@ export function CurrentTask({
             <button
               type="button"
               onClick={() => onSetCurrent(nextItem.id)}
-              className={`group/start inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl py-2 pl-2.5 pr-3.5 text-[13px] font-medium transition-colors ${FOCUS_RING}`}
+              className={`group/start inline-flex min-w-0 max-w-full items-center gap-2 rounded-xl py-2 pl-2.5 pr-3.5 text-body font-medium transition-colors ${FOCUS_RING}`}
               style={{
                 color: 'var(--accent)',
                 background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
@@ -88,7 +88,7 @@ export function CurrentTask({
               >
                 <Play size={12} fill="currentColor" aria-hidden="true" />
               </span>
-              {nextItem.taskKey && <span className="shrink-0 font-mono text-[12px] font-bold">{nextItem.taskKey}</span>}
+              {nextItem.taskKey && <span className="shrink-0 font-mono text-ui font-semibold">{nextItem.taskKey}</span>}
               <span className="truncate" style={{ color: 'var(--text-primary)' }}>{nextItem.title}</span>
             </button>
           )}
@@ -96,7 +96,7 @@ export function CurrentTask({
             <button
               type="button"
               onClick={onAddTask}
-              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-body font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
               style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
               <Plus size={14} aria-hidden="true" />
@@ -155,7 +155,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
       <div className="px-5 pb-4 pt-4 sm:px-6">
         <div className="flex items-center gap-2">
           <LiveDot active={!readOnly} />
-          <span className="text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>
+          <span className="text-ui font-semibold" style={{ color: 'var(--accent)' }}>
             {readOnly ? 'In progress' : 'Working on'}
           </span>
           {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="ml-1" />}
@@ -171,7 +171,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
                 <button
                   type="button"
                   onClick={() => onMarkDone(item.id)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold transition-colors hover:brightness-110 ${FOCUS_RING}`}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-ui font-semibold transition-colors hover:brightness-110 ${FOCUS_RING}`}
                   style={{
                     color: 'var(--success)',
                     background: 'color-mix(in srgb, var(--success) 12%, transparent)',
@@ -193,7 +193,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
             onCommit={onUpdateTitle}
-            className="text-[19px] font-semibold leading-[26px] tracking-[-0.015em]"
+            className="text-title font-semibold leading-[26px] tracking-[-0.015em]"
           />
         </div>
 
@@ -212,7 +212,7 @@ function DetailsExcerpt({ details }: { details?: string }) {
   if (!details) return null;
   return (
     <p
-      className="mt-2.5 line-clamp-3 whitespace-pre-line break-words border-l-2 pl-3 text-[13px] leading-[19px]"
+      className="mt-2.5 line-clamp-3 whitespace-pre-line break-words border-l-2 pl-3 text-body leading-[19px]"
       style={{ color: 'var(--text-secondary)', borderColor: 'color-mix(in srgb, var(--accent) 30%, var(--border))' }}
     >
       {details}

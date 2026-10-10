@@ -43,7 +43,7 @@ export function WorkSyncControls() {
 
   return (
     <div className="flex items-center gap-1" data-testid="work-sync-controls">
-      <span className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12px]" style={{ color: 'var(--text-secondary)' }} title={syncTitle}>
+      <span className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui" style={{ color: 'var(--text-secondary)' }} title={syncTitle}>
         {autoSyncOff && !isSyncing && !hasError
           ? <CloudOff size={13} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
           : <span className="h-2 w-2 rounded-full" style={{ background: dot }} aria-hidden="true" />}

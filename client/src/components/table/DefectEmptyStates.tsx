@@ -15,10 +15,10 @@ export function JiraNotConnectedState({ onConnectJira, onAddTask }: { onConnectJ
         <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
           <PlugZap size={18} aria-hidden="true" />
         </div>
-        <p className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           Connect Jira, or add tasks manually
         </p>
-        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-2 text-body leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Work shows Jira defects once a connection is saved. Until then, your own tasks and notes live in Today and Tasks.
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
@@ -52,10 +52,10 @@ export function NothingSyncedState({
         <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)' }}>
           <RefreshCw size={18} aria-hidden="true" />
         </div>
-        <p className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           Jira is connected, but nothing has synced yet
         </p>
-        <dl className="mt-3 space-y-1 text-left text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+        <dl className="mt-3 space-y-1 text-left text-body" style={{ color: 'var(--text-secondary)' }}>
           <div className="flex justify-between gap-4">
             <dt style={{ color: 'var(--text-muted)' }}>Last sync</dt>
             <dd>{lastSynced ? formatRelativeTime(lastSynced) : 'Never'}</dd>
@@ -77,7 +77,7 @@ export function NothingSyncedState({
             </div>
           ) : null}
         </dl>
-        <p className="mt-3 text-[13px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-3 text-body leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           {rosterOnly
             ? rosterSize === 0
               ? 'This scope only pulls issues assigned to people on your team, and your roster is empty, so nothing can match. Add team members, or switch the scope to include unassigned issues or the base query.'
@@ -97,7 +97,7 @@ export function ProjectCleanState() {
     <div className={shell}>
       <div>
         <CircleCheck size={18} className="mx-auto mb-2" style={{ color: 'var(--success)' }} aria-hidden="true" />
-        <p className="text-[15px]" style={{ color: 'var(--text-secondary)' }}>No open defects. Your project is clean.</p>
+        <p className="text-title-sm" style={{ color: 'var(--text-secondary)' }}>No open defects. Your project is clean.</p>
       </div>
     </div>
   );

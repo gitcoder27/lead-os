@@ -5,7 +5,7 @@ export function AssigneeCell({ name }: { name?: string }) {
   return (
     <span className="flex items-center gap-2 group/assignee">
       <span
-        className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold uppercase transition-all duration-150 group-hover/assignee:ring-2 ring-[var(--accent)]"
+        className="w-6 h-6 rounded-full flex items-center justify-center text-ui font-semibold uppercase transition-all duration-150 group-hover/assignee:ring-2 ring-[var(--accent)]"
         style={{
           background: 'var(--bg-tertiary)',
           color: 'var(--text-secondary)',
@@ -13,7 +13,7 @@ export function AssigneeCell({ name }: { name?: string }) {
       >
         {name.charAt(0)}
       </span>
-      <span className="text-[13px] truncate" style={{ color: 'var(--text-primary)' }}>
+      <span className="text-body truncate" style={{ color: 'var(--text-primary)' }}>
         {name}
       </span>
     </span>

@@ -64,7 +64,7 @@ export function IssueStatusActions({ issue }: { issue: Issue }) {
             </div>
           ) : (
             <>
-              <p className="px-3 py-2 text-[13px]">Current Jira status: {query.data?.currentStatus.name}</p>
+              <p className="px-3 py-2 text-body">Current Jira status: {query.data?.currentStatus.name}</p>
               {query.data?.transitions.length ? (
                 query.data.transitions.map((item) => (
                   <MenuItem
@@ -78,7 +78,7 @@ export function IssueStatusActions({ issue }: { issue: Issue }) {
                 <p className="p-3">No transitions available.</p>
               )}
               {query.data?.transitions.some((item) => !item.supported) && (
-                <p className="p-3 text-[12px]">Transitions that need a form must be completed in Jira.</p>
+                <p className="p-3 text-ui">Transitions that need a form must be completed in Jira.</p>
               )}
               <button
                 type="button"
@@ -91,7 +91,7 @@ export function IssueStatusActions({ issue }: { issue: Issue }) {
             </>
           )}
           {error && (
-            <p role="alert" className="p-3 text-[13px]">
+            <p role="alert" className="p-3 text-body">
               {error}
             </p>
           )}

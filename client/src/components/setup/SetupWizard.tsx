@@ -601,10 +601,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           >
             <Loader2 size={28} className="animate-spin" style={{ color: '#fbbf24' }} />
           </div>
-          <h2 className="text-[26px] font-semibold tracking-tight md:text-[32px]" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="text-display font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Syncing your workspace
           </h2>
-          <p className="mx-auto mt-4 max-w-sm text-[14px] leading-7" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mx-auto mt-4 max-w-sm text-body leading-7" style={{ color: 'var(--text-secondary)' }}>
             Pulling Jira data into the manager surface. This usually takes a moment.
           </p>
         </motion.div>
@@ -625,7 +625,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       <button
         type="button"
         onClick={toggleTheme}
-        className="absolute right-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[13px] font-semibold transition-colors"
+        className="absolute right-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-body font-semibold transition-colors"
         style={{
           background: 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
           color: 'var(--text-primary)',
@@ -659,10 +659,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               <LeadOSMark size={26} />
             </div>
             <div className="text-left">
-              <div className="text-[12px] font-semibold uppercase tracking-[0.3em]" style={{ color: '#fbbf24' }}>
+              <div className="text-ui font-semibold uppercase tracking-[0.3em]" style={{ color: '#fbbf24' }}>
                 Workspace Setup
               </div>
-              <div className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <div className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
                 LeadOS
               </div>
             </div>
@@ -686,7 +686,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               return (
                 <div key={stepKey} className="flex items-center gap-2">
                   <div
-                    className="flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[12px] font-semibold transition-all duration-300"
+                    className="flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-ui font-semibold transition-all duration-300"
                     style={{
                       borderColor: isActive
                         ? 'rgba(251, 191, 36, 0.5)'
@@ -746,13 +746,13 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.24em]" style={{ color: '#fbbf24' }}>
+            <div className="text-ui font-semibold uppercase tracking-[0.24em]" style={{ color: '#fbbf24' }}>
               {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira'}
             </div>
-            <h2 className="mt-2 text-[24px] font-semibold leading-tight tracking-tight md:text-[28px]" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="mt-2 text-display font-semibold leading-tight tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {activeStepMeta.title}
             </h2>
-            <p className="mt-2 text-[13px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+            <p className="mt-2 text-body leading-6" style={{ color: 'var(--text-secondary)' }}>
               {activeStepMeta.description}
             </p>
 
@@ -761,7 +761,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 role="alert"
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 rounded-[14px] border px-4 py-3 text-[13px]"
+                className="mt-4 rounded-[14px] border px-4 py-3 text-body"
                 style={{
                   borderColor: 'rgba(239, 68, 68, 0.35)',
                   background: 'rgba(239, 68, 68, 0.08)',
@@ -917,7 +917,7 @@ function StepContent(props: StepContentProps) {
       return (
         <div className="space-y-5">
           <fieldset className="space-y-2">
-            <legend className="mb-2 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <legend className="mb-2 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               How will you use LeadOS?
             </legend>
             {WORKSPACE_KIND_OPTIONS.map((option) => {
@@ -940,8 +940,8 @@ function StepContent(props: StepContentProps) {
                     className="mt-0.5 accent-amber-400"
                   />
                   <span>
-                    <span className="block text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>{option.title}</span>
-                    <span className="mt-1 block text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>{option.description}</span>
+                    <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{option.title}</span>
+                    <span className="mt-1 block text-body leading-5" style={{ color: 'var(--text-secondary)' }}>{option.description}</span>
                   </span>
                 </label>
               );
@@ -1028,7 +1028,7 @@ function StepContent(props: StepContentProps) {
               placeholder={props.configQuery.data?.jiraApiToken ? 'Leave blank to keep saved token' : 'Paste API token'}
             />
           </Field>
-          <div className="rounded-[14px] border px-4 py-3 text-[13px] leading-5" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)', color: 'var(--text-secondary)' }}>
+          <div className="rounded-[14px] border px-4 py-3 text-body leading-5" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)', color: 'var(--text-secondary)' }}>
             Skip this step to start with Today, your tasks and notes. Jira can be connected later from Settings.
           </div>
           <button
@@ -1065,10 +1065,10 @@ function StepContent(props: StepContentProps) {
               className="mt-0.5 accent-amber-400"
             />
             <span>
-              <span className="block text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Include manager&apos;s Jira assignments
               </span>
-              <span className="mt-1 block text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+              <span className="mt-1 block text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
                 Leave off if using a service account or if the manager stays outside tracked scope.
               </span>
             </span>
@@ -1122,7 +1122,7 @@ function StepContent(props: StepContentProps) {
 
           {/* Selection counter badge */}
           <div
-            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold"
+            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-body font-semibold"
             style={{
               background: props.selectedDeveloperIds.size > 0 ? 'rgba(6, 182, 212, 0.1)' : 'var(--bg-tertiary)',
               color: props.selectedDeveloperIds.size > 0 ? 'var(--accent)' : 'var(--text-muted)',
@@ -1140,7 +1140,7 @@ function StepContent(props: StepContentProps) {
             style={{ maxHeight: 'calc(100vh - 540px)', minHeight: 160 }}
           >
             {props.filteredDiscoveredUsers.length === 0 ? (
-              <div className="py-8 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="py-8 text-center text-body" style={{ color: 'var(--text-muted)' }}>
                 {props.discoverQuery ? 'No matching users found.' : 'No Jira users discovered. Save an empty roster and add people manually from Settings.'}
               </div>
             ) : (
@@ -1181,11 +1181,11 @@ function StepContent(props: StepContentProps) {
               background: 'rgba(6, 182, 212, 0.05)',
             }}
           >
-            <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               Developer login link
             </div>
-            <div className="mt-1 text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
-              Share <span className="rounded-md px-1.5 py-0.5 font-mono text-[12px]" style={{ background: 'var(--bg-tertiary)' }}>{DEVELOPER_LOGIN_URL}</span> with developers after accounts are created.
+            <div className="mt-1 text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
+              Share <span className="rounded-md px-1.5 py-0.5 font-mono text-ui" style={{ background: 'var(--bg-tertiary)' }}>{DEVELOPER_LOGIN_URL}</span> with developers after accounts are created.
             </div>
           </div>
 
@@ -1251,16 +1251,16 @@ function StepContent(props: StepContentProps) {
 
           {/* Existing accounts list */}
           <div className="rounded-[16px] border" style={{ borderColor: 'var(--border)' }}>
-            <div className="border-b px-4 py-2.5 text-[13px] font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            <div className="border-b px-4 py-2.5 text-body font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
               Existing accounts
             </div>
             <div className="max-h-[180px] overflow-y-auto p-3">
               {props.loadingUsers ? (
-                <div className="flex items-center gap-2 py-3 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+                <div className="flex items-center gap-2 py-3 text-body" style={{ color: 'var(--text-secondary)' }}>
                   <Loader2 size={14} className="animate-spin" /> Loading…
                 </div>
               ) : props.appUsers.length === 0 ? (
-                <div className="py-3 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>No accounts yet.</div>
+                <div className="py-3 text-center text-body" style={{ color: 'var(--text-muted)' }}>No accounts yet.</div>
               ) : (
                 <div className="space-y-1.5">
                   {props.appUsers.map((account: import('@/types').AuthUser) => (
@@ -1270,15 +1270,15 @@ function StepContent(props: StepContentProps) {
                       style={{ background: 'var(--bg-tertiary)' }}
                     >
                       <div>
-                        <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {account.displayName}
                         </div>
-                        <div className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                        <div className="text-ui" style={{ color: 'var(--text-secondary)' }}>
                           @{account.username} {account.developerAccountId ? `· ${account.developerAccountId}` : '· manager'}
                         </div>
                       </div>
                       <span
-                        className="rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase"
+                        className="rounded-full px-2 py-0.5 text-ui font-semibold uppercase"
                         style={{
                           background: account.role === 'manager' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(6, 182, 212, 0.14)',
                           color: account.role === 'manager' ? 'var(--warning)' : 'var(--accent)',
@@ -1377,7 +1377,7 @@ function StepFooter(props: StepFooterProps) {
             <button
               type="button"
               onClick={tertiaryAction}
-              className="rounded-[14px] px-3.5 py-2.5 text-[13px] font-medium transition-colors"
+              className="rounded-[14px] px-3.5 py-2.5 text-body font-medium transition-colors"
               style={{ color: 'var(--text-secondary)' }}
             >
               {tertiaryLabel}
@@ -1429,10 +1429,10 @@ function UserRow({
       }}
     >
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div className="truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {user.displayName}
         </div>
-        <div className="truncate text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+        <div className="truncate text-ui" style={{ color: 'var(--text-secondary)' }}>
           {user.email || user.accountId}
         </div>
       </div>
@@ -1446,7 +1446,7 @@ function UserRow({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[13px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <span className="mb-2 block text-body font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </span>
       {children}
@@ -1489,21 +1489,21 @@ function PasswordInput({
 
 /* ── Style constants ─────────────────────────────── */
 
-const fieldClassName = 'w-full rounded-[16px] border px-4 py-3 text-[14px] outline-none transition-colors';
+const fieldClassName = 'w-full rounded-[16px] border px-4 py-3 text-body outline-none transition-colors';
 const fieldStyle = {
   background: 'var(--bg-tertiary)',
   color: 'var(--text-primary)',
   borderColor: 'var(--border)',
 };
 
-const primaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-5 py-3 text-[13px] font-semibold transition-all disabled:opacity-40';
+const primaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-5 py-3 text-body font-semibold transition-all disabled:opacity-40';
 const primaryBtnStyle = {
   background: 'linear-gradient(135deg, var(--warning), color-mix(in srgb, var(--warning) 60%, white))',
   color: '#111827',
   boxShadow: '0 4px 20px rgba(245, 158, 11, 0.18)',
 };
 
-const secondaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-[13px] font-semibold transition-colors disabled:opacity-40';
+const secondaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-body font-semibold transition-colors disabled:opacity-40';
 const secondaryBtnStyle = {
   background: 'var(--bg-tertiary)',
   color: 'var(--text-primary)',

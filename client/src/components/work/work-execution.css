@@ -23,7 +23,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .work-bulk-targets {
   padding: 0;
@@ -38,7 +38,7 @@
   gap: 6px 12px;
   border-top: 1px solid var(--border);
   padding: 10px 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   overflow-wrap: anywhere;
 }
 .work-bulk-targets li [role] {

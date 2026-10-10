@@ -100,7 +100,9 @@ describe('weekly report', () => {
   });
   it('step 1 Jira lines are body size, like the other review rows (UX-28)', async () => {
     const css = (await import('node:fs')).readFileSync(`${process.cwd()}/src/components/review/review.css`, 'utf8');
-    expect(css).toMatch(/\.review-jira-lines label \{[^}]*font-size: 13\.5px;/);
+    // docs/73 UXD-02: body size is the 13px scale token, shared with the review row titles.
+    expect(css).toMatch(/\.review-jira-lines label \{[^}]*font-size: var\(--fs-13\);/);
+    expect(css).toMatch(/\.review-row-title \{[^}]*font-size: var\(--fs-13\);/);
   });
 
   it('Shipped lists only done work: a dropped task is not offered as a line at all (UX-28)', () => {

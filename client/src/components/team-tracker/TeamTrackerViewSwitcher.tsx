@@ -50,7 +50,7 @@ export function TeamTrackerViewSwitcher({
           >
             <Icon size={13} aria-hidden="true" />
             <span>{lens.label}</span>
-            <span className="tabular-nums text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="tabular-nums text-ui" style={{ color: 'var(--text-muted)' }}>
               {counts[lens.key]}
             </span>
           </button>

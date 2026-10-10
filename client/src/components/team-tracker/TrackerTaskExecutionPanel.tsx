@@ -52,10 +52,10 @@ export function TrackerTaskExecutionPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
+          <div className="text-ui font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
             Team Tracker Execution
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px]">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-body">
             <span
               className="rounded-full px-2.5 py-1 font-semibold"
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
@@ -76,7 +76,7 @@ export function TrackerTaskExecutionPanel({
               type="button"
               onClick={() => onSetCurrent(item.id)}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ui font-semibold disabled:opacity-40"
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >
               <Play size={12} />
@@ -88,7 +88,7 @@ export function TrackerTaskExecutionPanel({
               type="button"
               onClick={() => onUpdateState(item.id, 'done')}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ui font-semibold disabled:opacity-40"
               style={{
                 background: 'color-mix(in srgb, var(--success) 12%, transparent)',
                 color: 'var(--success)',
@@ -105,7 +105,7 @@ export function TrackerTaskExecutionPanel({
               onClick={() => setReassignOpen((current) => !current)}
               disabled={isPending}
               aria-expanded={reassignOpen}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ui font-semibold disabled:opacity-40"
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             >
               <ArrowRightLeft size={12} />
@@ -117,7 +117,7 @@ export function TrackerTaskExecutionPanel({
               type="button"
               onClick={() => onUpdateState(item.id, 'dropped')}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ui font-semibold disabled:opacity-40"
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
               <CircleX size={12} />
@@ -129,7 +129,7 @@ export function TrackerTaskExecutionPanel({
               type="button"
               onClick={() => onUpdateState(item.id, 'planned')}
               disabled={isPending}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-ui font-semibold disabled:opacity-40"
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             >
               <RotateCcw size={12} />
@@ -137,7 +137,7 @@ export function TrackerTaskExecutionPanel({
             </button>
           )}
           {isDelegated && !isClosed && (
-            <span className="self-center text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="self-center text-ui" style={{ color: 'var(--text-muted)' }}>
               Close via My follow-through
             </span>
           )}
@@ -151,7 +151,7 @@ export function TrackerTaskExecutionPanel({
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <span
-              className="text-[12px] font-bold uppercase tracking-[0.18em]"
+              className="text-ui font-semibold uppercase tracking-[0.18em]"
               style={{ color: 'var(--text-muted)' }}
             >
               Reassign to
@@ -182,7 +182,7 @@ export function TrackerTaskExecutionPanel({
 
       <div className="mt-4">
         <div
-          className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.18em]"
+          className="flex items-center gap-1.5 text-ui font-semibold uppercase tracking-[0.18em]"
           style={{ color: 'var(--text-muted)' }}
         >
           <History size={11} />
@@ -196,7 +196,7 @@ export function TrackerTaskExecutionPanel({
             )}
           </>
         ) : (
-          <div className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-2 text-body" style={{ color: 'var(--text-muted)' }}>
             No task timeline yet.
           </div>
         )}

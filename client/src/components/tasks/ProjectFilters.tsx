@@ -17,7 +17,7 @@ export function ProjectFilters({
   const detail = useProject(id, today);
   return (
     <div className="flex flex-wrap gap-2 border-b px-4 py-2" style={{ borderColor: 'var(--border)' }}>
-      <label className="flex items-center gap-2 text-xs">
+      <label className="flex items-center gap-2 text-ui leading-4">
         Project
         <select
           aria-label="Project"
@@ -39,7 +39,7 @@ export function ProjectFilters({
         </select>
       </label>
       {id && (
-        <label className="flex items-center gap-2 text-xs">
+        <label className="flex items-center gap-2 text-ui leading-4">
           Track
           <select
             aria-label="Track"

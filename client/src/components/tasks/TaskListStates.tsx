@@ -60,7 +60,7 @@ export function TaskListError({ message, onRetry }: { message: string; onRetry: 
     <div className={`${TASK_LIST_CONTAINER} pt-3`}>
       <div
         role="alert"
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px]"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-body"
         style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
       >
         <TriangleAlert size={14} />
@@ -133,8 +133,8 @@ export function TaskListEmpty({
     return (
       <div className="flex flex-col items-center gap-2 py-14 text-center">
         <SearchX size={20} style={{ color: 'var(--text-muted)' }} />
-        <p className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>No tasks match these filters.</p>
-        <button type="button" onClick={onClearFilters} className="mt-1 flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-semibold" style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}>
+        <p className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>No tasks match these filters.</p>
+        <button type="button" onClick={onClearFilters} className="mt-1 flex items-center gap-1 rounded-lg px-2.5 py-1 text-ui font-semibold" style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}>
           <X size={12} /> Clear filters
         </button>
       </div>

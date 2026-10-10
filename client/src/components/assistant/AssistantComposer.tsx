@@ -87,7 +87,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
               send();
             }
           }}
-          className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-[13px] leading-5 outline-none disabled:opacity-50"
+          className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-body leading-5 outline-none disabled:opacity-50"
           style={{ color: 'var(--text-primary)' }}
         />
         {streaming ? (
@@ -115,7 +115,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
           </button>
         )}
       </div>
-      <p className="mt-1.5 text-[11px] leading-4" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1.5 text-meta leading-4" style={{ color: 'var(--text-muted)' }}>
         Copilot can make mistakes — review proposed actions before confirming.
       </p>
       </div>

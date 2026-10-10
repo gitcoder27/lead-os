@@ -38,7 +38,7 @@ export function TokenSuggestionList({ trigger, suggestions, activeIndex, onChoos
           onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={() => onHover?.(index)}
           onClick={() => onChoose(suggestion)}
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] transition-colors"
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-ui transition-colors"
           style={{
             background: index === activeIndex ? 'var(--accent-glow)' : 'transparent',
             color: 'var(--text-primary)',
@@ -54,7 +54,7 @@ export function TokenSuggestionList({ trigger, suggestions, activeIndex, onChoos
           <span className={trigger === '@' ? 'font-medium' : 'font-mono font-semibold'}>
             {trigger === '@' ? suggestion.label : `${trigger}${suggestion.insert}`}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="min-w-0 flex-1 truncate text-ui" style={{ color: 'var(--text-muted)' }}>
             {trigger === '+' ? taskLabelDisplayName(suggestion.insert) : trigger === '@' ? (
               <>
                 {suggestion.detail ? `${suggestion.detail} · ` : ''}

@@ -48,12 +48,12 @@ export function TeamModeSection() {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-2">
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+        <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
           Team Mode
         </h3>
         {setTeamMode.isPending ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
       </div>
-      <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Choose whether developers take part in LeadOS or you track the team on your own.
       </p>
       <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Team mode">
@@ -84,10 +84,10 @@ export function TeamModeSection() {
                 >
                   {option.icon}
                 </span>
-                <span className="min-w-0 flex-1 text-[13px] font-semibold leading-5">{option.label}</span>
+                <span className="min-w-0 flex-1 text-body font-semibold leading-5">{option.label}</span>
                 {selected ? <Check size={14} style={{ color: 'var(--accent)' }} /> : null}
               </span>
-              <span className="mt-2 block text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+              <span className="mt-2 block text-ui leading-5" style={{ color: 'var(--text-secondary)' }}>
                 {option.description}
               </span>
             </button>

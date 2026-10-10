@@ -24,18 +24,18 @@ export function PersonCommitments({ accountId, onCapture, isSelf = false }: { ac
       {query.isError && <QueryReadError message="Could not load commitments." onRetry={query.refetch} retrying={query.isFetching} />}
       {query.isLoading ? <EmptyLine>Loading commitments…</EmptyLine> : query.data && groups.map((group) => (
         <section key={group.title} aria-label={group.title} className="mb-3">
-          <h4 className="mb-1 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{group.title} ({group.tasks.length})</h4>
+          <h4 className="mb-1 text-ui font-semibold" style={{ color: 'var(--text-secondary)' }}>{group.title} ({group.tasks.length})</h4>
           {group.tasks.length === 0 ? <EmptyLine>No open commitments.</EmptyLine> : (
             <ul className="space-y-1">
               {group.tasks.map((task) => (
                 <li key={task.taskKey}>
                   <button type="button" onClick={() => setTaskKey(task.taskKey)} className={`min-h-11 w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}>
-                    <span className="block text-[13px]" style={{ color: 'var(--text-primary)' }}>{task.taskKey} · {task.title}</span>
-                    <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                    <span className="block text-body" style={{ color: 'var(--text-primary)' }}>{task.taskKey} · {task.title}</span>
+                    <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
                       {task.status} · Updated {formatCompactRelative(task.updatedAt)} · {task.later ? 'Later' : task.scheduledOn ? formatDay(task.scheduledOn, getLocalIsoDate()) : 'Undated'}
                       {task.followUpAt ? ` · Next check ${formatDayTime(task.followUpAt)}` : ' · Next check not scheduled'}
                     </span>
-                    {task.nextAction && <span className="block text-[12px]" style={{ color: 'var(--text-secondary)' }}>Next: {task.nextAction}</span>}
+                    {task.nextAction && <span className="block text-ui" style={{ color: 'var(--text-secondary)' }}>Next: {task.nextAction}</span>}
                   </button>
                 </li>
               ))}
@@ -43,7 +43,7 @@ export function PersonCommitments({ accountId, onCapture, isSelf = false }: { ac
           )}
         </section>
       ))}
-      <button type="button" onClick={onCapture} className={`flex min-h-11 items-center gap-2 text-[12px] ${FOCUS_RING}`} style={{ color: 'var(--accent)' }}><Plus size={14} />Capture follow-up</button>
+      <button type="button" onClick={onCapture} className={`flex min-h-11 items-center gap-2 text-ui ${FOCUS_RING}`} style={{ color: 'var(--accent)' }}><Plus size={14} />Capture follow-up</button>
       <TaskDrawer key={accountId} taskKey={taskKey} onClose={() => setTaskKey(null)} onNavigateTask={setTaskKey} stacked />
     </DrawerSection>
   );

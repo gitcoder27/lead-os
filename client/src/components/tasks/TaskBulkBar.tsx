@@ -23,7 +23,7 @@ export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
       className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-1 rounded-xl px-2 py-1.5"
       style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--panel-shadow)' }}
     >
-      <span className="px-2 text-[12.5px] font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }} aria-live="polite">
+      <span className="px-2 text-body font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }} aria-live="polite">
         {count} selected
       </span>
       <span className="h-4 w-px" style={{ background: 'var(--border)' }} />
@@ -36,7 +36,7 @@ export function TaskBulkBar({ count, onDone, onMenu, onDrop, onClear }: {
       <BulkButton label="Project" hint="" onClick={(event) => onMenu('project', event.currentTarget)}><Folder size={13} /></BulkButton>
       <BulkButton label="Drop" hint="#" onClick={onDrop} danger><Ban size={13} /></BulkButton>
       <span className="h-4 w-px" style={{ background: 'var(--border)' }} />
-      <button type="button" onClick={onClear} className="flex h-7 items-center gap-1 rounded-lg px-2 text-[12px]" style={{ color: 'var(--text-muted)' }} aria-label="Clear selection (Esc)" title="Clear selection (Esc)">
+      <button type="button" onClick={onClear} className="flex h-7 items-center gap-1 rounded-lg px-2 text-ui" style={{ color: 'var(--text-muted)' }} aria-label="Clear selection (Esc)" title="Clear selection (Esc)">
         <X size={13} />
       </button>
     </motion.div>
@@ -56,7 +56,7 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       onClick={onClick}
       title={hint ? `${label} (${hint})` : label}
       aria-label={hint ? `${label} (${hint})` : label}
-      className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
       style={{ color: danger ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
       {children}

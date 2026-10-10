@@ -1,7 +1,7 @@
 .action-confirm-target {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -9,7 +9,7 @@
   margin: 8px 0;
   display: grid;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .action-confirm-changes > div {
   display: grid;
@@ -30,14 +30,14 @@
   min-height: 28px;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .action-confirm-technical pre {
   max-height: 200px;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-secondary);
 }
 .action-confirm-card button:focus-visible,

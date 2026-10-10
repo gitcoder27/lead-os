@@ -114,14 +114,14 @@ export function CheckInForm({
         }}
         rows={3}
         placeholder={note ? 'Add a note — saved on today’s record…' : 'General remark — lands as a check-in on today’s record…'}
-        className="w-full resize-none rounded-lg px-3 py-2 text-[13px] leading-5 outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        className="w-full resize-none rounded-lg px-3 py-2 text-body leading-5 outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {!note && (
         <CheckInVisibilityChoice developerName={developerName} value={visibility} onChange={onVisibilityChange} disabled={pending || submitted} />
       )}
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
           <Kbd subtle>↵</Kbd> save · <Kbd subtle>⇧↵</Kbd> newline{!note && visibility === 'private' ? '' : ' · mention T-keys to link tasks'}
         </span>
         <button
@@ -133,7 +133,7 @@ export function CheckInForm({
           {pending ? 'Saving…' : submitted ? 'Retry note' : note ? 'Save note' : 'Save check-in'}
         </button>
       </div>
-      {submitted && !pending && <p role="alert" className="text-xs">Not acknowledged. Retry this note to confirm it was saved.</p>}
+      {submitted && !pending && <p role="alert" className="text-ui leading-4">Not acknowledged. Retry this note to confirm it was saved.</p>}
     </div>
   );
 }
@@ -148,7 +148,7 @@ export function ReassignList({
   onPick: (developer: Developer) => void;
 }) {
   if (developers.length === 0) {
-    return <div className="px-4 py-5 text-center text-[12.5px]" style={{ color: 'var(--text-muted)' }}>No other developers to reassign to.</div>;
+    return <div className="px-4 py-5 text-center text-body" style={{ color: 'var(--text-muted)' }}>No other developers to reassign to.</div>;
   }
   return (
     <div className="max-h-[300px] overflow-y-auto px-2 py-2">
@@ -158,7 +158,7 @@ export function ReassignList({
           type="button"
           onClick={() => onPick(dev)}
           disabled={pending}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
           style={{ color: 'var(--text-primary)' }}
         >
           <Avatar name={dev.displayName} seed={dev.accountId} size={24} />
@@ -187,7 +187,7 @@ export function FlagForm({
 }) {
   return (
     <div className="space-y-2 px-4 py-3">
-      <label htmlFor="standup-flag-reason" className="text-[12.5px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+      <label htmlFor="standup-flag-reason" className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
         Why follow up with {name}? <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
       </label>
       <input
@@ -208,11 +208,11 @@ export function FlagForm({
           }
         }}
         placeholder="e.g. waiting on design review"
-        className="w-full rounded-lg px-3 py-2 text-[13px] outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        className="w-full rounded-lg px-3 py-2 text-body outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
           <Kbd subtle>↵</Kbd> flag · <Kbd subtle>Esc</Kbd> cancel
         </span>
         <button type="button" onClick={onSubmit} className="ui-btn-solid">Flag for follow-up</button>

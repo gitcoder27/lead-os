@@ -325,7 +325,7 @@ function FullPageLoading() {
           className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
           style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
         />
-        <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>Loading…</span>
+        <span className="text-body" style={{ color: 'var(--text-secondary)' }}>Loading…</span>
       </div>
     </div>
   );
@@ -405,7 +405,7 @@ function PanelLoading() {
           className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
           style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
         />
-        <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>Loading…</span>
+        <span className="text-body" style={{ color: 'var(--text-secondary)' }}>Loading…</span>
       </div>
     </div>
   );
@@ -421,19 +421,19 @@ function NotFoundState({ onGoToday }: { onGoToday: () => void }) {
           background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
         }}
       >
-        <p className="text-[12px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
           404
         </p>
-        <h1 className="mt-2 text-[24px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <h1 className="mt-2 text-display font-semibold" style={{ color: 'var(--text-primary)' }}>
           Workspace not found
         </h1>
-        <p className="mt-3 text-[14px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-3 text-body leading-6" style={{ color: 'var(--text-secondary)' }}>
           This LeadOS route does not match a known workspace.
         </p>
         <button
           type="button"
           onClick={onGoToday}
-          className="mt-6 rounded-lg px-4 py-2.5 text-[13px] font-semibold"
+          className="mt-6 rounded-lg px-4 py-2.5 text-body font-semibold"
           style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}
         >
           Go to Today

@@ -77,10 +77,10 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           <CalendarDays size={14} />
         </div>
         <div className="min-w-0">
-          <div className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             1:1s
           </div>
-          <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-ui" style={{ color: 'var(--text-muted)' }}>
             Recurring manager-private one-on-one series
           </div>
         </div>
@@ -89,7 +89,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
             <button
               type="button"
               onClick={() => setCreating((value) => !value)}
-              className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium"
+              className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-ui font-medium"
               style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)' }}
             >
               <Plus size={12} />
@@ -99,7 +99,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12px] font-medium"
+            className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-ui font-medium"
             style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             aria-label="Close 1:1 overview"
             title="Close (Esc)"
@@ -115,7 +115,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           <select
             value={newDev}
             onChange={(event) => setNewDev(event.target.value)}
-            className="h-8 rounded-lg px-2 text-[12px]"
+            className="h-8 rounded-lg px-2 text-ui"
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             aria-label="Developer"
           >
@@ -129,7 +129,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           <select
             value={newCadence}
             onChange={(event) => setNewCadence(event.target.value as OneOnOneCadence)}
-            className="h-8 rounded-lg px-2 text-[12px]"
+            className="h-8 rounded-lg px-2 text-ui"
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             aria-label="Cadence"
           >
@@ -145,7 +145,7 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
           >
             {createSeries.isPending ? 'Creating…' : 'Create series'}
           </button>
-          <button type="button" onClick={() => setCreating(false)} className="h-8 rounded-lg px-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <button type="button" onClick={() => setCreating(false)} className="h-8 rounded-lg px-2 text-ui" style={{ color: 'var(--text-muted)' }}>
             Cancel
           </button>
         </div>
@@ -157,15 +157,15 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
       >
         {list.isError && <QueryReadError message={list.data ? 'Could not refresh 1:1s. Showing saved content.' : 'Could not load 1:1s.'} onRetry={() => list.refetch()} retrying={list.isFetching} />}
         {list.isError && !(list.data?.series.length) ? null : list.isLoading ? (
-          <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="px-4 py-10 text-center text-body" style={{ color: 'var(--text-muted)' }}>
             Loading 1:1s…
           </div>
         ) : (list.data?.series ?? []).length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <div className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               Pick a developer to start a 1:1 series.
             </div>
-            <div className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-1 text-body" style={{ color: 'var(--text-muted)' }}>
               Use "New series" above, or open a developer's drawer.
             </div>
           </div>
@@ -199,30 +199,30 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
         data-testid={`one-on-one-series-${series.developerAccountId}`}
       >
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
             {series.developerName}
           </div>
-          <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-ui" style={{ color: 'var(--text-muted)' }}>
             {CADENCE_LABELS[series.cadence]}
             {series.active ? '' : ' · paused'}
           </div>
         </div>
         <div className="text-right">
           <div
-            className="text-[12px]"
+            className="text-ui"
             style={{ color: overdue ? 'var(--danger)' : 'var(--text-secondary)' }}
           >
             {series.nextSessionDate ? formatDayWithRelative(series.nextSessionDate, getLocalIsoDate()) : 'Not scheduled'}
           </div>
           {overdue && (
-            <div className="text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
+            <div className="text-meta font-semibold" style={{ color: 'var(--danger)' }}>
               overdue {series.nextSessionOverdueDays}d
             </div>
           )}
         </div>
         {series.openAgendaCount > 0 && (
           <span
-            className="rounded px-1.5 py-0.5 text-[11px]"
+            className="rounded px-1.5 py-0.5 text-meta"
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
             title="Open agenda items"
           >

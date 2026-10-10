@@ -127,7 +127,7 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
           ) : issue ? (
             <div className="flex-1 overflow-y-auto">
               <div className="px-5 pt-4 pb-1 triage-reveal triage-reveal-1">
-                <h2 className="text-[16px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
+                <h2 className="text-title-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
                   {issue.summary}
                 </h2>
               </div>
@@ -198,10 +198,10 @@ function DescriptionSection({ content }: { content: string }) {
     <div className="triage-section">
       <button type="button" onClick={() => setExpanded((p) => !p)} className="triage-section-label flex items-center gap-1 mb-1.5">
         Description
-        <span className="text-[11px] ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
+        <span className="text-meta ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
       </button>
       <div
-        className={`text-[13px] leading-relaxed prose prose-sm max-w-none ${expanded ? '' : 'line-clamp-2 cursor-pointer'}`}
+        className={`text-body leading-relaxed prose prose-sm max-w-none ${expanded ? '' : 'line-clamp-2 cursor-pointer'}`}
         onClick={() => !expanded && setExpanded(true)}
         style={{ color: expanded ? 'var(--text-secondary)' : 'var(--text-muted)' }}
       >

@@ -50,7 +50,7 @@ export function SeverityMark({ tone, level, children }: { tone: 'danger' | 'warn
   if (level >= 2) style.background = `color-mix(in srgb, var(--${tone}) ${level === 3 ? 20 : 12}%, transparent)`;
   if (level === 3) style.boxShadow = `inset 0 0 0 1px color-mix(in srgb, var(--${tone}) 45%, transparent)`;
   return (
-    <span className={`whitespace-nowrap rounded-md px-1.5 py-px tabular-nums ${level === 3 ? 'font-bold' : 'font-semibold'}`} style={style}>
+    <span className={`whitespace-nowrap rounded-md px-1.5 py-px tabular-nums ${level === 3 ? 'font-semibold' : 'font-semibold'}`} style={style}>
       {children}
     </span>
   );
@@ -159,31 +159,31 @@ export const TaskListRow = memo(function TaskListRow({
         </button>
         <div className="task-row-content" style={{ opacity: dim }}>
           <button type="button" className="task-row-open" data-task-open={task.taskKey} aria-label={ariaLabel} aria-describedby={date ? `task-date-description-${task.taskKey}` : undefined} onClick={handleClick}>
-            <span className="task-row-key font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
-            {time && <span className="shrink-0 text-[12px] font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>{time}</span>}
-            <span className="task-row-title text-[13px] font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
+            <span className="task-row-key font-mono text-ui tabular-nums" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
+            {time && <span className="shrink-0 text-ui font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>{time}</span>}
+            <span className="task-row-title text-body font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
           </button>
           <span className="task-row-metadata">
             <TaskPlacementLabel placement={task.placement} />
-            {labels.slice(0, 2).map((label) => <span key={label} className="task-row-label hidden max-w-[120px] truncate rounded-md px-1.5 py-px text-[11px] font-semibold sm:inline" title={taskLabelDisplayName(label)} style={labelChipStyle(labelColor(label))}>{taskLabelDisplayName(label)}</span>)}
-            {labels.length > 2 && <span className="hidden shrink-0 text-[11px] sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>+{labels.length - 2}</span>}
-            {task.lingering && isOpenStatus(task.status) && <span className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>}
-            {actions && <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="meeting-actions">{actions}</span>}
-            {waiting?.check && <span className="text-[11px]" data-testid="waiting-check">{waiting.check.tone === 'muted' ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span> : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}</span>}
-            {waiting?.aging && <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>}
-            {attentionReasons.map((reason) => <span key={reason.label} className="text-[11px]"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
+            {labels.slice(0, 2).map((label) => <span key={label} className="task-row-label hidden max-w-[120px] truncate rounded-md px-1.5 py-px text-meta font-semibold sm:inline" title={taskLabelDisplayName(label)} style={labelChipStyle(labelColor(label))}>{taskLabelDisplayName(label)}</span>)}
+            {labels.length > 2 && <span className="hidden shrink-0 text-meta sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>+{labels.length - 2}</span>}
+            {task.lingering && isOpenStatus(task.status) && <span className="text-meta italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>}
+            {actions && <span className="text-meta tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="meeting-actions">{actions}</span>}
+            {waiting?.check && <span className="text-meta" data-testid="waiting-check">{waiting.check.tone === 'muted' ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span> : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}</span>}
+            {waiting?.aging && <span className="text-meta tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>}
+            {attentionReasons.map((reason) => <span key={reason.label} className="text-meta"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
             {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
-            {jira && <span className="hidden rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
+            {jira && <span className="hidden rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
             {handlers.onCaptureOutcome && meetingNeedsOutcome(task, today) && (
-              <button type="button" className="task-row-outcome shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-semibold"
+              <button type="button" className="task-row-outcome shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-ui font-semibold"
                 aria-label={`Capture outcome for ${task.taskKey}`}
                 style={{ color: 'var(--accent-text)', border: '1px solid var(--border)' }}
                 onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
                 Capture outcome
               </button>
             )}
-            {showOwner && <span className="task-row-owner text-[12px]" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
-            {(dateColumn || date) && <span className="task-row-date text-[12px] tabular-nums" title={date?.title} aria-label={date?.title}>
+            {showOwner && <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
+            {(dateColumn || date) && <span className="task-row-date text-ui tabular-nums" title={date?.title} aria-label={date?.title}>
               {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>)}
             </span>}
           </span>
@@ -192,7 +192,7 @@ export const TaskListRow = memo(function TaskListRow({
           onClick={(event) => { handlers.onFocusRow(task.taskKey); handlers.onMenu(task.taskKey, 'more', event.currentTarget); }}><Ellipsis size={15} /></button>
       </div>
       {date && <span className="sr-only" id={`task-date-description-${task.taskKey}`}>{date.title}</span>}
-      {task.nextAction && <p className="task-row-next text-[12px]" style={{ color: 'var(--text-muted)', opacity: dim }}>→ {task.nextAction}</p>}
+      {task.nextAction && <p className="task-row-next text-ui" style={{ color: 'var(--text-muted)', opacity: dim }}>→ {task.nextAction}</p>}
     </div>
   );
 });

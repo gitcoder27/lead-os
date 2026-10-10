@@ -66,7 +66,7 @@ function ThinkingBlock({
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left"
       >
         <Brain size={12} style={{ color: active ? 'var(--accent)' : 'var(--text-muted)' }} />
-        <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
           {active ? 'Thinking…' : 'Thought process'}
         </span>
         {active ? (
@@ -100,7 +100,7 @@ function ThinkingBlock({
           >
             <div
               ref={bodyRef}
-              className="max-h-44 overflow-y-auto whitespace-pre-wrap px-2.5 pb-2.5 text-[12px] leading-5"
+              className="max-h-44 overflow-y-auto whitespace-pre-wrap px-2.5 pb-2.5 text-ui leading-5"
               style={{ color: 'var(--text-muted)' }}
             >
               {reasoning}
@@ -173,7 +173,7 @@ export function MessageList({
       {onLoadOlder ? <button type="button" onClick={onLoadOlder} disabled={loadingOlder || Boolean(streaming)} className="ui-btn-ghost w-full">{loadingOlder ? 'Loading older messages…' : 'Load older messages'}</button> : null}
       {isEmpty ? (
         <div className="space-y-3 pt-6">
-          <p className="text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
             Ask about your team, work, or desk — or let Copilot propose an action for you to confirm.
           </p>
           <SuggestionChips currentView={currentView} items={emptySuggestions} onPick={onPickSuggestion} />

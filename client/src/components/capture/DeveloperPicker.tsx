@@ -65,20 +65,20 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
           style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
         >
           <div
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-meta font-semibold"
             style={{ background: `${c}20`, color: c, border: `1px solid ${c}30` }}
           >
             {initials(selected.displayName)}
           </div>
           <span
-            className="text-[13px] font-medium truncate"
+            className="text-body font-medium truncate"
             style={{ color: 'var(--text-primary)' }}
           >
             {selected.displayName}
           </span>
           {unavail && (
             <span
-              className="text-[11px] px-1.5 py-0.5 rounded-md font-medium"
+              className="text-meta px-1.5 py-0.5 rounded-md font-medium"
               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}
             >
               {selected.availability?.note || 'Unavailable'}
@@ -91,7 +91,7 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
             setOpen(true);
             onClear();
           }}
-          className="text-[12px] px-2 py-1.5 rounded-lg font-medium shrink-0"
+          className="text-ui px-2 py-1.5 rounded-lg font-medium shrink-0"
           style={{
             color: 'var(--text-secondary)',
             background: 'var(--bg-tertiary)',
@@ -119,7 +119,7 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search developer…"
-          className="w-full rounded-xl pl-9 pr-3 py-2 text-[13px] outline-none"
+          className="w-full rounded-xl pl-9 pr-3 py-2 text-body outline-none"
           style={{
             background: 'var(--bg-elevated)',
             color: 'var(--text-primary)',
@@ -134,14 +134,14 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
       >
         {isLoading ? (
           <div
-            className="px-3 py-6 text-center text-[12px]"
+            className="px-3 py-6 text-center text-ui"
             style={{ color: 'var(--text-muted)' }}
           >
             Loading team…
           </div>
         ) : filtered.length === 0 ? (
           <div
-            className="px-3 py-6 text-center text-[12px]"
+            className="px-3 py-6 text-center text-ui"
             style={{ color: 'var(--text-muted)' }}
           >
             {search ? 'No matching developers' : 'No developers found'}
@@ -167,20 +167,20 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
                 }}
               >
                 <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-meta font-semibold"
                   style={{ background: `${c}15`, color: c, border: `1px solid ${c}20` }}
                 >
                   {initials(dev.displayName)}
                 </div>
                 <span
-                  className="text-[13px] font-medium truncate flex-1"
+                  className="text-body font-medium truncate flex-1"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {dev.displayName}
                 </span>
                 {unavail && (
                   <span
-                    className="text-[11px] px-1.5 py-0.5 rounded-md font-medium shrink-0 flex items-center gap-0.5"
+                    className="text-meta px-1.5 py-0.5 rounded-md font-medium shrink-0 flex items-center gap-0.5"
                     style={{ background: 'color-mix(in srgb, var(--danger) 8%, transparent)', color: 'var(--danger)' }}
                   >
                     <Clock size={8} />

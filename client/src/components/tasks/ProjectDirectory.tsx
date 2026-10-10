@@ -32,16 +32,16 @@ export const ProjectDirectory = ({ today, archived, query, searchRef, onQuery, o
         </div>
         <label className="project-search flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 max-sm:w-full" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <Search size={14} aria-hidden="true" />
-          <input ref={searchRef} aria-label="Search projects" placeholder="Search projects…" value={query} onChange={(event) => onQuery(event.target.value)} className="min-w-0 bg-transparent text-[13px] outline-none" style={{ color: 'var(--text-primary)' }} />
+          <input ref={searchRef} aria-label="Search projects" placeholder="Search projects…" value={query} onChange={(event) => onQuery(event.target.value)} className="min-w-0 bg-transparent text-body outline-none" style={{ color: 'var(--text-primary)' }} />
           {query && <button className="ui-icon-btn" aria-label="Clear project search" onClick={() => onQuery('')}><X size={13} /></button>}
         </label>
       </div>
       {list.isLoading && <div className="project-loading animate-pulse motion-reduce:animate-none" role="status"><span className="sr-only">Loading projects…</span>{[0, 1, 2].map((key) => <span key={key} aria-hidden="true" />)}</div>}
-      {list.error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 text-sm"><p>{list.error.message}</p><button className="ui-btn-secondary" onClick={() => void list.refetch()}>Try again</button></div>}
+      {list.error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 text-body leading-5"><p>{list.error.message}</p><button className="ui-btn-secondary" onClick={() => void list.refetch()}>Try again</button></div>}
       {!list.isLoading && !list.error && entries.length === 0 && (
         <div className="project-empty">
           <span className="project-icon">{archived ? <Archive size={18} /> : <Folder size={18} />}</span>
-          <h2 className="text-sm font-semibold">{query ? 'No matching projects' : archived ? 'No archived projects' : 'No projects yet'}</h2>
+          <h2 className="text-body leading-5 font-semibold">{query ? 'No matching projects' : archived ? 'No archived projects' : 'No projects yet'}</h2>
           <p className="project-caption">{query ? 'Try another name or outcome.' : archived ? 'Projects you archive will appear here. Their open tasks stay actionable.' : 'Start with an outcome. Add tasks directly, then use optional tracks to organize larger projects.'}</p>
           {query ? <button className="ui-btn" onClick={() => onQuery('')}>Clear search</button> : archived ? <button className="ui-btn" onClick={() => onArchiveFilter(false)}>View active projects</button> : <button className="ui-btn" onClick={onCreate}><Plus size={14} /> Create your first project</button>}
         </div>

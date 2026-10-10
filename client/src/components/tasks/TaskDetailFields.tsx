@@ -100,7 +100,7 @@ function statusTint(status: TaskStatus) {
 export function StatusPill({ status }: { status: TaskStatus }) {
   return (
     <span
-      className="inline-flex h-7 items-center gap-1.5 rounded-full pl-2 pr-2.5 text-[12px] font-semibold"
+      className="inline-flex h-7 items-center gap-1.5 rounded-full pl-2 pr-2.5 text-ui font-semibold"
       style={statusTint(status)}
     >
       <TaskStatusGlyph status={status} size={13} />
@@ -126,7 +126,7 @@ export function StatusControl({ task, editable, onPatch }: { task: TaskDetailRes
         aria-label={`Task status: ${TASK_STATUS_META[task.status].label}`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
-        className={`group inline-flex h-7 items-center gap-1.5 rounded-full pl-2 pr-2 text-[12px] font-semibold transition-[filter] hover:brightness-125 ${FOCUS_RING}`}
+        className={`group inline-flex h-7 items-center gap-1.5 rounded-full pl-2 pr-2 text-ui font-semibold transition-[filter] hover:brightness-125 ${FOCUS_RING}`}
         style={tint}
       >
         <TaskStatusGlyph status={task.status} size={13} />
@@ -138,7 +138,7 @@ export function StatusControl({ task, editable, onPatch }: { task: TaskDetailRes
         onClick={() => onPatch({ status: open ? 'done' : 'open' })}
         title={open ? 'Mark done (E)' : 'Reopen (E)'}
         data-task-shortcut="e"
-        className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
         style={{ color: open ? 'var(--text-secondary)' : 'var(--text-muted)', border: '1px solid var(--border)' }}
       >
         {open ? <Check size={12} style={{ color: 'var(--success)' }} /> : <RotateCcw size={12} />}
@@ -263,7 +263,7 @@ function OwnerRow({ task, editable, onPatch, people }: { task: TaskDetailRespons
           <>
             <Avatar name="?" muted />
             <Placeholder>Unassigned</Placeholder>
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Inbox</span>
+            <span className="text-ui" style={{ color: 'var(--text-muted)' }}>Inbox</span>
           </>
         )}
       </PropertyButton>
@@ -301,7 +301,7 @@ function WaitingRow({ task, editable, onPatch, people }: { task: TaskDetailRespo
           <>
             <Avatar name={name === 'You' ? people.userName : name} seed={waitingOn?.ref ?? name} />
             <span className="truncate font-medium">{name}</span>
-            {summary && <span className="shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{summary}</span>}
+            {summary && <span className="shrink-0 text-ui" style={{ color: 'var(--text-muted)' }}>{summary}</span>}
           </>
         ) : (
           <Placeholder>No one</Placeholder>
@@ -329,7 +329,7 @@ function TrackedByRow({ task, people }: { task: TaskDetailResponse; people: Task
   const label = trackedBy ? people.nameFor(trackedBy) ?? 'Another manager' : null;
   return (
     <PropertyRow icon={<Eye size={14} />} label="Tracked by">
-      <span className="flex min-h-[32px] items-center gap-2 px-2 text-[13px]" style={{ color: 'var(--text-secondary)' }} title={trackedBy ?? undefined}>
+      <span className="flex min-h-[32px] items-center gap-2 px-2 text-body" style={{ color: 'var(--text-secondary)' }} title={trackedBy ?? undefined}>
         {label ? (
           <>
             <Avatar name={label === 'You' ? people.userName : label} seed={trackedBy ?? undefined} size={18} />
@@ -398,7 +398,7 @@ function ScheduleRow({ task, editable, canLater, onPatch }: { task: TaskDetailRe
         {later ? (
           <span className="flex min-w-0 items-baseline gap-1.5">
             <span className="font-medium" style={{ color: 'var(--info)' }}>Later</span>
-            <span className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>parked, off today&apos;s list</span>
+            <span className="truncate text-ui" style={{ color: 'var(--text-muted)' }}>parked, off today&apos;s list</span>
           </span>
         ) : (
           <DateValue display={display} empty="Not scheduled" />
@@ -721,11 +721,11 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
               discard();
             }
           }}
-          className="block max-h-[60vh] min-h-[96px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-[13.5px] leading-[21px] outline-none placeholder:text-[var(--text-placeholder)]"
+          className="block max-h-[60vh] min-h-[96px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-body leading-[21px] outline-none placeholder:text-[var(--text-placeholder)]"
           style={{ color: 'var(--text-primary)' }}
         />
         <div className="flex items-center gap-2 px-2 pt-1">
-          <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
             {draft.length > TASK_DETAILS_MAX * 0.9 ? `${draft.length.toLocaleString()} / ${TASK_DETAILS_MAX.toLocaleString()}` : '⌘/Ctrl ↵ to save · Esc to discard'}
           </span>
           <div className="ml-auto flex items-center gap-1">
@@ -733,7 +733,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={discard}
-              className={`h-7 rounded-lg px-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
               style={{ color: 'var(--text-secondary)' }}
             >
               Cancel
@@ -742,7 +742,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={commit}
-              className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold transition-[filter] hover:brightness-110 ${FOCUS_RING}`}
+              className={`h-7 rounded-lg px-2.5 text-ui font-semibold transition-[filter] hover:brightness-110 ${FOCUS_RING}`}
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >
               Save
@@ -761,7 +761,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             if ((event.target as HTMLElement).closest('a')) return;
             startEditing();
           }}
-          className={`-mx-2 whitespace-pre-wrap break-words rounded-lg px-2 py-1.5 text-[13.5px] leading-[21px] transition-colors ${editable ? 'cursor-text hover:bg-[var(--bg-secondary)]' : ''} ${folded ? 'max-h-[210px] overflow-hidden' : ''}`}
+          className={`-mx-2 whitespace-pre-wrap break-words rounded-lg px-2 py-1.5 text-body leading-[21px] transition-colors ${editable ? 'cursor-text hover:bg-[var(--bg-secondary)]' : ''} ${folded ? 'max-h-[210px] overflow-hidden' : ''}`}
           style={{
             color: 'var(--text-primary)',
             ...(folded ? { maskImage: 'linear-gradient(180deg, #000 70%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 70%, transparent)' } : {}),
@@ -774,7 +774,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             type="button"
             onClick={() => setExpanded((open) => !open)}
             aria-expanded={expanded}
-            className={`-ml-1 mt-0.5 inline-flex h-6 items-center rounded-md px-1 text-[12px] font-medium transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
+            className={`-ml-1 mt-0.5 inline-flex h-6 items-center rounded-md px-1 text-ui font-medium transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             {expanded ? 'Show less' : 'Show more'}
@@ -788,7 +788,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
         type="button"
         onClick={startEditing}
         data-task-shortcut="d"
-        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[12.5px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
       >
         <AlignLeft size={13} />
@@ -810,7 +810,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             onClick={startEditing}
             data-task-shortcut="d"
             title="Edit details (D)"
-            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <Pencil size={12} />
@@ -831,7 +831,7 @@ export function MeetingOutcome({ task, editable, onPatch }: { task: TaskDetailRe
       className="rounded-xl px-2 py-2"
       style={{ background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', border: '1px solid var(--border)' }}
     >
-      <div className="px-2 pb-1 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Outcome</div>
+      <div className="px-2 pb-1 text-ui font-semibold" style={{ color: 'var(--text-secondary)' }}>Outcome</div>
       <InlineTextField
         value={task.outcome ?? ''}
         placeholder="What was decided?"
@@ -861,7 +861,7 @@ export function taskMetaEntries(task: TaskDetailResponse, people: TaskPeople): [
 
 export function TaskMetaList({ task, people }: { task: TaskDetailResponse; people: TaskPeople }) {
   return (
-    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[12px]">
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-ui">
       {taskMetaEntries(task, people).map(([label, value]) => (
         <div key={label} className="contents">
           <dt style={{ color: 'var(--text-muted)' }}>{label}</dt>

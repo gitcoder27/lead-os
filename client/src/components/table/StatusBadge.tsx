@@ -10,7 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap"
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-ui font-medium whitespace-nowrap"
       style={{ background: colors.bg, color: colors.text }}
     >
       {status}

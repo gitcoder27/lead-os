@@ -63,12 +63,12 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               {proposal.summary}
             </p>
             {proposal.jiraMutating ? (
               <span
-                className="rounded-full px-1.5 py-px text-[11px] font-semibold"
+                className="rounded-full px-1.5 py-px text-meta font-semibold"
                 style={{ background: 'var(--warning)', color: 'var(--bg-primary)' }}
               >
                 Changes Jira
@@ -106,7 +106,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
               onClick={() => onDecision('confirm')}
               disabled={busy}
               aria-label="Confirm action"
-              className="rounded-lg px-3 py-1 text-[12px] font-semibold transition-opacity disabled:opacity-50"
+              className="rounded-lg px-3 py-1 text-ui font-semibold transition-opacity disabled:opacity-50"
               style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Confirm
@@ -116,7 +116,7 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
               onClick={() => onDecision('cancel')}
               disabled={busy}
               aria-label="Cancel action"
-              className="rounded-lg px-3 py-1 text-[12px] font-medium transition-opacity disabled:opacity-50"
+              className="rounded-lg px-3 py-1 text-ui font-medium transition-opacity disabled:opacity-50"
               style={{
                 background: 'transparent',
                 color: 'var(--text-secondary)',

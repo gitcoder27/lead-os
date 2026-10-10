@@ -40,11 +40,11 @@ export function DefectCardList({ issues, selectedKey, onSelectIssue, virtualRows
               }}
               data-testid="defect-card"
             >
-              <span className="block text-[13.5px] font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
-                <span className="mr-1.5 font-mono text-[12px]" style={{ color: 'var(--accent-text)' }}>{issue.jiraKey}</span>
+              <span className="block text-body font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
+                <span className="mr-1.5 font-mono text-ui" style={{ color: 'var(--accent-text)' }}>{issue.jiraKey}</span>
                 {issue.summary}
               </span>
-              <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+              <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ui" style={{ color: 'var(--text-secondary)' }}>
                 <span>{issue.assigneeName ?? 'Unassigned'}</span>
                 <span aria-hidden="true">·</span>
                 <span style={{ color: overdue ? 'var(--task-danger-text)' : today ? 'var(--warning-text)' : undefined }}>{dueLabel}</span>

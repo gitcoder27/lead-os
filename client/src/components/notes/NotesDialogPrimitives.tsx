@@ -37,7 +37,7 @@ export function NotesDialogShell({
               <Dialog.Title className="ui-dialog-title">
                 {title}
               </Dialog.Title>
-              <Dialog.Description className="mt-1 inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <Dialog.Description className="mt-1 inline-flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                 <Lock size={10} aria-hidden="true" />
                 {sourceLabel}
               </Dialog.Description>
@@ -89,17 +89,17 @@ export function NotesField({
   return (
     <div>
       {htmlFor ? (
-        <label htmlFor={htmlFor} className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <label htmlFor={htmlFor} className="mb-1 block text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
           {labelNode}
         </label>
       ) : (
-        <span className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <span className="mb-1 block text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
           {labelNode}
         </span>
       )}
       {children}
       {hint ? (
-        <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 text-ui" style={{ color: 'var(--text-muted)' }}>
           {hint}
         </p>
       ) : null}
@@ -110,7 +110,7 @@ export function NotesField({
 export function NotesFormError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <p className="text-[12px]" style={{ color: 'var(--danger)' }} role="alert">
+    <p className="text-ui" style={{ color: 'var(--danger)' }} role="alert">
       {message}
     </p>
   );

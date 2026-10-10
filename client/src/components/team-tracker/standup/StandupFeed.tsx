@@ -73,7 +73,7 @@ export function StandupFeed({
         right={(
           <span className="flex items-center gap-1.5">
             {data ? (
-              <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-meta tabular-nums" style={{ color: 'var(--text-muted)' }}>
                 {data.anchoredToSession ? `since ${windowLabel(data.windowStart)}` : `${data.windowHours}h window`}
               </span>
             ) : null}
@@ -95,7 +95,7 @@ export function StandupFeed({
         Changes
       </SectionLabel>
 
-      {data?.truncated && <p role="status" className="mb-3 text-xs">Showing the latest 120 events and 120 notes. Earlier changes remain in task history; this feed boundary will not advance.</p>}
+      {data?.truncated && <p role="status" className="mb-3 text-ui leading-4">Showing the latest 120 events and 120 notes. Earlier changes remain in task history; this feed boundary will not advance.</p>}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-0.5" onScroll={(event) => {
         const element = event.currentTarget;
@@ -108,7 +108,7 @@ export function StandupFeed({
         ) : isError ? (
           <div
             role="alert"
-            className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px]"
+            className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-body"
             style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
           >
             <TriangleAlert size={14} />
@@ -121,7 +121,7 @@ export function StandupFeed({
           <div
             className="py-3"
           >
-            <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>No changes in this window.</p>
+            <p className="text-body" style={{ color: 'var(--text-muted)' }}>No changes in this window.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -164,8 +164,8 @@ function FeedGroupCard({
               className="flex min-w-0 flex-1 items-center gap-2 text-left hover:underline"
               title={`Focus ${group.taskKey}`}
             >
-              <span className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
-              <span className="break-words text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
+              <span className="shrink-0 font-mono text-ui font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
+              <span className="break-words text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
             </button>
             <button
               type="button"
@@ -179,7 +179,7 @@ function FeedGroupCard({
             </button>
           </>
         ) : (
-          <span className="flex-1 text-[12.5px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{note ? 'Notes' : 'Notes and check-ins'}</span>
+          <span className="flex-1 text-body font-semibold" style={{ color: 'var(--text-secondary)' }}>{note ? 'Notes' : 'Notes and check-ins'}</span>
         )}
       </div>
       <ol className="px-3 pb-2.5">
@@ -196,18 +196,18 @@ function FeedGroupCard({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[12px] font-semibold" style={{ color: view.tone === 'muted' ? 'var(--text-secondary)' : color }}>
+                  <span className="text-ui font-semibold" style={{ color: view.tone === 'muted' ? 'var(--text-secondary)' : color }}>
                     {entry.kind === 'checkin' && (note || entry.authorType === 'manager') ? 'Note' : view.label}
                   </span>
                   {entry.authorType === 'manager' && (
-                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>· {entry.authorId === user?.accountId ? 'you' : 'manager'}</span>
+                    <span className="text-meta" style={{ color: 'var(--text-muted)' }}>· {entry.authorId === user?.accountId ? 'you' : 'manager'}</span>
                   )}
-                    <span className="ml-auto text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
+                    <span className="ml-auto text-meta tabular-nums" style={{ color: 'var(--text-muted)' }} title={entry.occurredAt}>
                     {formatRelativeTime(entry.occurredAt)}
                   </span>
                 </div>
                 {view.text && (
-                  <p className="whitespace-pre-line break-words text-[12.5px] leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="whitespace-pre-line break-words text-body leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
                     {view.text}
                   </p>
                 )}
@@ -232,7 +232,7 @@ export function StandupFeedRail({ count, onExpand }: { count: number | undefined
       style={{ color: 'var(--text-muted)' }}
     >
       <PanelRightOpen size={14} aria-hidden="true" />
-      {count ? <span className="text-[10px] font-semibold tabular-nums leading-none">{count}</span> : null}
+      {count ? <span className="text-meta font-semibold tabular-nums leading-none">{count}</span> : null}
     </button>
   );
 }

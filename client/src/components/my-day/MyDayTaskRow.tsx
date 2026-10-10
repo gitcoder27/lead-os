@@ -99,7 +99,7 @@ export function MyDayTaskRow({
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
             onCommit={onUpdateTitle}
-            className={closed ? 'text-[13px] leading-5' : 'text-[13px] font-medium leading-5'}
+            className={closed ? 'text-body leading-5' : 'text-body font-medium leading-5'}
             color={closed ? 'var(--text-secondary)' : 'var(--text-primary)'}
             strike={variant === 'dropped'}
           />
@@ -208,7 +208,7 @@ function LeadingGlyph({
   }
 
   const number = typeof index === 'number' ? (
-    <span className="text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
+    <span className="text-ui font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
   ) : null;
 
   if (!reorderable) {

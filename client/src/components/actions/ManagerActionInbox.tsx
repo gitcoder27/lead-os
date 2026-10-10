@@ -315,7 +315,7 @@ export function ManagerActionInbox({
             )}
             {attentionCount > 0 ? (
               <span
-                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[11px] font-bold leading-none"
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-meta font-semibold leading-none"
                 style={{
                   background: 'var(--danger-solid)',
                   color: 'var(--on-danger)',
@@ -343,10 +343,10 @@ export function ManagerActionInbox({
             <div className="border-b px-3.5 py-3" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <p className="truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {updatesOnly ? 'Updates inbox' : 'Action inbox'}
                   </p>
-                  <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                     {updatesOnly ? 'Changes to your team’s tasks' : actionsLoading ? 'Syncing queue' : `${actionsData?.totalCount ?? 0} open`}
                   </p>
                 </div>
@@ -356,7 +356,7 @@ export function ManagerActionInbox({
                     setOpen(false);
                     onViewChange('today');
                   }}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{ color: 'var(--accent)' }}
                 >
                   Today
@@ -390,7 +390,7 @@ export function ManagerActionInbox({
                     <div className="mt-1 border-t pt-1.5" style={{ borderColor: 'var(--border)' }}>
                       <div className="flex items-center justify-between px-3 py-1">
                         <span
-                          className="text-[11px] font-semibold uppercase tracking-[0.1em]"
+                          className="text-meta font-semibold uppercase tracking-[0.1em]"
                           style={{ color: 'var(--text-muted)' }}
                         >
                           Attention signals
@@ -399,7 +399,7 @@ export function ManagerActionInbox({
                           type="button"
                           onClick={clearSignals}
                           disabled={dismissAlerts.isPending}
-                          className="rounded px-1.5 py-0.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
+                          className="rounded px-1.5 py-0.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
                           style={{ color: 'var(--text-muted)' }}
                         >
                           Clear all
@@ -460,10 +460,10 @@ function ManagerActionInboxRow({
       </button>
 
       <button type="button" onClick={() => onOpenTarget(item.target)} className="min-w-0 text-left">
-        <span className="block truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <span className="block truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {item.title}
         </span>
-        <span className="mt-0.5 block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 block truncate text-ui" style={{ color: 'var(--text-muted)' }}>
           {item.signal}
         </span>
       </button>
@@ -472,7 +472,7 @@ function ManagerActionInboxRow({
         type="button"
         onClick={() => onRunCommand(item.primaryAction)}
         disabled={isPending}
-        className="h-7 rounded-md px-2 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-45"
+        className="h-7 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-45"
         style={{ color: 'var(--accent)' }}
       >
         {isPending ? 'Working' : item.primaryAction.label}
@@ -502,7 +502,7 @@ function ManagerActionInboxRow({
                   key={`${action.kind}-${action.label}`}
                   type="button"
                   onClick={() => onRunCommand(action)}
-                  className="block w-full px-3 py-2 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {action.label}
@@ -513,7 +513,7 @@ function ManagerActionInboxRow({
             <button
               type="button"
               onClick={() => onOpenTarget(item.target)}
-              className="block w-full px-3 py-2 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
               style={{ color: 'var(--text-secondary)' }}
             >
               Open
@@ -539,7 +539,7 @@ function SnoozeActions({
           key={preset}
           type="button"
           onClick={() => onRunCommand(action, preset)}
-          className="block w-full px-3 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="block w-full px-3 py-1.5 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--text-secondary)' }}
         >
           {label}
@@ -610,10 +610,10 @@ export function SignalRow({
       </button>
 
       <button type="button" onClick={onOpen} className="min-w-0 text-left">
-        <span className="block truncate text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <span className="block truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {alert.message}
         </span>
-        <span className="mt-0.5 block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="mt-0.5 block truncate text-ui" style={{ color: 'var(--text-muted)' }}>
           {detail}
         </span>
       </button>
@@ -658,10 +658,10 @@ function InboxEmpty({ title, detail }: { title: string; detail: string }) {
       >
         <CircleCheck size={16} />
       </div>
-      <p className="mt-3 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+      <p className="mt-3 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
         {title}
       </p>
-      <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-1 text-ui" style={{ color: 'var(--text-muted)' }}>
         {detail}
       </p>
     </div>

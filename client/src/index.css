@@ -49,6 +49,18 @@
   --focus-ring:    #0E7490;
   --app-header-height: 72px;
 
+  /* docs/73 UXD-02: the type scale. Six sizes (meta, ui, body, title-sm, title, display),
+     weights 400/500/600. Tailwind maps them to text-meta … text-display (size only, so
+     existing line-heights hold); CSS uses the size and line-height pairs directly. */
+  --fs-11: 11px;  --lh-11: 16px;
+  --fs-12: 12px;  --lh-12: 18px;
+  --fs-13: 13px;  --lh-13: 20px;
+  --fs-15: 15px;  --lh-15: 22px;
+  --fs-19: 19px;  --lh-19: 26px;
+  --fs-24: 24px;  --lh-24: 30px;
+  /* The one exception: text inputs on phones stay 16px so iOS doesn't zoom on focus. */
+  --fs-input-touch: 16px;
+
   /* docs/54 T4/T6/V2: one overlay vocabulary — scrims, shadows, stacking. */
   /* docs/73 UXD-01: OKLCH lightness for avatar initials; ≥4.5:1 for every hue on every surface. */
   --avatar-text-l:  0.44;
@@ -223,7 +235,7 @@ body::after {
   border-radius: 5px;
   padding: 0 4px;
   font-family: 'Geist Mono Variable', monospace;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 500;
   line-height: 1;
   color: var(--text-muted);
@@ -243,18 +255,18 @@ body::after {
   gap: 5px;
   white-space: nowrap;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   transition: background-color 120ms ease, color 120ms ease;
 }
 
 .ui-btn { height: 28px; padding: 0 10px; color: var(--accent-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent); }
 .ui-btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.ui-btn-sm { height: 24px; padding: 0 8px; font-size: 11.5px; }
+.ui-btn-sm { height: 24px; padding: 0 8px; font-size: var(--fs-12); }
 .ui-btn-ghost { height: 28px; padding: 0 8px; font-weight: 500; color: var(--text-secondary); }
 .ui-btn-ghost:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 
-.ui-btn-solid, .ui-btn-quiet, .ui-btn-secondary, .ui-btn-danger, .ui-btn-danger-solid { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; }
+.ui-btn-solid, .ui-btn-quiet, .ui-btn-secondary, .ui-btn-danger, .ui-btn-danger-solid { height: 30px; padding: 0 12px; border-radius: 8px; font-size: var(--fs-12); }
 .ui-btn-solid { background: var(--accent-solid); color: var(--on-accent); }
 .ui-btn-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-solid) 88%, var(--text-primary)); }
 .ui-btn-quiet { color: var(--text-secondary); }
@@ -281,7 +293,7 @@ body::after {
 }
 .ui-icon-btn:hover, .ui-icon-btn[aria-expanded='true'] { background: var(--bg-tertiary); color: var(--text-primary); }
 
-.ui-link { border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--accent-text); }
+.ui-link { border-radius: 4px; font-size: var(--fs-12); font-weight: 500; color: var(--accent-text); }
 .ui-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .ui-btn:focus-visible, .ui-btn-ghost:focus-visible, .ui-btn-solid:focus-visible, .ui-btn-quiet:focus-visible,
@@ -329,8 +341,8 @@ body::after {
   align-items: center;
   border-radius: 5px;
   padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 550;
+  font-size: var(--fs-11);
+  font-weight: 500;
   line-height: 16px;
   /* docs/63 #3: pulled toward the text colour so any tone reads ≥4.5:1 on its own 12% tint, in both themes. */
   color: color-mix(in srgb, var(--tone, var(--text-secondary)) 45%, var(--text-primary));
@@ -416,7 +428,7 @@ body::after {
 .ui-dialog-head-extra { padding: 6px 16px 2px; }
 
 .ui-dialog-title {
-  font-size: 14.5px;
+  font-size: var(--fs-15);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -424,7 +436,7 @@ body::after {
 
 .ui-dialog-subtitle {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
 }
 
@@ -447,14 +459,14 @@ body::after {
 
 .ui-dialog-foot-hint {
   margin-right: auto;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
 }
 
 .ui-field-label {
   display: block;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -465,7 +477,7 @@ body::after {
   border: 1px solid var(--border);
   background: var(--bg-primary);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 20px;
   color: var(--text-primary);
   outline: none;
@@ -493,7 +505,7 @@ textarea.ui-field { resize: none; }
   gap: 6px;
   border-radius: 7px;
   padding: 4px 9px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   color: var(--text-secondary);
   box-shadow: inset 0 0 0 1px var(--border);
@@ -507,7 +519,7 @@ textarea.ui-field { resize: none; }
 
 .ui-error {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   color: var(--danger);
 }
@@ -516,7 +528,7 @@ textarea.ui-field { resize: none; }
 /* docs/54 D1: the one page-title step (Tasks, Team, My Day). Today's band
  * title and the Notes document heading are deliberate exceptions. */
 .ui-page-title {
-  font-size: 19px;
+  font-size: var(--fs-19);
   font-weight: 600;
   line-height: 26px;
   letter-spacing: -0.015em;
@@ -537,7 +549,7 @@ textarea.ui-field { resize: none; }
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 .one-on-one-notes .notes-editor { margin-top: 0; min-height: 180px; }
-.one-on-one-notes .notes-editor .cm-editor { font-size: 13.5px; line-height: 1.55; }
+.one-on-one-notes .notes-editor .cm-editor { font-size: var(--fs-13); line-height: 1.55; }
 .one-on-one-notes .notes-editor .cm-scroller { line-height: 1.55; }
 .one-on-one-notes .notes-editor .cm-content { min-height: 170px; padding: 8px 0 16px; }
 
@@ -565,7 +577,7 @@ textarea.ui-field { resize: none; }
   gap: 6px;
   border-radius: 7px;
   padding: 0 10px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   color: var(--text-muted);
   transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
@@ -635,7 +647,7 @@ textarea.ui-field { resize: none; }
   background: color-mix(in srgb, var(--bg-tertiary) 62%, transparent);
   color: var(--text-primary);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.4;
   outline: none;
   transition: border-color 160ms ease, background-color 160ms ease;
@@ -711,7 +723,7 @@ textarea.ui-field { resize: none; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -806,7 +818,7 @@ textarea.ui-field { resize: none; }
 }
 
 /* docs/56 UX-20: text under each collapsed Work filter-rail icon. */
-.filter-rail-label { margin-bottom: 6px; font-size: 10.5px; line-height: 1.1; color: var(--text-muted); }
+.filter-rail-label { margin-bottom: 6px; font-size: var(--fs-11); line-height: 1.1; color: var(--text-muted); }
 
 /* Header controls: flat ghost buttons, one search field, one filled primary. */
 .header-ghost { color: var(--text-muted); background: transparent; transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease; }

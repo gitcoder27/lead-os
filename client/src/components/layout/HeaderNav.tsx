@@ -33,7 +33,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
       {isManager && morePages.length > 0 && (
         <>
           <button ref={moreRef} type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More workspaces"
-            className="header-ghost flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-[12.5px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+            className="header-ghost flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-ui font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
             style={moreIsActive || moreOpen ? { background: 'var(--bg-tertiary)', color: moreIsActive ? 'var(--accent-text)' : 'var(--text-primary)' } : undefined}>
             <MoreHorizontal size={13} /><span className="hidden sm:inline">More</span>
           </button>
@@ -41,7 +41,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
             {morePages.map((id) => {
               const meta = NAV_PAGE_META[id]; const Icon = meta.icon;
               return <a key={id} href={meta.href} role="menuitem" onClick={(event) => interceptWorkspaceLink(event, () => { onViewChange(meta.view); setMoreOpen(false); })}
-                className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-[12px] hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)] focus-visible:outline-none" style={{ color: 'var(--text-secondary)' }}>
+                className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-ui hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)] focus-visible:outline-none" style={{ color: 'var(--text-secondary)' }}>
                 <Icon size={13} /><span>{meta.label}</span>
               </a>;
             })}

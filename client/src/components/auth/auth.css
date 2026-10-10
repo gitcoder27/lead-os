@@ -2,13 +2,13 @@
  * one step larger because signing in is the whole task on these screens. */
 
 .ui-field-label.auth-label {
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .ui-field.auth-field {
   height: 44px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: var(--fs-13);
 }
 
 .ui-field.auth-field-password {
@@ -17,7 +17,7 @@
 
 .auth-hint {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
 }
 
@@ -25,15 +25,15 @@
   width: 100%;
   height: 44px;
   border-radius: 9px;
-  font-size: 14px;
+  font-size: var(--fs-13);
 }
 
 .ui-link.auth-link {
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .auth-footnote {
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.45;
   color: var(--text-muted);
 }
@@ -43,7 +43,7 @@
   gap: 8px;
   border-radius: 9px;
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1.45;
 }
 
@@ -68,13 +68,13 @@
 .auth-signup > div:nth-child(3) .auth-hint { min-height: 34px; }
 .auth-error-space { min-height: 38px; margin-top: -4px; }
 .auth-submit { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-.auth-switch { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-muted); font-size: 13px; }
-.auth-disclosure { border-top: 1px solid var(--border); padding-top: 16px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+.auth-switch { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-muted); font-size: var(--fs-13); }
+.auth-disclosure { border-top: 1px solid var(--border); padding-top: 16px; font-size: var(--fs-12); line-height: 1.6; color: var(--text-muted); }
 .auth-entry-state { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 16px 0 4px; }
-.auth-entry-state p { font-size: 14px; line-height: 1.65; color: var(--text-secondary); text-align: center; max-width: 34ch; }
+.auth-entry-state p { font-size: var(--fs-13); line-height: 1.65; color: var(--text-secondary); text-align: center; max-width: 34ch; }
 .auth-entry-icon { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid var(--border); border-radius: 14px; color: var(--accent); background: var(--bg-secondary); }
 .ui-dialog:has(.auth-join) .ui-dialog-head { padding-top: 18px; padding-bottom: 8px; }
-.ui-dialog:has(.auth-join) .ui-dialog-title { font-size: 18px; }
+.ui-dialog:has(.auth-join) .ui-dialog-title { font-size: var(--fs-15); }
 .ui-dialog:has(.auth-join) .ui-dialog-subtitle { line-height: 1.5; margin-top: 6px; }
 .ui-dialog:has(.auth-join) .ui-dialog-head .ui-icon-btn { width: 44px; height: 44px; margin-top: -6px; }
 .auth-spinner { animation: auth-spin 1s linear infinite; }
@@ -83,4 +83,4 @@
 
 @media (min-width: 640px) { .auth-signup > div:nth-child(3) .auth-hint { min-height: 18px; } }
 
-@media (max-width: 639px) { .ui-field.auth-field { font-size: 16px; } }
+@media (max-width: 639px) { .ui-field.auth-field { font-size: var(--fs-input-touch); } }

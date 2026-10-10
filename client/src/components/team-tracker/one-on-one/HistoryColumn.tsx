@@ -51,7 +51,7 @@ export function HistoryColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDe
             <LastTime session={latest.session} topics={latest.topics} today={today} onOpenTask={onOpenTask} />
             {older.length > 0 && (
               <>
-                <div className="mb-1 mt-4 px-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                <div className="mb-1 mt-4 px-1.5 text-ui font-semibold" style={{ color: 'var(--text-muted)' }}>
                   Earlier
                 </div>
                 <ul>
@@ -98,13 +98,13 @@ function LastTime({
       data-testid="one-on-one-last-session"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-meta font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--text-muted)' }}>
           Last time
         </span>
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {formatDay(session.scheduledFor, today)}
         </span>
-        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
           {relativeDay(session.completedAt ?? session.scheduledFor, today)}
         </span>
         <span className="ml-auto">
@@ -112,7 +112,7 @@ function LastTime({
         </span>
       </div>
       <div
-        className={`mt-2 whitespace-pre-wrap text-[12.5px] leading-[19px] ${showAll ? '' : 'line-clamp-6'}`}
+        className={`mt-2 whitespace-pre-wrap text-body leading-[19px] ${showAll ? '' : 'line-clamp-6'}`}
         style={{ color: notes ? 'var(--text-secondary)' : 'var(--text-muted)' }}
       >
         {notes ? renderMarkdownLite(notes) : session.status === 'skipped' ? 'Skipped — topics carried over.' : 'No notes taken.'}
@@ -121,7 +121,7 @@ function LastTime({
         <button
           type="button"
           onClick={() => setShowAll((value) => !value)}
-          className={`mt-1 rounded text-[12px] font-medium ${FOCUS_RING}`}
+          className={`mt-1 rounded text-ui font-medium ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           {showAll ? 'Show less' : 'Read all notes'}
@@ -129,7 +129,7 @@ function LastTime({
       )}
       {topics.length > 0 && (
         <div className="mt-2.5 border-t pt-2" style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}>
-          <div className="mb-1 text-[11.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          <div className="mb-1 text-meta font-medium" style={{ color: 'var(--text-muted)' }}>
             On the agenda · {topics.length}
           </div>
           <TopicList topics={topics} onOpenTask={onOpenTask} />
@@ -154,7 +154,7 @@ function TopicList({ topics, onOpenTask, limit }: { topics: OneOnOneAgendaItem[]
           >
             <TaskStatusGlyph status={item.task.status} size={12} />
             <span
-              className="min-w-0 truncate text-[12.5px]"
+              className="min-w-0 truncate text-body"
               style={{
                 color: item.task.status === 'done' || item.task.status === 'dropped' ? 'var(--text-muted)' : 'var(--text-secondary)',
               }}
@@ -169,7 +169,7 @@ function TopicList({ topics, onOpenTask, limit }: { topics: OneOnOneAgendaItem[]
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className={`rounded px-1 text-[12px] font-medium ${FOCUS_RING}`}
+            className={`rounded px-1 text-ui font-medium ${FOCUS_RING}`}
             style={{ color: 'var(--accent)' }}
           >
             +{topics.length - limit} more
@@ -202,22 +202,22 @@ function HistoryRow({
         aria-expanded={expanded}
       >
         {expanded ? <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />}
-        <span className="text-[13px]" style={{ color: 'var(--text-primary)' }}>
+        <span className="text-body" style={{ color: 'var(--text-primary)' }}>
           {formatDay(session.scheduledFor, today)}
         </span>
         <StatusChip status={session.status} />
-        <span className="ml-auto shrink-0 text-[11.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+        <span className="ml-auto shrink-0 text-meta tabular-nums" style={{ color: 'var(--text-muted)' }}>
           {topics.length} topic{topics.length === 1 ? '' : 's'}
         </span>
       </button>
       {!expanded && preview && (
-        <div className="mt-1 line-clamp-2 pl-5 text-[12px] leading-[17px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-1 line-clamp-2 pl-5 text-ui leading-[17px]" style={{ color: 'var(--text-muted)' }}>
           {preview}
         </div>
       )}
       {expanded && (
         <div className="mt-1.5 space-y-2 pl-5">
-          <div className="whitespace-pre-wrap text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          <div className="whitespace-pre-wrap text-ui leading-5" style={{ color: 'var(--text-secondary)' }}>
             {session.notes.trim() ? renderMarkdownLite(session.notes) : 'No notes.'}
           </div>
           {topics.length > 0 && <TopicList topics={topics} onOpenTask={onOpenTask} limit={SNAPSHOT_PREVIEW} />}

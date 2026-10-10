@@ -104,7 +104,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
               </div>
               <div className="min-w-0">
                 <h1
-                  className="font-sans text-[17px] font-semibold leading-tight truncate md:text-[18px]"
+                  className="font-sans text-title-sm font-semibold leading-tight truncate"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   LeadOS
@@ -125,7 +125,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                 <button
                   type="button"
                   onClick={() => openCommandPalette()}
-                  className="header-search inline-flex h-8 w-8 items-center justify-center gap-2 rounded-xl text-[12.5px] md:w-full md:max-w-[420px] md:justify-start md:px-3"
+                  className="header-search inline-flex h-8 w-8 items-center justify-center gap-2 rounded-xl text-ui md:w-full md:max-w-[420px] md:justify-start md:px-3"
                   title="Search and jump anywhere (Ctrl/⌘+K)"
                   aria-label="Open command palette"
                 >
@@ -196,7 +196,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                       defaultTarget: captureContext?.defaultTarget ?? defaultCaptureTarget,
                     })
                   }
-                  className="header-primary-btn ml-1 inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-[12.5px] font-semibold"
+                  className="header-primary-btn ml-1 inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-ui font-semibold"
                   title="Quick capture (Ctrl/⌘+I)"
                   aria-label="Capture"
                 >

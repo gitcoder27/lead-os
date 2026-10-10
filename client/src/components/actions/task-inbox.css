@@ -10,7 +10,7 @@
 .task-inbox {
   padding: 12px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .task-inbox-heading {
   display: flex;
@@ -64,7 +64,7 @@
 .task-inbox-meta,
 .task-inbox time {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .task-inbox a:hover,
 .task-inbox button:hover,
@@ -93,7 +93,7 @@
   background: var(--danger);
   color: var(--on-danger);
   border-radius: 99px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 1px 4px;
 }
 @media (pointer: coarse), (max-width: 640px) {

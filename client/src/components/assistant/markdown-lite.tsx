@@ -150,7 +150,7 @@ function renderTable(lines: string[], opts: MarkdownLiteOptions, key: string): R
   });
   return (
     <div key={key} className="overflow-x-auto">
-      <table className="w-full border-collapse text-[13px] leading-5">
+      <table className="w-full border-collapse text-body leading-5">
         <thead>
           <tr>
             {Array.from({ length: colCount }, (_, i) => (
@@ -183,7 +183,7 @@ function renderTable(lines: string[], opts: MarkdownLiteOptions, key: string): R
 function renderParagraph(lines: string[], opts: MarkdownLiteOptions, key: string): ReactNode {
   if (lines.every(isBulletLine)) {
     return (
-      <ul key={key} className="list-disc space-y-0.5 pl-4 text-[13px] leading-5">
+      <ul key={key} className="list-disc space-y-0.5 pl-4 text-body leading-5">
         {lines.map((line, i) => (
           <li key={i}>{renderInline(line.replace(/^\s*[-*]\s+/, ''), opts, `${key}-b${i}`)}</li>
         ))}
@@ -192,7 +192,7 @@ function renderParagraph(lines: string[], opts: MarkdownLiteOptions, key: string
   }
   if (lines.every(isNumberedLine)) {
     return (
-      <ol key={key} className="list-decimal space-y-0.5 pl-4 text-[13px] leading-5">
+      <ol key={key} className="list-decimal space-y-0.5 pl-4 text-body leading-5">
         {lines.map((line, i) => (
           <li key={i}>{renderInline(line.replace(/^\s*\d+\.\s+/, ''), opts, `${key}-n${i}`)}</li>
         ))}
@@ -216,7 +216,7 @@ function renderParagraph(lines: string[], opts: MarkdownLiteOptions, key: string
     }
   });
   return (
-    <p key={key} className="text-[13px] leading-5">
+    <p key={key} className="text-body leading-5">
       {parts}
     </p>
   );
@@ -233,7 +233,7 @@ export function renderMarkdownLite(text: string, opts: MarkdownLiteOptions = {})
       blocks.push(
         <pre
           key={`code-${index++}`}
-          className="my-1 overflow-x-auto rounded-lg px-3 py-2 font-mono text-[12px] leading-5"
+          className="my-1 overflow-x-auto rounded-lg px-3 py-2 font-mono text-ui leading-5"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
         >
           {code}

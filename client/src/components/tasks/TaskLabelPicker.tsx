@@ -7,7 +7,7 @@ import { labelChipStyle } from './label-colors';
 export function TaskLabelChip({ name, color, onRemove }: { name: string; color?: string; onRemove?: () => void }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-semibold"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-ui font-semibold"
       style={labelChipStyle(color)}
     >
       <Tag size={9} className="opacity-60" />
@@ -132,7 +132,7 @@ export function TaskLabelPicker({ labels, onChange, disabled = false }: TaskLabe
             }
           }}
           placeholder={labels.length ? '' : 'Add label…'}
-          className="min-w-[72px] flex-1 rounded-md bg-transparent px-1 py-0.5 text-[12px] outline-none"
+          className="min-w-[72px] flex-1 rounded-md bg-transparent px-1 py-0.5 text-ui outline-none"
           style={{ color: 'var(--text-primary)' }}
           aria-label="Add a label"
         />
@@ -149,7 +149,7 @@ export function TaskLabelPicker({ labels, onChange, disabled = false }: TaskLabe
               type="button"
               role="option"
               aria-selected={false}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] transition-colors hover:brightness-110"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui transition-colors hover:brightness-110"
               style={{ color: 'var(--text-primary)' }}
               onClick={() => add(label.name)}
             >
@@ -159,7 +159,7 @@ export function TaskLabelPicker({ labels, onChange, disabled = false }: TaskLabe
           {canCreate && (
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12px] transition-colors hover:brightness-110"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-ui transition-colors hover:brightness-110"
               style={{ color: 'var(--accent)' }}
               onClick={() => add(normalizedDraft)}
             >

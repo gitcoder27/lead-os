@@ -10,7 +10,7 @@ export const TaskWorkspaceSelect = ({ views, counts, viewId, onSelectView }: {
   <select
     value={viewId}
     onChange={(event) => onSelectView(event.target.value)}
-    className="rounded-lg px-2 py-1 text-[12px] md:hidden"
+    className="rounded-lg px-2 py-1 text-ui md:hidden"
     style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
     aria-label="Task view"
   >

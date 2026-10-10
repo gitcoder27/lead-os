@@ -221,7 +221,7 @@ export function ManagerDeskCaptureDialog({
                 id="manager-desk-capture-category"
                 value={category}
                 onChange={(event) => setCategory(event.target.value as ManagerDeskCategory)}
-                className="ui-field py-1 text-[12px]"
+                className="ui-field py-1 text-ui"
                 aria-label="Category"
               >
                 {categoryOptions.map((option) => (
@@ -255,7 +255,7 @@ export function ManagerDeskCaptureDialog({
             <FileText size={12} /> Add a context note
           </button>
         )}
-        <p id={dialogDescriptionId} className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p id={dialogDescriptionId} className="text-ui" style={{ color: 'var(--text-muted)' }}>
           {description}
         </p>
       </div>

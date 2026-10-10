@@ -204,12 +204,12 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
       <span className="flex h-6 w-6 shrink-0 items-center justify-center">{indicator}</span>
       <h2
         id={headerId}
-        className="truncate text-[12.5px] font-semibold tracking-[-0.005em]"
+        className="truncate text-body font-semibold tracking-[-0.005em]"
         style={{ color: severity ? tone : group.collapsible ? 'var(--text-secondary)' : 'var(--text-primary)' }}
       >
         {group.label}
       </h2>
-      <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} aria-label={`${count} tasks`}>
+      <span className="text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} aria-label={`${count} tasks`}>
         {count}
       </span>
       <span className="flex-1" />
@@ -217,7 +217,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
         <button
           type="button"
           onClick={() => onMoveOverdueToToday(movable)}
-          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--accent)' }}
         >
           <CalendarClock size={12} /> Move all to today
@@ -253,7 +253,7 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel, 
       <button
         type="button"
         onClick={onStart}
-        className="flex h-11 w-full items-center gap-2 px-2 text-left text-[12.5px] transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-[var(--text-secondary)]"
+        className="flex h-11 w-full items-center gap-2 px-2 text-left text-ui transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-[var(--text-secondary)]"
         style={{ color: 'var(--text-muted)' }}
         aria-label={groupLabel ? `Add task to ${groupLabel}` : 'Add task'}
       >
@@ -327,7 +327,7 @@ function InlineAddForm({ onCancel, onSubmit, groupLabel, defaults }: {
         placeholder={`New task${groupLabel ? ` in ${groupLabel}` : ''} — @person !date +label · Enter to add, Esc to close`}
         aria-label={groupLabel ? `New task in ${groupLabel}` : 'New task'}
         readOnly={pending}
-        className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+        className="min-w-0 flex-1 bg-transparent text-body outline-none"
         style={{ color: 'var(--text-primary)' }}
       />
       {typeahead.open && typeahead.fragment ? (

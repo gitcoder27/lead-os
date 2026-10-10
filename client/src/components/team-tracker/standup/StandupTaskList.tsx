@@ -94,21 +94,21 @@ export function StandupTaskList({
               >
                 <span className="flex min-h-[38px] items-center gap-2.5">
                   <TaskStatusGlyph status={task.status} />
-                  <span className="shrink-0 font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                  <span className="shrink-0 font-mono text-ui tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {task.taskKey}
                   </span>
-                  <span className="min-w-0 flex-1 break-words py-2 text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <span className="min-w-0 flex-1 break-words py-2 text-body font-medium" style={{ color: 'var(--text-primary)' }}>
                     {task.title}
                   </span>
                   {isNew && (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--accent)' }} title="Activity since last standup">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-meta font-semibold" style={{ color: 'var(--accent)' }} title="Activity since last standup">
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
                       new
                     </span>
                   )}
                   {task.highPriority && <Flag size={12} fill="currentColor" style={{ color: 'var(--text-primary)' }} aria-label="High priority" />}
                   {task.jiraKey && (
-                    <span className="hidden shrink-0 rounded px-1 py-px font-mono text-[11px] font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    <span className="hidden shrink-0 rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
                       {task.jiraKey}
                     </span>
                   )}
@@ -116,7 +116,7 @@ export function StandupTaskList({
                   {task.status === 'blocked' && <StatusTag color="var(--danger)">Blocked</StatusTag>}
                 </span>
                 {latest && (
-                  <span className="flex flex-wrap items-center gap-1.5 pb-2 pl-6 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="flex flex-wrap items-center gap-1.5 pb-2 pl-6 text-ui" style={{ color: 'var(--text-muted)' }}>
                     <span className="min-w-0 truncate">↳ {latest.excerpt}</span>
                     <span className="shrink-0 tabular-nums">· {formatRelativeTime(latest.occurredAt)}</span>
                   </span>
@@ -128,7 +128,7 @@ export function StandupTaskList({
       )}
 
       {composer && tasks[focusedIndex] && <div className="mt-3 border-l-2 pl-3" style={{ borderColor: 'var(--accent)' }}>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-ui leading-4">
           <span className="min-w-0 flex-1 break-words" style={{ color: 'var(--text-secondary)' }}>{tasks[focusedIndex]!.taskKey} · {tasks[focusedIndex]!.title}</span>
           <button type="button" className="ui-icon-btn shrink-0" aria-label={`Open ${tasks[focusedIndex]!.taskKey}`} title="Open task details" onClick={() => onOpen(tasks[focusedIndex]!.taskKey)}><ArrowUpRight size={16} /></button>
         </div>
@@ -141,7 +141,7 @@ export function StandupTaskList({
             type="button"
             onClick={() => setShowDone((value) => !value)}
             aria-expanded={showDone}
-            className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.09em]"
+            className="mb-1.5 flex items-center gap-1 text-meta font-semibold uppercase tracking-[0.09em]"
             style={{ color: 'var(--text-muted)' }}
           >
             <ChevronDown size={12} className={`transition-transform ${showDone ? '' : '-rotate-90'}`} />
@@ -157,8 +157,8 @@ export function StandupTaskList({
                     className="flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-[var(--bg-secondary)]"
                   >
                     <TaskStatusGlyph status="done" size={14} />
-                    <span className="w-12 shrink-0 font-mono text-[12px]" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
-                    <span className="min-w-0 truncate text-[12.5px] line-through" style={{ color: 'var(--text-muted)' }}>{task.title}</span>
+                    <span className="w-12 shrink-0 font-mono text-ui" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
+                    <span className="min-w-0 truncate text-body line-through" style={{ color: 'var(--text-muted)' }}>{task.title}</span>
                   </button>
                 </li>
               ))}
@@ -173,7 +173,7 @@ export function StandupTaskList({
 function StatusTag({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span
-      className="shrink-0 rounded-full px-1.5 py-px text-[11px] font-semibold uppercase tracking-[0.04em]"
+      className="shrink-0 rounded-full px-1.5 py-px text-meta font-semibold uppercase tracking-[0.04em]"
       style={{ color, background: `color-mix(in srgb, ${color} 13%, transparent)` }}
     >
       {children}

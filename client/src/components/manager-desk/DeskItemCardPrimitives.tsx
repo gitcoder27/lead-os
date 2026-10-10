@@ -70,7 +70,7 @@ export function SignalChip({
 
   return (
     <span
-      className="inline-flex max-w-[180px] items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
+      className="inline-flex max-w-[180px] items-center gap-1 rounded-md px-1 py-0.5 text-meta font-semibold uppercase tracking-[0.06em]"
       style={style ?? toneStyle[tone]}
       title={title ?? label}
     >

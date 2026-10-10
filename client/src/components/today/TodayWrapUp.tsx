@@ -412,7 +412,7 @@ function PersonAsk({
         {firstName(person.displayName)}
       </button>
       {asked ? (
-        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>asked {asked}</span>
+        <span className="text-ui" style={{ color: 'var(--text-muted)' }}>asked {asked}</span>
       ) : person.primaryAction ? (
         <button
           type="button"

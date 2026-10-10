@@ -21,13 +21,13 @@ function DeletedTaskState({ task, onGoToday }: { task: TaskResolution; onGoToday
           background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
         }}
       >
-        <p className="text-[12px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
           Deleted task
         </p>
-        <h1 className="mt-2 text-[24px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <h1 className="mt-2 text-display font-semibold" style={{ color: 'var(--text-primary)' }}>
           {task.taskKey} was deleted
         </h1>
-        <p className="mt-3 text-[14px] leading-6" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-3 text-body leading-6" style={{ color: 'var(--text-secondary)' }}>
           {task.title}
         </p>
         <button
@@ -76,7 +76,7 @@ export function TaskLinkResolver({ taskKey, role, onResolved, onGoToday, notFoun
           className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
           style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
         />
-        <span className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+        <span className="text-body" style={{ color: 'var(--text-secondary)' }}>
           Opening {taskKey.toUpperCase()}…
         </span>
       </div>

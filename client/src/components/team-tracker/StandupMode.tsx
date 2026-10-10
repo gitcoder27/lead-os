@@ -725,9 +725,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     return createPortal(
       <div ref={rootRef} tabIndex={-1} className="standup-shell fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg-primary)' }} role="dialog" aria-modal="true" aria-label="Standup mode" data-testid="standup-mode">
         <div className="max-w-sm px-6 py-8 text-center">
-          <h1 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>Standup</h1>
-          <p className="mt-1.5 text-sm" style={{ color: 'var(--text-muted)' }}>{!ownsRound ? 'Standup is open in another tab. Close it there to continue here.' : 'No people in this view.'}</p>
-          <button type="button" onClick={onClose} className="mt-4 rounded-lg px-3 py-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+          <h1 className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Standup</h1>
+          <p className="mt-1.5 text-body leading-5" style={{ color: 'var(--text-muted)' }}>{!ownsRound ? 'Standup is open in another tab. Close it there to continue here.' : 'No people in this view.'}</p>
+          <button type="button" onClick={onClose} className="mt-4 rounded-lg px-3 py-1.5 text-ui font-semibold" style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
             Exit
           </button>
         </div>
@@ -764,10 +764,10 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <ArrowLeftRight size={14} />
           </div>
           <div>
-            <h1 className="text-[14px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="text-title-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
               Standup
             </h1>
-            <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-ui" style={{ color: 'var(--text-muted)' }}>
               {formatStandupDate(date)}
             </div>
           </div>
@@ -791,7 +791,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               style={{ background: 'var(--accent)', transformOrigin: 'left' }}
             />
           </div>
-          <span className="shrink-0 text-[12px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+          <span className="shrink-0 text-ui tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{reviewedCount}</span> of {ordered.length} visited
             {session.flagged.length > 0 && (
               <span style={{ color: 'var(--text-muted)' }}> · {session.flagged.length} flagged</span>
@@ -823,17 +823,17 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
         </div>
       </header>
 
-      {storageFailed && <p role="alert" className="px-4 py-2 text-sm">Browser recovery is unavailable. Keep this page open until your work is saved.</p>}
-      {!ownsRound && <div role="alert" className="px-4 py-2 text-sm">Standup is open in another tab. Close it there to continue here.</div>}
+      {storageFailed && <p role="alert" className="px-4 py-2 text-body leading-5">Browser recovery is unavailable. Keep this page open until your work is saved.</p>}
+      {!ownsRound && <div role="alert" className="px-4 py-2 text-body leading-5">Standup is open in another tab. Close it there to continue here.</div>}
       {/* Only a failure earns a banner. "Saving…" used to appear here on every first visit to a person for the
           ~100ms the server took to confirm, pushing the whole page down 32px and back; it is now inline (below). */}
       {visitsPending && reviewError && (
-        <div role="status" className="flex items-center gap-3 px-4 py-2 text-xs">
+        <div role="status" className="flex items-center gap-3 px-4 py-2 text-ui leading-4">
           Visits not saved. Your progress is kept in this tab.
           <button type="button" className="ui-btn" onClick={retryReviewWrites}>Retry</button>
         </div>
       )}
-      {finishError && <p role="alert" className="px-4 py-2 text-sm">{finishError}</p>}
+      {finishError && <p role="alert" className="px-4 py-2 text-body leading-5">{finishError}</p>}
 
       <div className="flex min-h-0 flex-1">
         <StandupRail
@@ -1088,7 +1088,7 @@ function TopButton({
       aria-label={label}
       aria-pressed={pressed}
       title={label}
-      className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
       style={{
         color: pressed || accent ? 'var(--accent)' : 'var(--text-secondary)',
         border: `1px solid ${pressed || accent ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)'}`,

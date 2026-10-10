@@ -37,10 +37,10 @@ export function StandupRail({
       aria-label="Standup roster"
     >
       <div className="hidden items-center justify-between px-4 pb-1.5 pt-3.5 md:flex">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-meta font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
           Order
         </span>
-        <span className="text-[12px] font-semibold tabular-nums" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-muted)' }}>
+        <span className="text-ui font-semibold tabular-nums" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-muted)' }}>
           {reviewedCount}/{days.length}
         </span>
       </div>
@@ -81,7 +81,7 @@ export function StandupRail({
               </span>
               <span className="hidden min-w-0 flex-1 md:block">
                 <span
-                  className="block truncate text-[12.5px] font-semibold"
+                  className="block truncate text-body font-semibold"
                   style={{ color: isReviewed && !active ? 'var(--text-secondary)' : 'var(--text-primary)' }}
                 >
                   {day.developer.displayName}
@@ -102,7 +102,7 @@ export function StandupRail({
 
       <div className="border-t p-2" style={{ borderColor: 'var(--border)' }}>
         {allReviewed && !wrapUpActive && (
-          <div className="mb-2 hidden rounded-md px-2 py-1.5 text-[12px] font-medium md:block" style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' }}>
+          <div className="mb-2 hidden rounded-md px-2 py-1.5 text-ui font-medium md:block" style={{ color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 10%, transparent)' }}>
             All people visited
           </div>
         )}
@@ -110,7 +110,7 @@ export function StandupRail({
           type="button"
           onClick={onWrapUp}
           aria-pressed={wrapUpActive}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors md:justify-start"
+          className="flex w-full items-center justify-center gap-2 rounded-lg px-2 py-2 text-ui font-semibold transition-colors md:justify-start"
           style={{
             color: wrapUpActive || allReviewed ? 'var(--accent)' : 'var(--text-secondary)',
             background: wrapUpActive ? 'var(--accent-glow)' : 'transparent',

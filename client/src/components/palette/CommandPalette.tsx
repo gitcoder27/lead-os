@@ -334,7 +334,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
             }}
             onKeyDown={handleInputKeyDown}
             placeholder={`Search, or type to add to ${surfaceLabel}…`}
-            className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-placeholder"
+            className="flex-1 bg-transparent text-title-sm outline-none placeholder:text-placeholder"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Search"
             role="combobox"
@@ -349,7 +349,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
 
         {showSearchError && (
           <div className="flex items-center justify-between gap-3 px-4 py-2">
-            <p role="alert" className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <p role="alert" className="text-body" style={{ color: 'var(--text-muted)' }}>
               Search failed. Try again.
             </p>
             <button
@@ -360,7 +360,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
                 setRetryingQuery(query.trim());
                 void searchQuery.refetch().finally(() => setRetryingQuery(null));
               }}
-              className="text-[13px] disabled:opacity-50"
+              className="text-body disabled:opacity-50"
               style={{ color: 'var(--accent-text)' }}
             >
               Retry
@@ -368,7 +368,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           </div>
         )}
         {isSearching && (
-          <p role="status" className="px-4 py-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <p role="status" className="px-4 py-2 text-body" style={{ color: 'var(--text-muted)' }}>
             Searching…
           </p>
         )}
@@ -376,7 +376,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
         <div ref={listRef} id={listId} role="listbox" aria-label="Commands and search results" aria-busy={isSearching} className="max-h-[52vh] overflow-y-auto py-1.5">
           {items.length === 0 && !isSearching && !showSearchError ? (
             <div className="px-4 py-8 text-center">
-              <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-body" style={{ color: 'var(--text-muted)' }}>
                 {hasResults ? 'No matches found.' : `Type to search, pick a destination, or start typing to add to ${surfaceLabel}.`}
               </p>
             </div>
@@ -389,7 +389,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
               return (
                 <div key={item.id}>
                   {showGroupLabel && (
-                    <div className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                    <div className="px-4 pb-1 pt-2 text-meta font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                       {GROUP_LABELS[item.group]}
                     </div>
                   )}
@@ -416,11 +416,11 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
                       <Icon size={13} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                      <span className="block truncate text-body font-medium" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                         {item.title}
                       </span>
                       {item.description && (
-                        <span className="block truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        <span className="block truncate text-ui" style={{ color: 'var(--text-muted)' }}>
                           {item.description}
                         </span>
                       )}
@@ -435,7 +435,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t px-4 py-2 text-[12px]" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-4 border-t px-4 py-2 text-ui" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <span>↑↓ navigate</span>
           <span>↵ open</span>
           <span>esc close</span>

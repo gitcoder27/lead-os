@@ -23,13 +23,13 @@ export function StandupHistory({
   nameFor: (accountId: string) => string;
 }) {
   if (isLoading) {
-    return <p className="px-4 py-8 text-center text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Loading…</p>;
+    return <p className="px-4 py-8 text-center text-body" style={{ color: 'var(--text-muted)' }}>Loading…</p>;
   }
   if (isError) {
     return (
       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-        <p className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>Couldn’t load the previous standup.</p>
-        <button type="button" onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold" style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}>
+        <p className="text-body" style={{ color: 'var(--text-muted)' }}>Couldn’t load the previous standup.</p>
+        <button type="button" onClick={onRetry} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-ui font-semibold" style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}>
           <RefreshCw size={12} /> Retry
         </button>
       </div>
@@ -37,7 +37,7 @@ export function StandupHistory({
   }
   if (!session) {
     return (
-      <p className="px-4 py-8 text-center text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="px-4 py-8 text-center text-body" style={{ color: 'var(--text-muted)' }}>
         No sealed standup yet — this view fills in once you end a round.
       </p>
     );
@@ -54,7 +54,7 @@ export function StandupHistory({
 
   return (
     <div className="max-h-[60vh] overflow-y-auto px-4 py-3.5" data-testid="standup-history">
-      <p className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-ui tabular-nums" style={{ color: 'var(--text-muted)' }}>
         Ended {formatRelativeTime(session.endedAt)} · {session.reviewed.length} visited
         {flagged.length > 0 ? ` · ${flagged.length} flagged` : ''}
       </p>
@@ -78,12 +78,12 @@ export function StandupHistory({
           <ul className="mt-1.5 space-y-2.5">
             {[...byPerson.entries()].map(([accountId, entries]) => (
               <li key={accountId}>
-                <span className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{nameFor(accountId)}</span>
+                <span className="text-ui font-semibold" style={{ color: 'var(--text-primary)' }}>{nameFor(accountId)}</span>
                 <ul className="mt-0.5 space-y-0.5">
                   {entries.map((entry, index) => (
-                    <li key={index} className="flex items-baseline gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+                    <li key={index} className="flex items-baseline gap-2 text-ui" style={{ color: 'var(--text-secondary)' }}>
                       <span className="min-w-0 flex-1">{entry.kind === 'checkin' ? 'Added a person note' : describeLogEntry(entry)}</span>
-                      <span className="shrink-0 text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(entry.at)}</span>
+                      <span className="shrink-0 text-meta tabular-nums" style={{ color: 'var(--text-muted)' }}>{formatRelativeTime(entry.at)}</span>
                     </li>
                   ))}
                 </ul>
@@ -97,7 +97,7 @@ export function StandupHistory({
         <section className="mt-4">
           <SectionLabel>Summary</SectionLabel>
           <pre
-            className="mt-1.5 whitespace-pre-wrap rounded-lg px-3 py-2.5 font-sans text-[12px] leading-5"
+            className="mt-1.5 whitespace-pre-wrap rounded-lg px-3 py-2.5 font-sans text-ui leading-5"
             style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}
           >
             {session.summary}

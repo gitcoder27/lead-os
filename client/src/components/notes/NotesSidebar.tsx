@@ -211,7 +211,7 @@ export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelect
                 className="notes-day-row mt-1"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <span className="text-[12px]">{listQuery.isFetchingNextPage ? 'Loading…' : 'Load earlier notes'}</span>
+                <span className="text-ui">{listQuery.isFetchingNextPage ? 'Loading…' : 'Load earlier notes'}</span>
               </button>
             ) : null}
           </>

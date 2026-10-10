@@ -198,7 +198,7 @@ export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates,
               <Dialog.Title className="ui-dialog-title">
                 Wrap up {prettyNoteDate(noteDate, 'EEEE')}
               </Dialog.Title>
-              <Dialog.Description className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <Dialog.Description className="mt-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                 {pending.length === 0
                   ? 'Nothing loose — every list item is done or converted.'
                   : `${pending.length} open item${pending.length === 1 ? '' : 's'}. Decide what happens to each; anything left undecided stays in the note.`}
@@ -266,13 +266,13 @@ export function NotesWrapUpDialog({ open, noteDate, noteKind, today, candidates,
           ) : null}
 
           {error ? (
-            <p className="mt-3 text-[12px]" style={{ color: 'var(--danger)' }} role="alert">
+            <p className="mt-3 text-ui" style={{ color: 'var(--danger)' }} role="alert">
               {error}
             </p>
           ) : null}
 
           <div className="mt-5 flex items-center justify-between gap-2">
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
               Keys on a row: T · F · C · D
             </p>
             <div className="flex items-center gap-2">

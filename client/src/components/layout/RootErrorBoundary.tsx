@@ -10,7 +10,7 @@ interface RootErrorBoundaryState {
 }
 
 const ACTION_CLASS =
-  'rounded-lg px-4 py-2 text-[13px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]';
+  'rounded-lg px-4 py-2 text-body font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]';
 
 /**
  * Last-resort recovery screen. It is deliberately static: no router, providers,
@@ -44,8 +44,8 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
           className="w-full max-w-md rounded-xl border p-6"
           style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}
         >
-          <h1 className="text-lg font-semibold">Something went wrong</h1>
-          <p className="mt-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+          <h1 className="text-title-sm leading-6 font-semibold">Something went wrong</h1>
+          <p className="mt-2 text-body" style={{ color: 'var(--text-secondary)' }}>
             LeadOS hit an unexpected error. Your data is safe. Reloading usually fixes it.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -67,7 +67,7 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
             </button>
           </div>
           {error.message ? (
-            <details className="mt-4 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <details className="mt-4 text-ui" style={{ color: 'var(--text-muted)' }}>
               <summary className="cursor-pointer">Error details</summary>
               <pre className="mt-2 whitespace-pre-wrap break-words">{error.message}</pre>
             </details>

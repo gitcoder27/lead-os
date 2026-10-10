@@ -27,7 +27,7 @@ export function NotesSourceLink({ source }: NotesSourceLinkProps) {
     <a
       href={href}
       onClick={handleClick}
-      className="inline-flex items-center gap-1 text-[12px]"
+      className="inline-flex items-center gap-1 text-ui"
       style={{ color: 'var(--text-muted)' }}
       aria-label={`Open source note from ${source.date}`}
     >

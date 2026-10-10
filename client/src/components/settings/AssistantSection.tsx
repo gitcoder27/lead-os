@@ -15,7 +15,7 @@ import type { AiProviderProfile, AiReasoningEffort, AssistantResponseStyle, Upda
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );
@@ -24,7 +24,7 @@ function GroupLabel({ children }: { children: ReactNode }) {
 function LabeledInput({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="mb-1.5 block text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
         {label}
       </label>
       {children}
@@ -32,7 +32,7 @@ function LabeledInput({ label, id, children }: { label: string; id?: string; chi
   );
 }
 
-const inputClass = 'w-full rounded-lg px-3 py-1.5 text-[12.5px] outline-none';
+const inputClass = 'w-full rounded-lg px-3 py-1.5 text-body outline-none';
 const inputStyle = {
   background: 'var(--settings-input-bg)',
   color: 'var(--text-primary)',
@@ -66,10 +66,10 @@ function ToggleRow({
       style={{ background: 'var(--settings-input-bg)', border: 'var(--settings-inset-border)' }}
     >
       <div className="min-w-0">
-        <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {title}
         </p>
-        <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
           {description}
         </p>
       </div>
@@ -353,7 +353,7 @@ export function AssistantSection() {
       {/* Enable toggle */}
       <div>
         <GroupLabel>Assistant</GroupLabel>
-        <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           LeadOS Copilot answers questions about this workspace and proposes actions that only run after you confirm
           them. It needs an OpenAI-compatible API key.
         </p>
@@ -416,7 +416,7 @@ export function AssistantSection() {
       {/* Providers */}
       <div>
         <GroupLabel>Providers</GroupLabel>
-        <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Any OpenAI-compatible chat-completions endpoint works. Save one provider per account — each keeps its own
           endpoint, model, and encrypted key — then pick which one Copilot uses.
         </p>
@@ -451,12 +451,12 @@ export function AssistantSection() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    <p className="truncate text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {provider.name}
                     </p>
                     {isActive ? (
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-meta font-semibold"
                         style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
                       >
                         Active
@@ -464,17 +464,17 @@ export function AssistantSection() {
                     ) : null}
                     {!provider.hasApiKey ? (
                       <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        className="rounded-full px-2 py-0.5 text-meta font-semibold"
                         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
                       >
                         No key
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-0.5 truncate font-mono text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="mt-0.5 truncate font-mono text-ui" style={{ color: 'var(--text-muted)' }}>
                     {provider.model} · {hostOf(provider.baseUrl)}
                   </p>
-                  <p className="mt-0.5 truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="mt-0.5 truncate text-ui" style={{ color: 'var(--text-muted)' }}>
                     {[
                       provider.resolvedContextWindow ? `ctx ${formatTokens(provider.resolvedContextWindow)}` : null,
                       provider.resolvedMaxOutputTokens ? `out ≤${formatTokens(provider.resolvedMaxOutputTokens)}` : null,
@@ -503,14 +503,14 @@ export function AssistantSection() {
             );
           })}
           {providers.length === 0 ? (
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
               No providers saved yet — add one below.
             </p>
           ) : null}
           <button
             type="button"
             onClick={openAddProvider}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors"
             style={{
               background: 'var(--settings-accent-soft-bg)',
               color: 'var(--accent)',
@@ -527,7 +527,7 @@ export function AssistantSection() {
             className="mt-3 space-y-3 rounded-xl p-3.5"
             style={{ background: 'var(--settings-input-bg)', border: 'var(--settings-inset-border)' }}
           >
-            <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               {providerForm.id ? `Edit ${editingProvider?.name ?? 'provider'}` : 'New provider'}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -636,7 +636,7 @@ export function AssistantSection() {
                   <option value="max">Max</option>
                 </select>
               </LabeledInput>
-              <p className="text-[12px] sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-ui sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
                 Reasoning applies to thinking-capable endpoints (ZAI GLM, DeepSeek). Blank token fields use
                 the model&apos;s catalog defaults when known; blank temperature uses the assistant default (0.7).
               </p>
@@ -646,7 +646,7 @@ export function AssistantSection() {
                 type="button"
                 onClick={() => void handleSaveProvider()}
                 disabled={!canSaveProvider || providerBusy !== null}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                 style={{
                   background: 'var(--settings-cta-primary-bg)',
                   color: 'var(--settings-cta-primary-text)',
@@ -660,7 +660,7 @@ export function AssistantSection() {
                 type="button"
                 onClick={() => void handleTestProvider()}
                 disabled={providerBusy !== null}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                 style={{
                   background: 'var(--settings-accent-soft-bg)',
                   color: 'var(--accent)',
@@ -675,7 +675,7 @@ export function AssistantSection() {
                   type="button"
                   onClick={() => void handleDeleteProvider()}
                   disabled={providerBusy !== null}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                   style={{
                     background: 'transparent',
                     color: 'var(--danger)',
@@ -693,7 +693,7 @@ export function AssistantSection() {
                   setConfirmingDelete(false);
                 }}
                 disabled={providerBusy !== null}
-                className="rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+                className="rounded-lg px-3 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 Cancel
@@ -706,7 +706,7 @@ export function AssistantSection() {
       {/* Behavior */}
       <div>
         <GroupLabel>Behavior</GroupLabel>
-        <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Shared across providers. Requests are made server-side; keys never reach the browser after saving.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -763,16 +763,16 @@ export function AssistantSection() {
       {/* Memory */}
       <div>
         <GroupLabel>Memory</GroupLabel>
-        <p className="mt-1 mb-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Durable facts Copilot remembers for you — saved only when you confirm a "remember" proposal in chat. They
           shape every answer and are listed here for review.
         </p>
         {memoryQuery.isPending ? (
-          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
             Loading…
           </p>
         ) : memories.length === 0 ? (
-          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
             Nothing remembered yet — tell Copilot "remember that…" in chat.
           </p>
         ) : (
@@ -784,7 +784,7 @@ export function AssistantSection() {
                   className="flex items-start gap-3 px-3.5 py-2.5"
                   style={{ borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                 >
-                  <p className="flex-1 text-[12.5px] leading-5" style={{ color: 'var(--text-primary)' }}>
+                  <p className="flex-1 text-body leading-5" style={{ color: 'var(--text-primary)' }}>
                     {memory.text}
                   </p>
                   <button
@@ -811,7 +811,7 @@ export function AssistantSection() {
                 void clearMemory.mutateAsync();
               }}
               disabled={clearMemory.isPending}
-              className="text-[12px] font-medium transition-colors disabled:opacity-50"
+              className="text-ui font-medium transition-colors disabled:opacity-50"
               style={{ color: 'var(--danger-muted)' }}
             >
               {confirmingClearMemory ? 'Click again to clear all memories' : 'Clear all memories'}
@@ -826,7 +826,7 @@ export function AssistantSection() {
           type="button"
           onClick={() => void handleSave()}
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12.5px] font-semibold transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-ui font-semibold transition-colors disabled:opacity-50"
           style={{
             background: 'var(--settings-cta-primary-bg)',
             color: 'var(--settings-cta-primary-text)',

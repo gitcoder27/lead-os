@@ -113,10 +113,10 @@ export function TrackerDrawerItemRow({
   };
 
   const titleClass = isCurrent
-    ? 'text-[14px] font-semibold leading-5 tracking-[-0.005em]'
+    ? 'text-title-sm font-semibold leading-5 tracking-[-0.005em]'
     : isHistory
-      ? 'text-[13px] leading-5'
-      : 'text-[13px] font-medium leading-5';
+      ? 'text-body leading-5'
+      : 'text-body font-medium leading-5';
   const titleColor = isClosed ? 'var(--text-secondary)' : 'var(--text-primary)';
   const titleDecoration = item.state === 'dropped' ? 'line-through' : 'none';
 
@@ -126,7 +126,7 @@ export function TrackerDrawerItemRow({
       <JiraIssueLink
         key="jira"
         issueKey={item.jiraKey}
-        className="font-mono text-[12px] font-semibold hover:underline"
+        className="font-mono text-ui font-semibold hover:underline"
         style={{ color: 'var(--accent)' }}
         title={item.jiraSummary && item.jiraSummary !== item.title ? `${item.jiraKey} · ${item.jiraSummary}` : item.jiraKey}
       >
@@ -234,7 +234,7 @@ export function TrackerDrawerItemRow({
                       cancelTitle();
                     }
                   }}
-                  className={`min-w-0 flex-1 rounded-md px-1.5 py-0.5 text-[13.5px] ${FOCUS_RING}`}
+                  className={`min-w-0 flex-1 rounded-md px-1.5 py-0.5 text-body ${FOCUS_RING}`}
                   style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
                   aria-label="Edit title"
                 />
@@ -287,7 +287,7 @@ export function TrackerDrawerItemRow({
         </div>
 
         {meta.length > 0 && (
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-[18px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-ui leading-[18px]" style={{ color: 'var(--text-muted)' }}>
             {meta.map((node, position) => (
               <span key={position} className="inline-flex min-w-0 max-w-full items-center gap-1.5">
                 {position > 0 && <span aria-hidden="true" className="opacity-60">·</span>}
@@ -300,7 +300,7 @@ export function TrackerDrawerItemRow({
         {item.note && !isHistory && (
           <div className="mt-1.5 flex items-start gap-1.5">
             <StickyNote size={12} className="mt-[3px] shrink-0" style={{ color: 'var(--text-muted)' }} />
-            <span className="line-clamp-2 whitespace-pre-line break-words text-[12.5px] leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
+            <span className="line-clamp-2 whitespace-pre-line break-words text-body leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
               {item.note}
             </span>
           </div>
@@ -363,7 +363,7 @@ function LeadingGlyph({
   }
 
   const number = typeof index === 'number' ? (
-    <span className="text-[12px] font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
+    <span className="text-ui font-semibold tabular-nums" style={{ color: 'var(--text-muted)' }}>{index + 1}</span>
   ) : null;
 
   if (!draggable) {

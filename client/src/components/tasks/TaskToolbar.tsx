@@ -133,19 +133,19 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
         <div className="px-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {!projectContext && <TaskWorkspaceSelect {...{ views, counts, viewId, onSelectView }} />}
-            <Heading className={`${projectContext ? 'text-[13px] font-semibold' : 'ui-page-title'} flex items-center gap-2`}>
+            <Heading className={`${projectContext ? 'text-body font-semibold' : 'ui-page-title'} flex items-center gap-2`}>
               {title}
               {isSavedView && hasOverrides && (
                 <span className="h-2 w-2 rounded-full" style={{ background: 'var(--warning)' }} title="Unsaved filter changes" aria-label="Unsaved filter changes" />
               )}
             </Heading>
             {count !== undefined && (
-              <span className={`text-[12px] tabular-nums ${narrowed ? '' : 'md:hidden'}`} style={{ color: 'var(--text-muted)' }}>
+              <span className={`text-ui tabular-nums ${narrowed ? '' : 'md:hidden'}`} style={{ color: 'var(--text-muted)' }}>
                 {narrowed ? `${count} matching` : `${count} task${count === 1 ? '' : 's'}`}
               </span>
             )}
             {updating && (
-              <span className="flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+              <span className="flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }} aria-live="polite">
                 <Loader2 size={11} className="animate-spin" /> Updating…
               </span>
             )}
@@ -169,7 +169,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
                 }}
                 placeholder={projectContext ? 'Search project tasks…' : 'Search this view'}
                 aria-label="Search tasks"
-                className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none"
+                className="min-w-0 flex-1 bg-transparent text-body outline-none"
                 style={{ color: 'var(--text-primary)' }}
               />
               {query ? (
@@ -180,7 +180,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
             </label>
 
             <button ref={optionsRef} type="button" onClick={open('options')} aria-haspopup="menu" aria-describedby={activeFilterCount ? 'task-options-summary' : undefined}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
               style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
               <SlidersHorizontal size={12} />View options{activeFilterCount ? ` (${activeFilterCount})` : ''}
             </button>
@@ -292,10 +292,10 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
       {saveOpen && (
         <Dialog title="Save view" size="sm" onClose={closeSave}>
           <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-            <label className="block text-[13px]">View name
+            <label className="block text-body">View name
               <input data-autofocus value={name} maxLength={120} onChange={(event) => setName(event.target.value)} aria-label="Saved view name" disabled={saving} className="ui-input mt-2 w-full" />
             </label>
-            {saveError && <p role="alert" className="mt-2 text-[13px]">Could not save view. Try again.</p>}
+            {saveError && <p role="alert" className="mt-2 text-body">Could not save view. Try again.</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" className="ui-btn-ghost" disabled={saving} onClick={closeSave}>Cancel</button>
               <button type="submit" className="ui-btn-primary" disabled={!name.trim() || saving}>{saving ? 'Saving…' : 'Save view'}</button>

@@ -6,7 +6,7 @@ export function YouTag({ show }: { show?: boolean }) {
   if (!show) return null;
   return (
     <span
-      className="ml-1.5 shrink-0 rounded-full px-1.5 py-px align-middle text-[11px] font-semibold"
+      className="ml-1.5 shrink-0 rounded-full px-1.5 py-px align-middle text-meta font-semibold"
       style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent-text, var(--accent))' }}
     >
       You

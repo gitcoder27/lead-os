@@ -84,7 +84,7 @@ export function NavigationSection() {
     <div className="max-w-[720px] space-y-7">
       <div>
         <SettingsGroupLabel>Top navigation</SettingsGroupLabel>
-        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Pages here stay visible in the header. Today is always first.
         </p>
         <div
@@ -100,11 +100,11 @@ export function NavigationSection() {
             >
               <Home size={11} />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>
+            <span className="min-w-0 flex-1 truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>
               Today
             </span>
             <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              className="shrink-0 rounded-full px-2 py-0.5 text-meta font-medium"
               style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: 'var(--settings-inset-border)' }}
             >
               Always first
@@ -128,7 +128,7 @@ export function NavigationSection() {
 
       <div>
         <SettingsGroupLabel>More menu</SettingsGroupLabel>
-        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Pages here sit behind the More menu in the header.
         </p>
         <div
@@ -138,7 +138,7 @@ export function NavigationSection() {
           aria-label="More menu"
         >
           {draft.moreNav.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px]" role="listitem" style={{ color: 'var(--text-muted)' }}>
+            <p className="px-3.5 py-2.5 text-ui" role="listitem" style={{ color: 'var(--text-muted)' }}>
               Every page is in the top navigation — the More menu stays hidden.
             </p>
           ) : (
@@ -161,7 +161,7 @@ export function NavigationSection() {
 
       <div>
         <SettingsGroupLabel>Hidden</SettingsGroupLabel>
-        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Hidden pages are left out of the header. They still open from a link, the command palette or Ctrl/Cmd+K.
         </p>
         <div
@@ -171,7 +171,7 @@ export function NavigationSection() {
           aria-label="Hidden pages"
         >
           {draft.hidden.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px]" role="listitem" style={{ color: 'var(--text-muted)' }}>
+            <p className="px-3.5 py-2.5 text-ui" role="listitem" style={{ color: 'var(--text-muted)' }}>
               Nothing is hidden.
             </p>
           ) : (
@@ -197,7 +197,7 @@ export function NavigationSection() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || saving}
-          className="flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-[12.5px] font-semibold transition-opacity disabled:opacity-40"
+          className="flex h-8 items-center gap-1.5 rounded-lg px-3.5 text-ui font-semibold transition-opacity disabled:opacity-40"
           style={{ background: 'var(--settings-cta-primary-bg)', color: 'var(--settings-cta-primary-text)' }}
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
@@ -207,13 +207,13 @@ export function NavigationSection() {
           type="button"
           onClick={handleReset}
           disabled={saving}
-          className="flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium transition-opacity disabled:opacity-40"
+          className="flex h-8 items-center gap-1.5 rounded-lg px-3 text-ui font-medium transition-opacity disabled:opacity-40"
           style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-secondary)', border: 'var(--settings-inset-border)' }}
         >
           <RotateCcw size={12} />
           Restore default
         </button>
-        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
           {dirty ? 'Unsaved changes' : 'Applies to your account on every device.'}
         </span>
       </div>
@@ -259,9 +259,9 @@ function NavPreferenceRow({ id, zone, index, count, disabled, hint, onMove, onMo
       >
         <Icon size={11} />
       </span>
-      <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>
+      <span className="min-w-0 flex-1 truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>
         {meta.label}
-        {hint ? <span className="ml-2 text-[11.5px] font-normal" style={{ color: 'var(--text-muted)' }}>{hint}</span> : null}
+        {hint ? <span className="ml-2 text-meta font-normal" style={{ color: 'var(--text-muted)' }}>{hint}</span> : null}
       </span>
       <div className="flex shrink-0 items-center gap-1">
         {isHidden ? (
@@ -312,7 +312,7 @@ function RowButton({ label, disabled, onClick, children }: { label: string; disa
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );

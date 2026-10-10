@@ -57,7 +57,7 @@ export function TeamRosterEmpty({ readOnly = false }: { readOnly?: boolean }) {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Name, e.g. Priya Raman"
-              className="h-9 w-56 rounded-lg px-3 text-[13px] outline-none"
+              className="h-9 w-56 rounded-lg px-3 text-body outline-none"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             />
             <button type="submit" className="ui-btn-solid inline-flex h-9 items-center gap-1.5" disabled={!name.trim() || addMember.isPending}>
@@ -66,7 +66,7 @@ export function TeamRosterEmpty({ readOnly = false }: { readOnly?: boolean }) {
             </button>
           </form>
           {jiraConnected && (
-            <button type="button" className="text-[12px] font-semibold underline" style={{ color: 'var(--accent)' }} onClick={openTeamSettings}>
+            <button type="button" className="text-ui font-semibold underline" style={{ color: 'var(--accent)' }} onClick={openTeamSettings}>
               Import from Jira
             </button>
           )}

@@ -22,7 +22,7 @@ export function CheckInVisibilityChoice({ developerName, value, onChange, disabl
       aria-checked={value === choice}
       disabled={disabled}
       onClick={() => onChange(choice)}
-      className="rounded-md px-2 py-0.5 text-[12px] font-medium transition-colors disabled:opacity-50"
+      className="rounded-md px-2 py-0.5 text-ui font-medium transition-colors disabled:opacity-50"
       style={
         value === choice
           ? { background: 'var(--bg-primary)', color: 'var(--text-primary)', boxShadow: '0 0 0 1px var(--border-strong)' }
@@ -44,7 +44,7 @@ export function CheckInVisibilityChoice({ developerName, value, onChange, disabl
         {option('shared', `Visible to ${firstName}`)}
         {option('private', 'Private — only you')}
       </div>
-      <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
         {value === 'private' ? "Can't be linked to a task." : `${firstName} sees this on My Day.`}
       </span>
     </div>

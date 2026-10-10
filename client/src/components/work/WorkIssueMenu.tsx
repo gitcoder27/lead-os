@@ -95,13 +95,13 @@ export function WorkIssueMenu({ issue }: { issue: Issue }) {
             </>
           )}
           {issue.snoozedUntil && hidden && (
-            <p className="p-3 text-[12px]">Snoozed until {new Date(issue.snoozedUntil).toLocaleString()}</p>
+            <p className="p-3 text-ui">Snoozed until {new Date(issue.snoozedUntil).toLocaleString()}</p>
           )}
         </TaskPopover>
       )}
       {custom && (
         <Dialog title={`Snooze ${issue.jiraKey}`} onClose={closeCustom} size="sm">
-          <label className="block text-[13px]">
+          <label className="block text-body">
             Return on
             <input
               data-autofocus
@@ -112,7 +112,7 @@ export function WorkIssueMenu({ issue }: { issue: Issue }) {
               onChange={(event) => setDate(event.target.value)}
             />
           </label>
-          <p className="text-[13px] my-3">You can restore it earlier from Excluded / snoozed.</p>
+          <p className="text-body my-3">You can restore it earlier from Excluded / snoozed.</p>
           <div className="flex justify-end gap-2">
             <button type="button" className="ui-btn-secondary" onClick={closeCustom}>
               Cancel

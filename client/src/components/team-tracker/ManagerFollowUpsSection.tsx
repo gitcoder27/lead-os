@@ -72,7 +72,7 @@ function ManagerFollowUpItem({ item, onComplete }: { item: ManagerDeskItem; onCo
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
           <span
-            className="truncate text-[13.5px] font-medium leading-5"
+            className="truncate text-body font-medium leading-5"
             style={{
               color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
               textDecoration: isDone ? 'line-through' : undefined,
@@ -81,14 +81,14 @@ function ManagerFollowUpItem({ item, onComplete }: { item: ManagerDeskItem; onCo
           >
             {item.title}
           </span>
-          <span className="shrink-0 text-[12px] font-medium" style={{ color: managerDeskStatusColors[item.status] }}>
+          <span className="shrink-0 text-ui font-medium" style={{ color: managerDeskStatusColors[item.status] }}>
             {managerDeskStatusLabels[item.status]}
           </span>
         </div>
         {(meta.issueKey || meta.subtitle) && (
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] leading-[18px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-ui leading-[18px]" style={{ color: 'var(--text-muted)' }}>
             {meta.issueKey && (
-              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0 font-mono text-[12px] font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
+              <JiraIssueLink issueKey={meta.issueKey} className="shrink-0 font-mono text-ui font-semibold hover:underline" style={{ color: 'var(--accent)' }}>
                 {meta.issueKey}
               </JiraIssueLink>
             )}
@@ -115,7 +115,7 @@ export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCaptur
         <button
           type="button"
           onClick={onCapture}
-          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--md-accent-glow)] ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--md-accent-glow)] ${FOCUS_RING}`}
           style={{ color: 'var(--md-accent)' }}
           title={`Capture a private follow-up linked to ${day.developer.displayName}`}
         >

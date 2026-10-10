@@ -115,10 +115,10 @@ export function OneOnOneWorkspace({ developerAccountId, onClose, onOpenTask }: O
     return (
       <WorkspaceFrame name="1:1" onClose={onClose}>
         <PanelMessage>
-          <div className="text-[14px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             No 1:1 series yet
           </div>
-          <div className="mx-auto mt-1 max-w-[420px] text-[13px] leading-5" style={{ color: 'var(--text-muted)' }}>
+          <div className="mx-auto mt-1 max-w-[420px] text-body leading-5" style={{ color: 'var(--text-muted)' }}>
             A recurring 1:1 keeps a running agenda of topics that carry until you discuss them, private notes per
             session, and a history of what you covered.
           </div>
@@ -169,7 +169,7 @@ function WorkspaceFrame({ name, onClose, children }: { name: string; onClose: ()
         </span>
         <div className="min-w-0">
           <h2 className="ui-page-title truncate">{name ? `1:1 — ${name}` : '1:1'}</h2>
-          <div className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="text-ui" style={{ color: 'var(--text-muted)' }}>
             Private to you — agenda, notes, history
           </div>
         </div>
@@ -240,7 +240,7 @@ function SeriesControls({ detail }: { detail: OneOnOneSeriesDetail }) {
   const weekday = WEEKDAY_OPTIONS.find((option) => option.value === detail.series.preferredWeekday) ?? WEEKDAY_OPTIONS[0]!;
   const recurring = detail.series.cadence !== 'ad_hoc';
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-ui" style={{ color: 'var(--text-secondary)' }}>
       <CadenceSegment
         value={detail.series.cadence}
         onChange={(cadence) => updateSeries.mutate({ cadence }, { onError })}
@@ -252,7 +252,7 @@ function SeriesControls({ detail }: { detail: OneOnOneSeriesDetail }) {
           aria-label={`Preferred weekday: ${weekday.label}`}
           aria-haspopup="menu"
           aria-expanded={Boolean(weekdayAnchor)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
           style={{ color: 'var(--text-secondary)', background: weekdayAnchor ? 'var(--bg-tertiary)' : undefined }}
         >
           <CalendarDays size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />

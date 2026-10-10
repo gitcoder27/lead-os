@@ -176,12 +176,12 @@ export function MyDayPage() {
           <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-xl" style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
             <CircleX size={22} />
           </div>
-          <h2 className="mb-1.5 text-[16px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>Couldn’t load your day</h2>
-          <p className="mb-6 text-[13px]" style={{ color: 'var(--text-secondary)' }}>{error.message}</p>
+          <h2 className="mb-1.5 text-title-sm font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>Couldn’t load your day</h2>
+          <p className="mb-6 text-body" style={{ color: 'var(--text-secondary)' }}>{error.message}</p>
           <div className="flex flex-col gap-2">
             <button
               onClick={() => refetch()}
-              className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
+              className="rounded-xl px-4 py-2.5 text-body font-semibold"
               style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Try again
@@ -189,14 +189,14 @@ export function MyDayPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => { window.history.pushState(null, '', '/'); window.location.reload(); }}
-                className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-medium"
+                className="flex-1 rounded-xl px-4 py-2.5 text-body font-medium"
                 style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
               >
                 Today
               </button>
               <button
                 onClick={async () => { await logout(); window.location.reload(); }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-[13px] font-medium"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-body font-medium"
                 style={{ color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
               >
                 <LogOut size={14} /> Sign out
@@ -344,7 +344,7 @@ export function MyDayPage() {
                 }
                 action={
                   day?.lastCheckInAt ? (
-                    <span className="text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} title="Last check-in">
+                    <span className="text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} title="Last check-in">
                       {formatCompactRelative(day.lastCheckInAt)}
                     </span>
                   ) : undefined
@@ -387,7 +387,7 @@ export function MyDayPage() {
                 </div>
               </MyDaySection>
 
-              <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[12px] md:flex" style={{ color: 'var(--text-muted)' }}>
+              <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-ui md:flex" style={{ color: 'var(--text-muted)' }}>
                 {!isReadOnly && (
                   <>
                     <span className="inline-flex items-center gap-1.5"><Kbd>n</Kbd> new task</span>

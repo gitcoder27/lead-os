@@ -1,7 +1,12 @@
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 import { addDays, format, formatDistanceToNowStrict, isToday, isBefore, parseISO, startOfDay } from 'date-fns';
 import type { DeveloperWorkload } from '@/types';
+
+// docs/73 UXD-02: register the type-scale names so `text-ui` is a size, not a colour, when merged.
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { 'font-size': [{ text: ['meta', 'ui', 'body', 'title-sm', 'title', 'display'] }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

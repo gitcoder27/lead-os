@@ -79,7 +79,7 @@ export function TrackerSummaryStrip({ summary, activeFilter, onFilterChange }: T
         onClick={() => onFilterChange('all')}
         aria-pressed={allActive}
         title={meterTitle || undefined}
-        className={`flex h-8 shrink-0 items-center gap-2 rounded-lg px-2.5 text-[12.5px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`flex h-8 shrink-0 items-center gap-2 rounded-lg px-2.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
         style={{
           background: allActive ? 'var(--bg-tertiary)' : 'transparent',
           boxShadow: allActive ? 'inset 0 0 0 1px var(--border)' : 'none',
@@ -95,7 +95,7 @@ export function TrackerSummaryStrip({ summary, activeFilter, onFilterChange }: T
       <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0" style={{ background: 'var(--border)' }} />
 
       {visibleChips.length === 0 && (
-        <span className="flex shrink-0 items-center gap-1.5 px-1.5 text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex shrink-0 items-center gap-1.5 px-1.5 text-body" style={{ color: 'var(--text-muted)' }}>
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--success)' }} />
           No active risk signals
         </span>
@@ -111,7 +111,7 @@ export function TrackerSummaryStrip({ summary, activeFilter, onFilterChange }: T
             type="button"
             onClick={() => onFilterChange(isActive ? 'all' : chip.key)}
             aria-pressed={isActive}
-            className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
             style={{
               background: isActive ? `color-mix(in srgb, ${chip.color} 12%, var(--bg-tertiary))` : 'transparent',
               boxShadow: isActive ? `inset 0 0 0 1px color-mix(in srgb, ${chip.color} 36%, transparent)` : 'none',

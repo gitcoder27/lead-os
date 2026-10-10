@@ -219,7 +219,7 @@ export function TaskMeta({
       <JiraIssueLink
         key="jira"
         issueKey={item.jiraKey}
-        className="font-mono text-[12px] font-semibold hover:underline"
+        className="font-mono text-ui font-semibold hover:underline"
         style={{ color: closed ? 'var(--text-muted)' : 'var(--accent)' }}
         title={item.jiraSummary && item.jiraSummary !== item.title ? `${item.jiraKey} · ${item.jiraSummary}` : item.jiraKey}
       >
@@ -302,7 +302,7 @@ export function TaskMeta({
 
   return (
     <div
-      className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-[18px] ${className ?? ''}`}
+      className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-ui leading-[18px] ${className ?? ''}`}
       style={{ color: 'var(--text-muted)' }}
     >
       {meta.map((node, position) => (
@@ -321,7 +321,7 @@ export function TaskNote({ note, className, clamp = true }: { note?: string; cla
     <div className={`flex items-start gap-1.5 ${className ?? ''}`}>
       <StickyNote size={12} className="mt-[3px] shrink-0" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
       <span
-        className={`whitespace-pre-line break-words text-[12.5px] leading-[18px] ${clamp ? 'line-clamp-3' : ''}`}
+        className={`whitespace-pre-line break-words text-body leading-[18px] ${clamp ? 'line-clamp-3' : ''}`}
         style={{ color: 'var(--text-secondary)' }}
       >
         {note}
@@ -345,7 +345,7 @@ export function OpenTaskButton({ taskKey, label = 'Details', className = '' }: {
         event.stopPropagation();
         openTask(taskKey);
       }}
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING} ${className}`}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-ui transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING} ${className}`}
       style={{ color: 'var(--text-muted)' }}
     >
       <PanelRight size={12} aria-hidden="true" />
@@ -413,7 +413,7 @@ export function InlineTaskActions({
         }}
         aria-label={`Add an update to ${taskKey}`}
         aria-expanded={composerOpen}
-        className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
+        className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
         style={{ color: composerOpen ? 'var(--text-secondary)' : 'var(--text-muted)' }}
       >
         <MessageSquarePlus size={12} aria-hidden="true" />

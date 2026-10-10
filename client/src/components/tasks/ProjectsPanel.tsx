@@ -31,7 +31,7 @@ export function ProjectsPanel({ today, projectId, trackId, archived, query, sear
       {!projectId ? <ProjectDirectory {...{ today, archived, query, searchRef, onQuery, onArchiveFilter, onNavigate, openTask }} onCreate={() => setEdit({})} /> : (
         <>
           {detail.isLoading && <div className="project-page" role="status"><p className="project-caption">Loading project…</p><div className="project-loading animate-pulse motion-reduce:animate-none"><span aria-hidden="true" /><span aria-hidden="true" /></div></div>}
-          {unavailable && <div className="project-page space-y-3"><button className="ui-link" onClick={() => onNavigate()}>Back to projects</button><p role="alert" className="text-sm">Project or track unavailable.</p>{detail.isError && <button className="ui-btn-secondary" onClick={() => void detail.refetch()}>Try again</button>}</div>}
+          {unavailable && <div className="project-page space-y-3"><button className="ui-link" onClick={() => onNavigate()}>Back to projects</button><p role="alert" className="text-body leading-5">Project or track unavailable.</p>{detail.isError && <button className="ui-btn-secondary" onClick={() => void detail.refetch()}>Try again</button>}</div>}
           {detail.data && !unavailable && <ProjectOverview detail={detail.data} {...{ trackId, archived, onNavigate, onArchiveFilter, openTask }} onEdit={(item, parent) => setEdit({ item, projectId: parent })} onArchive={(item, facts, parent) => setArchive({ item, facts, projectId: parent })} />}
         </>
       )}

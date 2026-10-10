@@ -20,10 +20,10 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
   return (
     <div className="space-y-3">
       <fieldset disabled={disabled} className="min-w-0">
-        <legend className="mb-2 text-[13px] font-medium">Project</legend>
+        <legend className="mb-2 text-body font-medium">Project</legend>
         <label className="project-search flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <Search size={14} aria-hidden="true" />
-          <input aria-label="Search projects" placeholder="Search projects…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] outline-none" style={{ color: 'var(--text-primary)' }} />
+          <input aria-label="Search projects" placeholder="Search projects…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-body outline-none" style={{ color: 'var(--text-primary)' }} />
         </label>
         <div className="placement-options mt-2 max-h-52 overflow-y-auto rounded-lg border p-1" style={{ borderColor: 'var(--border)' }}>
           <label className="placement-option" data-selected={!value}>
@@ -44,7 +44,7 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
       {value && (
         <div className="space-y-2">
           <p className="project-field-hint break-words">Selected: <strong style={{ color: 'var(--text-secondary)' }}>{selected?.name ?? 'Selected project'}</strong>{selected?.archivedAt ? ' · Archived' : ''}</p>
-          <label className="flex flex-col gap-2 text-[13px] font-medium">
+          <label className="flex flex-col gap-2 text-body font-medium">
             Track (optional)
             <select aria-label="Track (optional)" className="ui-field" disabled={disabled || detail.isLoading || Boolean(selected?.archivedAt)} value={value.trackId ?? ''} onChange={(event) => onChange({ projectId: value.projectId, trackId: event.target.value ? Number(event.target.value) : null })}>
               <option value="">No track · project only</option>
@@ -56,7 +56,7 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
           {(selected?.archivedAt || selectedTrack?.archivedAt) && <p className="project-field-hint">Choose an active project or track to move tasks into it.</p>}
         </div>
       )}
-      {(projects.error || detail.error) && <p role="alert" className="text-[13px]" style={{ color: 'var(--danger)' }}>Could not load projects or tracks. <button className="ui-link" onClick={() => { if (projects.error) void projects.refetch(); if (detail.error) void detail.refetch(); }}>Try again</button></p>}
+      {(projects.error || detail.error) && <p role="alert" className="text-body" style={{ color: 'var(--danger)' }}>Could not load projects or tracks. <button className="ui-link" onClick={() => { if (projects.error) void projects.refetch(); if (detail.error) void detail.refetch(); }}>Try again</button></p>}
     </div>
   );
 }

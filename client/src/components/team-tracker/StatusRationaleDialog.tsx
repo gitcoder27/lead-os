@@ -137,20 +137,20 @@ export function StatusRationaleDialog({
         {askVisibility && (
           <fieldset className="space-y-1" data-testid="status-visibility">
             <legend className="ui-field-label">Who sees this</legend>
-            <label className="flex items-start gap-2 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+            <label className="flex items-start gap-2 text-body" style={{ color: 'var(--text-primary)' }}>
               <input type="radio" name="status-visibility" checked={!isPrivate} onChange={() => setIsPrivate(false)} className="mt-0.5" />
               <span>
                 Visible to {firstName}
-                <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
                   {firstName} sees the status and this rationale on My Day. Your follow-up time stays private.
                 </span>
               </span>
             </label>
-            <label className="flex items-start gap-2 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+            <label className="flex items-start gap-2 text-body" style={{ color: 'var(--text-primary)' }}>
               <input type="radio" name="status-visibility" checked={isPrivate} onChange={() => setIsPrivate(true)} className="mt-0.5" />
               <span>
                 Private — only you
-                <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
                   {firstName} still sees the new status, but not the rationale or follow-up. Can&apos;t be linked to a task.
                 </span>
               </span>

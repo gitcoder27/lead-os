@@ -66,7 +66,7 @@ export function LinkSearchPanel({
             if (e.key === 'Enter' && type === 'external') addExternal();
           }}
           placeholder={placeholderByType[type]}
-          className="flex-1 bg-transparent text-[13px] outline-none"
+          className="flex-1 bg-transparent text-body outline-none"
           style={{ color: 'var(--text-primary)' }}
         />
         <button onClick={onClose} style={{ color: 'var(--text-muted)' }} aria-label="Close link search">
@@ -109,10 +109,10 @@ function IssueResults({
           className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:opacity-80"
           style={{ background: 'transparent' }}
         >
-          <span className="text-[12px] font-mono font-bold" style={{ color: 'var(--accent)' }}>
+          <span className="text-ui font-mono font-semibold" style={{ color: 'var(--accent)' }}>
             {issue.jiraKey}
           </span>
-          <span className="flex-1 truncate text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <span className="flex-1 truncate text-ui" style={{ color: 'var(--text-secondary)' }}>
             {issue.summary}
           </span>
         </button>
@@ -145,19 +145,19 @@ function DeveloperResults({
           style={{ background: 'transparent' }}
         >
           <UserCircle size={14} style={{ color: 'var(--info)' }} />
-          <span className="text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+          <span className="text-ui font-medium" style={{ color: 'var(--text-primary)' }}>
             {developer.displayName}
           </span>
           {developer.availability?.state === 'inactive' ? (
             <span
-              className="rounded-full px-1.5 py-0.5 text-[11px] font-bold uppercase"
+              className="rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase"
               style={{ background: 'rgba(245, 158, 11, 0.12)', color: 'var(--warning)' }}
             >
               Inactive
             </span>
           ) : null}
           {developer.email ? (
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
               {developer.email}
             </span>
           ) : null}
@@ -178,7 +178,7 @@ function ExternalAction({
     <div className="border-t px-3 py-2" style={{ borderColor: 'var(--border)' }}>
       <button
         onClick={onAdd}
-        className="flex items-center gap-1.5 text-[12px] font-medium transition-colors"
+        className="flex items-center gap-1.5 text-ui font-medium transition-colors"
         style={{ color: 'var(--md-accent)' }}
       >
         <Plus size={11} /> Add "{query}"

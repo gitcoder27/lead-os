@@ -207,13 +207,13 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
     const message = query.error instanceof Error ? query.error.message : 'Task not found';
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-        <span className="rounded-md px-2 py-0.5 font-mono text-[12px] font-bold" style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}>{taskKey}</span>
-        <p className="max-w-sm text-[14px]" style={{ color: 'var(--text-secondary)' }}>{message}</p>
+        <span className="rounded-md px-2 py-0.5 font-mono text-ui font-semibold" style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}>{taskKey}</span>
+        <p className="max-w-sm text-body" style={{ color: 'var(--text-secondary)' }}>{message}</p>
         {dismiss && (
           <button
             type="button"
             onClick={dismiss}
-            className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors hover:brightness-110 ${FOCUS_RING}`}
+            className={`rounded-lg px-3 py-1.5 text-body font-semibold transition-colors hover:brightness-110 ${FOCUS_RING}`}
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
           >
             Go back
@@ -238,8 +238,8 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className={`mx-auto space-y-5 ${fullPage ? 'max-w-3xl px-6 py-8' : 'px-6 py-5'}`}>
-            <h2 className="text-[20px] font-semibold leading-7 tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>{task.title}</h2>
-            <p className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px]" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+            <h2 className="text-title font-semibold leading-7 tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>{task.title}</h2>
+            <p className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-body" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
               <Lock size={13} style={{ color: 'var(--text-muted)' }} />
               You no longer own this task. Only your own shared updates are shown.
             </p>
@@ -344,7 +344,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           <TaskKeyChip taskKey={task.taskKey} />
           {task.kind === 'meeting' && (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 text-[12px] font-semibold leading-5"
+              className="inline-flex items-center gap-1 rounded-full px-2 text-ui font-semibold leading-5"
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >
               <Users size={11} />
@@ -354,7 +354,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           {task.parent && <ParentCrumb parent={task.parent} onOpen={onNavigateTask} />}
           {!fullPage && (
             <span
-              className="min-w-0 truncate text-[13px] font-semibold transition-all duration-200"
+              className="min-w-0 truncate text-body font-semibold transition-all duration-200"
               style={{ color: 'var(--text-primary)', opacity: condensed ? 1 : 0, transform: condensed ? 'none' : 'translateY(4px)' }}
               aria-hidden={!condensed}
             >
@@ -381,13 +381,13 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
       <TitleField task={task} editable={canEditTitle} onPatch={onPatch} size={fullPage ? 'page' : 'drawer'} />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <StatusControl task={task} editable={canEditStatus} onPatch={onPatch} />
-        <span className="ml-auto text-[12px]" style={{ color: 'var(--text-muted)' }} title={formatStamp(task.updatedAt)}>
+        <span className="ml-auto text-ui" style={{ color: 'var(--text-muted)' }} title={formatStamp(task.updatedAt)}>
           Updated {formatRelativeTime(task.updatedAt)}
         </span>
       </div>
       {deleted && (
         <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px] font-medium"
+          className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-body font-medium"
           style={{ background: 'color-mix(in srgb, var(--danger) 8%, transparent)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 22%, transparent)' }}
           role="status"
         >
@@ -413,7 +413,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
             window.history.pushState(null, '', oneOnOneHref(oneOnOneWith.accountId));
             window.dispatchEvent(new PopStateEvent('popstate'));
           }}
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium"
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-body font-medium"
           style={{ background: 'var(--accent-glow)', color: 'var(--accent-text)', border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)' }}
         >
           <Users size={14} aria-hidden="true" />
@@ -459,7 +459,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
                 className="space-y-4 rounded-2xl p-4 lg:sticky lg:top-6"
                 style={{ background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)', border: '1px solid var(--border)' }}
               >
-                <div className="px-1 text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Details</div>
+                <div className="px-1 text-ui font-semibold" style={{ color: 'var(--text-secondary)' }}>Details</div>
                 {properties}
                 <div className="h-px" style={{ background: 'var(--border)' }} />
                 <div className="px-1">
@@ -534,7 +534,7 @@ function DetailToolbar({ fullPage, onBack, leading, actions }: {
           <button
             type="button"
             onClick={onBack}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <ArrowLeft size={14} />
@@ -569,8 +569,8 @@ function TitleField({ task, editable, onPatch, size }: {
   }, [value, editable]);
 
   const typography = size === 'page'
-    ? 'text-[26px] leading-[34px] tracking-[-0.02em] sm:text-[28px] sm:leading-[36px]'
-    : 'text-[20px] leading-[28px] tracking-[-0.012em]';
+    ? 'text-display leading-[30px] tracking-[-0.02em]'
+    : 'text-title leading-[28px] tracking-[-0.012em]';
 
   if (!editable) {
     return (
@@ -646,8 +646,8 @@ function MoreActions({ task, canDelete, onDelete, onOpenFullPage }: {
         <TaskPopover anchor={anchor} onClose={close} label={confirming ? 'Confirm delete' : 'More actions'} width={236}>
           {confirming ? (
             <div className="p-1.5">
-              <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>Delete {task.taskKey}?</p>
-              <p className="mt-1 text-[12px] leading-[1.45]" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Delete {task.taskKey}?</p>
+              <p className="mt-1 text-ui leading-[1.45]" style={{ color: 'var(--text-muted)' }}>
                 It leaves every list and becomes a read-only record.
               </p>
               <div className="mt-3 flex justify-end gap-1.5">
@@ -655,7 +655,7 @@ function MoreActions({ task, canDelete, onDelete, onOpenFullPage }: {
                   type="button"
                   role="menuitem"
                   onClick={() => setConfirming(false)}
-                  className={`h-7 rounded-lg px-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+                  className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Cancel
@@ -723,9 +723,9 @@ function OneOnOneAttachMenu({ task }: { task: TaskDetailResponse }) {
         <TaskPopover anchor={anchor} onClose={() => setAnchor(null)} label="1:1 series" width={232}>
           <MenuHeading>Add to 1:1 agenda</MenuHeading>
           {list.isLoading ? (
-            <div className="px-2 py-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+            <div className="px-2 py-2 text-ui" style={{ color: 'var(--text-muted)' }}>Loading…</div>
           ) : series.length === 0 ? (
-            <div className="px-2 py-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="px-2 py-2 text-ui" style={{ color: 'var(--text-muted)' }}>
               No 1:1 series yet — start one from the developer&apos;s drawer.
             </div>
           ) : (
@@ -768,7 +768,7 @@ function TaskDetailSkeleton({ taskKey, fullPage, onClose, onBack }: { taskKey: s
       <DetailToolbar
         fullPage={fullPage}
         onBack={onBack}
-        leading={<span className="font-mono text-[12px] font-bold" style={{ color: 'var(--text-muted)' }}>{taskKey}</span>}
+        leading={<span className="font-mono text-ui font-semibold" style={{ color: 'var(--text-muted)' }}>{taskKey}</span>}
         actions={onClose && <IconButton label="Close" hint="Esc" onClick={onClose}><X size={16} /></IconButton>}
       />
       <div className={`space-y-6 ${fullPage ? 'mx-auto w-full max-w-[1180px] px-8 pt-8' : 'px-6 pt-5'}`}>

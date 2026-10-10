@@ -18,18 +18,18 @@ export function SectionHeader({ icon, title, count, hint, action, id, as: Headin
   return (
     <div className="flex min-h-[28px] items-center gap-2">
       {icon && <span className="flex items-center" style={{ color: 'var(--text-muted)' }}>{icon}</span>}
-      <Heading id={id} className="text-[13px] font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
+      <Heading id={id} className="text-body font-semibold tracking-[-0.005em]" style={{ color: 'var(--text-primary)' }}>
         {title}
       </Heading>
       {count !== undefined && count !== null && (
         <span
-          className="rounded-full px-1.5 text-[12px] font-semibold tabular-nums leading-[18px]"
+          className="rounded-full px-1.5 text-ui font-semibold tabular-nums leading-[18px]"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
         >
           {count}
         </span>
       )}
-      {hint && <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
+      {hint && <span className="text-ui" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
       {action && <div className="ml-auto flex items-center gap-1">{action}</div>}
     </div>
   );

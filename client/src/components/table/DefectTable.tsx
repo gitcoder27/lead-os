@@ -516,7 +516,7 @@ export function DefectTable({
             <JiraIssueLink
               issueKey={jiraKey}
               data-jira-link
-              className="font-mono text-[13px] font-medium relative group/id cursor-pointer whitespace-nowrap"
+              className="font-mono text-body font-medium relative group/id cursor-pointer whitespace-nowrap"
               style={{
                 color: 'var(--text-muted)',
                 textDecoration: isVisited ? 'underline' : 'none',
@@ -539,7 +539,7 @@ export function DefectTable({
             </JiraIssueLink>
           ) : (
             <span
-              className="font-mono text-[13px] font-medium whitespace-nowrap"
+              className="font-mono text-body font-medium whitespace-nowrap"
               style={{ color: 'var(--text-muted)' }}
             >
               {jiraKey}
@@ -559,7 +559,7 @@ export function DefectTable({
               onSelectIssue(info.row.original.jiraKey);
             }}
             aria-label={`Open triage for ${info.row.original.jiraKey}: ${info.getValue()}`}
-            className="text-[13px] truncate block max-w-[420px] text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            className="text-body truncate block max-w-[420px] text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             title={info.getValue()}
             style={{ color: 'var(--text-primary)' }}
           >
@@ -657,7 +657,7 @@ export function DefectTable({
                 setStatusFilterOpen((open) => !open);
               }}
               onMouseDown={(event) => event.stopPropagation()}
-              className="h-6 px-1.5 rounded-md inline-flex items-center gap-1 text-[12px] transition-colors"
+              className="h-6 px-1.5 rounded-md inline-flex items-center gap-1 text-ui transition-colors"
               style={{
                 border: hasStatusFilter ? '1px solid var(--border)' : '1px dashed var(--border)',
                 background: statusFilterOpen ? 'var(--bg-tertiary)' : 'transparent',
@@ -694,7 +694,7 @@ export function DefectTable({
                 style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="px-2 py-1.5 text-[12px] uppercase font-semibold border-b flex items-center justify-between"
+                <div className="px-2 py-1.5 text-ui uppercase font-semibold border-b flex items-center justify-between"
                      style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)', letterSpacing: '0.08em' }}
                 >
                   <span>Status filter</span>
@@ -716,7 +716,7 @@ export function DefectTable({
                   {allStatuses.map((status) => (
                     <label
                       key={status}
-                      className="flex items-center gap-2 px-2 py-1 rounded-md text-[13px]"
+                      className="flex items-center gap-2 px-2 py-1 rounded-md text-body"
                       style={{
                         color: 'var(--text-primary)',
                         cursor: 'pointer',
@@ -861,7 +861,7 @@ export function DefectTable({
   if (isLoading) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex flex-col px-3 pt-3">
-        <div className="text-[13px] font-medium pb-1.5" style={{ color: 'var(--text-secondary)' }}>
+        <div className="text-body font-medium pb-1.5" style={{ color: 'var(--text-secondary)' }}>
           Loading defects
         </div>
         {Array.from({ length: 8 }).map((_, i) => (
@@ -879,17 +879,17 @@ export function DefectTable({
     return (
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-6 text-center">
         <div>
-          <div className="text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>
+          <div className="text-body font-semibold" style={{ color: 'var(--danger)' }}>
             Could not load defects
           </div>
-          <p className="mt-2 max-w-md text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-2 max-w-md text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
             {error instanceof Error ? error.message : 'The issue query failed.'}
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="mt-4 rounded-md px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+            className="mt-4 rounded-md px-3 py-1.5 text-ui font-semibold disabled:opacity-50"
             style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
           >
             {isFetching ? 'Retrying' : 'Retry'}
@@ -919,11 +919,11 @@ export function DefectTable({
       style={{ borderColor: 'var(--border)' }}
     >
       <div className="min-w-0 flex items-center gap-2">
-        <div className="text-[13px] font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
+        <div className="text-body font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
           Defects
         </div>
         <div className="h-4 w-px" style={{ background: 'var(--border)' }} />
-        <div className="text-[13px] truncate" style={{ color: 'var(--text-secondary)' }}>
+        <div className="text-body truncate" style={{ color: 'var(--text-secondary)' }}>
           {filteredIssues.length} visible defect{filteredIssues.length !== 1 ? 's' : ''}{normalizedSearch ? ' after search' : ''}.
         </div>
       </div>
@@ -955,7 +955,7 @@ export function DefectTable({
           title="Clear all filters"
         >
           <CircleX size={15} />
-          <span className="text-[13px] font-medium hidden sm:inline">Clear filters</span>
+          <span className="text-body font-medium hidden sm:inline">Clear filters</span>
         </button>
 
         {!searchOpen ? (
@@ -968,7 +968,7 @@ export function DefectTable({
             title="Search defects"
           >
             <Search size={15} />
-            <span className="text-[13px] font-medium hidden sm:inline">Search</span>
+            <span className="text-body font-medium hidden sm:inline">Search</span>
           </button>
         ) : (
           <div
@@ -982,7 +982,7 @@ export function DefectTable({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID or title..."
-              className="flex-1 text-[13px] bg-transparent outline-none"
+              className="flex-1 text-body bg-transparent outline-none"
               style={{ color: 'var(--text-primary)' }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -1027,13 +1027,13 @@ export function DefectTable({
           <div className="mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--danger)' }}>
             <TriangleAlert size={18} />
           </div>
-          <p className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Jira defects could not be refreshed
           </p>
-          <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-2 text-body leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             {describeSyncError(syncErrorMessage)}
           </p>
-          <p className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="mt-2 text-body" style={{ color: 'var(--text-muted)' }}>
             Check the saved Jira API token in Settings, then run Save &amp; Sync.
           </p>
         </div>
@@ -1055,10 +1055,10 @@ export function DefectTable({
         {toolbar}
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="text-center">
-            <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
               Filter State
             </div>
-            <p className="text-[14px] mt-2" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-body mt-2" style={{ color: 'var(--text-secondary)' }}>
               No defects match the current filters.
             </p>
           </div>
@@ -1094,10 +1094,10 @@ export function DefectTable({
           {filteredIssues.length === 0 ? (
             <div className="h-full flex items-center justify-center px-6">
               <div className="text-center">
-                <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                   Search State
                 </div>
-                <p className="text-[14px] mt-2" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-body mt-2" style={{ color: 'var(--text-secondary)' }}>
                   No defects match this search.
                 </p>
               </div>
@@ -1121,7 +1121,7 @@ export function DefectTable({
                         <th
                           key={header.id}
                           aria-sort={canSort ? sortState === 'asc' ? 'ascending' : sortState === 'desc' ? 'descending' : 'none' : undefined}
-                          className="text-left text-[12px] font-semibold uppercase px-2 py-1.5 select-none sticky top-0 z-30"
+                          className="text-left text-ui font-semibold uppercase px-2 py-1.5 select-none sticky top-0 z-30"
                           style={{
                             letterSpacing: '0.08em',
                             color: 'var(--text-muted)',
@@ -1229,7 +1229,7 @@ export function DefectTable({
                     whileHover={{ y: -1, backgroundColor: ROW_HOVER_BACKGROUND }}
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => (
-                      <td key={cell.id} className="px-2 py-1.5 text-[13px] relative z-0 first:rounded-l-[10px] last:rounded-r-[10px]">
+                      <td key={cell.id} className="px-2 py-1.5 text-body relative z-0 first:rounded-l-[10px] last:rounded-r-[10px]">
                         {cellIndex === 0 && indicatorReason ? (
                           <span
                             role="img"

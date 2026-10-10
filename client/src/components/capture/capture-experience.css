@@ -1,6 +1,6 @@
 .capture-guidance {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .capture-examples summary {
   display: inline-flex;
@@ -32,7 +32,7 @@
   white-space: normal;
   overflow-wrap: anywhere;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 @media (max-width: 767px), (pointer: coarse) {
   .capture-examples summary {

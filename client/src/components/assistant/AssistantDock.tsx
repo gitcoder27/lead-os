@@ -79,7 +79,7 @@ export function AssistantDock() {
 
       {configQuery.isPending ? (
         <div className="flex flex-1 items-center justify-center p-6">
-          <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-body" style={{ color: 'var(--text-muted)' }}>
             Loading…
           </span>
         </div>
@@ -87,7 +87,7 @@ export function AssistantDock() {
         <>
           {thread.error ? (
             <div
-              className="shrink-0 border-b px-3 py-1.5 text-[12px]"
+              className="shrink-0 border-b px-3 py-1.5 text-ui"
               style={{ borderColor: 'var(--border)', color: 'var(--danger)' }}
               role="alert"
             >
@@ -132,10 +132,10 @@ export function AssistantDock() {
             <CopilotMark size={20} monochrome />
           </span>
           <div>
-            <p className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               Copilot isn&apos;t set up yet
             </p>
-            <p className="mt-1 text-[12px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+            <p className="mt-1 text-ui leading-5" style={{ color: 'var(--text-secondary)' }}>
               Add an API key and enable the assistant in Settings to start asking about your workspace.
             </p>
           </div>
@@ -145,7 +145,7 @@ export function AssistantDock() {
               onOpenTarget?.({ type: 'view', view: 'settings', section: 'assistant' });
               close();
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold"
             style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
           >
             <Settings size={13} />

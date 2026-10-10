@@ -55,7 +55,7 @@ export function NotesConflictPanel({ remote, base, local, error, onKeepBoth, onU
         </div>
       ) : null}
       {error ? (
-        <p className="mt-2 text-[12px]" style={{ color: 'var(--danger)' }}>
+        <p className="mt-2 text-ui" style={{ color: 'var(--danger)' }}>
           {error}
         </p>
       ) : null}
@@ -75,7 +75,7 @@ export function NotesConflictPanel({ remote, base, local, error, onKeepBoth, onU
             <Dialog.Title className="ui-dialog-title">
               Discard your draft?
             </Dialog.Title>
-            <Dialog.Description className="mt-2 text-[12.5px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+            <Dialog.Description className="mt-2 text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
               This replaces your unsaved draft with the version saved on the server. This cannot be undone.
             </Dialog.Description>
             <div className="mt-4 flex justify-end gap-2">

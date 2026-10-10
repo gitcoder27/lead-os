@@ -13,14 +13,14 @@ export function Kbd({ children, variant = 'default', className = '' }: {
 }) {
   if (variant === 'bare') {
     return (
-      <kbd className={`font-mono text-[11px] font-medium ${className}`} style={{ color: 'var(--text-muted)' }}>
+      <kbd className={`font-mono text-meta font-medium ${className}`} style={{ color: 'var(--text-muted)' }}>
         {typeof children === 'string' ? formatShortcutKeys(children) : children}
       </kbd>
     );
   }
   return (
     <kbd
-      className={`inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-[5px] px-1 font-mono text-[11px] font-medium leading-none ${className}`}
+      className={`inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-[5px] px-1 font-mono text-meta font-medium leading-none ${className}`}
       style={{
         color: variant === 'subtle' ? 'var(--text-muted)' : 'var(--text-secondary)',
         background: 'var(--bg-tertiary)',
@@ -42,7 +42,7 @@ export function KeySpec({ keys, variant = 'default' }: { keys: string; variant?:
     <span className="inline-flex flex-wrap items-center gap-1">
       {tokens.map((token, index) =>
         /^\s*(\/|→|\+|·)\s*$/.test(token) ? (
-          <span key={index} className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{token.trim()}</span>
+          <span key={index} className="text-meta" style={{ color: 'var(--text-muted)' }}>{token.trim()}</span>
         ) : (
           <Kbd key={index} variant={variant}>{token}</Kbd>
         ),

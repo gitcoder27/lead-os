@@ -48,11 +48,11 @@ export function TriageNotesToday({ value, dateLabel, onChange, onBlur, readOnly 
           className="inline-block shrink-0 rounded-full"
           style={{ width: 6, height: 6, background: 'var(--accent)', boxShadow: '0 0 6px var(--accent-glow)' }}
         />
-        <span className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <span className="text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
           {dateLabel}
         </span>
         <span
-          className="rounded-full px-1.5 py-px text-[11px] font-semibold uppercase tracking-[0.1em]"
+          className="rounded-full px-1.5 py-px text-meta font-semibold uppercase tracking-[0.1em]"
           style={{ color: 'var(--accent)', background: 'var(--accent-glow)' }}
         >
           Today
@@ -71,7 +71,7 @@ export function TriageNotesToday({ value, dateLabel, onChange, onBlur, readOnly 
         onBlur={() => { isFocusedRef.current = false; setIsFocused(false); onBlur(); }}
         readOnly={readOnly}
         placeholder="Add today's analysis, findings, or handoff…"
-        className="w-full resize-none bg-transparent px-0 py-0 text-[12.5px] leading-[1.7] focus:outline-none read-only:cursor-default"
+        className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.7] focus:outline-none read-only:cursor-default"
         style={{ color: 'var(--text-primary)', minHeight: 56, maxHeight: 200, fontFamily: "'Geist Variable', sans-serif" }}
       />
     </div>

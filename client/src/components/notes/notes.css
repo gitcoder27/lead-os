@@ -33,7 +33,7 @@
 }
 
 .notes-sidebar-title {
-  font-size: 17px;
+  font-size: var(--fs-15);
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.01em;
@@ -65,7 +65,7 @@
   border: 1px solid var(--border);
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   padding: 7px 44px 7px 28px;
   outline: none;
 }
@@ -140,7 +140,7 @@
 
 .notes-history-group {
   padding: 12px 10px 4px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   color: var(--text-muted);
 }
@@ -158,13 +158,13 @@
 
 .notes-day-row-produced {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .notes-day-row-date {
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -175,7 +175,7 @@
 
 .notes-day-row-title {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 500;
   color: var(--text-primary);
   overflow: hidden;
@@ -185,7 +185,7 @@
 
 .notes-day-row-excerpt {
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,7 +209,7 @@
 .notes-sidebar-empty {
   padding: 28px 18px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   color: var(--text-muted);
   line-height: 1.6;
 }
@@ -250,7 +250,7 @@
 }
 
 .notes-doc-heading {
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.015em;
@@ -268,7 +268,7 @@
   border-radius: 999px;
   background: var(--accent-glow);
   color: var(--accent-text);
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -284,7 +284,7 @@
   border-radius: 999px;
   background: var(--bg-tertiary);
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -307,7 +307,7 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
@@ -345,7 +345,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -385,20 +385,20 @@
   max-width: 420px;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: var(--fs-13);
   line-height: 1.6;
 }
 
 .notes-doc-inline-error {
   margin-top: 12px;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   line-height: 1.5;
   color: var(--danger);
 }
 
 .notes-teach {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   line-height: 1.7;
   color: var(--text-muted);
 }
@@ -418,7 +418,7 @@
   border: 0;
   background: transparent;
   padding: 2px 0;
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -482,7 +482,7 @@
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   cursor: pointer;
 }
 
@@ -516,7 +516,7 @@
   background: transparent;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 15px;
+  font-size: var(--fs-15);
   line-height: 1.6;
   border-radius: 8px;
 }
@@ -557,7 +557,7 @@
 
 /* Live markdown */
 .notes-editor .cm-note-heading {
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
 }
@@ -588,7 +588,7 @@
 }
 
 .notes-editor .cm-note-strong {
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .notes-editor .cm-note-em {
@@ -703,7 +703,7 @@
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   line-height: 1;
   cursor: pointer;
   user-select: none;
@@ -787,7 +787,7 @@
 .notes-editor .cm-note-preview {
   width: 260px;
   padding: 10px 12px;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
 }
 
 .notes-editor .cm-note-preview-head {
@@ -798,13 +798,13 @@
 
 .notes-editor .cm-note-preview-key {
   font-family: 'Geist Mono Variable', ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-11);
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
 .notes-editor .cm-note-preview-meta {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
 }
 
@@ -825,7 +825,7 @@
   border: 0;
   background: var(--accent-glow);
   color: var(--accent);
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 6px;
@@ -833,7 +833,7 @@
 }
 
 .notes-editor .cm-note-preview-hint {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
 }
 
@@ -850,7 +850,7 @@
   gap: 8px;
   padding: 5px 8px;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   color: var(--text-secondary);
 }
 
@@ -862,7 +862,7 @@
 .notes-editor .cm-completionDetail {
   margin-left: auto;
   font-style: normal;
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
   max-width: 200px;
   overflow: hidden;
@@ -885,13 +885,13 @@
 }
 
 .notes-editor .cm-panel.cm-search {
-  font-size: 12px;
+  font-size: var(--fs-12);
   padding: 6px 8px;
 }
 
 .notes-editor .cm-panel.cm-search input,
 .notes-editor .cm-panel.cm-search button {
-  font-size: 12px;
+  font-size: var(--fs-12);
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--bg-primary);
@@ -925,7 +925,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
 }
@@ -951,7 +951,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -962,7 +962,7 @@
 
 .notes-conflict-detail {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   color: var(--text-secondary);
   line-height: 1.5;
 }
@@ -986,7 +986,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-13);
   line-height: 1.55;
   color: var(--text-secondary);
   border: 1px solid var(--border);
@@ -996,7 +996,7 @@
 }
 
 .notes-conflict-side {
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 3px;
@@ -1022,7 +1022,7 @@
 }
 
 .notes-from-group-label {
-  font-size: 11.5px;
+  font-size: var(--fs-11);
   font-weight: 500;
   color: var(--text-muted);
   padding: 4px 8px 2px;
@@ -1039,7 +1039,7 @@
   border-radius: 8px;
   background: transparent;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--text-primary);
   cursor: pointer;
 }
@@ -1056,8 +1056,8 @@
 
 .notes-from-key {
   font-family: 'Geist Mono Variable', ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--fs-11);
+  font-weight: 600;
   color: var(--text-secondary);
   flex-shrink: 0;
 }
@@ -1071,7 +1071,7 @@
 }
 
 .notes-from-meta {
-  font-size: 11.5px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -1101,7 +1101,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
   background: var(--bg-primary);
   border-top: 1px solid var(--border);
@@ -1124,7 +1124,7 @@
 }
 
 .notes-footer-note {
-  font-size: 11.5px;
+  font-size: var(--fs-12);
 }
 
 .notes-meta-spacer {
@@ -1151,7 +1151,7 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
 }
@@ -1173,13 +1173,13 @@
 }
 
 .notes-ghost-count {
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
 
 .notes-icon-button {
-  font-size: 13px;
+  font-size: var(--fs-13);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -1203,7 +1203,7 @@
   border: 0;
   background: transparent;
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   cursor: pointer;
   padding: 2px 4px;
@@ -1221,7 +1221,7 @@
   display: grid;
   gap: 5px;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   outline: none;
 }
 
@@ -1274,7 +1274,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
 }
 
@@ -1284,7 +1284,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   padding: 3px 6px;
   cursor: pointer;
@@ -1305,12 +1305,12 @@
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   cursor: pointer;
 }
 
 .notes-preset span {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-muted);
 }
 
@@ -1327,7 +1327,7 @@
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-muted);
 }
 
@@ -1335,7 +1335,7 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   padding: 3px 7px;
   border-radius: 6px;
@@ -1387,7 +1387,7 @@
 }
 
 .notes-wrapup-text {
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
@@ -1404,7 +1404,7 @@
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: var(--fs-12);
   font-weight: 500;
   padding: 3px 8px;
   border-radius: 6px;
@@ -1454,11 +1454,11 @@
   }
 
   .notes-doc-heading {
-    font-size: 20px;
+    font-size: var(--fs-19);
   }
 
   .notes-editor .cm-editor {
-    font-size: 16px; /* iOS: no zoom-on-focus below 16px */
+    font-size: var(--fs-input-touch); /* iOS: no zoom-on-focus below 16px */
   }
 
   .notes-conflict-hunk {

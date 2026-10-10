@@ -216,7 +216,7 @@ function TrackerOnlyDrawer({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span
-                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider"
+                  className="inline-flex items-center rounded-full px-2 py-0.5 text-ui font-semibold uppercase tracking-wider"
                   style={{
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-secondary)',
@@ -228,18 +228,18 @@ function TrackerOnlyDrawer({
               </div>
               <div className="mt-2 flex items-center gap-2">
                 {item.taskKey && <TaskKeyChip taskKey={item.taskKey} />}
-                <span className="text-[18px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+                <span className="text-title-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
                   {item.title}
                 </span>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+              <div className="mt-1 flex items-center gap-2 text-body" style={{ color: 'var(--text-secondary)' }}>
                 <span>{dev.displayName}</span>
                 {item.jiraKey && (
                   <>
                     <span style={{ color: 'var(--text-muted)' }}>·</span>
                     <JiraIssueLink
                       issueKey={item.jiraKey}
-                      className="font-mono text-[12px] font-semibold"
+                      className="font-mono text-ui font-semibold"
                       style={{ color: 'var(--accent)' }}
                     >
                       {item.jiraKey}
@@ -283,17 +283,17 @@ function TrackerOnlyDrawer({
                 'linear-gradient(180deg, color-mix(in srgb, var(--accent-glow) 20%, transparent) 0%, var(--bg-secondary) 100%)',
             }}
           >
-            <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               Promote to Manager Follow-Up
             </div>
-            <div className="mt-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>
               Create a Manager Desk item linked to this tracker task. This enables priority, status tracking, and linking from Manager Desk.
             </div>
             <button
               type="button"
               onClick={onPromote}
               disabled={isPromoting}
-              className="mt-3 flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-semibold transition-all disabled:opacity-50"
+              className="mt-3 flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-body font-semibold transition-all disabled:opacity-50"
               style={{
                 background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent) 70%, transparent))',
                 color: 'var(--bg-primary)',
@@ -328,7 +328,7 @@ function BackToDeveloperRow({
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-medium transition-colors hover:brightness-125"
+        className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-ui font-medium transition-colors hover:brightness-125"
         style={{ color: 'var(--text-secondary)' }}
         aria-label={`Back to ${label}`}
       >
@@ -364,10 +364,10 @@ function TrackerTaskDetailPlaceholder({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[12px] font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--md-accent)' }}>
+            <div className="text-ui font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--md-accent)' }}>
               Item Detail
             </div>
-            <div className="mt-2 text-[20px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+            <div className="mt-2 text-title font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
               {isLoading ? 'Opening task detail' : 'Could not open task detail'}
             </div>
           </div>
@@ -400,10 +400,10 @@ function TrackerTaskDetailPlaceholder({
               <TriangleAlert size={16} className="mt-0.5" style={{ color: 'var(--warning)' }} />
             )}
             <div className="min-w-0">
-              <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {isLoading ? 'Loading task detail' : 'Task detail is unavailable'}
               </div>
-              <div className="mt-1 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+              <div className="mt-1 text-body" style={{ color: 'var(--text-secondary)' }}>
                 {isLoading
                   ? 'Loading tracker task detail and execution context.'
                   : errorMessage}
@@ -415,7 +415,7 @@ function TrackerTaskDetailPlaceholder({
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-xl px-3 py-1.5 text-[12px] font-semibold"
+                className="rounded-xl px-3 py-1.5 text-ui font-semibold"
                 style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
               >
                 Retry
@@ -423,7 +423,7 @@ function TrackerTaskDetailPlaceholder({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-[12px]"
+                className="text-ui"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Close

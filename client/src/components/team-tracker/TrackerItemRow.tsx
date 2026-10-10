@@ -164,7 +164,7 @@ function ClassicTrackerItemRow({
                       setTitleEditing(false);
                     }
                   }}
-                  className="flex-1 min-w-0 rounded px-1.5 py-0.5 text-[13px] outline-none"
+                  className="flex-1 min-w-0 rounded px-1.5 py-0.5 text-body outline-none"
                   style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
                   aria-label="Edit title"
                 />
@@ -195,7 +195,7 @@ function ClassicTrackerItemRow({
                 title={item.title}
               >
                 <span
-                  className="block truncate text-[13px] hover:underline"
+                  className="block truncate text-body hover:underline"
                   style={{ color: 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}
                 >
                   {item.title}
@@ -203,7 +203,7 @@ function ClassicTrackerItemRow({
               </button>
             ) : (
               <span
-                className="block truncate text-[13px]"
+                className="block truncate text-body"
                 style={{ color: isDone ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: isDone ? 'line-through' : 'none' }}
                 title={item.title}
               >
@@ -236,10 +236,10 @@ function ClassicTrackerItemRow({
 
         {item.jiraKey && (
           <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-            <span className="text-[12px] font-semibold uppercase shrink-0" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+            <span className="text-ui font-semibold uppercase shrink-0" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
               Jira
             </span>
-            <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-[12px] truncate" style={{ color: 'var(--accent)' }}>
+            <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-ui truncate" style={{ color: 'var(--accent)' }}>
               {jiraLabel}
             </JiraIssueLink>
           </div>
@@ -252,7 +252,7 @@ function ClassicTrackerItemRow({
         />
         {jiraMeta && (
           <div className="mt-0.5">
-            <span className="text-[12px]" style={{ color: item.jiraPriorityName ? priorityColor(item.jiraPriorityName) : 'var(--text-muted)' }}>
+            <span className="text-ui" style={{ color: item.jiraPriorityName ? priorityColor(item.jiraPriorityName) : 'var(--text-muted)' }}>
               {jiraMeta}
             </span>
           </div>
@@ -260,7 +260,7 @@ function ClassicTrackerItemRow({
         {isLinked && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.06em]"
               style={{
                 background: 'color-mix(in srgb, var(--md-accent) 10%, transparent)',
                 color: 'var(--md-accent, var(--warning))',
@@ -276,7 +276,7 @@ function ClassicTrackerItemRow({
         {isContinued && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.06em]"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-muted)',
@@ -289,7 +289,7 @@ function ClassicTrackerItemRow({
           </div>
         )}
         {item.latestEvent && !compact && (
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>
             <span className="truncate" title={item.latestEvent.excerpt}>
               {item.latestEvent.excerpt}
             </span>
@@ -303,7 +303,7 @@ function ClassicTrackerItemRow({
           <div className="mt-1 flex items-start gap-1.5">
             <StickyNote size={12} className="shrink-0 mt-[2px]" style={{ color: 'var(--text-muted)' }} />
             <span
-              className="text-[13px] leading-5"
+              className="text-body leading-5"
               style={{ color: 'var(--text-secondary)' }}
             >
               {item.note}

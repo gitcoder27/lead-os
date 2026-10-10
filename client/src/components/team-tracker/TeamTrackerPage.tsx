@@ -636,10 +636,10 @@ export function TeamTrackerPage({
         ) : isError ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <div className="text-[13px] font-semibold" style={{ color: 'var(--danger)' }}>
+              <div className="text-body font-semibold" style={{ color: 'var(--danger)' }}>
                 Could not load team tracker
               </div>
-              <p className="mt-2 max-w-md text-[13px] leading-5" style={{ color: 'var(--text-secondary)' }}>
+              <p className="mt-2 max-w-md text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
                 {error instanceof Error ? error.message : 'The team tracker query failed.'}
               </p>
               <button
@@ -691,7 +691,7 @@ export function TeamTrackerPage({
           </div>
         ) : (
           <div className="flex items-center justify-center py-20">
-            <div className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+            <div className="text-body" style={{ color: 'var(--text-muted)' }}>
               No tracker data. Add developers from the settings page first.
             </div>
           </div>
@@ -844,7 +844,7 @@ function TeamTrackerModeBanner({
   return (
     <span
       role="status"
-      className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
+      className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-ui font-medium"
       style={{
         color: 'var(--warning)',
         background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
@@ -898,7 +898,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
         <button
           type="button"
           onClick={() => onChange(getLocalIsoDate())}
-          className={`h-8 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`h-8 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           Today
@@ -922,7 +922,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
           <button
             type="button"
             onClick={openPicker}
-            className={`flex h-7 min-w-[112px] items-center justify-center gap-1.5 rounded-md px-2 text-[12.5px] font-medium tabular-nums transition-colors hover:bg-[var(--bg-elevated)] ${FOCUS_RING}`}
+            className={`flex h-7 min-w-[112px] items-center justify-center gap-1.5 rounded-md px-2 text-ui font-medium tabular-nums transition-colors hover:bg-[var(--bg-elevated)] ${FOCUS_RING}`}
             style={{ color: 'var(--text-primary)' }}
             aria-label={`Choose date, ${label}`}
             title="Choose date"
@@ -1000,10 +1000,10 @@ function TeamTrackerSkeleton() {
 function EmptyLensState({ title, message }: { title: string; message: string }) {
   return (
     <div className="flex min-h-[220px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-10 text-center" style={{ borderColor: 'var(--border)' }}>
-      <div className="text-[13.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+      <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
         {title}
       </div>
-      <div className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
+      <div className="text-body" style={{ color: 'var(--text-muted)' }}>
         {message}
       </div>
     </div>

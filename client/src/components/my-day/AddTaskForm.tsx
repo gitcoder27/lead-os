@@ -17,7 +17,7 @@ interface AddTaskFormProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const ghostButton = `inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`;
+const ghostButton = `inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`;
 
 export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpenChange }: AddTaskFormProps) {
   const [openState, setOpenState] = useState(false);
@@ -85,7 +85,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className={`group/add flex w-full items-center gap-3 px-3 py-2.5 text-left text-[13px] transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)] disabled:opacity-50 sm:px-4 ${FOCUS_RING} focus-visible:ring-inset`}
+        className={`group/add flex w-full items-center gap-3 px-3 py-2.5 text-left text-body transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)] disabled:opacity-50 sm:px-4 ${FOCUS_RING} focus-visible:ring-inset`}
         style={{ color: 'var(--text-muted)' }}
       >
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors group-hover/add:text-[var(--accent)]">
@@ -131,7 +131,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
               }
             }}
             placeholder="What’s next? One line is enough"
-            className="w-full bg-transparent text-[14px] font-medium leading-6 outline-none placeholder:font-normal placeholder:text-[var(--text-placeholder)]"
+            className="w-full bg-transparent text-body font-medium leading-6 outline-none placeholder:font-normal placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
           />
 
@@ -143,12 +143,12 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
               <div className="flex min-w-0 items-baseline gap-2">
                 <JiraIssueLink
                   issueKey={selectedIssue.jiraKey}
-                  className="shrink-0 font-mono text-[12px] font-semibold"
+                  className="shrink-0 font-mono text-ui font-semibold"
                   style={{ color: 'var(--accent)' }}
                 >
                   {selectedIssue.jiraKey}
                 </JiraIssueLink>
-                <span className="truncate text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>{selectedIssue.summary}</span>
+                <span className="truncate text-body" style={{ color: 'var(--text-secondary)' }}>{selectedIssue.summary}</span>
               </div>
               <button
                 type="button"
@@ -184,7 +184,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                   disabled={disabled}
                   placeholder="Search by key or summary..."
                   aria-label="Search Jira issues"
-                  className="w-full rounded-lg py-1.5 pl-8 pr-3 text-[13px] outline-none focus:border-[var(--border-active)]"
+                  className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none focus:border-[var(--border-active)]"
                   style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
                 />
               </div>
@@ -204,7 +204,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                         <JiraIssueLink
                           issueKey={issue.jiraKey}
                           stopPropagation
-                          className="shrink-0 font-mono text-[12px] font-semibold"
+                          className="shrink-0 font-mono text-ui font-semibold"
                           style={{ color: 'var(--accent)' }}
                         >
                           {issue.jiraKey}
@@ -212,14 +212,14 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                         <button
                           type="button"
                           onClick={() => selectIssue(issue)}
-                          className="min-w-0 flex-1 truncate text-left text-[13px] outline-none focus-visible:underline"
+                          className="min-w-0 flex-1 truncate text-left text-body outline-none focus-visible:underline"
                           style={{ color: 'var(--text-secondary)' }}
                         >
                           {issue.summary}
                         </button>
                       </div>
                       {(issue.priorityName || issue.developmentDueDate || issue.dueDate) && (
-                        <div className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                        <div className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                           {[
                             issue.priorityName,
                             (issue.developmentDueDate ?? issue.dueDate)
@@ -235,7 +235,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                 </div>
               )}
               {jiraSearch && issues && filteredIssues.length === 0 && (
-                <p className="mt-1.5 px-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>No matching issues assigned to you.</p>
+                <p className="mt-1.5 px-1 text-ui" style={{ color: 'var(--text-muted)' }}>No matching issues assigned to you.</p>
               )}
             </div>
           )}
@@ -251,7 +251,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                 disabled={disabled}
                 rows={3}
                 placeholder="Context, links, what done looks like (optional)"
-                className="w-full resize-none rounded-lg px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--border-active)]"
+                className="w-full resize-none rounded-lg px-2.5 py-1.5 text-body outline-none focus:border-[var(--border-active)]"
                 style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
               />
             </div>
@@ -283,11 +283,11 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                 type="button"
                 onClick={handleSubmit}
                 disabled={!title.trim() || isPending || disabled}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-ui font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS_RING}`}
                 style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
               >
                 Add task
-                <span className="hidden text-[12px] font-medium opacity-70 sm:inline" aria-hidden="true">↵</span>
+                <span className="hidden text-ui font-medium opacity-70 sm:inline" aria-hidden="true">↵</span>
               </button>
             </div>
           </div>

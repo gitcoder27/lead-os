@@ -99,12 +99,12 @@ export function WorkBulkTriage({
       onClose={pending ? () => {} : onClose}
       size="md"
     >
-      <p className="text-[13px] mb-4">
+      <p className="text-body mb-4">
         Review these targets before applying. Jira writes are checked separately for each issue.
       </p>
       {!submitted && (
         <>
-          <label className="block text-[13px] mb-3">
+          <label className="block text-body mb-3">
             Action
             <select
               data-autofocus
@@ -131,7 +131,7 @@ export function WorkBulkTriage({
             </select>
           </label>
           {action === 'assign' && (
-            <label className="block text-[13px] mb-3">
+            <label className="block text-body mb-3">
               Assignee
               <select className="ui-input w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
                 <option value="">Choose a Jira-linked person</option>
@@ -146,7 +146,7 @@ export function WorkBulkTriage({
             </label>
           )}
           {action === 'priority' && (
-            <label className="block text-[13px] mb-3">
+            <label className="block text-body mb-3">
               Priority
               <select className="ui-input w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
                 {PRIORITY_OPTIONS.map((priority) => (
@@ -156,7 +156,7 @@ export function WorkBulkTriage({
             </label>
           )}
           {['date', 'snooze'].includes(action) && (
-            <label className="block text-[13px] mb-3">
+            <label className="block text-body mb-3">
               {action === 'snooze' ? 'Return on' : 'Due date'}
               <input
                 type="date"
@@ -168,7 +168,7 @@ export function WorkBulkTriage({
             </label>
           )}
           {['new', 'indeterminate', 'done'].includes(action) && (
-            <p className="text-[13px] mb-3">
+            <p className="text-body mb-3">
               Only one available transition to that category can be applied. Issues needing a form or a choice of
               transitions will stay unchanged.
             </p>
@@ -203,7 +203,7 @@ export function WorkBulkTriage({
         })}
       </ul>
       {error && (
-        <p role="alert" className="my-3 text-[13px]">
+        <p role="alert" className="my-3 text-body">
           {error}
         </p>
       )}

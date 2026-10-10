@@ -80,8 +80,8 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               <Database size={16} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Backups</h3>
-              <p className="mt-0.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Backups</h3>
+              <p className="mt-0.5 text-ui leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 Snapshots of the whole LeadOS database, taken on a schedule and before resets.
                 {latest ? ` Last backup ${formatRelativeTime(latest.createdAt)}.` : ' No backup yet.'}
               </p>
@@ -99,17 +99,17 @@ export function SettingsDataSection({ active }: { active: boolean }) {
         </div>
 
         {error ? (
-          <p role="alert" className="mt-3 text-[12px]" style={{ color: 'var(--danger)' }}>{error}</p>
+          <p role="alert" className="mt-3 text-ui" style={{ color: 'var(--danger)' }}>{error}</p>
         ) : null}
         {runtime?.lastError && !error ? (
-          <p role="alert" className="mt-3 text-[12px]" style={{ color: 'var(--danger)' }}>Last backup failed: {runtime.lastError}</p>
+          <p role="alert" className="mt-3 text-ui" style={{ color: 'var(--danger)' }}>Last backup failed: {runtime.lastError}</p>
         ) : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <label className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-3" style={{ background: 'var(--settings-input-bg)', border: 'var(--settings-inset-border)' }}>
             <span className="min-w-0">
-              <span className="block text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Scheduled backups</span>
-              <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="block text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Scheduled backups</span>
+              <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
                 {enabled
                   ? runtime?.nextRunAt ? `On. Next backup ${formatRelativeTime(runtime.nextRunAt)}.` : 'On.'
                   : 'Off. Only manual and pre-reset backups are taken.'}
@@ -124,7 +124,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               onChange={(event) => void saveSchedule({ backupEnabled: event.target.checked })}
             />
           </label>
-          <label className="flex flex-col gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <label className="flex flex-col gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
             Frequency
             <select
               className="ui-input"
@@ -139,7 +139,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <label className="flex flex-col gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
             Keep for (days)
             <input
               className="ui-input"
@@ -157,9 +157,9 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               }}
             />
           </label>
-          <div className="flex flex-col gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex flex-col gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
             Stored in
-            <code className="truncate rounded-md px-2 py-1.5 text-[11.5px]" title={directory} style={{ background: 'var(--settings-code-bg)', color: 'var(--text-secondary)' }}>
+            <code className="truncate rounded-md px-2 py-1.5 text-ui" title={directory} style={{ background: 'var(--settings-code-bg)', color: 'var(--text-secondary)' }}>
               {directory || '—'}
             </code>
           </div>
@@ -167,13 +167,13 @@ export function SettingsDataSection({ active }: { active: boolean }) {
       </div>
 
       <div>
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>Snapshots</h3>
+        <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>Snapshots</h3>
         {backups.isLoading ? (
-          <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>Loading backups…</p>
+          <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>Loading backups…</p>
         ) : backups.isError ? (
-          <p role="alert" className="mt-2 text-[12px]" style={{ color: 'var(--danger)' }}>Backups could not be loaded.</p>
+          <p role="alert" className="mt-2 text-ui" style={{ color: 'var(--danger)' }}>Backups could not be loaded.</p>
         ) : list.length === 0 ? (
-          <p className="mt-2 text-[12px]" style={{ color: 'var(--text-muted)' }}>No snapshots yet. Use “Back up now” to take the first one.</p>
+          <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>No snapshots yet. Use “Back up now” to take the first one.</p>
         ) : (
           <ul className="mt-2 overflow-hidden rounded-xl" style={{ border: 'var(--settings-pane-border)' }} aria-label="Backup snapshots">
             {list.map((backup, index) => (
@@ -183,8 +183,8 @@ export function SettingsDataSection({ active }: { active: boolean }) {
                 style={{ borderTop: index > 0 ? 'var(--settings-row-divider)' : 'none' }}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }} title={backup.name}>{backup.name}</p>
-                  <p className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }} title={backup.name}>{backup.name}</p>
+                  <p className="text-meta" style={{ color: 'var(--text-muted)' }}>
                     <span className="capitalize">{backup.reason}</span> · {formatAbsoluteDateTime(backup.createdAt)} ({formatRelativeTime(backup.createdAt)}) · {formatSize(backup.sizeBytes)}
                   </p>
                 </div>
@@ -205,15 +205,15 @@ export function SettingsDataSection({ active }: { active: boolean }) {
       <div className="rounded-xl px-4 py-3.5" style={cardStyle}>
         <div className="flex items-center gap-2">
           <Terminal size={13} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
-          <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Restoring a backup</h3>
+          <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Restoring a backup</h3>
         </div>
-        <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-1.5 text-ui leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Restore is not available in the app, because it replaces the live database. Stop the server and run this on the machine that hosts LeadOS:
         </p>
-        <pre className="mt-2 overflow-x-auto rounded-md px-3 py-2 text-[12px]" style={{ background: 'var(--settings-code-bg)', color: 'var(--text-primary)' }}>
+        <pre className="mt-2 overflow-x-auto rounded-md px-3 py-2 text-ui" style={{ background: 'var(--settings-code-bg)', color: 'var(--text-primary)' }}>
           <code>npm run backup:restore -- &lt;path-to-backup-db&gt;</code>
         </pre>
-        <p className="mt-2 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-2 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Backups live on the same machine as the database. Download one now and then, or copy the folder off the machine (rsync or object storage). See docs/23 for a scheduled copy.
         </p>
       </div>

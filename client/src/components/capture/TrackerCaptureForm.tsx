@@ -103,7 +103,7 @@ export function TrackerCaptureForm({
         {/* Developer picker */}
         <div>
           <label
-            className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
+            className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
             style={{ color: 'var(--text-muted)' }}
           >
             Assign to
@@ -119,7 +119,7 @@ export function TrackerCaptureForm({
         {/* Task title */}
         <div>
           <label
-            className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
+            className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
             style={{ color: 'var(--text-muted)' }}
             htmlFor="tracker-capture-title"
           >
@@ -143,7 +143,7 @@ export function TrackerCaptureForm({
                 : 'Select a developer first…'
             }
             disabled={!developer}
-            className="w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none transition-all disabled:opacity-40"
+            className="w-full rounded-xl px-3.5 py-2.5 text-body outline-none transition-all disabled:opacity-40"
             style={{
               background: 'var(--bg-elevated)',
               color: 'var(--text-primary)',
@@ -169,7 +169,7 @@ export function TrackerCaptureForm({
             <button
               type="button"
               onClick={() => setJiraPickerOpen(true)}
-              className="text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+              className="text-ui px-2.5 py-1 rounded-lg font-medium transition-colors"
               style={{
                 color: 'var(--accent)',
                 background: 'var(--accent-glow)',
@@ -181,7 +181,7 @@ export function TrackerCaptureForm({
             <button
               type="button"
               onClick={() => setNoteOpen(true)}
-              className="text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors"
+              className="text-ui px-2.5 py-1 rounded-lg font-medium transition-colors"
               style={{
                 color: 'var(--text-secondary)',
                 background: 'var(--bg-tertiary)',
@@ -198,7 +198,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-[12px] font-semibold uppercase tracking-widest"
+                className="text-ui font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Linked Jira
@@ -210,7 +210,7 @@ export function TrackerCaptureForm({
                   setJiraSearch('');
                   setJiraPickerOpen(true);
                 }}
-                className="text-[12px] px-2 py-0.5 rounded-lg font-medium"
+                className="text-ui px-2 py-0.5 rounded-lg font-medium"
                 style={{ color: 'var(--accent)' }}
               >
                 Change
@@ -228,7 +228,7 @@ export function TrackerCaptureForm({
                   <Link size={11} style={{ color: 'var(--accent)' }} />
                   <JiraIssueLink
                     issueKey={selectedIssue.jiraKey}
-                    className="font-mono text-[12px] font-semibold"
+                    className="font-mono text-ui font-semibold"
                     style={{ color: 'var(--accent)' }}
                   >
                     {selectedIssue.jiraKey}
@@ -236,7 +236,7 @@ export function TrackerCaptureForm({
                 </div>
                 {selectedIssue.summary && (
                   <div
-                    className="text-[13px] mt-0.5 truncate"
+                    className="text-body mt-0.5 truncate"
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     {selectedIssue.summary}
@@ -264,7 +264,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-[12px] font-semibold uppercase tracking-widest"
+                className="text-ui font-semibold uppercase tracking-widest"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Link a Jira issue
@@ -275,7 +275,7 @@ export function TrackerCaptureForm({
                   setJiraPickerOpen(false);
                   setJiraSearch('');
                 }}
-                className="text-[12px] px-2 py-0.5 rounded-lg font-medium"
+                className="text-ui px-2 py-0.5 rounded-lg font-medium"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Cancel
@@ -294,7 +294,7 @@ export function TrackerCaptureForm({
                   value={jiraSearch}
                   onChange={(e) => setJiraSearch(e.target.value)}
                   placeholder="Search by key or summary…"
-                  className="w-full rounded-xl pl-9 pr-3 py-2.5 text-[13px] outline-none"
+                  className="w-full rounded-xl pl-9 pr-3 py-2.5 text-body outline-none"
                   style={{
                     background: 'var(--bg-elevated)',
                     color: 'var(--text-primary)',
@@ -330,13 +330,13 @@ export function TrackerCaptureForm({
                       }}
                     >
                       <span
-                        className="font-mono text-[12px] font-semibold shrink-0"
+                        className="font-mono text-ui font-semibold shrink-0"
                         style={{ color: 'var(--accent)' }}
                       >
                         {issue.jiraKey}
                       </span>
                       <span
-                        className="min-w-0 flex-1 truncate text-[13px]"
+                        className="min-w-0 flex-1 truncate text-body"
                         style={{ color: 'var(--text-secondary)' }}
                       >
                         {issue.summary}
@@ -348,7 +348,7 @@ export function TrackerCaptureForm({
 
               {jiraSearch.length >= 2 && issueResults && issueResults.length === 0 && (
                 <div
-                  className="rounded-xl px-3 py-2.5 text-[13px] text-center"
+                  className="rounded-xl px-3 py-2.5 text-body text-center"
                   style={{
                     background: 'var(--bg-elevated)',
                     border: '1px solid var(--border)',
@@ -366,7 +366,7 @@ export function TrackerCaptureForm({
         {noteOpen && (
           <div>
             <label
-              className="block text-[12px] font-semibold uppercase mb-1.5 tracking-widest"
+              className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
               style={{ color: 'var(--text-muted)' }}
               htmlFor="tracker-capture-note"
             >
@@ -387,7 +387,7 @@ export function TrackerCaptureForm({
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               placeholder="Context, links, what done looks like — shared with the developer"
-              className="w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-none"
+              className="w-full rounded-xl px-3.5 py-2.5 text-body outline-none resize-none"
               style={{
                 background: 'var(--bg-elevated)',
                 color: 'var(--text-primary)',
@@ -407,7 +407,7 @@ export function TrackerCaptureForm({
             'color-mix(in srgb, var(--bg-primary) 60%, var(--bg-secondary) 40%)',
         }}
       >
-        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
           Creates task for{' '}
           <span style={{ color: 'var(--text-secondary)' }}>today</span>
         </p>
@@ -415,7 +415,7 @@ export function TrackerCaptureForm({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl px-3 py-1.5 text-[12px] font-medium"
+            className="rounded-xl px-3 py-1.5 text-ui font-medium"
             style={{
               color: 'var(--text-secondary)',
               background: 'var(--bg-elevated)',
@@ -428,7 +428,7 @@ export function TrackerCaptureForm({
             type="button"
             onClick={handleSubmit}
             disabled={!title.trim() || !developer || addItem.isPending}
-            className="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-ui font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background:
                 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, transparent), color-mix(in srgb, var(--accent) 70%, transparent))',

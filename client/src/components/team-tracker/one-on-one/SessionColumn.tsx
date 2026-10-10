@@ -349,11 +349,11 @@ function LiveSession({
             title="Reschedule"
             className={`-ml-1.5 flex min-w-0 items-baseline gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
           >
-            <span className="truncate text-[15px] font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>
+            <span className="truncate text-title-sm font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>
               {date.label}
             </span>
             {!live && date.hint && (
-              <span className="shrink-0 text-[12px] font-medium" style={{ color: toneColor(date.tone) }}>
+              <span className="shrink-0 text-ui font-medium" style={{ color: toneColor(date.tone) }}>
                 {date.hint}
               </span>
             )}
@@ -379,7 +379,7 @@ function LiveSession({
             </button>
           </div>
         </div>
-        <div className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-1 text-ui" style={{ color: 'var(--text-muted)' }}>
           {openCount === 0
             ? 'No open topics yet — add some in the agenda.'
             : `${openCount} open topic${openCount === 1 ? '' : 's'} to cover with ${firstName}`}
@@ -387,7 +387,7 @@ function LiveSession({
 
         {confirmingComplete && (
           <div
-            className="mt-2.5 rounded-lg px-2.5 py-2 text-[12.5px]"
+            className="mt-2.5 rounded-lg px-2.5 py-2 text-body"
             role="group"
             aria-label="Complete session"
             style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)' }}
@@ -396,7 +396,7 @@ function LiveSession({
               {openCount > 0 ? `Keep the ${openCount} open agenda item${openCount === 1 ? '' : 's'} on the agenda?` : 'Complete this session?'}
             </div>
             {openCount > 0 && (
-              <div className="mt-0.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                 Kept topics carry to the next session. Detaching leaves the tasks open but off the agenda.
               </div>
             )}
@@ -473,7 +473,7 @@ function LiveSession({
             value={actionDraft}
             onChange={(event) => setActionDraft(event.target.value)}
             placeholder="Action item…"
-            className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Add action item"
           />
@@ -487,7 +487,7 @@ function LiveSession({
             <Plus size={13} />
           </button>
         </div>
-        <label className="mt-1 flex w-fit cursor-pointer items-center gap-1.5 text-[12px]" style={{ color: assignToDeveloper ? 'var(--warning)' : 'var(--text-muted)' }}>
+        <label className="mt-1 flex w-fit cursor-pointer items-center gap-1.5 text-ui" style={{ color: assignToDeveloper ? 'var(--warning)' : 'var(--text-muted)' }}>
           <input
             type="checkbox"
             checked={assignToDeveloper}
@@ -499,7 +499,7 @@ function LiveSession({
       </form>
 
       <div className="flex min-h-0 flex-1 flex-col" data-testid="one-on-one-notes">
-        <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <div className="mb-1 flex items-center gap-1.5 text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
           <Lock size={11} aria-hidden="true" />
           Private notes
         </div>
@@ -516,7 +516,7 @@ function LiveSession({
             omit={['update', 'wrap-up']}
           />
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta" style={{ color: 'var(--text-muted)' }}>
           <span aria-live="polite" data-testid="one-on-one-save-state">
             {saveState === 'saving' || saveState === 'dirty'
               ? 'Saving…'

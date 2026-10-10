@@ -38,13 +38,13 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
             value={issue.priorityName}
             onChange={(e) => { onUpdate(issue.jiraKey, { priorityName: e.target.value }); onEditField(null); }}
             onBlur={() => onEditField(null)}
-            className="text-[12px] bg-transparent outline-none cursor-pointer font-semibold"
+            className="text-ui bg-transparent outline-none cursor-pointer font-semibold"
             style={{ color: priorityColor(issue.priorityName) }}
           >
             {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         ) : (
-          <span className="text-[12px] font-semibold" style={{ color: priorityColor(issue.priorityName) }}>
+          <span className="text-ui font-semibold" style={{ color: priorityColor(issue.priorityName) }}>
             {issue.priorityName}
           </span>
         )}
@@ -61,7 +61,7 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
             value={issue.assigneeId ?? ''}
             onChange={(e) => { onUpdate(issue.jiraKey, { assigneeId: e.target.value || null }); onEditField(null); }}
             onBlur={() => onEditField(null)}
-            className="text-[12px] bg-transparent outline-none cursor-pointer font-medium"
+            className="text-ui bg-transparent outline-none cursor-pointer font-medium"
             style={{ color: 'var(--text-primary)' }}
           >
             <option value="">Unassigned</option>
@@ -79,7 +79,7 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
           </select>
         ) : (
           <span
-            className="text-[12px] font-medium"
+            className="text-ui font-medium"
             style={{ color: issue.assigneeName ? 'var(--text-primary)' : 'var(--text-muted)' }}
           >
             {issue.assigneeName ?? 'Unassigned'}
@@ -97,12 +97,12 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
             key={issue.jiraKey}
             currentValue={dueValue }
             onSave={(value) =>  onUpdate(issue.jiraKey, { developmentDueDate: value }) }onClose={() => onEditField(null)}
-            className="text-[12px] bg-transparent cursor-pointer font-medium"
+            className="text-ui bg-transparent cursor-pointer font-medium"
             style={{ color: 'var(--text-primary)' }}
           />
         ) : (
           <span
-            className="text-[12px] font-medium"
+            className="text-ui font-medium"
             style={{ color: dueValue ? 'var(--text-primary)' : 'var(--text-muted)' }}
           >
             {formatDate(dueValue ?? undefined)}
@@ -120,7 +120,7 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
         }}
         title={issue.flagged ? 'Clear blocked flag' : 'Mark as blocked'}
       >
-        <span className="text-[12px] font-semibold">{issue.flagged ? '⚑ Blocked' : '⚑'}</span>
+        <span className="text-ui font-semibold">{issue.flagged ? '⚑ Blocked' : '⚑'}</span>
       </button>
     </div>
   );
@@ -156,7 +156,7 @@ function Chip({
       }}
     >
       <kbd
-        className="text-[11px] font-mono font-bold rounded px-1 py-px leading-none"
+        className="text-meta font-mono font-semibold rounded px-1 py-px leading-none"
         style={{
           background: 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
           color: 'var(--text-muted)',

@@ -114,7 +114,7 @@ function SidebarSection({ title, open, onToggle, onClear, showClear = false, cle
             }}
           />
           <div className="min-w-0 text-left">
-            <div className="text-[12px] font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            <div className="text-ui font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
               {title}
             </div>
           </div>
@@ -218,26 +218,26 @@ export function FilterSidebar({
 
           <div className="grid grid-cols-3 gap-1 mt-2">
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Views
               </div>
-              <div className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div className="mt-0.5 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {FILTER_KEYS.length}
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Tags
               </div>
-              <div className="mt-0.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div className="mt-0.5 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {tags?.length ?? 0}
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-[12px] uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
                 Active
               </div>
-              <div className="mt-0.5 text-[13px] font-semibold" style={{ color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-primary)' }}>
+              <div className="mt-0.5 text-body font-semibold" style={{ color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-primary)' }}>
                 {activeSelectionCount}
               </div>
             </div>
@@ -315,7 +315,7 @@ export function FilterSidebar({
                       }
                     }}
                     isIdle={dev.activeDefects === 0}
-                    icon={<span className="text-[12px] font-semibold">{initials(dev.developer.displayName)}</span>}
+                    icon={<span className="text-ui font-semibold">{initials(dev.developer.displayName)}</span>}
                   />
                 ))}
               </div>
@@ -422,7 +422,7 @@ export function FilterSidebar({
             <div className="flex flex-col items-center gap-2">
               <div
                 title="Active filters"
-                className="min-w-[40px] rounded-full px-2 py-1 text-center text-[12px] font-mono"
+                className="min-w-[40px] rounded-full px-2 py-1 text-center text-ui font-mono"
                 style={{
                   background: activeSelectionCount > 0 ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
                   color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-muted)',
@@ -430,7 +430,7 @@ export function FilterSidebar({
               >
                 {activeSelectionCount}
               </div>
-              <div className="text-[12px] uppercase" style={{ letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
+              <div className="text-ui uppercase" style={{ letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
                 Focus
               </div>
             </div>

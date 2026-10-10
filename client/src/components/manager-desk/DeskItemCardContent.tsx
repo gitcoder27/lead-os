@@ -70,7 +70,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span
-              className="min-w-0 max-w-full truncate text-[15px] font-semibold leading-5 tracking-[-0.01em]"
+              className="min-w-0 max-w-full truncate text-title-sm font-semibold leading-5 tracking-[-0.01em]"
               style={{
                 color: isDone ? 'var(--text-muted)' : 'var(--text-primary)',
                 textDecoration: item.status === 'cancelled' ? 'line-through' : undefined,
@@ -81,7 +81,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
           </div>
 
           {metaItems.length > 0 ? (
-            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] leading-5">
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-ui leading-5">
               {metaItems.map((meta, index) => (
                 <span
                   key={`${meta}-${index}`}
@@ -209,7 +209,7 @@ function RowActionButton({
         event.stopPropagation();
         onStatusChange(action.status);
       }}
-      className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+      className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-ui font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
       style={action.style}
       aria-label={`${action.label} ${itemTitle}`}
       title={action.label}
@@ -236,7 +236,7 @@ function RowMenuAction({
         event.stopPropagation();
         onStatusChange(action.status);
       }}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] font-medium transition-colors hover:bg-white/5"
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-ui font-medium transition-colors hover:bg-white/5"
       style={{ color: action.status === 'cancelled' ? 'var(--text-muted)' : 'var(--text-secondary)' }}
       aria-label={`${action.label} ${itemTitle}`}
       title={action.label}
@@ -254,7 +254,7 @@ function RowContext({ item, isDone }: { item: ManagerDeskItem; isDone: boolean }
   return (
     <div className="mt-1 min-w-0">
       <span
-        className="block max-w-[620px] truncate text-[12px] leading-5"
+        className="block max-w-[620px] truncate text-ui leading-5"
         style={{ color: isDone ? 'var(--success)' : 'var(--text-secondary)' }}
       >
         {isDone ? 'Outcome: ' : 'Next: '}

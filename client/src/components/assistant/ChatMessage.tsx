@@ -39,7 +39,7 @@ export function ChatMessage({ message, canRegenerate, onRegenerate, onOpenTarget
         className="flex justify-end"
       >
         <div
-          className="max-w-[88%] rounded-2xl rounded-br-md px-3 py-2 text-[13px] leading-5 whitespace-pre-wrap"
+          className="max-w-[88%] rounded-2xl rounded-br-md px-3 py-2 text-body leading-5 whitespace-pre-wrap"
           style={{
             background: 'var(--accent-glow)',
             border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
@@ -84,7 +84,7 @@ export function ChatMessage({ message, canRegenerate, onRegenerate, onOpenTarget
         <button
           type="button"
           onClick={onRegenerate}
-          className="mt-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="mt-1 flex items-center gap-1 rounded-md px-1 py-0.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)]"
           style={{ color: 'var(--text-muted)' }}
           title="Regenerate response"
           aria-label="Regenerate response"

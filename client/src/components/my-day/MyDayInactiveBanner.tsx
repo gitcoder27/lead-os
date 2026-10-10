@@ -27,11 +27,11 @@ function Banner({ icon, tone, title, children, action }: { icon: ReactNode; tone
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
             {title}
           </div>
           {children && (
-            <div className="mt-0.5 text-[12.5px] leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="mt-0.5 text-body leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
               {children}
             </div>
           )}
@@ -69,7 +69,7 @@ export function MyDayReadOnlyBanner({ reason, onToday }: { reason?: MyDayReadOnl
         <button
           type="button"
           onClick={onToday}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-lg px-3 text-[12.5px] font-semibold transition-colors hover:bg-[var(--bg-tertiary)] sm:self-auto ${FOCUS_RING}`}
+          className={`inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-lg px-3 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)] sm:self-auto ${FOCUS_RING}`}
           style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
         >
           Back to today

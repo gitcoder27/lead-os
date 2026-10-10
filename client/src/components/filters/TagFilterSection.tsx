@@ -64,7 +64,7 @@ export function TagFilterSection({
             }}
           />
           <div className="min-w-0 text-left">
-            <div className="text-[12px] font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            <div className="text-ui font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
               Tags
             </div>
           </div>
@@ -91,7 +91,7 @@ export function TagFilterSection({
         <div className="flex flex-col gap-1 pt-1.5">
           {sortedTags.length === 0 && !noTagsFilter && (
             <span
-              className="text-[13px] px-2.5 py-1.5 italic"
+              className="text-body px-2.5 py-1.5 italic"
               style={{ color: 'var(--text-muted)' }}
             >
               Assign tags in the table to start grouping related defects.
@@ -105,7 +105,7 @@ export function TagFilterSection({
               <button
                 key={tag.id}
                 onClick={() => onTagToggle(tag.id)}
-                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-[18px] text-[13px] font-medium transition-all duration-200 cursor-pointer border"
+                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-[18px] text-body font-medium transition-all duration-200 cursor-pointer border"
                 style={{
                   background: isActive ? 'var(--bg-glow)' : 'transparent',
                   color: isActive ? tag.color : 'var(--text-secondary)',
@@ -126,7 +126,7 @@ export function TagFilterSection({
                   <span className="truncate">{tag.name}</span>
                 </span>
                 <span
-                  className="text-[12px] font-mono tabular-nums min-w-[24px] text-center rounded-full px-2 py-1"
+                  className="text-ui font-mono tabular-nums min-w-[24px] text-center rounded-full px-2 py-1"
                   style={{
                     background: isActive ? `${tag.color}22` : 'var(--bg-tertiary)',
                     color: isActive ? tag.color : 'var(--text-muted)',
@@ -140,7 +140,7 @@ export function TagFilterSection({
 
           <button
             onClick={onNoTagsToggle}
-            className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-[18px] text-[13px] font-medium transition-all duration-200 cursor-pointer border"
+            className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-[18px] text-body font-medium transition-all duration-200 cursor-pointer border"
             style={{
               background: noTagsFilter ? 'var(--bg-glow)' : 'transparent',
               color: noTagsFilter ? 'var(--accent)' : 'var(--text-secondary)',
@@ -161,7 +161,7 @@ export function TagFilterSection({
               <span className="truncate italic">No tags</span>
             </span>
             <span
-              className="text-[12px] font-mono tabular-nums min-w-[24px] text-center rounded-full px-2 py-1"
+              className="text-ui font-mono tabular-nums min-w-[24px] text-center rounded-full px-2 py-1"
               style={{
                 background: noTagsFilter ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
                 color: noTagsFilter ? 'var(--accent)' : 'var(--text-muted)',

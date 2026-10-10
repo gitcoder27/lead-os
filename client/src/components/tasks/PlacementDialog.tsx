@@ -93,7 +93,7 @@ export function PlacementDialog({
     >
       <div className="space-y-4">
         <PlacementPicker today={today} value={placement} onChange={setPlacement} disabled={write.isPending} />
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-body leading-5">
           <input
             type="checkbox"
             className="accent-[var(--accent-solid)]"
@@ -104,14 +104,14 @@ export function PlacementDialog({
           Include subtasks
         </label>
         <section className="rounded-lg border p-3" aria-label="Move preview" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
-          <p className="text-[13px] font-medium" role="status">{preview ? `${countLabel} will ${placement ? 'move' : 'have no project'}` : 'Checking affected tasks…'}</p>
+          <p className="text-body font-medium" role="status">{preview ? `${countLabel} will ${placement ? 'move' : 'have no project'}` : 'Checking affected tasks…'}</p>
           <p className="project-field-hint mt-1 break-words">Destination: {destinationName}</p>
-          <ul className="mt-3 max-h-36 space-y-2 overflow-auto text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <ul className="mt-3 max-h-36 space-y-2 overflow-auto text-ui" style={{ color: 'var(--text-secondary)' }}>
             {preview?.tasks.map((task) => <li key={task.taskKey} className="break-words"><span className="mr-2 font-mono" style={{ color: 'var(--text-muted)' }}>{task.taskKey}</span>{task.title}{!preview.keys.includes(task.taskKey) && <span className="project-field-hint ml-2">Subtask</span>}</li>)}
           </ul>
           <p className="project-field-hint mt-3">Only project organization changes. You can undo this move.</p>
         </section>
-        {error && <div role="alert" className="space-y-2 text-[13px]"><p style={{ color: 'var(--danger)' }}>{error}</p><button className="ui-btn-secondary" disabled={write.isPending} onClick={() => setPreviewRevision((revision) => revision + 1)}>Review affected tasks</button></div>}
+        {error && <div role="alert" className="space-y-2 text-body"><p style={{ color: 'var(--danger)' }}>{error}</p><button className="ui-btn-secondary" disabled={write.isPending} onClick={() => setPreviewRevision((revision) => revision + 1)}>Review affected tasks</button></div>}
       </div>
     </Dialog>
   );

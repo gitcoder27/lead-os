@@ -19,7 +19,7 @@ export function LinkedCell({ hasNotes, trackerCount, developerNames }: { hasNote
           role="img"
           aria-label={trackerLabel}
           title={trackerLabel}
-          className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-semibold"
+          className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-ui font-semibold"
           style={{ background: 'var(--accent-glow)', color: 'var(--accent-text)' }}
         >
           <Users size={12} aria-hidden="true" />

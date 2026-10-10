@@ -90,7 +90,7 @@ export function TrackerBoardToolbar({
       />
 
       {isFiltered && (
-        <span className="px-1 text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+        <span className="px-1 text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} aria-live="polite">
           {visibleCount} of {totalCount}
         </span>
       )}
@@ -159,7 +159,7 @@ function ToolbarButton({
       aria-label={ariaLabel}
       aria-expanded={expanded}
       title={title}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-ui font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         tinted ? 'hover:brightness-110' : 'hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
       } ${FOCUS_RING}`}
       style={{
@@ -206,7 +206,7 @@ const SearchInput = forwardRef<HTMLInputElement, {
           onClear();
         }
       }}
-      className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-placeholder)]"
+      className="min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
       style={{ color: 'var(--text-primary)' }}
     />
     {value && (
@@ -313,7 +313,7 @@ function OptionGroup({
 }) {
   return (
     <div>
-      <div className="px-2 pb-1 pt-1 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+      <div className="px-2 pb-1 pt-1 text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
         {label}
       </div>
       <div className="grid gap-px" role="radiogroup" aria-label={label}>
@@ -326,7 +326,7 @@ function OptionGroup({
               role="radio"
               aria-checked={active}
               onClick={() => onSelect(option.value)}
-              className={`flex h-8 items-center justify-between rounded-lg px-2 text-left text-[13px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`flex h-8 items-center justify-between rounded-lg px-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
               style={{
                 color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontWeight: active ? 600 : 400,

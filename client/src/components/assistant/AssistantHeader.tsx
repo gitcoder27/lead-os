@@ -65,11 +65,11 @@ export function AssistantHeader({
           <CopilotMark size={18} />
         </span>
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-body font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
             Copilot
           </p>
           <p
-            className="truncate text-[11px] leading-tight"
+            className="truncate text-meta leading-tight"
             style={{ color: 'var(--text-muted)' }}
             title="What Copilot sees — this screen and its active filters go with each message"
           >
@@ -101,7 +101,7 @@ export function AssistantHeader({
             >
               <div className="max-h-64 overflow-y-auto">
                 {conversations.length === 0 ? (
-                  <p className="px-3 py-2.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                  <p className="px-3 py-2.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                     No conversations yet
                   </p>
                 ) : (
@@ -124,10 +124,10 @@ export function AssistantHeader({
                         }}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <p className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <p className="truncate text-ui font-medium" style={{ color: 'var(--text-primary)' }}>
                           {conversation.title}
                         </p>
-                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-meta" style={{ color: 'var(--text-muted)' }}>
                           {formatRelativeTime(conversation.updatedAt)}
                         </p>
                       </button>

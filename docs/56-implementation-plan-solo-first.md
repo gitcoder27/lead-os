@@ -898,7 +898,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 
 - [x] UXD-00 — Review, plan and screenshots committed; local after-shot folder ignored.
 - [x] UXD-01 — Contrast and accent fixes.
-- [ ] UXD-02 — Type scale tokens.
+- [x] UXD-02 — Type scale tokens.
 - [ ] UXD-03 — Sentence-case labels.
 - [ ] UXD-04 — Row action hierarchy.
 - [ ] UXD-05 — `Select`, disclosure and `KeySpec` adoption.
@@ -927,6 +927,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 | --- | --- | --- | --- |
 | 2026-10-10 | UXD-00 | main (0c7c8f1, this commit) | docs/73, the docs/56 pointer and the review shots landed in the owner's tree cleanup commit `0c7c8f1`; this commit adds the `docs/screenshots/ux-review-after/` ignore entry and the item checklist. No application code changed. |
 | 2026-10-10 | UXD-01 | main (this commit) | Header Capture fill on `--accent-solid` (5.36:1); note task chips and the Notes nudge button on `--accent-text`; task times in secondary tabular sans; Work keys muted mono; Settings initials (rail footer, users list, Jira people pickers) on the shared `Avatar`, which now uses OKLCH so initials clear 4.5:1 for every hue (docs/73 §12). `themeTokens.test` +3 (header fill ratio, avatar hues × surfaces in both themes, source checks): 35 pass. axe (9 routes × desktop light/dark, phone light): color-contrast 0 (baseline 13 nodes; the first fix exposed an Avatar 4.4:1 in dark, fixed). Targeted suites (DefectTable, Header, NotesPage, SettingsPanel, SettingsDataSection, TasksPage, themeTokens, Team): 406 pass. typecheck, build:check PASS. Browser (scratch DB, ports 3082/5253, mocked Jira): Today, Tasks, Team, Work, Notes, Settings at 1440 and 375 in light and dark, compared with fresh before-shots; header focus ring unchanged. |
+| 2026-10-10 | UXD-02 | main (this commit) | Six size tokens (`--fs-11/12/13/15/19/24` with line-height pairs) and a size-only Tailwind map; 1,300+ arbitrary sizes in 205 files and every CSS font-size moved onto them by a per-folder codemod (control vs reading text decided by the owning element: 12.5 → 12 on buttons, 13 on text and inputs; 14 → 15 on titles, 13 otherwise). Weights 550/560/520 → 500, 650/700/bold → 600. Exceptions and two judgement calls in docs/73 §12. New `typeScale.test` (5: tokens, no arbitrary or default sizes, CSS sizes from the scale, weights, cn merge); `weekly-report.test` UX-28 assertion now checks the token (same intent). Accept grep: 0 matches (no arbitrary px sizes remain). Client suite 2113 pass; typecheck, build:check PASS. Browser: 6 routes × 4 sizes × 2 themes plus 23 secondary states, sign-in/join, My Day and Setup Wizard, compared with before-shots taken from the stashed tree; DOM clip audit on 16 routes at 1440 and 375 found no clipped text. |
 
 ## Self-registration and tenant isolation (docs/72)
 

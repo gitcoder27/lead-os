@@ -9,7 +9,7 @@ interface UserPasswordResetActionProps {
   onReset: (newPassword: string) => Promise<void>;
 }
 
-const CHIP_BUTTON = 'rounded-full px-2.5 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-50';
+const CHIP_BUTTON = 'rounded-full px-2.5 py-1.5 text-ui font-semibold transition-colors disabled:opacity-50';
 
 export function UserPasswordResetAction({ user, onReset }: UserPasswordResetActionProps) {
   const [open, setOpen] = useState(false);
@@ -64,7 +64,7 @@ export function UserPasswordResetAction({ user, onReset }: UserPasswordResetActi
       }}
       className="flex flex-col gap-1.5"
     >
-      <p className="text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+      <p className="text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
         Set a new password for {user.displayName}? They will be signed out on every device.
       </p>
       <div className="flex flex-wrap items-center gap-2">
@@ -77,7 +77,7 @@ export function UserPasswordResetAction({ user, onReset }: UserPasswordResetActi
           disabled={submitting}
           aria-label={`New password for ${user.displayName}`}
           placeholder={`New password (min ${MIN_PASSWORD_LENGTH})`}
-          className="h-8 w-48 rounded-lg px-2.5 text-[13px] outline-none"
+          className="h-8 w-48 rounded-lg px-2.5 text-body outline-none"
           style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
         />
         <button
@@ -103,7 +103,7 @@ export function UserPasswordResetAction({ user, onReset }: UserPasswordResetActi
         </button>
       </div>
       {error ? (
-        <p role="alert" className="text-[12px]" style={{ color: 'var(--danger-muted)' }}>{error}</p>
+        <p role="alert" className="text-ui" style={{ color: 'var(--danger-muted)' }}>{error}</p>
       ) : null}
     </form>
   );

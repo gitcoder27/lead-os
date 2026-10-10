@@ -56,7 +56,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
         </>
       )}
     >
-      <div className="space-y-3 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+      <div className="space-y-3 text-body" style={{ color: 'var(--text-secondary)' }}>
         <div>
           <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>You will lose</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5" aria-label="What is lost">
@@ -73,7 +73,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
             : 'Automatic backup before reset is off, so this cannot be undone. Take a backup in Settings → Data & Backups first.'}
         </p>
         <label className="block">
-          <span className="block text-[12px]" style={{ color: 'var(--text-muted)' }}>
+          <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
             <span id="reset-configuration-instruction">Type <strong style={{ color: 'var(--text-primary)' }}>{RESET_CONFIGURATION_TEXT}</strong> to confirm</span>
           </span>
           <input

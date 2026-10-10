@@ -128,7 +128,7 @@ function authorLabel(event: TaskEvent, accountId?: string): string {
   return event.author.displayName ?? `${AUTHOR_LABELS[event.author.type] ?? event.author.type}${event.author.id ? ` (${event.author.id})` : ''}`;
 }
 
-const BADGE = 'rounded-full px-1.5 text-[11px] font-semibold leading-[18px]';
+const BADGE = 'rounded-full px-1.5 text-meta font-semibold leading-[18px]';
 
 function EventBadges({ event }: { event: TaskEvent }) {
   const meta = eventMeta(event);
@@ -224,7 +224,7 @@ function EventBody({ text }: { text: string }) {
   return (
     <>
       <div
-        className={`whitespace-pre-wrap break-words text-[13px] leading-[1.6] ${long && !expanded ? 'line-clamp-6' : ''}`}
+        className={`whitespace-pre-wrap break-words text-body leading-[1.6] ${long && !expanded ? 'line-clamp-6' : ''}`}
         style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}
       >
         {text}
@@ -233,7 +233,7 @@ function EventBody({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1 text-[12px] font-medium outline-none hover:underline focus-visible:underline"
+          className="mt-1 text-ui font-medium outline-none hover:underline focus-visible:underline"
           style={{ color: 'var(--accent)' }}
           aria-expanded={expanded}
         >
@@ -260,7 +260,7 @@ export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
         type="button"
         aria-expanded={expanded}
         aria-label={`Activity for ${taskKey}`}
-        className="flex items-center gap-1.5 py-1 text-[12px]"
+        className="flex items-center gap-1.5 py-1 text-ui"
         style={{ color: 'var(--text-secondary)' }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); }}
@@ -298,8 +298,8 @@ export function TaskTimeline(props: TaskTimelineProps) {
       {eventId && target.enabled && target.isError ? <p role="alert">This update is unavailable. <button type="button" className="min-h-[44px] rounded-md px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]" onClick={() => void target.refetch()}>Retry</button></p> : null}
       {event ? (
         <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" style={{ borderColor: 'var(--accent)' }}>
-          <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
-          <p className="mb-2 mt-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
+          <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
+          <p className="mb-2 mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
           <EventBody text={eventDescription(event, props.resolveName) ?? ''} />
         </section>
       ) : null}
@@ -326,7 +326,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
   });
   const retryOlder = query.isFetchNextPageError && !accessLost;
   const errorBanner = query.isError ? (
-    <div role="alert" className="py-3 text-[12px]" style={{ color: 'var(--danger)' }}>
+    <div role="alert" className="py-3 text-ui" style={{ color: 'var(--danger)' }}>
       {retryOlder ? 'Could not load older activity.' : query.data && !accessLost ? 'Could not refresh the timeline.' : 'Could not load the timeline.'}{' '}
       <button type="button" disabled={query.isFetching} onClick={() => void (retryOlder ? query.fetchNextPage() : query.refetch())} style={{ color: 'var(--accent)' }}>
         {retryOlder ? 'Retry older activity' : 'Retry'}
@@ -355,7 +355,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
 
   if (events.length === 0 && !query.isError) {
     return (
-      <div className="py-3 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+      <div className="py-3 text-body" style={{ color: 'var(--text-muted)' }}>
         {emptyLabel}
       </div>
     );
@@ -364,7 +364,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
   return (
     <div aria-busy={Boolean(query.isFetching)}>
       {errorBanner}
-      {query.isFetching && !query.isLoading ? <p role="status" className="py-2 text-[12px]">{query.isFetchingNextPage ? 'Loading older activity…' : 'Refreshing activity…'}</p> : null}
+      {query.isFetching && !query.isLoading ? <p role="status" className="py-2 text-ui">{query.isFetchingNextPage ? 'Loading older activity…' : 'Refreshing activity…'}</p> : null}
       <ol className="relative">
         {events.map((event, index) => {
           const typeLabel =
@@ -413,7 +413,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           );
 
           const meta = (
-            <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
               <span>{authorLabel(event, user?.accountId)}</span>
               <span aria-hidden="true"> · </span>
               <time dateTime={event.occurredAt} title={formatAbsoluteDateTime(event.occurredAt)}>{formatRelativeTime(event.occurredAt)}</time>
@@ -444,7 +444,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
               {message ? (
                 <div className="min-w-0 flex-1">
                   <div className="flex min-h-[24px] flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-[12.5px] font-semibold" style={{ color: event.redacted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                    <span className="text-body font-semibold" style={{ color: event.redacted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                       {typeLabel}
                     </span>
                     <EventBadges event={event} />
@@ -459,7 +459,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
                     }}
                   >
                     {event.redacted ? (
-                      <span className="text-[13px] italic" style={{ color: 'var(--text-muted)' }}>
+                      <span className="text-body italic" style={{ color: 'var(--text-muted)' }}>
                         This entry was removed.
                       </span>
                     ) : (
@@ -468,7 +468,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-[24px] min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-[12.5px]">
+                <div className="flex min-h-[24px] min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-body">
                   <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{typeLabel}</span>
                   {event.redacted ? (
                     <span className="italic" style={{ color: 'var(--text-muted)' }}>This entry was removed.</span>
@@ -489,7 +489,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           type="button"
           onClick={() => void query.fetchNextPage()}
           disabled={query.isFetching}
-          className="ml-9 mt-1 rounded-lg px-2 py-1 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+          className="ml-9 mt-1 rounded-lg px-2 py-1 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
           style={{ color: 'var(--accent)' }}
         >
           {query.isFetchingNextPage ? 'Loading…' : 'Load older activity'}

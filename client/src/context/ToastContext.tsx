@@ -228,11 +228,11 @@ function ToastItem({ toast, onDismiss }: { toast: StackedToast; onDismiss: () =>
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px]" style={{ background: 'var(--tone)' }} />
       <Icon size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--tone)' }} aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
           {toast.title}
         </p>
         {toast.message && (
-          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-0.5 text-ui" style={{ color: 'var(--text-secondary)' }}>
             {toast.message}
           </p>
         )}

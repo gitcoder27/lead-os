@@ -290,16 +290,16 @@ export function ManagerDeskPage({
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(239,68,68,0.12)' }}>
             <Briefcase size={18} style={{ color: 'var(--danger)' }} />
           </div>
-          <h2 className="mt-3 text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h2 className="mt-3 text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Failed to load Manager Desk
           </h2>
-          <p className="mt-1.5 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+          <p className="mt-1.5 text-body" style={{ color: 'var(--text-secondary)' }}>
             {(error as Error).message}
           </p>
           <button
             type="button"
             onClick={() => refetch()}
-            className="mt-4 rounded-lg px-4 py-1.5 text-[13px] font-semibold"
+            className="mt-4 rounded-lg px-4 py-1.5 text-body font-semibold"
             style={{ background: 'var(--md-accent)', color: '#000' }}
           >
             Retry
@@ -446,7 +446,7 @@ function ViewModeBanner({
 }) {
   if (viewMode === 'live') {
     return (
-      <div className="md-glass-panel rounded-xl px-3 py-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+      <div className="md-glass-panel rounded-xl px-3 py-2 text-body" style={{ color: 'var(--text-secondary)' }}>
         Open manager work stays on this desk until you complete it or drop it. A new day changes the lens, not the task’s existence.
       </div>
     );
@@ -455,7 +455,7 @@ function ViewModeBanner({
   if (viewMode === 'planning') {
     return (
       <div className="md-glass-panel rounded-xl px-3 py-2">
-        <div className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-2 text-body" style={{ color: 'var(--text-secondary)' }}>
           <CalendarClock size={13} style={{ color: 'var(--accent)' }} />
           Future dates use a lighter scheduling view. Only work explicitly relevant to {date} is shown here.
         </div>
@@ -466,7 +466,7 @@ function ViewModeBanner({
   return (
     <div className="md-glass-panel rounded-xl px-3 py-2">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-2 text-body" style={{ color: 'var(--text-secondary)' }}>
           <History size={13} style={{ color: 'var(--info)' }} />
           Past dates show a review-focused snapshot. This view is read-only.
         </div>
@@ -500,7 +500,7 @@ function HistoryToggleButton({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.08em]"
+      className="rounded-md px-2 py-1 text-ui font-semibold uppercase tracking-[0.08em]"
       style={{
         background: active ? 'var(--md-accent-glow)' : 'transparent',
         color: active ? 'var(--md-accent)' : 'var(--text-secondary)',
@@ -518,7 +518,7 @@ function DrawerModeNote({ viewMode, date }: { viewMode: ManagerDeskViewMode; dat
 
   return (
     <div
-      className="mx-5 mt-4 rounded-xl border px-3 py-2 text-[12px]"
+      className="mx-5 mt-4 rounded-xl border px-3 py-2 text-ui"
       style={{
         borderColor: viewMode === 'history' ? 'rgba(59,130,246,0.18)' : 'rgba(6,182,212,0.18)',
         background: viewMode === 'history' ? 'rgba(59,130,246,0.06)' : 'rgba(6,182,212,0.06)',

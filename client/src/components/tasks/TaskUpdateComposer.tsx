@@ -214,8 +214,8 @@ function OwnedTaskUpdateComposer({
         }}
         className={
           quiet
-            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-[12px] outline-none transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] focus-visible:bg-[var(--bg-tertiary)]'
-            : 'mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[12px] transition-colors'
+            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-ui outline-none transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] focus-visible:bg-[var(--bg-tertiary)]'
+            : 'mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-ui transition-colors'
         }
         style={{ color: 'var(--text-muted)', background: quiet ? undefined : 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
       >
@@ -236,7 +236,7 @@ function OwnedTaskUpdateComposer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      {value.person && <p className="mb-1 text-xs" style={{ color: 'var(--text-secondary)' }}>{taskKey} · {value.person.name}</p>}
+      {value.person && <p className="mb-1 text-ui leading-4" style={{ color: 'var(--text-secondary)' }}>{taskKey} · {value.person.name}</p>}
       <textarea
         ref={setRefs}
         value={draft}
@@ -246,7 +246,7 @@ function OwnedTaskUpdateComposer({
         rows={1}
         autoFocus={autoFocus}
         placeholder={placeholder ?? (type === 'instruction' ? 'What did you tell them?' : type === 'decision' ? 'What was decided?' : type === 'blocker' ? 'What is blocking this?' : 'Add an update…')}
-        className="w-full resize-none bg-transparent text-[13px] leading-5 outline-none"
+        className="w-full resize-none bg-transparent text-body leading-5 outline-none"
         style={{ color: 'var(--text-primary)' }}
         aria-label={`Add an update to ${taskKey}`}
       />
@@ -257,7 +257,7 @@ function OwnedTaskUpdateComposer({
               key={option.value}
               type="button"
               onClick={() => setType(option.value)}
-              className="rounded-md px-2 py-0.5 text-[12px] font-semibold transition-colors"
+              className="rounded-md px-2 py-0.5 text-ui font-semibold transition-colors"
               style={{
                 background: type === option.value ? 'var(--bg-elevated)' : 'transparent',
                 color: type === option.value ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -275,7 +275,7 @@ function OwnedTaskUpdateComposer({
                 key={action}
                 type="button"
                   onClick={() => setBlockerAction(action)}
-                className="rounded-md px-2 py-0.5 text-[12px] font-semibold capitalize transition-colors"
+                className="rounded-md px-2 py-0.5 text-ui font-semibold capitalize transition-colors"
                 style={{
                   background: blockerAction === action ? 'var(--bg-elevated)' : 'transparent',
                   color: blockerAction === action ? (action === 'raised' ? 'var(--danger)' : 'var(--success)') : 'var(--text-muted)',
@@ -291,7 +291,7 @@ function OwnedTaskUpdateComposer({
           <button
             type="button"
             onClick={togglePrivate}
-            className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-[12px] font-semibold transition-colors"
+            className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-ui font-semibold transition-colors"
             style={{
               background: isPrivate ? 'color-mix(in srgb, var(--warning) 12%, transparent)' : 'var(--bg-tertiary)',
               color: isPrivate ? 'var(--warning)' : 'var(--text-muted)',
@@ -307,14 +307,14 @@ function OwnedTaskUpdateComposer({
           type="button"
           onClick={submit}
           disabled={!draft.trim() || pending}
-          className="ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12px] font-semibold transition-colors disabled:opacity-40"
+          className="ml-auto flex items-center gap-1 rounded-lg px-2.5 py-1 text-ui font-semibold transition-colors disabled:opacity-40"
           style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
         >
           <Send size={11} />
           {pending ? 'Saving…' : failed ? 'Retry post' : 'Post'}
         </button>
       </div>
-      {failed && <p role="alert" className="mt-1 text-xs">Not acknowledged. Retry to confirm it was saved, or edit this update.</p>}
+      {failed && <p role="alert" className="mt-1 text-ui leading-4">Not acknowledged. Retry to confirm it was saved, or edit this update.</p>}
     </div>
   );
 }

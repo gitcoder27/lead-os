@@ -33,7 +33,7 @@ export function TrackerIssueAssignmentConflictPanel({
   if (assignmentQuery.isLoading) {
     return (
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12px]"
+        className="flex items-center gap-2 rounded-xl px-3 py-2 text-ui"
         style={{
           background: 'var(--bg-elevated)',
           border: '1px solid var(--border)',
@@ -72,10 +72,10 @@ export function TrackerIssueAssignmentConflictPanel({
       <div className="flex items-start gap-2">
         <TriangleAlert size={14} className="mt-0.5 shrink-0" style={{ color: tone }} />
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
             {heading}
           </div>
-          <div className="mt-1 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+          <div className="mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>
             Duplicates are still allowed in this flow. Open an existing assignment or add another task anyway.
           </div>
         </div>
@@ -92,20 +92,20 @@ export function TrackerIssueAssignmentConflictPanel({
             }}
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex items-center gap-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                 <UserRound size={10} />
                 <span>{assignment.developer.displayName}</span>
                 <span style={{ color: 'var(--border-strong)' }}>·</span>
                 <span>{stateLabel(assignment.state)}</span>
               </div>
-              <div className="mt-0.5 truncate text-[12px]" style={{ color: 'var(--text-primary)' }}>
+              <div className="mt-0.5 truncate text-ui" style={{ color: 'var(--text-primary)' }}>
                 {assignment.title}
               </div>
             </div>
             <button
               type="button"
               onClick={() => onOpenAssignment(assignment.itemId)}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
+              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-ui font-semibold"
               style={{
                 background: 'var(--accent-glow)',
                 color: 'var(--accent)',

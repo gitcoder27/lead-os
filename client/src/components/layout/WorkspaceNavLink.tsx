@@ -24,7 +24,7 @@ export function interceptWorkspaceLink(event: MouseEvent<HTMLAnchorElement>, onN
 export function WorkspaceNavLink({ label, icon: Icon, active, accentColor, onClick, href, badge }: WorkspaceNavLinkProps) {
   return (
     <a href={href} onClick={(event) => interceptWorkspaceLink(event, onClick)} aria-current={active ? 'page' : undefined}
-      className="workspace-nav-chip header-ghost relative flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-[12.5px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] lg:px-3"
+      className="workspace-nav-chip header-ghost relative flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-ui font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] lg:px-3"
       style={active ? { color: toneText(accentColor), fontWeight: 600 } : undefined}>
       {active && (
         <motion.span

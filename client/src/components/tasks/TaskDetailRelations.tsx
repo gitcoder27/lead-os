@@ -88,7 +88,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
             onClick={(event) => openKinds(event.currentTarget)}
             aria-haspopup="menu"
             aria-expanded={menu?.kind === 'kinds'}
-            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-[12px] font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <Plus size={13} />
@@ -115,7 +115,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
         <button
           type="button"
           onClick={(event) => openKinds(event.currentTarget)}
-          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[12.5px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
           style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
         >
           <Link2 size={13} />
@@ -149,14 +149,14 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
               }
             }}
             placeholder={kindMeta(adding).placeholder}
-            className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             aria-label={`${adding} link`}
           />
           <button
             type="submit"
             disabled={!draft.trim() || addLink.isPending}
-            className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold disabled:opacity-40 ${FOCUS_RING}`}
+            className={`h-7 rounded-lg px-2.5 text-ui font-semibold disabled:opacity-40 ${FOCUS_RING}`}
             style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
           >
             Add
@@ -214,7 +214,7 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
 }) {
   const { Icon, label: kindLabel } = kindMeta(link.kind);
   const personName = link.kind === 'person' ? people.nameFor(link.ref) ?? link.ref : '';
-  const rowClass = 'min-w-0 flex-1 truncate text-left text-[13px] font-medium';
+  const rowClass = 'min-w-0 flex-1 truncate text-left text-body font-medium';
 
   let body: React.ReactNode;
   if (link.kind === 'jira') {
@@ -255,11 +255,11 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
       )}
       {body}
       {link.role === 'primary' && (
-        <span className="shrink-0 rounded-full px-1.5 text-[11px] font-semibold leading-[18px]" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
+        <span className="shrink-0 rounded-full px-1.5 text-meta font-semibold leading-[18px]" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
           Primary
         </span>
       )}
-      <span className="shrink-0 text-[12px]" style={{ color: 'var(--text-muted)' }}>{kindLabel}</span>
+      <span className="shrink-0 text-ui" style={{ color: 'var(--text-muted)' }}>{kindLabel}</span>
       {onRemove && (
         <button
           type="button"
@@ -298,13 +298,13 @@ function PersonPicker({ anchor, people, onClose, onSelect }: {
         }}
         placeholder="Link a developer…"
         aria-label="Filter developers"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-[12.5px] outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {visible.map((dev) => (
         <MenuItem key={dev.accountId} icon={<Avatar name={dev.displayName} seed={dev.accountId} size={18} />} label={dev.displayName} onSelect={() => onSelect(dev.accountId)} />
       ))}
-      {visible.length === 0 && <p className="px-2 py-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>No match</p>}
+      {visible.length === 0 && <p className="px-2 py-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>No match</p>}
     </TaskPopover>
   );
 }
@@ -383,7 +383,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           ))}
         </ul>
       )}
-      {canAdd && <details className="text-xs" onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</details>}
+      {canAdd && <details className="text-ui leading-4" onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</details>}
       {canAdd && (
         <form
           className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
@@ -406,7 +406,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
               }
             }}
             placeholder={isMeeting ? 'Add an action item — @dev for owner, !fri for a date…' : 'Add subtask — @dev for owner, !fri for a date…'}
-            className="min-w-0 flex-1 bg-transparent py-2 text-[13px] outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-2 text-body outline-none placeholder:text-[var(--text-placeholder)]"
             style={{ color: 'var(--text-primary)' }}
             readOnly={attempt.isPending}
             aria-label={isMeeting ? 'New action item' : 'New subtask'}
@@ -427,7 +427,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
             <button
               type="submit"
               disabled={attempt.isPending}
-              className={`h-7 rounded-lg px-2.5 text-[12px] font-semibold disabled:opacity-40 ${FOCUS_RING}`}
+              className={`h-7 rounded-lg px-2.5 text-ui font-semibold disabled:opacity-40 ${FOCUS_RING}`}
               style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}
             >
               Add
@@ -450,9 +450,9 @@ function ChildRow({ child, people, onOpen }: { child: TaskChildRef; people: Task
         className={`group flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}
       >
         <TaskStatusGlyph status={child.status} size={14} />
-        <span className="shrink-0 font-mono text-[12px] font-semibold" style={{ color: 'var(--text-muted)' }}>{child.taskKey}</span>
+        <span className="shrink-0 font-mono text-ui font-semibold" style={{ color: 'var(--text-muted)' }}>{child.taskKey}</span>
         <span
-          className={`min-w-0 flex-1 truncate text-[13px] ${closed ? 'line-through decoration-[var(--text-disabled)]' : ''}`}
+          className={`min-w-0 flex-1 truncate text-body ${closed ? 'line-through decoration-[var(--text-disabled)]' : ''}`}
           style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)' }}
         >
           {child.title}
@@ -470,7 +470,7 @@ export function ParentCrumb({ parent, onOpen }: { parent: TaskChildRef; onOpen: 
     <button
       type="button"
       onClick={() => onOpen(parent.taskKey)}
-      className={`flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[12px] transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
       style={{ color: 'var(--text-muted)' }}
       title={`Parent: ${parent.taskKey} ${parent.title}`}
       aria-label={`Open parent task ${parent.taskKey}`}

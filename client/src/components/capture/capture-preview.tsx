@@ -45,7 +45,7 @@ export function CaptureChip({ icon, children, tone }: { icon?: React.ReactNode; 
   const color = tone === 'error' ? 'var(--danger)' : tone === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-ui font-medium"
       style={{ background: 'var(--bg-tertiary)', color, border: '1px solid var(--border)' }}
     >
       {icon}

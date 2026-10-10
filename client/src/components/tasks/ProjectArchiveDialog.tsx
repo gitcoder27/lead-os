@@ -14,9 +14,9 @@ export const ProjectArchiveDialog = ({ item, facts, projectId, onClose }: Projec
       onClose={onClose}
       footer={<><button className="ui-btn-quiet" onClick={onClose}>Cancel</button><button className="ui-btn-solid" disabled={write.isPending} onClick={() => write.mutate({ id: item.id, projectId, track: Boolean(projectId), changes: { archived: !restoring } }, { onSuccess: onClose })}>{write.isPending ? 'Saving…' : `${restoring ? 'Restore' : 'Archive'} ${kind}`}</button></>}
     >
-      <p className="text-[13px] leading-relaxed">{restoring ? `This ${kind} will be available for new tasks again${projectId ? ' when its project is active' : ''}.` : `This ${kind} will move out of your active view and stop accepting new tasks. You can restore it later.`}</p>
-      {!restoring && <p className="mt-3 text-[13px] font-medium">{facts.open} open {facts.open === 1 ? 'task remains' : 'tasks remain'} actionable.</p>}
-      {write.error && <p role="alert" className="mt-3 text-sm" style={{ color: 'var(--danger)' }}>{write.error.message}</p>}
+      <p className="text-body leading-relaxed">{restoring ? `This ${kind} will be available for new tasks again${projectId ? ' when its project is active' : ''}.` : `This ${kind} will move out of your active view and stop accepting new tasks. You can restore it later.`}</p>
+      {!restoring && <p className="mt-3 text-body font-medium">{facts.open} open {facts.open === 1 ? 'task remains' : 'tasks remain'} actionable.</p>}
+      {write.error && <p role="alert" className="mt-3 text-body leading-5" style={{ color: 'var(--danger)' }}>{write.error.message}</p>}
     </Dialog>
   );
 };

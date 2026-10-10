@@ -87,7 +87,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
         aria-label="Quick update"
         disabled={disabled}
         rows={1}
-        className="block w-full resize-none bg-transparent text-[13.5px] leading-[22px] outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed"
+        className="block w-full resize-none bg-transparent text-body leading-[22px] outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed"
         style={{ color: 'var(--text-primary)', maxHeight: MAX_HEIGHT }}
       />
 
@@ -106,7 +106,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
       </AnimatePresence>
 
       <div className="mt-2 flex items-center justify-between gap-3 pt-2" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
-        <div className="min-w-0 text-[12px]" style={{ color: 'var(--text-muted)' }} aria-live="polite">
+        <div className="min-w-0 text-ui" style={{ color: 'var(--text-muted)' }} aria-live="polite">
           {justSent ? (
             <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: 'var(--success)' }}>
               <Check size={13} aria-hidden="true" />
@@ -124,7 +124,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
           type="button"
           onClick={handleSubmit}
           disabled={!canSend}
-          className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold transition-all disabled:cursor-not-allowed ${FOCUS_RING}`}
+          className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-ui font-semibold transition-all disabled:cursor-not-allowed ${FOCUS_RING}`}
           style={
             canSend
               ? { background: 'var(--accent-solid)', color: 'var(--on-accent)', boxShadow: '0 4px 14px color-mix(in srgb, var(--accent) 28%, transparent)' }
@@ -161,7 +161,7 @@ function MentionChips({
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Tag tasks">
-      <span className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-ui font-medium" style={{ color: 'var(--text-muted)' }}>
         About
       </span>
       {tasks.map((task) => {
@@ -178,14 +178,14 @@ function MentionChips({
             }
             aria-pressed={active}
             title={`${task.taskKey} · ${task.title}${mentioned ? ' — mentioned in text' : ''}`}
-            className={`inline-flex max-w-[168px] items-center gap-1.5 rounded-full py-0.5 pl-1.5 pr-2 text-[12px] transition-colors ${FOCUS_RING}`}
+            className={`inline-flex max-w-[168px] items-center gap-1.5 rounded-full py-0.5 pl-1.5 pr-2 text-ui transition-colors ${FOCUS_RING}`}
             style={{
               background: active ? 'color-mix(in srgb, var(--accent) 13%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)',
               color: active ? 'var(--accent)' : 'var(--text-secondary)',
               border: `1px solid ${active ? 'color-mix(in srgb, var(--accent) 32%, transparent)' : HAIRLINE}`,
             }}
           >
-            <span className="font-mono text-[11px] font-bold">{task.taskKey}</span>
+            <span className="font-mono text-meta font-semibold">{task.taskKey}</span>
             <span className="truncate" aria-hidden="true">{task.title}</span>
           </button>
         );
@@ -193,7 +193,7 @@ function MentionChips({
       {unknownTokens.map((token) => (
         <span
           key={token}
-          className="rounded-full px-2 py-0.5 font-mono text-[11px] font-bold"
+          className="rounded-full px-2 py-0.5 font-mono text-meta font-semibold"
           style={{ color: 'var(--text-muted)', border: '1px dashed var(--border-strong)' }}
           title="Typed in the update — links if this task exists"
         >

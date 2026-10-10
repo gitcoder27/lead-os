@@ -298,7 +298,7 @@ export function NoteDocument({
         {editor.loadError ? (
           <div className="notes-doc-error" role="alert">
             <p>Could not load this note.</p>
-            <p className="mt-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="mt-1 text-ui" style={{ color: 'var(--text-muted)' }}>
               {editor.loadError.message}
             </p>
             <button type="button" className="ui-btn-secondary mt-4" onClick={editor.retryLoad}>

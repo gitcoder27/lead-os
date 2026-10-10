@@ -153,7 +153,7 @@ export function AttentionRulesSection() {
 
   if (query.isError) {
     return (
-      <p role="alert" className="text-[13px]" style={{ color: 'var(--danger)' }}>
+      <p role="alert" className="text-body" style={{ color: 'var(--danger)' }}>
         Could not load your attention rules.{' '}
         <button type="button" className="underline" onClick={() => void query.refetch()}>Retry</button>
       </p>
@@ -162,7 +162,7 @@ export function AttentionRulesSection() {
 
   if (!draft) {
     return (
-      <p className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+      <p className="flex items-center gap-2 text-body" style={{ color: 'var(--text-muted)' }}>
         <Loader2 size={13} className="animate-spin" aria-hidden="true" /> Loading attention rules…
       </p>
     );
@@ -179,26 +179,26 @@ export function AttentionRulesSection() {
         void save();
       }}
     >
-      <p className="text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         These rules decide when someone or something needs your attention. Hours count working time only:
         weekdays between the start and end of your day, so nobody reads as stale first thing in the morning or after a weekend.
       </p>
 
       <fieldset className="space-y-4">
-        <legend className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Working day</legend>
+        <legend className="text-ui font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Working day</legend>
         <div className="flex flex-wrap gap-4">
           <label className="block">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Day starts</span>
+            <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Day starts</span>
             <input type="time" value={draft.dayStart} onChange={(event) => set('dayStart', event.target.value)} className="ui-field mt-1.5 block w-[140px]" />
           </label>
           <label className="block">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Day ends</span>
+            <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Day ends</span>
             <input type="time" value={draft.dayEnd} onChange={(event) => set('dayEnd', event.target.value)} className="ui-field mt-1.5 block w-[140px]" />
           </label>
         </div>
         <label className="block">
-          <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>Time zone</span>
-          <span className="mt-0.5 block text-[12px]" style={{ color: 'var(--text-muted)' }}>The working day is measured here, whoever is looking.</span>
+          <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Time zone</span>
+          <span className="mt-0.5 block text-ui" style={{ color: 'var(--text-muted)' }}>The working day is measured here, whoever is looking.</span>
           <span className="mt-1.5 flex flex-wrap items-center gap-2">
             <input
               type="text"
@@ -218,16 +218,16 @@ export function AttentionRulesSection() {
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Thresholds</legend>
+        <legend className="text-ui font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Thresholds</legend>
         {NUMBER_FIELDS.map((field) => (
           <label key={field.key} className="block">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
               {field.label}
               {field.collabOnly && teamMode === 'solo' ? (
-                <span className="ml-2 text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>Collaborative mode only</span>
+                <span className="ml-2 text-meta font-normal" style={{ color: 'var(--text-muted)' }}>Collaborative mode only</span>
               ) : null}
             </span>
-            <span className="mt-0.5 block text-[12px]" style={{ color: 'var(--text-muted)' }}>{field.hint}</span>
+            <span className="mt-0.5 block text-ui" style={{ color: 'var(--text-muted)' }}>{field.hint}</span>
             <span className="mt-1.5 flex items-center gap-2">
               <input
                 type="number"
@@ -240,14 +240,14 @@ export function AttentionRulesSection() {
                 className="ui-field w-[100px]"
                 aria-label={field.label}
               />
-              <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>{field.unit}</span>
+              <span className="text-ui" style={{ color: 'var(--text-muted)' }}>{field.unit}</span>
             </span>
           </label>
         ))}
       </fieldset>
 
       {error ? (
-        <p role="alert" className="text-[12.5px]" style={{ color: 'var(--danger)' }}>{error}</p>
+        <p role="alert" className="text-body" style={{ color: 'var(--danger)' }}>{error}</p>
       ) : null}
 
       <div className="flex items-center gap-2">

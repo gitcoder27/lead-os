@@ -32,7 +32,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
               key={tag.id}
               onClick={() => onToggle(tag.id)}
               disabled={isPending}
-              className="text-[12px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 hover:opacity-70 transition-opacity disabled:cursor-wait"
+              className="text-ui px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 hover:opacity-70 transition-opacity disabled:cursor-wait"
               style={{ background: `${tag.color}20`, color: tag.color, border: `1px solid ${tag.color}30` }}
               title={`Remove "${tag.name}"`}
             >
@@ -40,7 +40,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
             </button>
           ))}
           {tags.length === 0 && !expanded && (
-            <button onClick={() => setExpanded(true)} className="text-[12px] font-medium" style={{ color: 'var(--accent)' }}>
+            <button onClick={() => setExpanded(true)} className="text-ui font-medium" style={{ color: 'var(--accent)' }}>
               + Add tag
             </button>
           )}
@@ -65,7 +65,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
                     key={tag.id}
                     onClick={() => onToggle(tag.id)}
                     disabled={isPending}
-                    className="text-[12px] px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 transition-opacity disabled:cursor-wait"
+                    className="text-ui px-1.5 py-[2px] rounded-full font-medium inline-flex items-center gap-0.5 transition-opacity disabled:cursor-wait"
                     style={{
                       background: isAssigned ? `${tag.color}35` : `${tag.color}12`,
                       color: tag.color,
@@ -91,13 +91,13 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
                 }
               }}
               placeholder="New tag…"
-              className="flex-1 text-[12px] px-2 py-0.5 rounded focus:outline-none focus:ring-1"
+              className="flex-1 text-ui px-2 py-0.5 rounded focus:outline-none focus:ring-1"
               style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', outlineColor: 'var(--accent)' }}
             />
             <button
               onClick={() => onCreate(newTagName, { onSuccess: () => setNewTagName('') })}
               disabled={!newTagName.trim() || isPending}
-              className="text-[12px] px-2 py-0.5 rounded font-medium disabled:opacity-30"
+              className="text-ui px-2 py-0.5 rounded font-medium disabled:opacity-30"
               style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Add

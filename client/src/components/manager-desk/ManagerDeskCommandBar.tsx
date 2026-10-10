@@ -104,7 +104,7 @@ export function ManagerDeskCommandBar({
                   key={key}
                   type="button"
                   onClick={() => onQuickFilterChange(key)}
-                  className="flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] font-medium transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+                  className="flex h-7 items-center gap-1.5 rounded-md border px-2 text-ui font-medium transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
                   style={{
                     background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent-glow) 82%, var(--bg-tertiary) 18%)' : 'transparent',
                     borderColor: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 46%, transparent)' : 'transparent',
@@ -114,7 +114,7 @@ export function ManagerDeskCommandBar({
                 >
                   <span>{label}</span>
                   <span
-                    className="rounded px-1 font-mono text-[12px] font-semibold tabular-nums"
+                    className="rounded px-1 font-mono text-ui font-semibold tabular-nums"
                     style={{
                       background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 14%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)',
                       color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-muted)',
@@ -135,7 +135,7 @@ export function ManagerDeskCommandBar({
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
                 placeholder="Search…"
-                className="h-7 min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-placeholder"
+                className="h-7 min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-placeholder"
                 style={{ color: 'var(--text-primary)' }}
                 aria-label="Search manager desk tasks"
               />
@@ -150,7 +150,7 @@ export function ManagerDeskCommandBar({
               type="button"
               onClick={onToggleFilters}
               aria-label={hasStructuredFilters ? 'Filtered' : 'Filters'}
-              className="flex h-7 items-center gap-1 rounded-lg border px-2 text-[12px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+              className="flex h-7 items-center gap-1 rounded-lg border px-2 text-ui font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
               style={{
                 background: hasStructuredFilters ? 'var(--md-accent-glow)' : 'color-mix(in srgb, var(--bg-secondary) 58%, transparent)',
                 borderColor: hasStructuredFilters ? 'color-mix(in srgb, var(--md-accent) 52%, transparent)' : 'color-mix(in srgb, var(--border) 66%, transparent)',
@@ -165,7 +165,7 @@ export function ManagerDeskCommandBar({
               <button
                 type="button"
                 onClick={onResetView}
-                className="h-7 rounded-lg border px-2 text-[12px] font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
+                className="h-7 rounded-lg border px-2 text-ui font-semibold transition-[background-color,border-color,color,transform] duration-150 hover:-translate-y-px active:scale-[0.98]"
                 style={{
                   background: 'color-mix(in srgb, var(--bg-secondary) 58%, transparent)',
                   borderColor: 'color-mix(in srgb, var(--border) 66%, transparent)',
@@ -224,7 +224,7 @@ function StructuredFilters({
       <button
         type="button"
         onClick={onClear}
-        className="self-end rounded-lg border px-2 py-1.5 text-[12px] font-semibold uppercase tracking-[0.1em]"
+        className="self-end rounded-lg border px-2 py-1.5 text-ui font-semibold uppercase tracking-[0.1em]"
         style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       >
         Clear
@@ -245,12 +245,12 @@ function SelectControl({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-0.5 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
+    <label className="flex flex-col gap-0.5 text-meta font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border px-2 py-1.5 text-[12px] font-medium outline-none"
+        className="rounded-lg border px-2 py-1.5 text-ui font-medium outline-none"
         style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
       >
         <option value="">All</option>

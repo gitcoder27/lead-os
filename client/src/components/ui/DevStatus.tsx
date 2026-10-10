@@ -38,7 +38,7 @@ export function DevStatusMark({ status, emphasis = false }: { status: TrackerDev
   const loud = emphasis || LOUD_STATUSES.has(status);
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] leading-[18px] ${loud ? 'rounded-full px-1.5 font-semibold' : 'font-medium'}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-ui leading-[18px] ${loud ? 'rounded-full px-1.5 font-semibold' : 'font-medium'}`}
       style={
         loud
           ? {

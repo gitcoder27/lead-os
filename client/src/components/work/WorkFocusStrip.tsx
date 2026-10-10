@@ -76,8 +76,8 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions }: WorkFo
             <ClipboardList size={14} />
           </span>
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</p>
-            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
+            <p className="text-body font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</p>
+            <p className="text-ui" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
           </div>
           {overviewLoading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
         </div>
@@ -101,11 +101,11 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions }: WorkFo
                 <span className="flex min-w-0 items-center gap-2">
                   <Icon size={13} className="shrink-0" style={{ color: active || signal.value > 0 ? signal.color : 'var(--text-muted)' }} />
                   <span className="min-w-0">
-                    <span className="block whitespace-nowrap text-[12px] font-semibold" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{signal.label}</span>
-                    <span className="block whitespace-nowrap text-[11px]" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
+                    <span className="block whitespace-nowrap text-ui font-semibold" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{signal.label}</span>
+                    <span className="block whitespace-nowrap text-meta" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
                   </span>
                 </span>
-                <span className="font-mono text-[15px] font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? toneText(signal.color) : 'var(--text-muted)' }}>
+                <span className="font-mono text-title-sm font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? toneText(signal.color) : 'var(--text-muted)' }}>
                   {signal.value}
                 </span>
               </button>

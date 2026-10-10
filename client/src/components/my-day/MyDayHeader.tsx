@@ -54,7 +54,7 @@ export function MyDayHeader({
   return (
     <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <p className="text-[12.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-body font-medium" style={{ color: 'var(--text-muted)' }}>
           {eyebrow}
         </p>
         <h1
@@ -101,7 +101,7 @@ function StatusChip({ status, onClick }: { status: ReturnType<typeof getStatusIn
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-6 items-center gap-1.5 rounded-full pl-2 pr-1.5 text-[12px] font-medium lg:hidden ${FOCUS_RING}`}
+      className={`inline-flex h-6 items-center gap-1.5 rounded-full pl-2 pr-1.5 text-ui font-medium lg:hidden ${FOCUS_RING}`}
       style={{
         color: status.color,
         background: `color-mix(in srgb, ${status.color} 10%, transparent)`,
@@ -157,7 +157,7 @@ function DayProgress({ done, current, planned, className }: { done: number; curr
           )}
         </div>
       )}
-      <span className="text-[12.5px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-body tabular-nums" style={{ color: 'var(--text-muted)' }}>
         {label}
       </span>
     </div>

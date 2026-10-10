@@ -60,7 +60,7 @@ export function StandupPersonHeader({
         <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 data-standup-person tabIndex={-1} className="break-words text-[20px] font-semibold leading-7 outline-none" style={{ color: 'var(--text-primary)' }}>
+            <h2 data-standup-person tabIndex={-1} className="break-words text-title font-semibold leading-7 outline-none" style={{ color: 'var(--text-primary)' }}>
               {day.developer.displayName}
               <YouTag show={day.developer.isSelf} />
             </h2>
@@ -69,7 +69,7 @@ export function StandupPersonHeader({
             <select
               value={day.status}
               onChange={(event) => onStatusSelect(event.target.value as TrackerDeveloperStatus)}
-              className="h-9 rounded-md px-2 text-[12px] font-medium outline-none"
+              className="h-9 rounded-md px-2 text-ui font-medium outline-none"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
               aria-label="Set developer status"
             >
@@ -80,14 +80,14 @@ export function StandupPersonHeader({
               ))}
             </select>
             {day.nextFollowUpAt && (
-              <span className="inline-flex items-center gap-1 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="inline-flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                 <BellRing size={11} /> Follow-up {formatTime(day.nextFollowUpAt)}
               </span>
             )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1">
-          <span className="mr-1 text-[12px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          <span className="mr-1 text-ui tabular-nums" style={{ color: 'var(--text-muted)' }}>
             {position} / {total}
           </span>
           <NavButton label="Previous developer" onClick={onPrev} disabled={position <= 1}>
@@ -99,29 +99,29 @@ export function StandupPersonHeader({
         </div>
       </div>
 
-      <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+      <p className="mt-3 text-ui leading-4" style={{ color: 'var(--text-muted)' }}>
         {usesCheckIn ? (stats.checkInsToday ? `Developer check-in ${stats.lastCheckInAt ? formatRelativeTime(stats.lastCheckInAt) : 'today'}` : 'No developer check-in today')
           : `Last touched: ${day.signals.freshness.lastManagerTouchAt ? formatRelativeTime(day.signals.freshness.lastManagerTouchAt) : 'not yet'}`}
       </p>
       {flagged && <div className="mt-4 border-l-2 pl-3" style={{ borderColor: 'var(--accent)' }}>
-        <p className="flex items-center gap-1.5 text-xs font-medium"><Bell size={13} />Follow up at finish</p>
-        <label className="mt-2 block text-xs" htmlFor="standup-flag-reason">Why follow up with {day.developer.displayName}? (optional)</label>
+        <p className="flex items-center gap-1.5 text-ui leading-4 font-medium"><Bell size={13} />Follow up at finish</p>
+        <label className="mt-2 block text-ui leading-4" htmlFor="standup-flag-reason">Why follow up with {day.developer.displayName}? (optional)</label>
         <input id="standup-flag-reason" className="ui-field mt-1 w-full" maxLength={200} value={flagReason ?? ''} onChange={(event) => onFlagReasonChange(event.target.value)} onBlur={(event) => onFlagReasonChange(cleanFlagReason(event.target.value))} onKeyDown={(event) => {
           if (event.key === 'Escape' || (event.key === 'Enter' && !event.nativeEvent.isComposing)) {
             event.preventDefault(); event.stopPropagation(); event.currentTarget.blur();
           }
         }} />
-        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Saved as a linked task when this round is finished.</p>
+        <p className="mt-1 text-ui leading-4" style={{ color: 'var(--text-muted)' }}>Saved as a linked task when this round is finished.</p>
       </div>}
 
       {/* P3-D11 hybrid status suggestion */}
       {suggestion && (
         <div
-          className="mt-3 flex items-center gap-2 text-xs"
+          className="mt-3 flex items-center gap-2 text-ui leading-4"
           data-testid="status-suggestion"
         >
           <TriangleAlert size={14} style={{ color: 'var(--warning)' }} />
-          <span className="min-w-0 flex-1 text-[12.5px]" style={{ color: 'var(--text-primary)' }}>
+          <span className="min-w-0 flex-1 text-body" style={{ color: 'var(--text-primary)' }}>
             {suggestion.reasonTaskKey} is blocked
           </span>
         </div>

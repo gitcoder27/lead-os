@@ -109,7 +109,7 @@ export function PlannedQueue({
   if (items.length === 0) {
     return (
       <div className={listClass}>
-        <p className="px-4 py-4 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="px-4 py-4 text-body" style={{ color: 'var(--text-muted)' }}>
           {readOnly ? 'Nothing was queued.' : 'Nothing queued. Add what’s next.'}
         </p>
         {footer && <div style={borderStyle}>{footer}</div>}

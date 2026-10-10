@@ -66,7 +66,7 @@ export function SignalChip({
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-meta font-semibold uppercase tracking-[0.08em]"
       style={{ borderColor: 'var(--border)', background, color }}
     >
       {icon}
@@ -104,7 +104,7 @@ export function UnifiedEmptyState({
       >
         <Icon size={16} />
       </div>
-      <p className="mt-3 text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+      <p className="mt-3 text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
         {message}
       </p>
     </div>

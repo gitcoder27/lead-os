@@ -111,7 +111,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
       transition={{ duration: 0.12 }}
     >
       <div className="px-5 py-3.5">
-        <label htmlFor="note-capture-text" className="mb-1.5 block text-[12px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <label htmlFor="note-capture-text" className="mb-1.5 block text-ui font-medium" style={{ color: 'var(--text-secondary)' }}>
           Quick note
         </label>
         <textarea
@@ -127,7 +127,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           }}
           placeholder="Jot it down before it slips…"
           rows={4}
-          className="notes-capture-textarea w-full rounded-xl px-3.5 py-2.5 text-[13px] outline-none resize-y disabled:opacity-60"
+          className="notes-capture-textarea w-full rounded-xl px-3.5 py-2.5 text-body outline-none resize-y disabled:opacity-60"
           style={{
             background: 'var(--bg-tertiary)',
             color: 'var(--text-primary)',
@@ -137,11 +137,11 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           maxLength={50000}
           disabled={submitting}
         />
-        <p className="mt-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-1.5 text-ui" style={{ color: 'var(--text-muted)' }}>
           Added to your private daily note
         </p>
         {storageWarning ? (
-          <p className="mt-1 text-[12px]" style={{ color: 'var(--warning)' }}>
+          <p className="mt-1 text-ui" style={{ color: 'var(--warning)' }}>
             Draft recovery unavailable in this browser. Keep this dialog open until it saves.
           </p>
         ) : null}
@@ -154,7 +154,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           background: 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)',
         }}
       >
-        <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
           {targetDate === date ? formattedDate : targetDate}
         </span>
         <div className="flex items-center gap-2">
@@ -165,7 +165,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
                 onClose();
                 onOpenNotes(targetDate);
               }}
-              className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium"
+              className="rounded-lg px-2.5 py-1.5 text-ui font-medium"
               style={{ color: 'var(--text-muted)' }}
             >
               Open Notes
@@ -175,7 +175,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
             type="button"
             onClick={handleSubmit}
             disabled={!text.trim() || submitting}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold transition-all disabled:opacity-40"
             style={{
               background: 'var(--accent-solid)',
               color: 'var(--on-accent)',

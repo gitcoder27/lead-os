@@ -186,7 +186,7 @@ function TrackerOnlyDrawer({
       {/* Backdrop */}
       <div
         className="workspace-shell-backdrop fixed inset-x-0 bottom-0 z-drawer-stacked"
-        style={{ background: 'var(--scrim-soft)', backdropFilter: 'var(--scrim-soft-blur)' }}
+        style={{ background: 'var(--scrim-soft)' }}
         onClick={onClose}
       />
 

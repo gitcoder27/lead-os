@@ -81,8 +81,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // Errors sit in their own stack (top), each announced assertively as it appears; the rest share one
-  // polite live region.
+  // Errors sit in their own stack (above the notices), each announced assertively as it appears; the rest
+  // share one polite live region. docs/73 UXD-07: the stack sits bottom-right, clear of the header's
+  // Capture and of an open Copilot dock.
   const alerts = toasts.filter((toast) => toast.type === 'error');
   const notices = toasts.filter((toast) => toast.type !== 'error');
   const persistent = toasts.filter((toast) => resolveDuration(toast) === 0).length;
@@ -91,7 +92,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ addToast, removeToast, clearToasts }}>
       {/* First in the DOM so a keyboard user reaches a toast (and can pause its timer) before the page;
           it is fixed-position, so the visual layout is unaffected. */}
-      <section aria-label="Notifications" className="fixed top-4 right-4 z-toast flex flex-col gap-2 max-w-sm">
+      <section aria-label="Notifications" className="toast-stack fixed bottom-4 left-4 right-4 z-toast flex flex-col items-stretch gap-2 sm:left-auto sm:max-w-sm">
         {persistent > 1 ? (
           <button type="button" className="ui-btn ui-btn-sm self-end" onClick={dismissPersistent}>
             Dismiss all ({persistent})

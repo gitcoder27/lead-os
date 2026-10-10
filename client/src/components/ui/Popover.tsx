@@ -71,7 +71,11 @@ export function TaskPopover({
   const closeRef = useRef<() => void>(() => {});
   closeRef.current = () => {
     onClose();
-    const target = returnFocus.current;
+    // docs/73 UXD-07: the trigger is the fallback when the remembered element is gone, is the
+    // page body, or sits inside this popover (dev StrictMode re-runs the capture after autofocus).
+    const remembered = returnFocus.current;
+    const usable = remembered && remembered !== document.body && document.contains(remembered) && !ref.current?.contains(remembered);
+    const target = usable ? remembered : anchor;
     if (target && document.contains(target)) requestAnimationFrame(() => target.focus());
   };
   const close = () => closeRef.current();

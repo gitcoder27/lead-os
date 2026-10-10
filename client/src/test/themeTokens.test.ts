@@ -205,6 +205,14 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     expect(src('components/tasks/TaskListRow.tsx')).toContain('task-row-outcome ui-row-action');
   });
 
+  it('drawers dim the list they annotate without blurring it (docs/73 UXD-07)', () => {
+    for (const file of ['components/tasks/TaskDrawer.tsx', 'components/team-tracker/DeveloperTrackerDrawer.tsx', 'components/team-tracker/TrackerTaskDetailDrawer.tsx', 'components/layout/DashboardLayout.tsx']) {
+      expect(src(file)).toContain("background: 'var(--scrim-soft)'");
+      expect(src(file)).not.toMatch(/scrim-soft-blur|blur\(0\.5px\)/);
+    }
+    expect(css).not.toContain('--scrim-soft-blur');
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

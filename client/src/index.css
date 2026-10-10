@@ -67,7 +67,6 @@
   --scrim:          rgba(15, 23, 42, 0.36);
   --scrim-soft:     rgba(15, 23, 42, 0.18);
   --scrim-blur:     blur(4px);
-  --scrim-soft-blur: blur(2px);
   --overlay-shadow: 0 24px 64px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.04);
   --drawer-shadow:  -24px 0 64px rgba(15, 23, 42, 0.16);
   --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
@@ -882,6 +881,14 @@ textarea.ui-field { resize: none; }
 .header-primary-btn:hover { filter: brightness(1.08); }
 .header-primary-btn:active { transform: translateY(0.5px); }
 .header-primary-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* docs/73 UXD-07: toasts dock bottom-right; with the Copilot dock open they move to its left. */
+@media (min-width: 640px) {
+  body:has([data-copilot-dock='docked']) .toast-stack { right: calc(min(400px, 100vw - 24px) + 24px); }
+}
+/* A heading focused by script (jump targets, a new standup person) is announced, not outlined;
+   keyboard users still get the ring where :focus-visible applies. */
+[tabindex='-1']:focus:not(:focus-visible) { outline: none; }
 
 /* docs/73 UXD-06: skip link — hidden until keyboard focus lands on it. */
 .skip-link {

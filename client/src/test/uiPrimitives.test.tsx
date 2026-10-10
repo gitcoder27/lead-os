@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MenuItem, Popover } from '@/components/ui/Popover';
 import { Dialog, DialogActions } from '@/components/ui/Dialog';
 import { KeySpec } from '@/components/ui/Kbd';
 import { DevStatusMark, STATUS_META } from '@/components/ui/DevStatus';
@@ -66,6 +68,59 @@ describe('useModalFocus stacking (docs/54 V1)', () => {
     // The lower layer yields instead of pulling focus back into itself.
     expect(screen.getByText('Upper button')).toHaveFocus();
     if (original) Object.defineProperty(HTMLElement.prototype, 'offsetParent', original);
+  });
+});
+
+describe('useModalFocus trap (docs/73 UXD-07)', () => {
+  function Palette() {
+    const ref = useModalFocus<HTMLDivElement>();
+    return (
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Palette">
+        <input aria-label="Search" />
+        {/* A scrollable listbox Chrome makes focusable, with roving options that are not Tab stops. */}
+        <div role="listbox" aria-label="Results" tabIndex={0}>
+          <button type="button" role="option" aria-selected="true" tabIndex={-1}>Go to Today</button>
+          <button type="button" role="option" aria-selected="false" tabIndex={-1}>Go to Tasks</button>
+        </div>
+      </div>
+    );
+  }
+
+  it('cycles between real stops only, so Tab never escapes from a scroller or an option', () => {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetParent');
+    Object.defineProperty(HTMLElement.prototype, 'offsetParent', { configurable: true, get() { return this.parentNode; } });
+    render(<><button type="button">Outside</button><Palette /></>);
+    const search = screen.getByRole('textbox', { name: 'Search' });
+    const list = screen.getByRole('listbox', { name: 'Results' });
+    list.focus();
+    fireEvent.keyDown(list, { key: 'Tab' });
+    expect(search).toHaveFocus();
+    screen.getByRole('option', { name: 'Go to Today' }).focus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab', shiftKey: true });
+    expect(list).toHaveFocus();
+    fireEvent.keyDown(list, { key: 'Tab' });
+    expect(search).toHaveFocus();
+    if (original) Object.defineProperty(HTMLElement.prototype, 'offsetParent', original);
+  });
+});
+
+describe('Popover focus return (docs/73 UXD-07)', () => {
+  it('falls back to its trigger when the remembered element is the body', async () => {
+    function Menu() {
+      const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+      return (
+        <>
+          <button type="button" onClick={(event) => setAnchor(event.currentTarget)}>More</button>
+          {anchor && <Popover anchor={anchor} onClose={() => setAnchor(null)} label="More"><MenuItem label="Notes" onSelect={() => setAnchor(null)} /></Popover>}
+        </>
+      );
+    }
+    render(<Menu />);
+    const trigger = screen.getByRole('button', { name: 'More' });
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.click(trigger);
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Notes' }), { key: 'Escape' });
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
 

@@ -557,7 +557,7 @@ export function DashboardLayout({
             {selectedIssueKey && (
               <div
                 className="absolute inset-0 z-40 transition-opacity duration-200"
-                style={{ background: 'rgba(0,0,0,0.08)', backdropFilter: 'blur(0.5px)' }}
+                style={{ background: 'var(--scrim-soft)' }}
                 onClick={handleClosePanel}
               />
             )}

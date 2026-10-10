@@ -47,6 +47,7 @@ export function AssistantDock() {
       key="assistant-panel"
       role="dialog"
       aria-label="LeadOS Copilot"
+      data-copilot-dock={expanded ? 'expanded' : 'docked'}
       layout
       initial={reduceMotion ? { opacity: 0 } : { x: 24, opacity: 0 }}
       animate={reduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}

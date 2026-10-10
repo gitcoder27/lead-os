@@ -1,7 +1,9 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+// docs/73 UXD-07: tabindex="-1" elements (listbox options, roving items) are never Tab stops.
+const FOCUSABLE_SELECTOR = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled])', 'select:not([disabled])', 'textarea:not([disabled])', '[tabindex]',
+].map((selector) => `${selector}:not([tabindex="-1"])`).join(', ');
 
 /**
  * True while a modal layer mounted later in the document (a dialog, drawer or
@@ -61,6 +63,15 @@ export function useModalFocus<T extends HTMLElement>(active = true, externalRef?
         return;
       }
       const inside = current !== null && root.contains(current);
+      if (inside && current && !focusables.includes(current)) {
+        // docs/73 UXD-07: something focusable the selector misses (Chrome makes scrollable lists
+        // keyboard-focusable) — step to its neighbour in DOM order instead of letting Tab escape.
+        const follows = (el: HTMLElement) => Boolean(current.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+        const next = event.shiftKey ? [...focusables].reverse().find((el) => !follows(el)) ?? last : focusables.find(follows) ?? first;
+        event.preventDefault();
+        next.focus();
+        return;
+      }
       if (event.shiftKey) {
         if (!inside || current === first) {
           event.preventDefault();

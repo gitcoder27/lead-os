@@ -113,7 +113,7 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onSt
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className={`workspace-shell-backdrop fixed inset-x-0 bottom-0 ${stacked ? 'z-drawer-stacked' : 'z-drawer'}`}
-          style={{ background: 'var(--scrim-soft)', backdropFilter: 'var(--scrim-soft-blur)' }}
+          style={{ background: 'var(--scrim-soft)' }}
           onClick={onClose}
         />
         <motion.aside

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { ToastProvider, useToast } from '@/context/ToastContext';
@@ -48,6 +50,15 @@ afterEach(() => {
 });
 
 describe('ToastProvider (docs/56 P7-01)', () => {
+  it('stacks toasts bottom-right, never over the header, and moves aside for an open Copilot dock (docs/73 UXD-07)', () => {
+    render(<ToastProvider><span /></ToastProvider>);
+    const stack = screen.getByRole('region', { name: 'Notifications' });
+    expect(stack).toHaveClass('toast-stack', 'fixed', 'bottom-4', 'right-4', 'z-toast');
+    expect(stack).not.toHaveClass('top-4');
+    const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8');
+    expect(css).toMatch(/body:has\(\[data-copilot-dock='docked'\]\) \.toast-stack \{ right:/);
+  });
+
   it('dismisses a success toast after 5 seconds, announced politely', () => {
     renderProvider();
     act(() => api.addToast({ type: 'success', title: 'Saved' }));

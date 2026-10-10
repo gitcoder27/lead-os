@@ -49,6 +49,7 @@ export class BackupService {
   private nextRunAt?: string;
   private lastError?: string;
   private lastRequestedAt = 0;
+  private preResetBackup?: Promise<BackupRecord>;
 
   constructor(
     private readonly settings = new SettingsService(),
@@ -114,6 +115,24 @@ export class BackupService {
     const enabled = await this.settings.getBackupBeforeReset(workspaceId);
     if (!enabled) {
       return null;
+    }
+    if (this.preResetBackup) return this.preResetBackup;
+    this.preResetBackup = this.reuseOrCreatePreResetBackup();
+    try {
+      return await this.preResetBackup;
+    } finally {
+      this.preResetBackup = undefined;
+    }
+  }
+
+  private async reuseOrCreatePreResetBackup(): Promise<BackupRecord> {
+    const recent = (await this.listBackups()).find((backup) => {
+      const age = Date.now() - Date.parse(backup.createdAt);
+      return backup.reason === "pre reset" && age >= 0 && age < 10 * 60_000;
+    });
+    if (recent) {
+      await this.verifyBackup(recent.path);
+      return recent;
     }
     return this.createBackup({ reason: "pre-reset", prune: true });
   }
@@ -297,6 +316,9 @@ export class BackupService {
     for (const backup of scheduledBackups.slice(maxScheduledSnapshots)) {
       backupsToDelete.add(backup.path);
     }
+
+    const preResetBackups = backups.filter((backup) => backup.reason === "pre reset");
+    for (const backup of preResetBackups.slice(10)) backupsToDelete.add(backup.path);
 
     await Promise.all(
       backups

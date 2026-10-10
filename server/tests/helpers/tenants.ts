@@ -1,3 +1,4 @@
+import type { BackupService as BackupServiceType } from "../../src/services/backup.service";
 import type { SyncEngine as SyncEngineType } from "../../src/sync/engine";
 import { expect } from "vitest";
 import crypto from "node:crypto";
@@ -22,7 +23,7 @@ export function workspaceSnapshot(workspaceId: string) {
 const MARK = "OWNERSECRET";
 
 /** Real services and API fixtures; only outbound sync and backups are stubbed. */
-export async function seedTenants() {
+export async function seedTenants(options: { backupService?: BackupServiceType } = {}) {
   const { createApp } = await import(`../../src/app`);
   const { rawDb } = await import(`../../src/db/connection`);
   const { invoke } = await import(`../helpers/http`);
@@ -66,7 +67,7 @@ export async function seedTenants() {
     getSyncScope: (ws: string) => new SyncEngine(settings).getSyncScope(ws),
     syncAllWorkspaces: async () => [],
   } as unknown as SyncEngineType;
-  const backupService = { start: async () => undefined, createPreResetBackup: async () => null } as unknown as BackupService;
+  const backupService = options.backupService ?? { start: async () => undefined, createPreResetBackup: async () => null } as unknown as BackupService;
   const today = new TodayService(issueService, tracker, desk, syncStub, { oneOnOneService: oneOnOnes });
   const search = new SearchService(settings, dailyNotes);
   const workViews = new WorkSavedViewsService();

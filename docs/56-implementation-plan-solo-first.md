@@ -898,7 +898,7 @@ Plan: [docs/72-self-registration-and-tenant-isolation.md](72-self-registration-a
 
 - [x] SR-01 — See docs/72 for scope and acceptance.
 - [x] SR-02 — See docs/72 for scope and acceptance.
-- [ ] SR-03 — See docs/72 for scope and acceptance.
+- [x] SR-03 — See docs/72 for scope and acceptance.
 - [ ] SR-04 — See docs/72 for scope and acceptance.
 - [ ] SR-05 — See docs/72 for scope and acceptance.
 - [ ] SR-06 — See docs/72 for scope and acceptance.
@@ -914,3 +914,4 @@ Plan: [docs/72-self-registration-and-tenant-isolation.md](72-self-registration-a
 | --- | --- | --- | --- |
 | 2026-10-10 | SR-01 | main (this commit) | Baseline: typecheck PASS; full test PASS (1531 server / 2085 client). Added strict explicit-scope normalization and install constant, a 200-route classified inventory, foreign-id/query/header/body and developer probes with owner-table hashes, and an injected missing-scope search regression. Initial strict test failed against existing fallback; fixtures corrected to actual capture/developer schemas. Final tenant + legacy multi-workspace suites: 6 PASS. typecheck, build:check, guard:data and diff check PASS; new test lint clean (existing touched-source warnings remain). Skipped routes have recorded focused-suite reasons in the manifest; no runtime DB, Jira, push or deploy. |
 | 2026-10-10 | SR-02 | main (this commit) | Four new regressions failed against the original scheduler (1ms write, unbounded stored interval, owner auto-sync gate, premature owner run). Added an idempotent 60s scheduler and due checks using each workspace last run, bounded reads/writes to 5–1440 minutes, removed timer restart on Jira save, and start the scheduler even before a connection exists. Added a no-restart route case; existing timer expectations updated for the reviewed policy. Final four targeted suites: 59 PASS. typecheck, build:check, new-test lint, guard:data and diff check PASS. One concurrent verification hit a fixture timeout; sequential rerun passed unchanged. No runtime data or real Jira calls. |
+| 2026-10-10 | SR-03 | main (this commit) | Four cross-workspace regressions reproduced multiple whole-install snapshots, concurrent reset failure and the missing count cap. Pre-reset requests now coalesce, reuse a verified snapshot younger than ten minutes even after service restart, and keep only ten pre-reset files. Owner manual backups are retained. Code recheck found the existing reason label is pre reset (spaces); preserved it and used it for matching. Added an expiry-boundary case and a real reset route test with owner-row hashing. Final backup/config suites: 50 PASS; typecheck, build:check, touched-test lint, guard:data and diff check PASS. All files and DBs are isolated in temporary test directories. |

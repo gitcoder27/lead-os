@@ -894,11 +894,38 @@ The bare manager login was the first screen anyone saw at the production URL. `/
 
 ## UI/UX design review and upgrade (docs/73)
 
-Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-design-review-and-upgrade-plan.md), with screenshots in `docs/screenshots/ux-review/`. Items UXD-01…UXD-29 run in three phases (foundation, daily screens, the rest), one commit per item, each checked in a browser in both themes at 1440 px and 375 px. Not authorized yet; implementation has not started.
+Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-design-review-and-upgrade-plan.md), with screenshots in `docs/screenshots/ux-review/`. Items UXD-01…UXD-29 run in three phases (foundation, daily screens, the rest), one commit per item, each checked in a browser in both themes at 1440 px and 375 px. Authorized by the owner on 2026-10-10. Decisions: Today's Inbox count stays a link; the Today defect cap is 3 rows plus one aggregate row (a code constant); the Tasks selection checkbox stays visible; `-after` shots stay local in `docs/screenshots/ux-review-after/` (git-ignored) and each phase commits at most six curated before/after pairs.
 
-- [ ] Phase 1 foundation: UXD-01…UXD-08
-- [ ] Phase 2 daily screens: UXD-10…UXD-16
-- [ ] Phase 3 the rest: UXD-20…UXD-29
+- [x] UXD-00 — Review, plan and screenshots committed; local after-shot folder ignored.
+- [ ] UXD-01 — Contrast and accent fixes.
+- [ ] UXD-02 — Type scale tokens.
+- [ ] UXD-03 — Sentence-case labels.
+- [ ] UXD-04 — Row action hierarchy.
+- [ ] UXD-05 — `Select`, disclosure and `KeySpec` adoption.
+- [ ] UXD-06 — Shell: header and landmarks.
+- [ ] UXD-07 — Overlay behaviour.
+- [ ] UXD-08 — Retire amber outside `/desk`.
+- [ ] UXD-10 — Today composition.
+- [ ] UXD-11 — Today visual polish.
+- [ ] UXD-12 — Tasks toolbar and row density.
+- [ ] UXD-13 — Inline row edits.
+- [ ] UXD-14 — Drawer and task page polish.
+- [ ] UXD-15 — Capture copy.
+- [ ] UXD-16 — Move to project in two clicks.
+- [ ] UXD-20 — Work table and toolbar.
+- [ ] UXD-21 — Triage panel.
+- [ ] UXD-22 — Team board, drawer and 1:1.
+- [ ] UXD-23 — Standup.
+- [ ] UXD-24 — Settings.
+- [ ] UXD-25 — Setup Wizard.
+- [ ] UXD-26 — Palette finds projects.
+- [ ] UXD-27 — Error and boot states.
+- [ ] UXD-28 — Projects polish.
+- [ ] UXD-29 — Copy sweep.
+
+| Date | Item | Commit | Validation / progress |
+| --- | --- | --- | --- |
+| 2026-10-10 | UXD-00 | main (0c7c8f1, this commit) | docs/73, the docs/56 pointer and the review shots landed in the owner's tree cleanup commit `0c7c8f1`; this commit adds the `docs/screenshots/ux-review-after/` ignore entry and the item checklist. No application code changed. |
 
 ## Self-registration and tenant isolation (docs/72)
 

@@ -21,3 +21,6 @@ client/.build-check/
 server/.build-check/
 .env.production.local
 *.tsbuildinfo
+
+# Local UX after-shots (curated pairs are committed per phase)
+docs/screenshots/ux-review-after/

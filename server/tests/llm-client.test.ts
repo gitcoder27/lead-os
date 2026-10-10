@@ -152,7 +152,7 @@ describe("OpenAiCompatibleClient.chatStream", () => {
     expect(content).toEqual(["Answer."]);
   });
 
-  it("surfaces the provider's error body instead of a bare status", async () => {
+  it("reports a safe rate-limit error without reflecting provider body text", async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(
@@ -164,7 +164,7 @@ describe("OpenAiCompatibleClient.chatStream", () => {
 
     await expect(client().chat({ messages: [{ role: "user", content: "hi" }] })).rejects.toMatchObject({
       status: 429,
-      message: "AI provider rate limited — Insufficient balance or no resource package.",
+      message: "AI provider rate limited",
     });
     // 429 is retryable — two backoff retries, then raised.
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -217,7 +217,7 @@ describe("OpenAiCompatibleClient.chatStream", () => {
 
     await expect(client().chat({ messages: [{ role: "user", content: "hi" }] })).rejects.toMatchObject({
       status: 502,
-      message: "AI provider error (400) — bad model",
+      message: "AI provider error (400)",
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

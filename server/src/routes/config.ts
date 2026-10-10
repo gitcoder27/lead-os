@@ -1,3 +1,4 @@
+import { assertAllowedOutboundUrl } from "../net/outbound-guard";
 import { Router } from "express";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -127,25 +128,8 @@ function normalizeManagerJiraAccountId(value: string | undefined): string | unde
   return trimmed;
 }
 
-function validateJiraBaseUrl(value: string): void {
-  const parsed = new URL(value);
-  const allowedHosts = process.env.JIRA_ALLOWED_HOSTS
-    ?.split(",")
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean);
-  const hostname = parsed.hostname.toLowerCase();
-
-  if (parsed.protocol !== "https:" && !(config.NODE_ENV !== "production" && ["http:", "https:"].includes(parsed.protocol))) {
-    throw new HttpError(400, "Jira base URL must use https");
-  }
-
-  if (config.NODE_ENV === "production" && parsed.protocol !== "https:") {
-    throw new HttpError(400, "Jira base URL must use https in production");
-  }
-
-  if (allowedHosts && allowedHosts.length > 0 && !allowedHosts.includes(hostname)) {
-    throw new HttpError(400, "Jira base URL host is not in JIRA_ALLOWED_HOSTS");
-  }
+async function validateJiraBaseUrl(value: string): Promise<void> {
+  await assertAllowedOutboundUrl(value, "jira");
 }
 
 async function testJiraConnection(baseUrl: string, email: string, token: string): Promise<{ displayName?: string; accountId?: string }> {
@@ -315,7 +299,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
     try {
       const workspaceId = req.auth!.user.workspaceId;
       const syncIntervalMs = req.body.syncIntervalMs ?? 300000;
-      validateJiraBaseUrl(req.body.jiraBaseUrl);
+      await validateJiraBaseUrl(req.body.jiraBaseUrl);
       const tokenForLookup = req.body.jiraApiToken ?? await getConfiguredJiraToken(workspaceId);
       const managerJiraAccountId = normalizeManagerJiraAccountId(req.body.managerJiraAccountId);
       const jiraSyncScopeMode = normalizeJiraSyncScopeMode(req.body.jiraSyncScopeMode ?? await getConfigValue(workspaceId, "jira_sync_scope_mode"));
@@ -400,7 +384,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
   router.post("/test", validate(testSchema), async (req, res, next) => {
     try {
       const workspaceId = req.auth!.user.workspaceId;
-      validateJiraBaseUrl(req.body.jiraBaseUrl);
+      await validateJiraBaseUrl(req.body.jiraBaseUrl);
       const token = req.body.jiraApiToken ?? await getConfiguredJiraToken(workspaceId);
       if (!token) {
         throw new HttpError(400, "Jira API token is required");
@@ -497,7 +481,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const jiraSyncScopeMode = normalizeJiraSyncScopeMode(req.body.jiraSyncScopeMode ?? await getConfigValue(workspaceId, "jira_sync_scope_mode"));
 
       if (jiraBaseUrl) {
-        validateJiraBaseUrl(jiraBaseUrl);
+        await validateJiraBaseUrl(jiraBaseUrl);
         await upsertConfig(workspaceId, "jira_base_url", jiraBaseUrl);
         shouldResync = true;
       }

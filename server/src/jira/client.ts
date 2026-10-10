@@ -1,3 +1,4 @@
+import { assertAllowedOutboundUrl } from "../net/outbound-guard";
 import { logger } from "../utils/logger";
 import { JiraIssue, JiraSearchResult, JiraUser, JiraTransition } from "./types";
 
@@ -39,9 +40,10 @@ export class JiraClient {
     try {
       requestUrl = new URL(path, this.normalizedBaseUrl).toString();
     } catch (error) {
-      throw new Error(`Invalid Jira request URL. baseUrl=${this.normalizedBaseUrl}, path=${path}`);
+      throw new Error("Invalid Jira request URL");
     }
 
+    await assertAllowedOutboundUrl(requestUrl, "jira");
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort(new DOMException("Jira request timed out", "TimeoutError"));
@@ -58,6 +60,7 @@ export class JiraClient {
           ...(init?.headers ?? {}),
         },
         signal: controller.signal,
+        redirect: "manual",
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === "TimeoutError") {
@@ -79,7 +82,7 @@ export class JiraClient {
     }
 
     if (!response.ok) {
-      const body = await response.text();
+      void response.body?.cancel().catch(() => undefined);
       if (response.status === 401) {
         throw new Error("Jira authentication failed (401)");
       }
@@ -89,7 +92,7 @@ export class JiraClient {
       if (response.status === 404) {
         throw new Error("Jira resource not found (404)");
       }
-      throw new Error(`Jira API error (${response.status}): ${body}`);
+      throw new Error(`Jira API error (${response.status})`);
     }
 
     if (response.status === 204) {

@@ -1,3 +1,4 @@
+import { assertAllowedOutboundUrl } from "../net/outbound-guard";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type {
@@ -301,6 +302,9 @@ export class AssistantConfigService {
 
   async update(workspaceId: string | undefined, patch: UpdateAiAssistantConfigRequest): Promise<AiAssistantConfig> {
     const normalizedWorkspaceId = normalizeWorkspaceId(workspaceId);
+    // Validate all proposed addresses before writing any part of the patch.
+    if (patch.baseUrl !== undefined) await assertAllowedOutboundUrl(normalizeAiBaseUrl(patch.baseUrl), "ai");
+    if (patch.upsertProvider) await assertAllowedOutboundUrl(normalizeAiBaseUrl(patch.upsertProvider.baseUrl), "ai");
 
     if (patch.enabled !== undefined) {
       await this.upsertValue(normalizedWorkspaceId, KEY_ENABLED, String(patch.enabled));

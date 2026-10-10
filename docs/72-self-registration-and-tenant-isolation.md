@@ -414,6 +414,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-03 | main (this commit) | Four cross-workspace regressions reproduced multiple whole-install snapshots, concurrent reset failure and the missing count cap. Pre-reset requests now coalesce, reuse a verified snapshot younger than ten minutes even after service restart, and keep only ten pre-reset files. Owner manual backups are retained. Code recheck found the existing reason label is pre reset (spaces); preserved it and used it for matching. Added an expiry-boundary case and a real reset route test with owner-row hashing. Final backup/config suites: 50 PASS; typecheck, build:check, touched-test lint, guard:data and diff check PASS. All files and DBs are isolated in temporary test directories. |
 
+| 2026-10-10 | SR-04 | main (this commit) | Four mocked outbound regressions failed against original Jira/AI save/test/request paths and raw body reflection. Added one production https/public-DNS/IP policy using the existing ipaddr.js 1.9.1 parser, explicit operator exceptions and exact/leading-dot Jira host rules; request-time rechecks and manual redirect handling cover background Jira and streaming/nonstreaming Copilot. All proposed AI profile URLs validate before patch writes. Removed untrusted provider text from errors, retaining status-specific messages; updated the two prior body-reflection expectations. Current provider profiles extend the plan file list but share the same policy. Final six targeted suites: 86 PASS; typecheck, build:check, new-module/test lint, touched JSON format, guard:data and diff check PASS. DNS/fetch mocked; residual rebinding documented. Offline npm metadata cache was missing, so declared the already-locked parser directly without changing its version or artifacts. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -430,7 +432,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Files:* `services/backup.service.ts`, `tests/backup.service.test.ts`, `tests/config.routes.test.ts`.
   - *Acceptance:* N resets in 10 minutes → 1 snapshot, reused; resets still succeed; at most 10 `pre-reset` files kept; owner-requested backups unaffected.
   - *Rollback:* revert.
-- [ ] **SR-04 Outbound URL guard (F-03).**
+- [x] **SR-04 Outbound URL guard (F-03).**
   - *Files:* `server/src/net/outbound-guard.ts` (new), `jira/client.ts`, `assistant/llm-client.ts`, `routes/config.ts`, `services/assistant-config.service.ts`, `.env.example` (`OUTBOUND_ALLOWED_HOSTS`, `JIRA_ALLOWED_HOSTS` suffix form), `docs/23`, tests `outbound-guard.test.ts`, `config.routes.test.ts`, `jira.client.test.ts`, `llm-client.test.ts`.
   - *Acceptance:* §8.3 guard cases; Jira errors carry status and a short message, not the body.
   - *Rollback:* revert. The owner's production AI URL is public (confirmed 2026-10-10), so no allow-list entry is needed for it. Before deploying, check `JIRA_ALLOWED_HOSTS` in the production `.env` (§10) and switch it to the suffix form if it is set.

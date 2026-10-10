@@ -1,3 +1,4 @@
+import { assertAllowedOutboundUrl } from "../net/outbound-guard";
 import { HttpError } from "../middleware/errorHandler";
 
 export type LlmRole = "system" | "user" | "assistant" | "tool";
@@ -150,42 +151,18 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-/** z.ai and OpenAI both return { error: { code, message } }; tolerate { error: string } and { message } too. */
-async function providerErrorDetail(response: Response): Promise<string | undefined> {
-  try {
-    const body = (await response.json()) as {
-      error?: { message?: string } | string;
-      message?: string;
-    };
-    const providerError = body?.error;
-    if (typeof providerError === "string" && providerError) {
-      return providerError;
-    }
-    if (typeof providerError === "object" && providerError !== null && providerError.message) {
-      return providerError.message;
-    }
-    if (typeof body?.message === "string" && body.message) {
-      return body.message;
-    }
-  } catch {
-    // body wasn't JSON — no detail available
-  }
-  return undefined;
-}
-
 async function raiseForStatus(response: Response): Promise<void> {
   if (response.ok) {
     return;
   }
-  const detail = await providerErrorDetail(response);
-  const suffix = detail ? ` — ${detail}` : "";
+  void response.body?.cancel().catch(() => undefined);
   if (response.status === 401 || response.status === 403) {
-    throw new HttpError(502, `AI credentials invalid${suffix}`);
+    throw new HttpError(502, `AI credentials invalid`);
   }
   if (response.status === 429) {
-    throw new HttpError(429, `AI provider rate limited${suffix}`);
+    throw new HttpError(429, `AI provider rate limited`);
   }
-  throw new HttpError(502, `AI provider error (${response.status})${suffix}`);
+  throw new HttpError(502, `AI provider error (${response.status})`);
 }
 
 function toResult(
@@ -357,6 +334,7 @@ export class OpenAiCompatibleClient implements LlmClient {
     for (let attempt = 0; ; attempt += 1) {
       const canRetry = attempt < this.maxRetries;
       try {
+        await assertAllowedOutboundUrl(`${this.baseUrl}/chat/completions`, "ai");
         const response = await fetch(`${this.baseUrl}/chat/completions`, {
           method: "POST",
           headers: {
@@ -366,6 +344,7 @@ export class OpenAiCompatibleClient implements LlmClient {
           },
           body: JSON.stringify(payload),
           signal: guard.signal,
+          redirect: "manual",
         });
         if (canRetry && !response.ok && isRetryableStatus(response.status)) {
           const delay = this.retryDelay(response.headers.get("retry-after"), attempt);

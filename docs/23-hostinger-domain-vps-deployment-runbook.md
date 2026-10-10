@@ -779,3 +779,11 @@ Only move to two hostnames if you still want the convenience after the single-ho
 - [Certbot: NGINX instructions](https://certbot.eff.org/instructions?ws=nginx&os=snap)
 - [Ubuntu Server: firewall documentation](https://documentation.ubuntu.com/server/how-to/security/firewalls/)
 - [Let's Encrypt FAQ](https://letsencrypt.org/docs/faq/)
+
+## Jira and Copilot outbound addresses
+
+In production, all Jira and Copilot configuration writes, connection tests and runtime requests require https and public IP/DNS targets. The guard refuses loopback, private, link-local, CGNAT, reserved and multicast addresses, including IPv4-mapped IPv6. Every DNS answer must be public. Redirects are refused, and error responses contain a safe status message without raw upstream bodies or provider error text.
+
+`JIRA_ALLOWED_HOSTS`, when set, restricts Jira hosts. Entries are exact hostnames or leading-dot suffixes: `.atlassian.net` permits that domain and its subdomains. Add friends' Jira domains before sending invites. `OUTBOUND_ALLOWED_HOSTS` is an operator-only exception for explicitly trusted internal hosts; it does not remove the https requirement. Leave it unset unless the install intentionally uses an internal provider. Development/test modes permit local HTTP fixtures; a scratch server must never inherit real credentials or call real Jira.
+
+DNS is checked immediately before each request, but the HTTP client's subsequent resolution leaves a DNS-rebinding race. This is a documented residual risk for this invite-only install. Production-copy checks and deployment remain operator-owned; do not test this policy by probing internal production services.

@@ -3,7 +3,7 @@ import type { CreateViaCapture } from '@/hooks/useCapture';
 import { PlacementDialog } from './PlacementDialog';
 import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
 import { ProjectsPanel } from './ProjectsPanel';
-import { ProjectFilters } from './ProjectFilters';
+import { ProjectFilterChip } from './ProjectFilters';
 import { useProject } from '@/hooks/useProjects';
 import { taskViewParamsFromState } from '@/lib/task-views';
 import { csvFileName, downloadCsv, tasksCsv } from '@/lib/csv';
@@ -873,6 +873,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           counts={countData}
           viewId={selectedView?.id ?? selectedId}
           onSelectView={(id) => setView(id)}
+          projectFilter={projectsMode ? undefined : <ProjectFilterChip today={today} definition={definition} onChange={setOverrides} />}
           overrides={toolbarOverrides}
           onOverrides={setOverrides}
           query={state.q ?? ''}
@@ -925,7 +926,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
             if (pointerPins.current) releasePointerPins();
           }}
         >
-          {projectsMode ? <ProjectsPanel query={state.q ?? ''} searchRef={searchRef} onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))} today={today} projectId={projectId} trackId={trackId} archived={state.archived ?? false} onNavigate={navigateProject} onArchiveFilter={(archived) => setState((current) => ({ ...current, archived }))} openTask={(key) => { setDrawerTaskKey(key); writeTaskParam(key); }} /> : <ProjectFilters today={today} definition={definition} onChange={setOverrides} />}
+          {projectsMode ? <ProjectsPanel query={state.q ?? ''} searchRef={searchRef} onQuery={(q) => setState((current) => ({ ...current, q: q || undefined }))} today={today} projectId={projectId} trackId={trackId} archived={state.archived ?? false} onNavigate={navigateProject} onArchiveFilter={(archived) => setState((current) => ({ ...current, archived }))} openTask={(key) => { setDrawerTaskKey(key); writeTaskParam(key); }} /> : null}
           {projectsMode && showTaskList && taskToolbar}
           {showTaskList && tasks.isError && (
             <TaskListError

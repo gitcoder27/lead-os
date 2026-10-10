@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState, type MouseEvent } from 'react';
+import { forwardRef, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Check, Keyboard, Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
 import { taskLabelDisplayName, type TaskAttentionSignal, type TaskLabel, type TaskStatus, type TaskViewCount, type TaskViewFilters, type TaskViewMeta, type TaskViewSort } from '@/types';
 import { OWNER_TOKENS, type TaskViewGroupOverride, type TaskViewOverrides } from '@/lib/task-views';
@@ -77,6 +77,8 @@ interface TaskToolbarProps {
   saving: boolean;
   canSave: boolean;
   onExport?: () => void;
+  /** docs/73 UXD-12: the Project filter chip, beside search (omitted inside Projects). */
+  projectFilter?: ReactNode;
   canExport?: boolean;
 }
 
@@ -84,7 +86,7 @@ interface TaskToolbarProps {
 export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(function TaskToolbar(props, searchRef) {
   const {
     title, projectContext = false, count, narrowed = false, updating, views, counts, viewId, onSelectView, overrides, onOverrides, query, onQuery,
-    effectiveSort, effectivePriority, defaultPriority, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport,
+    effectiveSort, effectivePriority, defaultPriority, effectiveGroup, developers, labels, isSavedView, hasOverrides, onUpdateView, onRevert, onShowShortcuts, onSaveView, saving, canSave, onExport, canExport, projectFilter,
   } = props;
   const [menu, setMenu] = useState<{ kind: OpenMenu; anchor: HTMLElement | null }>({ kind: null, anchor: null });
   const open = (kind: OpenMenu) => (event: MouseEvent<HTMLElement>) => {
@@ -150,11 +152,9 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
               </span>
             )}
             <span className="flex-1" />
-
-          </div>
-
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <label className="flex h-7 min-w-[180px] flex-1 items-center gap-1.5 rounded-lg px-2 sm:max-w-[260px]" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
+            {/* docs/73 UXD-12: one controls row — beside the title from md, a full row of its own on phones. */}
+            <div className="flex w-full min-w-0 items-center gap-1.5 md:w-auto">
+            <label className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 md:w-[240px] md:flex-none" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)' }}>
               <Search size={12} style={{ color: 'var(--text-muted)' }} />
               <input
                 ref={searchRef}
@@ -178,24 +178,26 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
                 <Kbd variant="subtle">/</Kbd>
               )}
             </label>
+            {projectFilter}
 
-            <button ref={optionsRef} type="button" onClick={open('options')} aria-haspopup="menu" aria-describedby={activeFilterCount ? 'task-options-summary' : undefined}
+            <button ref={optionsRef} type="button" onClick={open('options')} aria-haspopup="menu" aria-label={`View options${activeFilterCount ? ` (${activeFilterCount})` : ''}`} aria-describedby={activeFilterCount ? 'task-options-summary' : undefined}
               className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
               style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-              <SlidersHorizontal size={12} />View options{activeFilterCount ? ` (${activeFilterCount})` : ''}
+              <SlidersHorizontal size={12} /><span className="hidden sm:inline">View options</span>{activeFilterCount ? <span className="tabular-nums">{` (${activeFilterCount})`}</span> : ''}
             </button>
             <span id="task-options-summary" className="sr-only">{summary ? `Applied options: ${summary}` : 'View defaults'}</span>
             <button
               type="button"
               onClick={(event) => onShowShortcuts(event.currentTarget)}
               data-shortcuts-anchor=""
-              className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] md:flex"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts (?)"
             >
               <Keyboard size={14} />
             </button>
+            </div>
           </div>
         </div>
       </div>

@@ -845,7 +845,9 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       render(<TasksPage />);
 
       expect(within(row('T-12')).queryByText(/overdue/)).toBeNull();
-      expect(within(row('T-12')).getByText('Needs outcome')).toBeTruthy();
+      // docs/73 UXD-12: one action per meeting row — the outcome button replaces the "Needs outcome" label.
+      expect(within(row('T-12')).queryByText('Needs outcome')).toBeNull();
+      expect(within(row('T-12')).getAllByRole('button', { name: /outcome/i })).toHaveLength(1);
       fireEvent.click(within(row('T-12')).getByRole('button', { name: 'Capture outcome for T-12' }));
       const dialog = screen.getByRole('dialog', { name: /capture outcome/i });
       fireEvent.change(within(dialog).getByLabelText('Meeting outcome'), { target: { value: 'Go with Redis' } });
@@ -982,7 +984,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(mockApply.mock.calls.at(-1)![0][0].changes).toEqual({ followUpAt: new Date('2026-09-27T09:00:00').toISOString() });
   });
 
-  it('the Waiting view groups by the party waited on and shows aging and check chips (docs/57 §4)', () => {
+  it('the Waiting view groups by the party waited on; a check date is the one lateness signal, else the aging (docs/57 §4, docs/73 UXD-12)', () => {
     window.history.replaceState(null, '', '/tasks?view=waiting');
     mockUseTaskViews.mockReturnValue({
       data: { views: BUILTIN_VIEWS.map((view) => (view.id === 'waiting' ? { ...view, name: 'Waiting', definition: { ...view.definition, sort: 'checkBy', group: 'party' } } : view)) },
@@ -998,8 +1000,11 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(headings).toEqual(expect.arrayContaining(['Acme Legal', 'Dev One', 'Blocked']));
     expect(headings.indexOf('Blocked')).toBeGreaterThan(headings.indexOf('Acme Legal'));
     expect(within(row('T-1')).getByTestId('waiting-check').textContent).toBe('Check 1d late');
-    expect(within(row('T-1')).getByTestId('waiting-aging').textContent).toBe('Waiting 6d');
+    expect(within(row('T-1')).queryByTestId('waiting-aging')).toBeNull();
+    expect(within(row('T-1')).queryByRole('img', { name: /Follow-up/ })).toBeNull();
     expect(within(row('T-2')).getByTestId('waiting-aging').textContent).toBe('Waiting 9d');
+    // The owner is the group's own party, so the row doesn't repeat it.
+    expect(within(row('T-2')).queryByLabelText('Owner: Dev One')).toBeNull();
   });
 
   it('bulk status change clears the selection of removed rows (docs/51 B4)', async () => {

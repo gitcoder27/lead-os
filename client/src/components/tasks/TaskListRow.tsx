@@ -87,8 +87,19 @@ export const TaskListRow = memo(function TaskListRow({
   handlers: TaskRowHandlers;
 }) {
   const closed = !isOpenStatus(task.status);
-  const { showOwner, showDate } = impliedMeta(definition, context, task, today);
+  const waitingLens = context.mode === 'party' || definition?.filters?.waiting === true;
+  const meta = impliedMeta(definition, context, task, today);
+  // docs/73 UXD-12: in the Waiting lens my own name says nothing, and a check-by date is the one lateness signal.
+  const groupParty = context.mode === 'party' && context.waitingOn?.type === 'developer' ? context.waitingOn.ref : undefined;
+  const showOwner = meta.showOwner && !(waitingLens && (task.ownerType === 'manager' || (groupParty && task.ownerId === groupParty)));
+  // In the Waiting lens the check-by date (or, without one, the waiting age) is the row's time signal.
+  const hasCheck = waitingLens && isOpenStatus(task.status) && (Boolean(task.followUpAt) || task.signals?.waitingDays !== undefined && task.signals?.waitingDays !== null);
+  const outcomeAction = Boolean(handlers.onCaptureOutcome && meetingNeedsOutcome(task, today));
+  const showDate = meta.showDate && !hasCheck && !outcomeAction;
   const date = showDate ? relativeTaskDate(task, today) : null;
+  // Inside the Overdue group the heading already says "overdue": days read as quiet text, not pills.
+  const inOverdueGroup = context.mode === 'scheduled' && context.bucket === 'Overdue';
+  const placementScope = typeof definition?.filters?.track === 'number' ? 'track' : typeof definition?.filters?.project === 'number' ? 'project' : 'none';
   const time = meetingTime(task);
   const jira = task.links.find((link) => link.kind === 'jira' && link.role === 'primary') ?? task.links.find((link) => link.kind === 'jira');
   const signals = task.signals;
@@ -104,7 +115,7 @@ export const TaskListRow = memo(function TaskListRow({
     if (signals.stale) attentionReasons.push({ label: `Stale ${signals.staleDays}d`, tone: 'warning', level: 2 });
     if (signals.drift) attentionReasons.push({ label: 'Jira drift', tone: 'warning', level: 2 });
   } else {
-    if (task.followUpAt || task.labels.includes(FOLLOW_UP_LABEL)) {
+    if (!waitingLens && (task.followUpAt || task.labels.includes(FOLLOW_UP_LABEL))) {
       iconSignals.push(signals?.followUpDue
         ? { label: 'Follow-up due', color: 'var(--task-warning-text)', icon: <BellRing size={12} /> }
         : { label: 'Follow-up', color: 'var(--text-muted)', icon: <Bell size={12} /> });
@@ -113,7 +124,9 @@ export const TaskListRow = memo(function TaskListRow({
     if (signals?.drift) iconSignals.push({ label: 'Jira and task disagree on done-ness', color: 'var(--task-warning-text)', icon: <GitCompareArrows size={12} /> });
   }
   // docs/57 §4 (P3-03): the Waiting lens reads as aging + check-by text.
+  // docs/73 UXD-12: one lateness signal — a check-by date replaces the aging text and the row date.
   const waiting = context.mode === 'party' || definition?.filters?.waiting === true ? waitingChips(task, today) : null;
+  if (waiting?.check) waiting.aging = null;
   const waitingText = waiting ? [waiting.check?.label, waiting.aging].filter((label): label is string => Boolean(label)) : [];
   // docs/57 §4 (P3-06): a meeting's action items are its child tasks — "2/3 actions".
   const actions = signals?.actions && signals.actions.total > 0 ? `${signals.actions.done}/${signals.actions.total} ${task.kind === 'meeting' ? 'actions' : 'subtasks'}` : null;
@@ -164,7 +177,7 @@ export const TaskListRow = memo(function TaskListRow({
             <span className="task-row-title text-body font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
           </button>
           <span className="task-row-metadata">
-            <TaskPlacementLabel placement={task.placement} />
+            <TaskPlacementLabel placement={task.placement} scope={placementScope} />
             {labels.slice(0, 2).map((label) => <span key={label} className="task-row-label hidden max-w-[120px] truncate rounded-md px-1.5 py-px text-meta font-semibold sm:inline" title={taskLabelDisplayName(label)} style={labelChipStyle(labelColor(label))}>{taskLabelDisplayName(label)}</span>)}
             {labels.length > 2 && <span className="hidden shrink-0 text-meta sm:inline" style={{ color: 'var(--text-muted)' }} title={labels.slice(2).map(taskLabelDisplayName).join(', ')}>+{labels.length - 2}</span>}
             {task.lingering && isOpenStatus(task.status) && <span className="text-meta italic" style={{ color: 'var(--text-muted)' }}>{task.lingerHint ?? 'moved'}</span>}
@@ -174,16 +187,18 @@ export const TaskListRow = memo(function TaskListRow({
             {attentionReasons.map((reason) => <span key={reason.label} className="text-meta"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
             {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
-            {handlers.onCaptureOutcome && meetingNeedsOutcome(task, today) && (
+            {outcomeAction && (
+              // docs/73 UXD-12: the meeting's one action; the warning dot says it is owed.
               <button type="button" className="task-row-outcome ui-row-action"
                 aria-label={`Capture outcome for ${task.taskKey}`}
                 onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warning)' }} />
                 Capture outcome
               </button>
             )}
             {showOwner && <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
             {(dateColumn || date) && <span className="task-row-date text-ui tabular-nums" title={date?.title} aria-label={date?.title}>
-              {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: DATE_TONES[date.tone] }}>{date.label}</span>)}
+              {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') && !inOverdueGroup ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: inOverdueGroup && date.tone === 'danger' ? 'var(--task-danger-text)' : inOverdueGroup && date.tone === 'warning' ? 'var(--task-warning-text)' : DATE_TONES[date.tone] }}>{date.label}</span>)}
             </span>}
           </span>
         </div>

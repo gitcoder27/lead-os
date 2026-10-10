@@ -5,15 +5,11 @@ import { db, rawDb } from "../db/connection";
 import { workspaces } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 
-export const DEFAULT_WORKSPACE_ID = "default";
+import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "../workspace-scope";
+export { DEFAULT_WORKSPACE_ID, INSTALL_WORKSPACE_ID, normalizeWorkspaceId } from "../workspace-scope";
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-export function normalizeWorkspaceId(workspaceId?: string | null): string {
-  const normalized = workspaceId?.trim();
-  return normalized || DEFAULT_WORKSPACE_ID;
 }
 
 export class WorkspaceService {

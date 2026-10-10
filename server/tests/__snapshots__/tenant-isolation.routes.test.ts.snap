@@ -1,0 +1,1006 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`permanent tenant isolation guard > keeps all owner table families private under direct-id and spoofed-scope probes 1`] = `
+[
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/assistant/conversations/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/assistant route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/assistant/memory",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/assistant/memory/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/auth/users/:username",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/contacts/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/manager-desk/items/:itemId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/manager-desk/items/:itemId/links/:linkId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/my-day/items/:itemId",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/one-on-ones route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/one-on-ones/:id/agenda/:itemId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/tags/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/task-labels/:name",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/task-views/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/tasks/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/tasks route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/tasks/:key/events/:eventId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/tasks route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/tasks/:key/links/:linkId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "DELETE /api/team-tracker/items/:itemId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/team-tracker/views/:viewId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/team/developers/:accountId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "DELETE /api/work/views/:viewId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/alerts",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/assistant/conversations",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/assistant/conversations/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/assistant/memory",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "auth/install boundary regression",
+    "route": "GET /api/auth/bootstrap",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/auth/me",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/auth/users",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/backups",
+    "scope": "install admin",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/backups/:name/download",
+    "scope": "install admin",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/ai",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/attention-rules",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/connection-health",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/fields",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/maintenance/reset-preview",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/config/team-mode",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/contacts",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "auth/install boundary regression",
+    "route": "GET /api/health",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/issues",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/issues/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "GET /api/issues/:key/transitions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "GET /api/issues/suggestions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/manager-actions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/manager-desk",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "GET /api/manager-desk/carry-forward-context",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "GET /api/manager-desk/carry-forward-preview",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/manager-desk/items/:itemId/detail",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/manager-desk/lookups/developers",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/manager-desk/lookups/issues",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "GET /api/manager-desk/tracker-items/:trackerItemId/detail",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/my-day",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "GET /api/my-day/issues",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "GET /api/my-day/tasks",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "GET /api/my-day/tasks/:key",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "GET /api/my-day/tasks/:key/detail",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "GET /api/my-day/tasks/:key/events",
+    "scope": "developer",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/notes",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/notes/:date",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/notes/:date/context",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/notes/sources",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/one-on-ones",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/one-on-ones/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/one-on-ones/:id/agenda",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/one-on-ones/:id/suggestions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/overview",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/preferences/navigation",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/projects",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/projects/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/review/week",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/review/weeks",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/search",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/suggestions/assignee/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/suggestions route tests; no valid fixture in this matrix",
+    "route": "GET /api/suggestions/duedate/:priority",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/suggestions route tests; no valid fixture in this matrix",
+    "route": "GET /api/suggestions/priority/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/sync/status",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tags",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tags/:id/usage",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tags/counts",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/task-inbox",
+    "scope": "authenticated principal",
+  },
+  {
+    "proof": "skipped: focused /api/task-inbox route tests; no valid fixture in this matrix",
+    "route": "GET /api/task-inbox/events/:eventId",
+    "scope": "authenticated principal",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/task-labels",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/task-views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks/:key/detail",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks/:key/events",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks/person/:accountId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/tasks/view-counts",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team-tracker",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "GET /api/team-tracker/carry-forward-context",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "GET /api/team-tracker/carry-forward-preview",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "GET /api/team-tracker/issues/:jiraKey/assignment",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "GET /api/team-tracker/standup/feed",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team-tracker/standup/session/latest",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team-tracker/views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team/:accountId/issues",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team/developers",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team/self",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/team/workload",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/today",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/today route tests; no valid fixture in this matrix",
+    "route": "GET /api/today/settings",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "GET /api/work/views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/issues/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/manager-desk/items/:itemId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/my-day",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/my-day/items/:itemId",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/my-day/tasks/:key",
+    "scope": "developer",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/one-on-ones/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/one-on-ones route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/one-on-ones/:id/agenda",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/one-on-ones route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/one-on-ones/:id/sessions/:sid",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/project-tracks/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/projects/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/task-labels/:name",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/task-views/:id",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/tasks/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/tasks route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/tasks/:key/events/:eventId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/team-tracker/:accountId/availability",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/team-tracker/:accountId/day",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "PATCH /api/team-tracker/items/:itemId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/team-tracker/views/:viewId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/team/developers/:accountId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PATCH /api/work/views/:viewId",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/alerts/dismiss",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/assistant route tests; no valid fixture in this matrix",
+    "route": "POST /api/assistant/actions/confirm",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/assistant route tests; no valid fixture in this matrix",
+    "route": "POST /api/assistant/chat",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "auth/install boundary regression",
+    "route": "POST /api/auth/change-password",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "auth/install boundary regression",
+    "route": "POST /api/auth/login",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "skipped: focused /api/auth route tests; no valid fixture in this matrix",
+    "route": "POST /api/auth/logout",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/auth/register",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/auth/users/:username/reset-password",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/backups/run",
+    "scope": "install admin",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/capture",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "POST /api/config/ai/test",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/config/maintenance/reset",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "POST /api/config/reset",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "POST /api/config/test",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/contacts route tests; no valid fixture in this matrix",
+    "route": "POST /api/contacts",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "POST /api/issues/:key/comments",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/issues/:key/exclude",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "POST /api/issues/:key/restore",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "POST /api/issues/:key/snooze",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "POST /api/issues/:key/transition",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/issues route tests; no valid fixture in this matrix",
+    "route": "POST /api/issues/bulk",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-actions route tests; no valid fixture in this matrix",
+    "route": "POST /api/manager-actions/commands",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "POST /api/manager-desk/carry-forward",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "POST /api/manager-desk/items",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "POST /api/manager-desk/items/:itemId/cancel-delegated-task",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/manager-desk/items/:itemId/links",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/manager-desk route tests; no valid fixture in this matrix",
+    "route": "POST /api/manager-desk/tracker-items/:trackerItemId/promote",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "POST /api/my-day/checkins",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "POST /api/my-day/items",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "POST /api/my-day/items/:itemId/set-current",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "POST /api/my-day/tasks",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
+    "route": "POST /api/my-day/tasks/:key/events",
+    "scope": "developer",
+  },
+  {
+    "proof": "skipped: focused /api/notes route tests; no valid fixture in this matrix",
+    "route": "POST /api/notes/:date/append",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/notes/:date/follow-ups",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/notes route tests; no valid fixture in this matrix",
+    "route": "POST /api/notes/:date/task-updates",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/notes route tests; no valid fixture in this matrix",
+    "route": "POST /api/notes/:date/tasks",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/one-on-ones route tests; no valid fixture in this matrix",
+    "route": "POST /api/one-on-ones",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/one-on-ones/:id/agenda",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/one-on-ones/:id/sessions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/one-on-ones route tests; no valid fixture in this matrix",
+    "route": "POST /api/one-on-ones/:id/sessions/:sid/actions",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/one-on-ones/agenda",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/projects route tests; no valid fixture in this matrix",
+    "route": "POST /api/projects",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/projects/:id/tracks",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/sync route tests; no valid fixture in this matrix",
+    "route": "POST /api/sync",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/tags route tests; no valid fixture in this matrix",
+    "route": "POST /api/tags",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/task-inbox/read",
+    "scope": "authenticated principal",
+  },
+  {
+    "proof": "skipped: focused /api/task-labels route tests; no valid fixture in this matrix",
+    "route": "POST /api/task-labels",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/task-placements route tests; no valid fixture in this matrix",
+    "route": "POST /api/task-placements/bulk",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/task-placements/preview",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/task-views route tests; no valid fixture in this matrix",
+    "route": "POST /api/task-views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/tasks route tests; no valid fixture in this matrix",
+    "route": "POST /api/tasks",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/tasks/:key/events",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/tasks/:key/links",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/tasks/bulk",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/:accountId/checkins",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/:accountId/items",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/:accountId/status-update",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/carry-forward",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/team-tracker/items/:itemId/reassign",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/items/:itemId/set-current",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/standup/reviews",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/standup/session",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team-tracker route tests; no valid fixture in this matrix",
+    "route": "POST /api/team-tracker/views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team route tests; no valid fixture in this matrix",
+    "route": "POST /api/team/developers",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team route tests; no valid fixture in this matrix",
+    "route": "POST /api/team/developers/manual",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/team route tests; no valid fixture in this matrix",
+    "route": "POST /api/team/discover",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/work route tests; no valid fixture in this matrix",
+    "route": "POST /api/work/views",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "PUT /api/config",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "PUT /api/config/ai",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "PUT /api/config/attention-rules",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PUT /api/config/settings",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
+    "route": "PUT /api/config/team-mode",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/notes route tests; no valid fixture in this matrix",
+    "route": "PUT /api/notes/:date",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/preferences route tests; no valid fixture in this matrix",
+    "route": "PUT /api/preferences/navigation",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/review route tests; no valid fixture in this matrix",
+    "route": "PUT /api/review/week/:weekStart",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PUT /api/tags/issue/:key",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PUT /api/team/self",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "skipped: focused /api/today route tests; no valid fixture in this matrix",
+    "route": "PUT /api/today/settings",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PUT /api/today/top3",
+    "scope": "workspace manager",
+  },
+]
+`;

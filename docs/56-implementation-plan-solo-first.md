@@ -894,4 +894,22 @@ The bare manager login was the first screen anyone saw at the production URL. `/
 
 ## Self-registration and tenant isolation (docs/72)
 
-Plan: [docs/72-self-registration-and-tenant-isolation.md](72-self-registration-and-tenant-isolation.md). It covers invite-link sign-up for friends, with each friend getting their own empty workspace behind an operator kill switch (`LEADOS_REGISTRATION`, default `off`). The research found no cross-tenant data leak but four install-wide blockers: the shared Jira sync interval, unthrottled whole-database pre-reset snapshots, SSRF in the Jira and Copilot connection tests, and an implicit install owner. Items SR-01…SR-13 and their checklist live in docs/72. Phase 0 (SR-01…SR-07) must land before any registration code, and registration opens only at SR-13. Implement sequentially, one commit per item. On 2026-10-10 the owner authorized committing docs/72 and continuing to completion, reporting after each phase; production enabling remains operator-only. See docs/72 §6.1 for UI design and browser verification gates. Implementation not started.
+Plan: [docs/72-self-registration-and-tenant-isolation.md](72-self-registration-and-tenant-isolation.md). It covers invite-link sign-up for friends, with each friend getting their own empty workspace behind an operator kill switch (`LEADOS_REGISTRATION`, default `off`). The research found no cross-tenant data leak but four install-wide blockers: the shared Jira sync interval, unthrottled whole-database pre-reset snapshots, SSRF in the Jira and Copilot connection tests, and an implicit install owner. Items SR-01…SR-13 and their checklist live in docs/72. Phase 0 (SR-01…SR-07) must land before any registration code, and registration opens only at SR-13. Implement sequentially, one commit per item. On 2026-10-10 the owner authorized committing docs/72 and continuing to completion, reporting after each phase; production enabling remains operator-only. See docs/72 §6.1 for UI design and browser verification gates. Implementation in progress; checklist and evidence follow.
+
+- [x] SR-01 — See docs/72 for scope and acceptance.
+- [ ] SR-02 — See docs/72 for scope and acceptance.
+- [ ] SR-03 — See docs/72 for scope and acceptance.
+- [ ] SR-04 — See docs/72 for scope and acceptance.
+- [ ] SR-05 — See docs/72 for scope and acceptance.
+- [ ] SR-06 — See docs/72 for scope and acceptance.
+- [ ] SR-07 — See docs/72 for scope and acceptance.
+- [ ] SR-08 — See docs/72 for scope and acceptance.
+- [ ] SR-09 — See docs/72 for scope and acceptance.
+- [ ] SR-10 — See docs/72 for scope and acceptance.
+- [ ] SR-11 — See docs/72 for scope and acceptance.
+- [ ] SR-12 — See docs/72 for scope and acceptance.
+- [ ] SR-13 — See docs/72 for scope and acceptance.
+
+| Date | Item | Commit | Validation / progress |
+| --- | --- | --- | --- |
+| 2026-10-10 | SR-01 | main (this commit) | Baseline: typecheck PASS; full test PASS (1531 server / 2085 client). Added strict explicit-scope normalization and install constant, a 200-route classified inventory, foreign-id/query/header/body and developer probes with owner-table hashes, and an injected missing-scope search regression. Initial strict test failed against existing fallback; fixtures corrected to actual capture/developer schemas. Final tenant + legacy multi-workspace suites: 6 PASS. typecheck, build:check, guard:data and diff check PASS; new test lint clean (existing touched-source warnings remain). Skipped routes have recorded focused-suite reasons in the manifest; no runtime DB, Jira, push or deploy. |

@@ -1,3 +1,4 @@
+import { INSTALL_WORKSPACE_ID } from "./workspace-scope";
 import { z } from "zod";
 import { getJiraApiToken, hasJiraApiToken } from "./runtime-credentials";
 
@@ -22,6 +23,6 @@ if (!parsed.success) {
 export const config = parsed.data;
 
 export function hasJiraCredentials(): boolean {
-  const hasToken = Boolean(config.JIRA_API_TOKEN || hasJiraApiToken());
+  const hasToken = Boolean(config.JIRA_API_TOKEN || hasJiraApiToken(INSTALL_WORKSPACE_ID));
   return Boolean(config.JIRA_BASE_URL && config.JIRA_EMAIL && hasToken && config.JIRA_PROJECT_KEY);
 }

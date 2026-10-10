@@ -1,10 +1,5 @@
 const jiraApiTokens = new Map<string, string>();
-const DEFAULT_WORKSPACE_ID = "default";
-
-function normalizeWorkspaceId(workspaceId?: string | null): string {
-  const normalized = workspaceId?.trim();
-  return normalized || DEFAULT_WORKSPACE_ID;
-}
+import { normalizeWorkspaceId } from "./workspace-scope";
 
 export function getJiraApiToken(workspaceId?: string): string {
   return jiraApiTokens.get(normalizeWorkspaceId(workspaceId)) ?? "";

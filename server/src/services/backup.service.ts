@@ -1,3 +1,4 @@
+import { INSTALL_WORKSPACE_ID } from "../workspace-scope";
 import { sanitizeBackupCopy, withBackupSanitization } from "./backup-sanitizer";
 import fs from "node:fs";
 import os from "node:os";
@@ -59,13 +60,13 @@ export class BackupService {
     this.stop();
     await this.pruneOldBackups();
 
-    const enabled = await this.settings.getBackupEnabled();
+    const enabled = await this.settings.getBackupEnabled(INSTALL_WORKSPACE_ID);
     if (!enabled) {
       this.nextRunAt = undefined;
       return;
     }
 
-    const intervalMinutes = await this.settings.getBackupIntervalMinutes();
+    const intervalMinutes = await this.settings.getBackupIntervalMinutes(INSTALL_WORKSPACE_ID);
     const intervalMs = intervalMinutes * 60_000;
     this.nextRunAt = new Date(Date.now() + intervalMs).toISOString();
     this.task = setInterval(() => {
@@ -84,8 +85,8 @@ export class BackupService {
   async initialize(): Promise<void> {
     await this.ensureBackupDirectory();
 
-    const enabled = await this.settings.getBackupEnabled();
-    if (enabled && (await this.settings.getBackupOnStartup()) && (await this.shouldCreateStartupBackup())) {
+    const enabled = await this.settings.getBackupEnabled(INSTALL_WORKSPACE_ID);
+    if (enabled && (await this.settings.getBackupOnStartup(INSTALL_WORKSPACE_ID)) && (await this.shouldCreateStartupBackup())) {
       await this.createBackup({ reason: "startup", skipIfRunning: false, prune: true });
     }
 
@@ -187,7 +188,7 @@ export class BackupService {
 
   async getRuntimeStatus(): Promise<BackupRuntimeStatus> {
     return {
-      enabled: await this.settings.getBackupEnabled(),
+      enabled: await this.settings.getBackupEnabled(INSTALL_WORKSPACE_ID),
       running: this.running,
       directory: await this.getBackupDirectory(),
       nextRunAt: this.nextRunAt,
@@ -201,7 +202,7 @@ export class BackupService {
       return true;
     }
 
-    const maxAgeHours = await this.settings.getBackupStartupMaxAgeHours();
+    const maxAgeHours = await this.settings.getBackupStartupMaxAgeHours(INSTALL_WORKSPACE_ID);
     const latestBackup = backups[0];
     if (!latestBackup) {
       return true;
@@ -211,7 +212,7 @@ export class BackupService {
   }
 
   private async runScheduledBackup(): Promise<void> {
-    const intervalMinutes = await this.settings.getBackupIntervalMinutes();
+    const intervalMinutes = await this.settings.getBackupIntervalMinutes(INSTALL_WORKSPACE_ID);
     try {
       await this.createBackup({ reason: "scheduled", skipIfRunning: true, prune: true });
     } catch (error) {
@@ -280,7 +281,7 @@ export class BackupService {
   }
 
   private async pruneOldBackups(): Promise<void> {
-    const retentionDays = await this.settings.getBackupRetentionDays();
+    const retentionDays = await this.settings.getBackupRetentionDays(INSTALL_WORKSPACE_ID);
     const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
     const backups = await this.listBackups();
     const backupsToDelete = new Set<string>();
@@ -291,7 +292,7 @@ export class BackupService {
       }
     }
 
-    const maxScheduledSnapshots = await this.settings.getBackupMaxScheduledSnapshots();
+    const maxScheduledSnapshots = await this.settings.getBackupMaxScheduledSnapshots(INSTALL_WORKSPACE_ID);
     const scheduledBackups = backups.filter((backup) => backup.reason === "scheduled");
     for (const backup of scheduledBackups.slice(maxScheduledSnapshots)) {
       backupsToDelete.add(backup.path);
@@ -308,7 +309,7 @@ export class BackupService {
   }
 
   private async getBackupDirectory(): Promise<string> {
-    const configured = await this.settings.getBackupDirectory();
+    const configured = await this.settings.getBackupDirectory(INSTALL_WORKSPACE_ID);
     return configured ? resolveWorkspacePath(configured) : getDefaultBackupDirectory();
   }
 

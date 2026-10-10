@@ -7,7 +7,7 @@ import { JiraIssue } from "../jira/types";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SettingsService } from "../services/settings.service";
-import { normalizeWorkspaceId } from "../services/workspace.service";
+import { INSTALL_WORKSPACE_ID, normalizeWorkspaceId } from "../services/workspace.service";
 import type { JiraSyncScopeMode } from "shared/types";
 
 export interface SyncResult {
@@ -32,7 +32,7 @@ export class SyncEngine {
 
   async start(): Promise<void> {
     this.stop();
-    if (!(await this.isAutoSyncEnabled())) {
+    if (!(await this.isAutoSyncEnabled(INSTALL_WORKSPACE_ID))) {
       logger.info("Jira auto-sync is disabled; sync scheduler not started");
       return;
     }
@@ -240,7 +240,7 @@ export class SyncEngine {
   private async getSchedulerIntervalMs(): Promise<number> {
     const workspaceIds = await this.getSyncableWorkspaceIds();
     if (workspaceIds.length === 0) {
-      return this.settings.getSyncIntervalMs();
+      return this.settings.getSyncIntervalMs(INSTALL_WORKSPACE_ID);
     }
 
     const intervals = await Promise.all(workspaceIds.map((workspaceId) => this.settings.getSyncIntervalMs(workspaceId)));

@@ -408,9 +408,11 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 | --- | --- | --- | --- |
 | 2026-10-10 | SR-PLAN | main (this commit) | Owner approved docs/72 and continuation through all items. Preserved the reviewed design and phase order, added the required UI acceptance gates, and made production rollout operator-only. Baseline validation is recorded with SR-01. No application code or data changed. |
 
+| 2026-10-10 | SR-01 | main (this commit) | Baseline: typecheck PASS; full test PASS (1531 server / 2085 client). Added strict explicit-scope normalization and install constant, a 200-route classified inventory, foreign-id/query/header/body and developer probes with owner-table hashes, and an injected missing-scope search regression. Initial strict test failed against existing fallback; fixtures corrected to actual capture/developer schemas. Final tenant + legacy multi-workspace suites: 6 PASS. typecheck, build:check, guard:data and diff check PASS; new test lint clean (existing touched-source warnings remain). Skipped routes have recorded focused-suite reasons in the manifest; no runtime DB, Jira, push or deploy. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
-- [ ] **SR-01 Permanent tenant-isolation harness.**
+- [x] **SR-01 Permanent tenant-isolation harness.**
   - *Scope:* §8.1, plus strict workspace mode and the `INSTALL_WORKSPACE_ID` constant for install-scope callers.
   - *Files:* `server/tests/tenant-isolation.routes.test.ts` (new), `server/tests/helpers/tenants.ts` (new), `services/workspace.service.ts`, `runtime-credentials.ts`, `services/backup.service.ts`, `sync/engine.ts`, `index.ts` (explicit install scope).
   - *Acceptance:* every route classified; the harness passes on the current code (the probe found no leak); deleting a `workspaceId` argument in any probed service call makes it fail.

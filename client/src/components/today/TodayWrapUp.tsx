@@ -281,7 +281,7 @@ function WrapUpRow({
       <span className="today-row-actions">
         {leading}
         {done ? (
-          <button type="button" className="ui-btn" aria-label={`Done: ${title}`} onClick={() => onRunCommand(done)}>Done</button>
+          <button type="button" className="ui-row-action" aria-label={`Done: ${title}`} onClick={() => onRunCommand(done)}>Done</button>
         ) : null}
         {tomorrow ? (
           <button type="button" className="ui-btn-ghost" aria-label={`Tomorrow: ${title}`} onClick={() => onRunCommand(tomorrow.command, tomorrow.preset)}>Tomorrow</button>

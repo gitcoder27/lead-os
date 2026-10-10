@@ -125,7 +125,7 @@ export const TodayActionRow = memo(function TodayActionRow({
         {/* Every row ends in its next step; plain "Open …" steps read quieter. */}
         <button
           type="button"
-          className={`${primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-btn'} today-row-primary`}
+          className={`${primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-row-action'} today-row-primary`}
           onClick={() => onRunCommand(item.primaryAction)}
           disabled={isPending}
           aria-label={item.primaryAction.label}
@@ -189,7 +189,7 @@ export function TodayGroupRow({ item, group, expanded, featured = false, isActiv
         <span className="today-row-actions">
           <button
             type="button"
-            className={`${item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-btn'} today-row-primary`}
+            className={`${item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-row-action'} today-row-primary`}
             onClick={() => onRunCommand(item.primaryAction)}
             aria-label={item.primaryAction.label}
             title={item.primaryAction.label}

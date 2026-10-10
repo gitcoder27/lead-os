@@ -391,9 +391,9 @@
 
 .today-row:hover { background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent); }
 
+/* docs/73 UXD-04: featured = a soft tint only; the left bar belongs to the keyboard cursor. */
 .today-row[data-featured='true'] {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 /* The keyboard cursor row: the shared selection idiom (soft tint + left accent bar), not a ring. */

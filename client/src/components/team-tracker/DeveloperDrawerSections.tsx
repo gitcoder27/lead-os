@@ -390,9 +390,15 @@ function NextCheckActions({ day, date, onFollowUp }: { day: TrackerDeveloperDay;
   };
   return (
     <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+      {/* docs/73 UXD-04: Follow up is the card's one bordered action; Set check stays quiet beside it. */}
+      {onFollowUp ? (
+        <button type="button" className="ui-btn inline-flex items-center gap-1.5" onClick={onFollowUp}>
+          Follow up
+        </button>
+      ) : null}
       <button
         type="button"
-        className="ui-btn inline-flex items-center gap-1.5"
+        className={`${onFollowUp ? 'ui-btn-ghost' : 'ui-btn'} inline-flex items-center gap-1.5`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
         disabled={updateDay.isPending}
@@ -401,11 +407,6 @@ function NextCheckActions({ day, date, onFollowUp }: { day: TrackerDeveloperDay;
         <BellRing size={12} aria-hidden="true" />
         Set check
       </button>
-      {onFollowUp ? (
-        <button type="button" className="ui-btn-ghost inline-flex items-center gap-1.5" onClick={onFollowUp}>
-          Follow up
-        </button>
-      ) : null}
       {anchor ? (
         <TaskPopover anchor={anchor} onClose={() => setAnchor(null)} label="Set next check" width={220}>
           {followUpPresets().map((preset) => (

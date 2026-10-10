@@ -42,7 +42,7 @@ export function TodayCompactRow({ title, placement, detail, severity, target, pr
             {secondary.label}
           </button>
         ) : null}
-        <button type="button" className="ui-btn" onClick={() => onRunCommand(primary)}>
+        <button type="button" className="ui-row-action" onClick={() => onRunCommand(primary)}>
           {primary.label}
         </button>
       </span>

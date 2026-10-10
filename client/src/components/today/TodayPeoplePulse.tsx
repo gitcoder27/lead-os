@@ -98,7 +98,7 @@ function PulseRow({ person, onRunCommand }: { person: TodayPulsePerson; onRunCom
       </button>
       <span className="today-row-actions">
         {person.primary ? (
-          <button type="button" className="ui-btn" onClick={() => onRunCommand(person.primary!)}>
+          <button type="button" className="ui-row-action" onClick={() => onRunCommand(person.primary!)}>
             {person.primary.label}
           </button>
         ) : null}

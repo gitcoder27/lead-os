@@ -144,7 +144,7 @@ export const TaskListRow = memo(function TaskListRow({
   const dim = task.lingering ? 0.6 : undefined;
 
   return (
-    <div data-task-row={task.taskKey} className="task-row ui-row-focus" data-focused={focused || undefined}
+    <div data-task-row={task.taskKey} className="task-row ui-row-focus" data-action-row="" data-focused={focused || undefined}
       onFocus={() => handlers.onFocusRow(task.taskKey)}
       style={{ background: selected ? 'var(--accent-glow)' : focused ? 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' : undefined }}>
       <div className="task-row-layout">
@@ -175,9 +175,8 @@ export const TaskListRow = memo(function TaskListRow({
             {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
             {handlers.onCaptureOutcome && meetingNeedsOutcome(task, today) && (
-              <button type="button" className="task-row-outcome shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-ui font-semibold"
+              <button type="button" className="task-row-outcome ui-row-action"
                 aria-label={`Capture outcome for ${task.taskKey}`}
-                style={{ color: 'var(--accent-text)', border: '1px solid var(--border)' }}
                 onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
                 Capture outcome
               </button>

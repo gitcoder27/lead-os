@@ -191,6 +191,20 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     expect(settings).not.toMatch(/rounded-md text-\[11px\] font-bold/);
   });
 
+  it('row actions are quiet until their row is hovered, focused or featured; featured has no bar (docs/73 UXD-04)', () => {
+    const rest = css.match(/\n\.ui-row-action \{([^}]*)\}/)![1]!;
+    expect(rest).toContain('color: var(--accent-text)');
+    expect(rest).not.toMatch(/(^|;)\s*box-shadow:/);
+    expect(css).toMatch(/:where\(\[data-action-row\], \.today-row\):is\(:hover, :focus-within, \[data-featured='true'\], \[data-keyboard-active='true'\]\) \.ui-row-action \{[^}]*box-shadow: inset 0 0 0 1px/);
+    expect(css).toMatch(/@media \(pointer: coarse\) \{ \.ui-row-action \{ min-height: 44px; min-width: 44px; \} \}/);
+    const today = src('components/today/today.css');
+    expect(today).toMatch(/\.today-row\[data-featured='true'\] \{[^}]*\}/);
+    expect(today.match(/\.today-row\[data-featured='true'\] \{([^}]*)\}/)![1]).not.toContain('box-shadow');
+    expect(src('components/today/TodayActionRow.tsx')).toContain("'ui-row-action'} today-row-primary");
+    expect(src('components/today/TodayWrapUp.tsx')).toContain('className="ui-row-action" aria-label={`Done: ${title}`}');
+    expect(src('components/tasks/TaskListRow.tsx')).toContain('task-row-outcome ui-row-action');
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

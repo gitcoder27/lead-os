@@ -225,6 +225,12 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('Today titles stay inside their rows: side-queue rows are title-only at wrap-up, phone titles ellipsize (docs/73 UXD-11)', () => {
+    const today = src('components/today/today.css');
+    expect(today).toMatch(/\.today-row-title \{[^}]*max-width: 100%;[^}]*text-overflow: ellipsis/);
+    expect(today).toMatch(/\.today-panel-queue \.today-row \.ui-chip,\s*\.today-panel-queue \.today-row \.task-placement-label,\s*\.today-panel-queue \.today-row-meta \{ display: none; \}/);
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

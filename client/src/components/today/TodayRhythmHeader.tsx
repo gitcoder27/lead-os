@@ -1,9 +1,8 @@
 import { useRef } from 'react';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { Keyboard, Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { formatClock, metricLabel, todayHeaderMetrics } from '@/lib/today-layout';
 import { todayShortcuts } from '@/lib/keyboard-shortcuts';
-import { useQuickActions } from '@/context/QuickActionsContext';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import type { TodayFreshness } from '@/lib/today-freshness';
 import type { TodayActionTarget, TodayResponse } from '@/types';
@@ -40,17 +39,19 @@ export function TodayRhythmHeader({
   onFocusQueue,
   onFocusPlan,
 }: TodayRhythmHeaderProps) {
-  const { openKeyboardShortcuts } = useQuickActions();
   const teamMode = useTeamMode();
-  const shortcutsRef = useRef<HTMLButtonElement>(null);
+  // docs/73 UXD-11: shortcuts live in the account menu and on "?"; the band anchors the fallback sheet.
+  const shortcutsRef = useRef<HTMLDivElement>(null);
   const date = parseISO(today.date);
   const until = formatClock(today.rhythm.nextStage?.startsAt);
-  const updated = formatDistanceToNowStrict(parseISO(today.generatedAt), { addSuffix: true });
+  // docs/73 UXD-11: "just now" rather than "0 seconds ago".
+  const generatedAt = parseISO(today.generatedAt);
+  const updated = Date.now() - generatedAt.getTime() < 60_000 ? 'just now' : formatDistanceToNowStrict(generatedAt, { addSuffix: true });
   const isStale = freshness?.state === 'stale';
   const metrics = todayHeaderMetrics(today.summary);
 
   return (
-    <div className="today-band" role="region" aria-label="Today summary">
+    <div ref={shortcutsRef} className="today-band" role="region" aria-label="Today summary">
       {onFocusPlan && <div className="today-mobile-jumps">
         <button type="button" onClick={onFocusPlan} aria-label="Jump to My plan">My plan</button>
         <button type="button" onClick={onFocusQueue} aria-label="Jump to attention queue">Queue</button>
@@ -94,17 +95,6 @@ export function TodayRhythmHeader({
           title={isStale ? 'Retry' : 'Refresh'}
         >
           {isFetching ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-        </button>
-        <button
-          ref={shortcutsRef}
-          type="button"
-          onClick={(event) => openKeyboardShortcuts ? openKeyboardShortcuts(event.currentTarget) : onToggleShortcuts(!shortcutsOpen)}
-          className="ui-icon-btn hidden md:inline-flex"
-          aria-label="Keyboard shortcuts"
-          aria-expanded={shortcutsOpen}
-          title="Keyboard shortcuts (?)"
-        >
-          <Keyboard size={14} />
         </button>
       </span>
       {shortcutsOpen ? (

@@ -431,6 +431,7 @@
 
 .today-row-title {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -735,3 +736,8 @@
 .today-getting-started-intro { margin: 8px 8px 6px; font-size: var(--fs-13); line-height: 1.5; color: var(--text-secondary); }
 .today-getting-started button { min-height: 44px; min-width: 44px; }
 .today-getting-started-step > button { flex-shrink: 0; }
+
+/* docs/73 UXD-11: at wrap-up the queue is a side list — title-only rows so titles read, not "Marcu…". */
+.today-panel-queue .today-row .ui-chip,
+.today-panel-queue .today-row .task-placement-label,
+.today-panel-queue .today-row-meta { display: none; }

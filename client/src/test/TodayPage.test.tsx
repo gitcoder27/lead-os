@@ -1396,16 +1396,24 @@ describe('TodayPage V2', () => {
       expect(screen.queryAllByTestId('today-action-row')).toHaveLength(0);
     });
 
-    it('uses app help from the Today button and ignores composing question marks', async () => {
+    it('leaves help to the account menu and "?" (no page button), and ignores composing question marks (docs/73 UXD-11)', async () => {
       mockFetch(todayResponse());
       const openKeyboardShortcuts = vi.fn();
       renderToday(todayResponse(), vi.fn(), vi.fn(), openKeyboardShortcuts);
-      const button = await screen.findByRole('button', { name: 'Keyboard shortcuts' });
+      await screen.findByRole('heading', { name: 'Queue' });
+      expect(screen.queryByRole('button', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
       fireEvent.keyDown(window, { key: '?', isComposing: true });
       expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
-      fireEvent.click(button);
-      expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
-      expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+      expect(openKeyboardShortcuts).not.toHaveBeenCalled();
+    });
+
+    it('says "Updated just now" for a snapshot under a minute old (docs/73 UXD-11)', async () => {
+      const response = todayResponse({ generatedAt: new Date().toISOString() });
+      mockFetch(response);
+      renderToday(response);
+      const band = await screen.findByRole('region', { name: 'Today summary' });
+      expect(within(band).getByText('Updated just now')).toBeInTheDocument();
+      expect(within(band).queryByText(/0 seconds ago/)).not.toBeInTheDocument();
     });
 
     it('? opens the shortcuts sheet', async () => {

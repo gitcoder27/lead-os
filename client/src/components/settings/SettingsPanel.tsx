@@ -871,7 +871,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
   const renderAddManually = (spacing: string) => (
     <div className={`${spacing} rounded-xl p-3`} style={{ border: 'var(--settings-inset-border)', background: 'var(--settings-inset-bg)' }}>
-      <SettingsGroupLabel>Add Manually</SettingsGroupLabel>
+      <SettingsGroupLabel>Add manually</SettingsGroupLabel>
       <p className="mt-1 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Add a person before linking Jira. They can be used in Team, Desk, and developer access immediately.
       </p>
@@ -1132,7 +1132,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <div className="max-w-[720px] space-y-7">
                   {/* Active connection */}
                   <div>
-                    <SettingsGroupLabel>Active Connection</SettingsGroupLabel>
+                    <SettingsGroupLabel>Active connection</SettingsGroupLabel>
                     <div className="mt-2.5 overflow-hidden rounded-xl" style={{ border: 'var(--settings-pane-border)' }}>
                       {([
                         { label: 'Workspace', value: connectionLabel },
@@ -1185,7 +1185,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                   {/* Connection details */}
                   <div>
-                    <SettingsGroupLabel>Connection Details</SettingsGroupLabel>
+                    <SettingsGroupLabel>Connection details</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Edit the Jira site and project used by this workspace. Save before running a sync.
                     </p>
@@ -1231,7 +1231,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                   {/* API token */}
                   <div>
-                    <SettingsGroupLabel>Jira API Token</SettingsGroupLabel>
+                    <SettingsGroupLabel>Jira API token</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Paste a new token here when Jira access changes. The saved token is never displayed.
                     </p>
@@ -1265,7 +1265,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Manager identity */}
                   <div>
                     <div className="flex items-center justify-between">
-                      <SettingsGroupLabel>Manager Jira Identity</SettingsGroupLabel>
+                      <SettingsGroupLabel>Manager Jira identity</SettingsGroupLabel>
                       {managerJiraAccountId ? (
                         <button
                           type="button"
@@ -1304,7 +1304,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     </div>
                     <div className="mt-3">
                       <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="ui-label">
                           Directory picks
                         </p>
                         {discoveringTeam ? (
@@ -1368,7 +1368,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <div className="max-w-[720px] space-y-7">
                   {/* Auto sync */}
                   <div>
-                    <SettingsGroupLabel>Auto Sync</SettingsGroupLabel>
+                    <SettingsGroupLabel>Auto sync</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       When enabled, LeadOS refreshes Jira issues automatically on a schedule. Turn it off if you only
                       track people and daily work here — no Jira calls are made until you run a manual sync.
@@ -1416,7 +1416,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                   {/* Scope mode */}
                   <div>
-                    <SettingsGroupLabel>Scope Mode</SettingsGroupLabel>
+                    <SettingsGroupLabel>Scope mode</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Choose whether Jira sync covers the tracked roster (with or without unassigned issues) or is driven directly by the base query.
                     </p>
@@ -1471,9 +1471,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               <span className="min-w-0 flex-1">
                                 <span className="block text-body font-semibold leading-5">{option.label}</span>
                                 <span
-                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-meta font-semibold uppercase"
+                                  className="mt-0.5 inline-flex rounded-full px-2 py-0.5 text-meta font-semibold"
                                   style={{
-                                    letterSpacing: '0.08em',
                                     background: selected ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-tertiary)',
                                     color: selected ? 'var(--accent)' : 'var(--text-muted)',
                                   }}
@@ -1494,7 +1493,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                   {/* Base query */}
                   <div>
-                    <SettingsGroupLabel>Base JQL Query</SettingsGroupLabel>
+                    <SettingsGroupLabel>Base JQL query</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       {syncScopeMode === 'base_query'
                         ? 'This query is sent to Jira without LeadOS adding assignee filters.'
@@ -1521,7 +1520,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
                   {/* Custom fields */}
                   <div>
-                    <SettingsGroupLabel>Custom Field Mapping</SettingsGroupLabel>
+                    <SettingsGroupLabel>Custom field mapping</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Map custom Jira fields surfaced during triage. Use Discover to browse available fields.
                     </p>
@@ -1609,7 +1608,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Tracked team */}
                   <div className="min-w-0">
                     <div className="mb-2.5 flex items-center justify-between">
-                      <SettingsGroupLabel>Tracked Team</SettingsGroupLabel>
+                      <SettingsGroupLabel>Tracked team</SettingsGroupLabel>
                       <span
                         className="rounded-full px-2 py-0.5 text-ui font-semibold"
                         style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
@@ -1756,7 +1755,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* Jira directory */}
                   <div className="min-w-0">
                     <div className="mb-2.5 flex items-center justify-between">
-                      <SettingsGroupLabel>Jira Directory</SettingsGroupLabel>
+                      <SettingsGroupLabel>Jira directory</SettingsGroupLabel>
                       <button
                         type="button"
                         onClick={() => handleDiscoverTeamMembers({ query: discoveredSearch.trim(), startAt: 0, append: false, silentEmpty: false })}
@@ -1903,7 +1902,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 <div className="max-w-[720px] space-y-7">
                   {/* Dev login link */}
                   <div>
-                    <SettingsGroupLabel>Developer Login Link</SettingsGroupLabel>
+                    <SettingsGroupLabel>Developer login link</SettingsGroupLabel>
                     <p className="mt-1 mb-3 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                       Share this URL with developers. They land directly in their My Day workspace after sign-in.
                     </p>
@@ -1933,7 +1932,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                   {/* App accounts */}
                   <div>
                     <div className="mb-2.5 flex items-center justify-between">
-                      <SettingsGroupLabel>App Accounts</SettingsGroupLabel>
+                      <SettingsGroupLabel>App accounts</SettingsGroupLabel>
                       <span
                         className="rounded-full px-2 py-0.5 text-ui font-semibold"
                         style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
@@ -1959,7 +1958,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <p className="truncate text-body font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
                                   <span
-                                    className="rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.1em]"
+                                    className="rounded-full px-1.5 py-0.5 text-meta font-semibold capitalize"
                                     style={{ background: u.role === 'manager' ? 'var(--settings-warning-soft-bg)' : 'var(--settings-accent-soft-bg)', color: u.role === 'manager' ? 'var(--warning)' : 'var(--accent)' }}
                                   >
                                     {u.role}
@@ -1993,7 +1992,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 />
                               ) : (
                                 <div
-                                  className="rounded-full px-2.5 py-1 text-meta font-semibold uppercase tracking-[0.1em]"
+                                  className="rounded-full px-2.5 py-1 text-meta font-semibold"
                                   style={{ background: 'var(--settings-warning-soft-bg)', color: 'var(--warning)', border: 'var(--settings-warning-soft-border)' }}
                                 >
                                   Manager access
@@ -2029,7 +2028,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     ) : (
                       <div className="rounded-xl p-4" style={{ background: 'var(--settings-pane-bg)', border: 'var(--settings-accent-soft-border)' }}>
                         <div className="mb-3 flex items-center justify-between">
-                          <p className="text-ui font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--accent)' }}>New account</p>
+                          <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>New account</p>
                           <button
                             type="button"
                             onClick={() => { setShowCreateUser(false); setNewUsername(''); setNewDisplayName(''); setNewPassword(''); setNewRole('developer'); setNewDevAccountId(''); }}
@@ -2101,7 +2100,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}
                               >
                                 <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>Generator options</span>
+                                  <span className="ui-label">Generator options</span>
                                   <button
                                     type="button"
                                     onClick={() => { setNewPassword(generateStrongPassword(pwLength, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
@@ -2282,7 +2281,7 @@ export const SettingsPanel = SettingsPage;
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
       {children}
     </h3>
   );
@@ -2291,7 +2290,7 @@ function SettingsGroupLabel({ children }: { children: ReactNode }) {
 function SettingsLabeledInput({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="ui-field-label">
         {label}
       </label>
       {children}
@@ -2530,8 +2529,8 @@ function FieldListGroup({
   return (
     <>
       <div
-        className="px-4 py-2 text-ui font-semibold uppercase tracking-[0.18em]"
-        style={{ color: accent ? 'var(--accent)' : 'var(--text-muted)', background: 'var(--settings-neutral-chip-bg)' }}
+        className="px-4 py-2 text-body font-semibold"
+        style={{ color: 'var(--text-primary)', background: 'var(--settings-neutral-chip-bg)' }}
       >
         {title}
       </div>
@@ -2548,7 +2547,7 @@ function FieldListGroup({
             <p className="truncate font-mono text-ui" style={{ color: 'var(--text-muted)' }}>{field.id}</p>
           </div>
           {field.id === currentFieldValue ? (
-            <span className="rounded-full px-2 py-0.5 text-ui font-semibold uppercase tracking-[0.1em]" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
+            <span className="rounded-full px-2 py-0.5 text-ui font-semibold" style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)' }}>
               Selected
             </span>
           ) : null}

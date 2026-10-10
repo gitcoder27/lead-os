@@ -35,8 +35,7 @@ export function TriageNotesHistory({
       <div className="flex items-center gap-2.5 mb-1">
         <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
         <span
-          className="text-meta font-semibold uppercase tracking-[0.08em] shrink-0"
-          style={{ color: 'var(--text-muted)' }}
+          className="ui-label shrink-0"
         >
           Past entries
         </span>

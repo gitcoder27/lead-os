@@ -161,7 +161,7 @@ export function LabelsSection() {
                   </span>
                   {label.system && (
                     <span
-                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-meta font-semibold uppercase tracking-[0.05em]"
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-meta font-semibold"
                       style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
                       title={`"${taskLabelDisplayName(label.name)}" is a system label`}
                     >

@@ -37,7 +37,7 @@ export function StandupRail({
       aria-label="Standup roster"
     >
       <div className="hidden items-center justify-between px-4 pb-1.5 pt-3.5 md:flex">
-        <span className="text-meta font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="ui-label">
           Order
         </span>
         <span className="text-ui font-semibold tabular-nums" style={{ color: allReviewed ? 'var(--success)' : 'var(--text-muted)' }}>

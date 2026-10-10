@@ -309,7 +309,7 @@ function MaintenanceActionCard({
         </button>
       ) : (
         <div className="mt-4 space-y-3 rounded-xl p-3" style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}>
-          <p className="text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--danger-muted)' }}>
+          <p className="text-ui font-semibold" style={{ color: 'var(--danger-muted)' }}>
             Type {expectedText} to confirm
           </p>
           <input

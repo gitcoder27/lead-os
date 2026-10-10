@@ -23,7 +23,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
   return (
     <div className="triage-section">
       <div className="flex items-center gap-2">
-        <span className="triage-section-label shrink-0">
+        <span className="ui-label inline-flex shrink-0 items-center gap-1.5">
           <Tag size={10} /> Tags
         </span>
         <div className="flex flex-wrap gap-1 flex-1 min-w-0">

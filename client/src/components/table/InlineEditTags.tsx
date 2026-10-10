@@ -229,7 +229,7 @@ export function InlineEditTags({ issueKey, localTags }: InlineEditTagsProps) {
           >
             <div className="flex items-center gap-1.5 mb-2">
               <Tag size={12} style={{ color: 'var(--text-muted)' }} />
-              <span className="text-ui font-semibold uppercase" style={{ letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              <span className="ui-label">
                 Tags
               </span>
             </div>

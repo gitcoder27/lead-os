@@ -236,7 +236,7 @@ function ClassicTrackerItemRow({
 
         {item.jiraKey && (
           <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-            <span className="text-ui font-semibold uppercase shrink-0" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+            <span className="ui-label shrink-0">
               Jira
             </span>
             <JiraIssueLink issueKey={item.jiraKey} className="font-mono text-ui truncate" style={{ color: 'var(--accent)' }}>
@@ -260,7 +260,7 @@ function ClassicTrackerItemRow({
         {isLinked && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-meta font-semibold"
               style={{
                 background: 'color-mix(in srgb, var(--md-accent) 10%, transparent)',
                 color: 'var(--md-accent, var(--warning))',
@@ -276,7 +276,7 @@ function ClassicTrackerItemRow({
         {isContinued && !compact && (
           <div className="mt-0.5">
             <span
-              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.06em]"
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-meta font-semibold"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-muted)',

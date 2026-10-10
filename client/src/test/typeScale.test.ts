@@ -45,6 +45,17 @@ describe('type scale (docs/73 UXD-02)', () => {
     expect([...tsxOffenders, ...cssOffenders]).toEqual([]);
   });
 
+  it('keeps labels in sentence case: uppercase only for palette and menu group headings (docs/73 UXD-03)', () => {
+    const allowed = ['components/ui/Popover.tsx', 'components/palette/CommandPalette.tsx', 'components/table/DefectTable.tsx'];
+    const offenders = [...tsx, ...css]
+      .filter((file) => !file.includes('/manager-desk/'))
+      .flatMap((file) => [...read(file).matchAll(/(?<![\w-])uppercase(?![\w:)-])/g)].map(() => file))
+      .filter((file) => !allowed.includes(file));
+    expect(offenders).toEqual([]);
+    // The allowed files carry exactly their group heading (DefectTable: the status-filter menu).
+    for (const file of allowed) expect(read(file).match(/(?<![\w-])uppercase(?![\w:)-])/g)).toHaveLength(1);
+  });
+
   it('cn() treats the scale names as sizes, so a colour class does not drop them', () => {
     expect(cn('text-ui', 'text-text-primary')).toBe('text-ui text-text-primary');
     expect(cn('text-body', 'text-meta')).toBe('text-meta');

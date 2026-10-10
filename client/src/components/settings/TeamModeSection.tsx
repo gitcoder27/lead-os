@@ -48,8 +48,8 @@ export function TeamModeSection() {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-2">
-        <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
-          Team Mode
+        <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Team mode
         </h3>
         {setTeamMode.isPending ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}
       </div>

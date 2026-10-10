@@ -102,7 +102,7 @@ export function ReviewLookBackStep({ ctx }: { ctx: ReviewStepContext }) {
           <section key={group.id} role="group" aria-labelledby={`review-group-${group.id}`} className="review-group">
             <div className="review-group-head">
               <h3 id={`review-group-${group.id}`} className="today-subhead review-subhead">
-                {group.label} · {group.rows.length}
+                {group.label} <span className="today-subhead-count">{group.rows.length}</span>
               </h3>
               <span className="review-group-tally" aria-live="off">
                 {inUpdate} in update

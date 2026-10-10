@@ -116,7 +116,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
 
       {plan && plan.doneToday.count > 0 ? (
         <div role="group" aria-label={`Done today (${plan.doneToday.count})`}>
-          <h3 className="today-subhead">Done today · {plan.doneToday.count}</h3>
+          <h3 className="today-subhead">Done today <span className="today-subhead-count">{plan.doneToday.count}</span></h3>
           {doneRows.map((item) => (
             <TodayDoneRow key={item.taskKey} title={item.title} placement={item.placement} onOpen={() => onOpenTarget(item.target)} />
           ))}
@@ -128,7 +128,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
 
       {stillOpen.length > 0 ? (
         <div role="group" aria-label={`Still open today (${stillOpen.length})`}>
-          <h3 id="today-open-plan-heading" tabIndex={-1} className="today-subhead today-jump-target">Still open today · {stillOpen.length}</h3>
+          <h3 id="today-open-plan-heading" tabIndex={-1} className="today-subhead today-jump-target">Still open today <span className="today-subhead-count">{stillOpen.length}</span></h3>
           {openRows.map((item) => (
             <StillOpenRow
               key={item.taskKey}
@@ -152,7 +152,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
 
       {openPromises.length > 0 ? (
         <div role="group" aria-label={`Open promises (${openPromises.length})`}>
-          <h3 className="today-subhead">Open promises · {openPromises.length}</h3>
+          <h3 className="today-subhead">Open promises <span className="today-subhead-count">{openPromises.length}</span></h3>
           {promises.map((promise) => {
             const snooze = promise.secondaryActions.find((action) => action.kind === 'snooze');
             return (
@@ -175,7 +175,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
 
       {carryCandidates.length > 0 ? (
         <div role="group" aria-label={`Carry to tomorrow (${carryCandidates.length})`}>
-          <h3 className="today-subhead">Carry to tomorrow · {carryCandidates.length}</h3>
+          <h3 className="today-subhead">Carry to tomorrow <span className="today-subhead-count">{carryCandidates.length}</span></h3>
           {carries.map((item) => {
             const done = item.secondaryActions.find((action) => action.kind === 'mark_done');
             return (
@@ -199,7 +199,7 @@ export function TodayWrapUp({ wrapUp, plan, pinning = false, onSetTomorrowTop3, 
       {missing.length > 0 ? (
         <div role="group" aria-label={`No check-in today (${missing.length})`}>
           <h3 className="today-subhead today-subhead-action">
-            <span>No check-in today · {missing.length}</span>
+            <span>No check-in today <span className="today-subhead-count">{missing.length}</span></span>
             {askable.length > 1 ? (
               <button
                 type="button"
@@ -362,7 +362,7 @@ function TomorrowTopThree({
 
   return (
     <div role="group" aria-label="Tomorrow's top 3">
-      <h3 className="today-subhead">Tomorrow&apos;s top 3 · {picked.length}/{TODAY_TOP_LIMIT}</h3>
+      <h3 className="today-subhead">Tomorrow&apos;s top 3 <span className="today-subhead-count">{picked.length}/{TODAY_TOP_LIMIT}</span></h3>
       {picked.map((item) => (
         <div key={item.taskKey} className="today-row today-tone-info" data-testid="tomorrow-top3-row">
           <span className="today-row-icon" aria-hidden="true"><Pin size={14} /></span>

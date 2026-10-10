@@ -21,7 +21,7 @@ function DeletedTaskState({ task, onGoToday }: { task: TaskResolution; onGoToday
           background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
         }}
       >
-        <p className="text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+        <p className="ui-label">
           Deleted task
         </p>
         <h1 className="mt-2 text-display font-semibold" style={{ color: 'var(--text-primary)' }}>

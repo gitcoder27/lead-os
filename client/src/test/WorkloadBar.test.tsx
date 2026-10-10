@@ -73,7 +73,7 @@ describe('WorkloadBar', () => {
 
     fireEvent.click(screen.getAllByLabelText('Expand workload panel')[0]!);
 
-    const idleBadges = screen.getAllByText('idle');
+    const idleBadges = screen.getAllByText('Idle');
     expect(idleBadges.length).toBeGreaterThanOrEqual(1);
   });
 

@@ -52,8 +52,8 @@ export function TrackerTaskExecutionPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-ui font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>
-            Team Tracker Execution
+          <div className="ui-label">
+            Team board execution
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-body">
             <span
@@ -151,8 +151,7 @@ export function TrackerTaskExecutionPanel({
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <span
-              className="text-ui font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--text-muted)' }}
+              className="ui-label"
             >
               Reassign to
             </span>
@@ -182,8 +181,7 @@ export function TrackerTaskExecutionPanel({
 
       <div className="mt-4">
         <div
-          className="flex items-center gap-1.5 text-ui font-semibold uppercase tracking-[0.18em]"
-          style={{ color: 'var(--text-muted)' }}
+          className="ui-label flex items-center gap-1.5"
         >
           <History size={11} />
           Timeline

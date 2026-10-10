@@ -185,7 +185,7 @@ export function AttentionRulesSection() {
       </p>
 
       <fieldset className="space-y-4">
-        <legend className="text-ui font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Working day</legend>
+        <legend className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Working day</legend>
         <div className="flex flex-wrap gap-4">
           <label className="block">
             <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Day starts</span>
@@ -218,7 +218,7 @@ export function AttentionRulesSection() {
       </fieldset>
 
       <fieldset className="space-y-4">
-        <legend className="text-ui font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Thresholds</legend>
+        <legend className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Thresholds</legend>
         {NUMBER_FIELDS.map((field) => (
           <label key={field.key} className="block">
             <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>

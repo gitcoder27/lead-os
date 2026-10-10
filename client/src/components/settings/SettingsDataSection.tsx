@@ -167,7 +167,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
       </div>
 
       <div>
-        <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>Snapshots</h3>
+        <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Snapshots</h3>
         {backups.isLoading ? (
           <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>Loading backups…</p>
         ) : backups.isError ? (

@@ -618,7 +618,7 @@ export function DefectTable({
         size: 120,
       }),
       columnHelper.accessor('developmentDueDate', {
-        header: 'Due Date',
+        header: 'Due date',
         cell: (info) => {
           const issue = info.row.original;
           const effectiveDueDate = getEffectiveDueDate(issue);
@@ -1055,8 +1055,8 @@ export function DefectTable({
         {toolbar}
         <div className="flex-1 flex items-center justify-center px-6">
           <div className="text-center">
-            <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
-              Filter State
+            <div className="ui-label">
+              Filter state
             </div>
             <p className="text-body mt-2" style={{ color: 'var(--text-secondary)' }}>
               No defects match the current filters.
@@ -1094,7 +1094,7 @@ export function DefectTable({
           {filteredIssues.length === 0 ? (
             <div className="h-full flex items-center justify-center px-6">
               <div className="text-center">
-                <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                <div className="ui-label">
                   Search State
                 </div>
                 <p className="text-body mt-2" style={{ color: 'var(--text-secondary)' }}>
@@ -1121,9 +1121,8 @@ export function DefectTable({
                         <th
                           key={header.id}
                           aria-sort={canSort ? sortState === 'asc' ? 'ascending' : sortState === 'desc' ? 'descending' : 'none' : undefined}
-                          className="text-left text-ui font-semibold uppercase px-2 py-1.5 select-none sticky top-0 z-30"
+                          className="text-left text-ui font-semibold px-2 py-1.5 select-none sticky top-0 z-30"
                           style={{
-                            letterSpacing: '0.08em',
                             color: 'var(--text-muted)',
                             background: 'color-mix(in srgb, var(--bg-secondary) 94%, white 6%)',
                             boxShadow: '0 1px 0 var(--border)',
@@ -1134,7 +1133,7 @@ export function DefectTable({
                             <button
                               type="button"
                               onClick={header.column.getToggleSortingHandler()}
-                              className="flex items-center gap-1 rounded-sm text-left uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+                              className="flex items-center gap-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
                             >
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               <ArrowUpDown size={10} style={{ opacity: sortState ? 0.8 : 0.4 }} />

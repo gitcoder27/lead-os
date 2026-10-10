@@ -114,7 +114,7 @@ function SidebarSection({ title, open, onToggle, onClear, showClear = false, cle
             }}
           />
           <div className="min-w-0 text-left">
-            <div className="text-ui font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            <div className="ui-label">
               {title}
             </div>
           </div>
@@ -218,7 +218,7 @@ export function FilterSidebar({
 
           <div className="grid grid-cols-3 gap-1 mt-2">
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="ui-label">
                 Views
               </div>
               <div className="mt-0.5 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -226,7 +226,7 @@ export function FilterSidebar({
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="ui-label">
                 Tags
               </div>
               <div className="mt-0.5 text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -234,7 +234,7 @@ export function FilterSidebar({
               </div>
             </div>
             <div className="rounded-[12px] px-2 py-1.5" style={{ background: 'var(--bg-tertiary)' }}>
-              <div className="text-ui uppercase font-semibold" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+              <div className="ui-label">
                 Active
               </div>
               <div className="mt-0.5 text-body font-semibold" style={{ color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-primary)' }}>
@@ -430,7 +430,7 @@ export function FilterSidebar({
               >
                 {activeSelectionCount}
               </div>
-              <div className="text-ui uppercase" style={{ letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
+              <div className="ui-label">
                 Focus
               </div>
             </div>

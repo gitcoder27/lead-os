@@ -67,7 +67,7 @@ export function TriageNotesEditor({ value, onChange, onBlurSave, isSaved, readOn
   return (
     <div className="triage-section">
       <div className="flex items-center justify-between mb-2">
-        <span className="triage-section-label">
+        <span className="ui-label inline-flex items-center gap-1.5">
           <FileText size={10} /> Notes
         </span>
         <span

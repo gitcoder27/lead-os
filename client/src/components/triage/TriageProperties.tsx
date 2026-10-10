@@ -36,7 +36,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
           className="shrink-0 transition-transform duration-150"
           style={{ color: 'var(--text-muted)', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
         />
-        <span className="triage-section-label">Properties</span>
+        <span className="ui-label inline-flex items-center gap-1.5">Properties</span>
         {!expanded && (
           <span className="ml-auto text-ui truncate max-w-[260px]" style={{ color: 'var(--text-muted)' }}>
             {issue.statusName}
@@ -53,7 +53,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
         >
           {fields.map(({ label, value, accent, mono }) => (
             <div key={label} className="px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="text-meta font-semibold uppercase tracking-[0.08em] mb-0.5" style={{ color: 'var(--text-muted)' }}>
+              <div className="ui-label mb-0.5">
                 {label}
               </div>
               <div
@@ -70,7 +70,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
 
           {issue.labels && issue.labels.length > 0 && (
             <div className="col-span-2 px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="text-meta font-semibold uppercase tracking-[0.08em] mb-1" style={{ color: 'var(--text-muted)' }}>
+              <div className="ui-label mb-1">
                 Labels
               </div>
               <div className="flex flex-wrap gap-1">

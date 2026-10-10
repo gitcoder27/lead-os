@@ -64,7 +64,7 @@ export function TagFilterSection({
             }}
           />
           <div className="min-w-0 text-left">
-            <div className="text-ui font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+            <div className="ui-label">
               Tags
             </div>
           </div>

@@ -390,8 +390,7 @@ export function ManagerActionInbox({
                     <div className="mt-1 border-t pt-1.5" style={{ borderColor: 'var(--border)' }}>
                       <div className="flex items-center justify-between px-3 py-1">
                         <span
-                          className="text-meta font-semibold uppercase tracking-[0.1em]"
-                          style={{ color: 'var(--text-muted)' }}
+                          className="ui-label"
                         >
                           Attention signals
                         </span>

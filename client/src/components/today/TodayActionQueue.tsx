@@ -111,7 +111,7 @@ export const TodayActionQueue = forwardRef<HTMLHeadingElement, TodayActionQueueP
           {view.groups.map((entry) => (
             <div key={entry.group} role="group" aria-label={`${groupLabels[entry.group]} (${entry.items.length})`}>
               <h3 className="today-subhead">
-                {groupLabels[entry.group]} · {entry.items.length}
+                {groupLabels[entry.group]} <span className="today-subhead-count">{entry.items.length}</span>
               </h3>
               {entry.items.map((item) => renderRow(item, false))}
             </div>

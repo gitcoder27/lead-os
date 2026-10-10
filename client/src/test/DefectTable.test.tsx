@@ -460,7 +460,7 @@ describe('DefectTable', () => {
     expect(screen.getByText('Title')).toBeInTheDocument();
     expect(screen.getByText('Tags')).toBeInTheDocument();
     expect(screen.getByText('Assignee')).toBeInTheDocument();
-    expect(screen.getByText('Due Date')).toBeInTheDocument();
+    expect(screen.getByText('Due date')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
     // UX-31: Notes and Tracker are one "Linked" column; there is no OPEN column.
     expect(screen.getByText('Linked')).toBeInTheDocument();

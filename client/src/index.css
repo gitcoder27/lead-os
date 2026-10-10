@@ -463,6 +463,16 @@ body::after {
   color: var(--text-muted);
 }
 
+/* docs/73 UXD-03: the one small label — sentence case, no tracking, count after a space.
+   Uppercase is kept only for kbd caps and palette/menu group headings. */
+.ui-label {
+  font-size: var(--fs-11);
+  line-height: var(--lh-11);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.ui-label-count { font-weight: 400; font-variant-numeric: tabular-nums; }
+
 .ui-field-label {
   display: block;
   margin-bottom: 6px;
@@ -717,17 +727,6 @@ textarea.ui-field { resize: none; }
 
 .triage-section + .triage-section {
   border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-}
-
-.triage-section-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-11);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
 }
 
 /* ── Triage quick-action chips ─────────────────────── */

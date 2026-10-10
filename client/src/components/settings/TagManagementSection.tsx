@@ -388,8 +388,7 @@ function DeleteTagDialog({
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <label
-                    className="text-ui font-semibold uppercase"
-                    style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}
+                    className="ui-label"
                   >
                     Linked defects
                   </label>
@@ -416,7 +415,7 @@ function DeleteTagDialog({
                             {issue.jiraKey}
                           </span>
                           <span
-                            className="rounded-full px-2 py-1 text-ui font-semibold uppercase tracking-[0.12em]"
+                            className="rounded-full px-2 py-1 text-ui font-semibold"
                             style={{
                               background: 'var(--settings-neutral-chip-bg)',
                               color: 'var(--text-muted)',

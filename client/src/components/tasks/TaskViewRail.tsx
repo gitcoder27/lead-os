@@ -142,7 +142,7 @@ export function TaskViewRail({
   );
 
   const heading = (text: string) => (
-    <p className="px-2 pb-1.5 pt-5 text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{text}</p>
+    <p className="ui-label px-2 pb-1.5 pt-5">{text}</p>
   );
 
   return (

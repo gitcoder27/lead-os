@@ -421,7 +421,7 @@ function NotFoundState({ onGoToday }: { onGoToday: () => void }) {
           background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
         }}
       >
-        <p className="text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+        <p className="ui-label">
           404
         </p>
         <h1 className="mt-2 text-display font-semibold" style={{ color: 'var(--text-primary)' }}>

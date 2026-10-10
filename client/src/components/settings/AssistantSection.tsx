@@ -15,7 +15,7 @@ import type { AiProviderProfile, AiReasoningEffort, AssistantResponseStyle, Upda
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-ui font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>
+    <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
       {children}
     </h3>
   );
@@ -24,7 +24,7 @@ function GroupLabel({ children }: { children: ReactNode }) {
 function LabeledInput({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-ui font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <label htmlFor={id} className="ui-field-label">
         {label}
       </label>
       {children}

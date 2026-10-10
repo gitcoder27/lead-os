@@ -187,7 +187,7 @@ describe('TrackerTaskDetailDrawer', () => {
 
     expect(screen.getByRole('dialog', { name: /team tracker task detail/i })).toBeInTheDocument();
     expect(screen.getByText('Review pull request')).toBeInTheDocument();
-    expect(screen.getByText('Tracker Only')).toBeInTheDocument();
+    expect(screen.getByText('Tracker only')).toBeInTheDocument();
     expect(screen.getByText('Execution panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /promote to manager follow-up/i })).toBeInTheDocument();
   });

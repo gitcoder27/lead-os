@@ -286,7 +286,7 @@ describe('SettingsPage', () => {
     window.history.replaceState(null, '', '/settings?section=team');
     render(<TestWrapper><SettingsPage /></TestWrapper>);
     const search = await screen.findByLabelText('Search current team');
-    const addManually = screen.getByText('Add Manually');
+    const addManually = screen.getByText('Add manually');
     expect(addManually.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -586,7 +586,7 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
-    await screen.findByText('Add Manually');
+    await screen.findByText('Add manually');
     fireEvent.change(screen.getByRole('textbox', { name: /manual team member name/i }), {
       target: { value: 'Priya Manual' },
     });
@@ -616,7 +616,7 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /team members/i }));
-    await screen.findByText('Tracked Team');
+    await screen.findByText('Tracked team');
     fireEvent.click(screen.getByRole('button', { name: /edit taylor dev/i }));
     fireEvent.change(screen.getByRole('textbox', { name: /edit team member name/i }), {
       target: { value: 'Taylor Updated' },

@@ -36,26 +36,26 @@ function AssigneeMetrics({ suggestion }: { suggestion: AssignmentSuggestion }) {
         </span>
         {isIdle && (
           <span
-            className="rounded-full px-1.5 py-0.5 uppercase"
-            style={{ background: 'var(--bg-tertiary)', letterSpacing: '0.06em' }}
+            className="rounded-full px-1.5 py-0.5"
+            style={{ background: 'var(--bg-tertiary)', }}
           >
-            idle
+            Idle
           </span>
         )}
         {isDoneForToday && (
           <span
-            className="rounded-full px-1.5 py-0.5 uppercase"
-            style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', letterSpacing: '0.06em' }}
+            className="rounded-full px-1.5 py-0.5"
+            style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', }}
           >
-            done for today
+            Done for today
           </span>
         )}
         {isBlocked && (
           <span
-            className="rounded-full px-1.5 py-0.5 uppercase"
-            style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.08)', letterSpacing: '0.06em' }}
+            className="rounded-full px-1.5 py-0.5"
+            style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.08)', }}
           >
-            blocked
+            Blocked
           </span>
         )}
       </span>
@@ -129,7 +129,7 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
         style={{ background: 'var(--bg-glow)', border: '1px solid var(--border-active)' }}
       >
         <div className="flex items-center justify-between">
-          <span className="triage-section-label" style={{ color: 'var(--accent)' }}>
+          <span className="ui-label inline-flex items-center gap-1.5" style={{ color: 'var(--accent-text)' }}>
             <Sparkles size={11} /> Suggestions
           </span>
           {allRows.length > 1 && (

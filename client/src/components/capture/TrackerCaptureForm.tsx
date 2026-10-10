@@ -103,8 +103,7 @@ export function TrackerCaptureForm({
         {/* Developer picker */}
         <div>
           <label
-            className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
-            style={{ color: 'var(--text-muted)' }}
+            className="ui-field-label"
           >
             Assign to
           </label>
@@ -119,8 +118,7 @@ export function TrackerCaptureForm({
         {/* Task title */}
         <div>
           <label
-            className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
-            style={{ color: 'var(--text-muted)' }}
+            className="ui-field-label"
             htmlFor="tracker-capture-title"
           >
             Task
@@ -198,8 +196,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-ui font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-muted)' }}
+                className="ui-label"
               >
                 Linked Jira
               </label>
@@ -264,8 +261,7 @@ export function TrackerCaptureForm({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label
-                className="text-ui font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-muted)' }}
+                className="ui-label"
               >
                 Link a Jira issue
               </label>
@@ -366,8 +362,7 @@ export function TrackerCaptureForm({
         {noteOpen && (
           <div>
             <label
-              className="block text-ui font-semibold uppercase mb-1.5 tracking-widest"
-              style={{ color: 'var(--text-muted)' }}
+              className="ui-field-label"
               htmlFor="tracker-capture-note"
             >
               Details{' '}

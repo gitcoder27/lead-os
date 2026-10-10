@@ -155,7 +155,7 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
               {description && <DescriptionSection content={description} />}
 
               <div className="triage-section">
-                <span className="triage-section-label mb-2 block">Comment</span>
+                <span className="ui-label mb-2 block">Comment</span>
                 <CommentForm issueKey={issue.jiraKey} />
               </div>
             </div>
@@ -196,7 +196,7 @@ function DescriptionSection({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="triage-section">
-      <button type="button" onClick={() => setExpanded((p) => !p)} className="triage-section-label flex items-center gap-1 mb-1.5">
+      <button type="button" onClick={() => setExpanded((p) => !p)} className="ui-label flex items-center gap-1 mb-1.5">
         Description
         <span className="text-meta ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
       </button>

@@ -346,9 +346,7 @@
   align-items: center;
   gap: 5px;
   font-size: var(--fs-11);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-weight: 500;
   color: var(--text-muted);
   margin-bottom: 6px;
 }

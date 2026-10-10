@@ -23,8 +23,7 @@ export function RelatedIssueChips({
   return (
     <div className={`flex min-w-0 flex-wrap items-center gap-1 ${className ?? ''}`}>
       <span
-        className="text-meta font-semibold uppercase"
-        style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}
+        className="ui-label"
       >
         Related
       </span>

@@ -62,7 +62,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
               load {dev.score}
             </span>
             {dev.trackerStatus && (
-              <span className="uppercase" style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}>
+              <span className="capitalize" style={{ color: 'var(--text-muted)', }}>
                 {dev.trackerStatus.replace(/_/g, ' ')}
               </span>
             )}
@@ -71,26 +71,26 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
         <div className="flex flex-col items-end gap-0.5 shrink-0">
           {isIdle && (
             <span
-              className="text-meta uppercase font-semibold rounded-full px-1.5 py-0.5"
-              style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', letterSpacing: '0.06em' }}
+              className="text-meta font-semibold rounded-full px-1.5 py-0.5"
+              style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', }}
             >
-              idle
+              Idle
             </span>
           )}
           {hasMismatch && (
             <span
-              className="text-meta uppercase font-semibold rounded-full px-1.5 py-0.5"
-              style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', letterSpacing: '0.06em' }}
+              className="text-meta font-semibold rounded-full px-1.5 py-0.5"
+              style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', }}
             >
-              mismatch
+              Mismatch
             </span>
           )}
           {noCurrentItem && !isIdle && (
             <span
-              className="text-meta uppercase font-semibold rounded-full px-1.5 py-0.5"
-              style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', letterSpacing: '0.06em' }}
+              className="text-meta font-semibold rounded-full px-1.5 py-0.5"
+              style={{ color: 'var(--warning)', background: 'rgba(245,158,11,0.10)', }}
             >
-              no current
+              No current item
             </span>
           )}
         </div>
@@ -116,7 +116,7 @@ export function DeveloperCard({ dev, expanded, active = false, onClick }: Develo
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-ui uppercase rounded-full px-2 py-1" style={{ color, background: `${color}14`, letterSpacing: '0.08em' }}>
+          <span className="text-ui rounded-full px-2 py-1 capitalize" style={{ color, background: `${color}14`, }}>
             {dev.level}
           </span>
         </div>

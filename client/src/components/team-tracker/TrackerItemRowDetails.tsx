@@ -16,7 +16,7 @@ export function TrackerItemRowDetails({ regionId, title, note }: TrackerItemRowD
         border: '1px solid var(--border)',
       }}
     >
-      <div className="text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+      <div className="ui-label">
         Full title
       </div>
       <div className="mt-1 text-body leading-5 break-words" style={{ color: 'var(--text-primary)' }}>
@@ -24,7 +24,7 @@ export function TrackerItemRowDetails({ regionId, title, note }: TrackerItemRowD
       </div>
       {note && (
         <>
-          <div className="mt-2 text-ui font-semibold uppercase" style={{ color: 'var(--text-muted)', letterSpacing: '0.06em' }}>
+          <div className="ui-label mt-2">
             Notes
           </div>
           <div className="mt-1 whitespace-pre-wrap break-words text-body leading-5" style={{ color: 'var(--text-secondary)' }}>

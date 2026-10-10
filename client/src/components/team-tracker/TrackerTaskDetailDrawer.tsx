@@ -216,14 +216,14 @@ function TrackerOnlyDrawer({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span
-                  className="inline-flex items-center rounded-full px-2 py-0.5 text-ui font-semibold uppercase tracking-wider"
+                  className="inline-flex items-center rounded-full px-2 py-0.5 text-ui font-semibold"
                   style={{
                     background: 'var(--bg-tertiary)',
                     color: 'var(--text-secondary)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  Tracker Only
+                  Tracker only
                 </span>
               </div>
               <div className="mt-2 flex items-center gap-2">
@@ -364,8 +364,8 @@ function TrackerTaskDetailPlaceholder({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-ui font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--md-accent)' }}>
-              Item Detail
+            <div className="ui-label">
+              Item detail
             </div>
             <div className="mt-2 text-title font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
               {isLoading ? 'Opening task detail' : 'Could not open task detail'}

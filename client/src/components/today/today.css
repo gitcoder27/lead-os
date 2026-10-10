@@ -363,12 +363,12 @@
 
 .today-subhead {
   padding: 12px 12px 4px;
-  font-size: var(--fs-11);
+  font-size: var(--fs-12);
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
+/* docs/73 UXD-03: "Done today 3", not "DONE TODAY · 3". */
+.today-subhead-count { font-weight: 400; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 
 .today-list {
   border-top: 1px solid var(--border);

@@ -120,7 +120,7 @@ export function ReviewPeopleStep({ ctx }: { ctx: ReviewStepContext }) {
       {groups.map((group) => (
         <section key={group.key} role="group" aria-labelledby={`review-group-${group.key}`} className="review-group">
           <div className="review-group-head">
-            <h3 id={`review-group-${group.key}`} className="today-subhead review-subhead">{group.label} · {group.entries.length}</h3>
+            <h3 id={`review-group-${group.key}`} className="today-subhead review-subhead">{group.label} <span className="today-subhead-count">{group.entries.length}</span></h3>
           </div>
           <div role="list">
             {group.entries.map((entry) => {

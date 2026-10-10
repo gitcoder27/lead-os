@@ -42,7 +42,7 @@ export function WorkAttentionSignals({ onOpenTarget }: { onOpenTarget?: (target:
           aria-label="Attention signals"
         >
           <div className="flex items-center justify-between px-3 py-1">
-            <span className="text-meta font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>Attention signals</span>
+            <span className="ui-label">Attention signals</span>
             <button
               type="button"
               onClick={() => runDismiss(signals.map((alert) => alert.id))}

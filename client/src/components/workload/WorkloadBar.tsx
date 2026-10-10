@@ -59,8 +59,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                 {expanded ? (
                   <>
                     <span
-                      className="text-ui font-semibold uppercase block"
-                      style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}
+                      className="ui-label block"
                     >
                       Workload
                     </span>
@@ -70,7 +69,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                   </>
                 ) : (
                   <span className="flex items-center gap-2">
-                    <span className="text-body font-semibold uppercase" style={{ letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                    <span className="text-body font-semibold" style={{ color: 'var(--text-muted)' }}>
                       Workload
                     </span>
                     <span

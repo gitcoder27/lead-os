@@ -98,7 +98,7 @@ function LastTime({
       data-testid="one-on-one-last-session"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-meta font-semibold uppercase tracking-[0.04em]" style={{ color: 'var(--text-muted)' }}>
+        <span className="ui-label">
           Last time
         </span>
         <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -130,7 +130,7 @@ function LastTime({
       {topics.length > 0 && (
         <div className="mt-2.5 border-t pt-2" style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}>
           <div className="mb-1 text-meta font-medium" style={{ color: 'var(--text-muted)' }}>
-            On the agenda · {topics.length}
+            On the agenda <span className="ui-label-count">{topics.length}</span>
           </div>
           <TopicList topics={topics} onOpenTask={onOpenTask} />
         </div>

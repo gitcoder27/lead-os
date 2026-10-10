@@ -123,7 +123,7 @@ export function ReviewNextWeekStep({ ctx }: { ctx: ReviewStepContext }) {
       {shown.length > 0 ? (
         <section role="group" aria-labelledby="review-group-candidates" className="review-group">
           <div className="review-group-head">
-            <h3 id="review-group-candidates" className="today-subhead review-subhead">Candidates · {candidates.length}</h3>
+            <h3 id="review-group-candidates" className="today-subhead review-subhead">Candidates <span className="today-subhead-count">{candidates.length}</span></h3>
           </div>
           <div role="list">
             {shown.map((item, index) => (
@@ -148,7 +148,7 @@ export function ReviewNextWeekStep({ ctx }: { ctx: ReviewStepContext }) {
 
       <section role="group" aria-labelledby="review-group-week" className="review-group">
         <div className="review-group-head">
-          <h3 id="review-group-week" className="today-subhead review-subhead">{ctx.review.nextWorkday === ctx.review.range.nextStart ? 'Planned next week' : 'Planned ahead'} · {plan.total}</h3>
+          <h3 id="review-group-week" className="today-subhead review-subhead">{ctx.review.nextWorkday === ctx.review.range.nextStart ? 'Planned next week' : 'Planned ahead'} <span className="today-subhead-count">{plan.total}</span></h3>
         </div>
         <ul className="review-days" aria-label="Planned tasks per day">
           {plan.days.map((entry) => (
@@ -164,7 +164,7 @@ export function ReviewNextWeekStep({ ctx }: { ctx: ReviewStepContext }) {
       {plan.backFromLater.length > 0 ? (
         <section role="group" aria-labelledby="review-group-later" className="review-group">
           <div className="review-group-head">
-            <h3 id="review-group-later" className="today-subhead review-subhead">Back from Later next week · {plan.backFromLater.length}</h3>
+            <h3 id="review-group-later" className="today-subhead review-subhead">Back from Later next week <span className="today-subhead-count">{plan.backFromLater.length}</span></h3>
           </div>
           <div role="list">
             {plan.backFromLater.map((row) => (

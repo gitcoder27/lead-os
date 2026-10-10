@@ -73,8 +73,8 @@ export function TaskPicker({ tasks, text = '', selected, onChange, disabled }: T
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-ui font-semibold uppercase tracking-[0.08em]" style={{ color: 'var(--text-muted)' }}>
-        about:
+      <span className="ui-label">
+        About
       </span>
       {tasks.map((task) => {
         const mentioned = parsed.includes(task.taskKey);

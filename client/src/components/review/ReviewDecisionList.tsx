@@ -125,7 +125,7 @@ export function ReviewDecisionList({
         <section key={group.key} role="group" aria-labelledby={`review-group-${group.key}`} className="review-group">
           <div className="review-group-head">
             <h3 id={`review-group-${group.key}`} className="today-subhead review-subhead">
-              {group.label} · {group.rows.length}
+              {group.label} <span className="today-subhead-count">{group.rows.length}</span>
             </h3>
           </div>
           <div role="list">

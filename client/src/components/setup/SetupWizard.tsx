@@ -659,8 +659,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               <LeadOSMark size={26} />
             </div>
             <div className="text-left">
-              <div className="text-ui font-semibold uppercase tracking-[0.3em]" style={{ color: '#fbbf24' }}>
-                Workspace Setup
+              <div className="ui-label" style={{ color: '#fbbf24' }}>
+                Workspace setup
               </div>
               <div className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
                 LeadOS
@@ -746,7 +746,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
-            <div className="text-ui font-semibold uppercase tracking-[0.24em]" style={{ color: '#fbbf24' }}>
+            <div className="ui-label" style={{ color: '#fbbf24' }}>
               {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira'}
             </div>
             <h2 className="mt-2 text-display font-semibold leading-tight tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -1251,7 +1251,7 @@ function StepContent(props: StepContentProps) {
 
           {/* Existing accounts list */}
           <div className="rounded-[16px] border" style={{ borderColor: 'var(--border)' }}>
-            <div className="border-b px-4 py-2.5 text-body font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            <div className="ui-label border-b px-4 py-2.5" style={{ borderColor: 'var(--border)' }}>
               Existing accounts
             </div>
             <div className="max-h-[180px] overflow-y-auto p-3">
@@ -1278,7 +1278,7 @@ function StepContent(props: StepContentProps) {
                         </div>
                       </div>
                       <span
-                        className="rounded-full px-2 py-0.5 text-ui font-semibold uppercase"
+                        className="rounded-full px-2 py-0.5 text-ui font-semibold capitalize"
                         style={{
                           background: account.role === 'manager' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(6, 182, 212, 0.14)',
                           color: account.role === 'manager' ? 'var(--warning)' : 'var(--accent)',
@@ -1446,7 +1446,7 @@ function UserRow({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-body font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+      <span className="ui-field-label">
         {label}
       </span>
       {children}

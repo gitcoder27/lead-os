@@ -141,11 +141,10 @@ export function StandupTaskList({
             type="button"
             onClick={() => setShowDone((value) => !value)}
             aria-expanded={showDone}
-            className="mb-1.5 flex items-center gap-1 text-meta font-semibold uppercase tracking-[0.09em]"
-            style={{ color: 'var(--text-muted)' }}
+            className="ui-label mb-1.5 flex items-center gap-1"
           >
             <ChevronDown size={12} className={`transition-transform ${showDone ? '' : '-rotate-90'}`} />
-            Done today · {doneToday.length}
+            Done today <span className="ui-label-count">{doneToday.length}</span>
           </button>
           {showDone && (
             <ul className="space-y-0.5 pl-1">
@@ -173,7 +172,7 @@ export function StandupTaskList({
 function StatusTag({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <span
-      className="shrink-0 rounded-full px-1.5 py-px text-meta font-semibold uppercase tracking-[0.04em]"
+      className="shrink-0 rounded-full px-1.5 py-px text-meta font-semibold"
       style={{ color, background: `color-mix(in srgb, ${color} 13%, transparent)` }}
     >
       {children}

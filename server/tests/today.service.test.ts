@@ -8,7 +8,7 @@ import { configTable, developers, issues, managerDeskDays, teamTrackerDays } fro
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
-import { TodayService } from "../src/services/today.service";
+import { TODAY_DEFECT_ROWS, TodayService } from "../src/services/today.service";
 
 const trackerService = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(trackerService);
@@ -513,24 +513,64 @@ describe("TodayService", () => {
     expect(response.actionItems.find((item) => item.id === "today-issue-AM-13")?.type).toBe("unassigned_issue");
   });
 
-  it("caps high-priority rows at three and folds the rest into an aggregate row (docs/53 F12)", async () => {
+  it("caps defect rows at TODAY_DEFECT_ROWS and folds the rest into one aggregate row (docs/53 F12, docs/73 UXD-10)", async () => {
     for (const key of ["AM-20", "AM-21", "AM-22", "AM-23", "AM-24"]) {
       await seedIssue(key, { statusCategory: "new", statusName: "To Do", dueDate: null });
     }
 
     const response = await todayService().getToday("manager-1", "2026-03-08");
-    const priorityRows = response.actionItems.filter(
-      (item) => item.type === "high_priority_issue" && item.target.issueKey,
-    );
-    const aggregate = response.actionItems.find((item) => item.id === "today-issue-priority-backlog");
+    const defectRows = response.actionItems.filter((item) => item.target.issueKey);
+    const aggregate = response.actionItems.find((item) => item.id === "today-issue-aggregate");
 
-    expect(priorityRows).toHaveLength(3);
+    expect(TODAY_DEFECT_ROWS).toBe(3);
+    expect(defectRows).toHaveLength(TODAY_DEFECT_ROWS);
     expect(aggregate).toMatchObject({
-      type: "high_priority_issue",
-      title: "5 high-priority defects",
+      title: "2 more defects are high priority",
       target: { type: "view", view: "work", filter: "highPriority" },
       primaryAction: { kind: "open", label: "Open Work" },
     });
+  });
+
+  it("keeps the strongest defects and names what the aggregate holds (docs/73 UXD-10)", async () => {
+    await seedIssue("AM-40", { dueDate: "2026-03-01" });
+    await seedIssue("AM-41", { dueDate: "2026-03-02" });
+    for (const key of ["AM-42", "AM-43", "AM-44"]) {
+      await seedIssue(key, { assigneeId: null, assigneeName: null, teamScopeState: "unassigned", dueDate: "2026-03-03" });
+    }
+
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const defectRows = response.actionItems.filter((item) => item.target.issueKey).map((item) => item.target.issueKey);
+    // Overdue and assigned (92) outrank overdue and unassigned (90).
+    expect(defectRows).toEqual(["AM-40", "AM-41", "AM-42"]);
+    expect(response.actionItems.find((item) => item.id === "today-issue-aggregate")).toMatchObject({
+      title: "2 more defects need an owner or are overdue",
+      context: "2 overdue · 2 without an owner",
+      target: { type: "view", view: "work", filter: "overdue" },
+    });
+  });
+
+  it("says 'need attention' when the folded defects have three or more reasons, with the counts beside it (docs/73 UXD-10)", async () => {
+    await seedIssue("AM-60", { dueDate: "2026-03-01" });
+    await seedIssue("AM-61", { dueDate: "2026-03-01" });
+    await seedIssue("AM-62", { dueDate: "2026-03-01" });
+    await seedIssue("AM-63", { assigneeId: null, assigneeName: null, teamScopeState: "unassigned", dueDate: null });
+    await seedIssue("AM-64", { dueDate: "2026-03-08" });
+    await seedIssue("AM-65", { statusCategory: "new", statusName: "To Do", dueDate: null });
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    expect(response.actionItems.find((item) => item.id === "today-issue-aggregate")).toMatchObject({
+      title: "3 more defects need attention",
+      context: "1 without an owner · 1 due today · 1 high priority",
+      target: { type: "view", view: "work" },
+    });
+  });
+
+  it("says Open in Work for an unassigned defect, since Today cannot assign in Jira (docs/73 UXD-10)", async () => {
+    await seedIssue("AM-50", { assigneeId: null, assigneeName: null, teamScopeState: "unassigned", dueDate: null });
+    const response = await todayService().getToday("manager-1", "2026-03-08");
+    const row = response.actionItems.find((item) => item.id === "today-issue-AM-50");
+    expect(row?.primaryAction).toMatchObject({ kind: "open", label: "Open in Work" });
+    expect(row?.target).toMatchObject({ type: "issue", view: "work", issueKey: "AM-50", filter: "unassigned" });
+    expect(response.actionItems.some((item) => item.primaryAction.label === "Assign owner")).toBe(false);
   });
 
   it("does not turn Later desk items into Today carry-forward actions", async () => {

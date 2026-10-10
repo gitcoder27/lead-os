@@ -65,7 +65,7 @@ import { getParticipatingDeveloperIds } from "./developer-participation.service"
 import { tracksNoCurrent, usesCheckIns } from "./tracker-freshness";
 import { normalizeWorkspaceId } from "./workspace.service";
 import { logger } from "../utils/logger";
-import { addDaysToIsoDay, getRhythmState, resolveTimeZone, toZonedIsoDay, zonedTimeToUtc } from "./today-clock";
+import { addDaysToIsoDay, getRhythmState, resolveTimeZone, toZonedIsoDay, zonedParts, zonedTimeToUtc } from "./today-clock";
 import { parseInstant, TodayStateService, type CheckInSince, type StandupSessionSummary } from "./today-state.service";
 
 type SyncStatusSource = {
@@ -472,6 +472,8 @@ export class TodayService {
     const followUps = getDueFollowUps(deskItems, clock.nowMs);
     for (const item of followUps) shownKeys.add(deskKey(item));
     const meetings = getMeetingPrompts(deskItems, clock);
+    // docs/73 UXD-10: a meeting asks for its outcome only once it is over; until then it is "At 16:30".
+    const endedMeetings = meetings.filter((item) => meetingHasEnded(item, clock));
     const oneOnOneActions = buildOneOnOneActions(oneOnOneSignals);
     const pinnedActions = plan ? buildTopThreeActions(plan) : [];
     // A pinned task is one row, at the top — its carry or follow-up row folds into it.
@@ -484,7 +486,7 @@ export class TodayService {
       ...buildDeveloperActions(teamBoard, clock, openAsks),
       ...buildIssueActions(issues, clock),
       ...buildFollowUpActions(followUps, clock),
-      ...buildMeetingActions(meetings),
+      ...buildMeetingActions(endedMeetings),
       ...buildJiraDriftActions(jiraDrift),
       ...oneOnOneActions,
       ...buildSyncActions(syncStatus),
@@ -526,7 +528,7 @@ export class TodayService {
       teamPulse: buildTeamPulse(teamBoard, clock, openAsks).slice(0, 10),
       promises: promiseItems.slice(0, 10),
       standupPrompts: buildStandupPrompts(teamBoard, issues, followUps, clock).slice(0, 8),
-      meetingPrompts: meetings.map((item) => buildMeetingPrompt(item)).slice(0, 8),
+      meetingPrompts: meetings.map((item) => buildMeetingPrompt(item, clock)).slice(0, 8),
       ...(rawSyncStatus ? { syncStatus: { ...rawSyncStatus, jiraConfigured } } : {}),
       isPartial: unavailableSources.length > 0,
       sourceStatus,
@@ -545,7 +547,7 @@ export class TodayService {
         promiseItems,
         carryActions,
         openAsks,
-      }), plan),
+      }), plan, actionItems),
       ...(state ? { checkInAsks: [...openAsks.values()] } : {}),
       ...(gettingStarted ? { gettingStarted } : {}),
       ...(weeklyReview ? { weeklyReview } : {}),
@@ -1404,18 +1406,28 @@ function getDeveloperPulsePrimary(
   };
 }
 
-const MAX_PRIORITY_ISSUE_ROWS = 3;
+/**
+ * docs/73 UXD-10: Today shows at most this many defect rows; the rest fold into one
+ * aggregate row that opens Work. A code constant on purpose (not a setting) — change it here.
+ */
+export const TODAY_DEFECT_ROWS = 3;
+
+type IssueCandidate = {
+  issue: TodayIssue;
+  kind: "overdue" | "due_today" | "unassigned" | "high_priority";
+  row: TodayActionItem;
+};
 
 /**
- * docs/53 F12: high-priority issues only surface when they still need a
- * manager decision — unassigned (handled by the unassigned bucket), not
- * started, or stale. Beyond a few rows the rest fold into one aggregate row
- * that deep-links to the filtered Work view.
+ * docs/53 F12, docs/73 UXD-10: an issue reaches Today when it is overdue, due today,
+ * unassigned, or high priority and still not started or stale. The strongest
+ * TODAY_DEFECT_ROWS keep their own rows; the rest become one aggregate row that names
+ * what it holds and opens the matching Work filter. Unassigned rows say "Open in Work":
+ * LeadOS cannot assign in Jira, so the label promises only what it does.
  */
 function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionItem[] {
   const date = clock.date;
-  const rows: TodayActionItem[] = [];
-  const priorityIssues: TodayIssue[] = [];
+  const candidates: IssueCandidate[] = [];
 
   for (const issue of issues) {
     if (issue.statusCategory.toLowerCase() === "done") {
@@ -1440,7 +1452,24 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionIt
       if (!notStarted && !stale) {
         continue;
       }
-      priorityIssues.push(issue);
+      candidates.push({
+        issue,
+        kind: "high_priority",
+        row: action({
+          id: `today-issue-${issue.jiraKey}`,
+          type: "high_priority_issue",
+          title: `${issue.jiraKey} ${issue.summary}`,
+          context: issue.assigneeName ? `${issue.assigneeName} / ${issue.statusName}` : issue.statusName,
+          signal: ["High priority", notStarted ? "Not started" : undefined, stale ? "Stale" : undefined].filter(Boolean).join(" / "),
+          severity: "warning",
+          priority: 66,
+          group: "next",
+          target: target("issue", "work", { issueKey: issue.jiraKey, filter: "highPriority", date }),
+          primaryKind: "open",
+          primaryLabel: "Open issue",
+          secondaryKinds: ["capture_follow_up"],
+        }),
+      });
       continue;
     }
 
@@ -1455,8 +1484,10 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionIt
       highPriority ? "High priority" : undefined,
     ].filter(Boolean).join(" / ");
 
-    rows.push(
-      action({
+    candidates.push({
+      issue,
+      kind: overdue ? "overdue" : dueToday ? "due_today" : "unassigned",
+      row: action({
         id: `today-issue-${issue.jiraKey}`,
         type: itemType,
         title: `${issue.jiraKey} ${issue.summary}`,
@@ -1466,56 +1497,75 @@ function buildIssueActions(issues: TodayIssue[], clock: DayClock): TodayActionIt
         priority: overdue && !unassigned ? 92 : overdue ? 90 : dueToday ? 72 : 70,
         group: overdue || dueToday ? "now" : "next",
         target: actionTarget,
-        primaryKind: unassigned ? "assign_owner" : "open",
-        primaryLabel: unassigned ? "Assign owner" : "Open issue",
+        primaryKind: "open",
+        primaryLabel: unassigned ? "Open in Work" : "Open issue",
         secondaryKinds: ["capture_follow_up"],
       }),
-    );
+    });
   }
 
-  for (const issue of priorityIssues.slice(0, MAX_PRIORITY_ISSUE_ROWS)) {
-    const stale = Boolean(issue.stale);
-    const notStarted = issue.statusCategory === "new";
-    const actionTarget = target("issue", "work", { issueKey: issue.jiraKey, filter: "highPriority", date });
-    rows.push(
-      action({
-        id: `today-issue-${issue.jiraKey}`,
-        type: "high_priority_issue",
-        title: `${issue.jiraKey} ${issue.summary}`,
-        context: issue.assigneeName ? `${issue.assigneeName} / ${issue.statusName}` : issue.statusName,
-        signal: ["High priority", notStarted ? "Not started" : undefined, stale ? "Stale" : undefined].filter(Boolean).join(" / "),
-        severity: "warning",
-        priority: 66,
-        group: "next",
-        target: actionTarget,
-        primaryKind: "open",
-        primaryLabel: "Open issue",
-        secondaryKinds: ["capture_follow_up"],
-      }),
-    );
-  }
-
-  if (priorityIssues.length > MAX_PRIORITY_ISSUE_ROWS) {
-    const aggregateTarget = target("view", "work", { filter: "highPriority", date });
-    rows.push(
-      action({
-        id: "today-issue-priority-backlog",
-        type: "high_priority_issue",
-        title: `${priorityIssues.length} high-priority defects`,
-        context: "Open the high-priority Work filter to triage the rest",
-        signal: "High priority",
-        severity: "info",
-        priority: 64,
-        group: "next",
-        target: aggregateTarget,
-        primaryKind: "open",
-        primaryLabel: "Open Work",
-        secondaryKinds: [],
-      }),
-    );
-  }
-
+  // Strongest first; ties keep the order issues arrived in.
+  const ranked = candidates
+    .map((candidate, index) => ({ candidate, index }))
+    .sort((left, right) => right.candidate.row.priority - left.candidate.row.priority || left.index - right.index)
+    .map(({ candidate }) => candidate);
+  const shown = ranked.slice(0, TODAY_DEFECT_ROWS);
+  const folded = ranked.slice(TODAY_DEFECT_ROWS);
+  const rows = shown.map((candidate) => candidate.row);
+  if (folded.length > 0) rows.push(buildDefectAggregate(folded, date));
   return rows;
+}
+
+/**
+ * "4 more defects need an owner or are overdue" — one row for what did not fit, opening Work.
+ * With three or more reasons the sentence would run on, so it says "need attention" and the
+ * context line carries the counts.
+ */
+function buildDefectAggregate(folded: IssueCandidate[], date: string): TodayActionItem {
+  const count = (kind: IssueCandidate["kind"]) => folded.filter((candidate) => candidate.kind === kind).length;
+  const overdue = count("overdue");
+  const dueToday = count("due_today");
+  const highPriority = count("high_priority");
+  const unassigned = folded.filter((candidate) => !candidate.issue.assigneeId).length;
+  const one = folded.length === 1;
+  const reasons = [
+    unassigned > 0 ? (one ? "needs an owner" : "need an owner") : undefined,
+    overdue > 0 ? (one ? "is overdue" : "are overdue") : undefined,
+    dueToday > 0 ? (one ? "is due today" : "are due today") : undefined,
+    highPriority > 0 ? (one ? "is high priority" : "are high priority") : undefined,
+  ].filter((part): part is string => Boolean(part));
+  const predicate = reasons.length === 0 || reasons.length > 2
+    ? (one ? "needs attention" : "need attention")
+    : reasons.join(" or ");
+  const title = `${folded.length} more ${one ? "defect" : "defects"} ${predicate}`;
+  const context = [
+    overdue ? `${overdue} overdue` : undefined,
+    unassigned ? `${unassigned} without an owner` : undefined,
+    dueToday ? `${dueToday} due today` : undefined,
+    highPriority ? `${highPriority} high priority` : undefined,
+  ].filter(Boolean).join(" · ");
+  // A single kind opens its own filter; a mix opens all of Work.
+  const kinds = new Set(folded.map((candidate) => candidate.kind));
+  const only = kinds.size === 1 ? [...kinds][0] : undefined;
+  const filter: FilterType | undefined = only === "overdue" ? "overdue"
+    : only === "due_today" ? "dueToday"
+      : only === "unassigned" ? "unassigned"
+        : only === "high_priority" ? "highPriority"
+          : undefined;
+  return action({
+    id: "today-issue-aggregate",
+    type: overdue > 0 ? "overdue_issue" : "high_priority_issue",
+    title,
+    context: context || "Open Work to triage the rest",
+    signal: "",
+    severity: "info",
+    priority: 64,
+    group: "next",
+    target: target("view", "work", { ...(filter ? { filter } : {}), date }),
+    primaryKind: "open",
+    primaryLabel: "Open Work",
+    secondaryKinds: [],
+  });
 }
 
 /**
@@ -1761,22 +1811,46 @@ function buildPromiseItem(item: ManagerDeskItem, clock: DayClock): TodayPromiseI
   };
 }
 
-function buildMeetingPrompt(item: ManagerDeskItem): TodayMeetingPrompt {
+function buildMeetingPrompt(item: ManagerDeskItem, clock: DayClock): TodayMeetingPrompt {
   const meetingTarget = target("meeting", "tasks", { taskView: "meetings",
     managerDeskItemId: item.id,
     taskKey: item.taskKey ?? undefined,
     date: item.originDate,
   });
+  const ended = meetingHasEnded(item, clock);
+  const startsAt = item.plannedStartAt ? zonedParts(new Date(item.plannedStartAt), clock.tz) : undefined;
+  const at = startsAt ? `At ${String(startsAt.hour).padStart(2, "0")}:${String(startsAt.minute).padStart(2, "0")}` : undefined;
 
   return {
     id: `meeting-${item.id}`,
     title: item.title,
-    detail: item.participants || "Needs captured outcome",
-    severity: item.priority === "critical" || item.priority === "high" ? "warning" : "info",
+    detail: ended ? item.participants || "Needs captured outcome" : [at, item.participants].filter(Boolean).join(" · "),
+    severity: ended && (item.priority === "critical" || item.priority === "high") ? "warning" : "info",
     target: meetingTarget,
-    primaryAction: command("capture_meeting_outcome", "Outcome", meetingTarget),
-    secondaryActions: [command("capture_follow_up", "Follow up", meetingTarget), command("open", "Open", meetingTarget)],
+    // docs/73 UXD-10: nothing to capture before it happens — the row only opens the meeting.
+    primaryAction: ended ? command("capture_meeting_outcome", "Outcome", meetingTarget) : command("open", "Open", meetingTarget),
+    secondaryActions: ended
+      ? [command("capture_follow_up", "Follow up", meetingTarget), command("open", "Open", meetingTarget)]
+      : [command("capture_follow_up", "Follow up", meetingTarget)],
   };
+}
+
+/** Grace after the start when a meeting has no end time. */
+const MEETING_DEFAULT_MINUTES = 30;
+
+/**
+ * docs/73 UXD-10: a meeting is over once its end time passes, or 30 minutes after it starts
+ * when it has no end. Meetings from earlier days, or with no time at all, count as over.
+ */
+export function meetingHasEnded(item: Pick<ManagerDeskItem, "plannedStartAt" | "plannedEndAt" | "originDate">, clock: DayClock): boolean {
+  if (item.originDate && item.originDate < clock.date) return true;
+  const end = item.plannedEndAt
+    ? Date.parse(item.plannedEndAt)
+    : item.plannedStartAt
+      ? Date.parse(item.plannedStartAt) + MEETING_DEFAULT_MINUTES * 60_000
+      : Number.NaN;
+  if (Number.isNaN(end)) return true;
+  return end <= clock.nowMs;
 }
 
 function buildStandupPrompts(
@@ -2395,8 +2469,27 @@ function buildStandupActions(
   ];
 }
 
-function withPlan(focus: TodayFocus, plan: TodayPlanFocus | undefined): TodayFocus {
-  return plan ? { ...focus, plan } : focus;
+function withPlan(focus: TodayFocus, plan: TodayPlanFocus | undefined, queue: TodayActionItem[] = []): TodayFocus {
+  return plan ? { ...focus, plan: withoutQueuedPlanItems(plan, queue, focus.stage) } : focus;
+}
+
+/**
+ * docs/73 UXD-10: a task the queue already raises (a meeting to close out, a follow-up due)
+ * is not listed again under My plan. Pins and carry rows are the plan's own (the client folds
+ * them out of the queue), and at wrap-up the plan's Done/Tomorrow/Drop lists own their tasks.
+ */
+export function withoutQueuedPlanItems(plan: TodayPlanFocus, queue: TodayActionItem[], stage: TodayFocus["stage"]): TodayPlanFocus {
+  if (stage === "wrap_up") return plan;
+  const queued = new Set(
+    queue
+      .filter((item) => item.type !== "top_three" && item.type !== "desk_carry_forward")
+      .map((item) => item.target.taskKey ?? item.target.context?.taskKey)
+      .filter((key): key is string => Boolean(key)),
+  );
+  if (queued.size === 0) return plan;
+  const pinned = new Set(plan.top3);
+  const items = plan.items.filter((item) => pinned.has(item.taskKey) || !queued.has(item.taskKey));
+  return items.length === plan.items.length ? plan : { ...plan, items };
 }
 
 function countGroups(items: TodayActionItem[]): Record<TodayActionGroup, number> {

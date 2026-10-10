@@ -308,12 +308,21 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
     expect(wrapUp?.eodNoteTarget).toEqual({ type: "view", view: "notes", date: "2026-03-08" });
   });
 
-  it("returns honest totals, group counts, and overflow rows past the visible cut (F13)", async () => {
-    for (let index = 0; index < 26; index += 1) {
-      await seedIssue(`AM-${index + 1}`, { dueDate: "2026-03-01" });
+  // docs/73 UXD-10: defects are capped at TODAY_DEFECT_ROWS + one aggregate, so the overflow
+  // contracts below use a flood of due follow-ups (which are not capped) instead of Jira issues.
+  const seedDueFollowUps = async (count: number) => {
+    for (let index = 0; index < count; index += 1) {
+      await managerDeskService.createItem("manager-1", {
+        date: "2026-03-07", title: `Chase vendor ${index + 1}`, kind: "action", category: "follow_up", status: "planned",
+        followUpAt: "2026-03-07T09:00:00.000Z",
+      });
     }
+  };
+
+  it("returns honest totals, group counts, and overflow rows past the visible cut (F13)", async () => {
+    await seedDueFollowUps(26);
     const today = await todayService().getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
-    // 26 overdue issues + dev-1's stale-check-in row.
+    // 26 overdue follow-ups + dev-1's stale-check-in row.
     expect(today.actionItems).toHaveLength(20);
     expect(today.totalCount).toBe(27);
     expect(today.overflowActionItems).toHaveLength(7);
@@ -322,13 +331,11 @@ describe("TodayService stage-driven contracts (docs/53 §8.5-7)", () => {
   });
 
   it("keeps counting past the shipped cap, so the client can say how many rows it never received (docs/63 #6)", async () => {
-    for (let index = 0; index < 101; index += 1) {
-      await seedIssue(`AM-${index + 1}`, { dueDate: "2026-03-01" });
-    }
+    await seedDueFollowUps(101);
     const today = await todayService().getToday("manager-1", "2026-03-08", undefined, { tz: "Asia/Kolkata" });
     const shipped = today.actionItems.length + (today.overflowActionItems?.length ?? 0);
     expect(shipped).toBe(100);
-    // 101 overdue issues + dev-1's stale-check-in row.
+    // 101 overdue follow-ups + dev-1's stale-check-in row.
     expect(today.totalCount).toBe(102);
     expect(today.summary.find((metric) => metric.id === "attention")?.value).toBe(102);
   });

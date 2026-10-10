@@ -184,13 +184,19 @@ describe("Today plan (P3-01)", () => {
   it("asks for an outcome only for meetings that are not on a later day, and never calls a meeting overdue (UX-08)", async () => {
     const past = await add("Architecture sync", { kind: "meeting", scheduledOn: "2026-03-07", startsAt: "2026-03-07T09:00:00.000Z", endsAt: "2026-03-07T10:00:00.000Z" });
     const later = await add("1:1 with Priya", { kind: "meeting", startsAt: "2026-03-09T11:00:00.000Z", endsAt: "2026-03-09T12:00:00.000Z" });
+    // docs/73 UXD-10: one still to come today (now is 04:00Z) is on the plan, not asking for an outcome.
+    const upcoming = await add("Atlas go/no-go", { kind: "meeting", scheduledOn: DATE, startsAt: "2026-03-08T16:30:00.000Z", endsAt: "2026-03-08T17:00:00.000Z" });
     const today = await getToday();
     type Row = { type: string; target: { taskKey?: string }; primaryAction: { kind: string } };
     const outcomes = (today.actionItems as Row[]).filter((item) => item.type === "meeting_outcome").map((item) => item.target.taskKey);
     expect(outcomes).toContain(past);
     expect(outcomes).not.toContain(later);
-    const planRow = (today.focus.plan.items as { taskKey: string; overdue: boolean; kind?: string }[]).find((item) => item.taskKey === past);
-    expect(planRow).toMatchObject({ overdue: false, kind: "meeting" });
+    expect(outcomes).not.toContain(upcoming);
+    const plan = today.focus.plan.items as { taskKey: string; overdue: boolean; kind?: string }[];
+    // The meeting the queue raises is not listed again under My plan (UXD-10)…
+    expect(plan.map((item) => item.taskKey)).not.toContain(past);
+    // …and a meeting on the plan is never called overdue.
+    expect(plan.find((item) => item.taskKey === upcoming)).toMatchObject({ overdue: false, kind: "meeting" });
   });
 
   it("drops a task from wrap-up with an undo, and moves one to tomorrow (UX-26)", async () => {
@@ -369,6 +375,44 @@ describe("Today plan (P3-01)", () => {
     }
     // Ordinary tasks scheduled today are not carry rows, so the plan is the only place wrap-up can list them.
     expect(after.focus.wrapUp.carryCandidates).toEqual([]);
+  });
+
+  it("asks for a meeting's outcome only once it is over: after its end, or 30 minutes after a start with no end (docs/73 UXD-10)", async () => {
+    // The clock is 04:00Z, read in UTC.
+    const ended = await add("Standup retro", { kind: "meeting", scheduledOn: DATE, startsAt: "2026-03-08T02:00:00.000Z", endsAt: "2026-03-08T03:00:00.000Z" });
+    const graceOver = await add("Quick sync", { kind: "meeting", scheduledOn: DATE, startsAt: "2026-03-08T03:00:00.000Z" });
+    const inGrace = await add("Vendor call", { kind: "meeting", scheduledOn: DATE, startsAt: "2026-03-08T03:45:00.000Z" });
+    const later = await add("Atlas go/no-go", { kind: "meeting", scheduledOn: DATE, startsAt: "2026-03-08T16:30:00.000Z", endsAt: "2026-03-08T17:00:00.000Z" });
+    const today = await getToday();
+    type Row = { type: string; target: { taskKey?: string }; detail?: string; primaryAction: { kind: string } };
+    const outcomes = (today.actionItems as Row[]).filter((item) => item.type === "meeting_outcome").map((item) => item.target.taskKey);
+    expect(outcomes.sort()).toEqual([ended, graceOver].sort());
+    const prompts = today.meetingPrompts as Row[];
+    const upcoming = prompts.find((item) => item.target.taskKey === later);
+    expect(upcoming?.detail).toMatch(/^At 16:30/);
+    expect(upcoming?.primaryAction.kind).toBe("open");
+    expect(prompts.find((item) => item.target.taskKey === inGrace)?.detail).toMatch(/^At 03:45/);
+    expect(prompts.find((item) => item.target.taskKey === ended)?.primaryAction.kind).toBe("capture_meeting_outcome");
+  });
+
+  it("does not list a task the queue raises again under My plan, except pins, and leaves wrap-up's lists alone (docs/73 UXD-10)", async () => {
+    const due = await add("Chase legal", { scheduledOn: DATE, followUpAt: "2026-03-08T02:00:00.000Z" });
+    const plain = await add("Write the runbook", { scheduledOn: DATE });
+    const pinned = await add("Pinned chase", { scheduledOn: DATE, followUpAt: "2026-03-08T01:00:00.000Z" });
+    await put({ date: DATE, taskKeys: [pinned] });
+
+    const midday = await getToday();
+    type Row = { type: string; target: { taskKey?: string } };
+    expect((midday.actionItems as Row[]).some((item) => item.type === "follow_up_due" && item.target.taskKey === due)).toBe(true);
+    const planKeys = (midday.focus.plan.items as { taskKey: string }[]).map((item) => item.taskKey);
+    expect(planKeys).toContain(plain);
+    expect(planKeys).toContain(pinned);
+    expect(planKeys).not.toContain(due);
+
+    // 18:00 local is wrap-up: the plan's Done / Tomorrow / Drop lists own their tasks.
+    const evening = await getToday(testApp, "Pacific/Kiritimati");
+    expect(evening.focus.stage).toBe("wrap_up");
+    expect((evening.focus.plan.items as { taskKey: string }[]).map((item) => item.taskKey)).toContain(due);
   });
 
   it("reports a failed plan, state or weekly-review read instead of dropping it silently (docs/63 #6)", async () => {

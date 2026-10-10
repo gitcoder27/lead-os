@@ -45,7 +45,7 @@ vi.mock('@/hooks/useGlobalSearch', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useProjects', () => ({ useProject: (...args: unknown[]) => mockUseProject(...args), useProjects: () => ({ data: { projects: [] } }), useProjectWrites: () => ({ isPending: false }) }));
+vi.mock('@/hooks/useProjects', () => ({ useProject: (...args: unknown[]) => mockUseProject(...args), useProjects: () => ({ data: { projects: [] } }), useProjectWrites: () => ({ isPending: false }), usePlacementWrites: () => ({ isPending: false, mutateAsync: vi.fn() }), previewPlacement: vi.fn(() => new Promise(() => undefined)) }));
 
 vi.mock('@/hooks/useTaskViews', () => ({
   useTaskViews: (...args: unknown[]) => mockUseTaskViews(...args),
@@ -856,7 +856,28 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ outcome: 'Go with Redis', status: 'done' });
     });
 
-    it('a plain task never shows an action tally', () => {
+    it('edits a row in place: the date reschedules, the owner reassigns, the flag sets priority, m moves to a project (docs/73 UXD-13)', () => {
+    window.history.replaceState(null, '', '/tasks?view=attention');
+    mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => definition?.filters?.closed ? tasksResult([]) : tasksResult([
+      task({ id: 21, taskKey: 'T-21', title: 'Hire contractor', priority: 'high', ownerType: 'developer', ownerId: 'dev-1', scheduledOn: '2026-09-24' }),
+    ]));
+    render(<TasksPage />);
+    fireEvent.click(within(row('T-21')).getByRole('button', { name: /Thu, Sep 24, 2026/ }));
+    // The schedule control is the shared date picker (presets + calendar).
+    expect(screen.getByRole('dialog', { name: 'Schedule' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Schedule' }), { key: 'Escape' });
+    fireEvent.click(within(row('T-21')).getByRole('button', { name: 'Owner: Dev One' }));
+    expect(screen.getByRole('menu', { name: 'Assign' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'Assign' }), { key: 'Escape' });
+    fireEvent.click(within(row('T-21')).getByRole('button', { name: 'High priority' }));
+    expect(screen.getByRole('menu', { name: 'Set priority' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'Set priority' }), { key: 'Escape' });
+    act(() => { openRow('T-21').focus(); });
+    press('m');
+    expect(screen.getByRole('dialog', { name: /project/i })).toBeInTheDocument();
+  });
+
+  it('a plain task never shows an action tally', () => {
       window.history.replaceState(null, '', '/tasks?view=my-tasks');
       render(<TasksPage />);
       expect(screen.queryByTestId('meeting-actions')).toBeNull();
@@ -1122,7 +1143,8 @@ describe('TasksPage design layer (docs/51 D1–D5, U2–U6)', () => {
     window.history.replaceState(null, '', '/tasks?view=attention');
     mockUseTaskViewTasks.mockReturnValue(tasksResult([task({ priority: 'high', signals: { ...NO_SIGNALS, stale: true, staleDays: 9, drift: true } })]));
     render(<TasksPage />);
-    expect(within(row('T-1')).getByRole('img', { name: 'High priority' })).toBeVisible();
+    // docs/73 UXD-13: the flag is now the inline priority control — still visible and announced.
+    expect(within(row('T-1')).getByRole('button', { name: 'High priority' })).toBeVisible();
     expect(within(row('T-1')).getByText('Stale 9d')).toBeVisible();
     expect(within(row('T-1')).getByText('Jira drift')).toBeVisible();
     expect(openRow('T-1')).toHaveAccessibleName(expect.stringContaining('High priority'));

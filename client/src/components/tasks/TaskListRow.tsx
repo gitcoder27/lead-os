@@ -23,7 +23,7 @@ export interface TaskRowHandlers {
   onFocusRow: (taskKey: string) => void;
   onOpen: (taskKey: string) => void;
   onSelect: (taskKey: string, mode: 'toggle' | 'range') => void;
-  onMenu: (taskKey: string, kind: 'status' | 'schedule' | 'more', anchor: HTMLElement) => void;
+  onMenu: (taskKey: string, kind: 'status' | 'schedule' | 'assign' | 'priority' | 'more', anchor: HTMLElement) => void;
   onToggleDone: (taskKey: string) => void;
   /** docs/56 UX-08: the row action for a past meeting with no outcome. */
   onCaptureOutcome?: (taskKey: string) => void;
@@ -141,6 +141,13 @@ export const TaskListRow = memo(function TaskListRow({
     task.lingering ? (task.lingerHint ?? 'moved') : null,
   ].filter(Boolean).join(', ');
 
+  const dateMark = date ? (date.level && (date.tone === 'danger' || date.tone === 'warning') && !inOverdueGroup ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: inOverdueGroup && date.tone === 'danger' ? 'var(--task-danger-text)' : inOverdueGroup && date.tone === 'warning' ? 'var(--task-warning-text)' : DATE_TONES[date.tone] }}>{date.label}</span>) : null;
+
+  const openInline = (kind: 'schedule' | 'assign' | 'priority', anchor: HTMLElement) => {
+    handlers.onFocusRow(task.taskKey);
+    handlers.onMenu(task.taskKey, kind, anchor);
+  };
+
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (event.shiftKey) {
       event.preventDefault();
@@ -185,7 +192,11 @@ export const TaskListRow = memo(function TaskListRow({
             {waiting?.check && <span className="text-meta" data-testid="waiting-check">{waiting.check.tone === 'muted' ? <span style={{ color: 'var(--text-muted)' }}>{waiting.check.label}</span> : <SeverityMark tone={waiting.check.tone} level={waiting.check.tone === 'danger' ? 3 : 2}>{waiting.check.label}</SeverityMark>}</span>}
             {waiting?.aging && <span className="text-meta tabular-nums" style={{ color: 'var(--text-muted)' }} data-testid="waiting-aging">{waiting.aging}</span>}
             {attentionReasons.map((reason) => <span key={reason.label} className="text-meta"><SeverityMark tone={reason.tone} level={reason.level}>{reason.label}</SeverityMark></span>)}
-            {iconSignals.map((signal) => <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
+            {iconSignals.map((signal) => signal.label === 'High priority' && !closed
+              // docs/73 UXD-13: the flag is the priority control (p).
+              ? <button key={signal.label} type="button" className="task-row-inline flex items-center" style={{ color: signal.color }}
+                  aria-label="High priority" title="High priority — change (p)" onClick={(event) => openInline('priority', event.currentTarget)}>{signal.icon}</button>
+              : <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
             {outcomeAction && (
               // docs/73 UXD-12: the meeting's one action; the warning dot says it is owed.
@@ -196,9 +207,16 @@ export const TaskListRow = memo(function TaskListRow({
                 Capture outcome
               </button>
             )}
-            {showOwner && <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>}
-            {(dateColumn || date) && <span className="task-row-date text-ui tabular-nums" title={date?.title} aria-label={date?.title}>
-              {date && (date.level && (date.tone === 'danger' || date.tone === 'warning') && !inOverdueGroup ? <SeverityMark tone={date.tone} level={date.level}>{date.label}</SeverityMark> : <span className="whitespace-nowrap px-1.5" style={{ color: inOverdueGroup && date.tone === 'danger' ? 'var(--task-danger-text)' : inOverdueGroup && date.tone === 'warning' ? 'var(--task-warning-text)' : DATE_TONES[date.tone] }}>{date.label}</span>)}
+            {showOwner && (closed
+              ? <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>
+              // docs/73 UXD-13: the owner opens the assign menu (a).
+              : <button type="button" className="task-row-owner task-row-inline text-ui" aria-label={`Owner: ${owner}`} title={`${owner} — reassign (a)`} style={{ color: 'var(--text-secondary)' }}
+                  onClick={(event) => openInline('assign', event.currentTarget)}>{owner}</button>)}
+            {(dateColumn || date) && <span className="task-row-date text-ui tabular-nums" title={date?.title} aria-label={date && closed ? date.title : undefined}>
+              {date && !closed
+                // docs/73 UXD-13: the date is the schedule control (s) — reschedule in two clicks.
+                ? <button type="button" className="task-row-inline" aria-label={date.title} title={`${date.title} — reschedule (s)`} onClick={(event) => openInline('schedule', event.currentTarget)}>{dateMark}</button>
+                : dateMark}
             </span>}
           </span>
         </div>

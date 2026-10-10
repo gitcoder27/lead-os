@@ -840,6 +840,12 @@ textarea.ui-field { resize: none; }
 .task-row-metadata { display: flex; flex-shrink: 0; align-items: center; gap: 0.5rem; }
 .task-row-owner { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-row-date { display: flex; min-width: 84px; justify-content: flex-end; }
+/* docs/73 UXD-13: date, owner and flag are quiet inline controls — they look like text until pointed at. */
+.task-row-inline { display: inline-flex; align-items: center; border-radius: 6px; padding: 1px 2px; text-align: left; transition: background-color var(--dur-fast) ease; }
+.task-row-inline:hover { background: var(--bg-tertiary); }
+.task-row-inline:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* Touch: a 44px target made of padding, cancelled by margins so the row keeps its height. */
+@media (pointer: coarse) { .task-row-inline { min-height: 44px; min-width: 44px; justify-content: center; margin-block: -12px; } }
 .task-row-next { margin: -0.125rem 2rem 0 4rem; padding-bottom: 0.5rem; overflow-wrap: anywhere; }
 .task-row-control:focus-visible, .task-row-open:focus-visible, .task-row-selection:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (max-width: 767px), (pointer: coarse) {

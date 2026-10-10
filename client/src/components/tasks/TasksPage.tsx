@@ -718,6 +718,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
       case 'p': openMenu('priority', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'w': openMenu('waiting', targetsFor().map((task) => task.taskKey), anchor); break;
       case 'c': openMenu('checkBy', targetsFor().map((task) => task.taskKey), anchor); break;
+      // docs/73 UXD-13: m = move to project (the list map had it free).
+      case 'm': openMenu('project', targetsFor().map((task) => task.taskKey), anchor); break;
       case '#': drop(targetsFor()); break;
       case 'n': {
         const group = groups.find((candidate) => candidate.tasks.some((row) => row.taskKey === focused)) ?? groups[0];

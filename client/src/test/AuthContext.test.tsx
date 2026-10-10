@@ -1,6 +1,6 @@
 import { clearTaskUpdateDraftsForScope, completeTaskUpdateDraft, newTaskUpdateDraft, readTaskUpdateDraft, taskDraftGeneration, taskUpdateDraftPrefix, writeTaskUpdateDraft } from '@/lib/task-update-drafts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, getAuthScopeKey, useAuth } from '@/context/AuthContext';
 import { readDailyNoteDraft, writeDailyNoteDraft } from '@/lib/daily-note-drafts';
@@ -34,7 +34,7 @@ function createQueryClient() {
 }
 
 function AuthProbe() {
-  const { user, login, logout, refreshSession } = useAuth();
+  const { user, login, logout, refreshSession, signUp } = useAuth();
 
   return (
     <div>
@@ -43,6 +43,7 @@ function AuthProbe() {
       <button type="button" onClick={() => void login('manager-a', 'secret123')}>
         Login
       </button>
+      <button type="button" onClick={() => void signUp({ inviteToken: 'fixture-invite', username: 'manager-b', displayName: 'Manager B', password: 'fixture-password' })}>Create account</button>
       <button type="button" onClick={() => void logout().catch(() => {})}>
         Logout
       </button>
@@ -176,4 +177,48 @@ describe('AuthProvider cache isolation', () => {
     fireEvent.click(screen.getByText('Refresh session'));
     await waitFor(() => expect(window.localStorage.getItem('lead-os:signed-in')).toBeNull());
   });
+});
+
+  it('clears queries and all user-keyed storage before A logs out and B signs up in the same browser', async () => {
+    const client = createQueryClient();
+    apiMocks.get.mockResolvedValue({ user: managerA });
+    const managerB = { ...managerA, username: 'manager-b', workspaceId: 'workspace-b', displayName: 'Manager B', accountId: 'manager-b' };
+    apiMocks.post.mockImplementation((url: string) => Promise.resolve(url === '/auth/signup' ? { user: managerB, features: { tasksPhase3: true, teamMode: 'solo', backups: false } } : undefined));
+    renderAuthProbe(client); await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+    client.setQueryData(['tasks'], [{ title: 'OWNERSECRET task' }]);
+    localStorage.setItem('lead-os:workspace-a:manager-a:global-capture', 'OWNERSECRET capture');
+    sessionStorage.setItem('lead-os:workspace-a:manager-a:standup-session:today', 'OWNERSECRET standup');
+    localStorage.setItem('theme', 'dark');
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('anonymous'));
+    expect(client.getQueryData(['tasks'])).toBeUndefined();
+    expect(localStorage.getItem('lead-os:workspace-a:manager-a:global-capture')).toBeNull();
+    expect(sessionStorage.getItem('lead-os:workspace-a:manager-a:standup-session:today')).toBeNull();
+    expect(localStorage.getItem('theme')).toBe('dark');
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-b'));
+    expect(client.getQueryData(['tasks'])).toBeUndefined();
+    expect(document.body).not.toHaveTextContent('OWNERSECRET');
+  });
+
+it.each(['response', 'failure'])('ignores an old session refresh after logout and B signs in: %s', async (result) => {
+  const client = createQueryClient();
+  apiMocks.get.mockResolvedValueOnce({ user: managerA });
+  const managerB = { ...managerA, username: 'manager-b', accountId: 'manager-b', workspaceId: 'workspace-b' };
+  apiMocks.post.mockImplementation((url: string) => Promise.resolve(url === '/auth/signup' ? { user: managerB } : undefined));
+  renderAuthProbe(client);
+  await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-a'));
+  let resolve!: (value: unknown) => void;
+  let reject!: (error: Error) => void;
+  apiMocks.get.mockReturnValueOnce(new Promise((ok, fail) => { resolve = ok; reject = fail; }));
+  fireEvent.click(screen.getByText('Refresh session'));
+  fireEvent.click(screen.getByText('Logout'));
+  fireEvent.click(screen.getByText('Create account'));
+  await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('manager-b'));
+  client.setQueryData(['tasks', 'workspace-b'], [{ title: 'B task' }]);
+  await act(async () => {
+    if (result === 'response') resolve({ user: managerA }); else reject(new Error('Expired A session'));
+  });
+  expect(screen.getByTestId('user')).toHaveTextContent('manager-b');
+  expect(client.getQueryData(['tasks', 'workspace-b'])).toEqual([{ title: 'B task' }]);
 });

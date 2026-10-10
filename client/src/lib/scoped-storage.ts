@@ -18,3 +18,13 @@ export function useScopedStorageKey(baseKey: string): string {
     [baseKey, user?.workspaceId, user?.username]
   );
 }
+
+/** Remove user-keyed capture, standup and view state when a browser changes account. */
+export function clearScopedStorageForUser(user: AuthUser | null): void {
+  if (!user) return;
+  const prefix = `lead-os:${user.workspaceId}:${user.username}:`;
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    try { const storage = window[name]; for (const key of Object.keys(storage)) if (key.startsWith(prefix)) storage.removeItem(key); }
+    catch { /* Session/cache reset still succeeds when storage is unavailable. */ }
+  }
+}

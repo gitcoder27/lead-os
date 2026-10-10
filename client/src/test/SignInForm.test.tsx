@@ -22,7 +22,7 @@ describe('SignInForm', () => {
     vi.clearAllMocks();
   });
 
-  it('signs in with trimmed credentials and reports success', async () => {
+  it('trims the username, preserves the password and reports success', async () => {
     loginMock.mockResolvedValue(undefined);
     const onSignedIn = vi.fn();
     render(<SignInForm onSignedIn={onSignedIn} />);
@@ -35,7 +35,7 @@ describe('SignInForm', () => {
     fill('Password', ' secret123 ');
     fireEvent.click(submit);
 
-    await waitFor(() => expect(loginMock).toHaveBeenCalledWith('lead', 'secret123'));
+    await waitFor(() => expect(loginMock).toHaveBeenCalledWith('lead', ' secret123 '));
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledOnce());
   });
 

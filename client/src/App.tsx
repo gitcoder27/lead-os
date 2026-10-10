@@ -161,6 +161,8 @@ export function legacyTaskViewRedirect(pathname: string, search: string): string
   return `/tasks?${params.toString()}`;
 }
 
+function isJoinPath(pathname: string): boolean { return pathname === '/join' || pathname === '/join/'; }
+
 function isSignInPath(pathname: string): boolean {
   return pathname === '/login' || pathname === '/login/';
 }
@@ -178,7 +180,7 @@ function pathToView(pathname: string): ResolvedAppView {
   if (pathname === '/work' || pathname === '/work/' || pathname === '/dashboard' || pathname === '/dashboard/') return 'work';
   if (pathname === '/today' || pathname === '/today/' || pathname === '/' || pathname === '') return 'today';
   // `/login` is the landing page with sign-in open; signed in, it is Today.
-  if (isSignInPath(pathname)) return 'today';
+  if (isSignInPath(pathname) || isJoinPath(pathname)) return 'today';
   if (pathname === '/settings' || pathname === '/settings/') return 'settings';
   return 'not-found';
 }
@@ -306,7 +308,7 @@ function replaceLegacyPathIfNeeded() {
   }
   const currentView = pathToView(window.location.pathname);
   // `/login` stays put until someone signs in (the landing page reads it), then becomes `/`.
-  if (currentView === 'not-found' || currentView === 'task' || isSignInPath(window.location.pathname)) {
+  if (currentView === 'not-found' || currentView === 'task' || isSignInPath(window.location.pathname) || isJoinPath(window.location.pathname)) {
     return;
   }
   const canonicalPath = viewToPath(currentView);
@@ -1073,7 +1075,7 @@ function AppContent() {
       return;
     }
 
-    if (isAuthenticated && user?.role === 'manager' && isSignInPath(window.location.pathname)) {
+    if (isAuthenticated && user?.role === 'manager' && (isSignInPath(window.location.pathname) || isJoinPath(window.location.pathname))) {
       replaceView('today');
       return;
     }
@@ -1196,7 +1198,7 @@ function AppContent() {
     if (activeView === 'today' && !reviewMode) {
       return (
         <Suspense fallback={<LandingBootLoading />}>
-          <LandingPage initialSignInOpen={isSignInPath(window.location.pathname)} />
+          <LandingPage initialSignInOpen={isSignInPath(window.location.pathname)} joinInvite={isJoinPath(window.location.pathname) ? new URLSearchParams(window.location.search).get('invite') : undefined} />
         </Suspense>
       );
     }

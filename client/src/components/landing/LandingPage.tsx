@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { DatabaseBackup, Lock, Moon, Sun, UserRound } from 'lucide-react';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { CopilotMark } from '@/components/brand/CopilotMark';
+import { JoinDialog } from '@/components/auth/JoinDialog';
 import { SignInForm, type SignInMode } from '@/components/auth/SignInForm';
 import { Avatar } from '@/components/ui/Avatar';
 import { Dialog } from '@/components/ui/Dialog';
@@ -20,14 +21,16 @@ const PAGE_TITLE = 'LeadOS: the daily workspace for engineering managers';
 interface LandingPageProps {
   /** `/login` opens the page with the sign-in dialog already up. */
   initialSignInOpen?: boolean;
+  joinInvite?: string | null;
 }
 
 /**
  * The public front door at `/` for anyone without a session: what LeadOS is,
  * who it's for and why, with sign-in one click away in the top right. It reads
- * no workspace data; the only network call it can make is the sign-in itself.
+ * no workspace data; entry dialogs call only public authentication endpoints.
  */
-export function LandingPage({ initialSignInOpen = false }: LandingPageProps) {
+export function LandingPage({ initialSignInOpen = false, joinInvite }: LandingPageProps) {
+  const [joinOpen, setJoinOpen] = useState(joinInvite !== undefined);
   const [signInOpen, setSignInOpen] = useState(initialSignInOpen);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -70,6 +73,7 @@ export function LandingPage({ initialSignInOpen = false }: LandingPageProps) {
         <LandingFooter onSignIn={openSignIn} />
       </div>
 
+      {joinOpen ? <JoinDialog token={joinInvite ?? null} onClose={() => { setJoinOpen(false); window.history.replaceState(null, '', '/'); }} /> : null}
       {signInOpen ? <SignInDialog onClose={closeSignIn} /> : null}
     </MotionConfig>
   );

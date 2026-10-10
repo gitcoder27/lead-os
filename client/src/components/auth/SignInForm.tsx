@@ -1,5 +1,5 @@
-import { useId, useState, type FormEvent, type ReactNode } from 'react';
-import { Check, Eye, EyeOff } from 'lucide-react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { AuthField, AuthMessage, PasswordInput } from './AuthFields';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import './auth.css';
@@ -35,6 +35,7 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -51,22 +52,24 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!username.trim() || !password.trim() || submitting) return;
+    if (!username.trim() || !password || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
-      await login(username.trim(), password.trim());
+      await login(username.trim(), password);
       onSignedIn?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed. Check your username and password.');
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleChangePassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!username.trim() || !password.trim() || !newPassword.trim() || submitting) return;
-    if (newPassword.trim().length < PASSWORD_MIN_LENGTH) {
+    if (!username.trim() || !password || !newPassword || submittingRef.current) return;
+    if (newPassword.length < PASSWORD_MIN_LENGTH) {
       setError(`Use at least ${PASSWORD_MIN_LENGTH} characters for the new password.`);
       return;
     }
@@ -74,19 +77,21 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
       setError('The new passwords don’t match.');
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setError('');
     try {
       await api.post('/auth/change-password', {
         username: username.trim(),
-        currentPassword: password.trim(),
-        newPassword: newPassword.trim(),
+        currentPassword: password,
+        newPassword: newPassword,
       });
       setMode('sign-in');
       setNotice('Password changed. Sign in with your new password.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Password change failed.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -125,17 +130,18 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
           )}
         </AuthField>
 
-        {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
+        <div className="auth-error-space">{error ? <AuthMessage tone="error">{error}</AuthMessage> : notice ? <AuthMessage tone="success">{notice}</AuthMessage> : null}</div>
 
         <button
           type="submit"
           className="ui-btn-solid auth-submit"
-          disabled={!username.trim() || !password.trim() || !newPassword.trim() || !confirmPassword.trim() || submitting}
+          aria-busy={submitting}
+          disabled={!username.trim() || !password || !newPassword || !confirmPassword || submitting}
         >
           {submitting ? 'Changing password…' : 'Change password'}
         </button>
         <div className="flex justify-center">
-          <button type="button" className="ui-link auth-link" onClick={() => setMode('sign-in')}>
+          <button type="button" className="ui-link auth-link" disabled={submitting} onClick={() => setMode('sign-in')}>
             Back to sign in
           </button>
         </div>
@@ -145,7 +151,6 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
 
   return (
     <form className="space-y-4" onSubmit={handleSignIn} noValidate>
-      {notice ? <AuthMessage tone="success">{notice}</AuthMessage> : null}
       <AuthField label="Username">
         {(id) => (
           <input
@@ -168,80 +173,18 @@ export function SignInForm({ submitLabel = 'Sign in', onModeChange, onSignedIn, 
         )}
       </AuthField>
 
-      {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
+      <div className="auth-error-space">{error ? <AuthMessage tone="error">{error}</AuthMessage> : notice ? <AuthMessage tone="success">{notice}</AuthMessage> : null}</div>
 
-      <button type="submit" className="ui-btn-solid auth-submit" disabled={!username.trim() || !password.trim() || submitting}>
+      <button type="submit" className="ui-btn-solid auth-submit" aria-busy={submitting} disabled={!username.trim() || !password || submitting}>
         {submitting ? 'Signing in…' : submitLabel}
       </button>
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         {footnote ? <p className="auth-footnote">{footnote}</p> : <span />}
-        <button type="button" className="ui-link auth-link" onClick={() => setMode('change-password')}>
+        <button type="button" className="ui-link auth-link" disabled={submitting} onClick={() => setMode('change-password')}>
           Change password
         </button>
       </div>
     </form>
-  );
-}
-
-function AuthField({ label, hint, children }: { label: string; hint?: string; children: (id: string, hintId?: string) => ReactNode }) {
-  const id = useId();
-  const hintId = useId();
-  return (
-    <div>
-      <label htmlFor={id} className="ui-field-label auth-label">{label}</label>
-      {children(id, hint ? hintId : undefined)}
-      {hint ? <p id={hintId} className="auth-hint">{hint}</p> : null}
-    </div>
-  );
-}
-
-function PasswordInput({
-  id,
-  value,
-  onChange,
-  show,
-  onToggle,
-  autoComplete,
-  describedBy,
-}: {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  show: boolean;
-  onToggle: () => void;
-  autoComplete: string;
-  describedBy?: string;
-}) {
-  return (
-    <div className="relative">
-      <input
-        id={id}
-        type={show ? 'text' : 'password'}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={autoComplete}
-        aria-describedby={describedBy}
-        className="ui-field auth-field auth-field-password"
-      />
-      <button
-        type="button"
-        onClick={onToggle}
-        className="ui-icon-btn absolute right-1.5 top-1/2 -translate-y-1/2"
-        aria-label={show ? 'Hide password' : 'Show password'}
-        aria-pressed={show}
-      >
-        {show ? <EyeOff size={15} /> : <Eye size={15} />}
-      </button>
-    </div>
-  );
-}
-
-function AuthMessage({ tone, children }: { tone: 'error' | 'success'; children: ReactNode }) {
-  return (
-    <div className="auth-message" data-tone={tone} role={tone === 'error' ? 'alert' : 'status'}>
-      {tone === 'success' ? <Check size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> : null}
-      <span>{children}</span>
-    </div>
   );
 }

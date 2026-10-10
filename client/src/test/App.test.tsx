@@ -126,7 +126,7 @@ vi.mock('@/components/my-day/LoginPage', () => ({
 }));
 
 vi.mock('@/components/landing/LandingPage', () => ({
-  LandingPage: ({ initialSignInOpen }: { initialSignInOpen?: boolean }) => <div>{initialSignInOpen ? 'Landing page with sign-in open' : 'Landing page'}</div>,
+  LandingPage: ({ initialSignInOpen, joinInvite }: { initialSignInOpen?: boolean; joinInvite?: string | null }) => <div>{joinInvite !== undefined ? `Landing page with invite ${joinInvite ?? 'missing'}` : initialSignInOpen ? 'Landing page with sign-in open' : 'Landing page'}</div>,
 }));
 
 vi.mock('@/components/manager-desk', () => ({
@@ -331,6 +331,14 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('Landing page')).toBeInTheDocument();
     expect(screen.queryByText('Manager login')).not.toBeInTheDocument();
+  });
+
+  it('preserves /join and its invite until account creation', async () => {
+    useAuthMock.mockReturnValue({ user: null, features: { tasksPhase3: false, teamMode: 'solo' }, isLoading: false, isAuthenticated: false, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() });
+    window.history.replaceState(null, '', '/join?invite=fixture-token');
+    render(<App />);
+    expect(await screen.findByText('Landing page with invite fixture-token')).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe('/join?invite=fixture-token');
   });
 
   it('opens the landing page with sign-in up on /login and keeps the URL until someone signs in', async () => {

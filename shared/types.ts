@@ -785,7 +785,8 @@ export interface DashboardConfig {
   backupIntervalMinutes: number;
   backupRetentionDays: number;
   backupMaxScheduledSnapshots: number;
-  backupDirectory: string;
+  /** Server path is returned only to the install owner. */
+  backupDirectory?: string;
   backupOnStartup: boolean;
   backupStartupMaxAgeHours: number;
   backupBeforeReset: boolean;

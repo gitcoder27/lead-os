@@ -1,3 +1,4 @@
+import { taskInstallReadiness } from "../db/task-install-readiness";
 import { and, eq } from "drizzle-orm";
 import { db, rawDb } from "../db/connection";
 import { configTable, dataMigrations } from "../db/schema";
@@ -36,6 +37,8 @@ export class TaskCutoverService {
   async cutover(workspaceId: string, apply = false) {
     return runInTransaction(async () => {
       const scope = normalizeWorkspaceId(workspaceId);
+      const readiness = taskInstallReadiness(scope, "cutover");
+      if (!readiness.ok) throw new HttpError(409, readiness.detail);
       const stage = await this.setting(scope, "tasks_phase2_stage");
       if (["2b", "2c", "2d"].includes(stage ?? "")) return { workspaceId: scope, stage, applied: false, alreadyApplied: true };
       const raw = await this.setting(scope, "tasks_phase2_verified");

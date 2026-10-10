@@ -1,3 +1,4 @@
+import { taskInstallReadiness } from "../db/task-install-readiness";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { and, eq } from "drizzle-orm";
@@ -107,7 +108,7 @@ export class TaskContractService {
   async plan(workspaceId: string, opts: { serverSrcDir?: string } = {}): Promise<ContractPlan> {
     const scope = normalizeWorkspaceId(workspaceId);
     const stage = (await this.setting(scope, "tasks_phase2_stage")) ?? null;
-    const checks: ContractCheck[] = [];
+    const checks: ContractCheck[] = [taskInstallReadiness(scope, "contract")];
 
     checks.push({
       name: "stage",

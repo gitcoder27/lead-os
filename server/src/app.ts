@@ -156,8 +156,8 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
       return;
     }
     res.on("finish", () => {
-      if (res.statusCode < 400) {
-        services.todayService.clearTodayCache();
+      if (res.statusCode < 400 && req.auth?.user.workspaceId) {
+        services.todayService.clearTodayCache(req.auth.user.workspaceId);
       }
     });
     next();

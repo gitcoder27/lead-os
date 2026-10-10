@@ -280,7 +280,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         backupIntervalMinutes,
         backupRetentionDays,
         backupMaxScheduledSnapshots,
-        backupDirectory,
+        ...(canManageInstall(req.auth!.user) ? { backupDirectory } : {}),
         backupOnStartup,
         backupStartupMaxAgeHours,
         backupBeforeReset,
@@ -298,6 +298,10 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
   router.put("/", validate(configSchema), async (req, res, next) => {
     try {
       const workspaceId = req.auth!.user.workspaceId;
+      const backupFields = ["backupEnabled", "backupIntervalMinutes", "backupRetentionDays", "backupMaxScheduledSnapshots", "backupDirectory", "backupOnStartup", "backupStartupMaxAgeHours", "backupBeforeReset"];
+      if (backupFields.some(field => req.body[field] !== undefined) && !canManageInstall(req.auth!.user)) {
+        throw new HttpError(403, "Only the install owner can change backups");
+      }
       const syncIntervalMs = req.body.syncIntervalMs ?? 300000;
       await validateJiraBaseUrl(req.body.jiraBaseUrl);
       const tokenForLookup = req.body.jiraApiToken ?? await getConfiguredJiraToken(workspaceId);
@@ -371,7 +375,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
           void syncEngine.syncNow(workspaceId);
         }
       }
-      if (backupService) {
+      if (backupService && canManageInstall(req.auth!.user)) {
         await backupService.start();
       }
 
@@ -470,7 +474,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       // The schedule is install-wide and read from the default workspace, so only its managers
       // may change it (the same rule as /api/backups); checked before anything is written.
       if (backupChanges.length > 0 && !canManageInstall(req.auth!.user)) {
-        throw new HttpError(403, "Only a manager of the default workspace can change the backup schedule");
+        throw new HttpError(403, "Only the install owner can change backups");
       }
       for (const [field, key] of backupChanges) {
         await upsertConfig(workspaceId, key, String(req.body[field]));

@@ -1,3 +1,4 @@
+import { taskInstallReadiness } from "../db/task-install-readiness";
 import { and, eq } from "drizzle-orm";
 import { db, rawDb } from "../db/connection";
 import { configTable, dataMigrations } from "../db/schema";
@@ -108,7 +109,7 @@ export class TaskLegacyDropService {
     const present = tables.filter((table) => table.exists).length;
     const dependents = this.dependents();
     const unknownDependents = dependents.filter((name) => !(REBUILDABLE_DEPENDENTS as readonly string[]).includes(name));
-    const checks: LegacyDropCheck[] = [];
+    const checks: LegacyDropCheck[] = [taskInstallReadiness(scope, "drop")];
 
     checks.push({
       name: "stage",

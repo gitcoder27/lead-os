@@ -1,3 +1,4 @@
+import { rawDb } from "../src/db/connection";
 import { TaskCutoverService } from "../src/services/task-cutover.service";
 import { DailyNotesService } from "../src/services/daily-notes.service";
 import { MyDayService } from "../src/services/my-day.service";
@@ -537,6 +538,17 @@ describe("Phase 2 backfill", () => {
     expect(oth[0]!.title).toBe("Other task");
     const defEvents = await db.select().from(taskEvents).where(eq(taskEvents.workspaceId, "default"));
     expect(defEvents.every((e) => e.taskId === def[0]!.id)).toBe(true);
+  });
+
+  it("refuses global read-only triggers while another workspace is still at 2a", async () => {
+    rawDb.prepare("INSERT INTO workspaces (id,name,created_at,updated_at) VALUES ('legacy-friend','Friend','2026-01-01','2026-01-01')").run();
+    rawDb.prepare("INSERT INTO config (workspace_id,key,value) VALUES ('legacy-friend','tasks_phase2_stage','2a')").run();
+    const cutover = new TaskCutoverService();
+    const report = await service.plan("default");
+    await service.apply("default", decisionsFrom(report));
+    await cutover.verify("default"); await cutover.verify("default");
+    await expect(cutover.cutover("default")).rejects.toThrow(/other workspace|all workspace/i);
+    await expect(cutover.cutover("default", true)).rejects.toThrow(/other workspace|all workspace/i);
   });
 
   it("requires clean parity, freezes legacy writes, and rolls back canonical writes", async () => {

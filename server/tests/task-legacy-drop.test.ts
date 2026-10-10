@@ -42,6 +42,18 @@ describe("TaskLegacyDropService (§8.2)", () => {
     await resetDatabase();
   });
 
+  it("blocks global archive deletion while another workspace still needs legacy tables", async () => {
+    await markContracted(); archiveLegacyTables();
+    rawDb.prepare("INSERT INTO workspaces (id,name,owner_account_id,created_at,updated_at) VALUES ('legacy-friend','Friend','friend',?,?)").run(DAYS_AGO(40), DAYS_AGO(40));
+    rawDb.prepare("INSERT INTO config (workspace_id,key,value) VALUES ('legacy-friend','tasks_phase2_stage','2a')").run();
+    const createManualBackup = vi.fn(); const service = new TaskLegacyDropService({ createManualBackup });
+    const plan = await service.plan("default");
+    expect(check(plan, "all_workspaces")?.ok).toBe(false);
+    await expect(service.apply("default")).rejects.toThrow(/workspace/i);
+    expect(createManualBackup).not.toHaveBeenCalled();
+    expect(tableExists("legacy_team_tracker_items")).toBe(true);
+  });
+
   it("dry-run reports gates and refuses before stage 2d", async () => {
     const service = new TaskLegacyDropService();
     const plan = await service.plan("default");
@@ -167,6 +179,7 @@ describe("TaskLegacyDropService (§8.2)", () => {
     expect(plan.ok).toBe(false);
     expect(check(plan, "stage")?.ok).toBe(false);
     const other = await new TaskLegacyDropService().plan("workspace_other");
-    expect(other.ok).toBe(true);
+    expect(other.ok).toBe(false);
+    expect(check(other, "all_workspaces")?.ok).toBe(false);
   });
 });

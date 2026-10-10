@@ -418,6 +418,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-05 | main (this commit) | Explicit server-only install authority; active legacy default managers migrated once, new managers unprivileged, trusted CLI --install-admin. Backup list/run/download regressions and public flag stripping pass. Representative scratch-copy hashes unchanged and repeated migration preserves revocation. Real CLI scratch regression included. Seven targeted suites: 141 PASS; typecheck, build:check, touched lint, guard:data and diff check PASS. Production inspection remains operator-owned. |
 
+| 2026-10-10 | SR-06 | main (this commit) | Reproduced eight forbidden backup-field writes, path disclosure, unscoped cache invalidation and global legacy DDL readiness gaps. Backup writes now reject before any mutation; nonowners do not receive the path or restart backups. Real HTTP cache proof preserves A hit while invalidating B only. Contract/drop plans and cutover dry-run/apply require all other workspaces to qualify (canonical starts exempt; relevant soak gates retained). Updated prior single-workspace-only expectation for the install-wide rule. Five targeted suites: 99 PASS; stronger cache suite: 10 PASS; typecheck, build:check, new-module lint, guard:data and diff check PASS. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -443,7 +445,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Files:* `db/schema.ts`, `db/migrate.ts`, `middleware/auth.ts`, `services/auth.service.ts`, `scripts/create-auth-user.ts`, `routes/auth.ts`, tests `backups.routes.test.ts`, `config.routes.test.ts`, `db.migrate.test.ts`, `auth.routes.test.ts`.
   - *Acceptance:* the existing default managers keep backups; a later co-manager does not; the error message no longer says "default workspace".
   - *Rollback:* revert code; the column is harmless if left.
-- [ ] **SR-06 Install-config hygiene (F-06, F-08, F-11).**
+- [x] **SR-06 Install-config hygiene (F-06, F-08, F-11).**
   - *Scope:* backup fields → 403 in `PUT /api/config`; path hidden; Today cache cleared per workspace; legacy contract/drop and cutover refuse unless every workspace qualifies.
   - *Files:* `routes/config.ts`, `app.ts`, `services/today.service.ts`, `services/task-contract.service.ts`, `services/task-legacy-drop.service.ts`, `services/task-cutover.service.ts`, related tests.
   - *Rollback:* revert.

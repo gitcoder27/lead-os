@@ -94,6 +94,16 @@ async function seedStage2c(soakDays = 15) {
 }
 
 describe("Phase 2d contract gates", () => {
+  it("blocks global contract while another workspace still uses legacy tables", async () => {
+    await seedCanonical(); await seedStage2c();
+    rawDb.prepare("INSERT INTO workspaces (id,name,owner_account_id,created_at,updated_at) VALUES ('legacy-friend','Friend','friend',?,?)").run(DAYS_AGO(40), DAYS_AGO(40));
+    rawDb.prepare("INSERT INTO config (workspace_id,key,value) VALUES ('legacy-friend','tasks_phase2_stage','2a')").run();
+    const plan = await contract.plan("default");
+    expect(plan.checks.find(c => c.name === "all_workspaces")?.ok).toBe(false);
+    await expect(contract.apply("default")).rejects.toThrow(/workspace/i);
+    expect(tableExists("team_tracker_items")).toBe(true);
+  });
+
   it("plan refuses when the workspace is not at stage 2c", async () => {
     await seedCanonical();
     const plan = await contract.plan("default");

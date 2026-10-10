@@ -420,6 +420,12 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-06 | main (this commit) | Reproduced eight forbidden backup-field writes, path disclosure, unscoped cache invalidation and global legacy DDL readiness gaps. Backup writes now reject before any mutation; nonowners do not receive the path or restart backups. Real HTTP cache proof preserves A hit while invalidating B only. Contract/drop plans and cutover dry-run/apply require all other workspaces to qualify (canonical starts exempt; relevant soak gates retained). Updated prior single-workspace-only expectation for the install-wide rule. Five targeted suites: 99 PASS; stronger cache suite: 10 PASS; typecheck, build:check, new-module lint, guard:data and diff check PASS. |
 
+### Additional code verification finding
+
+- **F-17 · blocker · bootstrap race (SR-07):** route authorization checked the account count before asynchronous hashing. Two anonymous first-account requests could both pass that check. Account creation now rechecks a server-only bootstrap condition inside the synchronous transaction; a concurrent regression permits exactly one account. This preserves the reviewed first-account model.
+
+| 2026-10-10 | SR-07 | main (this commit) | Three red tests proved duplicate errors, orphan workspace/config on user-insert failure and bootstrap count disclosure. Hashing precedes synchronous Drizzle/SQLite transactions; workspace creation and insert roll back together, duplicate maps to 409, missing login performs one dummy scrypt comparison, and bootstrap hides installed counts. F-17 concurrent bootstrap now permits exactly one first account. Targeted auth/tenant/CLI suites: 50 PASS; extra timing/race suites: 6 PASS. Phase 0 gates: lint PASS (existing warnings), guard:data PASS, typecheck PASS, build:check PASS, full test PASS (1601 server / 2085 client); format:check FAIL only on pre-existing unrelated .claude/settings.local.json, preserved. Supplemental client contract typecheck PASS. No UI changes, runtime data, real Jira, push or deployment. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -449,7 +455,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Scope:* backup fields → 403 in `PUT /api/config`; path hidden; Today cache cleared per workspace; legacy contract/drop and cutover refuse unless every workspace qualifies.
   - *Files:* `routes/config.ts`, `app.ts`, `services/today.service.ts`, `services/task-contract.service.ts`, `services/task-legacy-drop.service.ts`, `services/task-cutover.service.ts`, related tests.
   - *Rollback:* revert.
-- [ ] **SR-07 Atomic account creation and honest errors (F-05, F-09, F-10).**
+- [x] **SR-07 Atomic account creation and honest errors (F-05, F-09, F-10).**
   - *Files:* `services/auth.service.ts`, `services/workspace.service.ts`, `routes/auth.ts`, `client` bootstrap hook (check it only reads `bootstrapOpen`), tests `auth.routes.test.ts`, the orphan case.
   - *Acceptance:* duplicate → 409 and no orphan; bootstrap response without `userCount` after first run.
   - *Rollback:* revert.

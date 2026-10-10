@@ -2,7 +2,7 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { and, eq, inArray } from "drizzle-orm";
 import type { AuthUser as PublicAuthUser, UserRole } from "shared/types";
-import { db } from "../db/connection";
+import { db, rawDb } from "../db/connection";
 import { runInTransaction } from "../db/transaction";
 import { appSessions, appUsers, developers } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
@@ -27,6 +27,8 @@ const DEFAULT_SESSION_COOKIE_NAME = "dcc_session";
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME?.trim() || DEFAULT_SESSION_COOKIE_NAME;
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const scryptAsync = promisify(scrypt);
+// A fixed valid-format hash ensures missing accounts do the same expensive comparison.
+const DUMMY_PASSWORD_HASH = `scrypt$0f4da4388193f8348e0175bd3fdbfdb6$${"00".repeat(64)}`;
 
 interface CreateUserParams {
   username: string;
@@ -37,6 +39,7 @@ interface CreateUserParams {
   developerAccountId?: string;
   isActive?: boolean;
   isInstallAdmin?: boolean;
+  bootstrapOnly?: boolean;
 }
 
 interface PersistedUser {
@@ -61,7 +64,7 @@ function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
 }
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
   const hash = (await scryptAsync(password, salt, 64) as Buffer).toString("hex");
   return `scrypt$${salt}$${hash}`;
@@ -143,12 +146,20 @@ export class AuthService {
     }
 
     if (params.isInstallAdmin && params.role !== "manager") throw new HttpError(400, "Install authority requires a manager account");
-    const userCount = await this.getUserCount();
+    const passwordHash = await hashPassword(params.password);
+    return rawDb.transaction(() => this.createUserWithHash(params, passwordHash))();
+  }
+
+  /** Synchronous DB work only. Registration composes this inside its invite transaction. */
+  createUserWithHash(params: CreateUserParams, passwordHash: string): AuthUser {
+    const username = normalizeUsername(params.username);
+    const userCount = db.select({ id: appUsers.id }).from(appUsers).all().length;
+    if (params.bootstrapOnly && userCount > 0) throw new HttpError(403, "Account setup is already complete");
     if (userCount === 0 && params.role !== "manager") {
       throw new HttpError(403, "The first account must be a manager");
     }
 
-    const workspaceId = await this.resolveWorkspaceIdForNewUser({
+    const workspaceId = this.resolveWorkspaceIdForNewUser({
       explicitWorkspaceId: params.workspaceId,
       userCount,
       role: params.role,
@@ -160,7 +171,7 @@ export class AuthService {
       throw new HttpError(400, "developerAccountId is required for developer users");
     }
     if (params.role === "developer" && params.developerAccountId) {
-      const developerRows = await db
+      const developerRows = db
         .select({ accountId: developers.accountId })
         .from(developers)
         .where(
@@ -170,7 +181,7 @@ export class AuthService {
             eq(developers.isActive, 1)
           )
         )
-        .limit(1);
+        .limit(1).all();
 
       if (!developerRows[0]) {
         throw new HttpError(400, "developerAccountId must match an active team member");
@@ -178,21 +189,26 @@ export class AuthService {
     }
 
     const now = nowIso();
-    const inserted = await db
+    let inserted;
+    try { inserted = db
       .insert(appUsers)
       .values({
         workspaceId,
-        isInstallAdmin: params.role === "manager" && (userCount === 0 || params.isInstallAdmin === true) ? 1 : 0,
+        isInstallAdmin: params.role === "manager" && ((userCount === 0 && workspaceId === DEFAULT_WORKSPACE_ID) || params.isInstallAdmin === true) ? 1 : 0,
         username,
         displayName: params.displayName.trim(),
-        passwordHash: await hashPassword(params.password),
+        passwordHash,
         role: params.role,
         developerAccountId: params.developerAccountId ?? null,
         isActive: params.isActive === false ? 0 : 1,
         createdAt: now,
         updatedAt: now,
       })
-      .returning();
+      .returning().all();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("UNIQUE constraint failed: app_users.username")) throw new HttpError(409, "That username is taken.");
+      throw error;
+    }
 
     const row = inserted[0];
     if (!row) {
@@ -219,7 +235,8 @@ export class AuthService {
       .limit(1);
 
     const row = rows[0];
-    if (!row || !(await verifyPassword(password, row.passwordHash))) {
+    const validPassword = await verifyPassword(password, row?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    if (!row || !validPassword) {
       throw new HttpError(401, "Invalid username or password");
     }
     // Same generic error: don't reveal that the account exists but was removed.
@@ -506,13 +523,13 @@ export class AuthService {
     await db.delete(appUsers).where(eq(appUsers.id, row.id));
   }
 
-  private async resolveWorkspaceIdForNewUser(params: {
+  private resolveWorkspaceIdForNewUser(params: {
     explicitWorkspaceId?: string;
     userCount: number;
     role: UserRole;
     username: string;
     displayName: string;
-  }): Promise<string> {
+  }): string {
     if (params.explicitWorkspaceId) {
       return this.workspaceService.assertWorkspaceExists(params.explicitWorkspaceId);
     }

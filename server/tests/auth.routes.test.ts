@@ -57,7 +57,7 @@ describe("auth routes", () => {
     });
 
     expect(after.status).toBe(200);
-    expect(after.body).toEqual({ bootstrapOpen: false, userCount: 1 });
+    expect(after.body).toEqual({ bootstrapOpen: false });
   });
 
   it("POST /api/auth/login creates a session and returns the authenticated user", async () => {

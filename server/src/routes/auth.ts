@@ -136,7 +136,7 @@ export function createAuthRouter(authService: AuthService): Router {
       const userCount = await authService.getUserCount();
       const response: AuthBootstrapResponse = {
         bootstrapOpen: userCount === 0,
-        userCount,
+        ...(userCount === 0 ? { userCount: 0 } : {}),
       };
       res.json(response);
     } catch (error) {
@@ -192,6 +192,7 @@ export function createAuthRouter(authService: AuthService): Router {
 
       const { username, password, displayName, role, developerAccountId } = req.body;
       const user = await authService.createUser({
+        bootstrapOnly: isBootstrap,
         username,
         password,
         displayName,

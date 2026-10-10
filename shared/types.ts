@@ -1011,7 +1011,7 @@ export interface AuthSessionResponse {
 
 export interface AuthBootstrapResponse {
   bootstrapOpen: boolean;
-  userCount: number;
+  userCount?: number;
 }
 
 // ── Team Tracker types ──────────────────────────────────

@@ -144,5 +144,5 @@ export async function seedTenants() {
   const before = snapshot();
   rawDb.prepare("INSERT INTO config (workspace_id,key,value) VALUES (?,'one_on_one_enabled','true') ON CONFLICT DO NOTHING").run(friend.workspaceId);
   const probes = foreignTenantProbes(seed, day);
-  return { app, authService, settings, tracker, search, friend, friendCookie, ownerCookie, seed, day, O, F, before, snapshot, probes };
+  return { app, authService, settings, tracker, search, syncStub, friend, friendCookie, ownerCookie, seed, day, O, F, before, snapshot, probes };
 }

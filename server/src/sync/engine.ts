@@ -7,7 +7,7 @@ import { JiraIssue } from "../jira/types";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SettingsService } from "../services/settings.service";
-import { INSTALL_WORKSPACE_ID, normalizeWorkspaceId } from "../services/workspace.service";
+import { normalizeWorkspaceId } from "../services/workspace.service";
 import type { JiraSyncScopeMode } from "shared/types";
 
 export interface SyncResult {
@@ -31,15 +31,10 @@ export class SyncEngine {
   constructor(private readonly settings = new SettingsService()) {}
 
   async start(): Promise<void> {
-    this.stop();
-    if (!(await this.isAutoSyncEnabled(INSTALL_WORKSPACE_ID))) {
-      logger.info("Jira auto-sync is disabled; sync scheduler not started");
-      return;
-    }
-    const syncIntervalMs = await this.getSchedulerIntervalMs();
+    if (this.task) return;
     this.task = setInterval(() => {
-      void this.syncAllWorkspaces();
-    }, syncIntervalMs);
+      void this.syncAllWorkspaces().catch((error: unknown) => logger.error({ err: error }, "Scheduled sync failed"));
+    }, 60_000);
   }
 
   stop(): void {
@@ -69,6 +64,10 @@ export class SyncEngine {
       if (!(await this.isAutoSyncEnabled(workspaceId))) {
         continue;
       }
+      const interval = await this.settings.getSyncIntervalMs(workspaceId);
+      const lastRun = await this.getLastSyncLog(workspaceId);
+      const startedAt = lastRun ? Date.parse(lastRun.startedAt) : Number.NaN;
+      if (Number.isFinite(startedAt) && Date.now() - startedAt < interval) continue;
       results.push(await this.syncNow(workspaceId));
     }
 
@@ -235,16 +234,6 @@ export class SyncEngine {
     } finally {
       this.syncingWorkspaces.delete(normalizedWorkspaceId);
     }
-  }
-
-  private async getSchedulerIntervalMs(): Promise<number> {
-    const workspaceIds = await this.getSyncableWorkspaceIds();
-    if (workspaceIds.length === 0) {
-      return this.settings.getSyncIntervalMs(INSTALL_WORKSPACE_ID);
-    }
-
-    const intervals = await Promise.all(workspaceIds.map((workspaceId) => this.settings.getSyncIntervalMs(workspaceId)));
-    return Math.min(...intervals.filter((interval) => Number.isFinite(interval) && interval > 0));
   }
 
   private isNonRetryableJiraConfigurationError(message: string): boolean {

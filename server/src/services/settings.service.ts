@@ -19,6 +19,8 @@ import {
 } from "shared/types";
 import { isValidTimeZone, parseClockTime, serverTimeZone } from "./today-clock";
 
+export const MIN_SYNC_INTERVAL_MS = 300_000;
+export const MAX_SYNC_INTERVAL_MS = 86_400_000;
 export const DEFAULT_SYNC_INTERVAL_MS = 300_000;
 export const DEFAULT_JIRA_AUTO_SYNC_ENABLED = true;
 /** docs/56 P1-02: the no-current-work signal is opt-in in solo mode. */
@@ -190,7 +192,8 @@ export class SettingsService {
   }
 
   async getSyncIntervalMs(workspaceId?: string): Promise<number> {
-    return this.getPositiveIntegerConfig("sync_interval_ms", DEFAULT_SYNC_INTERVAL_MS, workspaceId);
+    const stored = await this.getPositiveIntegerConfig("sync_interval_ms", DEFAULT_SYNC_INTERVAL_MS, workspaceId);
+    return Math.min(MAX_SYNC_INTERVAL_MS, Math.max(MIN_SYNC_INTERVAL_MS, stored));
   }
 
   async getJiraAutoSyncEnabled(workspaceId?: string): Promise<boolean> {

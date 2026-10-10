@@ -33,7 +33,7 @@ describe("SyncEngine", () => {
     expect(await new SyncEngine().getLastSuccessfulSyncLog()).toBeUndefined();
   });
 
-  it("schedules syncs using the persisted interval", async () => {
+  it("checks workspace schedules on a fixed 60-second tick", async () => {
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 120_000),
       getJiraAutoSyncEnabled: vi.fn(async () => true),
@@ -46,7 +46,7 @@ describe("SyncEngine", () => {
     const syncSpy = vi.spyOn(engine, "syncAllWorkspaces").mockResolvedValue([]);
 
     await engine.start();
-    await vi.advanceTimersByTimeAsync(119_999);
+    await vi.advanceTimersByTimeAsync(59_999);
     expect(syncSpy).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1);
@@ -55,7 +55,7 @@ describe("SyncEngine", () => {
     engine.stop();
   });
 
-  it("does not schedule syncs when auto-sync is disabled", async () => {
+  it("keeps the scheduler running independently of the install owner auto-sync setting", async () => {
     const settings = {
       getSyncIntervalMs: vi.fn(async () => 120_000),
       getJiraAutoSyncEnabled: vi.fn(async () => false),
@@ -70,13 +70,14 @@ describe("SyncEngine", () => {
     await engine.start();
     await vi.advanceTimersByTimeAsync(600_000);
 
-    expect(syncSpy).not.toHaveBeenCalled();
+    expect(syncSpy).toHaveBeenCalledTimes(10);
 
     engine.stop();
   });
 
   it("skips auto-sync for workspaces that disabled it while still syncing the rest", async () => {
     const engine = new SyncEngine({
+      getSyncIntervalMs: vi.fn(async () => 300_000),
       getJiraAutoSyncEnabled: vi.fn(async (workspaceId?: string) => workspaceId !== "workspace-b"),
     } as any);
     const syncableSpy = vi.spyOn(engine, "getSyncableWorkspaceIds").mockResolvedValue(["workspace-a", "workspace-b"]);

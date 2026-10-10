@@ -142,8 +142,8 @@ async function bootstrap(): Promise<void> {
   const syncableWorkspaceIds = await syncEngine.getSyncableWorkspaceIds();
   if (syncableWorkspaceIds.length > 0) {
     void syncEngine.syncAllWorkspaces();
-    await syncEngine.start();
   }
+  await syncEngine.start();
 }
 
 void bootstrap();

@@ -13,7 +13,7 @@ import { BackupService } from "../services/backup.service";
 import { AssistantConfigService } from "../services/assistant-config.service";
 import { OpenAiCompatibleClient } from "../assistant/llm-client";
 import { getPersistedJiraApiToken, storeJiraApiToken } from "../services/jira-credentials.service";
-import { defaultAttentionRules, normalizeJiraSyncScopeMode, SettingsService } from "../services/settings.service";
+import { defaultAttentionRules, normalizeJiraSyncScopeMode, MIN_SYNC_INTERVAL_MS, MAX_SYNC_INTERVAL_MS, SettingsService } from "../services/settings.service";
 import { isValidTimeZone } from "../services/today-clock";
 import { WorkspaceMaintenanceService } from "../services/workspace-maintenance.service";
 import { SyncEngine } from "../sync/engine";
@@ -40,7 +40,7 @@ const configSchema = z.object({
     jiraProjectKey: z.string().min(1),
     managerJiraAccountId: z.string().trim().optional(),
     jiraApiToken: z.string().trim().min(1).optional(),
-    syncIntervalMs: z.number().int().positive().default(300000),
+    syncIntervalMs: z.number().int().min(MIN_SYNC_INTERVAL_MS).max(MAX_SYNC_INTERVAL_MS).default(300000),
     staleThresholdHours: z.number().int().min(ATTENTION_RULE_LIMITS.jiraStaleHours.min).max(ATTENTION_RULE_LIMITS.jiraStaleHours.max).optional(),
     jiraAutoSyncEnabled: z.boolean().optional(),
     backupEnabled: z.boolean().optional(),
@@ -256,7 +256,7 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const jiraProjectKey = (await getConfigValue(workspaceId, "jira_project_key")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_PROJECT_KEY) ?? "";
       const managerJiraAccountId = await getStoredManagerJiraAccountId(workspaceId);
       const jiraApiToken = await getConfiguredJiraToken(workspaceId);
-      const syncIntervalMs = Number((await getConfigValue(workspaceId, "sync_interval_ms")) ?? "300000");
+      const syncIntervalMs = await settings.getSyncIntervalMs(workspaceId);
       // docs/56 P1-05: legacy field; the value lives in the Attention rules.
       const staleThresholdHours = (await settings.getAttentionRules(workspaceId)).jiraStaleHours;
       const jiraAutoSyncEnabled = await settings.getJiraAutoSyncEnabled(workspaceId);
@@ -383,7 +383,6 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       const token = req.body.jiraApiToken ?? tokenForLookup;
       const hasJiraConnection = Boolean(req.body.jiraBaseUrl && req.body.jiraEmail && req.body.jiraProjectKey && token);
       if (syncEngine && (hasJiraConnection || req.body.jiraAutoSyncEnabled !== undefined)) {
-        await syncEngine.start();
         if (hasJiraConnection && (await settings.getJiraAutoSyncEnabled(workspaceId))) {
           void syncEngine.syncNow(workspaceId);
         }
@@ -478,7 +477,6 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
     try {
       const workspaceId = req.auth!.user.workspaceId;
       let shouldResync = false;
-      let shouldRestartScheduler = false;
       const backupFields = [
         ["backupEnabled", "backup_enabled"],
         ["backupIntervalMinutes", "backup_interval_minutes"],
@@ -544,13 +542,11 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       }
       if (req.body.jiraAutoSyncEnabled !== undefined) {
         await upsertConfig(workspaceId, "jira_auto_sync_enabled", String(req.body.jiraAutoSyncEnabled));
-        shouldRestartScheduler = true;
       }
       if (backupService && backupChanges.length > 0) {
         await backupService.start();
       }
-      if (syncEngine && (shouldResync || shouldRestartScheduler)) {
-        await syncEngine.start();
+      if (syncEngine && shouldResync) {
         if (shouldResync && (await settings.getJiraAutoSyncEnabled(workspaceId))) {
           const [baseUrl, email, project, token] = await Promise.all([
             settings.getJiraBaseUrl(workspaceId),

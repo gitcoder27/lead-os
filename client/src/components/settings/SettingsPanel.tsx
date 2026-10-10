@@ -38,6 +38,7 @@ import { describeSyncError } from '@/lib/sync-error';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
 import { Avatar } from '@/components/ui/Avatar';
+import { useSignOut } from '@/hooks/useSignOut';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { useDevelopers } from '@/hooks/useDevelopers';
 import {
@@ -114,7 +115,7 @@ interface SettingsPageProps {
 export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const DISCOVER_PAGE_SIZE = 50;
   const DISCOVER_SEARCH_DEBOUNCE_MS = 350;
-  const { user, logout, features } = useAuth();
+  const { user, features } = useAuth();
   const tasksPhase3 = useTasksPhase3();
   // docs/56 P6-01 review: backups are install-wide; the server exposes the explicit install-owner capability.
   const canManageBackups = features?.backups ?? false;
@@ -197,7 +198,6 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const [confirmDeleteUsername, setConfirmDeleteUsername] = useState<string | null>(null);
   const [deletingUsername, setDeletingUsername] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>(
     () => {
       const section = sectionFromLocation();
@@ -491,22 +491,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     }
   };
 
-  const handleManagerLogout = useCallback(async () => {
-    setLoggingOut(true);
-    try {
-      await logout();
-      queryClient.clear();
-      window.history.replaceState(null, '', '/');
-      window.location.reload();
-    } catch (err) {
-      setLoggingOut(false);
-      addToast({
-        type: 'error',
-        title: 'Failed to log out',
-        message: err instanceof Error ? err.message : 'Request failed',
-      });
-    }
-  }, [addToast, logout, queryClient]);
+  const { signOut, pending: loggingOut } = useSignOut();
+  const handleManagerLogout = signOut;
 
   const filteredFields = fields.filter(
     (field) =>
@@ -1089,9 +1075,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <h2 className="text-body font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                <h1 className="text-body font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
                   {SECTION_LABELS[activeSection].title}
-                </h2>
+                </h1>
                 <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
                   {SECTION_LABELS[activeSection].description}
                 </p>
@@ -2278,9 +2264,9 @@ export const SettingsPanel = SettingsPage;
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
+    <h2 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
       {children}
-    </h3>
+    </h2>
   );
 }
 

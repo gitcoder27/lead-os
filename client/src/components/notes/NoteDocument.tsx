@@ -229,10 +229,11 @@ export function NoteDocument({
         <header className="notes-doc-toolbar">
           <div className="min-w-0 flex-1">
             {mobile ? (
-              <p className="notes-doc-mobile-label">
+              // docs/73 UXD-06: on phones the sidebar (and its "Notes" heading) is hidden, so this label is the page's <h1>.
+              <h1 className="notes-doc-mobile-label">
                 <Lock size={10} aria-hidden="true" />
                 {kind === 'standup' ? 'Standup · Only you' : 'Notes · Only you'}
-              </p>
+              </h1>
             ) : null}
             <div className="flex min-w-0 items-center gap-2">
               {onOpenHistory ? (

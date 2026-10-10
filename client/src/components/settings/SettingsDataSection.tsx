@@ -81,7 +81,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               <Database size={16} aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Backups</h3>
+              <h2 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Backups</h2>
               <p className="mt-0.5 text-ui leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 Snapshots of the whole LeadOS database, taken on a schedule and before resets.
                 {latest ? ` Last backup ${formatRelativeTime(latest.createdAt)}.` : ' No backup yet.'}
@@ -167,7 +167,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
       </div>
 
       <div>
-        <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Snapshots</h3>
+        <h2 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Snapshots</h2>
         {backups.isLoading ? (
           <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>Loading backups…</p>
         ) : backups.isError ? (
@@ -205,7 +205,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
       <div className="rounded-xl px-4 py-3.5" style={cardStyle}>
         <div className="flex items-center gap-2">
           <Terminal size={13} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
-          <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Restoring a backup</h3>
+          <h2 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Restoring a backup</h2>
         </div>
         <p className="mt-1.5 text-ui leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Restore is not available in the app, because it replaces the live database. Stop the server and run this on the machine that hosts LeadOS:

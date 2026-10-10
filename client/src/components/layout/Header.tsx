@@ -1,8 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Moon, Sun, PanelLeftOpen, Search, Settings, Plus, Keyboard } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { CopilotMark } from '@/components/brand/CopilotMark';
-import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { useAssistant } from '@/context/AssistantContext';
@@ -13,20 +12,20 @@ import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { Kbd } from '@/components/ui/Kbd';
+import { HeaderUserMenu } from '@/components/layout/HeaderUserMenu';
+import { interceptWorkspaceLink } from '@/components/layout/WorkspaceNavLink';
 import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 
 interface HeaderProps {
-  onOpenMobileSidebar?: () => void;
   activeView?: ActiveAppView;
   onViewChange?: (view: AppView) => void;
   onOpenActionTarget?: (target: ManagerActionTarget) => void;
   captureContext?: GlobalCaptureContext;
 }
 
-export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenActionTarget, captureContext }: HeaderProps) {
-  const { theme, toggleTheme } = useTheme();
+export function Header({ activeView, onViewChange, onOpenActionTarget, captureContext }: HeaderProps) {
   const { user, features } = useAuth();
-  const { openCapture, openCommandPalette, openKeyboardShortcuts, keyboardShortcutsOpen } = useQuickActions();
+  const { openCapture, openCommandPalette } = useQuickActions();
   const { isOpen: assistantOpen, toggle: toggleAssistant } = useAssistant();
   const headerRef = useRef<HTMLElement | null>(null);
   const canQuickCapture = user?.role === 'manager';
@@ -76,6 +75,8 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
 
   return (
     <>
+      {/* docs/73 UXD-06: the first stop on every page skips the header to the page's <main>. */}
+      <a href="#main" className="skip-link">Skip to content</a>
       <motion.header
         ref={headerRef}
         initial={{ opacity: 0, y: -8 }}
@@ -84,34 +85,24 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
         className="relative z-header shrink-0 px-1 pt-0.5 md:px-1.5"
       >
         <div
-          className="header-panel dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between"
+          className="header-panel dashboard-panel rounded-[14px] px-2 py-1.5 md:px-2.5 flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between"
           style={{ borderColor: 'var(--border-strong)' }}
         >
-          <div className="header-identity-nav flex min-w-0 flex-col gap-1.5 lg:flex-row lg:items-center lg:gap-3">
-            <div className="header-brand flex min-w-0 items-center gap-2 md:gap-2.5">
-              {onOpenMobileSidebar && (
-                <button
-                  onClick={onOpenMobileSidebar}
-                  className="h-8 w-8 rounded-xl transition-colors duration-150 flex items-center justify-center lg:hidden"
-                  style={{ background: 'var(--bg-tertiary)' }}
-                  title="Open sidebar"
-                  aria-label="Open sidebar"
-                >
-                  <PanelLeftOpen size={16} style={{ color: 'var(--text-secondary)' }} />
-                </button>
-              )}
-              <div className="h-8 w-8 md:h-11 md:w-11 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
+          <div className="header-identity-nav flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-2 lg:gap-3">
+            {/* The wordmark is a way home, not the page's heading: each page owns its one <h1>. */}
+            <a
+              href="/"
+              className="header-brand header-wordmark flex min-w-0 items-center gap-2 rounded-xl md:gap-2.5"
+              aria-label="LeadOS, go to Today"
+              onClick={(event) => { if (onViewChange) interceptWorkspaceLink(event, () => onViewChange('today')); }}
+            >
+              <span className="h-8 w-8 md:h-11 md:w-11 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
                 <LeadOSMark size={32} />
-              </div>
-              <div className="min-w-0">
-                <h1
-                  className="font-sans text-title-sm font-semibold leading-tight truncate"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  LeadOS
-                </h1>
-              </div>
-            </div>
+              </span>
+              <span className="font-sans text-title-sm font-semibold leading-tight truncate md:hidden lg:inline" style={{ color: 'var(--text-primary)' }}>
+                LeadOS
+              </span>
+            </a>
             {onViewChange && (
               <div className="header-navigation min-w-0 overflow-visible">
                 <HeaderNav activeView={activeView} isManager={user?.role === 'manager'} onViewChange={onViewChange} />
@@ -119,20 +110,20 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
             )}
           </div>
 
-          <div className="header-actions flex min-w-0 items-center justify-between gap-2 lg:flex-1 lg:gap-3">
-            {/* One search field in the middle; below md it collapses to an icon. */}
+          <div className="header-actions flex min-w-0 items-center justify-between gap-2 md:justify-end lg:flex-1 lg:justify-between lg:gap-3">
+            {/* One search field in the middle; below lg it collapses to an icon. */}
             {canQuickCapture && (
-              <div className="flex md:flex-1 md:justify-center">
+              <div className="flex lg:flex-1 lg:justify-center">
                 <button
                   type="button"
                   onClick={() => openCommandPalette()}
-                  className="header-search inline-flex h-8 w-8 items-center justify-center gap-2 rounded-xl text-ui md:w-full md:max-w-[420px] md:justify-start md:px-3"
+                  className="header-search header-icon-btn lg:w-full lg:max-w-[420px] lg:justify-start lg:gap-2 lg:px-3 text-ui"
                   title={`Search and jump anywhere (${formatShortcutKeys('⌘K')})`}
                   aria-label="Open command palette"
                 >
                   <Search size={14} className="shrink-0" />
-                  <span className="hidden md:inline">Search or jump to…</span>
-                  <Kbd variant="bare" className="ml-auto hidden md:inline">⌘K</Kbd>
+                  <span className="hidden lg:inline">Search or jump to…</span>
+                  <Kbd variant="bare" className="ml-auto hidden lg:inline">⌘K</Kbd>
                 </button>
               </div>
             )}
@@ -159,36 +150,6 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
               )}
 
               {canQuickCapture && (
-                <button type="button" className="header-ghost header-icon-btn" data-global-shortcuts-anchor=""
-                  aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-expanded={Boolean(keyboardShortcutsOpen)}
-                  onClick={(event) => openKeyboardShortcuts?.(event.currentTarget)}>
-                  <Keyboard size={16} />
-                </button>
-              )}
-
-              <button
-                onClick={toggleTheme}
-                className="header-ghost header-icon-btn"
-                title="Toggle theme"
-                aria-label="Toggle theme"
-              >
-                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-
-              {user?.role === 'manager' && onViewChange && (
-                <button
-                  onClick={() => onViewChange('settings')}
-                  className="header-ghost header-icon-btn"
-                  style={activeView === 'settings' ? { color: 'var(--accent-text)', background: 'var(--accent-glow)' } : undefined}
-                  title="Settings"
-                  aria-label="Open settings"
-                  aria-current={activeView === 'settings' ? 'page' : undefined}
-                >
-                  <Settings size={16} />
-                </button>
-              )}
-
-              {canQuickCapture && (
                 <button
                   type="button"
                   onClick={() =>
@@ -197,14 +158,22 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                       defaultTarget: captureContext?.defaultTarget ?? defaultCaptureTarget,
                     })
                   }
-                  className="header-primary-btn ml-1 inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-ui font-semibold"
+                  className="header-capture-hit ml-1"
                   title={`Quick capture (${formatShortcutKeys('⌘I')})`}
                   aria-label="Capture"
                 >
-                  <Plus size={14} strokeWidth={2.5} />
-                  <span className="hidden sm:inline">Capture</span>
+                  {/* The fill stays 32px; on phones the button around it is the 44px target. */}
+                  <span className="header-primary-btn inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-xl px-2 text-ui font-semibold lg:px-3">
+                    <Plus size={14} strokeWidth={2.5} />
+                    <span className="hidden lg:inline">Capture</span>
+                  </span>
                 </button>
               )}
+
+              <HeaderUserMenu
+                onOpenSettings={user?.role === 'manager' && onViewChange ? () => onViewChange('settings') : undefined}
+                settingsActive={activeView === 'settings'}
+              />
             </div>
           </div>
         </div>

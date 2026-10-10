@@ -128,7 +128,7 @@ export function NotesPage({ date, kind, onDateChange, onKindChange, onOpenTarget
   const showSidebar = !isNarrow || historyOpen;
 
   return (
-    <main className="notes-page" aria-label="Notes workspace">
+    <div className="notes-page">
       {showSidebar ? (
         <NotesSidebar
           selectedDate={date}
@@ -154,6 +154,6 @@ export function NotesPage({ date, kind, onDateChange, onKindChange, onOpenTarget
         onOpenHistory={isNarrow ? () => setHistoryOpen(true) : undefined}
         jumpTerms={jump?.date === date ? jump.terms : undefined}
       />
-    </main>
+    </div>
   );
 }

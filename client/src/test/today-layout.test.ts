@@ -1,3 +1,4 @@
+import { deriveTodayQueue } from '@/lib/today-queue';
 import { describe, expect, it } from 'vitest';
 import {
   defaultFollowUpTitle,
@@ -225,6 +226,25 @@ describe('since-last-visit strip', () => {
     expect(formatSince(new Date(2026, 2, 8, 7, 5).toISOString(), now)).toBe('07:05');
     expect(formatSince(new Date(2026, 2, 7, 18, 40).toISOString(), now)).toBe('yesterday 18:40');
     expect(formatSince(new Date(2026, 2, 5, 18, 40).toISOString(), now)).toBe('Thu 18:40');
+  });
+});
+
+describe('deriveTodayQueue (docs/73 UXD-06)', () => {
+  it('gives the nav badge the same total as the Queue header: panel-owned rows are not counted', () => {
+    const items = [
+      row('f1'),
+      row('s', { type: 'standup', target: { type: 'view', view: 'team', mode: 'standup' } }),
+      row('o', { type: 'one_on_one', target: dev('x') }),
+      row('i', { type: 'overdue_issue', target: { type: 'issue', view: 'work', issueKey: 'AM-1' } }),
+    ];
+    const snapshot = { actionItems: items, overflowActionItems: [], totalCount: 4 } as unknown as TodayResponse;
+    const page = deriveTodayQueue(snapshot, { expanded: false, visibleLimit: 12 });
+    const badge = deriveTodayQueue(snapshot, { expanded: false, visibleLimit: 0 });
+    expect(page.queueView.totalCount).toBe(2);
+    expect(badge.queueView.totalCount).toBe(page.queueView.totalCount);
+    // Rows the server counted past its cap still count, on both.
+    const capped = { ...snapshot, totalCount: 30 } as TodayResponse;
+    expect(deriveTodayQueue(capped, { expanded: false, visibleLimit: 0 }).queueView.totalCount).toBe(28);
   });
 });
 

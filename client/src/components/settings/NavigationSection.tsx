@@ -312,8 +312,8 @@ function RowButton({ label, disabled, onClick, children }: { label: string; disa
 
 function SettingsGroupLabel({ children }: { children: ReactNode }) {
   return (
-    <h3 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
+    <h2 className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
       {children}
-    </h3>
+    </h2>
   );
 }

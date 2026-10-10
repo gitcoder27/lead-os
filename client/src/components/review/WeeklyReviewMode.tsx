@@ -87,7 +87,7 @@ export function WeeklyReviewMode({ week, initialStep, onWeekChange, onExit, onOp
           left={new Set()}
           onSelect={() => {}}
         />
-        <main className="review-main">
+        <div className="review-main">
           <div className="review-step-pane">
             {query.isError ? (
               <EmptyState
@@ -105,7 +105,7 @@ export function WeeklyReviewMode({ week, initialStep, onWeekChange, onExit, onOp
               <ReviewSkeleton />
             )}
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );
@@ -293,7 +293,7 @@ function ReviewSession({
       />
       <div className="review-frame">
         <ReviewStepsRail steps={railSteps} currentIndex={index} left={left} onSelect={goTo} />
-        <main className="review-main" aria-labelledby="review-step-heading">
+        <section className="review-main" aria-labelledby="review-step-heading">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={step.id}
@@ -328,7 +328,7 @@ function ReviewSession({
               </div>
             </footer>
           ) : null}
-        </main>
+        </section>
       </div>
       {sheet?.kind === 'keys' ? <ShortcutSheet anchor={sheet.anchor} groups={sheetGroups} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === 'steps' ? (

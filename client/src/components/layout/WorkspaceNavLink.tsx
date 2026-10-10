@@ -30,12 +30,13 @@ export function WorkspaceNavLink({ label, icon: Icon, active, accentColor, onCli
         <motion.span
           layoutId="header-nav-active"
           aria-hidden="true"
+          data-nav-pill=""
           className="absolute inset-0 rounded-lg"
           style={{ background: `color-mix(in srgb, ${accentColor} 13%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accentColor} 22%, transparent)` }}
           transition={{ type: 'spring', stiffness: 520, damping: 40 }}
         />
       )}
-      <Icon size={14} className="relative hidden shrink-0 sm:block" /><span className="relative inline-flex items-center">{label}{badge}</span>
+      <Icon size={14} className="relative hidden shrink-0 lg:block" /><span className="relative inline-flex items-center">{label}{badge}</span>
     </a>
   );
 }

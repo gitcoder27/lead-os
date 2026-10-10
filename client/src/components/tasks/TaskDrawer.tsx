@@ -572,11 +572,13 @@ function TitleField({ task, editable, onPatch, size }: {
     ? 'text-display leading-[30px] tracking-[-0.02em]'
     : 'text-title leading-[28px] tracking-[-0.012em]';
 
+  // docs/73 UXD-06: on the full task page the title is the page's one <h1>; in the drawer it stays an <h2>.
+  const Heading = size === 'page' ? 'h1' : 'h2';
   if (!editable) {
     return (
-      <h2 className={`font-semibold ${typography}`} style={{ color: 'var(--text-primary)' }}>
+      <Heading className={`font-semibold ${typography}`} style={{ color: 'var(--text-primary)' }}>
         {task.title}
-      </h2>
+      </Heading>
     );
   }
 
@@ -591,6 +593,8 @@ function TitleField({ task, editable, onPatch, size }: {
   };
 
   return (
+    <>
+    {size === 'page' ? <h1 className="sr-only">{task.title}</h1> : null}
     <textarea
       ref={ref}
       rows={1}
@@ -613,6 +617,7 @@ function TitleField({ task, editable, onPatch, size }: {
       style={{ color: 'var(--text-primary)' }}
       aria-label="Task title"
     />
+    </>
   );
 }
 

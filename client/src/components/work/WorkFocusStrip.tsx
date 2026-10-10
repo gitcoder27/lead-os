@@ -8,9 +8,11 @@ interface WorkFocusStripProps {
   activeFilter: FilterType;
   onFilterChange: (filter: FilterType) => void;
   actions?: ReactNode;
+  /** Phone/tablet: the filter-rail opener, before the title. */
+  leading?: ReactNode;
 }
 
-export function WorkFocusStrip({ activeFilter, onFilterChange, actions }: WorkFocusStripProps) {
+export function WorkFocusStrip({ activeFilter, onFilterChange, actions, leading }: WorkFocusStripProps) {
   const { data: overview, isLoading: overviewLoading } = useOverview();
 
   const defectSignals = [
@@ -72,11 +74,12 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions }: WorkFo
     >
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
         <div className="flex min-w-[220px] items-center gap-2">
+          {leading}
           <span className="flex h-8 w-8 items-center justify-center rounded-lg border" style={{ background: 'var(--accent-glow)', color: 'var(--accent)', borderColor: 'color-mix(in srgb, var(--accent) 22%, transparent)' }}>
             <ClipboardList size={14} />
           </span>
           <div className="min-w-0">
-            <p className="text-body font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</p>
+            <h1 className="text-body font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>Work</h1>
             <p className="text-ui" style={{ color: 'var(--text-muted)' }}>Defects, owners, due dates</p>
           </div>
           {overviewLoading ? <Loader2 size={12} className="animate-spin" style={{ color: 'var(--text-muted)' }} /> : null}

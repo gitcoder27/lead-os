@@ -26,9 +26,7 @@ vi.mock('@/hooks/useMediaQuery', () => ({
 }));
 
 vi.mock('@/components/layout/Header', () => ({
-  Header: ({ onOpenMobileSidebar }: { onOpenMobileSidebar?: () => void }) => (
-    <button onClick={onOpenMobileSidebar}>Header</button>
-  ),
+  Header: () => <div>Header</div>,
 }));
 
 vi.mock('@/components/alerts/ErrorBanner', () => ({
@@ -114,8 +112,8 @@ vi.mock('@/components/workload/WorkloadBar', () => ({
 }));
 
 vi.mock('@/components/work/WorkFocusStrip', () => ({
-  WorkFocusStrip: ({ onFilterChange }: { onFilterChange: (filter: 'new') => void }) => (
-    <button onClick={() => onFilterChange('new')}>Work Signal</button>
+  WorkFocusStrip: ({ onFilterChange, leading }: { onFilterChange: (filter: 'new') => void; leading?: React.ReactNode }) => (
+    <>{leading}<button onClick={() => onFilterChange('new')}>Work Signal</button></>
   ),
 }));
 
@@ -181,12 +179,12 @@ describe('DashboardLayout', () => {
     expect(lastTableCall.assigneeFilter).toBe('dev-1');
   });
 
-  it('opens the mobile drawer from the header toggle', () => {
+  it('opens the mobile drawer from the Work toolbar, not the app header (docs/73 UXD-06)', () => {
     useMediaQueryMock.mockReturnValue(true);
 
     render(<DashboardLayout />, { wrapper: TestWrapper });
 
-    fireEvent.click(screen.getByText('Header'));
+    fireEvent.click(screen.getByRole('button', { name: 'Open filters' }));
 
     const lastCall = filterSidebarSpy.mock.calls.at(-1)?.[0] as { collapsed: boolean; open: boolean; isMobile: boolean };
     expect(lastCall.isMobile).toBe(true);

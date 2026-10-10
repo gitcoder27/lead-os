@@ -725,7 +725,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
     return createPortal(
       <div ref={rootRef} tabIndex={-1} className="standup-shell fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg-primary)' }} role="dialog" aria-modal="true" aria-label="Standup mode" data-testid="standup-mode">
         <div className="max-w-sm px-6 py-8 text-center">
-          <h1 className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Standup</h1>
+          <h2 className="text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Standup</h2>
           <p className="mt-1.5 text-body leading-5" style={{ color: 'var(--text-muted)' }}>{!ownsRound ? 'Standup is open in another tab. Close it there to continue here.' : 'No people in this view.'}</p>
           <button type="button" onClick={onClose} className="mt-4 rounded-lg px-3 py-1.5 text-ui font-semibold" style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
             Exit
@@ -764,9 +764,9 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
             <ArrowLeftRight size={14} />
           </div>
           <div>
-            <h1 className="text-title-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="text-title-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
               Standup
-            </h1>
+            </h2>
             <div className="text-ui" style={{ color: 'var(--text-muted)' }}>
               {formatStandupDate(date)}
             </div>
@@ -847,7 +847,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
           onWrapUp={openWrapUp}
         />
 
-        <main className="min-w-0 flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-y-auto lg:overflow-hidden" data-standup-column="">
           {view === 'wrapup' ? (
             <div className="h-full overflow-y-auto">
               <StandupWrapUp
@@ -951,7 +951,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
               </aside>
             </div>
           )}
-        </main>
+        </div>
       </div>
 
       {view === 'person' && <StandupActionBar groups={actionGroups} />}

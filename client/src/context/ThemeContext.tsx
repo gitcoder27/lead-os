@@ -1,13 +1,17 @@
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react';
 
 type Theme = 'dark' | 'light';
+/** docs/73 UXD-06: what the manager chose; `system` follows the device. */
+export type ThemePreference = Theme | 'system';
 
 interface ThemeContextValue {
   theme: Theme;
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({ theme: 'light', toggleTheme: () => {} });
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'light', preference: 'system', setPreference: () => {}, toggleTheme: () => {} });
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -68,8 +72,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggleTheme = () =>
     setPreference((previous) => (previous ?? deviceTheme) === 'dark' ? 'light' : 'dark');
 
+  const choosePreference = (next: ThemePreference) => {
+    if (next === 'system') {
+      try {
+        localStorage.removeItem('theme');
+      } catch {
+        // Following the device still works for this session when storage is blocked.
+      }
+      setPreference(null);
+      return;
+    }
+    setPreference(next);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, preference: preference ?? 'system', setPreference: choosePreference, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

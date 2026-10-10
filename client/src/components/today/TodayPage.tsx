@@ -10,7 +10,7 @@ import { useTodayKeyboardTriage } from '@/hooks/useTodayKeyboardTriage';
 import { useTodayTop3 } from '@/hooks/useTodayTop3';
 import { useTeamTracker } from '@/hooks/useTeamTracker';
 import { useLocalDate } from '@/hooks/useLocalDate';
-import { buildTodayQueueView } from '@/lib/today-triage';
+import { deriveTodayQueue } from '@/lib/today-queue';
 import {
   checkInPlaceholder,
   deltaChips,
@@ -20,12 +20,9 @@ import {
   railItems,
   splitPulse,
   standupFocus,
-  groupQueueItems,
   isNotePerson,
   relabelCheckInCommands,
-  splitPanelRows,
   todayPanelOrder,
-  withoutWrapUpItems,
   type TodayPanelSectionId,
   type TodayQueueGroup,
 } from '@/lib/today-layout';
@@ -181,35 +178,11 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
     () => [...(snapshot?.actionItems ?? []), ...(snapshot?.overflowActionItems ?? [])],
     [snapshot?.actionItems, snapshot?.overflowActionItems],
   );
-  // The panel owns standup, 1:1s and carry-forward (and wrap-up's promises);
-  // what's left is grouped one-row-per-fact. Totals shrink by exactly what
-  // moved or folded.
-  const { queueView, queueGroups, groupByCommand, panelRows } = useMemo(() => {
-    const visible = withoutWrapUpItems(snapshot?.actionItems ?? [], focus);
-    const overflow = withoutWrapUpItems(snapshot?.overflowActionItems ?? [], focus);
-    const onPlan = new Set((focus?.plan?.items ?? []).map((item) => item.taskKey));
-    const split = splitPanelRows([...visible, ...overflow], onPlan);
-    const grouped = groupQueueItems(split.queue);
-    const shipped = (snapshot?.actionItems.length ?? 0) + (snapshot?.overflowActionItems?.length ?? 0);
-    const removed = shipped - grouped.items.length;
-    // Group rows are synthetic: their primary command is recognised by identity.
-    const byCommand = new Map<TodayActionCommand, TodayQueueGroup>();
-    for (const item of grouped.items) {
-      const group = grouped.groups.get(item.id);
-      if (group) byCommand.set(item.primaryAction, group);
-    }
-    return {
-      panelRows: split,
-      queueGroups: grouped.groups,
-      groupByCommand: byCommand,
-      queueView: buildTodayQueueView({
-        items: grouped.items,
-        totalCount: snapshot?.totalCount === undefined ? undefined : Math.max(snapshot.totalCount - removed, 0),
-        expanded: queueExpanded,
-        visibleLimit: QUEUE_VISIBLE_ROWS,
-      }),
-    };
-  }, [snapshot?.actionItems, snapshot?.overflowActionItems, snapshot?.totalCount, focus, queueExpanded]);
+  // The queue (and the nav badge's count) come from one derivation: lib/today-queue.ts.
+  const { queueView, queueGroups, groupByCommand, panelRows } = useMemo(
+    () => deriveTodayQueue(snapshot, { expanded: queueExpanded, visibleLimit: QUEUE_VISIBLE_ROWS }),
+    [snapshot, queueExpanded],
+  );
   // docs/57 §6: "cleared" is what I actually finished today — read from the
   // tasks' closed times, so it survives a reload and shows on every device.
   const plan = focus?.plan;
@@ -514,7 +487,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   ) : null;
 
   return (
-    <main className="today-page">
+    <div className="today-page">
       {snapshot ? (
         <>
           <TodayRhythmHeader
@@ -646,7 +619,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           }}
         />
       ) : null}
-    </main>
+    </div>
   );
 }
 

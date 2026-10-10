@@ -13,7 +13,7 @@ function deletedResolutionFrom(error: unknown): TaskResolution | undefined {
 
 function DeletedTaskState({ task, onGoToday }: { task: TaskResolution; onGoToday: () => void }) {
   return (
-    <main className="flex min-h-0 flex-1 items-center justify-center px-4" style={{ background: 'var(--bg-canvas)' }}>
+    <div className="flex min-h-0 flex-1 items-center justify-center px-4" style={{ background: 'var(--bg-canvas)' }}>
       <section
         className="w-full max-w-xl rounded-[18px] border px-6 py-8 text-center"
         style={{
@@ -38,7 +38,7 @@ function DeletedTaskState({ task, onGoToday }: { task: TaskResolution; onGoToday
           Go to Today
         </button>
       </section>
-    </main>
+    </div>
   );
 }
 

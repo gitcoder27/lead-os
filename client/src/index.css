@@ -883,6 +883,34 @@ textarea.ui-field { resize: none; }
 .header-primary-btn:active { transform: translateY(0.5px); }
 .header-primary-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
+/* docs/73 UXD-06: skip link — hidden until keyboard focus lands on it. */
+.skip-link {
+  position: fixed; top: 8px; left: 8px; z-index: calc(var(--z-header) + 1);
+  padding: 8px 12px; border-radius: 8px; font-size: var(--fs-13); font-weight: 600;
+  color: var(--on-accent); background: var(--accent-solid); box-shadow: var(--overlay-shadow);
+  transform: translateY(-160%); transition: transform var(--dur-fast) var(--ease-out);
+}
+.skip-link:focus-visible { transform: none; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.header-wordmark:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Capture: the button is the hit target, its inner span carries the fill. */
+.header-capture-hit { display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+.header-capture-hit:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.header-capture-hit:hover .header-primary-btn { filter: brightness(1.08); }
+.header-avatar-btn { border-radius: 999px; }
+/* Below lg the search is an icon among icons, not a filled tile. */
+@media (max-width: 1023px) {
+  .header-search { background: transparent; box-shadow: none; }
+  .header-search:hover { background: var(--bg-tertiary); box-shadow: none; }
+}
+/* Phones: 44px hit areas made of padding — the visible pills and fills keep their size. */
+@media (max-width: 767px) {
+  .header-icon-btn, .header-capture-hit { min-width: 44px; min-height: 44px; }
+  .header-icon-btn { width: 44px; height: 44px; border-radius: 12px; }
+  .workspace-nav-chip, .header-nav-more { min-height: 44px; }
+  .workspace-nav-chip > [data-nav-pill] { top: 6px; bottom: 6px; }
+  .header-wordmark { min-height: 44px; }
+}
+
 /* docs/56 UX-30: the header's updates inbox steps aside on phones (the nav has Today). */
 .header-wide-only { display: contents; }
 @media (max-width: 479px) { .header-wide-only { display: none; } }

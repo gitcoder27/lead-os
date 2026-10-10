@@ -413,7 +413,7 @@ function PanelLoading() {
 
 function NotFoundState({ onGoToday }: { onGoToday: () => void }) {
   return (
-    <main className="flex min-h-0 flex-1 items-center justify-center px-4" style={{ background: 'var(--bg-canvas)' }}>
+    <div className="flex min-h-0 flex-1 items-center justify-center px-4" style={{ background: 'var(--bg-canvas)' }}>
       <section
         className="w-full max-w-xl rounded-[18px] border px-6 py-8 text-center"
         style={{
@@ -439,7 +439,7 @@ function NotFoundState({ onGoToday }: { onGoToday: () => void }) {
           Go to Today
         </button>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -455,8 +455,11 @@ function WorkspaceShell({ activeView, onViewChange, onOpenActionTarget, children
     <div className="h-full flex flex-col overflow-hidden" style={{ background: 'transparent' }}>
       <Header activeView={activeView} onViewChange={onViewChange} onOpenActionTarget={onOpenActionTarget} />
       <div className="flex-1 min-h-0 px-1 pb-0.5 md:px-1.5 md:pb-1">
-        <div
-          className="h-full min-h-0 rounded-[16px] border overflow-hidden flex flex-col"
+        {/* docs/73 UXD-06: the shell owns the page's one <main> (the skip link's target); pages inside use sections. */}
+        <main
+          id="main"
+          tabIndex={-1}
+          className="h-full min-h-0 rounded-[16px] border overflow-hidden flex flex-col outline-none"
           style={{
             borderColor: 'var(--border-strong)',
             background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)',
@@ -464,7 +467,7 @@ function WorkspaceShell({ activeView, onViewChange, onOpenActionTarget, children
           }}
         >
           {children}
-        </div>
+        </main>
       </div>
     </div>
   );

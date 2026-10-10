@@ -144,7 +144,7 @@ export function DayRhythmSection() {
 
     <section className="space-y-4" aria-labelledby="weekly-review-settings">
       <div>
-        <h3 id="weekly-review-settings" className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review</h3>
+        <h2 id="weekly-review-settings" className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review</h2>
         <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
           A ten-minute close to the week, offered in Today on the day you pick.
         </p>

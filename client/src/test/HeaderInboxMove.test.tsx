@@ -14,7 +14,11 @@ vi.mock('@/hooks/useAlerts', () => ({
   useDismissAlerts: () => ({ mutate: mockDismiss, isPending: false }),
 }));
 vi.mock('@/hooks/useManagerActions', () => ({
-  useManagerActions: () => ({ data: todayTotal === undefined ? undefined : { totalCount: todayTotal } }),
+  useManagerActions: () => ({ data: undefined }),
+}));
+// docs/73 UXD-06: the badge reads the Today query and the same derivation as "Queue N".
+vi.mock('@/hooks/useToday', () => ({
+  useToday: () => ({ data: todayTotal === undefined ? undefined : { totalCount: todayTotal, actionItems: [], overflowActionItems: [] } }),
 }));
 vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
 

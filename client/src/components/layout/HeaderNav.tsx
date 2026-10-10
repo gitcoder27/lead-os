@@ -33,7 +33,7 @@ export function HeaderNav({ activeView, isManager, onViewChange }: HeaderNavProp
       {isManager && morePages.length > 0 && (
         <>
           <button ref={moreRef} type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More workspaces"
-            className="header-ghost flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-ui font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+            className="header-ghost header-nav-more flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 text-ui font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
             style={moreIsActive || moreOpen ? { background: 'var(--bg-tertiary)', color: moreIsActive ? 'var(--accent-text)' : 'var(--text-primary)' } : undefined}>
             <MoreHorizontal size={13} /><span className="hidden sm:inline">More</span>
           </button>

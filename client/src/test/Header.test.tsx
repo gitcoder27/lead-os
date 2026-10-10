@@ -47,6 +47,11 @@ vi.mock('@/components/actions/ManagerActionInbox', () => ({
   ManagerActionInbox: ({ updatesOnly }: { updatesOnly?: boolean }) => <div data-testid="manager-action-inbox" data-updates-only={String(Boolean(updatesOnly))}>Action Inbox</div>,
 }));
 
+const signOutMock = vi.fn();
+vi.mock('@/hooks/useSignOut', () => ({
+  useSignOut: () => ({ signOut: signOutMock, pending: false }),
+}));
+
 vi.mock('@/components/layout/TodayCountLink', () => ({
   TodayCountBadge: ({ hidden }: { hidden?: boolean }) => <span data-testid="today-count-badge" style={{ opacity: hidden ? 0 : 1 }}>14</span>,
 }));
@@ -84,8 +89,9 @@ describe('Header', () => {
     useNavAvailabilityMock.mockReturnValue({ team: true, work: true });
   });
 
-  it('keeps settings out of the main navigation while exposing the top-right gear for managers', () => {
-    render(<Header activeView="today" onViewChange={vi.fn()} />);
+  it('keeps settings out of the main navigation and in the account menu for managers (docs/73 UXD-06)', () => {
+    const onViewChange = vi.fn();
+    render(<Header activeView="today" onViewChange={onViewChange} />);
 
     expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.getByText('Work')).toBeInTheDocument();
@@ -105,8 +111,37 @@ describe('Header', () => {
     expect(screen.queryByText('Follow-ups')).not.toBeInTheDocument();
     expect(screen.queryByText('Meetings')).not.toBeInTheDocument();
     expect(screen.queryByText('My Day')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /open settings/i })).toBeInTheDocument();
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Account:/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Settings' }));
+    expect(onViewChange).toHaveBeenCalledWith('settings');
+  });
+
+  it('holds theme, shortcuts and sign-out in the account menu instead of three header icons (docs/73 UXD-06)', () => {
+    const setPreference = vi.fn();
+    useThemeMock.mockReturnValue({ theme: 'dark', preference: 'dark', setPreference, toggleTheme: vi.fn() });
+    render(<Header activeView="tasks" onViewChange={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Toggle theme' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open settings/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Account:/ }));
+    expect(screen.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'System' }));
+    expect(setPreference).toHaveBeenCalledWith('system');
+    fireEvent.click(screen.getByRole('button', { name: /^Account:/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes the wordmark a link home rather than a second <h1>, and offers a skip link (docs/73 UXD-06)', () => {
+    const onViewChange = vi.fn();
+    render(<Header activeView="tasks" onViewChange={onViewChange} />);
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute('href', '#main');
+    const home = screen.getByRole('link', { name: 'LeadOS, go to Today' });
+    expect(home).toHaveAttribute('href', '/');
+    fireEvent.click(home);
+    expect(onViewChange).toHaveBeenCalledWith('today');
   });
 
   it('uses native destination links on active and inactive workspaces', () => {
@@ -385,15 +420,17 @@ describe('Header', () => {
     }
   });
 
-  it('exposes manager help at phone widths and passes its opener to the app', () => {
+  it('exposes manager help at phone widths from the account menu and anchors the sheet on its button', () => {
     const openKeyboardShortcuts = vi.fn();
     render(<QuickActionsProvider value={{ openCapture: vi.fn(), openCommandPalette: vi.fn(), openKeyboardShortcuts, keyboardShortcutsOpen: true }}>
       <Header activeView="notes" onViewChange={vi.fn()} />
     </QuickActionsProvider>);
-    const button = screen.getByRole('button', { name: 'Keyboard shortcuts' });
+    const button = screen.getByRole('button', { name: /^Account:/ });
     expect(button.className).not.toMatch(/hidden|md:/);
     expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(button).toHaveAttribute('data-global-shortcuts-anchor');
     fireEvent.click(button);
+    fireEvent.click(screen.getByRole('menuitem', { name: /Keyboard shortcuts/ }));
     expect(openKeyboardShortcuts).toHaveBeenCalledWith(button);
   });
 

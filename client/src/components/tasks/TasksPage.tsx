@@ -898,7 +898,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   );
 
   return (
-    <main ref={mainRef} className="flex min-h-0 flex-1 overflow-hidden" aria-label="Tasks">
+    <section ref={mainRef} className="flex min-h-0 flex-1 overflow-hidden" aria-label="Tasks">
       <TaskViewRail
         views={allViews}
         counts={countData}
@@ -1139,6 +1139,6 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           navigateToTaskPage(key);
         }}
       />
-    </main>
+    </section>
   );
 }

@@ -1,13 +1,20 @@
-import { useManagerActions } from '@/hooks/useManagerActions';
+import { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { useToday } from '@/hooks/useToday';
+import { useLocalDate } from '@/hooks/useLocalDate';
+import { deriveTodayQueue } from '@/lib/today-queue';
 
 /**
  * docs/56 UX-30: off Today the nav's Today tab carries the size of Today's queue as a quiet count,
  * instead of a second "Today N" control next to the actions.
+ * docs/73 UXD-06: the count is the "Queue N" total itself — same Today query, same derivation.
  */
 export function TodayCountBadge({ hidden = false }: { hidden?: boolean }) {
-  const actions = useManagerActions({ surface: 'header', limit: 1 });
-  const count = actions.data?.totalCount;
+  const today = useToday(useLocalDate());
+  const count = useMemo(
+    () => (today.data ? deriveTodayQueue(today.data, { expanded: false, visibleLimit: 0 }).queueView.totalCount : 0),
+    [today.data],
+  );
   const reduceMotion = useReducedMotion();
   if (!count) return null;
   return (

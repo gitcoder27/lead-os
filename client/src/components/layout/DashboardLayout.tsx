@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { PanelLeftOpen } from 'lucide-react';
 import { Header } from './Header';
 import { ErrorBanner } from '@/components/alerts/ErrorBanner';
 import { FilterSidebar } from '@/components/filters/FilterSidebar';
@@ -492,7 +493,6 @@ export function DashboardLayout({
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: 'transparent' }}>
       <Header
-        onOpenMobileSidebar={isCompact ? () => setMobileSidebarOpen(true) : undefined}
         activeView={activeView}
         onViewChange={onViewChange}
         onOpenActionTarget={onOpenActionTarget}
@@ -500,8 +500,14 @@ export function DashboardLayout({
       />
 
       <div className="flex-1 min-h-0 px-1 pb-0.5 md:px-1.5 md:pb-1">
-        <div className="h-full min-h-0 min-w-0 rounded-[16px] border overflow-hidden flex flex-col" style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
+        <main id="main" tabIndex={-1} className="h-full min-h-0 min-w-0 rounded-[16px] border overflow-hidden flex flex-col outline-none" style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
           <WorkFocusStrip
+            // docs/73 UXD-06: the filter rail's opener lives with Work, not on the app's wordmark.
+            leading={isCompact ? (
+              <button type="button" onClick={() => setMobileSidebarOpen(true)} className="ui-icon-btn work-filters-btn" aria-label="Open filters" title="Open filters">
+                <PanelLeftOpen size={16} aria-hidden="true" />
+              </button>
+            ) : undefined}
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
             actions={<><WorkAttentionSignals onOpenTarget={onOpenActionTarget} /><WorkSyncControls />{workViewsMenu}</>}
@@ -567,7 +573,7 @@ export function DashboardLayout({
           </div>
 
           <WorkloadBar activeDeveloper={activeDeveloper} onDeveloperClick={handleDeveloperChange} />
-        </div>
+        </main>
       </div>
 
     </div>

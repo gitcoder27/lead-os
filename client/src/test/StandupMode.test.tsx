@@ -656,8 +656,8 @@ describe('StandupMode', () => {
       renderStandup();
       fireEvent.keyDown(document.body, { key: 'ArrowRight' });
       const tasks = screen.getByRole('listbox', { name: "Bob Jones's tasks" });
-      // Only the person column (up to <main>): the overlay itself fades in once, on open.
-      for (let node: HTMLElement | null = tasks; node && node.tagName !== 'MAIN'; node = node.parentElement) {
+      // Only the person column (up to its container): the overlay itself fades in once, on open.
+      for (let node: HTMLElement | null = tasks; node && !node.hasAttribute('data-standup-column'); node = node.parentElement) {
         expect(node.getAttribute('style') ?? '').not.toMatch(/opacity|transform/);
       }
       // A fresh column per person: scroll starts at the top.

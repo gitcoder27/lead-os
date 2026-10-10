@@ -787,3 +787,72 @@ In production, all Jira and Copilot configuration writes, connection tests and r
 `JIRA_ALLOWED_HOSTS`, when set, restricts Jira hosts. Entries are exact hostnames or leading-dot suffixes: `.atlassian.net` permits that domain and its subdomains. Add friends' Jira domains before sending invites. `OUTBOUND_ALLOWED_HOSTS` is an operator-only exception for explicitly trusted internal hosts; it does not remove the https requirement. Leave it unset unless the install intentionally uses an internal provider. Development/test modes permit local HTTP fixtures; a scratch server must never inherit real credentials or call real Jira.
 
 DNS is checked immediately before each request, but the HTTP client's subsequent resolution leaves a DNS-rebinding race. This is a documented residual risk for this invite-only install. Production-copy checks and deployment remain operator-owned; do not test this policy by probing internal production services.
+
+## Inviting friends
+
+Self-registration is invite-only and off by default. Each friend gets a separate, empty manager workspace with their own tasks, notes, team, Jira connection and Copilot key. Design and evidence: [docs/72](72-self-registration-and-tenant-isolation.md). The steps below are operator-only: the development agent never touches production or enables registration.
+
+### What the friend gets, and what you can see
+
+- A friend never sees your data, and you never see theirs through the app. Every query is scoped by workspace, and a permanent test probes about 200 routes across the boundary.
+- You, as the operator, can still read the database and the backups, which hold every workspace. Say so when you invite someone. Deleting a friend's workspace leaves their rows in existing snapshots until those expire.
+- A friend is a normal manager, not an install admin. Only an install admin sees Data & Backups, runs or downloads backups, or changes the backup schedule. New managers are never admins.
+- Each friend connects their own Jira site and their own AI key. Nothing falls back to yours.
+
+### Before you turn it on (once)
+
+1. Take a manual snapshot (Settings → Data & Backups → **Back up now**) and [copy it off the box](#copy-backups-off-the-box).
+2. Copy the production DB to a scratch path and start the new build against the copy, with Jira pointed at an unroutable host. Check that the migration markers ran, that you keep the Data & Backups card, and that `/api/sync/status` is unchanged.
+3. Read-only checks against the **copy**, never the live file:
+   - Workspaces and their managers: `sqlite3 <copy>.db "SELECT w.id, w.owner_account_id, u.username, u.role FROM workspaces w LEFT JOIN app_users u ON u.workspace_id = w.id AND u.is_active = 1 ORDER BY w.id"`
+   - Task-model stage per workspace: `sqlite3 <copy>.db "SELECT workspace_id, value FROM config WHERE key = 'tasks_phase2_stage'"` (anything other than `2c` or `2d` blocks `tasks:contract` and `tasks:drop-legacy`).
+   - Install admins: every active manager in `default` became an install admin once. If an account in `default` should not be one, clear it with the CLI after the migration.
+4. Check the `.env` keys exist, without printing values: `grep -oE '^(JIRA_ALLOWED_HOSTS|TRUST_PROXY)=' /home/ubuntu/apps/lead-os-prod/.env`.
+   - `TRUST_PROXY=loopback` must be present, or every visitor shares one IP and the sign-up limiter blocks everyone together ([Client IP and TRUST_PROXY](#client-ip-and-trust_proxy)).
+   - If `JIRA_ALLOWED_HOSTS` is set, add each friend's Jira domain (for example `.atlassian.net`) before sending invites. See [Jira and Copilot outbound addresses](#jira-and-copilot-outbound-addresses).
+
+### Deploy
+
+Deploy as usual with `scripts/deploy.sh prod` from `/home/ubuntu/apps/lead-os-prod` ([One-Command Deploy](#one-command-deploy)). With `LEADOS_REGISTRATION=off` (the default) nothing changes for you or your existing users, and the sign-up endpoints answer 404.
+
+### Turn on
+
+1. In the production `.env` set:
+   ```
+   LEADOS_REGISTRATION=invite
+   LEADOS_PUBLIC_URL=https://lead.daycommand.online
+   ```
+   `LEADOS_PUBLIC_URL` must be an origin (https in production).
+2. Restart the service.
+3. From the production checkout, create one invite per friend:
+   ```bash
+   npm run auth:invite --workspace=server -- --create --note "<friend>"
+   ```
+   The command prints a `/join?invite=…` link **once**; only a hash is stored. Send the link privately. A link is single-use and expires after seven days (`--expires-days <1-365>` to change it).
+4. List or revoke invites (tokens are never shown again):
+   ```bash
+   npm run auth:invite --workspace=server -- --list
+   npm run auth:invite --workspace=server -- --revoke <id>
+   ```
+5. The friend opens the link, creates an account and lands on an empty Today. Without a valid invite, the landing page shows no sign-up option.
+
+### Turn off
+
+Set `LEADOS_REGISTRATION=off`, restart, and revoke any outstanding invites. Existing friend accounts keep working. Nobody is signed out.
+
+### Remove a friend
+
+Dry run first; it lists a count for every table and changes nothing:
+
+```bash
+npm run auth:delete-workspace --workspace=server -- --workspace <workspace-id>
+npm run auth:delete-workspace --workspace=server -- --workspace <workspace-id> --confirm <workspace-id> --apply
+```
+
+`--apply` first takes and verifies a whole-install backup, refuses the `default` workspace, and deletes the workspace in one transaction. Existing snapshots keep the friend's rows until they expire.
+
+### Watch
+
+- `du -sh data/ data/backups/` weekly for the first month. Each workspace adds rows, and pre-reset snapshots are capped at ten.
+- `sync_log` error counts per workspace. Each workspace syncs on its own interval (5–1440 minutes).
+- Rollback of the whole feature: set `off` and restart. The additive migrations stay in place and do no harm.

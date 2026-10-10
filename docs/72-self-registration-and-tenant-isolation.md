@@ -426,6 +426,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-07 | main (this commit) | Three red tests proved duplicate errors, orphan workspace/config on user-insert failure and bootstrap count disclosure. Hashing precedes synchronous Drizzle/SQLite transactions; workspace creation and insert roll back together, duplicate maps to 409, missing login performs one dummy scrypt comparison, and bootstrap hides installed counts. F-17 concurrent bootstrap now permits exactly one first account. Targeted auth/tenant/CLI suites: 50 PASS; extra timing/race suites: 6 PASS. Phase 0 gates: lint PASS (existing warnings), guard:data PASS, typecheck PASS, build:check PASS, full test PASS (1601 server / 2085 client); format:check FAIL only on pre-existing unrelated .claude/settings.local.json, preserved. Supplemental client contract typecheck PASS. No UI changes, runtime data, real Jira, push or deployment. |
 
+| 2026-10-10 | SR-08 | main (this commit) | Added registration_invites with SHA-256 hashes and an idempotent marker; random 32-byte single-use tokens expire in seven days by default and can be revoked. Trusted auth:invite create/list/revoke prints a join URL once, omits tokens/hashes from lists, and requires completed owner setup plus configured public origin. LEADOS_REGISTRATION defaults off; no signup routes yet. Lifecycle/migration/owner suites: 15 PASS; final copy/CLI/migration suites: 13 PASS. The populated synthetic-copy hashes stay unchanged. Corrected a scratch-helper import and gave the multi-subprocess integration its own 15s timeout without changing assertions. New-module lint, touched JSON formatting, guard:data and diff check PASS. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -462,7 +464,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 ### Phase 1 — Registration backend (merged dark: `LEADOS_REGISTRATION` defaults to `off`)
 
-- [ ] **SR-08 Invites and kill switch.**
+- [x] **SR-08 Invites and kill switch.**
   - *Files:* schema/migrate, `services/registration.service.ts` (new), `scripts/invite.ts` (new; `npm run auth:invite`), `server/package.json` script, `config.ts` env schema (`LEADOS_REGISTRATION`, `LEADOS_PUBLIC_URL`), tests.
   - *Acceptance:* create/list/revoke; the token is printed once and stored hashed; expiry.
   - *Rollback:* revert; the empty table is harmless.

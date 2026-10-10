@@ -1,3 +1,4 @@
+import { migrateRegistrationInvites } from "./registration-invites";
 import { migrateInstallAdmin } from "./install-admin";
 import BetterSqlite3 from "better-sqlite3";
 import { encryptSecretIfNeeded, isEncryptedSecret } from "../services/secret-crypto";
@@ -1523,6 +1524,7 @@ export function migrate(sqlite: BetterSqlite3.Database): void {
   // to legacy_* archives, after which these repair statements are inert.
   runConstraintRepairStatements(sqlite, true);
   migrateInstallAdmin(sqlite);
+  migrateRegistrationInvites(sqlite);
   migrateSecretConfigValues(sqlite);
   backfillTeamMode(sqlite);
   pinLegacyJiraSyncScope(sqlite);

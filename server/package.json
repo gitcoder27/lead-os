@@ -25,7 +25,8 @@
     "auth:reset-password": "tsx src/scripts/reset-auth-password.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "auth:invite": "tsx src/scripts/invite.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",

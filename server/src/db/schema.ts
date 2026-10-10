@@ -795,3 +795,16 @@ export const projectTracks = sqliteTable("project_tracks", {
 export const taskPlacements = sqliteTable("task_placements", {
   workspaceId: text("workspace_id").notNull(), managerAccountId: text("manager_account_id").notNull(), taskId: integer("task_id").notNull(), projectId: integer("project_id").notNull(), trackId: integer("track_id"),
 }, (table) => [primaryKey({ columns: [table.workspaceId, table.managerAccountId, table.taskId] }), index("task_placements_project").on(table.workspaceId, table.managerAccountId, table.projectId, table.trackId)]);
+
+/** Install-wide invitations contain hashes only; raw tokens belong only to the CLI output. */
+export const registrationInvites = sqliteTable("registration_invites", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tokenHash: text("token_hash").notNull().unique(),
+  note: text("note"),
+  createdBy: text("created_by").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  usedByUserId: integer("used_by_user_id").references(() => appUsers.id, { onDelete: "set null" }),
+  revokedAt: text("revoked_at"),
+});

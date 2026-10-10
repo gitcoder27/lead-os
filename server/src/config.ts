@@ -5,6 +5,11 @@ import { getJiraApiToken, hasJiraApiToken } from "./runtime-credentials";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(3001),
+  LEADOS_REGISTRATION: z.enum(["off", "invite"]).default("off"),
+  LEADOS_PUBLIC_URL: z.string().url().refine(value => {
+    const url = new URL(value);
+    return !url.username && !url.password && !url.search && !url.hash && url.pathname === "/" && (url.protocol === "https:" || (process.env.NODE_ENV !== "production" && url.protocol === "http:"));
+  }, "LEADOS_PUBLIC_URL must be an origin, using https in production").optional(),
   JIRA_BASE_URL: z.string().url().optional(),
   JIRA_EMAIL: z.string().email().optional(),
   JIRA_API_TOKEN: z.string().min(1).optional(),

@@ -50,7 +50,8 @@
   --app-header-height: 72px;
 
   /* docs/54 T4/T6/V2: one overlay vocabulary — scrims, shadows, stacking. */
-  --avatar-text-l:  36%;
+  /* docs/73 UXD-01: OKLCH lightness for avatar initials; ≥4.5:1 for every hue on every surface. */
+  --avatar-text-l:  0.44;
   --scrim:          rgba(15, 23, 42, 0.36);
   --scrim-soft:     rgba(15, 23, 42, 0.18);
   --scrim-blur:     blur(4px);
@@ -118,7 +119,7 @@
   --task-danger-text: #FCA5A5;
   --focus-ring:    #22D3EE;
 
-  --avatar-text-l:  66%;
+  --avatar-text-l:  0.78;
   --scrim:          rgba(4, 8, 14, 0.55);
   --scrim-soft:     rgba(2, 6, 23, 0.42);
   --overlay-shadow: 0 32px 80px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
@@ -815,7 +816,8 @@ textarea.ui-field { resize: none; }
 .header-search { color: var(--text-muted); background: var(--bg-tertiary); box-shadow: inset 0 0 0 1px var(--border); transition: box-shadow var(--dur-fast) ease, color var(--dur-fast) ease; }
 .header-search:hover { color: var(--text-secondary); box-shadow: inset 0 0 0 1px var(--border-strong); }
 .header-search:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.header-primary-btn { color: var(--on-accent); background: var(--accent); transition: filter var(--dur-fast) ease, transform var(--dur-fast) ease; }
+/* docs/73 UXD-01: text sits on the solid accent (5.36:1 light); never on --accent. */
+.header-primary-btn { color: var(--on-accent); background: var(--accent-solid); transition: filter var(--dur-fast) ease, transform var(--dur-fast) ease; }
 .header-primary-btn:hover { filter: brightness(1.08); }
 .header-primary-btn:active { transform: translateY(0.5px); }
 .header-primary-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

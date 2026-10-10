@@ -577,3 +577,9 @@ A fresh scratch DB (migrated, never `data/`), with backups redirected to the scr
 - Staleness signals over time (all touches were minutes old on a Saturday).
 - A 1:1 due today on Today.
 - The "0 visible defects" list after "Assign owner" may be a load-timing artifact; it needs a re-check before UXD-10.
+
+## 12. Implementation notes (2026-10-10)
+
+Deviations from §8 found while building, and open items noticed but left out of scope. The progress log in docs/56 has the per-item verification.
+
+- **UXD-01:** axe on the current code also flagged the Notes "nudge" ghost button (`--accent` text, 3.55:1); it now uses `--accent-text`. Moving the Settings initials onto `Avatar` surfaced a contrast gap in `Avatar` itself: HSL lightness isn't perceptual, so yellow-hue initials measured 2.47:1 in light and blue ones 4.4:1 in dark. `Avatar` now computes its tint and text in OKLCH (`--avatar-text-l` 0.44 light / 0.78 dark), which clears 4.5:1 for every hue on every surface (`themeTokens.test.ts` measures all hues). Person colours shift slightly; the same person keeps the same colour everywhere.

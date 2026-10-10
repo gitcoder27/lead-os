@@ -44,9 +44,10 @@ export function Avatar({ name, seed, size = 20, muted = false, tone, ring = fals
         width: size,
         height: size,
         fontSize: Math.max(9, Math.round(size * 0.4)),
-        background: muted ? 'var(--bg-tertiary)' : `hsl(${hue} 70% 50% / 0.18)`,
-        color: muted ? 'var(--text-muted)' : `hsl(${hue} 65% var(--avatar-text-l))`,
-        border: `1px solid ${muted ? 'var(--border)' : `hsl(${hue} 70% 55% / 0.35)`}`,
+        // OKLCH keeps lightness perceptual, so yellow and blue initials read alike (docs/73 UXD-01).
+        background: muted ? 'var(--bg-tertiary)' : `oklch(0.7 0.17 ${hue} / 0.2)`,
+        color: muted ? 'var(--text-muted)' : `oklch(var(--avatar-text-l) 0.14 ${hue})`,
+        border: `1px solid ${muted ? 'var(--border)' : `oklch(0.7 0.17 ${hue} / 0.38)`}`,
         boxShadow: shadows.length ? shadows.join(', ') : undefined,
       }}
     >

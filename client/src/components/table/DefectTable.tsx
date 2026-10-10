@@ -518,7 +518,7 @@ export function DefectTable({
               data-jira-link
               className="font-mono text-[13px] font-medium relative group/id cursor-pointer whitespace-nowrap"
               style={{
-                color: isVisited ? 'var(--info)' : 'var(--accent)',
+                color: 'var(--text-muted)',
                 textDecoration: isVisited ? 'underline' : 'none',
                 textDecorationColor: 'var(--info)',
                 textUnderlineOffset: '3px',
@@ -540,7 +540,7 @@ export function DefectTable({
           ) : (
             <span
               className="font-mono text-[13px] font-medium whitespace-nowrap"
-              style={{ color: 'var(--accent)' }}
+              style={{ color: 'var(--text-muted)' }}
             >
               {jiraKey}
             </span>

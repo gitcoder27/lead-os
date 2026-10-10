@@ -37,6 +37,7 @@ import { useTriggerSync } from '@/hooks/useTriggerSync';
 import { describeSyncError } from '@/lib/sync-error';
 import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/context/AuthContext';
+import { Avatar } from '@/components/ui/Avatar';
 import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { useDevelopers } from '@/hooks/useDevelopers';
 import {
@@ -1048,12 +1049,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
           {/* User footer */}
           <div className="hidden border-t p-2.5 md:block" style={{ borderColor: 'var(--border-strong)' }}>
             <div className="flex items-center gap-2">
-              <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
-                style={{ background: 'var(--settings-warning-soft-bg)', color: 'var(--warning)' }}
-              >
-                {(user?.displayName ?? '').split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase() || 'M'}
-              </div>
+              <Avatar name={user?.displayName || 'Manager'} seed={user?.accountId} size={24} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[12px] font-medium" style={{ color: 'var(--text-primary)' }}>
                   {user?.displayName || 'Manager'}
@@ -1330,7 +1326,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none',
                               }}
                             >
-                              <IdentityAvatar user={u} accent={u.accountId === managerJiraAccountId ? 'var(--accent)' : 'var(--text-muted)'} />
+                              <IdentityAvatar user={u} selected={u.accountId === managerJiraAccountId} />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
                                 <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
@@ -1654,7 +1650,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                               className="flex items-start gap-2 px-3 py-1.5"
                               style={{ background: idx % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)', borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                             >
-                              <IdentityAvatar user={member} accent="var(--accent)" />
+                              <IdentityAvatar user={member} />
                               {isEditing ? (
                                 <div className="min-w-0 flex-1">
                                   <div className="grid gap-1.5">
@@ -1841,7 +1837,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                 >
                                   {isAlready || isSel ? '✓' : ''}
                                 </span>
-                                <IdentityAvatar user={u} accent={isSel ? 'var(--accent)' : 'var(--text-muted)'} />
+                                <IdentityAvatar user={u} selected={isSel} />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-[12.5px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
                                   <p className="truncate text-[12px]" style={{ color: 'var(--text-muted)' }}>{u.email ?? u.accountId}</p>
@@ -1958,12 +1954,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                             style={{ background: idx % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)', borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                           >
                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <div
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
-                                style={{ background: u.role === 'manager' ? 'var(--settings-warning-soft-bg)' : 'var(--settings-accent-soft-bg)', color: u.role === 'manager' ? 'var(--warning)' : 'var(--accent)' }}
-                              >
-                                {u.displayName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
-                              </div>
+                              <Avatar name={u.displayName} seed={u.developerAccountId ?? u.accountId} size={24} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <p className="truncate text-[13px] font-medium" style={{ color: 'var(--text-primary)' }}>{u.displayName}</p>
@@ -2567,18 +2558,11 @@ function FieldListGroup({
   );
 }
 
-function IdentityAvatar({ user, accent }: { user: { displayName: string; avatarUrl?: string }; accent: string }) {
+function IdentityAvatar({ user, selected = false }: { user: { displayName: string; avatarUrl?: string; accountId?: string }; selected?: boolean }) {
   if (user.avatarUrl) {
-    return <img src={user.avatarUrl} alt={user.displayName} className="h-7 w-7 shrink-0 rounded-lg object-cover" />;
+    return <img src={user.avatarUrl} alt={user.displayName} className="h-7 w-7 shrink-0 rounded-full object-cover" />;
   }
-  return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold"
-      style={{ background: 'var(--settings-neutral-chip-bg)', color: accent, border: '1px solid var(--border-strong)' }}
-    >
-      {user.displayName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'U'}
-    </div>
-  );
+  return <Avatar name={user.displayName || 'User'} seed={user.accountId} size={28} ring={selected} />;
 }
 
 function generateStrongPassword(

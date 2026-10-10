@@ -897,7 +897,7 @@ The bare manager login was the first screen anyone saw at the production URL. `/
 Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-design-review-and-upgrade-plan.md), with screenshots in `docs/screenshots/ux-review/`. Items UXD-01…UXD-29 run in three phases (foundation, daily screens, the rest), one commit per item, each checked in a browser in both themes at 1440 px and 375 px. Authorized by the owner on 2026-10-10. Decisions: Today's Inbox count stays a link; the Today defect cap is 3 rows plus one aggregate row (a code constant); the Tasks selection checkbox stays visible; `-after` shots stay local in `docs/screenshots/ux-review-after/` (git-ignored) and each phase commits at most six curated before/after pairs.
 
 - [x] UXD-00 — Review, plan and screenshots committed; local after-shot folder ignored.
-- [ ] UXD-01 — Contrast and accent fixes.
+- [x] UXD-01 — Contrast and accent fixes.
 - [ ] UXD-02 — Type scale tokens.
 - [ ] UXD-03 — Sentence-case labels.
 - [ ] UXD-04 — Row action hierarchy.
@@ -926,6 +926,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
 | 2026-10-10 | UXD-00 | main (0c7c8f1, this commit) | docs/73, the docs/56 pointer and the review shots landed in the owner's tree cleanup commit `0c7c8f1`; this commit adds the `docs/screenshots/ux-review-after/` ignore entry and the item checklist. No application code changed. |
+| 2026-10-10 | UXD-01 | main (this commit) | Header Capture fill on `--accent-solid` (5.36:1); note task chips and the Notes nudge button on `--accent-text`; task times in secondary tabular sans; Work keys muted mono; Settings initials (rail footer, users list, Jira people pickers) on the shared `Avatar`, which now uses OKLCH so initials clear 4.5:1 for every hue (docs/73 §12). `themeTokens.test` +3 (header fill ratio, avatar hues × surfaces in both themes, source checks): 35 pass. axe (9 routes × desktop light/dark, phone light): color-contrast 0 (baseline 13 nodes; the first fix exposed an Avatar 4.4:1 in dark, fixed). Targeted suites (DefectTable, Header, NotesPage, SettingsPanel, SettingsDataSection, TasksPage, themeTokens, Team): 406 pass. typecheck, build:check PASS. Browser (scratch DB, ports 3082/5253, mocked Jira): Today, Tasks, Team, Work, Notes, Settings at 1440 and 375 in light and dark, compared with fresh before-shots; header focus ring unchanged. |
 
 ## Self-registration and tenant isolation (docs/72)
 

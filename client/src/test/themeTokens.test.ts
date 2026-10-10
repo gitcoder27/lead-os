@@ -155,6 +155,42 @@ describe('contrast of text, chips and focus (docs/63 #3)', () => {
     expect(src('components/notes/notes.css')).not.toMatch(/\.notes-day-row\.selected \.notes-day-row-date \{\s*color: var\(--accent\);/);
   });
 
+  it.each(themes)('%s: the header Capture fill clears 4.5:1 with its text (docs/73 UXD-01)', (_name, tokens) => {
+    expect(css).toMatch(/\.header-primary-btn \{[^}]*color: var\(--on-accent\);[^}]*background: var\(--accent-solid\)/);
+    expect(ratio(rgb(tokens['--on-accent']!), rgb(tokens['--accent-solid']!))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(themes)('%s: avatar initials clear 4.5:1 for every hue on every surface (docs/73 UXD-01)', (_name, tokens) => {
+    const oklch = (l: number, c: number, h: number): Rgb => {
+      const a = c * Math.cos((h * Math.PI) / 180);
+      const b = c * Math.sin((h * Math.PI) / 180);
+      const [lc, mc, sc] = [l + 0.3963377774 * a + 0.2158037573 * b, l - 0.1055613458 * a - 0.0638541728 * b, l - 0.0894841775 * a - 1.291485548 * b].map((v) => v ** 3) as Rgb;
+      const linear = [4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc, -1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc, -0.0041960863 * lc - 0.7034186147 * mc + 1.707614701 * sc];
+      return linear.map((v) => { const x = Math.min(Math.max(v, 0), 1); return 255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055); }) as Rgb;
+    };
+    const avatar = src('components/ui/Avatar.tsx');
+    expect(avatar).toContain('oklch(var(--avatar-text-l) 0.14 ${hue})');
+    expect(avatar).toContain('oklch(0.7 0.17 ${hue} / 0.2)');
+    const lightness = Number(tokens['--avatar-text-l']);
+    for (let hue = 0; hue < 360; hue += 3) {
+      for (const surface of surfaces) {
+        const fill = mix(oklch(0.7, 0.17, hue), rgb(tokens[surface]!), 0.2);
+        expect(ratio(oklch(lightness, 0.14, hue), fill), `hue ${hue} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('accent is not used as small text on note chips, task times or Work keys (docs/73 UXD-01)', () => {
+    const notes = src('components/notes/notes.css');
+    expect(notes).toMatch(/\.cm-note-chip-task \{[^}]*color: var\(--accent-text\)/);
+    expect(notes).toMatch(/\.notes-ghost-button\.nudge \{[^}]*color: var\(--accent-text\)/);
+    expect(src('components/tasks/TaskListRow.tsx')).not.toContain("{time && <span className=\"shrink-0 font-mono");
+    expect(src('components/table/DefectTable.tsx')).not.toMatch(/color: isVisited \? 'var\(--info\)' : 'var\(--accent\)'/);
+    const settings = src('components/settings/SettingsPanel.tsx');
+    expect(settings).toContain("from '@/components/ui/Avatar'");
+    expect(settings).not.toMatch(/rounded-md text-\[11px\] font-bold/);
+  });
+
   it.each(themes)('%s: the focus ring clears 3:1 on every surface', (_name, tokens) => {
     for (const surface of surfaces) expect(ratio(rgb(tokens['--focus-ring']!), rgb(tokens[surface]!))).toBeGreaterThanOrEqual(3);
   });

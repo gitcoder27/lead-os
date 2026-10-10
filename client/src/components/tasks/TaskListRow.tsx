@@ -160,7 +160,7 @@ export const TaskListRow = memo(function TaskListRow({
         <div className="task-row-content" style={{ opacity: dim }}>
           <button type="button" className="task-row-open" data-task-open={task.taskKey} aria-label={ariaLabel} aria-describedby={date ? `task-date-description-${task.taskKey}` : undefined} onClick={handleClick}>
             <span className="task-row-key font-mono text-[12px] tabular-nums" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>
-            {time && <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>{time}</span>}
+            {time && <span className="shrink-0 text-[12px] font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>{time}</span>}
             <span className="task-row-title text-[13px] font-medium" style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: closed ? 'line-through' : undefined }}>{task.title}</span>
           </button>
           <span className="task-row-metadata">
@@ -177,7 +177,7 @@ export const TaskListRow = memo(function TaskListRow({
             {handlers.onCaptureOutcome && meetingNeedsOutcome(task, today) && (
               <button type="button" className="task-row-outcome shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-semibold"
                 aria-label={`Capture outcome for ${task.taskKey}`}
-                style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}
+                style={{ color: 'var(--accent-text)', border: '1px solid var(--border)' }}
                 onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
                 Capture outcome
               </button>

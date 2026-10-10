@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.TASK_GUARD_FIELDS = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.ISSUE_BULK_LIMIT = exports.TODAY_TOP_LIMIT = exports.DEFAULT_WEEKLY_REVIEW_DAY = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.WEEKLY_REVIEW_LIMITS = exports.WEEKLY_REVIEW_STEPS = exports.DEFAULT_NAV_PREFERENCES = exports.NAV_PAGE_IDS_TASKS = exports.NAV_PAGE_IDS = exports.LEGACY_NAV_PAGE_IDS = exports.oneOnOneSessionActionSchema = exports.oneOnOneAgendaReorderSchema = exports.oneOnOneQuickAttachSchema = exports.oneOnOneAgendaAttachSchema = exports.oneOnOneSessionUpdateSchema = exports.oneOnOneSessionCreateSchema = exports.oneOnOneSeriesUpdateSchema = exports.oneOnOneSeriesCreateSchema = exports.oneOnOneCadenceSchema = exports.ONE_ON_ONE_SUGGESTION_LIMIT = exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = exports.TASK_EVENT_TYPES = exports.TASK_GUARD_FIELDS = exports.taskViewDefinitionSchema = exports.ATTENTION_RULE_LIMITS = exports.DEFAULT_ATTENTION_RULES = exports.TASK_STALE_DAYS = exports.TASK_LANES = exports.TASK_LABEL_COLORS = exports.TASK_KEY_PATTERN = exports.RESERVED_USERNAMES = exports.USERNAME_PATTERN = exports.DEFAULT_TEAM_MODE = exports.TEAM_MODES = exports.ISSUE_BULK_LIMIT = exports.TODAY_TOP_LIMIT = exports.DEFAULT_WEEKLY_REVIEW_DAY = exports.DEFAULT_TODAY_RHYTHM_BOUNDARIES = void 0;
+exports.signUpPasswordError = signUpPasswordError;
 exports.isSystemTaskLabel = isSystemTaskLabel;
 exports.taskLabelDisplayName = taskLabelDisplayName;
 exports.isTaskHidden = isTaskHidden;
@@ -26,6 +27,16 @@ exports.ISSUE_BULK_LIMIT = 20;
  *  means developers log in and participate (check-ins, My Day). */
 exports.TEAM_MODES = ["solo", "collab"];
 exports.DEFAULT_TEAM_MODE = "solo";
+exports.USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,39}$/;
+exports.RESERVED_USERNAMES = ["admin", "root", "system", "support", "leados", "default", "api", "null"];
+function signUpPasswordError(password, username) {
+    if (password.length < 8 || password.length > 200)
+        return "Use 8–200 characters for your password.";
+    const common = ["password", "password1", "password123", "12345678", "123456789", "1234567890", "qwerty123", "qwertyuiop", "letmein123", "welcome123", "iloveyou"];
+    if (password.toLowerCase() === username.trim().toLowerCase() || common.includes(password.toLowerCase()))
+        return "Choose a less common password, different from your username.";
+    return undefined;
+}
 exports.TASK_KEY_PATTERN = /^[Tt]-(\d{1,9})$/;
 exports.TASK_LABEL_COLORS = [
     "slate",

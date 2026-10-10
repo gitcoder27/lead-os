@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { startCanonicalTasksIfEmpty } from "../db/canonical-start";
 import { db, rawDb } from "../db/connection";
-import { workspaces } from "../db/schema";
+import { configTable, workspaces } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "../workspace-scope";
@@ -47,6 +47,13 @@ export class WorkspaceService {
     // docs/56 P3-00a: a brand-new workspace has nothing to backfill, so it starts canonical.
     startCanonicalTasksIfEmpty(rawDb, id);
     return id;
+  }
+
+  initializeWorkspace(workspaceId: string, { timeZone }: { timeZone?: string } = {}): void {
+    this.assertWorkspaceExists(workspaceId);
+    for (const [key, value] of [["team_mode", "solo"], ["one_on_one_enabled", "true"], ...(timeZone ? [["attention_time_zone", timeZone]] : [])]) {
+      db.insert(configTable).values({ workspaceId, key: key!, value: value! }).onConflictDoNothing().run();
+    }
   }
 
   assertWorkspaceExists(workspaceId?: string | null): string {

@@ -1,3 +1,9 @@
+import { config } from "../config";
+import { RegistrationService } from "../services/registration.service";
+import { authIpLimit } from "../middleware/auth-ip-limit";
+import { isValidTimeZone } from "../services/today-clock";
+import { USERNAME_PATTERN, RESERVED_USERNAMES, signUpPasswordError } from "shared/types";
+import type { RequestHandler } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import type { AuthBootstrapResponse, AuthSessionResponse, AuthUser } from "shared/types";
@@ -16,6 +22,22 @@ import { TaskKeysService } from "../services/task-keys.service";
 import { SettingsService } from "../services/settings.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { HttpError } from "../middleware/errorHandler";
+
+const signUpSchema = z.object({
+  body: z.object({
+    inviteToken: z.string().max(200).default(""),
+    username: z.string().trim().toLowerCase().regex(USERNAME_PATTERN, "Use 3–40 letters, numbers, dots, underscores or hyphens.").refine(value => !(RESERVED_USERNAMES as readonly string[]).includes(value), "Choose a different username."),
+    displayName: z.string().trim().min(1, "Enter your name.").max(200),
+    password: z.string().min(8).max(200),
+    timeZone: z.string().refine(isValidTimeZone, "Choose a valid time zone.").optional(),
+  }).strict().superRefine((data, ctx) => { const error = signUpPasswordError(data.password, data.username); if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["password"], message: error }); }),
+  params: z.any().optional(), query: z.any().optional(),
+});
+const registrationOpen: RequestHandler = (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (config.LEADOS_REGISTRATION !== "invite") { next(new HttpError(404, "Not Found")); return; }
+  next();
+};
 
 const loginSchema = z.object({
   body: z.object({
@@ -131,6 +153,19 @@ export function createAuthRouter(authService: AuthService): Router {
     },
   });
 
+  const registration = new RegistrationService(authService);
+  router.get("/invite", registrationOpen, authIpLimit(10), validate(z.object({ query: z.object({ token: z.string().max(200).optional() }), body: z.any().optional(), params: z.any().optional() })), (req, res) => {
+    res.json({ valid: registration.checkInvite(String(req.query.token ?? "")) });
+  });
+  router.post("/signup", registrationOpen, authIpLimit(10), validate(signUpSchema), async (req, res, next) => {
+    try {
+      await registration.signUp(req.body);
+      const result = await authService.authenticate(req.body.username, req.body.password);
+      res.setHeader("Set-Cookie", serializeSessionCookie(result.sessionId, authService.sessionMaxAgeSeconds));
+      res.status(201).json(await sessionResponse(result.user));
+    } catch (error) { next(error instanceof HttpError ? error : new HttpError(500, "Account creation failed. Please try again.")); }
+  });
+
   router.get("/bootstrap", async (_req, res, next) => {
     try {
       const userCount = await authService.getUserCount();
@@ -144,7 +179,7 @@ export function createAuthRouter(authService: AuthService): Router {
     }
   });
 
-  router.post("/login", validate(loginSchema), async (req, res, next) => {
+  router.post("/login", authIpLimit(30), validate(loginSchema), async (req, res, next) => {
     try {
       const { username, password } = req.body;
       const key = throttleKey(req, username);

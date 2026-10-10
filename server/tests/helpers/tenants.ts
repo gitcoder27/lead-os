@@ -67,7 +67,7 @@ export async function seedTenants(options: { backupService?: BackupServiceType }
     getSyncScope: (ws: string) => new SyncEngine(settings).getSyncScope(ws),
     syncAllWorkspaces: async () => [],
   } as unknown as SyncEngineType;
-  const backupService = options.backupService ?? { start: async () => undefined, createPreResetBackup: async () => null } as unknown as BackupService;
+  const backupService = options.backupService ?? { start: async () => undefined, createPreResetBackup: async () => null, listBackups: async () => [], createDownloadCopy: async () => undefined, getRuntimeStatus: async () => ({ enabled: false, running: false, directory: "/tmp/fixture-backups" }) } as unknown as BackupService;
   const today = new TodayService(issueService, tracker, desk, syncStub, { oneOnOneService: oneOnOnes });
   const search = new SearchService(settings, dailyNotes);
   const workViews = new WorkSavedViewsService();
@@ -145,5 +145,5 @@ export async function seedTenants(options: { backupService?: BackupServiceType }
   const before = snapshot();
   rawDb.prepare("INSERT INTO config (workspace_id,key,value) VALUES (?,'one_on_one_enabled','true') ON CONFLICT DO NOTHING").run(friend.workspaceId);
   const probes = foreignTenantProbes(seed, day);
-  return { app, authService, settings, tracker, search, syncStub, friend, friendCookie, ownerCookie, seed, day, O, F, before, snapshot, probes };
+  return { app, assistantServices: { todayService: today, teamTrackerService: tracker, managerDeskService: desk, issueService, dailyNotesService: dailyNotes, workloadService: workload, alertService, searchService: search, syncEngine: syncStub, tagService, workSavedViewsService: workViews, automationService: automation, settingsService: settings, memoryService: new AssistantMemoryService() }, authService, settings, tracker, search, syncStub, friend, friendCookie, ownerCookie, seed, day, O, F, before, snapshot, probes };
 }

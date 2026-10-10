@@ -428,6 +428,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-08 | main (this commit) | Added registration_invites with SHA-256 hashes and an idempotent marker; random 32-byte single-use tokens expire in seven days by default and can be revoked. Trusted auth:invite create/list/revoke prints a join URL once, omits tokens/hashes from lists, and requires completed owner setup plus configured public origin. LEADOS_REGISTRATION defaults off; no signup routes yet. Lifecycle/migration/owner suites: 15 PASS; final copy/CLI/migration suites: 13 PASS. The populated synthetic-copy hashes stay unchanged. Corrected a scratch-helper import and gave the multi-subprocess integration its own 15s timeout without changing assertions. New-module lint, touched JSON formatting, guard:data and diff check PASS. |
 
+| 2026-10-10 | SR-09 | main (this commit) | Added default-off invite/signup endpoints, per-IP limits including username-spray login defence, shared identity/password rules (runtime JS regenerated with AGENTS command), synchronous invite/user/workspace transaction, solo canonical starts, browser time zone and enabled 1:1s. All invalid invite states share 410; duplicate remains gated by a valid invite. Rollback, races, spoofed authority/workspace, validation and limiter tests pass. Actual API registration scenario seeds both tenants and checks list/search/palette, foreign ids/writes, Copilot tools and CSV-source lists with opposite-workspace hashes; fresh Copilot rejects owner-key fallback. Reviewed inventory adds only the two dark public routes. Fixed fixture mocks and accounted for callers own Today visits without excluding foreign-table hashes. Final three suites: 35 PASS; related five suites: 60 PASS; server typecheck, new-module lint, guard:data and diff check PASS. No per-workspace server export was added (reviewed out of scope). |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -468,7 +470,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Files:* schema/migrate, `services/registration.service.ts` (new), `scripts/invite.ts` (new; `npm run auth:invite`), `server/package.json` script, `config.ts` env schema (`LEADOS_REGISTRATION`, `LEADOS_PUBLIC_URL`), tests.
   - *Acceptance:* create/list/revoke; the token is printed once and stored hashed; expiry.
   - *Rollback:* revert; the empty table is harmless.
-- [ ] **SR-09 Sign-up endpoints, limiter and workspace initialisation (F-15, F-16).**
+- [x] **SR-09 Sign-up endpoints, limiter and workspace initialisation (F-15, F-16).**
   - *Seeds:* `one_on_one_enabled = true`, attention-rule zone from the browser, `team_mode` solo.
   - *Files:* `routes/auth.ts`, `services/registration.service.ts`, `services/workspace.service.ts`, `shared/types.ts` plus regenerated `shared/types.js`, tests §8.2 and §8.4.
   - *Acceptance:* every §8.4 case; the SR-01 harness extended with the new public routes.

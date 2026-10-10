@@ -123,6 +123,11 @@ exports[`permanent tenant isolation guard > keeps all owner table families priva
     "scope": "public (register: bootstrap or manager)",
   },
   {
+    "proof": "auth/install boundary regression",
+    "route": "GET /api/auth/invite",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
     "proof": "direct-id/scoped API probe",
     "route": "GET /api/auth/me",
     "scope": "workspace manager",
@@ -640,6 +645,11 @@ exports[`permanent tenant isolation guard > keeps all owner table families priva
   {
     "proof": "direct-id/scoped API probe",
     "route": "POST /api/auth/register",
+    "scope": "public (register: bootstrap or manager)",
+  },
+  {
+    "proof": "auth/install boundary regression",
+    "route": "POST /api/auth/signup",
     "scope": "public (register: bootstrap or manager)",
   },
   {

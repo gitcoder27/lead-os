@@ -21,7 +21,7 @@ function manifest(stack: RouteLayer[], probes: Array<[string, string, unknown?]>
       for (const method of Object.keys(layer.route.methods)) {
         const matcher = new RegExp(`^${path.replace(/:[^/]+/g, "[^/]+")}/?$`);
         const probed = probes.some(([verb, url]) => verb.toLowerCase() === method && matcher.test(url.split("?")[0]!));
-        const publicRoute = ["/api/health", "/api/auth/bootstrap", "/api/auth/login", "/api/auth/change-password", "/api/auth/register"].includes(path);
+        const publicRoute = ["/api/health", "/api/auth/bootstrap", "/api/auth/login", "/api/auth/change-password", "/api/auth/register", "/api/auth/signup", "/api/auth/invite"].includes(path);
         const install = path.startsWith("/api/backups");
         entries.push({
           route: `${method.toUpperCase()} ${path}`,

@@ -1000,13 +1000,26 @@ export interface SessionFeatures {
    *  developer sessions omit the field entirely (OO-D6). */
   oneOnOne?: boolean;
   /** docs/56 P6-01 review: Settings → Data & Backups. Manager sessions only; true for
-   *  managers of the default workspace, the only ones `/api/backups` serves. */
+   *  explicit install owners, the only principals `/api/backups` serves. */
   backups?: boolean;
 }
 
 export interface AuthSessionResponse {
   user: AuthUser;
   features?: SessionFeatures;
+}
+
+/** Registration is an install setting and defaults closed. */
+export type RegistrationMode = "off" | "invite";
+export interface InviteCheckResponse { valid: boolean; }
+export interface SignUpRequest { inviteToken: string; username: string; displayName: string; password: string; timeZone?: string; }
+export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,39}$/;
+export const RESERVED_USERNAMES = ["admin", "root", "system", "support", "leados", "default", "api", "null"] as const;
+export function signUpPasswordError(password: string, username: string): string | undefined {
+  if (password.length < 8 || password.length > 200) return "Use 8–200 characters for your password.";
+  const common = ["password", "password1", "password123", "12345678", "123456789", "1234567890", "qwerty123", "qwertyuiop", "letmein123", "welcome123", "iloveyou"];
+  if (password.toLowerCase() === username.trim().toLowerCase() || common.includes(password.toLowerCase())) return "Choose a less common password, different from your username.";
+  return undefined;
 }
 
 export interface AuthBootstrapResponse {

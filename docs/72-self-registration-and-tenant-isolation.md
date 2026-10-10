@@ -430,6 +430,8 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
 
 | 2026-10-10 | SR-09 | main (this commit) | Added default-off invite/signup endpoints, per-IP limits including username-spray login defence, shared identity/password rules (runtime JS regenerated with AGENTS command), synchronous invite/user/workspace transaction, solo canonical starts, browser time zone and enabled 1:1s. All invalid invite states share 410; duplicate remains gated by a valid invite. Rollback, races, spoofed authority/workspace, validation and limiter tests pass. Actual API registration scenario seeds both tenants and checks list/search/palette, foreign ids/writes, Copilot tools and CSV-source lists with opposite-workspace hashes; fresh Copilot rejects owner-key fallback. Reviewed inventory adds only the two dark public routes. Fixed fixture mocks and accounted for callers own Today visits without excluding foreign-table hashes. Final three suites: 35 PASS; related five suites: 60 PASS; server typecheck, new-module lint, guard:data and diff check PASS. No per-workspace server export was added (reviewed out of scope). |
 
+| 2026-10-10 | SR-10 | main (this commit) | Added operator-only auth:delete-workspace with complete per-table dry-run counts, exact-id confirmation, refusal of default, mandatory verified whole-install backup and atomic deletion in FK dependency order. Scoped rows, dependent sessions/chat messages and FTS rows are removed; snapshots retain data until expiry. Populated-copy tests prove all target counts zero, owner hashes unchanged, recoverable backup, backup failure/nonexistent-file refusal and transaction rollback. Real CLI dry-run/apply uses only the copy and scratch backups. Two targeted suites: 11 PASS. Phase 1 gates: lint, guard:data, typecheck, build:check PASS; full test PASS (1644 server / 2085 client). format:check FAIL only on preserved unrelated .claude/settings.local.json; touched package JSON format PASS. Registration stays off outside isolated tests; no production or runtime data accessed. |
+
 ### Phase 0 — Isolation blockers (registration code must not merge before these)
 
 - [x] **SR-01 Permanent tenant-isolation harness.**
@@ -475,7 +477,7 @@ Rules as in docs/70 and docs/71: sequential on `main` in the development checkou
   - *Files:* `routes/auth.ts`, `services/registration.service.ts`, `services/workspace.service.ts`, `shared/types.ts` plus regenerated `shared/types.js`, tests §8.2 and §8.4.
   - *Acceptance:* every §8.4 case; the SR-01 harness extended with the new public routes.
   - *Rollback:* revert; with the flag off, nothing is exposed.
-- [ ] **SR-10 Workspace purge CLI (F-14).**
+- [x] **SR-10 Workspace purge CLI (F-14).**
   - *Files:* `scripts/delete-workspace.ts` (new), `services/workspace-maintenance.service.ts` or a new `workspace-purge.service.ts`, tests (every workspace table emptied for the target, `default` refused, others untouched via `snapshot()`).
   - *Rollback:* revert.
 

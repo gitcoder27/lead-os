@@ -4,6 +4,7 @@ import { ArrowLeft, Lock, PenLine, Search } from 'lucide-react';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
 import { snippetSegments } from '@/lib/note-markdown';
 import type { DailyNoteKind, DailyNoteSummary } from '@/types';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 
 interface NotesSidebarProps {
   selectedDate: string;
@@ -136,7 +137,7 @@ export function NotesSidebar({ selectedDate, today, kind, onKindChange, onSelect
             className="notes-search-input"
           />
           <kbd className="ui-kbd notes-search-kbd" aria-hidden="true">
-            ⌘⇧F
+            {formatShortcutKeys('⌘⇧F')}
           </kbd>
         </label>
       </div>

@@ -28,6 +28,7 @@ import { useTeamMode } from '@/hooks/useTeamMode';
 import { MIN_PASSWORD_LENGTH } from '@/lib/password';
 import type { AuthUser, TeamModeUpdateRequest } from '@/types';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
+import { Select } from '@/components/ui/Select';
 
 interface DiscoveredUser {
   accountId: string;
@@ -1218,7 +1219,7 @@ function StepContent(props: StepContentProps) {
               />
             </Field>
             <Field label="Tracked developer">
-              <select
+              <Select className="w-full"
                 value={props.newAccountDeveloperId}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const id = e.target.value;
@@ -1228,14 +1229,12 @@ function StepContent(props: StepContentProps) {
                     props.setNewAccountDisplayName(matched.displayName);
                   }
                 }}
-                className={fieldClassName}
-                style={fieldStyle}
               >
                 <option value="">Select developer</option>
                 {props.eligibleDeveloperAccounts.map((c: DiscoveredUser) => (
                   <option key={c.accountId} value={c.accountId}>{c.displayName}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
           <button

@@ -6,6 +6,7 @@ import './action-confirm.css';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ClipboardList, Edit3, MessageSquare, NotebookPen, RefreshCw, Sparkles, UserPlus, Zap } from 'lucide-react';
 import type { AssistantActionDecision, AssistantActionProposal } from '@/types';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 interface ActionConfirmCardProps {
   proposal: AssistantActionProposal;
@@ -95,10 +96,9 @@ export function ActionConfirmCard({ proposal, busy, onDecision }: ActionConfirmC
             </dl>
           )}
           {previewEntries.length > 0 && (
-            <details className="action-confirm-technical">
-              <summary>Technical details</summary>
+            <Disclosure className="action-confirm-technical" summary="Technical details">
               <pre>{JSON.stringify(proposal.preview, null, 2)}</pre>
-            </details>
+            </Disclosure>
           )}
           <div className="mt-2 flex items-center gap-2">
             <button

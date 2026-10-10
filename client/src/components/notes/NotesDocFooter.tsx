@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react';
 import { CalendarClock, CheckCheck, ChevronDown, ListPlus, SquarePlus } from 'lucide-react';
 import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import type { NoteLineAction } from './editor/note-editor-extensions';
-import { NOTE_ACTION_SHORTCUTS, NOTES_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { formatShortcutKeys, NOTE_ACTION_SHORTCUTS, NOTES_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useQuickActions } from '@/context/QuickActionsContext';
 import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 
@@ -83,7 +83,7 @@ export const NotesDocFooter = forwardRef<HTMLButtonElement, NotesDocFooterProps>
           type="button"
           className={`notes-ghost-button${wrapUpNudge ? ' nudge' : ''}`}
           onClick={onWrapUp}
-          title={`Wrap up the day — ${wrapUpCount} open item${wrapUpCount === 1 ? '' : 's'} (⌘⏎)`}
+          title={`Wrap up the day — ${wrapUpCount} open item${wrapUpCount === 1 ? '' : 's'} (${formatShortcutKeys('⌘⏎')})`}
           disabled={disabled}
         >
           <CheckCheck size={12} aria-hidden="true" />

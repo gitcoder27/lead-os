@@ -105,7 +105,7 @@ export function WorkIssueMenu({ issue }: { issue: Issue }) {
             Return on
             <input
               data-autofocus
-              className="ui-input block mt-2"
+              className="ui-field block mt-2"
               type="date"
               min={shiftLocalIsoDate(getLocalIsoDate(), 1)}
               value={date}

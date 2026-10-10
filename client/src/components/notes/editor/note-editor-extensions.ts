@@ -6,7 +6,7 @@
  * over that text; nothing is serialized differently, so revisions, appends,
  * merges, and FTS search keep working on the exact same string.
  */
-import { NOTE_ACTION_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { formatShortcutKeys, NOTE_ACTION_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   autocompletion,
   completionKeymap,
@@ -603,7 +603,7 @@ function previewDom(entity: EntityAt, preview: NoteEntityPreview | null, handler
   });
   const hint = document.createElement('span');
   hint.className = 'cm-note-preview-hint';
-  hint.textContent = '⌘-click to open';
+  hint.textContent = `${formatShortcutKeys('⌘-click')} to open`;
   const foot = document.createElement('div');
   foot.className = 'cm-note-preview-foot';
   foot.append(open, hint);
@@ -673,7 +673,7 @@ const SLASH_COMMANDS: (SlashCommand & { command?: NoteEditorCommand })[] = [
       void f;
     },
   },
-  { label: 'Wrap up day', command: 'wrap-up', detail: '⌘⏎', run: (_v, _f, h) => h.onWrapUp() },
+  { label: 'Wrap up day', command: 'wrap-up', detail: formatShortcutKeys('⌘⏎'), run: (_v, _f, h) => h.onWrapUp() },
 ];
 
 function slashSource(getHandlers: () => NoteEditorHandlers, omit: ReadonlySet<NoteEditorCommand>) {

@@ -3,6 +3,7 @@ import { Folder, Search } from 'lucide-react';
 import { useProject, useProjects } from '@/hooks/useProjects';
 import type { TaskPlacement } from '@/types';
 import './projects.css';
+import { Select } from '@/components/ui/Select';
 
 export function PlacementPicker({ value, onChange, today, disabled = false }: {
   value: TaskPlacement | null | undefined;
@@ -46,11 +47,11 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
           <p className="project-field-hint break-words">Selected: <strong style={{ color: 'var(--text-secondary)' }}>{selected?.name ?? 'Selected project'}</strong>{selected?.archivedAt ? ' · Archived' : ''}</p>
           <label className="flex flex-col gap-2 text-body font-medium">
             Track (optional)
-            <select aria-label="Track (optional)" className="ui-field" disabled={disabled || detail.isLoading || Boolean(selected?.archivedAt)} value={value.trackId ?? ''} onChange={(event) => onChange({ projectId: value.projectId, trackId: event.target.value ? Number(event.target.value) : null })}>
+            <Select className="w-full" aria-label="Track (optional)" disabled={disabled || detail.isLoading || Boolean(selected?.archivedAt)} value={value.trackId ?? ''} onChange={(event) => onChange({ projectId: value.projectId, trackId: event.target.value ? Number(event.target.value) : null })}>
               <option value="">No track · project only</option>
               {detail.data?.tracks.filter((track) => !track.archivedAt).map((track) => <option key={track.id} value={track.id}>{track.name}</option>)}
               {value.trackId && (!selectedTrack || selectedTrack.archivedAt) && <option value={value.trackId} disabled>{selectedTrack?.name ?? 'Selected track'}{selectedTrack?.archivedAt ? ' · Archived' : ''}</option>}
-            </select>
+            </Select>
           </label>
           {detail.isLoading && <p className="project-field-hint" role="status">Loading tracks…</p>}
           {(selected?.archivedAt || selectedTrack?.archivedAt) && <p className="project-field-hint">Choose an active project or track to move tasks into it.</p>}

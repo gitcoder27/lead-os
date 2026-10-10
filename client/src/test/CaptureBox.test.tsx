@@ -617,12 +617,12 @@ describe('progressive capture guidance', () => {
     const input = screen.getByRole('textbox', { name: 'Capture' });
     expect(input).toHaveAttribute('placeholder', 'What do you need to do?');
     expect(input).toHaveAccessibleDescription('A title is enough. Extras are optional.');
-    const summary = screen.getByText('Examples');
-    const details = summary.closest('details')!;
-    expect(details.open).toBe(false);
+    // docs/73 UXD-05: Examples is a Disclosure (chevron button with aria-expanded), not <details>.
+    const summary = screen.getByRole('button', { name: 'Examples' });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
     fireEvent.change(input, { target: { value: 'Keep my draft' } });
     fireEvent.click(summary);
-    expect(details.open).toBe(true); expect(input).toHaveValue('Keep my draft');
+    expect(summary).toHaveAttribute('aria-expanded', 'true'); expect(input).toHaveValue('Keep my draft');
     expect(screen.getByText('Review the rollout checklist !tomorrow')).toBeInTheDocument();
     expect(screen.getByText('Prepare the release update !!')).toBeInTheDocument();
   });

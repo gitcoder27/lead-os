@@ -75,6 +75,7 @@ import { useAssistantConfig } from '@/hooks/useAssistantConfig';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import type { AuthUser, Developer, JiraSyncScopeMode } from '@/types';
 import { SYNC_SCOPE_SHORT_LABELS, SYNC_SCOPE_SUMMARIES } from '@/lib/sync-scope';
+import { Select } from '@/components/ui/Select';
 
 type FieldPickerTarget = 'dueDate' | 'aspenSeverity';
 type SectionId = 'navigation' | 'rhythm' | 'attention' | 'connection' | 'sync' | 'assistant' | 'team' | 'tags' | 'labels' | 'data' | 'maintenance' | 'access';
@@ -2135,28 +2136,24 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                           <div className="grid gap-2.5 sm:grid-cols-2">
                             <SettingsLabeledInput label="Role" id="new-role">
                               <div className="relative">
-                                <select
+                                <Select className="w-full"
                                   id="new-role"
                                   value={newRole}
                                   onChange={(e) => { setNewRole(e.target.value as CreatableUserRole); if (e.target.value === 'manager') setNewDevAccountId(''); }}
-                                  className="w-full appearance-none rounded-lg px-3 py-2 text-body outline-none"
-                                  style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                 >
                                   <option value="developer">Developer</option>
                                   <option value="manager">Manager</option>
-                                </select>
+                                </Select>
                                 <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                               </div>
                             </SettingsLabeledInput>
                             {newRole === 'developer' ? (
                               <SettingsLabeledInput label="Team member" id="new-jira-profile">
                                 <div className="relative">
-                                  <select
+                                  <Select className="w-full"
                                     id="new-jira-profile"
                                     value={newDevAccountId}
                                     onChange={(e) => setNewDevAccountId(e.target.value)}
-                                    className="w-full appearance-none rounded-lg px-3 py-2 text-body outline-none"
-                                    style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                   >
                                     <option value="">Select…</option>
                                     {developers.map((dev) => (
@@ -2164,7 +2161,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                                         {dev.displayName}{dev.email ? ` (${dev.email})` : ''}{dev.source === 'manual' && !dev.jiraAccountId ? ' · manual' : ''}
                                       </option>
                                     ))}
-                                  </select>
+                                  </Select>
                                   <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                                 </div>
                               </SettingsLabeledInput>

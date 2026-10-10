@@ -516,6 +516,39 @@ body::after {
 .ui-field:disabled { opacity: 0.55; }
 textarea.ui-field { resize: none; }
 
+/* docs/73 UXD-05: `Disclosure` — a chevron button instead of a native <details> marker. */
+.ui-disclosure-trigger {
+  display: inline-flex; max-width: 100%; align-items: center; gap: 4px; min-height: 24px;
+  margin-left: -4px; padding: 2px 6px 2px 2px; border-radius: 6px;
+  font-size: var(--fs-12); font-weight: 500; color: var(--text-secondary); text-align: left;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.ui-disclosure-trigger:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.ui-disclosure-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ui-disclosure-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform 150ms var(--ease-out); }
+.ui-disclosure-trigger[aria-expanded='true'] .ui-disclosure-chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .ui-disclosure-chevron { transition: none; } }
+@media (pointer: coarse) { .ui-disclosure-trigger { min-height: 44px; } }
+
+/* docs/73 UXD-05: `Select` — a native select styled as a field, with a chevron. */
+.ui-select { position: relative; display: inline-flex; min-width: 0; align-items: center; vertical-align: middle; }
+.ui-select > select {
+  width: 100%; min-width: 0; height: 36px; appearance: none; cursor: pointer;
+  border-radius: 8px; border: 1px solid var(--border); background: var(--bg-primary);
+  padding: 0 30px 0 10px; font-size: var(--fs-13); color: var(--text-primary); outline: none;
+  text-overflow: ellipsis; transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.ui-select > select:hover:not(:disabled) { border-color: color-mix(in srgb, var(--text-muted) 45%, var(--border)); }
+.ui-select > select:focus-visible { border-color: var(--border-active); box-shadow: 0 0 0 2px var(--accent-glow); }
+.ui-select > select:disabled { opacity: 0.55; cursor: default; }
+.ui-select-chevron { position: absolute; right: 10px; pointer-events: none; color: var(--text-muted); }
+.ui-select[data-size='sm'] > select { height: 28px; padding: 0 26px 0 8px; font-size: var(--fs-12); }
+.ui-select[data-size='sm'] .ui-select-chevron { right: 8px; }
+.ui-select[data-variant='quiet'] > select { height: auto; border-color: transparent; background: transparent; padding: 2px 22px 2px 4px; }
+.ui-select[data-variant='quiet'] > select:hover:not(:disabled) { border-color: transparent; background: var(--bg-tertiary); }
+.ui-select[data-variant='quiet'] .ui-select-chevron { right: 5px; }
+@media (max-width: 639px) { .ui-select > select { font-size: var(--fs-input-touch); } .ui-select[data-variant='quiet'] > select, .ui-select[data-size='sm'] > select { font-size: var(--fs-12); } }
+
 .ui-segment {
   display: inline-flex;
   flex-wrap: wrap;

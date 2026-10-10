@@ -15,6 +15,7 @@ import { MenuItem, TaskPopover } from '@/components/ui/Popover';
 import { Avatar, FOCUS_RING, SectionHeader } from './TaskDetailPrimitives';
 import type { TaskDetailMode, TaskPeople } from './TaskDetailFields';
 import { isHttpUrl, prettyUrl } from './task-detail-format';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 type LinkKind = TaskLink['kind'];
 
@@ -383,7 +384,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           ))}
         </ul>
       )}
-      {canAdd && <details className="text-ui leading-4" onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">Subtask project · inherits parent unless changed</summary>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</details>}
+      {canAdd && <Disclosure open={showPlacement} onOpenChange={setShowPlacement} summary="Subtask project · inherits parent unless changed">{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</Disclosure>}
       {canAdd && (
         <form
           className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"

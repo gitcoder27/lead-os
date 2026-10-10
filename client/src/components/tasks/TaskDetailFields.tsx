@@ -50,6 +50,7 @@ import {
   formatStamp,
   toLocalDateTimeInputValue,
 } from './task-detail-format';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 
 export type TaskDetailMode = 'manager' | 'developer';
 type Patch = (updates: UpdateTaskRequest) => void;
@@ -726,7 +727,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
         />
         <div className="flex items-center gap-2 px-2 pt-1">
           <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
-            {draft.length > TASK_DETAILS_MAX * 0.9 ? `${draft.length.toLocaleString()} / ${TASK_DETAILS_MAX.toLocaleString()}` : '⌘/Ctrl ↵ to save · Esc to discard'}
+            {draft.length > TASK_DETAILS_MAX * 0.9 ? `${draft.length.toLocaleString()} / ${TASK_DETAILS_MAX.toLocaleString()}` : `${formatShortcutKeys('⌘↵')} to save · Esc to discard`}
           </span>
           <div className="ml-auto flex items-center gap-1">
             <button

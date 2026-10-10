@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { TodayDialog, TodayDialogActions, TodayDialogError } from './TodayDialog';
+import { Select } from '@/components/ui/Select';
 
 export type TodayCapturePreset = 'later_today' | 'tomorrow' | 'next_week';
 
@@ -115,18 +116,17 @@ export function TodayTextCaptureDialog({
           </div>
           <div>
             <label htmlFor={ownerFieldId} className="ui-field-label">Owner</label>
-            <select
+            <Select className="w-full"
               id={ownerFieldId}
               value={ownerId}
               onChange={(event) => setOwnerId(event.target.value)}
               disabled={!nextAction.trim()}
-              className="ui-field"
             >
               <option value="">You</option>
               {nextActionOwners.map((owner) => (
                 <option key={owner.accountId} value={owner.accountId}>{owner.displayName}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       ) : null}

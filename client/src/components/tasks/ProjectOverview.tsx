@@ -1,6 +1,7 @@
 import { ChevronRight, Layers, Pencil, Plus } from 'lucide-react';
 import type { Project, ProjectDetail, ProjectFacts, ProjectTrack } from '@/types';
 import { ProjectFactsRow } from './ProjectFactsRow';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchiveFilter, onEdit, onArchive, openTask }: {
   detail: ProjectDetail;
@@ -38,10 +39,9 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
       <div className="mt-4"><ProjectFactsRow facts={facts} openTask={openTask} /></div>
       {isArchived && <p className="project-caption mt-3">Open tasks stay actionable. {project.archivedAt && track ? 'Restore the project to add tasks or tracks.' : `Restore this ${track ? 'track' : 'project'} to add new tasks${track ? '.' : ' or tracks.'}`}</p>}
       {item.summary && (
-        <details className="project-summary">
-          <summary>Latest summary{item.summaryUpdatedAt && <span className="ml-2 project-caption">Updated {new Date(item.summaryUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}</summary>
+        <Disclosure className="project-summary" summary={<>Latest summary{item.summaryUpdatedAt && <span className="ml-2 project-caption">Updated {new Date(item.summaryUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}</>}>
           <p>{item.summary}</p>
-        </details>
+        </Disclosure>
       )}
       {!track && (
         <section className="project-tracks" aria-label="Tracks">

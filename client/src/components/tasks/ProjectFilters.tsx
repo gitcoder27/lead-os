@@ -1,7 +1,7 @@
 import { useProjects, useProject } from '@/hooks/useProjects';
 import type { TaskViewOverrides } from '@/lib/task-views';
 import type { TaskViewDefinition } from '@/types';
-import { PROJECT_CONTROL, PROJECT_STYLE } from './ProjectEditor';
+import { Select } from '@/components/ui/Select';
 const parse = (value: string): number | 'none' | 'all' => (value === 'none' || value === 'all' ? value : Number(value));
 export function ProjectFilters({
   today,
@@ -19,10 +19,8 @@ export function ProjectFilters({
     <div className="flex flex-wrap gap-2 border-b px-4 py-2" style={{ borderColor: 'var(--border)' }}>
       <label className="flex items-center gap-2 text-ui leading-4">
         Project
-        <select
+        <Select size="sm"
           aria-label="Project"
-          className={PROJECT_CONTROL}
-          style={PROJECT_STYLE}
           value={definition?.filters?.project ?? 'all'}
           onChange={(event) => onChange({ project: parse(event.target.value), track: 'all' })}
         >
@@ -36,15 +34,13 @@ export function ProjectFilters({
           {id && !projects.data?.projects.some((project) => project.id === id) && (
             <option value={id}>{detail.data?.project.name ?? 'Unavailable project'}</option>
           )}
-        </select>
+        </Select>
       </label>
       {id && (
         <label className="flex items-center gap-2 text-ui leading-4">
           Track
-          <select
+          <Select size="sm"
             aria-label="Track"
-            className={PROJECT_CONTROL}
-            style={PROJECT_STYLE}
             value={definition?.filters?.track ?? 'all'}
             onChange={(event) => onChange({ track: parse(event.target.value) })}
           >
@@ -55,7 +51,7 @@ export function ProjectFilters({
                 {track.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
       )}
     </div>

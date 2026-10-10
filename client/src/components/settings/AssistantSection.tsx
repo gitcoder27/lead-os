@@ -12,6 +12,8 @@ import {
   useDeleteAssistantMemory,
 } from '@/hooks/useAssistantMemory';
 import type { AiProviderProfile, AiReasoningEffort, AssistantResponseStyle, UpdateAiAssistantConfigRequest } from '@/types';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
+import { Select } from '@/components/ui/Select';
 
 function GroupLabel({ children }: { children: ReactNode }) {
   return (
@@ -362,7 +364,7 @@ export function AssistantSection() {
             title="Enable Copilot"
             description={
               enabled
-                ? 'On — managers can open the Copilot dock (Ctrl/⌘+J).'
+                ? `On — managers can open the Copilot dock (${formatShortcutKeys('⌘J')}).`
                 : 'Off — the Copilot dock shows a setup prompt instead.'
             }
             checked={enabled}
@@ -622,19 +624,17 @@ export function AssistantSection() {
                 />
               </LabeledInput>
               <LabeledInput label="Reasoning effort" id="ai-provider-reasoning">
-                <select
+                <Select className="w-full"
                   id="ai-provider-reasoning"
                   value={providerForm.reasoningEffort}
                   onChange={(e) => setProviderForm((prev) => ({ ...prev, reasoningEffort: e.target.value as '' | AiReasoningEffort }))}
-                  className={inputClass}
-                  style={inputStyle}
                 >
                   <option value="">Provider default</option>
                   <option value="off">Off (disable thinking where supported)</option>
                   <option value="low">Low</option>
                   <option value="high">High</option>
                   <option value="max">Max</option>
-                </select>
+                </Select>
               </LabeledInput>
               <p className="text-ui sm:col-span-2" style={{ color: 'var(--text-muted)' }}>
                 Reasoning applies to thinking-capable endpoints (ZAI GLM, DeepSeek). Blank token fields use
@@ -726,19 +726,17 @@ export function AssistantSection() {
             />
           </LabeledInput>
           <LabeledInput label="Response style" id="ai-response-style">
-            <select
+            <Select className="w-full"
               id="ai-response-style"
               value={responseStyle}
               onChange={(e) => {
                 markTouched();
                 setResponseStyle(e.target.value as AssistantResponseStyle);
               }}
-              className={inputClass}
-              style={inputStyle}
             >
               <option value="concise">Concise — lead with the answer</option>
               <option value="detailed">Detailed — fuller context</option>
-            </select>
+            </Select>
           </LabeledInput>
         </div>
         <div className="mt-3">

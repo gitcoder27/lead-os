@@ -19,6 +19,7 @@ import {
   NotesSubmitButton,
   noteSourceLabel,
 } from './NotesDialogPrimitives';
+import { Select } from '@/components/ui/Select';
 
 export type NotesTaskActionMode = 'update' | 'create';
 
@@ -253,31 +254,29 @@ function NotesTaskUpdateDialog({ open, noteDate, noteKind, selectedText, inferen
         <label className="sr-only" htmlFor="note-task-update-type">
           Type
         </label>
-        <select
+        <Select size="sm" variant="quiet"
           id="note-task-update-type"
           value={eventType}
           onChange={(event) => setEventType(event.target.value as typeof eventType)}
-          className="notes-quiet-select"
         >
           {EVENT_TYPES.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
         <span aria-hidden="true">·</span>
         <label className="sr-only" htmlFor="note-task-update-visibility">
           Visibility
         </label>
-        <select
+        <Select size="sm" variant="quiet"
           id="note-task-update-visibility"
           value={visibility}
           onChange={(event) => setVisibility(event.target.value as typeof visibility)}
-          className="notes-quiet-select"
         >
           <option value="private">Only me</option>
           <option value="shared">Shared with developer</option>
-        </select>
+        </Select>
       </div>
       <NotesFormError message={formError} />
     </NotesDialogShell>

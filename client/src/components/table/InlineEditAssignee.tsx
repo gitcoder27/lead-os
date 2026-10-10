@@ -3,6 +3,7 @@ import { useUpdateIssue } from '@/hooks/useUpdateIssue';
 import { useDevelopers } from '@/hooks/useDevelopers';
 import { useToast } from '@/context/ToastContext';
 import { getLocalIsoDate } from '@/lib/utils';
+import { Select } from '@/components/ui/Select';
 
 interface InlineEditAssigneeProps {
   issueKey: string;
@@ -46,19 +47,12 @@ export function InlineEditAssignee({ issueKey, currentId, onClose }: InlineEditA
   };
 
   return (
-    <select
+    <Select size="sm" variant="quiet" className="max-w-[110px]"
       ref={ref}
       value={currentId ?? ''}
       onChange={(e) => handleChange(e.target.value)}
       onBlur={onClose}
       onClick={(e) => e.stopPropagation()}
-      className="text-body px-1.5 py-0.5 rounded cursor-pointer max-w-[110px]"
-      style={{
-        background: 'var(--bg-tertiary)',
-        color: 'var(--text-primary)',
-        border: '1px solid var(--border-active)',
-        outline: 'none',
-      }}
     >
       <option value="">Unassigned</option>
       {assignmentOptions.map(({ developer, value }) => (
@@ -72,6 +66,6 @@ export function InlineEditAssignee({ issueKey, currentId, onClose }: InlineEditA
             : developer.displayName}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

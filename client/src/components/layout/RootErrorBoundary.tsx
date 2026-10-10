@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { isChunkLoadError, reloadOnceForChunkError } from '@/lib/chunk-reload';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 interface RootErrorBoundaryProps {
   children: ReactNode;
@@ -67,10 +68,9 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
             </button>
           </div>
           {error.message ? (
-            <details className="mt-4 text-ui" style={{ color: 'var(--text-muted)' }}>
-              <summary className="cursor-pointer">Error details</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-words">{error.message}</pre>
-            </details>
+            <Disclosure className="mt-4" summary="Error details">
+              <pre className="mt-2 whitespace-pre-wrap break-words text-ui" style={{ color: 'var(--text-muted)' }}>{error.message}</pre>
+            </Disclosure>
           ) : null}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { cleanFlagReason, type DayStats } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
 import { Avatar } from './StandupPrimitives';
 import { YouTag } from '@/components/team-tracker/YouTag';
+import { Select } from '@/components/ui/Select';
 
 export const STATUS_OPTIONS: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];
 export const STATUS_LABELS: Record<TrackerDeveloperStatus, string> = {
@@ -66,11 +67,9 @@ export function StandupPersonHeader({
             </h2>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <select
+            <Select
               value={day.status}
               onChange={(event) => onStatusSelect(event.target.value as TrackerDeveloperStatus)}
-              className="h-9 rounded-md px-2 text-ui font-medium outline-none"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
               aria-label="Set developer status"
             >
               {STATUS_OPTIONS.map((status) => (
@@ -78,7 +77,7 @@ export function StandupPersonHeader({
                   {STATUS_LABELS[status]}
                 </option>
               ))}
-            </select>
+            </Select>
             {day.nextFollowUpAt && (
               <span className="inline-flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                 <BellRing size={11} /> Follow-up {formatTime(day.nextFollowUpAt)}

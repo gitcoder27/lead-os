@@ -293,7 +293,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
         <Dialog title="Save view" size="sm" onClose={closeSave}>
           <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <label className="block text-body">View name
-              <input data-autofocus value={name} maxLength={120} onChange={(event) => setName(event.target.value)} aria-label="Saved view name" disabled={saving} className="ui-input mt-2 w-full" />
+              <input data-autofocus value={name} maxLength={120} onChange={(event) => setName(event.target.value)} aria-label="Saved view name" disabled={saving} className="ui-field mt-2 w-full" />
             </label>
             {saveError && <p role="alert" className="mt-2 text-body">Could not save view. Try again.</p>}
             <div className="mt-4 flex justify-end gap-2">

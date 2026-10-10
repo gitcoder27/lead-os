@@ -5,6 +5,7 @@ import { useJiraExecution } from '@/hooks/useJiraExecution';
 import { ISSUE_BULK_LIMIT, type Issue, type IssueBulkItem, type IssueBulkResult, type IssueOperation } from '@/types';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { PRIORITY_OPTIONS } from '@/lib/constants';
+import { Select } from '@/components/ui/Select';
 
 export function WorkBulkTriage({
   issues,
@@ -106,9 +107,8 @@ export function WorkBulkTriage({
         <>
           <label className="block text-body mb-3">
             Action
-            <select
+            <Select className="w-full mt-1"
               data-autofocus
-              className="ui-input w-full mt-1"
               value={action}
               onChange={(event) => {
                 setAction(event.target.value);
@@ -128,12 +128,12 @@ export function WorkBulkTriage({
               <option value="snooze">Snooze until</option>
               <option value="exclude">Exclude</option>
               <option value="restore">Restore</option>
-            </select>
+            </Select>
           </label>
           {action === 'assign' && (
             <label className="block text-body mb-3">
               Assignee
-              <select className="ui-input w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
+              <Select className="w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
                 <option value="">Choose a Jira-linked person</option>
                 {developers
                   ?.filter((person) => person.jiraAccountId || person.source !== 'manual')
@@ -142,17 +142,17 @@ export function WorkBulkTriage({
                       {person.displayName}
                     </option>
                   ))}
-              </select>
+              </Select>
             </label>
           )}
           {action === 'priority' && (
             <label className="block text-body mb-3">
               Priority
-              <select className="ui-input w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
+              <Select className="w-full mt-1" value={value} onChange={(event) => setValue(event.target.value)}>
                 {PRIORITY_OPTIONS.map((priority) => (
                   <option key={priority}>{priority}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
           {['date', 'snooze'].includes(action) && (
@@ -160,7 +160,7 @@ export function WorkBulkTriage({
               {action === 'snooze' ? 'Return on' : 'Due date'}
               <input
                 type="date"
-                className="ui-input mt-1 block"
+                className="ui-field mt-1 block"
                 value={date}
                 min={action === 'snooze' ? shiftLocalIsoDate(getLocalIsoDate(), 1) : undefined}
                 onChange={(event) => setDate(event.target.value)}

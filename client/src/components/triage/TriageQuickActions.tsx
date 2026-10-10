@@ -1,6 +1,7 @@
 import { IssueDateEditor } from '@/components/table/IssueDateEditor';import { priorityColor, formatDate } from '@/lib/utils';
 import { PRIORITY_OPTIONS } from '@/lib/constants';
 import type { Issue, Developer } from '@/types';
+import { Select } from '@/components/ui/Select';
 
 interface TriageQuickActionsProps {
   issue: Issue;
@@ -33,16 +34,14 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
         accentColor={priorityColor(issue.priorityName)}
       >
         {editingField === 'priority' ? (
-          <select
+          <Select size="sm" variant="quiet" style={{ color: priorityColor(issue.priorityName) }}
             autoFocus
             value={issue.priorityName}
             onChange={(e) => { onUpdate(issue.jiraKey, { priorityName: e.target.value }); onEditField(null); }}
             onBlur={() => onEditField(null)}
-            className="text-ui bg-transparent outline-none cursor-pointer font-semibold"
-            style={{ color: priorityColor(issue.priorityName) }}
           >
             {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
+          </Select>
         ) : (
           <span className="text-ui font-semibold" style={{ color: priorityColor(issue.priorityName) }}>
             {issue.priorityName}
@@ -56,13 +55,11 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
         onClick={() => onEditField(editingField === 'assignee' ? null : 'assignee')}
       >
         {editingField === 'assignee' ? (
-          <select
+          <Select size="sm" variant="quiet"
             autoFocus
             value={issue.assigneeId ?? ''}
             onChange={(e) => { onUpdate(issue.jiraKey, { assigneeId: e.target.value || null }); onEditField(null); }}
             onBlur={() => onEditField(null)}
-            className="text-ui bg-transparent outline-none cursor-pointer font-medium"
-            style={{ color: 'var(--text-primary)' }}
           >
             <option value="">Unassigned</option>
             {assigneeOptions.map(({ developer, value }) => (
@@ -76,7 +73,7 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
                   : developer.displayName}
               </option>
             ))}
-          </select>
+          </Select>
         ) : (
           <span
             className="text-ui font-medium"

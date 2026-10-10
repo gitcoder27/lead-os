@@ -3,6 +3,7 @@ import { useUpdateIssue } from '@/hooks/useUpdateIssue';
 import { PRIORITY_OPTIONS } from '@/lib/constants';
 import { priorityColor } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
+import { Select } from '@/components/ui/Select';
 
 interface InlineEditPriorityProps {
   issueKey: string;
@@ -34,23 +35,16 @@ export function InlineEditPriority({ issueKey, currentValue, onClose }: InlineEd
   };
 
   return (
-    <select
+    <Select size="sm" variant="quiet" style={{ color: priorityColor(currentValue) }}
       ref={ref}
       value={currentValue}
       onChange={(e) => handleChange(e.target.value)}
       onBlur={onClose}
       onClick={(e) => e.stopPropagation()}
-      className="text-body px-1.5 py-0.5 rounded cursor-pointer"
-      style={{
-        background: 'var(--bg-tertiary)',
-        color: priorityColor(currentValue),
-        border: '1px solid var(--border-active)',
-        outline: 'none',
-      }}
     >
       {PRIORITY_OPTIONS.map((p) => (
         <option key={p} value={p}>{p}</option>
       ))}
-    </select>
+    </Select>
   );
 }

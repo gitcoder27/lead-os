@@ -2,14 +2,6 @@
   color: var(--text-secondary);
   font-size: var(--fs-13);
 }
-.capture-examples summary {
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  min-height: 28px;
-  color: var(--accent);
-}
-.capture-examples summary:focus-visible,
 .capture-title-input:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -35,11 +27,11 @@
   font-size: var(--fs-13);
 }
 @media (max-width: 767px), (pointer: coarse) {
-  .capture-examples summary {
+  .capture-examples .ui-disclosure-trigger {
     min-height: 44px;
   }
 }
 
 /* Capture is the first action in a new workspace. */
-.capture-box button, .capture-box summary { min-height: 44px; min-width: 44px; }
+.capture-box button { min-height: 44px; min-width: 44px; }
 .ui-dialog:has(.capture-box) .ui-dialog-head .ui-icon-btn { width: 44px; height: 44px; }

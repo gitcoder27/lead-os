@@ -3,6 +3,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { useProjectWrites } from '@/hooks/useProjects';
 import type { Project, ProjectTrack } from '@/types';
 import './projects.css';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 export const PROJECT_CONTROL = 'ui-field';
 export const PROJECT_STYLE = { borderColor: 'var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' };
@@ -43,14 +44,13 @@ export function ProjectEditor({ item, projectId, onClose, onCreated }: {
           <textarea id={outcomeId} className="ui-field resize-y" rows={2} maxLength={4000} value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="What will be different when this is done?" aria-describedby={hintId} />
           <span id={hintId} className="project-field-hint">Describe the result you’re working toward.</span>
         </div>
-        <details open={item ? true : undefined}>
-          <summary className="ui-link cursor-pointer">{item ? 'Summary' : 'Add a summary (optional)'}</summary>
+        <Disclosure defaultOpen={Boolean(item)} summary={item ? 'Summary' : 'Add a summary (optional)'}>
           <div className="mt-3 flex flex-col gap-2 text-body font-medium">
             <label htmlFor={summaryId}>Summary</label>
             <textarea id={summaryId} className="ui-field resize-y" rows={4} maxLength={10000} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="Where things stand, decisions, and what’s next." aria-describedby={`${summaryId}-hint`} />
             <span id={`${summaryId}-hint`} className="project-field-hint">A private snapshot of progress. LeadOS records when you update it.</span>
           </div>
-        </details>
+        </Disclosure>
         {write.error && <p role="alert" className="text-body leading-5" style={{ color: 'var(--danger)' }}>{write.error.message}</p>}
       </div>
     </Dialog>

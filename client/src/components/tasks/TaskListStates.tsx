@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { TriangleAlert, CalendarCheck, CheckCheck, Flag, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
-import { TASK_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { formatShortcutKeys, TASK_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -85,7 +85,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
     case 'today':
       return {
         title: 'Nothing planned for today',
-        body: candidates > 0 ? `${candidates} open task${candidates === 1 ? '' : 's'} could be pulled in.` : 'Capture something with ⌘I, or add a task below.',
+        body: candidates > 0 ? `${candidates} open task${candidates === 1 ? '' : 's'} could be pulled in.` : `Capture something with ${formatShortcutKeys('⌘I')}, or add a task below.`,
         Icon: CalendarCheck,
       };
     case 'inbox':
@@ -93,7 +93,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
     case 'projects':
       return { title: 'No tasks yet', body: 'Add a task below, or capture one for this project or track.', Icon: Inbox };
     case 'my-tasks':
-      return { title: 'No open tasks', body: 'Add one below or capture with ⌘I.', Icon: CalendarCheck };
+      return { title: 'No open tasks', body: `Add one below or capture with ${formatShortcutKeys('⌘I')}.`, Icon: CalendarCheck };
     case 'waiting':
       return { title: 'No tasks in Waiting.', Icon: CheckCheck };
     case 'meetings':
@@ -108,7 +108,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
     case 'closed-week':
       return { title: 'Nothing closed in the last 7 days.', Icon: Inbox };
     default:
-      return { title: 'Nothing in this view', body: 'Capture a task with ⌘I, or loosen the filters.', Icon: Inbox };
+      return { title: 'Nothing in this view', body: `Capture a task with ${formatShortcutKeys('⌘I')}, or loosen the filters.`, Icon: Inbox };
   }
 }
 

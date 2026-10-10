@@ -7,6 +7,7 @@ import type { ManagerDeskCategory, ManagerDeskCreateItemPayload, ManagerDeskItem
 import { CATEGORY_LABELS, KIND_LABELS } from '@/types/manager-desk';
 import type { GlobalCaptureContext } from './GlobalCaptureDialog';
 import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
+import { Select } from '@/components/ui/Select';
 
 const kindOptions: ManagerDeskItemKind[] = ['action', 'meeting', 'decision', 'waiting'];
 const categoryOptions: ManagerDeskCategory[] = [
@@ -153,23 +154,17 @@ export function DeskCaptureForm({
           <label htmlFor="desk-capture-category" className="sr-only">
             Desk item category
           </label>
-          <select
+          <Select size="sm" className="ml-auto"
             id="desk-capture-category"
             value={category}
             onChange={(e) => setCategory(e.target.value as ManagerDeskCategory)}
-            className="ml-auto rounded-lg px-2 py-1 text-ui outline-none"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-            }}
           >
             {categoryOptions.map((opt) => (
               <option key={opt} value={opt}>
                 {CATEGORY_LABELS[opt]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         )}
 

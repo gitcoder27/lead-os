@@ -78,7 +78,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
           </span>
           <input
             data-autofocus
-            className="ui-input mt-1 w-full"
+            className="ui-field mt-1 w-full"
             value={text}
             onChange={(event) => setText(event.target.value)}
             autoComplete="off"

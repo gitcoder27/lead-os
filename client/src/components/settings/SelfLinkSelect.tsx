@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useSelfLink, useSetSelfLink } from '@/hooks/useSelfLink';
 import type { Developer } from '@/types';
+import { Select } from '@/components/ui/Select';
 
 /**
  * Settings → Team Members: which roster record is the logged-in manager. If you are on the roster
@@ -35,13 +36,11 @@ export function SelfLinkSelect({ members, disabled }: { members: Pick<Developer,
       <label htmlFor={selectId} className="text-body font-medium" style={{ color: 'var(--text-secondary)' }}>
         Which one is you?
       </label>
-      <select
+      <Select className="min-w-0 flex-1"
         id={selectId}
         value={link.developerAccountId ?? ''}
         disabled={disabled || setLink.isPending}
         onChange={(event) => void choose(event.target.value)}
-        className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-ui outline-none disabled:opacity-50"
-        style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
       >
         <option value="">I'm not on this list</option>
         {members.map((member) => (
@@ -50,7 +49,7 @@ export function SelfLinkSelect({ members, disabled }: { members: Pick<Developer,
             {!link.developerAccountId && link.suggestedDeveloperAccountId === member.accountId ? ' (matches your Jira account)' : ''}
           </option>
         ))}
-      </select>
+      </Select>
       {setLink.isPending ? <Loader2 size={12} className="animate-spin" aria-label="Saving" /> : null}
     </div>
   );

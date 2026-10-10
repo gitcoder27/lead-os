@@ -13,6 +13,7 @@ import { HeaderNav } from '@/components/layout/HeaderNav';
 import { ManagerActionInbox } from '@/components/actions/ManagerActionInbox';
 import { LeadOSMark } from '@/components/brand/LeadOSMark';
 import { Kbd } from '@/components/ui/Kbd';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
 
 interface HeaderProps {
   onOpenMobileSidebar?: () => void;
@@ -126,7 +127,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   type="button"
                   onClick={() => openCommandPalette()}
                   className="header-search inline-flex h-8 w-8 items-center justify-center gap-2 rounded-xl text-ui md:w-full md:max-w-[420px] md:justify-start md:px-3"
-                  title="Search and jump anywhere (Ctrl/⌘+K)"
+                  title={`Search and jump anywhere (${formatShortcutKeys('⌘K')})`}
                   aria-label="Open command palette"
                 >
                   <Search size={14} className="shrink-0" />
@@ -150,7 +151,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                   className="header-ghost header-icon-btn"
                   aria-pressed={assistantOpen}
                   style={assistantOpen ? { color: 'var(--accent-text)', background: 'var(--accent-glow)' } : undefined}
-                  title="LeadOS Copilot (Ctrl/⌘+J)"
+                  title={`LeadOS Copilot (${formatShortcutKeys('⌘J')})`}
                   aria-label="Open Copilot"
                 >
                   <CopilotMark size={15} monochrome />
@@ -197,7 +198,7 @@ export function Header({ onOpenMobileSidebar, activeView, onViewChange, onOpenAc
                     })
                   }
                   className="header-primary-btn ml-1 inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-ui font-semibold"
-                  title="Quick capture (Ctrl/⌘+I)"
+                  title={`Quick capture (${formatShortcutKeys('⌘I')})`}
                   aria-label="Capture"
                 >
                   <Plus size={14} strokeWidth={2.5} />

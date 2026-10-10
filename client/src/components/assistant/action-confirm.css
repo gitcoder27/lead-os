@@ -24,14 +24,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.action-confirm-technical summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: var(--fs-12);
-}
 .action-confirm-technical pre {
   max-height: 200px;
   overflow: auto;
@@ -40,14 +32,12 @@
   font-size: var(--fs-12);
   color: var(--text-secondary);
 }
-.action-confirm-card button:focus-visible,
-.action-confirm-technical summary:focus-visible {
+.action-confirm-card button:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 @media (max-width: 767px), (pointer: coarse) {
-  .action-confirm-card button,
-  .action-confirm-technical summary {
+  .action-confirm-card button {
     min-height: 44px;
   }
 }

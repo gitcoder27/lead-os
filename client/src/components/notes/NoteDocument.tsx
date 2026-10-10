@@ -2,7 +2,7 @@ import { useDeferredValue, useCallback, useEffect, useMemo, useRef, useState } f
 import { addDays, format, parseISO } from 'date-fns';
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, History, Lock, Sun } from 'lucide-react';
 import { useQuickActions } from '@/context/QuickActionsContext';
-import { shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
+import { formatShortcutKeys, shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useToast } from '@/context/ToastContext';
 import { DAILY_NOTE_MAX_LENGTH, useDailyNoteEditor, type DailyNoteEditor } from '@/hooks/useDailyNoteEditor';
 import { useManagerDeskDeveloperLookup } from '@/hooks/useManagerDesk';
@@ -350,7 +350,7 @@ export function NoteDocument({
             {editor.body.trim().length === 0 && !conflicted ? (
               <p className="notes-teach">
                 Type <kbd className="ui-kbd">@</kbd> for people, <kbd className="ui-kbd">T-</kbd> for tasks, <kbd className="ui-kbd">#</kbd> for Jira, <kbd className="ui-kbd">/</kbd> for commands.
-                Put the caret on a line and press <kbd className="ui-kbd">⌘⇧E</kbd> to turn it into a task.
+                Put the caret on a line and press <kbd className="ui-kbd">{formatShortcutKeys('⌘⇧E')}</kbd> to turn it into a task.
               </p>
             ) : null}
 

@@ -6,6 +6,7 @@ import { useConfig } from '@/hooks/useConfig';
 import { useSaveSettingsConfig } from '@/hooks/useSettingsActions';
 import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
+import { Select } from '@/components/ui/Select';
 
 const INTERVAL_OPTIONS: Array<{ minutes: number; label: string }> = [
   { minutes: 15, label: 'Every 15 minutes' },
@@ -126,8 +127,7 @@ export function SettingsDataSection({ active }: { active: boolean }) {
           </label>
           <label className="flex flex-col gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
             Frequency
-            <select
-              className="ui-input"
+            <Select
               aria-label="Backup frequency"
               value={intervalMinutes ?? ''}
               disabled={saveSettings.isPending || !config.data}
@@ -137,12 +137,12 @@ export function SettingsDataSection({ active }: { active: boolean }) {
               {intervalOptions.map((option) => (
                 <option key={option.minutes} value={option.minutes}>{option.label}</option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="flex flex-col gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
             Keep for (days)
             <input
-              className="ui-input"
+              className="ui-field"
               type="number"
               min={1}
               aria-label="Backup retention days"

@@ -3,6 +3,7 @@ import { useToast } from '@/context/ToastContext';
 import { copyReport } from '@/lib/report-clipboard';
 import { formatWeekRange } from '@/lib/weekly-review';
 import { ReviewSourceNote } from './ReviewSourceNote';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 export function ReviewPastUpdates() {
   const query = useReviewPastWeeks();
@@ -21,8 +22,7 @@ export function ReviewPastUpdates() {
     }
   };
   return (
-    <details className="review-past">
-      <summary>Past updates</summary>
+    <Disclosure className="review-past" summary="Past updates">
       {query.isError ? (
         <ReviewSourceNote what="past updates" onRetry={() => void query.refetch()} />
       ) : query.isPending ? (
@@ -68,6 +68,6 @@ export function ReviewPastUpdates() {
       ) : (
         <p>No completed updates yet.</p>
       )}
-    </details>
+    </Disclosure>
   );
 }

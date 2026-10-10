@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { useTodayRhythmSettings, useUpdateTodayRhythmSettings } from '@/hooks/useTodayRhythmSettings';
 import { DEFAULT_TODAY_RHYTHM_BOUNDARIES, DEFAULT_WEEKLY_REVIEW_DAY, type TodayRhythmBoundaries } from '@/types';
+import { Select } from '@/components/ui/Select';
 
 /** docs/59 §5.1: the review is a workday habit; a saved Saturday or Sunday still shows as chosen. */
 const REVIEW_DAYS: Array<{ value: number; label: string }> = [
@@ -150,15 +151,14 @@ export function DayRhythmSection() {
       </div>
       <label className="block">
         <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Weekly review day</span>
-        <select
-          className="ui-field mt-1.5 w-[180px]"
+        <Select className="mt-1.5 w-[180px]"
           value={reviewDay}
           disabled={settings.isLoading || update.isPending}
           onChange={(event) => void saveReview({ weeklyReviewDay: Number(event.target.value) })}
         >
           {REVIEW_DAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
           {OTHER_DAYS[reviewDay] ? <option value={reviewDay}>{OTHER_DAYS[reviewDay]}</option> : null}
-        </select>
+        </Select>
       </label>
       <label className="flex items-start gap-2.5">
         <input

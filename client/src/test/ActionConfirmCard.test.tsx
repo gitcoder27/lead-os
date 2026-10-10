@@ -34,7 +34,7 @@ describe('readable action confirmation', () => {
     expect(screen.getByText('High')).toBeVisible();
     expect(screen.getByText('Keep this literal <script> message')).toBeVisible();
     expect(document.querySelector('script')).toBeNull();
-    expect(screen.getByText('Technical details').closest('details')?.open).toBe(false);
+    expect(screen.getByRole('button', { name: 'Technical details' })).toHaveAttribute('aria-expanded', 'false');
     expect(decision).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm action' }));
     expect(decision).toHaveBeenCalledExactlyOnceWith('confirm');

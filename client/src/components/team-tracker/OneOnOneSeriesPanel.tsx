@@ -6,6 +6,7 @@ import { useToast } from '@/context/ToastContext';
 import type { Developer, OneOnOneCadence, OneOnOneSeriesSummary } from '@/types';
 import { formatDayWithRelative } from '@/lib/date-format';
 import { getLocalIsoDate } from '@/lib/utils';
+import { Select } from '@/components/ui/Select';
 
 const CADENCE_OPTIONS: Array<{ value: OneOnOneCadence; label: string }> = [
   { value: 'weekly', label: 'Weekly' },
@@ -112,11 +113,9 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
 
       {creating && !list.isError && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 72%, transparent)' }}>
-          <select
+          <Select size="sm"
             value={newDev}
             onChange={(event) => setNewDev(event.target.value)}
-            className="h-8 rounded-lg px-2 text-ui"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             aria-label="Developer"
           >
             <option value="">Pick a developer…</option>
@@ -125,18 +124,16 @@ export function OneOnOneSeriesPanel({ developers, onOpenDeveloper, onClose }: On
                 {developer.displayName}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select size="sm"
             value={newCadence}
             onChange={(event) => setNewCadence(event.target.value as OneOnOneCadence)}
-            className="h-8 rounded-lg px-2 text-ui"
-            style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             aria-label="Cadence"
           >
             {CADENCE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
-          </select>
+          </Select>
           <button
             type="button"
             onClick={submit}

@@ -19,6 +19,8 @@ import { navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 import './capture-experience.css';
 import { TokenSuggestionList } from './TokenSuggestionList';
 import { CAPTURE_TOKEN_BG, CAPTURE_TOKEN_COLORS, summarizeCapture } from './capture-preview';
+import { formatShortcutKeys } from '@/lib/keyboard-shortcuts';
+import { Disclosure } from '@/components/ui/Disclosure';
 
 interface CaptureBoxProps {
   /** Initial text, e.g. "@dev-1 " from a developer context or "/note ". */
@@ -42,7 +44,7 @@ interface CaptureBoxProps {
 }
 
 /** docs/57 §3 (P3-05): Cmd/Ctrl+Enter captures and keeps the box open for the next one. */
-const KEEP_OPEN_HINT = '⌘/Ctrl+Enter captures and keeps this open';
+const KEEP_OPEN_HINT = `${formatShortcutKeys('⌘Enter')} captures and keeps this open`;
 
 function DiagnosticRow({ diagnostic }: { diagnostic: CaptureDiagnostic }) {
   return (
@@ -361,7 +363,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
             border: '1px solid var(--border)',
           }}
         />
-        {(!resolved || resolved.intent === 'create') && <details className="my-2 text-ui leading-4" open={showPlacement} onToggle={(event) => setShowPlacement(event.currentTarget.open)}><summary className="cursor-pointer">{placement ? 'Project and track' : 'Add to a project'}</summary>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</details>}
+        {(!resolved || resolved.intent === 'create') && <Disclosure className="my-2" open={showPlacement} onOpenChange={setShowPlacement} summary={placement ? 'Project and track' : 'Add to a project'}>{showPlacement && <PlacementPicker today={today} value={placement} onChange={setPlacement} />}</Disclosure>}
         {typeahead.open && typeahead.fragment ? (
           <TokenSuggestionList
             trigger={typeahead.fragment.trigger}
@@ -378,12 +380,12 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
 
       <div className="capture-guidance">
         <p id={hintId}>A title is enough. Extras are optional.</p>
-        <details className="capture-examples"><summary>Examples</summary><ul>
+        <Disclosure className="capture-examples" summary="Examples"><ul>
           <li><strong>Just a task</strong><code>Prepare the release update</code></li>
           <li><strong>Plan for tomorrow</strong><code>Review the rollout checklist !tomorrow</code></li>
           <li><strong>High priority</strong><code>Prepare the release update !!</code></li>
           <li><strong>Private daily note</strong><code>/note Decision: keep Friday for verification</code></li>
-        </ul><p>Type @ to choose a person, # to link Jira or + to add a label.</p></details>
+        </ul><p>Type @ to choose a person, # to link Jira or + to add a label.</p></Disclosure>
       </div>
 
       {/* Structured summary */}

@@ -16,10 +16,10 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: 'tasks', title: 'Capture a task', detail: 'Write down one thing you owe someone. Ctrl/Cmd+I works from anywhere.', action: 'Capture' },
-  { id: 'people', title: 'Add people', detail: 'Your team members show up on Team, in 1:1s and in follow-ups.', action: 'Add' },
+  { id: 'tasks', title: 'Capture your first task', detail: 'A promise, a follow-up, or one thing to do today.', action: 'Capture' },
+  { id: 'people', title: 'Add people', detail: 'Optional. Add your team when you’re ready for shared work and 1:1s.', action: 'Add' },
   { id: 'jira', title: 'Connect Jira', detail: 'Optional. Brings defects into Work and Today.', action: 'Connect' },
-  { id: 'rhythm', title: 'Set your day rhythm', detail: 'Pick when standup, midday and wrap-up start.', action: 'Set times' },
+  { id: 'rhythm', title: 'Set your day rhythm', detail: 'Optional. Pick the times that fit your working day.', action: 'Set times' },
 ];
 
 /**
@@ -49,6 +49,7 @@ export function TodayGettingStarted({ steps, onCapture, onOpenTarget, onDismiss 
           </button>
         </span>
       </div>
+      <p className="today-getting-started-intro">Start with one task. Everything else can wait.</p>
       <ul className="today-getting-started-list">
         {STEPS.map((step) => {
           const isDone = steps[step.id];
@@ -65,7 +66,7 @@ export function TodayGettingStarted({ steps, onCapture, onOpenTarget, onDismiss 
                 <span className="today-getting-started-detail">{step.detail}</span>
               </span>
               {isDone ? null : (
-                <button type="button" className="ui-btn ui-btn-sm" onClick={() => run(step.id)}>{step.action}</button>
+                <button type="button" className={step.id === 'tasks' ? 'ui-btn-solid' : 'ui-btn'} onClick={() => run(step.id)}>{step.action}</button>
               )}
             </li>
           );

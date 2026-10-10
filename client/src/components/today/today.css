@@ -729,3 +729,8 @@
   .today-panel-head:has(> #today-wrap-heading) { flex-wrap: wrap; }
   .today-panel-head:has(> #today-wrap-heading) .today-section-actions { margin-left: 0; flex-wrap: wrap; }
 }
+
+/* First-run actions remain comfortable on touch screens. */
+.today-getting-started-intro { margin: 8px 8px 6px; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.today-getting-started button { min-height: 44px; min-width: 44px; }
+.today-getting-started-step > button { flex-shrink: 0; }

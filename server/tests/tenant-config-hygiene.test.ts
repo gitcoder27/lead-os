@@ -41,3 +41,26 @@ describe("install configuration boundaries", () => {
     } finally { clear.mockRestore(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
   });
 });
+
+describe('install-owner Settings outside the default workspace', () => {
+  beforeEach(resetDatabase);
+  it.each(['/api/config', '/api/config/settings'])('writes the install backup schedule through %s while keeping Jira scoped', async (url) => {
+    const { F, friend } = await seedTenants();
+    // A trusted operator grant is supported by auth:create-user --install-admin.
+    rawDb.prepare("UPDATE app_users SET is_install_admin=1 WHERE username='friend'").run();
+    const response = await F('PUT', url, {
+      ...(url === '/api/config' ? { jiraBaseUrl: 'https://friend.atlassian.net', jiraEmail: 'friend@example.com', jiraProjectKey: 'FR' } : {}),
+      backupEnabled: false, backupIntervalMinutes: 60,
+    });
+    expect(response.status).toBe(200);
+    expect(rawDb.prepare("SELECT value FROM config WHERE workspace_id='default' AND key='backup_interval_minutes'").get()).toEqual({ value: '60' });
+    expect(rawDb.prepare("SELECT count(*) AS n FROM config WHERE workspace_id=? AND key LIKE 'backup_%'").get(friend.workspaceId)).toEqual({ n: 0 });
+    const configuration = (await F('GET', '/api/config')).body;
+    expect(configuration.backupEnabled).toBe(false);
+    expect(configuration.backupIntervalMinutes).toBe(60);
+    if (url === '/api/config') {
+      expect(configuration.jiraProjectKey).toBe('FR');
+      expect(rawDb.prepare("SELECT value FROM config WHERE workspace_id='default' AND key='jira_project_key'").get()).not.toEqual({ value: 'FR' });
+    }
+  });
+});

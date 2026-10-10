@@ -21,7 +21,7 @@ import { SyncEngine } from "../sync/engine";
 import { logger } from "../utils/logger";
 import { HttpError } from "../middleware/errorHandler";
 import { runInTransaction } from "../db/transaction";
-import { DEFAULT_WORKSPACE_ID } from "../services/workspace.service";
+import { DEFAULT_WORKSPACE_ID, INSTALL_WORKSPACE_ID } from "../workspace-scope";
 import {
   ATTENTION_RULE_LIMITS,
   TEAM_MODES,
@@ -244,14 +244,14 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
       // docs/56 P1-05: legacy field; the value lives in the Attention rules.
       const staleThresholdHours = (await settings.getAttentionRules(workspaceId)).jiraStaleHours;
       const jiraAutoSyncEnabled = await settings.getJiraAutoSyncEnabled(workspaceId);
-      const backupEnabled = await settings.getBackupEnabled(workspaceId);
-      const backupIntervalMinutes = await settings.getBackupIntervalMinutes(workspaceId);
-      const backupRetentionDays = await settings.getBackupRetentionDays(workspaceId);
-      const backupMaxScheduledSnapshots = await settings.getBackupMaxScheduledSnapshots(workspaceId);
-      const backupDirectory = await settings.getBackupDirectory(workspaceId);
-      const backupOnStartup = await settings.getBackupOnStartup(workspaceId);
-      const backupStartupMaxAgeHours = await settings.getBackupStartupMaxAgeHours(workspaceId);
-      const backupBeforeReset = await settings.getBackupBeforeReset(workspaceId);
+      const backupEnabled = await settings.getBackupEnabled(INSTALL_WORKSPACE_ID);
+      const backupIntervalMinutes = await settings.getBackupIntervalMinutes(INSTALL_WORKSPACE_ID);
+      const backupRetentionDays = await settings.getBackupRetentionDays(INSTALL_WORKSPACE_ID);
+      const backupMaxScheduledSnapshots = await settings.getBackupMaxScheduledSnapshots(INSTALL_WORKSPACE_ID);
+      const backupDirectory = await settings.getBackupDirectory(INSTALL_WORKSPACE_ID);
+      const backupOnStartup = await settings.getBackupOnStartup(INSTALL_WORKSPACE_ID);
+      const backupStartupMaxAgeHours = await settings.getBackupStartupMaxAgeHours(INSTALL_WORKSPACE_ID);
+      const backupBeforeReset = await settings.getBackupBeforeReset(INSTALL_WORKSPACE_ID);
       const jiraSyncScopeMode = await settings.getJiraSyncScopeMode(workspaceId);
       const jiraSyncJql = normalizeConfiguredJqlForMode(
         (await getConfigValue(workspaceId, "jira_sync_jql")) ?? defaultWorkspaceFallback(workspaceId, config.JIRA_SYNC_JQL) ?? "",
@@ -343,29 +343,29 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         await upsertConfig(workspaceId, "jira_aspen_severity_field", req.body.jiraAspenSeverityField);
       }
       if (req.body.backupEnabled !== undefined) {
-        await upsertConfig(workspaceId, "backup_enabled", String(req.body.backupEnabled));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_enabled", String(req.body.backupEnabled));
       }
       if (req.body.backupIntervalMinutes !== undefined) {
-        await upsertConfig(workspaceId, "backup_interval_minutes", String(req.body.backupIntervalMinutes));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_interval_minutes", String(req.body.backupIntervalMinutes));
       }
       if (req.body.backupRetentionDays !== undefined) {
-        await upsertConfig(workspaceId, "backup_retention_days", String(req.body.backupRetentionDays));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_retention_days", String(req.body.backupRetentionDays));
       }
       if (req.body.backupMaxScheduledSnapshots !== undefined) {
-        await upsertConfig(workspaceId, "backup_max_scheduled_snapshots", String(req.body.backupMaxScheduledSnapshots));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_max_scheduled_snapshots", String(req.body.backupMaxScheduledSnapshots));
       }
       if (req.body.backupDirectory !== undefined) {
         await settings.validateBackupDirectory(req.body.backupDirectory);
-        await upsertConfig(workspaceId, "backup_directory", req.body.backupDirectory);
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_directory", req.body.backupDirectory);
       }
       if (req.body.backupOnStartup !== undefined) {
-        await upsertConfig(workspaceId, "backup_on_startup", String(req.body.backupOnStartup));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_on_startup", String(req.body.backupOnStartup));
       }
       if (req.body.backupStartupMaxAgeHours !== undefined) {
-        await upsertConfig(workspaceId, "backup_startup_max_age_hours", String(req.body.backupStartupMaxAgeHours));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_startup_max_age_hours", String(req.body.backupStartupMaxAgeHours));
       }
       if (req.body.backupBeforeReset !== undefined) {
-        await upsertConfig(workspaceId, "backup_before_reset", String(req.body.backupBeforeReset));
+        await upsertConfig(INSTALL_WORKSPACE_ID, "backup_before_reset", String(req.body.backupBeforeReset));
       }
 
       const token = req.body.jiraApiToken ?? tokenForLookup;
@@ -471,13 +471,13 @@ export function createConfigRouter(syncEngine?: SyncEngine, backupService?: Back
         ["backupRetentionDays", "backup_retention_days"],
       ] as const;
       const backupChanges = backupFields.filter(([field]) => req.body[field] !== undefined);
-      // The schedule is install-wide and read from the default workspace, so only its managers
+      // The schedule is install-wide and read from the default workspace, so only an explicitly granted install owner
       // may change it (the same rule as /api/backups); checked before anything is written.
       if (backupChanges.length > 0 && !canManageInstall(req.auth!.user)) {
         throw new HttpError(403, "Only the install owner can change backups");
       }
       for (const [field, key] of backupChanges) {
-        await upsertConfig(workspaceId, key, String(req.body[field]));
+        await upsertConfig(INSTALL_WORKSPACE_ID, key, String(req.body[field]));
       }
       const jiraBaseUrl = req.body.jiraBaseUrl?.trim();
       const jiraEmail = req.body.jiraEmail?.trim();

@@ -67,7 +67,7 @@ export function TodayPlanPanel({ plan, today, pinning, onTogglePin, onRunCommand
                 {plan.inboxCount} to triage
               </button>
             ) : null}
-            <button type="button" className="ui-btn" onClick={onCapture}>
+            <button type="button" className="ui-btn" style={{ minHeight: 44 }} onClick={onCapture}>
               <Plus size={13} aria-hidden="true" />
               Add task
             </button>

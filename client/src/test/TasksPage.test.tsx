@@ -549,11 +549,12 @@ describe('TasksPage empty/loading/error (docs/49 §11)', () => {
     expect(screen.queryByText('No tasks in Waiting.')).not.toBeInTheDocument();
   });
 
-  it('Inbox zero is a success state', () => {
+  it('the clear inbox explains the next capture action', () => {
     window.history.replaceState(null, '', '/tasks?view=inbox');
     mockUseTaskViewTasks.mockReturnValue(tasksResult([]));
     render(<TasksPage />);
-    expect(screen.getByText('Inbox zero')).toBeTruthy();
+    expect(screen.getByText('Your inbox is clear')).toBeTruthy();
+    expect(screen.getByText('Capture a task here, then decide when to work on it.')).toBeInTheDocument();
   });
 
   it('Today empty offers Plan your day with a candidate count', () => {

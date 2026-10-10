@@ -5,6 +5,15 @@ import { DEVELOPER_LOGIN_URL } from '@/lib/constants';
 import { TestWrapper } from '@/test/wrapper';
 import type { TagUsageResponse } from '@/types';
 
+const authState = vi.hoisted(() => ({ backups: false, registered: false }));
+vi.mock('@/context/AuthContext', async () => ({
+  ...await vi.importActual('@/context/AuthContext'),
+  useAuth: () => ({
+    user: authState.registered ? { username: 'friend', displayName: 'Friend', workspaceId: 'workspace-friend', role: 'manager' } : null,
+    features: { backups: authState.backups, tasksPhase3: authState.registered, teamMode: 'solo', oneOnOne: authState.registered },
+    logout: vi.fn(),
+  }),
+}));
 const mockGet = vi.fn();
 const mockPut = vi.fn();
 const mockPatch = vi.fn();
@@ -140,6 +149,7 @@ vi.mock('@/lib/api', () => ({
 
 describe('SettingsPage', () => {
   beforeEach(() => {
+    authState.backups = false; authState.registered = false;
     vi.clearAllMocks();
     // Most cases exercise the Jira sections; UX-12's own cases open /settings bare.
     window.history.replaceState(null, '', '/settings?section=connection');
@@ -1167,4 +1177,19 @@ describe('SettingsPage', () => {
     expect(await screen.findByLabelText(/Standup window starts/)).toHaveValue('10:00');
     expect(screen.getAllByText('Day Rhythm').length).toBeGreaterThanOrEqual(1);
   });
+});
+
+it('keeps install backups out of a registered manager’s Settings and rejects its deep link', async () => {
+  authState.registered = true;
+  render(<TestWrapper><SettingsPage requestedSection={{ section: 'data', nonce: 1 }} /></TestWrapper>);
+  expect(await screen.findByRole('heading', { name: 'Navigation' })).toBeInTheDocument();
+  expect(screen.queryByText('Data & Backups')).not.toBeInTheDocument();
+  expect(mockGet.mock.calls.some(([path]) => path === '/backups')).toBe(false);
+  expect(screen.getAllByRole('button', { name: 'Log out' })).toHaveLength(2);
+});
+
+it('shows Data & Backups only with the explicit install-owner capability', async () => {
+  authState.registered = true; authState.backups = true;
+  render(<TestWrapper><SettingsPage /></TestWrapper>);
+  expect(await screen.findByRole('button', { name: /Data & Backups/ })).toBeInTheDocument();
 });

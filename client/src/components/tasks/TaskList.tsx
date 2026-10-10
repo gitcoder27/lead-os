@@ -253,7 +253,7 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel, 
       <button
         type="button"
         onClick={onStart}
-        className="flex h-[36px] w-full items-center gap-2 px-2 text-left text-[12.5px] transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-[var(--text-secondary)]"
+        className="flex h-11 w-full items-center gap-2 px-2 text-left text-[12.5px] transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-[var(--text-secondary)]"
         style={{ color: 'var(--text-muted)' }}
         aria-label={groupLabel ? `Add task to ${groupLabel}` : 'Add task'}
       >

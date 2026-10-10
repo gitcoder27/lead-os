@@ -89,7 +89,7 @@ function emptyCopy(viewId: string | undefined, signal: string[] | undefined, can
         Icon: CalendarCheck,
       };
     case 'inbox':
-      return { title: 'Inbox zero', body: 'Everything captured has been triaged.', tone: 'success', Icon: CheckCheck };
+      return { title: 'Your inbox is clear', body: 'Capture a task here, then decide when to work on it.', tone: 'success', Icon: CheckCheck };
     case 'projects':
       return { title: 'No tasks yet', body: 'Add a task below, or capture one for this project or track.', Icon: Inbox };
     case 'my-tasks':

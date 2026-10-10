@@ -39,3 +39,7 @@
     min-height: 44px;
   }
 }
+
+/* Capture is the first action in a new workspace. */
+.capture-box button, .capture-box summary { min-height: 44px; min-width: 44px; }
+.ui-dialog:has(.capture-box) .ui-dialog-head .ui-icon-btn { width: 44px; height: 44px; }

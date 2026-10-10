@@ -827,7 +827,9 @@ describe('TodayPage V2', () => {
 
       const card = await screen.findByTestId('today-getting-started');
       expect(within(card).getByText('0 of 4')).toBeInTheDocument();
-      for (const title of ['Capture a task', 'Add people', 'Connect Jira', 'Set your day rhythm']) {
+      expect(within(card).getByText('Start with one task. Everything else can wait.')).toBeInTheDocument();
+      expect(within(card).getAllByText(/^Optional\./)).toHaveLength(3);
+      for (const title of ['Capture your first task', 'Add people', 'Connect Jira', 'Set your day rhythm']) {
         expect(within(card).getByText(title)).toBeInTheDocument();
       }
 

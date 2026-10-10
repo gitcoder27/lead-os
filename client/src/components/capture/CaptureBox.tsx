@@ -268,7 +268,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
   const summaryChips = resolved ? summarizeCapture(resolved, developerNames, !!activeAssignee) : [];
 
   return (
-    <div className="px-4 py-3 space-y-2.5">
+    <div className="capture-box px-4 py-3 space-y-2.5">
       {showOwnerPill && (
         <div className="flex items-center gap-1.5" data-testid="capture-assignee">
           <span className="text-[11px] font-semibold uppercase tracking-[0.09em]" style={{ color: 'var(--text-muted)' }}>

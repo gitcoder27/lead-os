@@ -114,7 +114,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const DISCOVER_SEARCH_DEBOUNCE_MS = 350;
   const { user, logout, features } = useAuth();
   const tasksPhase3 = useTasksPhase3();
-  // docs/56 P6-01 review: backups are install-wide, so only a default-workspace manager sees them.
+  // docs/56 P6-01 review: backups are install-wide; the server exposes the explicit install-owner capability.
   const canManageBackups = features?.backups ?? false;
   const { data: config, refetch: refetchConfig } = useConfig();
   const { data: assistantConfig } = useAssistantConfig();
@@ -197,7 +197,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>(
-    () => sectionFromLocation() ?? defaultSection(!loadingDevelopers && developers.length === 0),
+    () => {
+      const section = sectionFromLocation();
+      return section === 'data' && !canManageBackups ? 'navigation' : section ?? defaultSection(!loadingDevelopers && developers.length === 0);
+    },
   );
   // The default follows the roster once it loads, until a section is chosen (URL or click).
   const sectionChosenRef = useRef(sectionFromLocation() !== null);
@@ -357,9 +360,12 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
   useEffect(() => {
     if (isSectionId(requestedSection?.section)) {
       sectionChosenRef.current = true;
-      setActiveSection(requestedSection.section);
+      setActiveSection(requestedSection.section === 'data' && !canManageBackups ? 'navigation' : requestedSection.section);
     }
-  }, [requestedSection]);
+  }, [requestedSection, canManageBackups]);
+  useEffect(() => {
+    if (!canManageBackups && activeSection === 'data') setActiveSection('navigation');
+  }, [canManageBackups, activeSection]);
 
   const handleDiscoverFields = useCallback(async (target: FieldPickerTarget) => {
     setFieldPickerTarget(target);
@@ -1062,10 +1068,10 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 disabled={hasChanges || loggingOut}
                 title="Log out"
                 aria-label="Log out"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition-colors disabled:opacity-40"
                 style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
               >
-                {loggingOut ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}
+                {loggingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
               </button>
             </div>
           </div>
@@ -1075,7 +1081,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
           {/* Section title bar */}
           <div
-            className="shrink-0 border-b px-5 py-2"
+            className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-2"
             style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-secondary) 42%, var(--bg-primary) 58%)' }}
           >
             <AnimatePresence mode="wait">
@@ -1094,6 +1100,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 </p>
               </motion.div>
             </AnimatePresence>
+            <button type="button" className="ui-icon-btn md:hidden" style={{ width: 44, height: 44 }} onClick={() => void handleManagerLogout()} disabled={hasChanges || loggingOut} aria-label="Log out">
+              {loggingOut ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <LogOut size={16} aria-hidden="true" />}
+            </button>
           </div>
 
           {/* Scrollable section content */}

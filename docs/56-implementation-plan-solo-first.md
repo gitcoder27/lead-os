@@ -916,7 +916,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 - [x] UXD-21 — Triage panel.
 - [x] UXD-22 — Team board, drawer and 1:1.
 - [x] UXD-23 — Standup.
-- [ ] UXD-24 — Settings.
+- [x] UXD-24 — Settings.
 - [ ] UXD-25 — Setup Wizard.
 - [ ] UXD-26 — Palette finds projects.
 - [ ] UXD-27 — Error and boot states.
@@ -947,6 +947,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 | 2026-10-11 | UXD-21 | main (this commit) | Icon chips (P/A/D kept as shortcuts in title + aria-keyshortcuts, no button-wrapped select while editing), Highest-only tone, Flag toggle, StatusBadge in the header, sentence-case Properties, a 'Follow up in Tasks' card, friendly suggestion dates and metrics, --overlay-shadow. Browser at 1440 and 375, light and dark; 'd' opens the date editor; suggestions checked with stubbed endpoints (seed has none). TriagePanel test added, SuggestionBar updated; client 2147 green, typecheck clean. |
 | 2026-10-11 | UXD-22 | main (this commit) | Board: muted dash for empty Up next (none on phone cards), meter from 2 items, toolbar skeleton (roster top 180px loading and loaded), phone signal chips in the search row. Drawer: task status labels with no 'open'/'Undated'/'not scheduled', Current work as a line plus a ghost 'Start next: …'. 1:1: board toolbar hidden, kbd hints hidden on coarse pointers, and phone columns no longer overlap (pre-existing). Browser at 1440/768/375, light and dark; touch run shows 0 visible kbd in the 1:1 and drawer. TeamTracker and PersonCommitments tests added; client 2151 green, typecheck clean. |
 | 2026-10-11 | UXD-23 | main (this commit) | Status menu (DevStatusMark trigger, radio items, o/r/b/w/d accelerators; Esc returns focus) in place of the native select; one work card with the composer as its footer; no ring on tabindex=-1 headings (wrap-up outline none); keycaps hidden on coarse pointers with every bar button kept, plus a scrolling bar on phone (deviation: not the whole footer, which is the touch path to Note/Flag/Done). Browser at 1440 and 375, light and dark, no horizontal scroll. StandupMode tests added and updated; client 2153 green, typecheck clean. |
+| 2026-10-11 | UXD-24 | main (this commit) | Section title on ui-page-title; sidebar groups Workspace/People/Integrations/Data (desktop headings, every section still listed); copy pass (no 'desk task', 'Start reset…', 'Reset tasks and Team board', sentence-case buttons, no Save-footer note, bold typed phrase; server phrases unchanged); Jira host neutral until lastSuccessAt. Browser at 1440 and 375, light and dark, no horizontal scroll; armed reset shows 'Type CLEAR MANAGER DESK to confirm'. SettingsPanel tests updated plus a groups/tone test; client 2154 green, typecheck clean. |
 
 ## Self-registration and tenant isolation (docs/72)
 

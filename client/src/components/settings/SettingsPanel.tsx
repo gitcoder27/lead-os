@@ -715,7 +715,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
       addToast({
         type: 'success',
         title: 'Team member added',
-        message: 'Manual team member is ready for Team, Desk, and My Day workflows.',
+        message: 'They show on the Team board and can own tasks now.',
       });
     } catch (err) {
       addToast({ type: 'error', title: 'Failed to add team member', message: err instanceof Error ? err.message : 'Request failed' });
@@ -841,7 +841,14 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
   const syncScopeLabel = SYNC_SCOPE_SHORT_LABELS[syncScopeMode];
 
-  const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
+  const SETTINGS_NAV_GROUPS: Array<{ label: string; ids: SectionId[] }> = [
+  { label: 'Workspace', ids: ['navigation', 'rhythm', 'attention', 'labels'] },
+  { label: 'People', ids: ['team', 'access'] },
+  { label: 'Integrations', ids: ['connection', 'sync', 'tags', 'assistant'] },
+  { label: 'Data', ids: ['data', 'maintenance'] },
+];
+
+const SECTION_LABELS: Record<SectionId, { title: string; description: string }> = {
     navigation: { title: 'Navigation', description: 'Choose which pages stay in the top bar and arrange their order.' },
     rhythm: { title: 'Day Rhythm', description: 'Set when standup, midday and wrap-up start on Today.' },
     attention: { title: 'Attention Rules', description: 'Your working day and the thresholds behind stale, untouched and follow-up signals.' },
@@ -860,7 +867,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     <div className={`${spacing} rounded-xl p-3`} style={{ border: 'var(--settings-inset-border)', background: 'var(--settings-inset-bg)' }}>
       <SettingsGroupLabel>Add manually</SettingsGroupLabel>
       <p className="mt-1 text-ui leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-        Add a person before linking Jira. They can be used in Team, Desk, and developer access immediately.
+        Add a person before linking Jira. They show on the Team board, can own tasks and can be given developer access straight away.
       </p>
       <div className="mt-3 grid gap-2">
         <input
@@ -908,7 +915,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
     { id: 'navigation', icon: <PanelTop size={13} />, label: 'Navigation', status: null, sv: 'muted' },
     { id: 'rhythm', icon: <Clock3 size={13} />, label: 'Day Rhythm', status: null, sv: 'muted' },
     { id: 'attention', icon: <Gauge size={13} />, label: 'Attention Rules', status: null, sv: 'muted' },
-    { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl ? 'success' : 'muted' },
+    { id: 'connection', icon: <Globe size={13} />, label: 'Jira Connection', status: connectionNeedsAttention ? 'Needs attention' : connectionLabel !== 'Connection pending' ? connectionLabel : null, sv: connectionNeedsAttention ? 'warning' : config?.jiraBaseUrl && syncStatus?.lastSuccessAt ? 'success' : 'muted' },
+    // docs/73 UXD-24: green only once a sync has succeeded; a saved host that never synced stays neutral.
     // docs/56 UX-12: Jira settings nobody uses are quiet — no status, no warning colour.
     { id: 'sync', icon: <RefreshCw size={13} />, label: 'Sync Scope', status: !jiraInUse ? null : !autoSyncEnabled ? 'Auto-sync off' : jql ? syncScopeLabel : 'No query', sv: jiraInUse && autoSyncEnabled && !jql ? 'warning' : 'muted' },
     { id: 'assistant', icon: <Sparkles size={13} />, label: 'Copilot', status: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'On' : 'Off', sv: assistantConfig?.enabled && assistantConfig?.hasApiKey ? 'success' : 'muted' },
@@ -996,7 +1004,15 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
 
           {/* Nav items */}
           <nav className="flex gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto">
-            {navItems.map((item) => {
+            {/* docs/73 UXD-24 (cheap half of P7-07): the sections in four named groups; the
+                headings show in the sidebar only, not in the phone's scrolling row. */}
+            {SETTINGS_NAV_GROUPS.map((group) => {
+              const items = group.ids.map((id) => navItems.find((item) => item.id === id)).filter((item): item is (typeof navItems)[number] => Boolean(item));
+              if (items.length === 0) return null;
+              return (
+                <div key={group.label} role="group" aria-labelledby={`settings-nav-${group.label}`} className="flex gap-1 md:mb-2 md:block">
+                  <p id={`settings-nav-${group.label}`} className="ui-label hidden px-2.5 pb-1 pt-2 md:block">{group.label}</p>
+                  {items.map((item) => {
               const isActive = activeSection === item.id;
               return (
                 <button
@@ -1029,6 +1045,9 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                     ) : null}
                   </div>
                 </button>
+              );
+            })}
+                </div>
               );
             })}
           </nav>
@@ -1064,7 +1083,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden">
           {/* Section title bar */}
           <div
-            className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-2"
+            className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-3"
             style={{ borderColor: 'var(--border-strong)', background: 'color-mix(in srgb, var(--bg-secondary) 42%, var(--bg-primary) 58%)' }}
           >
             <AnimatePresence mode="wait">
@@ -1075,7 +1094,8 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.12 }}
               >
-                <h1 className="text-body font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+                {/* docs/73 UXD-24: the section title is the page title step, above its 13px groups. */}
+                <h1 className="ui-page-title">
                   {SECTION_LABELS[activeSection].title}
                 </h1>
                 <p className="mt-0.5 text-ui" style={{ color: 'var(--text-muted)' }}>
@@ -2188,7 +2208,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
         {activeSection === 'maintenance' ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="hidden text-ui sm:block" style={{ color: 'var(--text-muted)' }}>
-              Maintenance actions run immediately after typed confirmation. The standard Save footer is intentionally hidden here.
+              Each reset runs as soon as its phrase is typed and confirmed. There is nothing to save on this page.
             </p>
             <button
               type="button"
@@ -2198,7 +2218,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
               style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
             >
               <TriangleAlert size={12} />
-              Reset &amp; Reconfigure App
+              Reset and reconfigure
             </button>
           </div>
         ) : (
@@ -2216,7 +2236,7 @@ export function SettingsPage({ requestedSection }: SettingsPageProps = {}) {
                 style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
               >
                 <TriangleAlert size={12} />
-                Reset &amp; Reconfigure
+                Reset and reconfigure
               </button>
               <button
                 type="button"

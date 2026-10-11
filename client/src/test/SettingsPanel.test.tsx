@@ -365,6 +365,23 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Jira sync is failing')).toBeInTheDocument();
   });
 
+  it('groups the sections and keeps a never-synced Jira host neutral (docs/73 UXD-24)', async () => {
+    const originalGet = mockGet.getMockImplementation();
+    let status: Record<string, unknown> = { status: 'idle' };
+    mockGet.mockImplementation((path: string) => path === '/sync/status' ? Promise.resolve(status) : originalGet?.(path));
+    const view = render(<TestWrapper><SettingsPage /></TestWrapper>);
+    for (const group of ['Workspace', 'People', 'Integrations', 'Data']) {
+      expect(screen.getByRole('group', { name: group })).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole('group', { name: 'People' })).getByRole('button', { name: /Team Members/ })).toBeInTheDocument();
+    const host = await within(screen.getByRole('group', { name: 'Integrations' })).findByText('acme.atlassian.net');
+    expect(host).toHaveStyle({ color: 'var(--text-muted)' });
+    view.unmount();
+    status = { status: 'idle', lastSuccessAt: '2026-03-07T10:00:00Z' };
+    render(<TestWrapper><SettingsPage /></TestWrapper>);
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'Integrations' })).getByText('acme.atlassian.net')).toHaveStyle({ color: 'var(--success-text)' }));
+  });
+
   it('saves and syncs without navigating away', async () => {
     mockPut.mockResolvedValue({ success: true });
     mockMutateAsync.mockResolvedValue({ status: 'success', issuesSynced: 4, startedAt: '', completedAt: '' });
@@ -996,9 +1013,9 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /data maintenance/i }));
 
     expect(await screen.findByText(/automatic pre-reset backup is enabled/i)).toBeInTheDocument();
-    expect(screen.getByText('128 tasks')).toBeInTheDocument();
+    expect(screen.getAllByText('128 tasks').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('72 tracker items').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Reset Both Workspaces')).toBeInTheDocument();
+    expect(screen.getByText('Reset tasks and Team board')).toBeInTheDocument();
   });
 
   it('resets the Jira configuration only through the typed-confirmation dialog, never window.confirm (docs/56 P6-06)', async () => {
@@ -1011,7 +1028,7 @@ describe('SettingsPage', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reset and reconfigure$/i }));
     const dialog = await screen.findByRole('alertdialog');
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(mockPost).not.toHaveBeenCalledWith('/config/reset', expect.anything());
@@ -1040,7 +1057,7 @@ describe('SettingsPage', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reset and reconfigure$/i }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.change(within(dialog).getByLabelText('Confirmation text'), { target: { value: 'RESET CONFIGURATION' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reset configuration' }));
@@ -1056,7 +1073,7 @@ describe('SettingsPage', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Reset & Reconfigure$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Reset and reconfigure$/i }));
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
@@ -1121,11 +1138,11 @@ describe('SettingsPage', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /data maintenance/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /arm reset both workspaces/i }));
-    fireEvent.change(screen.getByLabelText(/confirmation text for reset both workspaces/i), {
+    fireEvent.click(await screen.findByRole('button', { name: /^Start: reset tasks and Team board/i }));
+    fireEvent.change(screen.getByLabelText(/confirmation text for reset tasks and Team board/i), {
       target: { value: 'CLEAR EVERYTHING' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /run reset both workspaces/i }));
+    fireEvent.click(screen.getByRole('button', { name: /run reset tasks and Team board/i }));
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith('/config/maintenance/reset', {

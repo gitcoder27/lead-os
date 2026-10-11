@@ -35,7 +35,7 @@ export function SettingsMaintenanceSection({
     () =>
       previewQuery.data
         ? [
-            formatCount(previewQuery.data.managerDesk.itemCount, 'desk task'),
+            formatCount(previewQuery.data.managerDesk.itemCount, 'task'),
             formatCount(previewQuery.data.teamTracker.itemCount, 'tracker item'),
             formatCount(previewQuery.data.teamTracker.checkInCount, 'check-in'),
             formatCount(previewQuery.data.projectData?.workspace.projects ?? 0, 'private project'),
@@ -162,7 +162,7 @@ export function SettingsMaintenanceSection({
             style={{ background: 'var(--settings-neutral-chip-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
           >
             {previewQuery.isFetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}
-            Refresh Counts
+            Refresh counts
           </button>
         </div>
       </div>
@@ -213,7 +213,7 @@ export function SettingsMaintenanceSection({
 
         <MaintenanceActionCard
           target="workspace"
-          title="Reset Both Workspaces"
+          title="Reset tasks and Team board"
           description="Start fresh by clearing your tasks and the Team board together. This is the right option when duplicate migration data has polluted both."
           counts={fullResetCounts}
           expectedText={CONFIRMATION_TEXT.workspace}
@@ -302,15 +302,15 @@ function MaintenanceActionCard({
           onClick={onArm}
           className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-ui font-semibold"
           style={{ background: 'var(--settings-danger-soft-bg)', color: 'var(--danger-muted)', border: 'var(--settings-danger-soft-border)' }}
-          aria-label={`Arm ${title}`}
+          aria-label={`Start: ${title}`}
         >
           <TriangleAlert size={12} />
-          Arm Reset
+          Start reset…
         </button>
       ) : (
         <div className="mt-4 space-y-3 rounded-xl p-3" style={{ background: 'var(--settings-inset-bg)', border: 'var(--settings-inset-border)' }}>
           <p className="text-ui font-semibold" style={{ color: 'var(--danger-muted)' }}>
-            Type {expectedText} to confirm
+            Type <strong style={{ color: 'var(--text-primary)' }}>{expectedText}</strong> to confirm
           </p>
           <input
             type="text"
@@ -331,7 +331,7 @@ function MaintenanceActionCard({
               aria-label={`Run ${title}`}
             >
               {running ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-              {running ? 'Running…' : 'Run Reset'}
+              {running ? 'Running…' : 'Run reset'}
             </button>
             <button
               type="button"

@@ -42,7 +42,7 @@ function StatusMeter({ summary }: { summary: TrackerBoardSummary }) {
   const segments = statusSegments(summary);
   if (summary.total === 0 || segments.length === 0) return null;
   return (
-    <span aria-hidden="true" className="flex h-1.5 w-12 overflow-hidden rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
+    <span aria-hidden="true" className="flex h-1.5 w-12 overflow-hidden rounded-full max-md:hidden" style={{ background: 'var(--bg-tertiary)' }}>
       {segments.map((segment, index) => (
         <span
           key={segment.key}
@@ -92,7 +92,7 @@ export function TrackerSummaryStrip({ summary, activeFilter, onFilterChange }: T
         <StatusMeter summary={summary} />
       </button>
 
-      <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0" style={{ background: 'var(--border)' }} />
+      <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 max-md:hidden" style={{ background: 'var(--border)' }} />
 
       {visibleChips.length === 0 && (
         <span className="flex shrink-0 items-center gap-1.5 px-1.5 text-body" style={{ color: 'var(--text-muted)' }}>

@@ -1244,6 +1244,40 @@ describe('TeamTrackerPage', () => {
     );
   });
 
+  it('keeps one bordered action in the blocked card (docs/73 UXD-22)', () => {
+    const bob = mockBoard.developers.find((day) => day.developer.displayName === 'Bob Jones')!;
+    bob.nextFollowUpAt = undefined;
+    render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    clickDeveloperRow('Bob Jones');
+    const drawer = screen.getByRole('dialog', { name: 'Bob Jones developer details' });
+    expect(within(drawer).getByRole('button', { name: 'Follow up' })).toHaveClass('ui-btn');
+    expect(within(drawer).getByRole('button', { name: /Set check/ })).toHaveClass('ui-btn-ghost');
+  });
+
+  it('shows an empty Up next as a dash and the load meter only from two items (docs/73 UXD-22)', () => {
+    const alice = mockBoard.developers.find((day) => day.developer.displayName === 'Alice Smith')!;
+    alice.plannedItems = [];
+    alice.currentItem = undefined;
+    render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    expect(screen.queryByText(/^Nothing planned$/, { selector: ':not(.sr-only)' })).toBeNull();
+    expect(screen.getAllByText('Nothing planned', { selector: '.sr-only' }).length).toBeGreaterThan(0);
+    const loads = screen.getAllByTitle(/open items —/);
+    expect(loads.some((cell) => /^[2-9]/.test(cell.textContent ?? '') || /[2-9] open/.test(cell.textContent ?? ''))).toBe(true);
+    for (const cell of loads) {
+      const count = Number(cell.textContent?.match(/(\d+) open/)?.[1] ?? 0);
+      expect(Boolean(cell.querySelector('[aria-hidden="true"].flex'))).toBe(count >= 2);
+    }
+  });
+
+  it('holds the toolbar height while the board loads (docs/73 UXD-22)', () => {
+    mockBoard = undefined as never;
+    mockBoardQueryState = { ...mockBoardQueryState, isLoading: true };
+    render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
+    expect(screen.getByLabelText('Loading team')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Search team' })).toBeNull();
+    expect(document.querySelector('header .mt-3 .animate-pulse')).not.toBeNull();
+  });
+
   it('puts all-date commitments before current work and shows risk age and next check near the identity', () => {
     mockPersonCanonical = true;
     render(<TestWrapper><TeamTrackerPage /></TestWrapper>);
@@ -2714,6 +2748,9 @@ describe('P09 optional 1:1 loading', () => {
     view.rerender(<TestWrapper><TeamTrackerPage oneOnOnePanel="one-on-one" oneOnOneDeveloperId="dev-1" /></TestWrapper>);
     expect(await screen.findByText('Lazy 1:1 dev-1')).toBeInTheDocument();
     expect(oneOnOneLazy.imports).toBe(1);
+    // docs/73 UXD-22: search, signals, Standup and Views don't apply inside a 1:1.
+    expect(screen.queryByRole('textbox', { name: 'Search team' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Filter by signal' })).toBeNull();
     oneOnOneLazy.enabled = false;
   });
 });

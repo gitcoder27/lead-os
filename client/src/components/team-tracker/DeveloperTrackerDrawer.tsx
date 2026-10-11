@@ -2,7 +2,7 @@ import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { PersonCommitments } from './PersonCommitments';
 import { useState, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls, useReducedMotion } from 'framer-motion';
-import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, UserMinus, Users } from 'lucide-react';
+import { ArrowUpRight, Bell, CalendarClock, CornerDownLeft, Crosshair, ListTodo, MessagesSquare, NotebookPen, Play, UserMinus, Users } from 'lucide-react';
 import type { IssueSuggestion, TrackerCheckInVisibility, TrackerDeveloperDay, TrackerDeveloperStatus, TrackerWorkItem } from '@/types';
 import { TrackerItemRow } from './TrackerItemRow';
 import { AddTrackerItemForm } from './AddTrackerItemForm';
@@ -373,15 +373,26 @@ export function DeveloperTrackerDrawer({
                       extraActions={agendaActionFor(day.currentItem)}
                     />
                   ) : (
-                    <div
-                      className="rounded-xl px-3.5 py-3 text-body leading-5"
-                      style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
-                    >
-                      {readOnly
-                        ? 'No active item in this historical snapshot.'
-                        : localPlannedItems.length > 0
-                          ? 'Nothing in progress. Start a planned task to make it current work.'
-                          : 'Nothing in progress and nothing planned yet.'}
+                    // docs/73 UXD-22: a plain line plus a ghost action, not a dashed empty box.
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-body leading-5" style={{ color: 'var(--text-muted)' }}>
+                      <span>
+                        {readOnly
+                          ? 'No active item in this historical snapshot.'
+                          : localPlannedItems.length > 0
+                            ? 'Nothing in progress.'
+                            : 'Nothing in progress and nothing planned yet.'}
+                      </span>
+                      {!readOnly && localPlannedItems[0] ? (
+                        <button
+                          type="button"
+                          className="ui-btn-ghost inline-flex min-w-0 max-w-full items-center gap-1.5"
+                          onClick={() => onSetCurrent(localPlannedItems[0]!.id)}
+                          title={`Make "${localPlannedItems[0].title}" current work`}
+                        >
+                          <Play size={12} aria-hidden="true" />
+                          <span className="truncate">Start next: {localPlannedItems[0].title}</span>
+                        </button>
+                      ) : null}
                     </div>
                   )}
                 </DrawerSection>
@@ -514,7 +525,7 @@ export function DeveloperTrackerDrawer({
 
             {readOnly ? (
               <div
-                className="hidden shrink-0 border-t px-6 py-2 sm:block"
+                className="hint-fine-only hidden shrink-0 border-t px-6 py-2 sm:block"
                 style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}
               >
                 <ShortcutLegend hints={shortcutHints} />
@@ -749,7 +760,7 @@ function CheckInComposer({
           </div>
         )}
       </div>
-      {!engaged && <ShortcutLegend hints={shortcutHints} className="mt-2 hidden px-1 sm:flex" />}
+      {!engaged && <ShortcutLegend hints={shortcutHints} className="hint-fine-only mt-2 hidden px-1 sm:flex" />}
     </div>
   );
 }

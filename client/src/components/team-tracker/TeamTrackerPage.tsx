@@ -317,6 +317,7 @@ export function TeamTrackerPage({
   const { addToast } = useToast();
   const tasksPhase3 = useTasksPhase3();
   const oneOnOneEnabled = useOneOnOneEnabled();
+  const inOneOnOne = oneOnOneEnabled && (oneOnOnePanel === 'one-on-ones' || (oneOnOnePanel === 'one-on-one' && Boolean(oneOnOneDeveloperId)));
   const teamMode = useTeamMode();
   const [date, setDate] = useState(getLocalIsoDate);
   const [activeLens, setActiveLens] = useState<TeamTrackerLens>('team');
@@ -563,16 +564,19 @@ export function TeamTrackerPage({
             ) : null}
           </div>
 
-          {board && (
+          {/* docs/73 UXD-22: the board toolbar has nothing to act on inside a 1:1, and it keeps its
+              height while the board loads so rows don't jump. */}
+          {inOneOnOne ? null : board ? (
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2">
-              <TrackerSummaryStrip
-                summary={board.summary}
-                activeFilter={resolvedSummaryFilter}
-                onFilterChange={qs.handleSummaryFilterChange}
-              />
-
-              <div className="min-w-[280px] flex-1">
+              <div className="min-w-0 flex-1 md:min-w-[280px]">
                 <TrackerBoardToolbar
+                  summary={(
+                    <TrackerSummaryStrip
+                      summary={board.summary}
+                      activeFilter={resolvedSummaryFilter}
+                      onFilterChange={qs.handleSummaryFilterChange}
+                    />
+                  )}
                   searchQuery={resolvedSearch}
                   onSearchChange={qs.handleSearchChange}
                   sortBy={resolvedSortBy}
@@ -606,7 +610,9 @@ export function TeamTrackerPage({
                 />
               </div>
             </div>
-          )}
+          ) : isLoading ? (
+            <ToolbarSkeleton />
+          ) : null}
         </div>
       </motion.header>
 
@@ -960,6 +966,21 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
 
 function Bone({ className }: { className: string }) {
   return <span className={`block animate-pulse rounded ${className}`} style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' }} />;
+}
+
+function ToolbarSkeleton() {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2" aria-hidden="true">
+      <Bone className="h-8 w-28" />
+      <Bone className="h-8 w-40" />
+      <Bone className="h-8 min-w-[112px] max-w-[340px] flex-1" />
+      <div className="ml-auto flex gap-1.5 max-md:hidden">
+        <Bone className="h-8 w-16" />
+        <Bone className="h-8 w-24" />
+        <Bone className="h-8 w-20" />
+      </div>
+    </div>
+  );
 }
 
 function TeamTrackerSkeleton() {

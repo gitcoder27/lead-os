@@ -162,7 +162,7 @@ const ONE_ON_ONE_SHORTCUTS: ShortcutGroup[] = [
 function WorkspaceFrame({ name, onClose, children }: { name: string; onClose: () => void; children: React.ReactNode }) {
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="one-on-one-workspace">
+    <div className="flex min-h-0 flex-col lg:h-full" data-testid="one-on-one-workspace">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="ui-dialog-icon" aria-hidden="true">
           <CalendarDays size={14} />
@@ -211,7 +211,8 @@ function Workspace({ detail, onClose, onOpenTask }: { detail: OneOnOneSeriesDeta
   return (
     <WorkspaceFrame name={detail.series.developerName} onClose={onClose}>
       <SeriesControls detail={detail} />
-      <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.95fr)] lg:gap-0">
+      {/* docs/73 UXD-22: below lg the columns stack at their natural height; a height-capped grid overlapped them on phones. */}
+      <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.95fr)] lg:gap-0">
         <AgendaColumn detail={detail} onOpenTask={onOpenTask} />
         <SessionColumn detail={detail} onOpenTask={onOpenTask} />
         <HistoryColumn detail={detail} onOpenTask={onOpenTask} />

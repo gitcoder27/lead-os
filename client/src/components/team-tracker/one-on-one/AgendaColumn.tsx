@@ -123,7 +123,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
               Add
             </button>
           ) : (
-            <KeySpec keys="n" variant="subtle" />
+            <span className="hint-fine-only"><KeySpec keys="n" variant="subtle" /></span>
           )}
         </div>
       </form>
@@ -161,7 +161,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
         )}
         {openItems.length > 1 && (
           <div className="mt-1.5 flex items-center gap-1.5 px-1.5 text-meta" style={{ color: 'var(--text-muted)' }}>
-            Drag to reorder, or <KeySpec keys="⌥ ↑ / ⌥ ↓" variant="subtle" />
+            Drag to reorder<span className="hint-fine-only inline-flex items-center gap-1.5">or <KeySpec keys="⌥ ↑ / ⌥ ↓" variant="subtle" /></span>
           </div>
         )}
 

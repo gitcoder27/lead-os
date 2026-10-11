@@ -9,6 +9,20 @@ import { formatCompactRelative } from './trackerItemFormat';
 import { formatDay, formatDayTime } from '@/lib/date-format';
 import { getLocalIsoDate } from '@/lib/utils';
 import { DrawerSection, EmptyLine } from './DeveloperDrawerSections';
+import { TASK_STATUS_META } from '@/components/tasks/TaskMenus';
+
+/**
+ * docs/73 UXD-22: say what is there, in task words — "Blocked · Updated 20h ago · Sat 10 Oct · Next check
+ * Fri 9 Oct" — and leave out what isn't ("open", "Undated", "Next check not scheduled").
+ */
+function commitmentMeta(task: ManagerTask): string {
+  return [
+    task.status === 'open' ? null : TASK_STATUS_META[task.status].label,
+    `Updated ${formatCompactRelative(task.updatedAt)}`,
+    task.later ? 'Later' : task.scheduledOn ? formatDay(task.scheduledOn, getLocalIsoDate()) : null,
+    task.followUpAt ? `Next check ${formatDayTime(task.followUpAt)}` : null,
+  ].filter(Boolean).join(' · ');
+}
 
 export function PersonCommitments({ accountId, onCapture, isSelf = false }: { accountId: string; onCapture: () => void; isSelf?: boolean }) {
   const query = usePersonCommitments(accountId);
@@ -32,8 +46,7 @@ export function PersonCommitments({ accountId, onCapture, isSelf = false }: { ac
                   <button type="button" onClick={() => setTaskKey(task.taskKey)} className={`min-h-11 w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}>
                     <span className="block text-body" style={{ color: 'var(--text-primary)' }}>{task.taskKey} · {task.title}</span>
                     <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
-                      {task.status} · Updated {formatCompactRelative(task.updatedAt)} · {task.later ? 'Later' : task.scheduledOn ? formatDay(task.scheduledOn, getLocalIsoDate()) : 'Undated'}
-                      {task.followUpAt ? ` · Next check ${formatDayTime(task.followUpAt)}` : ' · Next check not scheduled'}
+                      {commitmentMeta(task)}
                     </span>
                     {task.nextAction && <span className="block text-ui" style={{ color: 'var(--text-secondary)' }}>Next: {task.nextAction}</span>}
                   </button>

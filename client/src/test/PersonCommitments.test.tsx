@@ -28,6 +28,14 @@ describe('person commitments', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(owed).toBeInTheDocument();
   });
+  it('uses task status labels and leaves out what is missing (docs/73 UXD-22)', () => {
+    query.data = { tasks: [task('T-6', { title: 'Plain' }), task('T-7', { title: 'Stuck', status: 'blocked' })] };
+    render(<PersonCommitments accountId="dev" onCapture={vi.fn()} />);
+    const plain = screen.getByRole('button', { name: /Plain/ });
+    expect(plain).toHaveTextContent(/Updated/);
+    expect(plain.textContent).not.toMatch(/open ·|Undated|not scheduled/);
+    expect(screen.getByRole('button', { name: /Stuck/ })).toHaveTextContent(/Blocked · Updated/);
+  });
   it('failed reads offer Retry and cached commitments survive refresh errors', () => {
     query.isError = true;
     const { rerender } = render(<PersonCommitments accountId="dev" onCapture={vi.fn()} />);

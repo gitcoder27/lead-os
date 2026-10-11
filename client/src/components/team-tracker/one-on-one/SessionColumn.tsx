@@ -526,10 +526,10 @@ function LiveSession({
                   ? `Saved ${savedAt}`
                   : 'Saved as you type'}
           </span>
-          <span className="hidden items-center gap-1 sm:inline-flex">
+          <span className="hint-fine-only hidden items-center gap-1 sm:inline-flex">
             <KeySpec keys="⌘ ⇧ E" variant="subtle" /> line → action item
           </span>
-          <span className="hidden items-center gap-1 xl:inline-flex">
+          <span className="hint-fine-only hidden items-center gap-1 xl:inline-flex">
             <KeySpec keys="⌘ ⇧ L" variant="subtle" /> my follow-up
           </span>
         </div>

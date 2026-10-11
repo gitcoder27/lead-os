@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { CalendarDays, Check, Presentation, Search, SlidersHorizontal, X } from 'lucide-react';
 import { FOCUS_RING } from '@/components/ui/focus';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { TeamTrackerBoardSort, TeamTrackerBoardGroupBy, TeamTrackerSavedView } from '@/types';
 import { SavedViewsMenu } from './SavedViewsMenu';
 import type { SavedViewsMenuProps } from './SavedViewsMenu';
@@ -20,6 +21,8 @@ interface TrackerBoardToolbarProps extends SavedViewsMenuProps<TeamTrackerSavedV
   onOpenOneOnOnes?: () => void;
   /** docs/56 UX-13: Standup and 1:1s need someone on the roster; they stay visible but disabled. */
   rosterEmpty?: boolean;
+  /** docs/73 UXD-22: the signal chips; on a phone they share the search row instead of taking their own. */
+  summary?: ReactNode;
 }
 
 const sortOptions: Array<{ value: TeamTrackerBoardSort; label: string }> = [
@@ -48,8 +51,10 @@ export function TrackerBoardToolbar({
   onStartStandup,
   onOpenOneOnOnes,
   rosterEmpty = false,
+  summary,
   ...savedViewProps
 }: TrackerBoardToolbarProps) {
+  const phone = useMediaQuery('(max-width: 767px)');
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,12 +87,16 @@ export function TrackerBoardToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <SearchInput
-        ref={inputRef}
-        value={localSearch}
-        onChange={handleSearchInput}
-        onClear={clearSearch}
-      />
+      <div className="flex min-w-0 items-center gap-1.5 max-md:w-full md:contents">
+        <SearchInput
+          ref={inputRef}
+          value={localSearch}
+          onChange={handleSearchInput}
+          onClear={clearSearch}
+          placeholder={phone ? 'Search…' : undefined}
+        />
+        {summary ? <div className="min-w-0 max-md:shrink md:order-first md:mr-1">{summary}</div> : null}
+      </div>
 
       {isFiltered && (
         <span className="px-1 text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} aria-live="polite">
@@ -183,9 +192,10 @@ const SearchInput = forwardRef<HTMLInputElement, {
   value: string;
   onChange: (v: string) => void;
   onClear: () => void;
-}>(({ value, onChange, onClear }, ref) => (
+  placeholder?: string;
+}>(({ value, onChange, onClear, placeholder = 'Search people, tasks, Jira keys…' }, ref) => (
   <label
-    className="flex h-8 min-w-[200px] max-w-[340px] flex-1 cursor-text items-center gap-2 rounded-lg border px-2.5 transition-colors focus-within:!border-[color:var(--border-active)]"
+    className="flex h-8 min-w-[112px] max-w-[340px] flex-1 cursor-text md:min-w-[200px] items-center gap-2 rounded-lg border px-2.5 transition-colors focus-within:!border-[color:var(--border-active)]"
     style={{
       background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)',
       borderColor: value ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
@@ -197,7 +207,7 @@ const SearchInput = forwardRef<HTMLInputElement, {
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      placeholder="Search people, tasks, Jira keys…"
+      placeholder={placeholder}
       aria-label="Search team"
       maxLength={200}
       onKeyDown={(event) => {

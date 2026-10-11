@@ -193,9 +193,10 @@ function UpNext({ items }: { items: TrackerWorkItem[] }) {
   const [first, ...rest] = items;
   if (!first) {
     return (
-      <span className="truncate text-body" style={{ color: 'var(--text-placeholder)' }}>
+      <span className="truncate text-body" style={{ color: 'var(--text-placeholder)' }} title="Nothing planned">
         <MobileLabel>Next</MobileLabel>
-        Nothing planned
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">Nothing planned</span>
       </span>
     );
   }
@@ -225,7 +226,8 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
       <span className="whitespace-nowrap text-body font-semibold tabular-nums" style={{ color: load > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
         {load} open
       </span>
-      <span aria-hidden="true" className="flex items-center gap-[2px]">
+      {/* docs/73 UXD-22: a meter only says something once there are two or more items. */}
+      {load >= 2 && <span aria-hidden="true" className="flex items-center gap-[2px]">
         {Array.from({ length: LOAD_PIPS }, (_, index) => (
           <span
             key={index}
@@ -237,7 +239,7 @@ function Load({ day }: { day: TrackerDeveloperDay }) {
             }}
           />
         ))}
-      </span>
+      </span>}
     </div>
   );
 }
@@ -414,7 +416,8 @@ function RosterRow({
         <CurrentWork item={day.currentItem} done={done} solo={solo} next={solo ? day.plannedItems[0] : undefined} onOpenTaskDetail={onOpenTaskDetail} />
       </div>
 
-      <div className={`min-w-0 ${MOBILE_SPAN}`}>
+      {/* docs/73 UXD-22: an empty Up next is a muted dash on the table and no line at all on a phone card. */}
+      <div className={`min-w-0 ${MOBILE_SPAN} ${(solo && !day.currentItem ? day.plannedItems.length <= 1 : day.plannedItems.length === 0) ? 'max-md:hidden' : ''}`}>
         <UpNext items={solo && !day.currentItem ? day.plannedItems.slice(1) : day.plannedItems} />
       </div>
 

@@ -528,6 +528,8 @@ textarea.ui-field { resize: none; }
 .ui-disclosure-trigger[aria-expanded='true'] .ui-disclosure-chevron { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .ui-disclosure-chevron { transition: none; } }
 @media (pointer: coarse) { .ui-disclosure-trigger { min-height: 44px; } }
+/* docs/73 UXD-22: keyboard hints mean nothing on a touch screen. */
+@media (pointer: coarse) { .hint-fine-only { display: none !important; } }
 
 /* docs/73 UXD-05: `Select` — a native select styled as a field, with a chevron. */
 .ui-select { position: relative; display: inline-flex; min-width: 0; align-items: center; vertical-align: middle; }

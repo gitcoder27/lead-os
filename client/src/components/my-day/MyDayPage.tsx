@@ -9,6 +9,7 @@ import { useTaskResolution } from '@/hooks/useTasks';
 import { usePrefetchTaskDetail } from '@/hooks/useTaskDetail';
 import { getLocalIsoDate, shiftLocalIsoDate } from '@/lib/utils';
 import { taskKeyFromParams, writeTaskParam } from '@/lib/view-params';
+import { useScopedStorageKey } from '@/lib/scoped-storage';
 import { TaskDrawer, navigateToTaskPage } from '@/components/tasks/TaskDrawer';
 import { tasksFromItems } from '@/components/tasks/TaskPicker';
 import { formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
@@ -99,6 +100,15 @@ export function MyDayPage() {
 
   const goToday = () => setDate(getLocalIsoDate());
   const [shortcutsAnchor, setShortcutsAnchor] = useState<HTMLElement | null>(null);
+  // docs/56 MDA-06: the key legend teaches until a shortcut has been used, then folds to one link.
+  const shortcutsKnownKey = useScopedStorageKey('my-day:shortcuts-known');
+  const [shortcutsKnown, setShortcutsKnown] = useState(() => {
+    try { return window.localStorage.getItem(shortcutsKnownKey) === '1'; } catch { return false; }
+  });
+  const markShortcutsKnown = useCallback(() => {
+    setShortcutsKnown(true);
+    try { window.localStorage.setItem(shortcutsKnownKey, '1'); } catch { /* Legend just keeps showing. */ }
+  }, [shortcutsKnownKey]);
 
   useMyDayShortcuts({
     onFocusUpdate: isReadOnly ? undefined : () => quickUpdateRef.current?.focus(),
@@ -107,6 +117,7 @@ export function MyDayPage() {
     onNextDay: () => setDate((d) => shiftLocalIsoDate(d, 1)),
     onToday: goToday,
     onShowShortcuts: () => setShortcutsAnchor(document.querySelector<HTMLElement>('[data-my-day-shortcuts]') ?? document.body),
+    onUsed: shortcutsKnown ? undefined : markShortcutsKnown,
   });
 
   useEffect(() => setAddTaskOpen(false), [date]);
@@ -229,7 +240,8 @@ export function MyDayPage() {
   return (
     <>
       <MyDayTaskDetailContext.Provider value={taskDetailActions}>
-      <div className="h-full overflow-y-auto" style={{ background: 'var(--bg-canvas)' }}>
+      {/* docs/56 MDA-06: My Day has no app shell, so it owns the page's one <main>. */}
+      <main id="main" tabIndex={-1} className="h-full overflow-y-auto outline-none" style={{ background: 'var(--bg-canvas)' }}>
         <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
           <MyDayHeader
             inbox={<TaskInboxPopover />}
@@ -399,14 +411,18 @@ export function MyDayPage() {
               </MyDaySection>
 
               <motion.div variants={sectionVariants} className="hidden flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-ui md:flex" style={{ color: 'var(--text-muted)' }}>
-                {!isReadOnly && (
+                {!shortcutsKnown && (
                   <>
-                    <span className="inline-flex items-center gap-1.5"><Kbd>n</Kbd> new task</span>
-                    <span className="inline-flex items-center gap-1.5"><Kbd>c</Kbd> check in</span>
+                    {!isReadOnly && (
+                      <>
+                        <span className="inline-flex items-center gap-1.5"><Kbd>n</Kbd> new task</span>
+                        <span className="inline-flex items-center gap-1.5"><Kbd>c</Kbd> check in</span>
+                      </>
+                    )}
+                    <span className="inline-flex items-center gap-1.5"><Kbd>[</Kbd><Kbd>]</Kbd> change day</span>
+                    <span className="inline-flex items-center gap-1.5"><Kbd>t</Kbd> today</span>
                   </>
                 )}
-                <span className="inline-flex items-center gap-1.5"><Kbd>[</Kbd><Kbd>]</Kbd> change day</span>
-                <span className="inline-flex items-center gap-1.5"><Kbd>t</Kbd> today</span>
                 <button
                   type="button"
                   data-my-day-shortcuts=""
@@ -414,7 +430,7 @@ export function MyDayPage() {
                   className={`inline-flex items-center gap-1.5 rounded-md underline-offset-2 hover:underline ${FOCUS_RING}`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  <Kbd>?</Kbd> all shortcuts
+                  <Kbd>?</Kbd> {shortcutsKnown ? 'Keyboard shortcuts' : 'all shortcuts'}
                 </button>
               </motion.div>
               {shortcutsAnchor ? (
@@ -427,7 +443,7 @@ export function MyDayPage() {
             </aside>
           </motion.div>
         </div>
-      </div>
+      </main>
       <TaskDrawer
         taskKey={openTaskKey}
         onClose={closeTask}

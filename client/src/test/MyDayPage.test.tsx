@@ -417,6 +417,19 @@ describe('MyDayPage', () => {
     expect(screen.getByText('For your lead · optional')).toBeInTheDocument();
   });
 
+  it('owns the page landmark and folds the key legend once a shortcut is used (MDA-06)', () => {
+    window.localStorage.clear();
+    const { unmount } = render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.getByRole('main')).toBeInTheDocument();
+    expect(screen.getByText('change day')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: ']' });
+    expect(screen.queryByText('change day')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Keyboard shortcuts/ })).toBeInTheDocument();
+    unmount();
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.queryByText('change day')).not.toBeInTheDocument();
+  });
+
   it('asks once about work carried for a week or more, and remembers a dismissal (MDA-04)', () => {
     window.localStorage.clear();
     const today = getLocalIsoDate();

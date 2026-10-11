@@ -103,7 +103,7 @@ function StatusChip({ status, onClick }: { status: ReturnType<typeof getStatusIn
       onClick={onClick}
       className={`inline-flex h-6 items-center gap-1.5 rounded-full pl-2 pr-1.5 text-ui font-medium lg:hidden ${FOCUS_RING}`}
       style={{
-        color: status.color,
+        color: status.textColor,
         background: `color-mix(in srgb, ${status.color} 10%, transparent)`,
         border: `1px solid color-mix(in srgb, ${status.color} 26%, transparent)`,
       }}

@@ -10,6 +10,8 @@ export interface StatusInfo {
   /** Longer hint for tooltips, e.g. "Done for today". */
   description: string;
   color: string;
+  /** The tone at a readable contrast for text on a tinted fill. */
+  textColor: string;
   icon: typeof Zap;
   /** Composer placeholder while this status is set — asks the question a lead would ask. */
   prompt: string;
@@ -28,5 +30,5 @@ const MY_DAY_EXTRAS: Record<TrackerDeveloperStatus, Pick<StatusInfo, 'icon' | 'p
 export function getStatusInfo(status: TrackerDeveloperStatus): StatusInfo {
   const key = STATUS_META[status] ? status : 'on_track';
   const meta = STATUS_META[key];
-  return { label: meta.label, shortLabel: meta.label, color: meta.color, ...MY_DAY_EXTRAS[key] };
+  return { label: meta.label, shortLabel: meta.label, color: meta.color, textColor: meta.text, ...MY_DAY_EXTRAS[key] };
 }

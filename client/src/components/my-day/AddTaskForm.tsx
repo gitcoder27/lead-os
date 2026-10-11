@@ -92,7 +92,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
           <Plus size={15} aria-hidden="true" />
         </span>
         <span className="flex-1 transition-colors group-hover/add:text-[var(--text-secondary)]">Add task</span>
-        <span className="hidden sm:inline-flex" aria-hidden="true"><Kbd>N</Kbd></span>
+        <span className="hidden sm:inline-flex" aria-hidden="true"><Kbd>n</Kbd></span>
       </button>
     );
   }

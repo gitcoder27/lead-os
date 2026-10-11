@@ -3,15 +3,17 @@ import type { TrackerDeveloperStatus } from '@/types';
 /**
  * docs/54 V6: the one developer-status vocabulary — Team roster, drawer,
  * Standup, Today and My Day all read labels and colours from here.
- * Sentence case; "Done" (not "Done for today", not "On Track").
+ * Sentence case; "Day done" (not "Done for today", not "On Track"). `color` is
+ * the tone for dots and tints; `text` is the same tone at a readable contrast
+ * for words on a tinted fill (docs/56 MDA-06).
  */
-export const STATUS_META: Record<TrackerDeveloperStatus, { label: string; color: string; key: string }> = {
-  on_track: { label: 'On track', color: 'var(--success)', key: 'o' },
-  at_risk: { label: 'At risk', color: 'var(--warning)', key: 'r' },
-  blocked: { label: 'Blocked', color: 'var(--danger)', key: 'b' },
-  waiting: { label: 'Waiting', color: 'var(--info)', key: 'w' },
+export const STATUS_META: Record<TrackerDeveloperStatus, { label: string; color: string; text: string; key: string }> = {
+  on_track: { label: 'On track', color: 'var(--success)', text: 'var(--success-text)', key: 'o' },
+  at_risk: { label: 'At risk', color: 'var(--warning)', text: 'var(--warning-text)', key: 'r' },
+  blocked: { label: 'Blocked', color: 'var(--danger)', text: 'var(--task-danger-text)', key: 'b' },
+  waiting: { label: 'Waiting', color: 'var(--info)', text: 'var(--info-text)', key: 'w' },
   // docs/56 MDA-05: "Day done", so a person's status never reads like a task's Done.
-  done_for_today: { label: 'Day done', color: 'var(--accent)', key: 'd' },
+  done_for_today: { label: 'Day done', color: 'var(--accent)', text: 'var(--accent-text)', key: 'd' },
 };
 
 export const DEV_STATUS_ORDER: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];

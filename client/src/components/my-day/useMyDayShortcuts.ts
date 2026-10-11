@@ -7,6 +7,8 @@ export interface MyDayShortcutHandlers {
   onNextDay: () => void;
   onToday: () => void;
   onShowShortcuts?: () => void;
+  /** Called after any shortcut but `?` runs — the page folds its legend once they're known. */
+  onUsed?: () => void;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -51,6 +53,7 @@ export function useMyDayShortcuts(handlers: MyDayShortcutHandlers) {
       if (!action) return;
       event.preventDefault();
       action();
+      if (action !== h.onShowShortcuts) h.onUsed?.();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

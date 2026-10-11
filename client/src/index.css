@@ -47,7 +47,8 @@
   --task-warning-text: #92400E;
   --task-danger-text: #991B1B;
   --focus-ring:    #0E7490;
-  --app-header-height: 72px;
+  /* Header.tsx publishes the measured height; pages without the app header (My Day) keep 0 so drawers run full height. */
+  --app-header-height: 0px;
 
   /* docs/73 UXD-02: the type scale. Six sizes (meta, ui, body, title-sm, title, display),
      weights 400/500/600. Tailwind maps them to text-meta … text-display (size only, so

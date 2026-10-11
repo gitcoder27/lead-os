@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { ChevronRight } from 'lucide-react';
 import { useIssueDetail } from '@/hooks/useIssueDetail';
 import { useUpdateIssue } from '@/hooks/useUpdateIssue';
 import { useDevelopers } from '@/hooks/useDevelopers';
@@ -117,7 +118,7 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
           style={{
             background: 'var(--bg-secondary)',
             borderLeft: '1px solid var(--border)',
-            boxShadow: '-8px 0 32px rgba(0,0,0,0.22), -2px 0 8px rgba(0,0,0,0.08)',
+            boxShadow: 'var(--overlay-shadow)',
           }}
         >
           <TriagePanelHeader issue={issue} jiraBaseUrl={config?.jiraBaseUrl} onClose={onClose} />
@@ -166,8 +167,8 @@ export function TriagePanel({ issueKey, onClose, onOpenManagerDesk }: TriagePane
         <ManagerDeskCaptureDialog
           onClose={() => setDeskCaptureOpen(false)}
           onOpenManagerDesk={onOpenManagerDesk}
-          heading="Add Issue Follow-Up"
-          description="Capture a manager task from the current Jira issue without leaving triage."
+          heading="Add a task for this defect"
+          description={`Linked to ${issue.jiraKey}. You stay in triage.`}
           initialTitle={issue.summary}
           initialCategory="analysis"
           initialContextNote={issue.analysisNotes?.trim() ? issue.analysisNotes : undefined}
@@ -196,9 +197,9 @@ function DescriptionSection({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="triage-section">
-      <button type="button" onClick={() => setExpanded((p) => !p)} className="ui-label flex items-center gap-1 mb-1.5">
+      <button type="button" onClick={() => setExpanded((p) => !p)} aria-expanded={expanded} className="ui-label flex items-center gap-1.5 mb-1.5">
+        <ChevronRight size={12} aria-hidden="true" className="transition-transform duration-150" style={{ color: 'var(--text-muted)', transform: expanded ? 'rotate(90deg)' : undefined }} />
         Description
-        <span className="text-meta ml-0.5" style={{ color: 'var(--text-muted)' }}>{expanded ? '▾' : '▸'}</span>
       </button>
       <div
         className={`text-body leading-relaxed prose prose-sm max-w-none ${expanded ? '' : 'line-clamp-2 cursor-pointer'}`}

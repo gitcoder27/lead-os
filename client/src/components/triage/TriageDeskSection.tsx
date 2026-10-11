@@ -1,4 +1,4 @@
-import { Briefcase } from 'lucide-react';
+import { ListPlus } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import type { Issue } from '@/types';
 
@@ -7,6 +7,10 @@ interface TriageDeskSectionProps {
   onCapture: () => void;
 }
 
+/**
+ * docs/73 UXD-21: one accent-tinted card that says what it does — a task linked to this defect —
+ * instead of an issue chip and a green owner chip that read like data.
+ */
 export function TriageDeskSection({ issue, onCapture }: TriageDeskSectionProps) {
   return (
     <div className="triage-section">
@@ -17,24 +21,17 @@ export function TriageDeskSection({ issue, onCapture }: TriageDeskSectionProps) 
           border: '1px solid color-mix(in srgb, var(--accent) 16%, transparent)',
         }}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <Briefcase size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-          <div className="flex flex-wrap gap-1 min-w-0">
-            <JiraIssueLink
-              issueKey={issue.jiraKey}
-              className="rounded-full px-1.5 py-[1px] text-ui font-medium"
-              style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-            >
-              {issue.jiraKey}
-            </JiraIssueLink>
-            {issue.assigneeName && (
-              <span
-                className="rounded-full px-1.5 py-[1px] text-ui font-medium"
-                style={{ background: 'rgba(16,185,129,0.08)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.14)' }}
-              >
-                {issue.assigneeName}
-              </span>
-            )}
+        <div className="flex items-start gap-2 min-w-0">
+          <ListPlus size={14} aria-hidden="true" style={{ color: 'var(--accent-text)', flexShrink: 0, marginTop: 2 }} />
+          <div className="min-w-0">
+            <p className="text-body font-medium" style={{ color: 'var(--text-primary)' }}>Follow up in Tasks</p>
+            <p className="text-ui" style={{ color: 'var(--text-muted)' }}>
+              Linked to{' '}
+              <JiraIssueLink issueKey={issue.jiraKey} className="font-mono" style={{ color: 'var(--text-secondary)' }}>
+                {issue.jiraKey}
+              </JiraIssueLink>
+              {issue.assigneeName ? `, with ${issue.assigneeName}` : ''}
+            </p>
           </div>
         </div>
         <button

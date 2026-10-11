@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { formatRelativeTime, priorityColor } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import type { Issue } from '@/types';
+import { statusLabel } from '@/components/table/StatusBadge';
 
 interface TriagePropertiesProps {
   issue: Issue;
@@ -12,14 +13,14 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
   const [expanded, setExpanded] = useState(false);
 
   const fields = [
-    { label: 'Status', value: issue.statusName, accent: statusFieldColor(issue.statusCategory) },
-    ...(jiraAspenSeverityField ? [{ label: 'Severity', value: issue.aspenSeverity ?? 'Not set', accent: issue.aspenSeverity ? 'rgb(99,102,241)' : undefined }] : []),
+    { label: 'Status', value: statusLabel(issue.statusName), accent: statusFieldColor(issue.statusCategory) },
+    ...(jiraAspenSeverityField ? [{ label: 'Severity', value: issue.aspenSeverity ?? 'Not set', accent: undefined }] : []),
     { label: 'Component', value: issue.component ?? '—' },
     { label: 'Reporter', value: issue.reporterName ?? '—' },
-    { label: 'Created', value: formatRelativeTime(issue.createdAt), mono: true },
-    { label: 'Jira updated', value: formatRelativeTime(issue.updatedAt), mono: true },
+    { label: 'Created', value: formatRelativeTime(issue.createdAt) },
+    { label: 'Jira updated', value: formatRelativeTime(issue.updatedAt) },
     ...(issue.localUpdatedAt
-      ? [{ label: 'Local edit', value: formatRelativeTime(issue.localUpdatedAt), mono: true }]
+      ? [{ label: 'Local edit', value: formatRelativeTime(issue.localUpdatedAt) }]
       : []),
   ];
 
@@ -39,7 +40,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
         <span className="ui-label inline-flex items-center gap-1.5">Properties</span>
         {!expanded && (
           <span className="ml-auto text-ui truncate max-w-[260px]" style={{ color: 'var(--text-muted)' }}>
-            {issue.statusName}
+            {statusLabel(issue.statusName)}
             {issue.component ? ` · ${issue.component}` : ''}
             {issue.reporterName ? ` · ${issue.reporterName}` : ''}
           </span>
@@ -51,13 +52,13 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
           className="mt-2 grid grid-cols-2 gap-px rounded-lg overflow-hidden"
           style={{ border: '1px solid var(--border)', background: 'var(--border)' }}
         >
-          {fields.map(({ label, value, accent, mono }) => (
+          {fields.map(({ label, value, accent }) => (
             <div key={label} className="px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
               <div className="ui-label mb-0.5">
                 {label}
               </div>
               <div
-                className={`text-body font-medium truncate ${mono ? 'font-mono' : ''}`}
+                className="text-body font-medium truncate"
                 style={{ color: accent ?? 'var(--text-primary)' }}
               >
                 {accent && label === 'Status' && (

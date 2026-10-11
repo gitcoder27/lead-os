@@ -116,6 +116,22 @@ describe('TriagePanel', () => {
     expect(screen.getByText('Login page crashes on submit with special chars')).toBeInTheDocument();
   });
 
+  it('labels the quick actions with icons and keeps P/A/D as shortcuts (docs/73 UXD-21)', () => {
+    render(
+      <TestWrapper>
+        <TriagePanel issueKey="PROJ-101" onClose={onClose} />
+      </TestWrapper>
+    );
+    const priority = screen.getByRole('button', { name: /^Priority:/ });
+    expect(priority).toHaveAttribute('title', 'Priority (P)');
+    expect(priority).toHaveAttribute('aria-keyshortcuts', 'p');
+    expect(screen.getByRole('button', { name: /^Assignee:/ })).toHaveAttribute('aria-keyshortcuts', 'a');
+    expect(screen.getByRole('button', { name: /^Due date:/ })).toHaveAttribute('aria-keyshortcuts', 'd');
+    expect(document.querySelector('.triage-chip kbd')).toBeNull();
+    fireEvent.keyDown(window, { key: 'p' });
+    expect(screen.getByRole('group', { name: 'Priority' }).querySelector('select')).not.toBeNull();
+  });
+
   it('does not render when issueKey is undefined', () => {
     render(
       <TestWrapper>

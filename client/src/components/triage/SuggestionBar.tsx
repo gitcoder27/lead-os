@@ -5,62 +5,49 @@ import { useToast } from '@/context/ToastContext';
 import { applyAllRows, buildSuggestionRows, buildUndoUpdate, mergeRowUpdates, type SuggestionRow } from '@/lib/suggestion-diff';
 import { workloadAssignedLabel } from '@/lib/utils';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { Avatar } from '@/components/ui/Avatar';
 import type { Issue, IssueUpdate, AssignmentSuggestion } from '@/types';
 
 interface SuggestionBarProps {
   issue: Issue;
 }
 
+/** docs/73 UXD-21: who and how loaded, in words; the raw score stays in the tooltip. */
 function AssigneeMetrics({ suggestion }: { suggestion: AssignmentSuggestion }) {
   const w = suggestion.workload;
   const todayLabel = workloadAssignedLabel(w);
   const isIdle = w.signals?.idle ?? false;
   const isDoneForToday = w.trackerStatus === 'done_for_today';
   const isBlocked = w.trackerStatus === 'blocked';
+  const pill = 'rounded-full px-1.5 py-0.5';
 
   return (
     <span className="flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
-      👤 <strong style={{ color: 'var(--text-primary)' }}>{suggestion.developer.displayName}</strong>
-      <span className="flex items-center gap-1 text-ui font-mono" style={{ color: 'var(--text-muted)' }}>
-        <span
-          className="rounded-full px-1.5 py-0.5"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
-          {todayLabel} today
+      <Avatar name={suggestion.developer.displayName} seed={suggestion.developer.accountId} size={18} />
+      <strong style={{ color: 'var(--text-primary)' }}>{suggestion.developer.displayName}</strong>
+      <span className="flex items-center gap-1 text-ui tabular-nums" style={{ color: 'var(--text-muted)' }} title={`Workload score ${w.score}`}>
+        <span className={pill} style={{ background: 'var(--bg-tertiary)' }}>{todayLabel} today</span>
+        <span className={pill} style={{ background: 'var(--bg-tertiary)' }}>
+          {w.activeDefects} Jira {w.activeDefects === 1 ? 'defect' : 'defects'}
         </span>
-        <span
-          className="rounded-full px-1.5 py-0.5"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
-          S{w.score} · {w.activeDefects} Jira
-        </span>
-        {isIdle && (
-          <span
-            className="rounded-full px-1.5 py-0.5"
-            style={{ background: 'var(--bg-tertiary)', }}
-          >
-            Idle
-          </span>
-        )}
-        {isDoneForToday && (
-          <span
-            className="rounded-full px-1.5 py-0.5"
-            style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)', }}
-          >
-            Done for today
-          </span>
-        )}
+        {isIdle && <span className={pill} style={{ background: 'var(--bg-tertiary)' }}>Idle</span>}
+        {isDoneForToday && <span className={pill} style={{ background: 'var(--bg-tertiary)' }}>Done for today</span>}
         {isBlocked && (
-          <span
-            className="rounded-full px-1.5 py-0.5"
-            style={{ color: 'var(--danger)', background: 'rgba(239, 68, 68, 0.08)', }}
-          >
+          <span className={pill} style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)' }}>
             Blocked
           </span>
         )}
       </span>
     </span>
   );
+}
+
+/** docs/73 UXD-21: suggested dates read "Wed 14 Oct", not "2026-10-14"; other values pass through. */
+function displayValue(field: SuggestionRow['field'], value: string): string {
+  if (field !== 'dueDate' || !/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
+  const date = parseISO(value.slice(0, 10));
+  return format(date, date.getFullYear() === new Date().getFullYear() ? 'EEE d MMM' : 'EEE d MMM yyyy');
 }
 
 export function SuggestionBar({ issue }: SuggestionBarProps) {
@@ -153,9 +140,9 @@ export function SuggestionBar({ issue }: SuggestionBarProps) {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="w-[68px] shrink-0 text-ui" style={{ color: 'var(--text-muted)' }}>{row.label}</span>
                 <span className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap" style={{ color: 'var(--text-secondary)' }}>
-                  <span data-testid={`suggestion-${row.field}-current`} style={{ textDecoration: 'line-through' }}>{row.current}</span>
+                  <span data-testid={`suggestion-${row.field}-current`} style={{ textDecoration: 'line-through' }}>{displayValue(row.field, row.current)}</span>
                   <ArrowRight size={11} aria-hidden="true" />
-                  <strong data-testid={`suggestion-${row.field}-suggested`} style={{ color: 'var(--text-primary)' }}>{row.suggested}</strong>
+                  <strong data-testid={`suggestion-${row.field}-suggested`} style={{ color: 'var(--text-primary)' }}>{displayValue(row.field, row.suggested)}</strong>
                 </span>
                 <button
                   type="button"

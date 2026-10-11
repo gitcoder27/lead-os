@@ -82,8 +82,9 @@ describe('SuggestionBar (docs/56 P5-02)', () => {
 
     expect(screen.getByTestId('suggestion-priority-current')).toHaveTextContent('High');
     expect(screen.getByTestId('suggestion-priority-suggested')).toHaveTextContent('Highest');
-    expect(screen.getByTestId('suggestion-dueDate-current')).toHaveTextContent('2026-03-10');
-    expect(screen.getByTestId('suggestion-dueDate-suggested')).toHaveTextContent('2026-03-02');
+    // docs/73 UXD-21: friendly dates, not ISO.
+    expect(screen.getByTestId('suggestion-dueDate-current')).toHaveTextContent(/^Tue 10 Mar/);
+    expect(screen.getByTestId('suggestion-dueDate-suggested')).toHaveTextContent(/^Mon 2 Mar/);
     expect(screen.getByTestId('suggestion-assignee-current')).toHaveTextContent('Alice');
     expect(screen.getByTestId('suggestion-assignee-suggested')).toHaveTextContent('Bob');
     expect(screen.getByText('Production-impacting label detected.')).toBeInTheDocument();

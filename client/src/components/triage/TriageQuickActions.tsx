@@ -1,4 +1,7 @@
-import { IssueDateEditor } from '@/components/table/IssueDateEditor';import { priorityColor, formatDate } from '@/lib/utils';
+import { CalendarDays, ChevronsUp, Flag, UserRound } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { IssueDateEditor } from '@/components/table/IssueDateEditor';
+import { Avatar } from '@/components/ui/Avatar';
 import { PRIORITY_OPTIONS } from '@/lib/constants';
 import type { Issue, Developer } from '@/types';
 import { Select } from '@/components/ui/Select';
@@ -13,6 +16,8 @@ interface TriageQuickActionsProps {
 
 export function TriageQuickActions({ issue, developers, editingField, onEditField, onUpdate }: TriageQuickActionsProps) {
   const dueValue = issue.developmentDueDate ?? issue.dueDate;
+  // docs/73 UXD-21: only Highest carries a tone (danger); no orange or amber priority chips.
+  const priorityTone = issue.priorityName === 'Highest' ? 'var(--danger)' : undefined;
   const assigneeOptions = (developers ?? [])
     .filter((developer) => Boolean(developer.jiraAccountId) || developer.source !== 'manual')
     .map((developer) => ({
@@ -28,13 +33,15 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-5 pb-3">
       <Chip
-        hint="P"
+        label="Priority"
+        shortcut="P"
+        icon={<ChevronsUp size={13} aria-hidden="true" style={{ color: priorityTone ?? 'var(--text-muted)' }} />}
         active={editingField === 'priority'}
         onClick={() => onEditField(editingField === 'priority' ? null : 'priority')}
-        accentColor={priorityColor(issue.priorityName)}
+        accentColor={priorityTone}
       >
         {editingField === 'priority' ? (
-          <Select size="sm" variant="quiet" style={{ color: priorityColor(issue.priorityName) }}
+          <Select size="sm" variant="quiet" style={{ color: priorityTone ?? 'var(--text-primary)' }}
             autoFocus
             value={issue.priorityName}
             onChange={(e) => { onUpdate(issue.jiraKey, { priorityName: e.target.value }); onEditField(null); }}
@@ -43,14 +50,18 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
             {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
           </Select>
         ) : (
-          <span className="text-ui font-semibold" style={{ color: priorityColor(issue.priorityName) }}>
+          <span className="text-ui font-semibold" style={{ color: priorityTone ?? 'var(--text-primary)' }}>
             {issue.priorityName}
           </span>
         )}
       </Chip>
 
       <Chip
-        hint="A"
+        label="Assignee"
+        shortcut="A"
+        icon={issue.assigneeName
+          ? <Avatar name={issue.assigneeName} seed={issue.assigneeId ?? undefined} size={18} />
+          : <UserRound size={13} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
         active={editingField === 'assignee'}
         onClick={() => onEditField(editingField === 'assignee' ? null : 'assignee')}
       >
@@ -85,7 +96,9 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
       </Chip>
 
       <Chip
-        hint="D"
+        label="Due date"
+        shortcut="D"
+        icon={<CalendarDays size={13} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
         active={editingField === 'dueDate'}
         onClick={() => onEditField(editingField === 'dueDate' ? null : 'dueDate')}
       >
@@ -102,66 +115,81 @@ export function TriageQuickActions({ issue, developers, editingField, onEditFiel
             className="text-ui font-medium"
             style={{ color: dueValue ? 'var(--text-primary)' : 'var(--text-muted)' }}
           >
-            {formatDate(dueValue ?? undefined)}
+            {dueValue ? format(parseISO(dueValue), 'EEE d MMM') : 'No due date'}
           </span>
         )}
       </Chip>
 
       <button
+        type="button"
         onClick={() => onUpdate(issue.jiraKey, { flagged: !issue.flagged })}
         className="triage-chip"
+        aria-pressed={Boolean(issue.flagged)}
+        aria-label={issue.flagged ? 'Blocked — clear the flag' : 'Mark as blocked'}
         style={{
-          background: issue.flagged ? 'rgba(239,68,68,0.1)' : 'transparent',
+          background: issue.flagged ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : 'transparent',
           color: issue.flagged ? 'var(--danger)' : 'var(--text-muted)',
-          borderColor: issue.flagged ? 'rgba(239,68,68,0.2)' : 'var(--border)',
+          borderColor: issue.flagged ? 'color-mix(in srgb, var(--danger) 24%, transparent)' : 'var(--border)',
         }}
         title={issue.flagged ? 'Clear blocked flag' : 'Mark as blocked'}
       >
-        <span className="text-ui font-semibold">{issue.flagged ? '⚑ Blocked' : '⚑'}</span>
+        <Flag size={12} aria-hidden="true" />
+        {issue.flagged && <span className="text-ui font-semibold">Blocked</span>}
       </button>
     </div>
   );
 }
 
+/**
+ * docs/73 UXD-21: an icon says what the chip is, not a "P"/"A"/"D" letter. The letter is still the
+ * panel's shortcut, so it stays in the tooltip and `aria-keyshortcuts`. While editing, the chip
+ * is a plain frame around its control, not a button wrapping a select.
+ */
 function Chip({
-  hint,
+  label,
+  shortcut,
+  icon,
   active,
   onClick,
   accentColor,
   children,
 }: {
-  hint: string;
+  label: string;
+  shortcut: string;
+  icon: React.ReactNode;
   active: boolean;
   onClick: () => void;
   accentColor?: string;
   children: React.ReactNode;
 }) {
+  const style = {
+    background: active
+      ? 'var(--bg-tertiary)'
+      : accentColor
+        ? `color-mix(in srgb, ${accentColor} 6%, transparent)`
+        : 'transparent',
+    borderColor: active ? 'var(--border-active)' : 'var(--border)',
+  };
+  if (active) {
+    return (
+      <div className="triage-chip" style={style} aria-label={label} role="group">
+        {icon}
+        {children}
+      </div>
+    );
+  }
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
       className="triage-chip"
-      style={{
-        background: active
-          ? 'var(--bg-tertiary)'
-          : accentColor
-            ? `color-mix(in srgb, ${accentColor} 6%, transparent)`
-            : 'transparent',
-        borderColor: active ? 'var(--border-active)' : 'var(--border)',
-      }}
+      style={style}
+      title={`${label} (${shortcut})`}
+      aria-keyshortcuts={shortcut.toLowerCase()}
     >
-      <kbd
-        className="text-meta font-mono font-semibold rounded px-1 py-px leading-none"
-        style={{
-          background: 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
-          color: 'var(--text-muted)',
-        }}
-      >
-        {hint}
-      </kbd>
+      {icon}
+      <span className="sr-only">{label}: </span>
       {children}
-    </div>
+    </button>
   );
 }

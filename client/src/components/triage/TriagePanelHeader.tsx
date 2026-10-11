@@ -1,6 +1,7 @@
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { JiraIssueLink } from '@/components/JiraIssueLink';
 import type { Issue } from '@/types';
+import { StatusBadge } from '@/components/table/StatusBadge';
 
 interface TriagePanelHeaderProps {
   issue?: Issue;
@@ -8,18 +9,7 @@ interface TriagePanelHeaderProps {
   onClose: () => void;
 }
 
-function statusAccent(category: string): string {
-  switch (category) {
-    case 'done': return 'var(--success)';
-    case 'indeterminate': return 'var(--accent)';
-    case 'new': return 'var(--info)';
-    default: return 'var(--text-secondary)';
-  }
-}
-
 export function TriagePanelHeader({ issue, jiraBaseUrl, onClose }: TriagePanelHeaderProps) {
-  const accent = issue ? statusAccent(issue.statusCategory) : 'var(--text-muted)';
-
   return (
     <div
       className="flex items-center justify-between px-5 py-2.5 border-b sticky top-0 z-10 shrink-0"
@@ -30,25 +20,18 @@ export function TriagePanelHeader({ issue, jiraBaseUrl, onClose }: TriagePanelHe
       }}
     >
       <button
+        type="button"
         onClick={onClose}
         className="p-1.5 -ml-1 rounded-lg transition-colors duration-150 hover:bg-[var(--bg-tertiary)]"
         title="Close (Esc)"
+        aria-label="Close"
       >
         <ArrowLeft size={15} style={{ color: 'var(--text-secondary)' }} />
       </button>
 
       {issue && (
         <div className="flex items-center gap-2.5">
-          <span
-            className="text-meta font-semibold px-2 py-[3px] rounded-full leading-none"
-            style={{
-              color: accent,
-              background: `color-mix(in srgb, ${accent} 10%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${accent} 18%, transparent)`,
-            }}
-          >
-            {issue.statusName}
-          </span>
+          <StatusBadge status={issue.statusName} />
           <JiraIssueLink
             issueKey={issue.jiraKey}
             className="font-mono text-body font-semibold tracking-tight"

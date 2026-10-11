@@ -620,3 +620,11 @@ Deviations from §8 found while building, and open items noticed but left out of
     - Copy pass: "desk task" becomes "task". "Arm Reset" becomes "Start reset…" (aria "Start: <title>"). "Reset Both Workspaces" becomes "Reset tasks and Team board". "Refresh counts", "Run reset" and "Reset and reconfigure" are now sentence case. The hidden-Save-footer note becomes "Each reset runs as soon as its phrase is typed and confirmed. There is nothing to save on this page." The two "Team, Desk, and…" strings name the Team board and Tasks. Typed phrases are unchanged and still server-checked, and the phrase is now bold inside "Type CLEAR MANAGER DESK to confirm".
     - The Jira status in the sidebar is green only once `lastSuccessAt` exists; before that the host is neutral.
   - **Left alone:** sidebar labels such as "Day Rhythm" stay in title case. They are the section names used in AGENTS.md and docs, so changing them belongs to the P7-07 IA pass. The reset dialog's "Desk items" is left for UXD-29.
+- **UXD-25:**
+  - **Wizard:**
+    - Step chips name their step: Account, Jira, Owner mapping, Team, Access. On a phone only the current chip shows its name; the rest keep the icon and title, and Jira-only steps say "(with Jira)" in their title. The current chip carries `aria-current="step"`.
+    - Every literal green, red and cyan is now a token mix (`--success`, `--danger`, `--accent`, `--info`). The error alert's `#fca5a5` text was unreadable on the light card and is now `--danger-text`.
+    - Inputs use `ui-field` at 44px tall.
+    - Buttons are sentence case: "Create account", "Save and continue", "Save team", "Save and finish", "Finish and sync".
+    - On phones the theme toggle is icon-only and 44px, so it no longer covers the "Workspace setup" mark.
+  - **Sign-up and `/join`:** checked on a scratch API run with `LEADOS_REGISTRATION=invite`, as approved. I took a scratch DB backup, minted an invite with `auth:invite` against the scratch DB, and did one real sign-up, which landed on an empty Today with Get started. I then restored the DB and restarted with registration off; `/api/auth/invite` answers 404 again. SignUpForm already used `ui-field` and sentence case; the valid, invalid-invite and first-run states needed no change.

@@ -167,29 +167,35 @@ const stepOrderFor = (kind: WorkspaceKind) => (kind === 'team' ? TEAM_STEP_ORDER
 /** docs/56 UX-14: steps that only exist with a Jira connection; uncounted ("with Jira") until it is saved. */
 const JIRA_ONLY_STEPS = new Set<WizardStep>(['manager-mapping', 'team-members']);
 
-const STEP_COPY: Record<Exclude<WizardStep, 'syncing'>, { title: string; description: string; icon: typeof BriefcaseBusiness }> = {
+// docs/73 UXD-25: each step chip names its step (Account · Jira · Owner mapping · Team · Access), not a bare number.
+const STEP_COPY: Record<Exclude<WizardStep, 'syncing'>, { title: string; short: string; description: string; icon: typeof BriefcaseBusiness }> = {
   'manager-account': {
     title: 'Create manager account',
+    short: 'Account',
     description: 'Start with your account. Jira, team members and developer logins are all optional and can come later.',
     icon: BriefcaseBusiness,
   },
   'jira-connection': {
     title: 'Connect Jira',
+    short: 'Jira',
     description: 'Jira is optional. Connect it for defect sync, or skip it and start with your own tasks and notes.',
     icon: PlugZap,
   },
   'manager-mapping': {
     title: 'Manager sync scope',
+    short: 'Owner mapping',
     description: 'Map a Jira identity only if manager-owned assignments should appear in sync scope.',
     icon: UserCog,
   },
   'team-members': {
     title: 'Build team roster',
+    short: 'Team',
     description: 'Choose synced Jira people now, or add team members manually from Settings later.',
     icon: Users,
   },
   'developer-access': {
     title: 'Developer access',
+    short: 'Access',
     description: 'Create My Day access for developers who will update their own daily workspace.',
     icon: ShieldPlus,
   },
@@ -583,7 +589,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       <div
         className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-8"
         style={{
-          background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
+          background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 50%), var(--bg-canvas)`,
         }}
       >
         <OrbDecoration />
@@ -617,7 +623,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     <div
       className="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-8"
       style={{
-        background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.14), transparent 50%), var(--bg-canvas)`,
+        background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 40%), radial-gradient(circle at 70% 80%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 50%), var(--bg-canvas)`,
       }}
     >
       <OrbDecoration />
@@ -626,7 +632,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       <button
         type="button"
         onClick={toggleTheme}
-        className="absolute right-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border px-3 py-2 text-body font-semibold transition-colors"
+        className="absolute right-3 top-3 z-20 inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border px-3 py-2 text-body font-semibold transition-colors sm:right-5 sm:top-5"
         style={{
           background: 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
           color: 'var(--text-primary)',
@@ -635,8 +641,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         aria-label="Toggle theme"
         title="Toggle theme"
       >
-        {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        {theme === 'dark' ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
+        <span className="hidden sm:inline">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
       </button>
 
       {/* Centered wizard content */}
@@ -692,30 +698,32 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                       borderColor: isActive
                         ? 'color-mix(in srgb, var(--accent) 50%, transparent)'
                         : isComplete
-                          ? 'rgba(34, 197, 94, 0.35)'
+                          ? 'color-mix(in srgb, var(--success) 35%, transparent)'
                           : 'var(--border)',
                       background: isActive
                         ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
                         : isComplete
-                          ? 'rgba(34, 197, 94, 0.08)'
+                          ? 'color-mix(in srgb, var(--success) 8%, transparent)'
                           : 'transparent',
                       color: isActive
                         ? 'var(--accent-text)'
                         : isComplete
-                          ? '#4ade80'
+                          ? 'var(--success-text)'
                           : 'var(--text-muted)',
                     }}
-                    title={meta.title}
+                    title={stepNumber(stepKey) === null ? `${meta.title} (with Jira)` : meta.title}
+                    aria-current={isActive ? 'step' : undefined}
                   >
-                    {isComplete ? <Check size={11} /> : <Icon size={11} />}
-                    <span className={stepNumber(stepKey) === null ? undefined : 'hidden sm:inline'}>{stepNumber(stepKey) ?? 'with Jira'}</span>
+                    {isComplete ? <Check size={11} aria-hidden="true" /> : <Icon size={11} aria-hidden="true" />}
+                    {/* On a phone only the current step spells its name; the others keep their icon and title. */}
+                    <span className={isActive ? undefined : 'hidden sm:inline'}>{meta.short}</span>
                   </div>
                   {index < stepOrder.length - 1 && (
                     <div
                       className="h-px w-4 transition-colors duration-300"
                       style={{
                         background: index < currentStepIndex
-                          ? 'rgba(34, 197, 94, 0.4)'
+                          ? 'color-mix(in srgb, var(--success) 40%, transparent)'
                           : 'var(--border)',
                       }}
                     />
@@ -748,7 +756,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           {/* Step header — always visible */}
           <div className="shrink-0 px-7 pb-0 pt-7 md:px-9 md:pt-9">
             <div className="ui-label" style={{ color: 'var(--accent-text)' }}>
-              {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira'}
+              {stepNumber(activeStepKey) !== null ? `Step ${stepNumber(activeStepKey)} of ${countedSteps.length}` : 'With Jira (optional)'}
             </div>
             <h2 className="mt-2 text-display font-semibold leading-tight tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {activeStepMeta.title}
@@ -764,9 +772,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                 animate={{ opacity: 1, y: 0 }}
                 className="mt-4 rounded-[14px] border px-4 py-3 text-body"
                 style={{
-                  borderColor: 'rgba(239, 68, 68, 0.35)',
-                  background: 'rgba(239, 68, 68, 0.08)',
-                  color: '#fca5a5',
+                  borderColor: 'color-mix(in srgb, var(--danger) 35%, transparent)',
+                  background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+                  color: 'var(--danger-text)',
                 }}
               >
                 {errorMessage}
@@ -899,7 +907,7 @@ function OrbDecoration() {
           height: 400,
           bottom: '-10%',
           right: '-5%',
-          background: 'radial-gradient(circle, rgba(6, 182, 212, 0.06), transparent 70%)',
+          background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 6%, transparent), transparent 70%)',
         }}
         animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
         transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
@@ -1041,7 +1049,7 @@ function StepContent(props: StepContentProps) {
           >
             {props.testingConnection ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
             {props.connectionValidated ? 'Connection confirmed' : 'Test connection'}
-            {props.connectionValidated && <Check size={14} style={{ color: '#4ade80' }} />}
+            {props.connectionValidated && <Check size={14} style={{ color: 'var(--success-text)' }} />}
           </button>
         </div>
       );
@@ -1125,9 +1133,9 @@ function StepContent(props: StepContentProps) {
           <div
             className="flex items-center gap-2 rounded-full px-3 py-1.5 text-body font-semibold"
             style={{
-              background: props.selectedDeveloperIds.size > 0 ? 'rgba(6, 182, 212, 0.1)' : 'var(--bg-tertiary)',
+              background: props.selectedDeveloperIds.size > 0 ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'var(--bg-tertiary)',
               color: props.selectedDeveloperIds.size > 0 ? 'var(--accent)' : 'var(--text-muted)',
-              border: `1px solid ${props.selectedDeveloperIds.size > 0 ? 'rgba(6, 182, 212, 0.3)' : 'var(--border)'}`,
+              border: `1px solid ${props.selectedDeveloperIds.size > 0 ? 'color-mix(in srgb, var(--accent) 30%, transparent)' : 'var(--border)'}`,
               alignSelf: 'flex-start',
             }}
           >
@@ -1178,8 +1186,8 @@ function StepContent(props: StepContentProps) {
           <div
             className="rounded-[14px] border p-4"
             style={{
-              borderColor: 'rgba(6, 182, 212, 0.25)',
-              background: 'rgba(6, 182, 212, 0.05)',
+              borderColor: 'color-mix(in srgb, var(--accent) 25%, transparent)',
+              background: 'color-mix(in srgb, var(--accent) 5%, transparent)',
             }}
           >
             <div className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -1279,7 +1287,7 @@ function StepContent(props: StepContentProps) {
                       <span
                         className="rounded-full px-2 py-0.5 text-ui font-semibold capitalize"
                         style={{
-                          background: account.role === 'manager' ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'rgba(6, 182, 212, 0.14)',
+                          background: account.role === 'manager' ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'color-mix(in srgb, var(--info) 14%, transparent)',
                           color: account.role === 'manager' ? 'var(--warning)' : 'var(--accent)',
                         }}
                       >
@@ -1315,13 +1323,13 @@ function StepFooter(props: StepFooterProps) {
 
   switch (step) {
     case 'manager-account':
-      primaryLabel = props.creatingManager ? 'Creating…' : 'Create Account';
+      primaryLabel = props.creatingManager ? 'Creating…' : 'Create account';
       primaryLoading = props.creatingManager;
       primaryDisabled = !props.managerUsername.trim() || !props.managerDisplayName.trim() || props.managerPassword.length < MIN_PASSWORD_LENGTH || props.creatingManager;
       primaryAction = props.handleCreateManager;
       break;
     case 'jira-connection':
-      primaryLabel = props.savingConnection ? 'Saving…' : 'Save & Continue';
+      primaryLabel = props.savingConnection ? 'Saving…' : 'Save and continue';
       primaryLoading = props.savingConnection;
       primaryDisabled = !props.jiraBaseUrl || !props.jiraEmail || !props.jiraProjectKey || (!props.jiraApiToken && !props.configQuery.data?.jiraApiToken) || props.savingConnection;
       primaryAction = props.handleSaveConnection;
@@ -1337,7 +1345,7 @@ function StepFooter(props: StepFooterProps) {
     case 'team-members':
       backLabel = 'Back';
       backAction = () => props.goToStep('manager-mapping');
-      primaryLabel = props.savingDevelopers ? 'Saving…' : props.workspaceKind === 'team' ? 'Save Team' : 'Save & Finish';
+      primaryLabel = props.savingDevelopers ? 'Saving…' : props.workspaceKind === 'team' ? 'Save team' : 'Save and finish';
       primaryLoading = props.savingDevelopers;
       primaryDisabled = props.savingDevelopers;
       primaryAction = props.handleSaveTrackedDevelopers;
@@ -1347,7 +1355,7 @@ function StepFooter(props: StepFooterProps) {
       backAction = () => props.goToStep('team-members');
       tertiaryLabel = 'Skip for now';
       tertiaryAction = props.handleSkip;
-      primaryLabel = 'Finish & Sync';
+      primaryLabel = 'Finish and sync';
       primaryDisabled = props.triggerSyncPending;
       primaryAction = props.handleFinish;
       break;
@@ -1488,12 +1496,9 @@ function PasswordInput({
 
 /* ── Style constants ─────────────────────────────── */
 
-const fieldClassName = 'w-full rounded-[16px] border px-4 py-3 text-body outline-none transition-colors';
-const fieldStyle = {
-  background: 'var(--bg-tertiary)',
-  color: 'var(--text-primary)',
-  borderColor: 'var(--border)',
-};
+// docs/73 UXD-25: the app's one input style; 44px tall so it is a comfortable target on touch.
+const fieldClassName = 'ui-field min-h-11';
+const fieldStyle = undefined;
 
 const primaryBtnClassName = 'inline-flex items-center justify-center gap-2 rounded-[16px] px-5 py-3 text-body font-semibold transition-all disabled:opacity-40';
 // docs/73 UXD-08: the primary action is the app's one solid accent, not an amber gradient with a glow.

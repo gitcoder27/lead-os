@@ -116,7 +116,7 @@ describe('SetupWizard', () => {
 
     /** From the (already signed-in) Jira step through saving the roster. */
     async function walkToRoster() {
-      fireEvent.click(await screen.findByRole('button', { name: /save & continue/i }));
+      fireEvent.click(await screen.findByRole('button', { name: /save and continue/i }));
       await screen.findByText('Manager sync scope');
       fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
       await screen.findByPlaceholderText(/search jira users/i);
@@ -140,7 +140,9 @@ describe('SetupWizard', () => {
         auth.authenticated = false;
         render(<SetupWizard onComplete={vi.fn()} />);
         expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
-        expect(screen.getAllByText('with Jira')).toHaveLength(2);
+        // docs/73 UXD-25: chips name their step; the Jira-only ones say so in their title.
+        expect(screen.getAllByTitle(/\(with Jira\)$/)).toHaveLength(2);
+        expect(screen.getByText('Account')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('radio', { name: /me and a team/i }));
         expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
       } finally {
@@ -195,7 +197,7 @@ describe('SetupWizard', () => {
 
       await walkToRoster();
       expect(screen.getByText('Step 4 of 4')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /save & finish/i }));
+      fireEvent.click(screen.getByRole('button', { name: /save and finish/i }));
 
       await waitFor(() => expect(mockSync).toHaveBeenCalledTimes(1));
       await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));

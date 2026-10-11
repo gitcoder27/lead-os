@@ -1,6 +1,7 @@
 import { useTaskIdentity } from '@/hooks/useTaskIdentity';
 import type { CreateViaCapture } from '@/hooks/useCapture';
 import { PlacementDialog } from './PlacementDialog';
+import { useQuickPlacement } from '@/hooks/useQuickPlacement';
 import { TaskWorkspaceSelect } from './TaskWorkspaceSelect';
 import { ProjectsPanel } from './ProjectsPanel';
 import { ProjectFilterChip } from './ProjectFilters';
@@ -602,6 +603,7 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   };
 
   // ── Menus ────────────────────────────────────────────────────────────────
+  const quickPlacement = useQuickPlacement();
   const openMenu = useCallback((kind: TaskMenuKind, keys: string[], anchor: HTMLElement | null) => {
     if (!keys.length || !anchor) return;
     setMenu({ kind, keys, anchor });
@@ -1103,6 +1105,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           onStatus={() => setMenu({ ...menu, kind: 'status' })}
           onAssign={() => setMenu({ ...menu, kind: 'assign' })}
           onProject={() => setMenu({ ...menu, kind: 'project' })}
+          onPickProject={(placement) => { const keys = menu.keys; closeMenu(); void quickPlacement.move(keys, placement); }}
+          currentPlacement={menuTargets.length === 1 ? menuTargets[0]?.placement ?? null : undefined}
           onLabels={() => setMenu({ ...menu, kind: 'label' })}
           onPriority={() => setMenu({ ...menu, kind: 'priority' })}
           onWaiting={() => setMenu({ ...menu, kind: 'waiting' })}

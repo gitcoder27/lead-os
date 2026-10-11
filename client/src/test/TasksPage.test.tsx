@@ -877,6 +877,15 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
     expect(screen.getByRole('dialog', { name: /project/i })).toBeInTheDocument();
   });
 
+  it('moves to a project from the row menu in two clicks via the Project flyout (docs/73 UXD-16)', async () => {
+    render(<TasksPage />);
+    fireEvent.click(within(row('T-1')).getByRole('button', { name: 'More actions for T-1' }));
+    const project = screen.getByRole('menuitem', { name: /^Project/ });
+    fireEvent.mouseOver(project);
+    expect(screen.getByRole('menu', { name: 'Move to project' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'More options…' })).toBeInTheDocument();
+  });
+
   it('a plain task never shows an action tally', () => {
       window.history.replaceState(null, '', '/tasks?view=my-tasks');
       render(<TasksPage />);

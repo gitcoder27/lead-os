@@ -22,6 +22,7 @@ export function TaskPopover({
   onAccelerator,
   role = 'menu',
   className = '',
+  placement = 'below',
 }: {
   anchor: HTMLElement | null;
   onClose: () => void;
@@ -32,6 +33,8 @@ export function TaskPopover({
   onAccelerator?: (key: string) => boolean;
   role?: 'menu' | 'dialog';
   className?: string;
+  /** docs/73 UXD-16: `side` opens beside the anchor (a submenu flyout), left when there is no room on the right. */
+  placement?: 'below' | 'side';
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -46,6 +49,13 @@ export function TaskPopover({
       const below = rect.bottom + 4;
       const top = below + height > window.innerHeight - 8 && rect.top - height - 4 > 8 ? rect.top - height - 4 : below;
       const measuredWidth = Math.min(width, window.innerWidth - 16);
+      if (placement === 'side') {
+        const right = rect.right + 4;
+        const sideLeft = right + measuredWidth <= window.innerWidth - 8 ? right : Math.max(8, rect.left - measuredWidth - 4);
+        const sideTop = Math.max(8, Math.min(rect.top - 4, window.innerHeight - height - 8));
+        setPosition({ top: sideTop, left: sideLeft });
+        return;
+      }
       const left = Math.min(Math.max(8, rect.right - measuredWidth), window.innerWidth - measuredWidth - 8);
       setPosition({ top, left });
     };
@@ -59,7 +69,7 @@ export function TaskPopover({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [anchor, width]);
+  }, [anchor, width, placement]);
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[data-autofocus], [role^="menuitem"]')?.focus();
@@ -84,6 +94,8 @@ export function TaskPopover({
     const onDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (ref.current?.contains(target) || anchor?.contains(target)) return;
+      // A flyout opened from this menu is its own layer; pointing into it keeps this one open.
+      if (target instanceof Element && target.closest('[data-popover-child]')) return;
       closeRef.current();
     };
     document.addEventListener('mousedown', onDown);
@@ -133,6 +145,7 @@ export function TaskPopover({
       role={role}
       aria-label={label}
       data-popover-layer=""
+      data-popover-child={placement === 'side' ? '' : undefined}
       onKeyDown={handleKeyDown}
       className={`fixed z-popover max-h-[360px] overflow-y-auto rounded-xl p-1 ${className}`}
       style={{

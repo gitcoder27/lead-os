@@ -19,7 +19,13 @@ export function PlacementDialog({
 }) {
   const today = useLocalDate();
   const [placement, setPlacement] = useState<TaskPlacement | null>(initial ?? null);
+  // docs/73 UXD-16: nothing to save until the destination changes — no "Remove from project"
+  // offered for a task that has none. Bulk moves start untouched (their tasks may differ).
+  const [touched, setTouched] = useState(false);
+  const samePlacement = (a: TaskPlacement | null | undefined, b: TaskPlacement | null | undefined) =>
+    (a?.projectId ?? null) === (b?.projectId ?? null) && (a?.trackId ?? null) === (b?.trackId ?? null);
   const [includeSubtasks, setIncludeSubtasks] = useState(false);
+  const changed = touched && (keys.length > 1 || includeSubtasks || !samePlacement(placement, initial ?? null));
   const [preview, setPreview] = useState<PlacementPreview | null>(null);
   const [error, setError] = useState('');
   const [previewRevision, setPreviewRevision] = useState(0);
@@ -53,7 +59,7 @@ export function PlacementDialog({
     };
   }, [keysSignature, includeSubtasks, scope, previewRevision]);
   const save = async () => {
-    if (!preview || !preview.tasks.length || write.isPending) return;
+    if (!preview || !preview.tasks.length || write.isPending || !changed) return;
     try {
       const receipt = await write.mutateAsync({ preview, placement });
       if (currentScope.current !== scope) return;
@@ -85,21 +91,21 @@ export function PlacementDialog({
       footer={
         <>
           <button className="ui-btn-quiet" onClick={onClose}>Cancel</button>
-          <button className="ui-btn-solid" disabled={!preview || !count || write.isPending} onClick={() => void save()}>
-            {write.isPending ? 'Moving…' : placement ? `Move ${countLabel}` : 'Remove from project'}
+          <button className="ui-btn-solid" disabled={!preview || !count || write.isPending || !changed} onClick={() => void save()}>
+            {write.isPending ? 'Moving…' : placement || (!initial && keys.length === 1) ? `Move ${countLabel}` : 'Remove from project'}
           </button>
         </>
       }
     >
       <div className="space-y-4">
-        <PlacementPicker today={today} value={placement} onChange={setPlacement} disabled={write.isPending} />
+        <PlacementPicker today={today} value={placement} onChange={(next) => { setPlacement(next); setTouched(true); }} disabled={write.isPending} />
         <label className="flex items-center gap-2 text-body leading-5">
           <input
             type="checkbox"
             className="accent-[var(--accent-solid)]"
             checked={includeSubtasks}
             disabled={write.isPending}
-            onChange={(event) => setIncludeSubtasks(event.target.checked)}
+            onChange={(event) => { setIncludeSubtasks(event.target.checked); setTouched(true); }}
           />
           Include subtasks
         </label>

@@ -21,8 +21,10 @@ import {
   Tag,
   UserRound,
   UserX,
+  ChevronRight,
 } from 'lucide-react';
-import { taskLabelDisplayName, type TaskLabel, type TaskStatus, type TaskWaitingOnInput } from '@/types';
+import { taskLabelDisplayName, type TaskLabel, type TaskPlacement, type TaskStatus, type TaskWaitingOnInput } from '@/types';
+import { ProjectPickMenu } from './ProjectPickMenu';
 import { nextMonday, nextWeekday, type SchedulePreset } from '@/lib/task-list';
 import { shiftLocalIsoDate } from '@/lib/utils';
 import { labelChipStyle } from './label-colors';
@@ -358,7 +360,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
   );
 }
 
-export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater, onProject }: {
+export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLabels, onPriority, onWaiting, onCheckBy, onLater, onDrop, onCopyLink, canLater, onProject, onPickProject, currentPlacement }: {
   anchor: HTMLElement;
   onClose: () => void;
   onSchedule: () => void;
@@ -373,14 +375,31 @@ export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLa
   onCopyLink: () => void;
   canLater: boolean;
   onProject?: () => void;
+  /** docs/73 UXD-16: one-pick moves from the "Project ▸" flyout; `onProject` stays for the full dialog. */
+  onPickProject?: (placement: TaskPlacement | null) => void;
+  currentPlacement?: TaskPlacement | null;
 }) {
+  const [flyout, setFlyout] = useState<HTMLElement | null>(null);
   return (
     <TaskPopover anchor={anchor} onClose={onClose} label="More actions" width={210}>
+      <div onMouseOver={(event) => {
+        // Hovering another item closes the flyout; hovering "Project" opens it.
+        const item = (event.target as Element).closest('[role^="menuitem"]');
+        if (!item) return;
+        if (item.closest('[data-flyout-trigger]')) { if (!flyout) setFlyout(item as HTMLElement); } else if (flyout) setFlyout(null);
+      }}>
       <MenuItem icon={<CalendarClock size={13} />} label="Schedule…" hint="s" onSelect={onSchedule} />
       <MenuItem icon={<CircleDashed size={13} />} label="Status…" onSelect={onStatus} />
       <MenuItem icon={<UserRound size={13} />} label="Assign…" hint="a" onSelect={onAssign} />
       <MenuItem icon={<Flag size={13} />} label="Priority…" hint="p" onSelect={onPriority} />
-      {onProject && <MenuItem icon={<Folder size={13} />} label="Move to project…" onSelect={onProject} />}
+      {onProject && !onPickProject && <MenuItem icon={<Folder size={13} />} label="Move to project…" onSelect={onProject} />}
+      {onPickProject && (
+        <span data-flyout-trigger="" role="none" className="contents"
+          onKeyDown={(event) => { if (event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); setFlyout(event.target as HTMLElement); } }}>
+          <MenuItem icon={<Folder size={13} />} label={<span className="flex items-center justify-between">Project<ChevronRight size={12} aria-hidden="true" /></span>}
+            onSelect={() => setFlyout((current) => current ? null : document.activeElement as HTMLElement)} />
+        </span>
+      )}
       <MenuItem icon={<Tag size={13} />} label="Labels…" hint="l" onSelect={onLabels} />
       <MenuItem icon={<Hourglass size={13} />} label="Waiting on…" hint="w" onSelect={onWaiting} />
       <MenuItem icon={<CalendarClock size={13} />} label="Check by…" hint="c" onSelect={onCheckBy} />
@@ -388,6 +407,12 @@ export function MoreMenu({ anchor, onClose, onSchedule, onStatus, onAssign, onLa
       <MenuItem icon={<Link2 size={13} />} label="Copy link" onSelect={onCopyLink} />
       <MenuDivider />
       <MenuItem icon={<Ban size={13} />} label="Drop" hint="#" tone="danger" onSelect={onDrop} />
+      </div>
+      {flyout && onPickProject && (
+        <ProjectPickMenu anchor={flyout} placement="side" current={currentPlacement} onClose={() => setFlyout(null)}
+          onPick={(placement) => { setFlyout(null); onPickProject(placement); }}
+          onMore={onProject ? () => { setFlyout(null); onProject(); } : undefined} />
+      )}
     </TaskPopover>
   );
 }

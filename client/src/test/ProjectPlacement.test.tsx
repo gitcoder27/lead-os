@@ -107,7 +107,8 @@ describe('guarded task moves', () => {
     mocks.preview.mockResolvedValue({ ...preview, tasks: [] });
     const { unmount } = render(<PlacementDialog keys={['T-1']} onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('0 tasks'));
-    expect(screen.getByRole('button', { name: 'Remove from project' })).toBeDisabled();
+    // docs/73 UXD-16: a task with no project is never offered "Remove from project"; nothing to save yet.
+    expect(screen.getByRole('button', { name: 'Move 0 tasks' })).toBeDisabled();
     unmount();
     mocks.preview.mockResolvedValue(preview);
     mocks.write.mockRejectedValue(new Error('Task changed; review and try again'));
@@ -126,12 +127,15 @@ describe('guarded task moves', () => {
   });
 
   it('does not run Undo under a different authentication scope', async () => {
-    const { rerender } = render(<PlacementDialog keys={['T-1']} onClose={vi.fn()} />);
+    const { rerender } = render(<PlacementDialog keys={['T-1']} initial={{ projectId: 1, trackId: 2 }} onClose={vi.fn()} />);
+    // docs/73 UXD-16: the primary wakes up only once the destination changes.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Move 1 task/ })).toBeDisabled());
+    fireEvent.click(screen.getByRole('radio', { name: /No project/ }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Remove from project' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Remove from project' }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalled());
     scope = 'ws:other-manager';
-    rerender(<PlacementDialog keys={['T-1']} onClose={vi.fn()} />);
+    rerender(<PlacementDialog keys={['T-1']} initial={{ projectId: 1, trackId: 2 }} onClose={vi.fn()} />);
     act(() => mocks.toast.mock.calls[0]?.[0].action.onClick());
     expect(mocks.write).toHaveBeenCalledOnce();
   });

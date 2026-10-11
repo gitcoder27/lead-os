@@ -6,6 +6,7 @@ import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { FOCUS_RING } from '@/components/ui/focus';
 import { EASE_OUT, Kbd, surfaceStyle } from './MyDayUI';
 import { TaskFooter, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
+import { FinishedHint } from './FinishedHint';
 
 interface CurrentTaskProps {
   viewDate: string;
@@ -209,6 +210,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
         <TaskMeta item={item} viewDate={viewDate} className="mt-2" hideDetailsHint />
         <TaskNote note={item.note} className="mt-2.5" clamp={false} />
         <DetailsExcerpt details={item.details} />
+        {!readOnly && <FinishedHint key={item.latestEvent?.id} item={item} onMarkDone={onMarkDone} className="mt-3 w-fit" />}
 
         <TaskFooter item={item} viewDate={viewDate} readOnly={readOnly} />
       </div>

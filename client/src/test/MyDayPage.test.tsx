@@ -430,6 +430,27 @@ describe('MyDayPage', () => {
     expect(screen.queryByText('change day')).not.toBeInTheDocument();
   });
 
+  it('asks whether a task your own update calls finished is done (MDA-07)', () => {
+    window.localStorage.clear();
+    const event = (id: number, excerpt: string, authorType: 'developer' | 'manager' = 'developer') => ({ id, type: 'update' as const, excerpt, authorType, occurredAt: '2026-10-01T10:00:00.000Z', approximateTime: false, visibility: 'shared' as const });
+    mockDay.currentItem = undefined;
+    mockDay.plannedItems = [
+      createItem({ id: 102, taskKey: 'T-2', title: 'Working in shop', latestEvent: event(9, 'complted') }),
+      createItem({ id: 103, taskKey: 'T-3', title: 'Lead says done', latestEvent: event(10, 'done', 'manager') }),
+      createItem({ id: 104, taskKey: 'T-4', title: 'Still going', latestEvent: event(11, 'not done yet') }),
+    ];
+    const { unmount } = render(<MyDayPage />, { wrapper: TestWrapper });
+    const hints = screen.getAllByRole('group', { name: 'Your last update sounds finished' });
+    expect(hints).toHaveLength(1);
+    fireEvent.click(within(hints[0]!).getByRole('button', { name: 'Mark done' }));
+    expect(mockUpdateItemMutate).toHaveBeenCalledWith({ itemId: 102, state: 'done' }, expect.anything());
+    fireEvent.click(within(screen.getByRole('group', { name: 'Your last update sounds finished' })).getByRole('button', { name: 'Not yet' }));
+    expect(screen.queryByRole('group', { name: 'Your last update sounds finished' })).not.toBeInTheDocument();
+    unmount();
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.queryByRole('group', { name: 'Your last update sounds finished' })).not.toBeInTheDocument();
+  });
+
   it('asks once about work carried for a week or more, and remembers a dismissal (MDA-04)', () => {
     window.localStorage.clear();
     const today = getLocalIsoDate();

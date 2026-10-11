@@ -8,6 +8,7 @@ import { formatAbsoluteDateTime } from '@/lib/utils';
 import { IconAction } from './MyDayUI';
 import { InlineTaskActions, RowComposer, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
 import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
+import { FinishedHint } from './FinishedHint';
 import { TaskStatusGlyph } from '@/components/tasks/TaskMenus';
 
 export type MyDayTaskRowVariant = 'planned' | 'done' | 'dropped';
@@ -122,6 +123,9 @@ export function MyDayTaskRow({
           )}
         </div>
         <TaskNote note={item.note} className="mt-1.5" />
+        {variant === 'planned' && !readOnly && (
+          <FinishedHint key={item.latestEvent?.id} item={item} onMarkDone={onMarkDone} className="mt-2 w-fit" />
+        )}
 
         {composerOpen && item.taskKey && !readOnly && (
           <RowComposer taskKey={item.taskKey} viewDate={viewDate} onClose={() => setComposerOpen(false)} />

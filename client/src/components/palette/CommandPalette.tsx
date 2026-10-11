@@ -18,6 +18,7 @@ import {
   Users,
   Video,
   Loader2,
+  FolderKanban,
 } from 'lucide-react';
 import type { AppView } from '@/App';
 import type { TodayActionTarget } from '@/types';
@@ -75,6 +76,7 @@ const RESULT_ICONS: Record<string, typeof Bug> = {
   desk: ClipboardList,
   tracker: ListChecks,
   tasks: ListChecks,
+  projects: FolderKanban,
   checkins: MessageSquare,
   developers: User,
   notes: NotebookPen,
@@ -86,6 +88,7 @@ const GROUP_LABELS: Record<string, string> = {
   desk: 'Desk items & follow-ups',
   tracker: 'Tracker tasks',
   tasks: 'Tasks',
+  projects: 'Projects',
   checkins: 'Check-ins',
   developers: 'Developers',
   notes: 'Notes',
@@ -143,6 +146,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
           deskItems: searchQuery.data?.deskItems ?? [],
           trackerItems: searchQuery.data?.trackerItems ?? [],
           tasks: searchQuery.data?.tasks ?? [],
+          projects: searchQuery.data?.projects ?? [],
           checkIns: searchQuery.data?.checkIns ?? [],
           developers: searchQuery.data?.developers ?? [],
           notes: searchQuery.data?.notes ?? [],

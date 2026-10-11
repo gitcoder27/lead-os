@@ -71,6 +71,7 @@ describe("GET /api/search", () => {
       trackerItems: [],
       developers: [],
       notes: [],
+      projects: [],
     });
   });
 

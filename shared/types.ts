@@ -2437,9 +2437,20 @@ export interface GlobalSearchTaskItem {
   updatedAt: string;
 }
 
+/** docs/73 UXD-26: a manager-private project, or one of its tracks, found by name. */
+export interface GlobalSearchProjectItem {
+  projectId: number;
+  projectName: string;
+  trackId?: number;
+  trackName?: string;
+  updatedAt: string;
+}
+
 export interface GlobalSearchResponse {
   query: string;
   tasks: GlobalSearchTaskItem[];
+  /** docs/73 UXD-26: only the signed-in manager's own, unarchived projects and tracks. */
+  projects?: GlobalSearchProjectItem[];
   issues: GlobalSearchIssueItem[];
   deskItems: GlobalSearchDeskItem[];
   checkIns: GlobalSearchCheckInItem[];

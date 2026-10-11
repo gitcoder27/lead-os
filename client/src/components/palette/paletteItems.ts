@@ -6,6 +6,7 @@ import type {
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
   GlobalSearchIssueItem,
+  GlobalSearchProjectItem,
   GlobalSearchTaskItem,
   GlobalSearchTrackerItem,
   TaskViewMeta,
@@ -15,7 +16,7 @@ import { KIND_LABELS } from '@/types/manager-desk';
 import { isValidIsoDate } from '@/lib/view-params';
 import { TASK_KEY_PATTERN } from '@/types';
 
-export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'tracker' | 'tasks' | 'checkins' | 'developers' | 'notes';
+export type PaletteGroupId = 'actions' | 'issues' | 'desk' | 'tracker' | 'tasks' | 'projects' | 'checkins' | 'developers' | 'notes';
 
 export interface PaletteItem {
   id: string;
@@ -374,6 +375,19 @@ export function developerToPaletteItem(developer: GlobalSearchDeveloperItem, ind
   };
 }
 
+/** docs/73 UXD-26: a project or track opens in Tasks' Projects view (`?view=projects&project=&track=`). */
+export function projectToPaletteItem(item: GlobalSearchProjectItem, index: number): PaletteItem {
+  const params = new URLSearchParams({ view: 'projects', project: String(item.projectId) });
+  if (item.trackId) params.set('track', String(item.trackId));
+  return {
+    id: `project-${item.projectId}${item.trackId ? `-track-${item.trackId}` : ''}-${index}`,
+    group: 'projects',
+    title: item.trackName ?? item.projectName,
+    description: item.trackName ? `Track in ${item.projectName}` : 'Project',
+    href: `/tasks?${params.toString()}`,
+  };
+}
+
 export function noteToPaletteItem(note: DailyNoteSummary, index: number): PaletteItem {
   const dateLabel = isValidIsoDate(note.date) ? format(parseISO(note.date), 'MMM d') : note.date;
   return {
@@ -390,6 +404,7 @@ export function buildResultGroups(results: {
   deskItems: GlobalSearchDeskItem[];
   trackerItems?: GlobalSearchTrackerItem[];
   tasks?: GlobalSearchTaskItem[];
+  projects?: GlobalSearchProjectItem[];
   checkIns: GlobalSearchCheckInItem[];
   developers: GlobalSearchDeveloperItem[];
   notes?: DailyNoteSummary[];
@@ -399,6 +414,11 @@ export function buildResultGroups(results: {
       id: 'tasks',
       label: 'Tasks',
       items: (results.tasks ?? []).map(taskToPaletteItem),
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      items: (results.projects ?? []).map(projectToPaletteItem),
     },
     {
       id: 'issues',

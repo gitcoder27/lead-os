@@ -427,3 +427,26 @@ describe('Weekly review (docs/59 §5.1)', () => {
     expect(buildNavigationCommands().some((command) => command.id === 'action-weekly-review')).toBe(false);
   });
 });
+
+describe('projects in the palette (docs/73 UXD-26)', () => {
+  it('opens a project, or a track inside it, in the Projects view', () => {
+    const groups = buildResultGroups({
+      issues: [], deskItems: [], checkIns: [], developers: [],
+      projects: [
+        { projectId: 3, projectName: 'Atlas payments migration', updatedAt: '' },
+        { projectId: 3, projectName: 'Atlas payments migration', trackId: 9, trackName: 'Cutover', updatedAt: '' },
+      ],
+    });
+    const projects = groups.find((group) => group.id === 'projects')!;
+    expect(projects.label).toBe('Projects');
+    expect(projects.items.map((item) => [item.title, item.description, item.href])).toEqual([
+      ['Atlas payments migration', 'Project', '/tasks?view=projects&project=3'],
+      ['Cutover', 'Track in Atlas payments migration', '/tasks?view=projects&project=3&track=9'],
+    ]);
+  });
+
+  it('adds no Projects group when nothing matched', () => {
+    expect(buildResultGroups({ issues: [], deskItems: [], checkIns: [], developers: [] }).some((group) => group.id === 'projects')).toBe(false);
+  });
+});
+

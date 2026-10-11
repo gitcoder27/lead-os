@@ -628,3 +628,12 @@ Deviations from §8 found while building, and open items noticed but left out of
     - Buttons are sentence case: "Create account", "Save and continue", "Save team", "Save and finish", "Finish and sync".
     - On phones the theme toggle is icon-only and 44px, so it no longer covers the "Workspace setup" mark.
   - **Sign-up and `/join`:** checked on a scratch API run with `LEADOS_REGISTRATION=invite`, as approved. I took a scratch DB backup, minted an invite with `auth:invite` against the scratch DB, and did one real sign-up, which landed on an empty Today with Get started. I then restored the DB and restarted with registration off; `/api/auth/invite` answers 404 again. SignUpForm already used `ui-field` and sentence case; the valid, invalid-invite and first-run states needed no change.
+- **UXD-26:**
+  - **Server:** `SearchService.searchProjects` matches project and track names (wildcards stay literal). It is scoped by the session's workspace and manager (`eq(workspaceId)`, `eq(managerAccountId)`) on both tables and on the track's parent join. It needs a manager, leaves archived projects and tracks (and tracks of archived projects) out, and runs only with canonical tasks, because the Projects view exists only there. The response gains `projects?: GlobalSearchProjectItem[]`; the type is type-only, so there's no `shared/types.js` regeneration.
+  - **Palette:** a "Projects" group (folder icon) opens `/tasks?view=projects&project=<id>`, adding `&track=<id>` for a track ("Track in Atlas payments migration").
+  - **Isolation:**
+    - `search-projects.test.ts` covers another manager in the same workspace, another workspace, archived rows, no manager, and wildcards.
+    - The tenant harness gains a positive control: the owner finds "OWNERSECRET Project/Track" and the friend gets `[]`. The existing `/api/search?q=OWNERSECRET` spoofed-scope probe now exercises the new query too.
+    - No new route, so the manifest is unchanged.
+  - **Browser:** "atlas" (the original miss) lists "Atlas payments migration · Project", and Enter opens `?view=projects&project=1`.
+  - **Left alone:** the palette group headings stay uppercase, the deliberate UXD-03 exception that `typeScale.test.ts` pins.

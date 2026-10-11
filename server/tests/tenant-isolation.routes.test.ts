@@ -58,6 +58,17 @@ describe("permanent tenant isolation guard", () => {
     expect(response.body.error).toContain("Explicit workspace");
   });
 
+  it("finds the owner's projects for the owner and never for another workspace (docs/73 UXD-26)", async () => {
+    vi.stubEnv("LEADOS_STRICT_WORKSPACE", "1");
+    const { O, F } = await seedTenants();
+    const own = await O("GET", "/api/search?q=OWNERSECRET");
+    expect(own.status).toBe(200);
+    expect(own.body.projects.map((item: { projectName: string; trackName?: string }) => item.trackName ?? item.projectName)).toEqual(expect.arrayContaining(["OWNERSECRET Project", "OWNERSECRET Track"]));
+    const foreign = await F("GET", "/api/search?q=OWNERSECRET");
+    expect(foreign.status).toBe(200);
+    expect(foreign.body.projects ?? []).toEqual([]);
+  });
+
   it("isolates developer sessions and refuses body/header/query workspace overrides", async () => {
     vi.stubEnv("LEADOS_STRICT_WORKSPACE", "1");
     const { app, authService, friend, F, seed, snapshot, before, day } = await seedTenants();

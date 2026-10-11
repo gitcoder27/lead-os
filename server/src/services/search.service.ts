@@ -5,6 +5,7 @@ import type {
   GlobalSearchDeveloperItem,
   GlobalSearchDeskItem,
   GlobalSearchIssueItem,
+  GlobalSearchProjectItem,
   GlobalSearchResponse,
   GlobalSearchTrackerItem,
   GlobalSearchTaskItem,
@@ -20,6 +21,8 @@ import {
   teamTrackerDays,
   teamTrackerItems,
   tasks as canonicalTasks,
+  projects as projectsTable,
+  projectTracks,
 } from "../db/schema";
 import { visibleWorkIssuePredicate } from "./issue-visibility";
 import { DailyNotesService } from "./daily-notes.service";
@@ -35,6 +38,7 @@ const CHECK_IN_LIMIT = 6;
 const TRACKER_ITEM_LIMIT = 6;
 const DEVELOPER_LIMIT = 4;
 const NOTE_LIMIT = 6;
+const PROJECT_LIMIT = 6;
 
 // Wildcard characters are treated as separators so user input can never turn
 // into a broad "%" scan; the wrapped pattern stays a literal substring match.
@@ -79,6 +83,7 @@ export class SearchService {
       trackerItems: [],
       developers: [],
       notes: [],
+      projects: [],
     };
 
     if (query.length < MIN_QUERY_LENGTH) {
@@ -89,7 +94,7 @@ export class SearchService {
     const pattern = containsPattern(query);
     const canonical = await this.taskKeys.canonicalEnabled(normalizedWorkspaceId);
 
-    const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems, tasks] = await Promise.all([
+    const [issueItems, deskItems, checkIns, trackerItems, developerItems, noteItems, tasks, projectItems] = await Promise.all([
       this.searchIssues(normalizedWorkspaceId, pattern),
       canonical ? Promise.resolve([]) : this.searchDeskItems(normalizedWorkspaceId, managerAccountId, pattern),
       this.searchCheckIns(normalizedWorkspaceId, pattern),
@@ -97,6 +102,7 @@ export class SearchService {
       this.searchDevelopers(normalizedWorkspaceId, pattern),
       this.searchNotes(normalizedWorkspaceId, managerAccountId, query),
       this.searchTasks(normalizedWorkspaceId, managerAccountId, query, pattern),
+      canonical ? this.searchProjects(normalizedWorkspaceId, managerAccountId, pattern) : Promise.resolve([]),
     ]);
 
     return {
@@ -108,7 +114,35 @@ export class SearchService {
       trackerItems,
       developers: developerItems,
       notes: noteItems,
+      projects: projectItems,
     };
+  }
+
+  /**
+   * docs/73 UXD-26: projects and tracks are manager-private, so both the workspace and the
+   * signed-in manager scope every row; without a manager there is nothing to find. Archived
+   * containers stay out, like the Move to project menu.
+   */
+  private async searchProjects(workspaceId: string, managerAccountId: string | undefined, pattern: string): Promise<GlobalSearchProjectItem[]> {
+    if (!managerAccountId) return [];
+    const scope = (table: typeof projectsTable | typeof projectTracks) => and(eq(table.workspaceId, workspaceId), eq(table.managerAccountId, managerAccountId), isNull(table.archivedAt));
+    const [projectRows, trackRows] = await Promise.all([
+      db.select({ id: projectsTable.id, name: projectsTable.name, updatedAt: projectsTable.updatedAt })
+        .from(projectsTable)
+        .where(and(scope(projectsTable), like(projectsTable.name, pattern)))
+        .orderBy(desc(projectsTable.updatedAt))
+        .limit(PROJECT_LIMIT),
+      db.select({ id: projectTracks.id, name: projectTracks.name, updatedAt: projectTracks.updatedAt, projectId: projectsTable.id, projectName: projectsTable.name })
+        .from(projectTracks)
+        .innerJoin(projectsTable, and(eq(projectTracks.projectId, projectsTable.id), scope(projectsTable)))
+        .where(and(scope(projectTracks), like(projectTracks.name, pattern)))
+        .orderBy(desc(projectTracks.updatedAt))
+        .limit(PROJECT_LIMIT),
+    ]);
+    return [
+      ...projectRows.map((row) => ({ projectId: row.id, projectName: row.name, updatedAt: row.updatedAt })),
+      ...trackRows.map((row) => ({ projectId: row.projectId, projectName: row.projectName, trackId: row.id, trackName: row.name, updatedAt: row.updatedAt })),
+    ].slice(0, PROJECT_LIMIT);
   }
 
   private async searchTasks(workspaceId: string, managerAccountId: string | undefined, query: string, pattern: string): Promise<GlobalSearchTaskItem[]> {

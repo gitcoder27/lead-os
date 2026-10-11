@@ -140,6 +140,6 @@ describe('developer status vocabulary (docs/54 V6)', () => {
       expect(getStatusInfo(status).label).toBe(STATUS_META[status].label);
       expect(getStatusInfo(status).color).toBe(STATUS_META[status].color);
     }
-    expect(getStatusInfo('done_for_today').label).toBe('Done');
+    expect(getStatusInfo('done_for_today').label).toBe('Day done');
   });
 });

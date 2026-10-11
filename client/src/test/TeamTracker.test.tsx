@@ -799,7 +799,7 @@ describe('TeamTrackerPage', () => {
     clickDeveloperRow('Alice Smith');
 
     fireEvent.click(screen.getByRole('button', { name: /change developer status/i }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Done/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Day done/ }));
 
     expect(mockStatusUpdateMutate).toHaveBeenCalledWith(
       { accountId: 'dev-1', status: 'done_for_today' },
@@ -2016,7 +2016,7 @@ describe('TrackerStatusPill', () => {
     expect(screen.getByText('At risk')).toBeInTheDocument();
 
     rerender(<TrackerStatusPill status="done_for_today" />);
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('Day done')).toBeInTheDocument();
   });
 });
 

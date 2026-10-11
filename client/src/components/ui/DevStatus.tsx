@@ -10,7 +10,8 @@ export const STATUS_META: Record<TrackerDeveloperStatus, { label: string; color:
   at_risk: { label: 'At risk', color: 'var(--warning)', key: 'r' },
   blocked: { label: 'Blocked', color: 'var(--danger)', key: 'b' },
   waiting: { label: 'Waiting', color: 'var(--info)', key: 'w' },
-  done_for_today: { label: 'Done', color: 'var(--accent)', key: 'd' },
+  // docs/56 MDA-05: "Day done", so a person's status never reads like a task's Done.
+  done_for_today: { label: 'Day done', color: 'var(--accent)', key: 'd' },
 };
 
 export const DEV_STATUS_ORDER: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];

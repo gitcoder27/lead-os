@@ -350,7 +350,7 @@ export function MyDayPage() {
                       Due for an update
                     </span>
                   ) : (
-                    'Optional'
+                    'For your lead · optional'
                   )
                 }
                 action={

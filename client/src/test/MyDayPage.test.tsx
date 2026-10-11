@@ -407,6 +407,16 @@ describe('MyDayPage', () => {
     );
   });
 
+  it('labels the Now card controls and tells the two update boxes apart (MDA-05)', () => {
+    mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Review PR comments', state: 'in_progress' });
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    const now = screen.getByRole('article', { name: 'Now: Review PR comments' });
+    expect(within(now).getByRole('button', { name: 'Drop Review PR comments' })).toHaveTextContent('Drop');
+    expect(within(now).getByRole('button', { name: 'Mark Review PR comments done' })).toHaveTextContent('Done');
+    expect(within(now).getByText('Update on this task…')).toBeInTheDocument();
+    expect(screen.getByText('For your lead · optional')).toBeInTheDocument();
+  });
+
   it('asks once about work carried for a week or more, and remembers a dismissal (MDA-04)', () => {
     window.localStorage.clear();
     const today = getLocalIsoDate();

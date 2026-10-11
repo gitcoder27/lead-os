@@ -18,7 +18,7 @@ export interface StatusInfo {
 export const STATUS_ORDER: TrackerDeveloperStatus[] = DEV_STATUS_ORDER;
 
 const MY_DAY_EXTRAS: Record<TrackerDeveloperStatus, Pick<StatusInfo, 'icon' | 'prompt' | 'description'>> = {
-  on_track: { icon: Zap, description: 'On track', prompt: 'Quick update — what’s happening?' },
+  on_track: { icon: Zap, description: 'On track', prompt: 'How’s your day going?' },
   at_risk: { icon: AlertTriangle, description: 'At risk', prompt: 'What’s putting it at risk?' },
   blocked: { icon: ShieldAlert, description: 'Blocked', prompt: 'What’s blocking you — and who can unblock it?' },
   waiting: { icon: Pause, description: 'Waiting', prompt: 'What are you waiting on?' },

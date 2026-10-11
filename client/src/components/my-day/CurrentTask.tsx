@@ -1,10 +1,10 @@
 import { forwardRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Play, Plus, X } from 'lucide-react';
+import { Check, CircleSlash, Play, Plus } from 'lucide-react';
 import type { TrackerWorkItem } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
 import { FOCUS_RING } from '@/components/ui/focus';
-import { EASE_OUT, IconAction, Kbd, surfaceStyle } from './MyDayUI';
+import { EASE_OUT, Kbd, surfaceStyle } from './MyDayUI';
 import { TaskFooter, TaskMeta, TaskNote, TaskTitle, canRenameItem, usePrefetchHandlers } from './MyDayTaskParts';
 
 interface CurrentTaskProps {
@@ -153,9 +153,9 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
       />
 
       <div className="px-5 pb-4 pt-4 sm:px-6">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <LiveDot active={!readOnly} />
-          <span className="text-ui font-semibold" style={{ color: 'var(--accent)' }}>
+          <span className="whitespace-nowrap text-ui font-semibold" style={{ color: 'var(--accent)' }}>
             {readOnly ? 'In progress' : 'Working on'}
           </span>
           {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="ml-1" />}
@@ -163,15 +163,24 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
           {!readOnly && (
             <div className="ml-auto flex items-center gap-1">
               {onDrop && (
-                <IconAction label={`Drop ${item.title}`} title="Drop from today" onClick={() => onDrop(item.id)} tone="var(--text-muted)">
-                  <X size={15} />
-                </IconAction>
+                // docs/56 MDA-05: a labelled control, not a bare ✕ that reads as "close".
+                <button
+                  type="button"
+                  onClick={() => onDrop(item.id)}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] sm:px-2.5 ${FOCUS_RING}`}
+                  style={{ color: 'var(--text-secondary)' }}
+                  aria-label={`Drop ${item.title}`}
+                  title="Drop from today — it moves to Done as dropped; Undo or reopen any time"
+                >
+                  <CircleSlash size={13} aria-hidden="true" />
+                  Drop
+                </button>
               )}
               {onMarkDone && (
                 <button
                   type="button"
                   onClick={() => onMarkDone(item.id)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-ui font-semibold transition-colors hover:brightness-110 ${FOCUS_RING}`}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-ui font-semibold transition-colors hover:brightness-110 sm:px-3 ${FOCUS_RING}`}
                   style={{
                     color: 'var(--success)',
                     background: 'color-mix(in srgb, var(--success) 12%, transparent)',

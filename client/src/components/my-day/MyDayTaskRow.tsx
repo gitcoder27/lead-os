@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Check, GripVertical, Play, RotateCcw, X } from 'lucide-react';
+import { Check, CircleSlash, GripVertical, Play, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import type { TrackerWorkItem } from '@/types';
 import { TaskKeyChip } from '@/components/tasks/TaskKeyChip';
@@ -156,7 +156,7 @@ function RowActions({
           ),
           onDrop && (
             <IconAction key="drop" size="sm" label={`Drop ${item.title}`} title="Drop from today" onClick={() => onDrop(item.id)} tone="var(--text-muted)">
-              <X size={14} />
+              <CircleSlash size={13} />
             </IconAction>
           ),
         ]

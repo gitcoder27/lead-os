@@ -380,7 +380,7 @@ export function TaskFooter({
       {/* pr-2 absorbs the quiet composer's hover bleed so it never overlaps the toggle. */}
       <div className="min-w-0 flex-1 pr-2">
         {!readOnly && (
-          <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed quiet placeholder="Add an update…" />
+          <TaskUpdateComposer taskKey={item.taskKey} mode="developer" date={viewDate} collapsed quiet placeholder="Update on this task…" />
         )}
       </div>
       <OpenTaskButton taskKey={item.taskKey} label="Details & activity" />

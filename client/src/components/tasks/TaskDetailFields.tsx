@@ -541,7 +541,8 @@ function PriorityRow({ task, editable, onPatch }: { task: TaskDetailResponse; ed
         onClick={(el) => setAnchor(anchor ? null : el)}
       >
         {high ? (
-          <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--danger)' }}>
+          // docs/73 UXD-14: priority is shape and weight, not red — red is for missed deadlines.
+          <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--text-primary)' }}>
             <Flag size={12} fill="currentColor" />
             High
           </span>

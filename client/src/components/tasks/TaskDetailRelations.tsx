@@ -384,7 +384,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
           ))}
         </ul>
       )}
-      {canAdd && <Disclosure open={showPlacement} onOpenChange={setShowPlacement} summary="Subtask project · inherits parent unless changed">{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</Disclosure>}
+      {canAdd && <Disclosure open={showPlacement} onOpenChange={setShowPlacement} summary={<span title="Subtasks use this task's project unless you pick another">Put new subtasks in another project</span>}>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</Disclosure>}
       {canAdd && (
         <form
           className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"

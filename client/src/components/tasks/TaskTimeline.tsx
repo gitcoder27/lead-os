@@ -32,6 +32,7 @@ import {
   useTaskEvents,
   useUpdateTaskEventVisibility,
 } from '@/hooks/useTasks';
+import { format, parseISO } from 'date-fns';
 import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
 import type { TaskEvent, TaskEventType } from '@/types';
 
@@ -70,6 +71,30 @@ function blockerAction(event: TaskEvent): 'raised' | 'cleared' | undefined {
 
 type NameResolver = (accountId: string) => string | undefined;
 
+/** docs/73 UXD-14: activity reads dates the manager's way — "Sat 10 Oct", never 2026-10-10. */
+export function friendlyEventValue(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return format(parseISO(value), 'EEE d MMM');
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return format(date, 'EEE d MMM, HH:mm');
+  }
+  return value;
+}
+
+/** Older note excerpts were raw slices of the note: strip list, checkbox and emphasis syntax. */
+export function plainExcerpt(value: string): string {
+  return value
+    .split('\n')
+    .map((line) => line
+      .replace(/^\s*#{1,6}\s+/, '')
+      .replace(/^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?/, '')
+      .replace(/^\s*\[[ xX]?\]\s*/, '')
+      .replace(/~~|\*\*|__/g, '')
+      .trim())
+    .filter(Boolean)
+    .join(' · ');
+}
+
 function eventDescription(event: TaskEvent, resolveName?: NameResolver): string {
   if (event.body) return event.body;
   const meta = eventMeta(event);
@@ -78,7 +103,7 @@ function eventDescription(event: TaskEvent, resolveName?: NameResolver): string 
   const PERSON_FIELDS = new Set(['ownerId', 'fromId', 'toId', 'developerAccountId']);
   const text = (field: string, fallback = 'Not set') => {
     const value = raw(field, fallback);
-    return PERSON_FIELDS.has(field) && value !== fallback ? resolveName?.(value) ?? value : value;
+    return PERSON_FIELDS.has(field) && value !== fallback ? resolveName?.(value) ?? value : friendlyEventValue(value);
   };
   const readable = (field: string) => text(field).replace(/_/g, ' ');
   switch (event.type) {
@@ -93,7 +118,7 @@ function eventDescription(event: TaskEvent, resolveName?: NameResolver): string 
     case 'schedule': return `${readable('field')}: ${text('from')} → ${text('to')}`;
     case 'link': return `${meta.action === 'removed' ? 'Removed' : 'Added'} ${text('kind', 'link')}: ${text('ref')}${meta.role ? ` (${text('role')})` : ''}`;
     case 'checkin_ref': return `Check-in on ${text('date')}${meta.developerAccountId ? ` for ${text('developerAccountId')}` : ''}${meta.excerpt ? `: ${text('excerpt')}` : ''}`;
-    case 'note_ref': return `${meta.relation === 'created_from' ? 'Created from note' : meta.relation === 'update_from' ? 'Updated from note' : 'Mentioned in note'} on ${text('noteDate')}${meta.excerpt ? `: ${text('excerpt')}` : ''}`;
+    case 'note_ref': return `${meta.relation === 'created_from' ? 'Created from your note' : meta.relation === 'update_from' ? 'Updated from your note' : 'Mentioned'} ${text('noteDate')}${meta.excerpt ? `: ${plainExcerpt(raw('excerpt'))}` : ''}`;
     case 'merged': return `${text('mergedKey')} → ${text('survivorKey')} (${text('decisionRef')})`;
     case 'blocker': return meta.action === 'cleared' ? 'Blocker cleared' : 'Blocker raised';
     default: return EVENT_TYPE_LABELS[event.type];
@@ -123,8 +148,12 @@ function canRedact(event: TaskEvent, accountId: string | undefined): boolean {
   );
 }
 
-function authorLabel(event: TaskEvent, accountId?: string): string {
+export function authorLabel(event: TaskEvent, accountId?: string): string {
   if (!event.author.displayName && event.author.type === 'manager' && accountId && event.author.id === accountId) return 'You';
+  // docs/73 UXD-14: a note reference is written by the app on your behalf — say where it came from.
+  if (event.type === 'note_ref' && event.author.type === 'system') return 'From your note';
+  // Other app-written events read as the person they were for, never "System (maya)".
+  if (event.author.type === 'system') return accountId && event.author.id === accountId ? 'You' : 'LeadOS';
   return event.author.displayName ?? `${AUTHOR_LABELS[event.author.type] ?? event.author.type}${event.author.id ? ` (${event.author.id})` : ''}`;
 }
 

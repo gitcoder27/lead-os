@@ -138,6 +138,30 @@ export function plainNoteLine(line: string): string {
     .trim();
 }
 
+/** Longest mention excerpt before it is windowed around the mention. */
+const MENTION_EXCERPT_LENGTH = 200;
+
+/**
+ * docs/73 UXD-14: the note line a task is mentioned on, as prose — the whole line with
+ * list, checkbox and emphasis syntax removed, never a slice cut mid-word. A line longer
+ * than MENTION_EXCERPT_LENGTH is windowed around the mention on word boundaries.
+ */
+export function mentionExcerpt(body: string, index: number, tokenLength: number): string {
+  const start = body.lastIndexOf("\n", Math.max(0, index - 1)) + 1;
+  const endAt = body.indexOf("\n", index);
+  const raw = body.slice(start, endAt === -1 ? body.length : endAt);
+  const line = plainNoteLine(raw);
+  if (line.length <= MENTION_EXCERPT_LENGTH) return line;
+  const token = body.slice(index, index + tokenLength);
+  const at = Math.max(0, line.indexOf(token));
+  let from = Math.max(0, at - Math.floor((MENTION_EXCERPT_LENGTH - token.length) / 2));
+  let to = Math.min(line.length, from + MENTION_EXCERPT_LENGTH);
+  from = Math.max(0, to - MENTION_EXCERPT_LENGTH);
+  if (from > 0) from = line.indexOf(" ", from) + 1 || from;
+  if (to < line.length) to = line.lastIndexOf(" ", to) > from ? line.lastIndexOf(" ", to) : to;
+  return `${from > 0 ? "…" : ""}${line.slice(from, to).trim()}${to < line.length ? "…" : ""}`;
+}
+
 function plainLines(body: string): string[] {
   return body.split("\n").map(plainNoteLine).filter((line) => line.length > 0);
 }
@@ -638,7 +662,7 @@ export class DailyNotesService {
             noteId: note.id,
             noteDate: note.date,
             relation: "mentioned",
-            excerpt: note.body.slice(Math.max(0, index - 80), index + token.length + 80),
+            excerpt: mentionExcerpt(note.body, index, token.length),
           },
         },
         { type: "system", accountId: note.managerAccountId }

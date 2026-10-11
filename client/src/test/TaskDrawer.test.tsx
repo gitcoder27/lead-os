@@ -124,6 +124,24 @@ beforeEach(() => {
   mockUser.mockReturnValue({ accountId: 'manager-a', role: 'manager', developerAccountId: undefined });
 });
 
+describe('drawer polish (docs/73 UXD-14)', () => {
+  it('keeps its keys behind one Shortcuts control instead of a permanent legend', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} orderedKeys={['T-4', 'T-7']} onStepTask={() => {}} />);
+    expect(screen.queryByText('Prev / next task')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Shortcuts/ }));
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveTextContent('Prev / next task');
+  });
+
+  it('shows high priority in text colour, not red', () => {
+    mockUseTaskDetail.mockReturnValue(queryFor(managerTask({ priority: 'high' })));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    const high = screen.getByRole('button', { name: 'Priority: High' }).querySelector('span[style]');
+    expect(high?.getAttribute('style')).toContain('var(--text-primary)');
+    expect(high?.getAttribute('style')).not.toContain('var(--danger)');
+  });
+});
+
 describe('TaskDrawer body (P3-D2)', () => {
   it('j/k step through the ordered list keys, dead inside inputs (docs/51 F19)', () => {
     mockUseTaskDetail.mockReturnValue(queryFor(managerTask()));

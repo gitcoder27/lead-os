@@ -937,3 +937,25 @@ describe("daily notes migration", () => {
     expect(sources.sources).toHaveLength(1);
   });
 });
+
+describe("mentionExcerpt (docs/73 UXD-14)", () => {
+  it("returns the whole mention line as prose, never a slice cut mid-word or raw markdown", async () => {
+    const { mentionExcerpt } = await import("../src/services/daily-notes.service");
+    const body = "## Saturday catch-up\n\n- Re-read the Atlas runbook draft; rollback step 4 is unclear (T-1)\n- [ ] Ask Tom about Redis 7 migration timeline T-26\n";
+    const index = body.indexOf("T-1");
+    expect(mentionExcerpt(body, index, 3)).toBe("Re-read the Atlas runbook draft; rollback step 4 is unclear (T-1)");
+    const second = body.indexOf("T-26");
+    expect(mentionExcerpt(body, second, 4)).toBe("Ask Tom about Redis 7 migration timeline T-26");
+  });
+
+  it("windows a very long line around the mention on word boundaries", async () => {
+    const { mentionExcerpt } = await import("../src/services/daily-notes.service");
+    const line = `- ${"lorem ipsum dolor ".repeat(12)}see T-9 for the rollback ${"sit amet consectetur ".repeat(12)}`;
+    const excerpt = mentionExcerpt(line, line.indexOf("T-9"), 3);
+    expect(excerpt).toContain("T-9");
+    expect(excerpt.length).toBeLessThanOrEqual(202);
+    expect(excerpt).toMatch(/^…[a-z]/);
+    expect(excerpt).toMatch(/[a-z]…$/);
+    expect(excerpt).not.toContain("- ");
+  });
+});

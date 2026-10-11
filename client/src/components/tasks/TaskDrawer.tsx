@@ -32,7 +32,9 @@ import { TaskKeyChip } from './TaskKeyChip';
 import { TaskTimeline } from './TaskTimeline';
 import { TaskUpdateComposer } from './TaskUpdateComposer';
 import { MenuDivider, MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
-import { FOCUS_RING, IconButton, SectionHeader, ShortcutLegend, isEditable, useTaskShortcuts } from './TaskDetailPrimitives';
+import { FOCUS_RING, IconButton, SectionHeader, isEditable, useTaskShortcuts } from './TaskDetailPrimitives';
+import { ShortcutSheet } from '@/components/ui/ShortcutSheet';
+import { Kbd } from '@/components/ui/Kbd';
 import {
   MeetingOutcome,
   StatusControl,
@@ -369,6 +371,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           {onOpenFullPage && (
             <IconButton label="Open full page" onClick={onOpenFullPage}><Maximize2 size={14} /></IconButton>
           )}
+          {hints.length > 0 && <DrawerShortcuts hints={onClose ? [...hints, ['Esc', 'Close']] : hints} />}
           <MoreActions task={task} canDelete={mode === 'manager' && !deleted} onDelete={onDelete} onOpenFullPage={onOpenFullPage} />
           {onClose && <IconButton label="Close" hint="Esc" onClick={onClose}><X size={16} /></IconButton>}
         </>
@@ -465,7 +468,6 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
                 <div className="px-1">
                   <TaskMetaList task={task} people={people} />
                 </div>
-                {hints.length > 0 && <ShortcutLegend hints={hints} className="px-1 pt-1" />}
               </div>
             </aside>
             <div className="min-w-0 space-y-9 lg:col-start-1">
@@ -499,11 +501,6 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           <TaskMetaList task={task} people={people} />
         </div>
       </div>
-      {hints.length > 0 && (
-        <div className="hidden shrink-0 border-t px-6 py-2 sm:block" style={{ borderColor: 'var(--border)', background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}>
-          <ShortcutLegend hints={[...hints, ['Esc', 'Close']]} />
-        </div>
-      )}
     </div>
   );
 }
@@ -517,6 +514,23 @@ function Divider() {
 }
 
 // ── Header pieces ───────────────────────────────────────────────────
+
+/**
+ * docs/73 UXD-14: the drawer's keys live behind one quiet "Shortcuts ?" control instead of a
+ * permanent two-line legend. Hidden on touch, where there is no keyboard to teach.
+ */
+function DrawerShortcuts({ hints }: { hints: [string, string][] }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <button type="button" className="ui-btn-ghost hidden gap-1.5 sm:inline-flex" aria-haspopup="dialog" aria-expanded={Boolean(anchor)}
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}>
+        Shortcuts <Kbd variant="subtle">?</Kbd>
+      </button>
+      {anchor && <ShortcutSheet anchor={anchor} groups={[{ group: 'This task', keys: hints }]} onClose={() => setAnchor(null)} />}
+    </>
+  );
+}
 
 function DetailToolbar({ fullPage, onBack, leading, actions }: {
   fullPage: boolean;

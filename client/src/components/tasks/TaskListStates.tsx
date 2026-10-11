@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { ErrorDetails } from '@/components/ui/QueryReadError';
 import { TriangleAlert, CalendarCheck, CheckCheck, Flag, Inbox, RefreshCw, SearchX, X } from 'lucide-react';
 import { TASK_LIST_CONTAINER } from './TaskList';
 import { formatShortcutKeys, TASK_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -55,16 +56,19 @@ export function TaskListSkeleton({ grouped = false }: { grouped?: boolean }) {
   );
 }
 
-export function TaskListError({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function TaskListError({ message, detail, onRetry }: { message: string; detail?: string; onRetry: () => void }) {
   return (
     <div className={`${TASK_LIST_CONTAINER} pt-3`}>
       <div
         role="alert"
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-body"
+        className="flex items-start gap-2 rounded-lg px-3 py-2 text-body"
         style={{ color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 24%, transparent)' }}
       >
-        <TriangleAlert size={14} />
-        <span className="min-w-0 flex-1">{message}</span>
+        <TriangleAlert size={14} className="shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          {message}
+          {detail ? <span className="mt-0.5 block" style={{ color: 'var(--text-secondary)' }}><ErrorDetails detail={detail} /></span> : null}
+        </span>
         <button type="button" onClick={onRetry} className="flex items-center gap-1 rounded-md px-2 py-1 font-semibold" style={{ border: '1px solid currentColor' }}>
           <RefreshCw size={12} /> Retry
         </button>

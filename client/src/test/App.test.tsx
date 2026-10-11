@@ -265,9 +265,12 @@ describe('App', () => {
 
   it('offers retry after an initial bootstrap failure instead of loading forever', () => {
     const refetch = vi.fn();
-    useBootstrapStateMock.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
+    useBootstrapStateMock.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: new TypeError('Failed to fetch'), refetch });
     render(<App />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not load setup');
+    // docs/73 UXD-27: a branded page with a plain reason; the raw error is only behind Details.
+    expect(screen.getByRole('heading', { name: "LeadOS didn't start" })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Check your connection, then retry.');
+    expect(screen.getByText('Failed to fetch')).not.toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledOnce();
     expect(screen.queryByText('Setup wizard')).not.toBeInTheDocument();

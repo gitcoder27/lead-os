@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
+import { describeLoadError } from '@/lib/error-copy';
+import { ErrorDetails } from '@/components/ui/QueryReadError';
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
 import { useTeamMode } from '@/hooks/useTeamMode';
@@ -537,7 +539,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           </div>
         </>
       ) : (
-        <TodayLoadingState isError={today.isError} onRetry={() => void today.refetch()} />
+        <TodayLoadingState isError={today.isError} error={today.error} onRetry={() => void today.refetch()} />
       )}
 
       {checkInDraft ? (
@@ -660,16 +662,19 @@ function TodayPartialDataNotice({
   );
 }
 
-function TodayLoadingState({ isError, onRetry }: { isError: boolean; onRetry: () => void }) {
+function TodayLoadingState({ isError, error, onRetry }: { isError: boolean; error?: unknown; onRetry: () => void }) {
   if (!isError) {
     return <TodayPageSkeleton />;
   }
-
+  // docs/73 UXD-27: the reason in plain words, with the server's own message behind Details.
+  const copy = describeLoadError(error, 'Today');
   return (
     <section className="flex min-h-0 flex-1 items-center justify-center px-5">
-      <div className="text-center">
+      <div role="alert" className="flex max-w-md flex-col items-center text-center">
         <p className="text-body font-medium" style={{ color: 'var(--text-primary)' }}>Today didn&apos;t load</p>
+        <p className="mt-1 text-body" style={{ color: 'var(--text-secondary)' }}>{copy.reason}</p>
         <button type="button" onClick={onRetry} className="ui-btn-solid mt-3">Retry</button>
+        {copy.detail ? <div className="mt-2"><ErrorDetails detail={copy.detail} /></div> : null}
       </div>
     </section>
   );

@@ -1,4 +1,6 @@
 import type { ManagerTask , TaskDetailResponse, UpdateTaskRequest } from '@/types';
+import { describeLoadError } from '@/lib/error-copy';
+import { ErrorDetails } from '@/components/ui/QueryReadError';
 import { TaskProjectField } from './TaskProjectField';
 import { clearTaskUpdateDraftsForTask } from '@/lib/task-update-drafts';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -206,11 +208,13 @@ export function TaskDetailBody({ taskKey, onClose, onOpenFullPage, onNavigateTas
   }
 
   if (query.isError || !query.data) {
-    const message = query.error instanceof Error ? query.error.message : 'Task not found';
+    // docs/73 UXD-27: plain words for the failure; the server's message stays behind Details.
+    const copy = query.isError ? describeLoadError(query.error, 'this task') : { headline: 'This task isn’t available any more.', reason: 'This task isn’t available any more.', detail: undefined };
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
         <span className="rounded-md px-2 py-0.5 font-mono text-ui font-semibold" style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}>{taskKey}</span>
-        <p className="max-w-sm text-body" style={{ color: 'var(--text-secondary)' }}>{message}</p>
+        <p role="alert" className="max-w-sm text-body" style={{ color: 'var(--text-secondary)' }}>{copy.headline}</p>
+        {copy.detail ? <ErrorDetails detail={copy.detail} /> : null}
         {dismiss && (
           <button
             type="button"

@@ -919,7 +919,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 - [x] UXD-24 — Settings.
 - [x] UXD-25 — Setup Wizard.
 - [x] UXD-26 — Palette finds projects.
-- [ ] UXD-27 — Error and boot states.
+- [x] UXD-27 — Error and boot states.
 - [ ] UXD-28 — Projects polish.
 - [ ] UXD-29 — Copy sweep.
 
@@ -950,6 +950,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 | 2026-10-11 | UXD-24 | main (this commit) | Section title on ui-page-title; sidebar groups Workspace/People/Integrations/Data (desktop headings, every section still listed); copy pass (no 'desk task', 'Start reset…', 'Reset tasks and Team board', sentence-case buttons, no Save-footer note, bold typed phrase; server phrases unchanged); Jira host neutral until lastSuccessAt. Browser at 1440 and 375, light and dark, no horizontal scroll; armed reset shows 'Type CLEAR MANAGER DESK to confirm'. SettingsPanel tests updated plus a groups/tone test; client 2154 green, typecheck clean. |
 | 2026-10-11 | UXD-25 | main (this commit) | Named step chips (Account/Jira/Owner mapping/Team/Access, aria-current), token colours in place of every literal (readable error text in light), ui-field inputs, sentence-case buttons, icon-only 44px theme toggle on phones. Browser at 1440 and 375, light and dark on the empty scratch instance. /join valid and invalid plus first-run Today checked on a scratch API with registration=invite (DB backed up, restored, registration off again: invite API 404). SetupWizard tests updated; client 2154 green, typecheck clean. |
 | 2026-10-11 | UXD-26 | main (this commit) | Palette finds the manager's own unarchived projects and tracks (workspace and manager scoped, canonical only) and opens ?view=projects&project=[&track=]. New search-projects tests (other manager, other workspace, archived, no manager, wildcards), a positive control in the tenant harness, and search shape tests updated. Browser: 'atlas' finds the project and Enter opens it. Server 1658 and client 2156 green, typecheck and build:check clean. |
+| 2026-10-11 | UXD-27 | main (this commit) | describeLoadError status-to-copy map (headline never the server text; detail behind Details; reason for titled pages); branded BootError page with Retry; Today error gains its reason; Tasks banner, Task drawer and Projects directory use the map. Browser in light and dark: API down cold, Tasks 500 (Details shows 'boom · Status 500'), Today 500. errorCopy tests added, App/ProjectsPanel tests updated; client 2160 green, typecheck and build:check clean. |
 
 ## Self-registration and tenant isolation (docs/72)
 

@@ -1,4 +1,4 @@
-import { QueryReadError } from '@/components/ui/QueryReadError';
+import { BootError } from '@/components/layout/BootError';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -1155,7 +1155,7 @@ function AppContent() {
 
   const renderActiveView = () => {
     if (!authLoading && !isAuthenticated && !bootstrapState && bootstrapQuery.isError) {
-      return <QueryReadError message="Could not load setup. Check your connection and retry." onRetry={() => bootstrapQuery.refetch()} retrying={bootstrapQuery.isFetching} />;
+      return <BootError error={bootstrapQuery.error} onRetry={() => bootstrapQuery.refetch()} retrying={bootstrapQuery.isFetching} />;
     }
 
     if (authLoading || isBootstrapPending) {

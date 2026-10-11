@@ -47,7 +47,9 @@ describe('Projects browsing and lifecycle', () => {
     expect(screen.queryByText('No projects yet')).not.toBeInTheDocument();
     hooks.list.mockReturnValue({ error: new Error('Connection failed'), refetch: hooks.retry });
     rerender(<ProjectsPanel {...props} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    // docs/73 UXD-27: a plain headline; the raw message is behind Details.
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load projects. Check your connection, then retry.");
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(hooks.retry).toHaveBeenCalledOnce();
   });
 

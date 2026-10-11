@@ -1,4 +1,5 @@
 import { useTaskIdentity } from '@/hooks/useTaskIdentity';
+import { describeLoadError } from '@/lib/error-copy';
 import type { CreateViaCapture } from '@/hooks/useCapture';
 import { PlacementDialog } from './PlacementDialog';
 import { useQuickPlacement } from '@/hooks/useQuickPlacement';
@@ -854,6 +855,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
   // ── Render ───────────────────────────────────────────────────────────────
   const countData = counts.data?.counts;
   const candidates = Math.max(0, (countData?.['my-tasks']?.count ?? 0) - (countData?.today?.count ?? 0)) + (countData?.inbox?.count ?? 0);
+  // docs/73 UXD-27: a plain headline for the failed list; the server's words go behind Details.
+  const listError = tasks.isError ? describeLoadError(tasks.error, selectedView?.name ?? 'tasks') : null;
   const firstLoad = tasks.isLoading && !tasks.data;
   const updating = tasks.isFetching && tasks.isPlaceholderData;
   // docs/51 F14: add is offered on empty views unless filters/search narrowed
@@ -934,7 +937,8 @@ export function TasksPage({ urlState, urlStateNonce, onUrlStateChange, openTaskK
           {projectsMode && showTaskList && taskToolbar}
           {showTaskList && tasks.isError && (
             <TaskListError
-              message={tasks.error instanceof Error ? tasks.error.message : 'Could not load tasks'}
+              message={listError!.headline}
+              detail={listError!.detail}
               onRetry={() => void tasks.refetch()}
             />
           )}

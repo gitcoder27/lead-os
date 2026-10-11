@@ -637,3 +637,11 @@ Deviations from §8 found while building, and open items noticed but left out of
     - No new route, so the manifest is unchanged.
   - **Browser:** "atlas" (the original miss) lists "Atlas payments migration · Project", and Enter opens `?view=projects&project=1`.
   - **Left alone:** the palette group headings stay uppercase, the deliberate UXD-03 exception that `typeScale.test.ts` pins.
+- **UXD-27:**
+  - **The copy map:** `lib/error-copy.ts` (`describeLoadError`) maps a failed read to copy. Its headline comes from the status and is never the server's text: connection/0, 401, 403, 404, 408 or 429, 5xx, and other. Its `detail` holds the server's message and status for a "Details" disclosure. Its `reason` is the headline without its "Couldn't load X." lead, for pages whose title already says so. `ApiRequestError` and the `{ error, status }` shape are untouched.
+  - **Where it's used:**
+    - The boot failure is a branded `BootError` page: the mark, "LeadOS didn't start", the reason, a solid Retry and Details.
+    - "Today didn't load" gains its reason line.
+    - The Tasks list banner reads "Couldn't load Inbox. Something went wrong on the server; retry in a moment." with "boom · Status 500" behind Details.
+    - The same map covers two read surfaces the brief didn't list: the Task drawer's failed load and the Projects directory, which showed the raw message.
+  - **Left alone:** mutation toasts keep the server's text, since those are usually actionable validation messages ("name already exists").

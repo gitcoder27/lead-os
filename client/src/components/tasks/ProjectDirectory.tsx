@@ -1,4 +1,6 @@
 import type { Ref } from 'react';
+import { describeLoadError } from '@/lib/error-copy';
+import { QueryReadError } from '@/components/ui/QueryReadError';
 import { Archive, ChevronRight, Folder, Plus, Search, X } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { ProjectFactsRow } from './ProjectFactsRow';
@@ -37,7 +39,7 @@ export const ProjectDirectory = ({ today, archived, query, searchRef, onQuery, o
         </label>
       </div>
       {list.isLoading && <div className="project-loading animate-pulse motion-reduce:animate-none" role="status"><span className="sr-only">Loading projects…</span>{[0, 1, 2].map((key) => <span key={key} aria-hidden="true" />)}</div>}
-      {list.error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 text-body leading-5"><p>{list.error.message}</p><button className="ui-btn-secondary" onClick={() => void list.refetch()}>Try again</button></div>}
+      {list.error && <QueryReadError message={describeLoadError(list.error, 'projects').headline} detail={describeLoadError(list.error, 'projects').detail} onRetry={() => list.refetch()} retrying={list.isFetching} />}
       {!list.isLoading && !list.error && entries.length === 0 && (
         <div className="project-empty">
           <span className="project-icon">{archived ? <Archive size={18} /> : <Folder size={18} />}</span>

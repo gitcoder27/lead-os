@@ -116,23 +116,24 @@ function StatusChip({ status, onClick }: { status: ReturnType<typeof getStatusIn
   );
 }
 
+/** docs/56 MDA-03: the task in focus is hatched, so an unfinished day never reads as half done. */
+const IN_PROGRESS_FILL = 'repeating-linear-gradient(-45deg, var(--accent) 0 2.5px, color-mix(in srgb, var(--accent) 38%, transparent) 2.5px 5px)';
+const QUEUED_FILL = 'color-mix(in srgb, var(--text-muted) 28%, transparent)';
+
 /**
- * The day at a glance: one segment per task — done, in focus, still queued.
- * Falls back to a proportional bar when the day is too full for segments.
+ * The day at a glance: one segment per task — done (solid), in focus
+ * (hatched), still queued (faint). Falls back to a proportional bar when the
+ * day is too full for segments.
  */
 function DayProgress({ done, current, planned, className }: { done: number; current: number; planned: number; className?: string }) {
   const total = done + current + planned;
-  const label =
-    total === 0
-      ? 'Nothing planned yet'
-      : done === total
-        ? `All ${total} done`
-        : `${done} of ${total} done`;
+  const allDone = total > 0 && done === total;
+  const label = total === 0 ? 'Nothing planned yet' : allDone ? `All ${total} done` : `${done} of ${total} done`;
 
   const segments: string[] = [
     ...Array<string>(done).fill('var(--success)'),
-    ...Array<string>(current).fill('var(--accent)'),
-    ...Array<string>(planned).fill('color-mix(in srgb, var(--text-muted) 28%, transparent)'),
+    ...Array<string>(current).fill(IN_PROGRESS_FILL),
+    ...Array<string>(planned).fill(QUEUED_FILL),
   ];
   const segmented = total > 0 && total <= 16;
 
@@ -145,20 +146,25 @@ function DayProgress({ done, current, planned, className }: { done: number; curr
           className="flex h-1.5 w-[132px] shrink-0 gap-[3px] overflow-hidden rounded-full sm:w-[168px]"
         >
           {segmented ? (
-            segments.map((color, index) => (
-              <span key={index} className="h-full min-w-[4px] flex-1 rounded-full transition-colors duration-500" style={{ background: color }} />
+            segments.map((fill, index) => (
+              <span key={index} className="h-full min-w-[4px] flex-1 rounded-full transition-colors duration-500" style={{ background: fill }} />
             ))
           ) : (
             <>
               <span className="h-full rounded-full" style={{ width: `${(done / total) * 100}%`, background: 'var(--success)' }} />
-              {current > 0 && <span className="h-full w-[6px] rounded-full" style={{ background: 'var(--accent)' }} />}
-              <span className="h-full flex-1 rounded-full" style={{ background: 'color-mix(in srgb, var(--text-muted) 28%, transparent)' }} />
+              {current > 0 && <span className="h-full w-[10px] rounded-full" style={{ background: IN_PROGRESS_FILL }} />}
+              <span className="h-full flex-1 rounded-full" style={{ background: QUEUED_FILL }} />
             </>
           )}
         </div>
       )}
-      <span className="text-body tabular-nums" style={{ color: 'var(--text-muted)' }}>
+      <span className="text-body tabular-nums" style={{ color: allDone ? 'var(--success-text)' : 'var(--text-secondary)' }}>
         {label}
+        {current > 0 && !allDone && (
+          <span style={{ color: 'var(--text-muted)' }}>
+            <span aria-hidden="true"> · </span>1 in progress
+          </span>
+        )}
       </span>
     </div>
   );

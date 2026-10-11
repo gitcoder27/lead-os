@@ -254,6 +254,13 @@ describe('MyDayPage', () => {
     };
   });
 
+  it('keeps the task in progress apart from done work in the day progress (MDA-03)', () => {
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.getByRole('img', { name: '1 of 3 tasks done, one in progress' })).toBeInTheDocument();
+    expect(screen.getByText('1 of 3 done')).toBeInTheDocument();
+    expect(screen.getByText('1 in progress')).toBeInTheDocument();
+  });
+
   it('opens the task drawer from keyed rows, the focus card, and finished work', () => {
     mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Current keyed task', state: 'in_progress' });
     mockDay.plannedItems = [createItem({ id: 102, taskKey: 'T-2', title: 'Planned keyed task' })];

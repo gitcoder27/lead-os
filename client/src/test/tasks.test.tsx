@@ -349,13 +349,15 @@ describe('TaskTimeline', () => {
     render(<TaskTimeline taskKey="T-5" mode="manager" />, { wrapper: Wrapper });
     for (const description of [
       'Created Investigate API for dev-1', 'planned → in progress (user)',
-      'dev-1 → dev-2 (in progress → planned)', 'Set as current work on 2026-09-24',
-      'Old title → New title', 'follow up at: Not set → 2026-09-25',
-      'Added jira: APP-1 (primary)', 'Check-in on 2026-09-24 for dev-1: Ready for review',
-      'Created from note on 2026-09-23: Private context', 'T-9 → T-5 (M-1)',
+      'dev-1 → dev-2 (in progress → planned)', 'Set as current work on Thu 24 Sep',
+      'Old title → New title', 'follow up at: Not set → Fri 25 Sep',
+      'Added jira: APP-1 (primary)', 'Check-in on Thu 24 Sep for dev-1: Ready for review',
+      'Created from your note Wed 23 Sep: Private context', 'T-9 → T-5 (M-1)',
     ]) expect(screen.getByText(description)).toBeInTheDocument();
     expect(screen.queryByText(/Hidden old title/)).not.toBeInTheDocument();
-    expect(screen.getAllByText(/System \(mgr-1\)/).length).toBeGreaterThan(0);
+    // docs/73 UXD-14: activity reads friendly dates and never "System (id)".
+    expect(screen.queryByText(/System \(/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d{4}-\d{2}-\d{2}/)).not.toBeInTheDocument();
   });
 
   it('offers redaction for own Copilot and system events within the correction window', () => {
@@ -459,7 +461,8 @@ describe('TaskTimeline', () => {
     render(<TaskTimeline taskKey="T-5" mode="manager" resolveName={(id) => names[id]} />, { wrapper: Wrapper });
     expect(screen.getByText('Created Ship it for Alice')).toBeInTheDocument();
     expect(screen.getByText('Alice → Bob')).toBeInTheDocument();
-    expect(screen.getByText('You')).toBeInTheDocument();
+    // The app-written event acted for this manager too, so both read as You (docs/73 UXD-14).
+    expect(screen.getAllByText('You')).toHaveLength(2);
   });
 
   it('shows the empty label when there are no events', () => {

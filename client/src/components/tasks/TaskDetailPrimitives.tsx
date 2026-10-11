@@ -94,7 +94,7 @@ export function DateValue({ display, empty }: { display: DateDisplay | null; emp
     <span className="flex min-w-0 items-baseline gap-1.5">
       <span className="truncate font-medium" style={{ color: toneColor(display.tone) }}>{display.label}</span>
       {display.hint && (
-        <span className="shrink-0 text-ui font-medium" style={{ color: toneColor(display.tone), opacity: 0.8 }}>
+        <span className="shrink-0 text-ui font-medium" style={{ color: toneColor(display.hintTone ?? display.tone), opacity: display.hintTone ? 1 : 0.8 }}>
           {display.hint}
         </span>
       )}

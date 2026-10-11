@@ -11,7 +11,6 @@ import { continuedDays, describeLatestEvent, formatCompactRelative } from '@/com
 import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
 
 /** Days carried before the provenance turns amber — matches the manager's drawer. */
-const AGING_DAYS = 3;
 
 export function isLinkedItem(item: TrackerWorkItem): boolean {
   return !item.canonicalTask && Boolean(item.managerDeskItemId);
@@ -189,6 +188,14 @@ export function TaskTitle({
  * One quiet line of context: Jira, related issues, delegation, how long it
  * has been carried, and the latest word on it.
  */
+
+/** Whole days an open item has been carried onto `viewDate` (0 when it is planned for that day or later). */
+export function carriedDays(item: TrackerWorkItem, viewDate?: string): number {
+  if (!viewDate || !item.originDate || item.originDate === viewDate) return 0;
+  if (item.scheduledOn && item.scheduledOn > viewDate) return 0;
+  return continuedDays(item.originDate, viewDate);
+}
+
 export function TaskMeta({
   item,
   viewDate,
@@ -211,7 +218,7 @@ export function TaskMeta({
   // docs/56 UX-29: work planned for a later day says so; it is not "continued" from anywhere.
   const plannedLater = Boolean(viewDate && item.scheduledOn && item.scheduledOn > viewDate);
   const isContinued = !plannedLater && Boolean(viewDate && item.originDate && item.originDate !== viewDate);
-  const carried = isContinued && viewDate ? continuedDays(item.originDate, viewDate) : 0;
+  const carried = carriedDays(item, viewDate);
   const latest = item.latestEvent && !closed ? describeLatestEvent(item.latestEvent) : null;
 
   if (item.jiraKey) {
@@ -273,9 +280,9 @@ export function TaskMeta({
     );
   }
   if (isContinued && !closed && !hideContinued) {
-    const aging = carried >= AGING_DAYS;
+    // docs/56 MDA-04: neutral on every row; old carry-overs get one nudge above the list instead.
     meta.push(
-      <span key="continued" style={{ color: aging ? 'var(--warning)' : undefined }} title={`Carried forward since ${formatDate(item.originDate)}`}>
+      <span key="continued" title={`Carried forward since ${formatDate(item.originDate)}`}>
         Continued from {formatDate(item.originDate)}
         {carried > 0 && <span className="tabular-nums"> · {carried}d</span>}
       </span>

@@ -25,6 +25,7 @@ import { PlannedQueue } from './PlannedQueue';
 import { AddTaskForm } from './AddTaskForm';
 import { FinishedWork } from './FinishedWork';
 import { RecentActivity } from './RecentActivity';
+import { CarryOverNudge } from './CarryOverNudge';
 import { HAIRLINE, Kbd, MyDaySection, pageVariants, sectionVariants, surfaceStyle } from './MyDayUI';
 import { FOCUS_RING } from '@/components/ui/focus';
 import { MyDayTaskDetailContext, type MyDayTaskDetailActions } from './MyDayTaskDetailContext';
@@ -209,6 +210,10 @@ export function MyDayPage() {
   }
 
   const isToday = date === getLocalIsoDate();
+  const jumpToCheckIn = () => {
+    document.getElementById('my-day-check-in')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!isReadOnly) window.setTimeout(() => quickUpdateRef.current?.focus({ preventScroll: true }), 350);
+  };
   const plannedItems = day?.plannedItems ?? [];
   const completedItems = day?.completedItems ?? [];
   const droppedItems = day?.droppedItems ?? [];
@@ -237,10 +242,7 @@ export function MyDayPage() {
             onRefresh={handleRefresh}
             onToggleTheme={toggleTheme}
             onLogout={logout}
-            onJumpToCheckIn={() => {
-              document.getElementById('my-day-check-in')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              if (!isReadOnly) window.setTimeout(() => quickUpdateRef.current?.focus({ preventScroll: true }), 350);
-            }}
+            onJumpToCheckIn={jumpToCheckIn}
           />
 
           <motion.div
@@ -257,6 +259,15 @@ export function MyDayPage() {
                   {day && <MyDayInactiveBanner availability={day.availability} />}
                   {!isInactive && <MyDayReadOnlyBanner reason={readOnlyReason} onToday={goToday} />}
                 </motion.div>
+              )}
+
+              {!isReadOnly && (
+                <CarryOverNudge
+                  key={date}
+                  viewDate={date}
+                  items={[...(day?.currentItem ? [day.currentItem] : []), ...plannedItems]}
+                  onCheckIn={jumpToCheckIn}
+                />
               )}
 
               <MyDaySection id="now" icon={<Target size={14} />} title="Now" readOnly={isReadOnly}>

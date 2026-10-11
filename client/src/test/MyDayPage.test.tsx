@@ -24,7 +24,8 @@ function createItem(overrides: Partial<TrackerWorkItem>): TrackerWorkItem {
   return {
     id: 1,
     dayId: 10,
-    originDate: '2026-03-10',
+    // Planned for the day on screen; carry-over tests set an older origin.
+    originDate: getLocalIsoDate(),
     itemType: 'custom',
     title: 'Task title',
     state: 'planned',
@@ -404,6 +405,31 @@ describe('MyDayPage', () => {
       }),
       expect.anything()
     );
+  });
+
+  it('asks once about work carried for a week or more, and remembers a dismissal (MDA-04)', () => {
+    window.localStorage.clear();
+    const today = getLocalIsoDate();
+    mockDay.currentItem = createItem({ id: 101, taskKey: 'T-1', title: 'Validate the prod', state: 'in_progress', originDate: shiftLocalIsoDate(today, -13) });
+    mockDay.plannedItems = [
+      createItem({ id: 102, taskKey: 'T-2', title: 'Working in shop', originDate: shiftLocalIsoDate(today, -14) }),
+      createItem({ id: 103, taskKey: 'T-3', title: 'Fresh carry', originDate: shiftLocalIsoDate(today, -2) }),
+    ];
+    const { unmount } = render(<MyDayPage />, { wrapper: TestWrapper });
+    const nudge = screen.getByRole('region', { name: 'Carried-over work' });
+    expect(within(nudge).getByText('2 tasks carried over for a week or more')).toBeInTheDocument();
+    expect(within(nudge).getByRole('button', { name: /T-2 Working in shop 14d/ })).toBeInTheDocument();
+    expect(within(nudge).queryByText('Fresh carry')).not.toBeInTheDocument();
+    // Rows stay neutral: the day count is plain text, not a warning.
+    expect(screen.getAllByText(/Continued from/)[0]!.getAttribute('style') ?? '').not.toMatch(/warning/);
+    fireEvent.click(within(nudge).getByRole('button', { name: /T-1 Validate the prod/ }));
+    expect(screen.getByRole('dialog', { name: 'Task T-1' })).toBeInTheDocument();
+    // The motion mock remounts sections on re-render, so look the region up again.
+    fireEvent.click(within(screen.getByRole('region', { name: 'Carried-over work' })).getByRole('button', { name: 'Dismiss for today' }));
+    expect(screen.queryByRole('region', { name: 'Carried-over work' })).not.toBeInTheDocument();
+    unmount();
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.queryByRole('region', { name: 'Carried-over work' })).not.toBeInTheDocument();
   });
 
   it('renders continued-from context for inherited live work', () => {

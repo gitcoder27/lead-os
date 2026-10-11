@@ -10,6 +10,8 @@ export interface DateDisplay {
   /** Secondary context, e.g. "3d ago" — rendered muted next to the label. */
   hint?: string;
   tone: DateTone;
+  /** Tone for the hint when it should not share the label's. */
+  hintTone?: DateTone;
 }
 
 function safeParse(value: string): Date | null {
@@ -39,6 +41,17 @@ export function describePlanDate(value: string | null, status: TaskStatus, today
   // docs/51 D1: a slipped plan date is amber at any age — red is reserved for missed `dueAt` deadlines.
   if (diff < 0) return { label: dayName(date, now), hint: `${-diff}d ago`, tone: 'warning' };
   return { label: dayName(date, now), tone: 'default' };
+}
+
+/**
+ * docs/56 MDA-04: an owner's open work from an earlier day is on their list
+ * today (My Day carries it), so the drawer agrees with the page instead of
+ * flagging a slipped date the developer cannot see anywhere else.
+ */
+export function describeOwnPlanDate(value: string | null, status: TaskStatus, today = getLocalIsoDate()): DateDisplay | null {
+  const display = describePlanDate(value, status, today);
+  if (!display || display.tone !== 'warning') return display;
+  return { label: 'Today', hint: `carried from ${display.label}`, tone: 'accent', hintTone: 'muted' };
 }
 
 /**

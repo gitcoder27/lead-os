@@ -44,6 +44,7 @@ import {
 import {
   describeDueDate,
   describeMoment,
+  describeOwnPlanDate,
   describePlanDate,
   describeWaiting,
   followUpPresets,
@@ -64,6 +65,8 @@ export interface TaskPeople {
   userId: string | undefined;
   /** Name used for "You" avatars. */
   userName: string;
+  /** Developers only know their lead by role: their roster has no manager names. */
+  viewer?: TaskDetailMode;
 }
 
 export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
@@ -83,8 +86,9 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
       nameFor: (id) => (!id ? undefined : isSelf(id) ? 'You' : byId.get(id)),
       userId,
       userName,
+      viewer: mode,
     };
-  }, [list, userId, userName, isSelf]);
+  }, [list, userId, userName, isSelf, mode]);
 }
 
 // ── Status ──────────────────────────────────────────────────────────
@@ -195,7 +199,7 @@ export function TaskProperties({ task, mode, readOnly, onPatch, people }: TaskPr
           </PropertyRow>
         </>
       )}
-      <ScheduleRow task={task} editable={editable} canLater={manager && !isMeeting} onPatch={onPatch} />
+      <ScheduleRow task={task} editable={editable} canLater={manager && !isMeeting} ownDay={!manager} onPatch={onPatch} />
       {manager && !isMeeting && (
         <MomentRow
           label="Follow-up"
@@ -350,7 +354,7 @@ const SCHEDULE_PRESETS: { preset: Exclude<SchedulePreset, 'later' | 'clear'>; la
   { preset: 'next-week', label: 'Next week', key: 'w', Icon: CalendarDays },
 ];
 
-function ScheduleRow({ task, editable, canLater, onPatch }: { task: TaskDetailResponse; editable: boolean; canLater: boolean; onPatch: Patch }) {
+function ScheduleRow({ task, editable, canLater, ownDay = false, onPatch }: { task: TaskDetailResponse; editable: boolean; canLater: boolean; ownDay?: boolean; onPatch: Patch }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const later = canLater && 'later' in task ? task.later : false;
   const today = getLocalIsoDate();
@@ -383,7 +387,7 @@ function ScheduleRow({ task, editable, canLater, onPatch }: { task: TaskDetailRe
     });
   }
 
-  const display = later ? null : describePlanDate(task.scheduledOn, task.status, today);
+  const display = later ? null : (ownDay ? describeOwnPlanDate : describePlanDate)(task.scheduledOn, task.status, today);
   const text = later ? 'Later' : display?.label ?? 'Not scheduled';
 
   return (
@@ -849,7 +853,8 @@ export function MeetingOutcome({ task, editable, onPatch }: { task: TaskDetailRe
 // ── Metadata ────────────────────────────────────────────────────────
 
 export function taskMetaEntries(task: TaskDetailResponse, people: TaskPeople): [string, string][] {
-  const creator = task.createdById ? people.nameFor(task.createdById) : undefined;
+  const creator = (task.createdById ? people.nameFor(task.createdById) : undefined)
+    ?? (people.viewer === 'developer' && task.createdByType === 'manager' ? 'Your lead' : undefined);
   const createdBy = creator ?? `${task.createdByType.charAt(0).toUpperCase()}${task.createdByType.slice(1)}${task.createdById && task.createdByType !== 'manager' ? ` (${task.createdById})` : ''}`;
   const entries: [string, string][] = [
     ['Created by', createdBy],

@@ -20,11 +20,14 @@ import {
  * docs/57 §3 (P3-05): `@person`, `#JIRA-KEY` and `+label` typeahead for any
  * text input that feeds the capture grammar. Owns the roster lookups, the
  * highlighted row and dismissal; the input owns the text and caret.
+ * `enabled: false` skips the roster, contact and label requests (manager-only
+ * endpoints) for a caller that renders no input, e.g. a developer's drawer.
  */
-export function useCaptureTypeahead(text: string, caret: number) {
-  const developers = useDevelopers();
-  const contacts = useContacts();
-  const labelRegistry = useTaskLabels();
+export function useCaptureTypeahead(text: string, caret: number, options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true;
+  const developers = useDevelopers(undefined, { enabled });
+  const contacts = useContacts({ enabled });
+  const labelRegistry = useTaskLabels({ enabled });
   const [activeIndex, setActiveIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   // docs/56 UX-05: alias (lower case) → person id for every `@` picked here. The text shows the
@@ -46,7 +49,7 @@ export function useCaptureTypeahead(text: string, caret: number) {
 
   const fragment = useMemo<TokenFragment | null>(() => tokenFragmentAt(text, caret), [text, caret]);
   const issueQuery = fragment?.trigger === '#' ? fragment.fragment : '';
-  const issues = useGlobalSearch(issueQuery, { enabled: fragment?.trigger === '#' });
+  const issues = useGlobalSearch(issueQuery, { enabled: enabled && fragment?.trigger === '#' });
 
   const suggestions = useMemo<TokenSuggestion[]>(() => {
     if (!fragment || dismissed) return [];

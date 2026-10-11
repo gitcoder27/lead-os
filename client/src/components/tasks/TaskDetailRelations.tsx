@@ -327,11 +327,12 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
   const [draft, setDraft] = useState('');
   const [caret, setCaret] = useState(0);
   const draftRef = useRef<HTMLInputElement>(null);
-  const typeahead = useCaptureTypeahead(draft, caret);
+  const canAdd = mode === 'manager' && !readOnly;
+  // The add input is the only consumer; developers would get 403s from its lookups.
+  const typeahead = useCaptureTypeahead(draft, caret, { enabled: canAdd });
   useEffect(() => { setPlacement(undefined); setShowPlacement(false); setDraft(''); setCaret(0); }, [task.taskKey]);
   const attempt = useCaptureAttempt({ text: typeahead.toWire(draft.trim()), defaults: { parentKey: task.taskKey, ...(placement !== undefined && { placement }) } });
   const isMeeting = task.kind === 'meeting';
-  const canAdd = mode === 'manager' && !readOnly;
   const done = task.children.filter((child) => child.status === 'done').length;
 
   if (!task.children.length && !canAdd) return null;

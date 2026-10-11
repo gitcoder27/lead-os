@@ -44,13 +44,15 @@ interface CaptureBoxProps {
 }
 
 /** docs/57 §3 (P3-05): Cmd/Ctrl+Enter captures and keeps the box open for the next one. */
-const KEEP_OPEN_HINT = `${formatShortcutKeys('⌘Enter')} captures and keeps this open`;
+// docs/73 UXD-15: one line — the action keeps the button's name.
+const KEEP_OPEN_HINT = `${formatShortcutKeys('⌘Enter')} adds another`;
 
 function DiagnosticRow({ diagnostic }: { diagnostic: CaptureDiagnostic }) {
   return (
     <div
       className="flex items-start gap-1.5 text-ui leading-snug"
-      style={{ color: diagnostic.severity === 'error' ? 'var(--danger)' : 'var(--warning)' }}
+      // docs/73 UXD-15: a token kept as text is a note, not a problem — muted, not amber.
+      style={{ color: diagnostic.severity === 'error' ? 'var(--danger)' : diagnostic.code === 'unparsed-token' ? 'var(--text-muted)' : 'var(--warning-text)' }}
     >
       <span className="mt-px shrink-0">{diagnostic.severity === 'error' ? '●' : '◐'}</span>
       <span>{diagnostic.message}</span>
@@ -446,7 +448,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
-        <span className="min-w-0 text-ui" style={{ color: 'var(--text-muted)' }}>
+        <span className="min-w-0 truncate text-ui" style={{ color: 'var(--text-muted)' }}>
           {resolved?.intent === 'update' ? 'Logs a shared update on the task' : resolved?.intent === 'note' ? 'Appends to today\u2019s daily note' : 'Creates a task'}
           <span className="hidden sm:inline" data-testid="capture-keep-open-hint"> · {KEEP_OPEN_HINT}</span>
         </span>

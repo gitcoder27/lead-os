@@ -611,6 +611,15 @@ describe('CaptureBox (P3-D8)', () => {
   });
 });
 
+describe('capture copy (docs/73 UXD-15)', () => {
+  it('says calmly that a #word is not a Jira key, in muted text, and keeps the footer to one line', () => {
+    renderBox('Plan the cutover #atlas');
+    const note = screen.getByText('"#atlas" is not a Jira key — kept as text');
+    expect(note.parentElement?.getAttribute('style')).toContain('var(--text-muted)');
+    expect(screen.getByTestId('capture-keep-open-hint').textContent).toMatch(/adds another$/);
+  });
+});
+
 describe('progressive capture guidance', () => {
   it('keeps plain-title capture obvious and preserves a draft while examples are opened', () => {
     render(<CaptureBox onClose={vi.fn()} />, { wrapper: TestWrapper });

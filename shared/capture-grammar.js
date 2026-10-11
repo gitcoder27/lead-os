@@ -248,7 +248,8 @@ function parseCapture(text, today) {
         }
         else if (/^[\^+#]/.test(word.raw)) {
             // Looks like a token but doesn't parse — keep it as title text.
-            pushDiagnostic(diagnostics, "warning", "unparsed-token", `"${word.raw}" isn't recognized — kept as text`, undefined);
+            // docs/73 UXD-15: "#atlas" is most often a project or a word, not a typo — say what happened, calmly.
+            pushDiagnostic(diagnostics, "warning", "unparsed-token", word.raw.startsWith("#") ? `"${word.raw}" is not a Jira key — kept as text` : `"${word.raw}" isn't recognized — kept as text`, undefined);
         }
         if (token)
             consume(word, token);

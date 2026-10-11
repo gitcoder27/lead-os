@@ -86,7 +86,8 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions, leading 
         </div>
 
         {/* docs/56 UX-31: five defect tiles that wrap, never truncate; Today's own metrics live on Today. */}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {/* docs/73 UXD-20: one line of tiles — wrapping from sm, a scrolling chip row on phones. */}
+        <div className="-mx-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {defectSignals.map((signal) => {
             const Icon = signal.icon;
             const active = activeFilter === signal.filter;
@@ -95,7 +96,8 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions, leading 
                 key={signal.id}
                 type="button"
                 onClick={() => onFilterChange(signal.filter)}
-                className="group flex h-10 shrink-0 items-center justify-between gap-3 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] active:scale-[0.99]"
+                aria-pressed={active}
+                className="group flex h-9 shrink-0 items-center justify-between gap-2.5 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] active:scale-[0.99]"
                 style={{
                   borderColor: active ? `color-mix(in srgb, ${signal.color} 42%, var(--border))` : 'var(--border)',
                   background: active ? `color-mix(in srgb, ${signal.color} 10%, var(--bg-primary))` : 'color-mix(in srgb, var(--bg-primary) 66%, transparent)',
@@ -103,12 +105,9 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions, leading 
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <Icon size={13} className="shrink-0" style={{ color: active || signal.value > 0 ? signal.color : 'var(--text-muted)' }} />
-                  <span className="min-w-0">
-                    <span className="block whitespace-nowrap text-ui font-semibold" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{signal.label}</span>
-                    <span className="block whitespace-nowrap text-meta" style={{ color: 'var(--text-muted)' }}>{signal.detail}</span>
-                  </span>
+                  <span className="whitespace-nowrap text-ui font-semibold" style={{ color: active ? 'var(--text-primary)' : 'var(--text-secondary)' }} title={signal.detail}>{signal.label}</span>
                 </span>
-                <span className="font-mono text-title-sm font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? toneText(signal.color) : 'var(--text-muted)' }}>
+                <span className="text-body font-semibold tabular-nums" style={{ color: active || signal.value > 0 ? toneText(signal.color) : 'var(--text-muted)' }}>
                   {signal.value}
                 </span>
               </button>

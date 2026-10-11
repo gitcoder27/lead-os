@@ -244,7 +244,17 @@ describe('FilterSidebar', () => {
       </TestWrapper>
     );
     for (const label of ['Filters', 'Tags', 'People']) expect(screen.getByText(label)).toBeInTheDocument();
-    expect(screen.getByTitle('Active filters')).toBeInTheDocument();
+    // docs/73 UXD-20: no "0 Focus" — the count appears only once a filter applies.
+    expect(screen.queryByTitle('Active filters')).toBeNull();
+  });
+
+  it('counts applied filters on the collapsed rail (UXD-20)', () => {
+    render(
+      <TestWrapper>
+        <FilterSidebar {...defaultProps} collapsed activeFilter="overdue" noTagsFilter />
+      </TestWrapper>
+    );
+    expect(screen.getByTitle('Active filters')).toHaveTextContent('2filters');
   });
 
   it('expands only the tags section when the tags rail button is clicked', () => {

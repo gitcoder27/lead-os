@@ -419,21 +419,18 @@ export function FilterSidebar({
               <span className="filter-rail-label">People</span>
             </div>
 
-            <div className="flex flex-col items-center gap-2">
-              <div
-                title="Active filters"
-                className="min-w-[40px] rounded-full px-2 py-1 text-center text-ui font-mono"
-                style={{
-                  background: activeSelectionCount > 0 ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
-                  color: activeSelectionCount > 0 ? 'var(--accent)' : 'var(--text-muted)',
-                }}
-              >
-                {activeSelectionCount}
+            {/* docs/73 UXD-20: the count shows only when filters apply — no "0 Focus". */}
+            {activeSelectionCount > 0 && (
+              <div className="flex flex-col items-center gap-1" title="Active filters">
+                <div
+                  className="min-w-[32px] rounded-full px-2 py-0.5 text-center text-ui font-semibold tabular-nums"
+                  style={{ background: 'var(--accent-glow)', color: 'var(--accent-text)' }}
+                >
+                  {activeSelectionCount}
+                </div>
+                <span className="filter-rail-label">{activeSelectionCount === 1 ? 'filter' : 'filters'}</span>
               </div>
-              <div className="ui-label">
-                Focus
-              </div>
-            </div>
+            )}
         </div>
       ) : (
         renderExpandedPanel(false)

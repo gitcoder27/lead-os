@@ -99,7 +99,7 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       aria-label={`Filter by ${dev.developer.displayName}`}
                       title={workloadChipTitle(dev)}
                       aria-pressed={isActive}
-                      className="flex items-center gap-1.5 shrink-0 rounded-full border px-2 py-1 transition-colors"
+                      className="flex items-center gap-1 shrink-0 rounded-full border px-2.5 py-1 transition-colors"
                       style={{
                         borderColor: isActive ? 'var(--accent)' : hasMismatch ? 'rgba(245,158,11,0.4)' : 'var(--border)',
                         background: isActive
@@ -108,31 +108,16 @@ export function WorkloadBar({ activeDeveloper, onDeveloperClick }: WorkloadBarPr
                       }}
                     >
                       <span
-                        className="flex h-5 w-5 items-center justify-center rounded-full text-meta font-semibold"
-                        style={{
-                          color: isActive ? 'var(--accent)' : color,
-                          background: isActive ? 'rgba(255,255,255,0.55)' : `${color}18`,
-                        }}
-                      >
-                        {dev.developer.displayName
-                          .split(' ')
-                          .filter(Boolean)
-                          .slice(0, 1)
-                          .map((part) => part[0]?.toUpperCase() ?? '')
-                          .join('')}
-                      </span>
-                      <span
                         className="text-ui truncate"
                         style={{ color: isActive ? 'var(--accent)' : isIdle ? 'var(--text-muted)' : 'var(--text-secondary)', maxWidth: 76 }}
                       >
                         {dev.developer.displayName.split(' ')[0]}
                       </span>
+                      <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>·</span>
                       <span className="text-ui font-semibold tabular-nums" style={{ color: isActive ? 'var(--accent)' : color }}>
                         {loadLabel} {dev.assignedTodayCount !== undefined ? 'today' : 'open'}
                       </span>
-                      <span className="text-ui tabular-nums" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
-                        {` · load ${dev.score}`}
-                      </span>
+                      {/* docs/73 UXD-20: "Aisha · 1 today" — the raw load score lives in the chip's tooltip. */}
                       {hasMismatch && !isActive && (
                         <Zap size={10} style={{ color: 'var(--warning)' }} />
                       )}

@@ -22,11 +22,11 @@ describe('WorkFocusStrip', () => {
     renderStrip();
     const tiles = screen.getAllByRole('button');
     expect(tiles.map((tile) => tile.textContent?.replace(/\d+$/, ''))).toEqual([
-      'All defectsactive',
-      'New to team24h',
-      'Due todaydefects',
-      'Overduelate',
-      'In progressmoving',
+      'All defects',
+      'New to team',
+      'Due today',
+      'Overdue',
+      'In progress',
     ]);
     expect(screen.getByRole('button', { name: /All defects/ })).toHaveTextContent('12');
     for (const name of [/Attention/, /Follow-ups/, /Stale/, /Sync/]) {
@@ -34,10 +34,11 @@ describe('WorkFocusStrip', () => {
     }
   });
 
+  // docs/73 UXD-20: one scrolling row on phones, wrapping from sm up; the detail moved to the title.
   it('tiles wrap and never truncate their labels', () => {
     renderStrip();
     const tile = screen.getByRole('button', { name: /New to team/ });
-    expect(tile.parentElement).toHaveClass('flex-wrap');
+    expect(tile.parentElement).toHaveClass('sm:flex-wrap');
     expect(tile.innerHTML).not.toContain('truncate');
   });
 

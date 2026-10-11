@@ -57,7 +57,9 @@ describe('WorkloadBar', () => {
       </TestWrapper>
     );
     const alice = screen.getByRole('button', { name: 'Filter by Alice' });
-    expect(alice.textContent).toContain('2 today · load 9');
+    expect(alice.textContent).toContain('2 today');
+    // docs/73 UXD-20: the score is only in the tooltip.
+    expect(alice.textContent).not.toContain('load 9');
     expect(alice.textContent).not.toMatch(/S9/);
     expect(alice).toHaveAttribute('title', expect.stringContaining('2 items on today'));
     expect(alice.getAttribute('title')).toContain('4 active Jira defects');
@@ -86,7 +88,7 @@ describe('WorkloadBar', () => {
 
     // UX-20: spelled out, not "2" and "S9".
     expect(screen.getByText('2 today')).toBeInTheDocument();
-    expect(screen.getByText('· load 9')).toBeInTheDocument();
+    expect(screen.queryByText('· load 9')).toBeNull();
   });
 
   it('applies a developer filter when a collapsed pill is clicked', () => {

@@ -1,27 +1,27 @@
-const ASPEN_SEVERITY_COLORS: Record<string, string> = {
-  '1 - Critical': 'var(--danger)',
-  '2 - Major': '#EC4899',
-  '3 - Minor': 'var(--warning)',
-  '4 - Low': 'var(--accent)',
+/**
+ * docs/73 UXD-20: severity as words — "Sev 1" … "Sev 4" — instead of a glowing colour dot.
+ * Sev 1 reads in the danger tone; the rest are quiet chips (no amber, §5.12).
+ */
+const SEVERITY: Record<string, { label: string; tone?: string }> = {
+  '1 - Critical': { label: 'Sev 1', tone: 'var(--danger)' },
+  '2 - Major': { label: 'Sev 2' },
+  '3 - Minor': { label: 'Sev 3' },
+  '4 - Low': { label: 'Sev 4' },
 };
 
 export function PriorityCell({ severity }: { severity?: string }) {
-  const color = severity ? (ASPEN_SEVERITY_COLORS[severity] ?? 'var(--text-muted)') : 'var(--text-muted)';
-  const title = severity ?? 'ASPEN Severity not set';
+  const meta = severity ? SEVERITY[severity] : undefined;
+  if (!meta) {
+    return <span className="text-ui" style={{ color: 'var(--text-muted)' }} title={severity ?? 'Severity not set'}>—</span>;
+  }
   return (
     <span
-      className="inline-block w-3 h-3 rounded-full transition-all duration-150 hover:scale-125 cursor-pointer"
-      style={{
-        background: color,
-        boxShadow: `0 0 0 1px var(--bg-secondary), 0 0 8px ${color}`,
-      }}
-      onMouseEnter={(e) => {
-        (e.target as HTMLElement).style.boxShadow = `0 0 0 1px var(--bg-secondary), 0 0 12px ${color}`;
-      }}
-      onMouseLeave={(e) => {
-        (e.target as HTMLElement).style.boxShadow = `0 0 0 1px var(--bg-secondary), 0 0 8px ${color}`;
-      }}
-      title={title}
-    />
+      className="ui-chip whitespace-nowrap tabular-nums"
+      data-quiet={meta.tone ? undefined : 'true'}
+      style={meta.tone ? ({ '--tone': meta.tone } as React.CSSProperties) : undefined}
+      title={severity}
+    >
+      {meta.label}
+    </span>
   );
 }

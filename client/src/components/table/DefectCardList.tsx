@@ -3,6 +3,7 @@ import type { Virtualizer } from '@tanstack/react-virtual';
 import { format, parseISO } from 'date-fns';
 import type { Issue } from '@/types';
 import { isDueToday, isOverdue } from '@/lib/utils';
+import { statusLabel } from './StatusBadge';
 
 /**
  * docs/56 UX-25: Work on a phone — one card per defect (title, assignee, due date, status) instead
@@ -41,7 +42,7 @@ export function DefectCardList({ issues, selectedKey, onSelectIssue, virtualRows
               data-testid="defect-card"
             >
               <span className="block text-body font-medium leading-5" style={{ color: 'var(--text-primary)' }}>
-                <span className="mr-1.5 font-mono text-ui" style={{ color: 'var(--accent-text)' }}>{issue.jiraKey}</span>
+                <span className="mr-1.5 font-mono text-ui" style={{ color: 'var(--text-muted)' }}>{issue.jiraKey}</span>
                 {issue.summary}
               </span>
               <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ui" style={{ color: 'var(--text-secondary)' }}>
@@ -49,7 +50,7 @@ export function DefectCardList({ issues, selectedKey, onSelectIssue, virtualRows
                 <span aria-hidden="true">·</span>
                 <span style={{ color: overdue ? 'var(--task-danger-text)' : today ? 'var(--warning-text)' : undefined }}>{dueLabel}</span>
                 <span aria-hidden="true">·</span>
-                <span>{issue.statusName}</span>
+                <span>{statusLabel(issue.statusName)}</span>
               </span>
             </button>
           </li>

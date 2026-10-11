@@ -153,10 +153,15 @@ function useDefectTableModel({
     });
   }, [baseIssues, excludedStatuses, normalizedSearch]);
 
+  // docs/73 UXD-20: a display-only column no visible row uses (nothing linked) is not drawn.
+  // Tags stays — it holds the per-row add control (UX-31) — but narrows while no row has tags.
+  const columnVisibility = useMemo(() => ({
+    linked: filteredIssues.some((issue) => hasAnalysisNotes(issue) || getTrackerAssignmentCount(issue) > 0),
+  }), [filteredIssues]);
   const table = useReactTable({
     data: filteredIssues,
     columns,
-    state: { sorting },
+    state: { sorting, columnVisibility },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -210,6 +215,7 @@ export function DefectTable({
   const isPhone = useMediaQuery('(max-width: 640px)');
   const { theme } = useTheme();
   const { data: issues, isLoading, isError, error, refetch, isFetching } = useIssues(filter, assigneeFilter, tagId, noTags);
+  const anyTags = useMemo(() => (issues ?? []).some((issue) => (issue.localTags?.length ?? 0) > 0), [issues]);
   const { data: config } = useConfig();
   const { data: syncStatus } = useSyncStatus();
   const { openCapture } = useQuickActions();
@@ -479,7 +485,7 @@ export function DefectTable({
         ? [
             columnHelper.display({
               id: 'dismiss',
-              header: '',
+              header: () => <span className="sr-only">Dismiss</span>,
               cell: (info) => {
                 const issue = info.row.original;
                 return (
@@ -587,7 +593,7 @@ export function DefectTable({
             />
           );
         },
-        size: 250,
+        size: anyTags ? 250 : 64,
         enableSorting: false,
       }),
       columnHelper.accessor('assigneeName', {
@@ -611,7 +617,7 @@ export function DefectTable({
               className="block min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
               aria-label={`Edit assignee for ${issue.jiraKey}`}
             >
-              <AssigneeCell name={info.getValue() ?? undefined} />
+              <AssigneeCell name={info.getValue() ?? undefined} accountId={issue.assigneeId ?? undefined} />
             </button>
           );
         },
@@ -759,13 +765,14 @@ export function DefectTable({
       }),
       columnHelper.display({
         id: 'more',
-        header: '',
+        // docs/73 UXD-20: icon-only columns still have a header for screen readers (axe empty-table-header).
+        header: () => <span className="sr-only">Actions</span>,
         size: 44,
         enableSorting: false,
         cell: ({ row }) => <WorkIssueMenu issue={row.original} />,
       }),
       columnHelper.accessor('flagged', {
-        header: '',
+        header: () => <span className="sr-only">Flagged</span>,
         cell: (info) =>
           info.getValue() ? (
             <Ban size={14} className="animate-pulse-blocked" style={{ color: 'var(--danger)' }} />
@@ -775,6 +782,7 @@ export function DefectTable({
       }),
     ],
     [
+      anyTags,
       selectionMode,
       toggleSelected,
       editingCell,

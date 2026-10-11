@@ -391,7 +391,7 @@ describe('DefectTable', () => {
       const first = cards.find((card) => card.textContent?.includes('PROJ-101'))!;
       expect(first).toHaveTextContent('Login page crashes on submit');
       expect(first).toHaveTextContent('Alice');
-      expect(first).toHaveTextContent('To Do');
+      expect(first).toHaveTextContent('To do') // docs/73 UXD-20: sentence case, as in the table;
       fireEvent.click(first);
       expect(onSelectIssue).toHaveBeenCalledWith('PROJ-101');
     } finally {
@@ -903,7 +903,7 @@ describe('DefectTable', () => {
         </TestWrapper>
       );
 
-      fireEvent.click(screen.getByText('Mar 7'));
+      fireEvent.click(screen.getByText('Sat 7 Mar'));
 
       expect(screen.getByDisplayValue('2026-03-07')).toBeInTheDocument();
       expect(showPicker).not.toHaveBeenCalled();
@@ -920,7 +920,7 @@ describe('DefectTable', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByText('Mar 7'));
+    fireEvent.click(screen.getByText('Sat 7 Mar'));
 
     expect(screen.getByDisplayValue('2026-03-07')).toBeInTheDocument();
   });
@@ -932,7 +932,7 @@ describe('DefectTable', () => {
       </TestWrapper>
     );
 
-    fireEvent.click(screen.getByText('Mar 7'));
+    fireEvent.click(screen.getByText('Sat 7 Mar'));
     const editor =screen.getByDisplayValue('2026-03-07');
     fireEvent.change(editor, { target: { value: '2026-03-10' } });
     expect(mockUpdateIssueMutate).not.toHaveBeenCalled();

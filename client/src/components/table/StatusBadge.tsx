@@ -1,19 +1,25 @@
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  'To Do': { bg: 'rgba(139,92,246,0.15)', text: '#A78BFA' },
-  'In Progress': { bg: 'rgba(16,185,129,0.15)', text: '#34D399' },
-  Done: { bg: 'rgba(75,85,99,0.15)', text: '#9CA3AF' },
-  Blocked: { bg: 'rgba(239,68,68,0.15)', text: '#F87171' },
+/**
+ * docs/73 UXD-20: status as a dot and a sentence-case label ("To do"), not a tinted pill —
+ * the dot carries the state, the words stay quiet.
+ */
+const STATUS_DOTS: Record<string, string> = {
+  'to do': 'var(--text-muted)',
+  'in progress': 'var(--accent)',
+  done: 'var(--success)',
+  blocked: 'var(--danger)',
 };
 
-export function StatusBadge({ status }: { status: string }) {
-  const colors = STATUS_COLORS[status] ?? { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' };
+export function statusLabel(status: string): string {
+  const lower = status.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
 
+export function StatusBadge({ status }: { status: string }) {
+  const dot = STATUS_DOTS[status.toLowerCase()] ?? 'var(--text-disabled)';
   return (
-    <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-ui font-medium whitespace-nowrap"
-      style={{ background: colors.bg, color: colors.text }}
-    >
-      {status}
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-ui" style={{ color: 'var(--text-secondary)' }} title={status}>
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dot }} />
+      {statusLabel(status)}
     </span>
   );
 }

@@ -126,6 +126,7 @@ export function MyDayPage() {
   // then scroll to and highlight its row. Unknown/non-owned keys 404.
   const taskResolution = useTaskResolution(deepLinkTaskKey, { role: 'developer' });
   const deepLinkHandledRef = useRef(false);
+  const deepLinkJumpedRef = useRef(false);
   useEffect(() => {
     if (deepLinkHandledRef.current) {
       return;
@@ -148,21 +149,25 @@ export function MyDayPage() {
       navigateToTaskPage(resolution.taskKey);
       return;
     }
-    if (resolution.date && resolution.date !== date) {
+    // Wait for the day in view to load (not the previous day's data still on screen).
+    if (!day || day.date !== date) {
+      return;
+    }
+    // Carried work is listed today, not on the date it was first planned, so
+    // look on the day in view before jumping to the task's own date.
+    const row = document.querySelector(`[data-task-key="${resolution.taskKey}"]`);
+    if (!row && resolution.date && resolution.date !== date && !deepLinkJumpedRef.current) {
+      deepLinkJumpedRef.current = true;
       setDate(resolution.date);
       return;
     }
-    if (!day) {
-      return;
-    }
-    const row = document.querySelector(`[data-task-key="${resolution.taskKey}"]`);
-    if (!row) {
-      return;
-    }
     deepLinkHandledRef.current = true;
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    row.classList.add('task-row-deep-link');
-    window.setTimeout(() => row.classList.remove('task-row-deep-link'), 2400);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('task-row-deep-link');
+      window.setTimeout(() => row.classList.remove('task-row-deep-link'), 2400);
+    }
+    // The drawer opens either way: a missing row never strands the link.
     openTask(resolution.taskKey);
   }, [taskResolution.data, taskResolution.isError, day, date, addToast, openTask]);
 

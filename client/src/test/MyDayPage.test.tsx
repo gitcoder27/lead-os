@@ -19,6 +19,7 @@ const mockAddCheckInMutate = vi.fn();
 const mockAddMyDayTaskEventMutate = vi.fn();
 
 let mockDay: MyDayResponse;
+let mockResolution: { data: unknown; isError: boolean; isLoading: boolean } = { data: undefined, isError: false, isLoading: false };
 
 function createItem(overrides: Partial<TrackerWorkItem>): TrackerWorkItem {
   return {
@@ -78,7 +79,7 @@ vi.mock('@/hooks/useMyDay', () => ({
 }));
 
 vi.mock('@/hooks/useTasks', () => ({
-  useTaskResolution: () => ({ data: undefined, isError: false, isLoading: false }),
+  useTaskResolution: () => mockResolution,
   useAddMyDayTaskEvent: () => ({ mutate: mockAddMyDayTaskEventMutate, mutateAsync: async (body: unknown) => mockAddMyDayTaskEventMutate(body, {}), isPending: false }),
   useAddTaskEvent: () => ({ mutate: vi.fn(), isPending: false }),
   useMyDayTaskEvents: () => ({ data: { pages: [{ events: [{ id: 1, taskKey: 'T-1', type: 'update', body: 'Earlier shared progress', visibility: 'shared', author: { type: 'developer', id: 'dev-1' }, occurredAt: new Date().toISOString(), approximateTime: false }], nextCursor: null }] } }),
@@ -209,6 +210,7 @@ vi.mock('framer-motion', async () => {
 describe('MyDayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolution = { data: undefined, isError: false, isLoading: false };
     mockDay = {
       date: '2026-03-10',
       viewMode: 'live',
@@ -449,6 +451,19 @@ describe('MyDayPage', () => {
     unmount();
     render(<MyDayPage />, { wrapper: TestWrapper });
     expect(screen.queryByRole('group', { name: 'Your last update sounds finished' })).not.toBeInTheDocument();
+  });
+
+  it('opens a deep-linked carried task on today instead of its first planned day', () => {
+    const today = getLocalIsoDate();
+    mockDay.date = today;
+    mockDay.currentItem = createItem({ id: 101, taskKey: 'T-81', title: 'Validate the prod', state: 'in_progress', originDate: shiftLocalIsoDate(today, -13) });
+    mockResolution = { data: { taskKey: 'T-81', title: 'Validate the prod', date: shiftLocalIsoDate(today, -13) }, isError: false, isLoading: false };
+    window.history.replaceState(null, '', '/my-day?task=T-81');
+    Element.prototype.scrollIntoView = vi.fn();
+    render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.getByRole('dialog', { name: 'Task T-81' })).toBeInTheDocument();
+    expect(screen.queryByText(/looking back at a past day/i)).not.toBeInTheDocument();
+    window.history.replaceState(null, '', '/my-day');
   });
 
   it('asks once about work carried for a week or more, and remembers a dismissal (MDA-04)', () => {

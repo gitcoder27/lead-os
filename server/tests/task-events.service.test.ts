@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers } from "../src/db/schema";
+import { appUsers, configTable, developers } from "../src/db/schema";
 import { runInTransaction } from "../src/db/transaction";
 import { TaskKeysService } from "../src/services/task-keys.service";
 import { TaskEventsService } from "../src/services/task-events.service";
@@ -54,6 +54,21 @@ describe("task keys and events", () => {
       expect(redacted).not.toHaveProperty("body");
       expect(redacted).not.toHaveProperty("meta");
     }
+  });
+
+  it("names manager, developer and app-written authors within the workspace only", async () => {
+    const now = new Date().toISOString();
+    await db.insert(appUsers).values([
+      { username: "manager-a", displayName: "Maya", passwordHash: "x", role: "manager", createdAt: now, updatedAt: now },
+      { workspaceId: "other", username: "manager-x", displayName: "Elsewhere", passwordHash: "x", role: "manager", createdAt: now, updatedAt: now },
+    ]);
+    const key = await runInTransaction(async () => keys.allocate("default"));
+    await events.append({ taskKey: key, type: "update", body: "From the lead", meta: null }, { type: "manager", accountId: "manager-a" });
+    await events.append({ taskKey: key, type: "focus", body: null, meta: { action: "set_current", date: "2026-09-24" } }, { type: "system", accountId: "dev-1" });
+    await events.append({ taskKey: key, type: "update", body: "Foreign id", meta: null }, { type: "manager", accountId: "manager-x" });
+    const listed = (await events.list(key, { kind: "manager", accountId: "manager-a" })).events;
+    expect(listed.map((event) => event.author.displayName)).toEqual([undefined, "One", "Maya"]);
+    expect((await events.get(listed[2]!.id, { kind: "manager", accountId: "manager-a" })).author).toEqual({ type: "manager", id: "manager-a", displayName: "Maya" });
   });
 
   it("allocates monotonically inside transactions and resolves case-insensitive aliases", async () => {

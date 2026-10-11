@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql, type SQL }
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
-import { appUsers, taskEvents, taskInbox, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
+import { appUsers, developers, taskEvents, taskInbox, taskLinks, tasks, teamTrackerDays, teamTrackerItems } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { normalizeWorkspaceId } from "./workspace.service";
@@ -58,6 +58,26 @@ function mapEvent(row: EventRow): TaskEvent {
     return { id: base.id, taskKey: base.taskKey, type: base.type, visibility: base.visibility, author: { type: base.author.type }, occurredAt: base.occurredAt, approximateTime: base.approximateTime, redacted: true };
   }
   return base;
+}
+
+/**
+ * Timelines read people by name: a manager's events carry their username and a
+ * developer's their roster account id, so both resolve inside the workspace.
+ * App-written (`system`) events name the person whose action wrote them.
+ */
+async function withAuthorNames(events: TaskEvent[], workspaceId?: string): Promise<TaskEvent[]> {
+  const ids = [...new Set(events.flatMap((event) => event.author.id && !event.author.displayName ? [event.author.id] : []))];
+  if (!ids.length) return events;
+  const scope = normalizeWorkspaceId(workspaceId);
+  const [users, roster] = await Promise.all([
+    db.select({ id: appUsers.username, name: appUsers.displayName }).from(appUsers).where(and(eq(appUsers.workspaceId, scope), inArray(appUsers.username, ids))),
+    db.select({ id: developers.accountId, name: developers.displayName }).from(developers).where(and(eq(developers.workspaceId, scope), inArray(developers.accountId, ids))),
+  ]);
+  const names = new Map<string, string>([...roster, ...users].map((row) => [row.id, row.name]));
+  return events.map((event) => {
+    const name = event.author.id ? names.get(event.author.id) : undefined;
+    return name ? { ...event, author: { ...event.author, displayName: name } } : event;
+  });
 }
 
 export class TaskEventsService {
@@ -208,7 +228,7 @@ export class TaskEventsService {
     if (cursor !== undefined && (!Number.isSafeInteger(cursor) || cursor < 1)) throw new HttpError(400, "Invalid cursor");
     const identity = await this.identity(key, viewer.workspaceId);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), identity, await this.visibility(viewer), cursor ? lt(taskEvents.id, cursor) : undefined)).orderBy(desc(taskEvents.id)).limit(limit + 1);
-    return { events: rows.slice(0, limit).map(mapEvent), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
+    return { events: await withAuthorNames(rows.slice(0, limit).map(mapEvent), viewer.workspaceId), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
   }
 
   async latestOfType(taskKey: string, type: TaskEventType, viewer: TaskViewer): Promise<TaskEvent | null> {
@@ -233,7 +253,7 @@ export class TaskEventsService {
     await this.keys.assertEnabled(viewer.workspaceId);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.id, eventId), await this.visibility(viewer))).limit(1);
     if (!rows[0]) throw new HttpError(404, "Event not found");
-    return mapEvent(rows[0]);
+    return (await withAuthorNames([mapEvent(rows[0])], viewer.workspaceId))[0]!;
   }
 
   async searchBodies(viewer: TaskViewer, pattern: string, limit: number): Promise<{ taskKey: string; excerpt: string }[]> {

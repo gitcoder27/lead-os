@@ -1,29 +1,8 @@
 import { isTaskActivityAccessLoss } from '@/lib/task-activity-recovery';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useInboxTargetEvent } from '@/hooks/useTaskInbox';
-import {
-  CalendarClock,
-  ClipboardCheck,
-  Crosshair,
-  Eye,
-  EyeOff,
-  Gavel,
-  GitMerge,
-  History,
-  Link2,
-  Lock,
-  Megaphone,
-  MessageSquareText,
-  NotebookPen,
-  OctagonAlert,
-  PenLine,
-  Sparkles,
-  Trash2,
-  UserRound,
-  CircleDot,
-  ShieldCheck,
-} from 'lucide-react';
+import { ChevronDown, ClipboardCheck, Eye, EyeOff, History, Lock, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -32,98 +11,30 @@ import {
   useTaskEvents,
   useUpdateTaskEventVisibility,
 } from '@/hooks/useTasks';
-import { format, parseISO } from 'date-fns';
 import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
+import { FOCUS_RING } from '@/components/ui/focus';
+import {
+  INLINE_CHANGE_LIMIT,
+  blockerAction,
+  buildActivityFeed,
+  eventMeta,
+  messageBody,
+  noteContext,
+  viaLabel,
+  type ActivityChange,
+  type NameResolver,
+} from '@/lib/task-activity';
 import type { TaskEvent, TaskEventType } from '@/types';
 
-const EVENT_TYPE_LABELS: Record<TaskEventType, string> = {
-  created: 'Created',
-  update: 'Update',
-  instruction: 'Told them',
-  decision: 'Decision',
-  blocker: 'Blocker',
-  status: 'Status',
-  assign: 'Reassigned',
-  focus: 'Focus',
-  title: 'Renamed',
-  schedule: 'Scheduled',
-  link: 'Linked',
-  checkin_ref: 'Check-in',
-  note_ref: 'Note',
-  merged: 'Merged',
-};
+export { friendlyEventValue, plainExcerpt } from '@/lib/task-activity';
 
 const AUTHOR_LABELS: Record<string, string> = {
   manager: 'Manager',
   developer: 'Developer',
   copilot: 'Copilot',
-  system: 'System',
+  system: 'LeadOS',
 };
-
-function eventMeta(event: TaskEvent): Record<string, unknown> {
-  return event.meta && typeof event.meta === 'object' ? (event.meta as Record<string, unknown>) : {};
-}
-
-function blockerAction(event: TaskEvent): 'raised' | 'cleared' | undefined {
-  const action = eventMeta(event).action;
-  return action === 'raised' || action === 'cleared' ? action : undefined;
-}
-
-type NameResolver = (accountId: string) => string | undefined;
-
-/** docs/73 UXD-14: activity reads dates the manager's way — "Sat 10 Oct", never 2026-10-10. */
-export function friendlyEventValue(value: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return format(parseISO(value), 'EEE d MMM');
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) return format(date, 'EEE d MMM, HH:mm');
-  }
-  return value;
-}
-
-/** Older note excerpts were raw slices of the note: strip list, checkbox and emphasis syntax. */
-export function plainExcerpt(value: string): string {
-  return value
-    .split('\n')
-    .map((line) => line
-      .replace(/^\s*#{1,6}\s+/, '')
-      .replace(/^\s*(?:[-*+]|\d{1,9}[.)])\s+(?:\[[ xX]\]\s+)?/, '')
-      .replace(/^\s*\[[ xX]?\]\s*/, '')
-      .replace(/~~|\*\*|__/g, '')
-      .trim())
-    .filter(Boolean)
-    .join(' · ');
-}
-
-function eventDescription(event: TaskEvent, resolveName?: NameResolver): string {
-  if (event.body) return event.body;
-  const meta = eventMeta(event);
-  const raw = (field: string, fallback = 'Not set') => typeof meta[field] === 'string' && meta[field] ? String(meta[field]) : fallback;
-  // Account-id fields read as people when the caller can resolve them.
-  const PERSON_FIELDS = new Set(['ownerId', 'fromId', 'toId', 'developerAccountId']);
-  const text = (field: string, fallback = 'Not set') => {
-    const value = raw(field, fallback);
-    return PERSON_FIELDS.has(field) && value !== fallback ? resolveName?.(value) ?? value : friendlyEventValue(value);
-  };
-  const readable = (field: string) => text(field).replace(/_/g, ' ');
-  switch (event.type) {
-    case 'created': return `Created ${text('title', event.taskKey)}${meta.ownerId ? ` for ${text('ownerId')}` : ''}`;
-    case 'status': return `${readable('from')} → ${readable('to')}${meta.reason ? ` (${readable('reason')})` : ''}`;
-    case 'assign': {
-      const reset = meta.stateReset as { from?: string; to?: string } | undefined;
-      return `${text('fromId', 'Unassigned')} → ${text('toId', 'Unassigned')}${reset?.from && reset.to ? ` (${reset.from.replace(/_/g, ' ')} → ${reset.to.replace(/_/g, ' ')})` : ''}`;
-    }
-    case 'focus': return `${meta.action === 'set_current' ? 'Set as current work' : 'Removed from current work'} on ${text('date')}`;
-    case 'title': return `${text('from')} → ${text('to')}`;
-    case 'schedule': return `${readable('field')}: ${text('from')} → ${text('to')}`;
-    case 'link': return `${meta.action === 'removed' ? 'Removed' : 'Added'} ${text('kind', 'link')}: ${text('ref')}${meta.role ? ` (${text('role')})` : ''}`;
-    case 'checkin_ref': return `Check-in on ${text('date')}${meta.developerAccountId ? ` for ${text('developerAccountId')}` : ''}${meta.excerpt ? `: ${text('excerpt')}` : ''}`;
-    case 'note_ref': return `${meta.relation === 'created_from' ? 'Created from your note' : meta.relation === 'update_from' ? 'Updated from your note' : 'Mentioned'} ${text('noteDate')}${meta.excerpt ? `: ${plainExcerpt(raw('excerpt'))}` : ''}`;
-    case 'merged': return `${text('mergedKey')} → ${text('survivorKey')} (${text('decisionRef')})`;
-    case 'blocker': return meta.action === 'cleared' ? 'Blocker cleared' : 'Blocker raised';
-    default: return EVENT_TYPE_LABELS[event.type];
-  }
-}
 
 function canToggleVisibility(event: TaskEvent, accountId: string | undefined): boolean {
   const meta = eventMeta(event);
@@ -148,100 +59,60 @@ function canRedact(event: TaskEvent, accountId: string | undefined): boolean {
   );
 }
 
+/** Who wrote or caused an event, by name (the server resolves names within the workspace). */
 export function authorLabel(event: TaskEvent, accountId?: string): string {
-  if (!event.author.displayName && event.author.type === 'manager' && accountId && event.author.id === accountId) return 'You';
   // docs/73 UXD-14: a note reference is written by the app on your behalf — say where it came from.
   if (event.type === 'note_ref' && event.author.type === 'system') return 'From your note';
-  // Other app-written events read as the person they were for, never "System (maya)".
-  if (event.author.type === 'system') return accountId && event.author.id === accountId ? 'You' : 'LeadOS';
-  return event.author.displayName ?? `${AUTHOR_LABELS[event.author.type] ?? event.author.type}${event.author.id ? ` (${event.author.id})` : ''}`;
+  if (event.author.type === 'copilot') return 'Copilot';
+  if (accountId && event.author.id === accountId) return 'You';
+  if (event.author.displayName) return event.author.displayName;
+  return AUTHOR_LABELS[event.author.type] ?? event.author.type;
 }
 
-const BADGE = 'rounded-full px-1.5 text-meta font-semibold leading-[18px]';
+/** The actor beside a change; an unattributed app job stays unnamed rather than "LeadOS". */
+function changeActor(event: TaskEvent, accountId?: string): string | undefined {
+  if (event.author.type === 'system' && !event.author.displayName && !(accountId && event.author.id === accountId)) return undefined;
+  return authorLabel(event, accountId);
+}
+
+const TAG = 'rounded-full px-1.5 text-meta font-semibold leading-[18px]';
+
+/** Message kinds that are not plain updates say so, in their tone. */
+function messageTag(event: TaskEvent): { label: string; tone: string } | null {
+  switch (event.type) {
+    case 'instruction': return { label: 'Instruction', tone: 'var(--info)' };
+    case 'decision': return { label: 'Decision', tone: 'var(--success)' };
+    case 'blocker': return blockerAction(event) === 'cleared' ? { label: 'Blocker cleared', tone: 'var(--success)' } : { label: 'Blocker', tone: 'var(--danger)' };
+    case 'checkin_ref': return { label: 'Check-in', tone: 'var(--accent)' };
+    default: return null;
+  }
+}
 
 function EventBadges({ event }: { event: TaskEvent }) {
-  const meta = eventMeta(event);
-  const imported = Boolean(meta.imported);
-  const via = typeof meta.via === 'string' ? meta.via : undefined;
-  const action = blockerAction(event);
-
   return (
     <>
       {event.visibility === 'private' && (
         <span
-          className={`${BADGE} inline-flex items-center gap-1`}
-          style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning)' }}
+          className={`${TAG} inline-flex items-center gap-1`}
+          style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning-text, var(--warning))' }}
           title="Only visible to its author"
         >
-          <Lock size={9} />
+          <Lock size={9} aria-hidden="true" />
           Private
         </span>
       )}
-      {action && (
-        <span
-          className={BADGE}
-          style={{
-            background: action === 'raised' ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'color-mix(in srgb, var(--success) 12%, transparent)',
-            color: action === 'raised' ? 'var(--danger)' : 'var(--success)',
-          }}
-        >
-          {action === 'raised' ? 'Raised' : 'Cleared'}
-        </span>
-      )}
-      {via && (
-        <span
-          className={BADGE}
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
-        >
-          {via.replace(/_/g, ' ')}
-        </span>
-      )}
-      {imported && (
-        <span
-          className={BADGE}
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
-          title="Imported from the previous notes field"
-        >
+      {Boolean(eventMeta(event).imported) && (
+        <span className={TAG} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }} title="Imported from the previous notes field">
           Imported
         </span>
       )}
       {event.approximateTime && (
-        <span
-          className={BADGE}
-          style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
-          title="Approximate time"
-        >
+        <span className={TAG} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }} title="Approximate time">
           ~time
         </span>
       )}
     </>
   );
-}
-
-/** Event types that carry a human message — rendered as cards; the rest are compact system lines. */
-const MESSAGE_TYPES = new Set<TaskEventType>(['update', 'instruction', 'decision', 'blocker', 'note_ref', 'checkin_ref']);
-
-function eventVisual(event: TaskEvent): { Icon: typeof History; color: string } {
-  switch (event.type) {
-    case 'update': return { Icon: MessageSquareText, color: 'var(--accent)' };
-    case 'instruction': return { Icon: Megaphone, color: 'var(--info)' };
-    case 'decision': return { Icon: Gavel, color: 'var(--success)' };
-    case 'blocker':
-      return blockerAction(event) === 'cleared'
-        ? { Icon: ShieldCheck, color: 'var(--success)' }
-        : { Icon: OctagonAlert, color: 'var(--danger)' };
-    case 'note_ref': return { Icon: NotebookPen, color: 'var(--text-secondary)' };
-    case 'checkin_ref': return { Icon: ClipboardCheck, color: 'var(--accent)' };
-    case 'created': return { Icon: Sparkles, color: 'var(--text-muted)' };
-    case 'status': return { Icon: CircleDot, color: 'var(--text-muted)' };
-    case 'assign': return { Icon: UserRound, color: 'var(--text-muted)' };
-    case 'focus': return { Icon: Crosshair, color: 'var(--text-muted)' };
-    case 'title': return { Icon: PenLine, color: 'var(--text-muted)' };
-    case 'schedule': return { Icon: CalendarClock, color: 'var(--text-muted)' };
-    case 'link': return { Icon: Link2, color: 'var(--text-muted)' };
-    case 'merged': return { Icon: GitMerge, color: 'var(--text-muted)' };
-    default: return { Icon: History, color: 'var(--text-muted)' };
-  }
 }
 
 const CLAMP_CHARS = 420;
@@ -263,7 +134,7 @@ function EventBody({ text }: { text: string }) {
           type="button"
           onClick={() => setExpanded((value) => !value)}
           className="mt-1 text-ui font-medium outline-none hover:underline focus-visible:underline"
-          style={{ color: 'var(--accent)' }}
+          style={{ color: 'var(--accent-text, var(--accent))' }}
           aria-expanded={expanded}
         >
           {expanded ? 'Show less' : 'Show more'}
@@ -305,6 +176,8 @@ export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
 const ACTION_BUTTON =
   'flex h-6 w-6 items-center justify-center rounded-md outline-none transition-opacity hover:bg-[var(--bg-tertiary)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--border-active)] group-hover/event:opacity-100 group-focus-within/event:opacity-100 [@media(hover:hover)]:opacity-0';
 
+const FOCUSED_LABELS: Partial<Record<TaskEventType, string>> = { instruction: 'Instruction', update: 'Update', created: 'Assignment', assign: 'Assignment' };
+
 export function TaskTimeline(props: TaskTimelineProps) {
   const { user } = useAuth();
   const requestedId = window.location.pathname === `/t/${encodeURIComponent(props.taskKey)}` ? new URLSearchParams(window.location.search).get('event') : null;
@@ -314,7 +187,7 @@ export function TaskTimeline(props: TaskTimelineProps) {
   const focusedId = useRef<number>();
   const reducedMotion = useReducedMotion();
   const event = target.enabled && !target.isError ? target.data?.event : undefined;
-  const focusedLabel = event?.type === 'instruction' ? 'Instruction' : event?.type === 'update' ? 'Update' : event?.type === 'blocker' ? blockerAction(event) === 'cleared' ? 'Blocker cleared' : 'Blocker raised' : event?.type === 'created' || event?.type === 'assign' ? 'Assignment' : event ? EVENT_TYPE_LABELS[event.type] : '';
+  const focusedLabel = !event ? '' : event.type === 'blocker' ? (blockerAction(event) === 'cleared' ? 'Blocker cleared' : 'Blocker raised') : FOCUSED_LABELS[event.type] ?? messageTag(event)?.label ?? 'Change';
   useEffect(() => {
     if (!event || focusedId.current === event.id) return;
     focusedId.current = event.id;
@@ -329,11 +202,190 @@ export function TaskTimeline(props: TaskTimelineProps) {
         <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" style={{ borderColor: 'var(--accent)' }}>
           <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
           <p className="mb-2 mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
-          <EventBody text={eventDescription(event, props.resolveName) ?? ''} />
+          <EventBody text={messageBody(event, props.resolveName)} />
         </section>
       ) : null}
       <TaskTimelineBody {...props} />
     </>
+  );
+}
+
+/** The rail every item hangs from; the last item has nothing below it. */
+function Rail({ last }: { last: boolean }) {
+  if (last) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute bottom-0 left-[11.5px] top-0 w-px"
+      style={{ background: 'var(--border)' }}
+    />
+  );
+}
+
+function TimeStamp({ event }: { event: TaskEvent }) {
+  return (
+    <time dateTime={event.occurredAt} title={formatAbsoluteDateTime(event.occurredAt)}>{formatRelativeTime(event.occurredAt)}</time>
+  );
+}
+
+function MessageAvatar({ event, label, viewerName }: { event: TaskEvent; label: string; viewerName?: string }) {
+  const icon = event.type === 'note_ref' ? NotebookPen : event.author.type === 'copilot' ? Sparkles : event.type === 'checkin_ref' && !event.author.displayName ? ClipboardCheck : null;
+  if (icon) {
+    const Icon = icon;
+    return (
+      <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+        <Icon size={12} strokeWidth={2.1} />
+      </span>
+    );
+  }
+  // Initials come from the person's name even when the label reads "You".
+  return <Avatar name={event.author.displayName ?? (label === 'You' ? viewerName ?? label : label)} seed={event.author.id ?? label} size={24} muted={event.redacted} />;
+}
+
+interface ItemProps {
+  last: boolean;
+  accountId?: string;
+  viewerName?: string;
+  resolveName?: NameResolver;
+  actions: (event: TaskEvent, change?: boolean) => ReactNode;
+}
+
+function MessageItem({ event, last, accountId, viewerName, resolveName, actions }: ItemProps & { event: TaskEvent }) {
+  const label = authorLabel(event, accountId);
+  const tag = messageTag(event);
+  const context = noteContext(event) ?? viaLabel(event);
+  const isPrivate = event.visibility === 'private';
+  const blockerRaised = event.type === 'blocker' && blockerAction(event) === 'raised';
+  return (
+    <li className={`group/event relative flex gap-3 ${last ? '' : 'pb-5'}`}>
+      <Rail last={last} />
+      <span className="relative z-[1] h-6 shrink-0 self-start rounded-full" style={{ background: 'var(--bg-primary)' }}>
+        <MessageAvatar event={event} label={label} viewerName={viewerName} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-[24px] flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{label}</span>
+          {tag && (
+            <span className={TAG} style={{ background: `color-mix(in srgb, ${tag.tone} 13%, transparent)`, color: tag.tone }}>{tag.label}</span>
+          )}
+          <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
+            {context ? <>{context}<span aria-hidden="true"> · </span></> : null}
+            <TimeStamp event={event} />
+          </span>
+          <EventBadges event={event} />
+          {actions(event)}
+        </div>
+        <div
+          className="mt-1.5 rounded-xl px-3 py-2.5"
+          style={{
+            background: isPrivate ? 'color-mix(in srgb, var(--warning) 5%, var(--bg-secondary))' : 'var(--bg-secondary)',
+            border: `1px solid ${isPrivate ? 'color-mix(in srgb, var(--warning) 22%, transparent)' : blockerRaised ? 'color-mix(in srgb, var(--danger) 28%, transparent)' : 'var(--border)'}`,
+          }}
+        >
+          {event.redacted ? (
+            <span className="text-body italic" style={{ color: 'var(--text-muted)' }}>This entry was removed.</span>
+          ) : (
+            <EventBody text={messageBody(event, resolveName)} />
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function ChangeLine({ change, accountId, actions }: { change: ActivityChange; accountId?: string; actions: ItemProps['actions'] }) {
+  const actor = changeActor(change.event, accountId);
+  return (
+    <div className="flex min-h-[24px] min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-ui">
+      <span
+        className={`min-w-0 break-words ${change.event.redacted ? 'italic' : ''}`}
+        style={{ color: change.event.redacted ? 'var(--text-muted)' : 'var(--text-secondary)', overflowWrap: 'anywhere' }}
+      >
+        {change.text}
+      </span>
+      {change.count > 1 && change.event.type !== 'schedule' && (
+        <span className={TAG} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }} title={`${change.count} times`}>×{change.count}</span>
+      )}
+      <span style={{ color: 'var(--text-muted)' }}>
+        {actor ? <>{actor}<span aria-hidden="true"> · </span></> : null}
+        <TimeStamp event={change.event} />
+      </span>
+      <EventBadges event={change.event} />
+      {actions(change.event, true)}
+    </div>
+  );
+}
+
+function ChangeDot() {
+  return (
+    <span aria-hidden="true" className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center">
+      <span className="h-[7px] w-[7px] rounded-full" style={{ background: 'var(--bg-primary)', border: '1.5px solid var(--text-muted)' }} />
+    </span>
+  );
+}
+
+function ChangeRun({ changes, last, accountId, actions }: ItemProps & { changes: ActivityChange[] }) {
+  const [open, setOpen] = useState(false);
+  const folded = changes.length > INLINE_CHANGE_LIMIT;
+
+  if (!folded || open) {
+    return (
+      <>
+        {changes.map((change, index) => {
+          const isLast = last && !folded && index === changes.length - 1;
+          return (
+            <li key={change.event.id} className={`group/event relative flex gap-3 ${isLast ? '' : 'pb-2.5'}`}>
+              <Rail last={isLast} />
+              <ChangeDot />
+              <ChangeLine change={change} accountId={accountId} actions={actions} />
+            </li>
+          );
+        }).concat(folded ? [
+          <li key="collapse" className={`relative flex gap-3 ${last ? '' : 'pb-2.5'}`}>
+            <Rail last={last} />
+            <span className="h-6 w-6 shrink-0" aria-hidden="true" />
+            <button
+              type="button"
+              aria-expanded
+              onClick={() => setOpen(false)}
+              className={`-mx-1.5 inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ChevronDown size={12} className="rotate-180" aria-hidden="true" />
+              Hide {changes.length} changes
+            </button>
+          </li>,
+        ] : [])}
+      </>
+    );
+  }
+
+  // Name the newest kinds of change so the folded line still says what happened.
+  const preview = [...new Set(changes.map((change) => change.text))].slice(0, 2).join(', ');
+  return (
+    <li className={`relative flex gap-3 ${last ? '' : 'pb-2.5'}`}>
+      <Rail last={last} />
+      <span aria-hidden="true" className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center">
+        <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full" style={{ background: 'var(--bg-primary)', border: '1.5px solid var(--text-muted)' }}>
+          <span className="h-[3px] w-[3px] rounded-full" style={{ background: 'var(--text-muted)' }} />
+        </span>
+      </span>
+      <button
+        type="button"
+        aria-expanded={false}
+        onClick={() => setOpen(true)}
+        className={`-mx-1.5 flex min-h-[24px] min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      >
+        <span className="shrink-0 font-medium" style={{ color: 'var(--text-secondary)' }}>{changes.length} changes</span>
+        <span className="min-w-0 truncate" style={{ color: 'var(--text-muted)' }}>
+          <span aria-hidden="true">· </span>{preview}{changes.length > 2 ? '…' : ''}
+        </span>
+        <span className="ml-auto shrink-0 pl-2" style={{ color: 'var(--text-muted)' }}>
+          <TimeStamp event={changes[0]!.event} />
+        </span>
+        <ChevronDown size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} className="shrink-0" />
+      </button>
+    </li>
   );
 }
 
@@ -390,126 +442,60 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
     );
   }
 
+  // Change lines keep their actions to hover devices; on touch they would sit on every line.
+  const actions = (event: TaskEvent, change = false) => {
+    const showVisibilityToggle = mode === 'manager' && canToggleVisibility(event, user?.accountId);
+    const showRedact = mode === 'manager' && canRedact(event, user?.accountId);
+    if (!showVisibilityToggle && !showRedact) return null;
+    const isPrivate = event.visibility === 'private';
+    return (
+      <span className={`ml-auto flex shrink-0 items-center gap-0.5 self-start ${change ? '[@media(hover:none)]:hidden' : ''}`}>
+        {showVisibilityToggle && (
+          <button
+            type="button"
+            className={ACTION_BUTTON}
+            style={{ color: 'var(--text-muted)' }}
+            title={isPrivate ? 'Make shared' : 'Make private'}
+            aria-label={isPrivate ? 'Make event shared' : 'Make event private'}
+            onClick={() =>
+              updateVisibility.mutate(
+                { eventId: event.id, visibility: isPrivate ? 'shared' : 'private' },
+                { onError: (err) => addToast(err.message, 'error') },
+              )
+            }
+          >
+            {isPrivate ? <Eye size={12} /> : <EyeOff size={12} />}
+          </button>
+        )}
+        {showRedact && (
+          <button
+            type="button"
+            className={ACTION_BUTTON}
+            style={{ color: 'var(--danger)' }}
+            title="Remove this event's content"
+            aria-label="Redact event"
+            onClick={() => redactEvent.mutate(event.id, { onError: (err) => addToast(err.message, 'error') })}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
+      </span>
+    );
+  };
+
+  const feed = buildActivityFeed(events, resolveName);
+
   return (
     <div aria-busy={Boolean(query.isFetching)}>
       {errorBanner}
-      {query.isFetching && !query.isLoading ? <p role="status" className="py-2 text-ui">{query.isFetchingNextPage ? 'Loading older activity…' : 'Refreshing activity…'}</p> : null}
+      {query.isFetching && !query.isLoading ? <p role="status" className="sr-only">{query.isFetchingNextPage ? 'Loading older activity…' : 'Refreshing activity…'}</p> : null}
       <ol className="relative">
-        {events.map((event, index) => {
-          const typeLabel =
-            event.type === 'blocker' && blockerAction(event) === 'cleared' ? 'Blocker cleared' : EVENT_TYPE_LABELS[event.type];
-          const showVisibilityToggle = mode === 'manager' && canToggleVisibility(event, user?.accountId);
-          const showRedact = mode === 'manager' && canRedact(event, user?.accountId);
-          const isPrivate = event.visibility === 'private';
-          const message = MESSAGE_TYPES.has(event.type) || (event.type === 'created' && Boolean(event.body));
-          const last = index === events.length - 1 && !query.hasNextPage;
-          const { Icon, color } = eventVisual(event);
-          const nodeColor = event.redacted ? 'var(--text-disabled)' : isPrivate && !message ? 'var(--warning)' : color;
-          const description = event.redacted ? null : eventDescription(event, resolveName);
-
-          const actions = (showVisibilityToggle || showRedact) && (
-            <span className="ml-auto flex shrink-0 items-center gap-0.5 self-start">
-              {showVisibilityToggle && (
-                <button
-                  type="button"
-                  className={ACTION_BUTTON}
-                  style={{ color: 'var(--text-muted)' }}
-                  title={isPrivate ? 'Make shared' : 'Make private'}
-                  aria-label={isPrivate ? 'Make event shared' : 'Make event private'}
-                  onClick={() =>
-                    updateVisibility.mutate(
-                      { eventId: event.id, visibility: isPrivate ? 'shared' : 'private' },
-                      { onError: (err) => addToast(err.message, 'error') },
-                    )
-                  }
-                >
-                  {isPrivate ? <Eye size={12} /> : <EyeOff size={12} />}
-                </button>
-              )}
-              {showRedact && (
-                <button
-                  type="button"
-                  className={ACTION_BUTTON}
-                  style={{ color: 'var(--danger)' }}
-                  title="Remove this event's content"
-                  aria-label="Redact event"
-                  onClick={() => redactEvent.mutate(event.id, { onError: (err) => addToast(err.message, 'error') })}
-                >
-                  <Trash2 size={12} />
-                </button>
-              )}
-            </span>
-          );
-
-          const meta = (
-            <span className="text-ui" style={{ color: 'var(--text-muted)' }}>
-              <span>{authorLabel(event, user?.accountId)}</span>
-              <span aria-hidden="true"> · </span>
-              <time dateTime={event.occurredAt} title={formatAbsoluteDateTime(event.occurredAt)}>{formatRelativeTime(event.occurredAt)}</time>
-            </span>
-          );
-
-          return (
-            <li key={event.id} className={`group/event relative flex gap-3 ${last ? '' : message ? 'pb-5' : 'pb-3.5'}`}>
-              {!last && (
-                <span
-                  aria-hidden="true"
-                  className="absolute bottom-0 left-[11.5px] top-[26px] w-px"
-                  style={{ background: 'color-mix(in srgb, var(--border) 75%, transparent)' }}
-                />
-              )}
-              <span
-                aria-hidden="true"
-                className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-                style={{
-                  color: nodeColor,
-                  background: message ? `color-mix(in srgb, ${nodeColor} 14%, var(--bg-primary))` : 'var(--bg-primary)',
-                  border: `1px solid ${message ? `color-mix(in srgb, ${nodeColor} 32%, transparent)` : 'var(--border)'}`,
-                }}
-              >
-                <Icon size={message ? 12 : 11} strokeWidth={2.1} />
-              </span>
-
-              {message ? (
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-h-[24px] flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-body font-semibold" style={{ color: event.redacted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                      {typeLabel}
-                    </span>
-                    <EventBadges event={event} />
-                    {meta}
-                    {actions}
-                  </div>
-                  <div
-                    className="mt-1.5 rounded-xl px-3 py-2.5"
-                    style={{
-                      background: isPrivate ? 'color-mix(in srgb, var(--warning) 5%, var(--bg-secondary))' : 'var(--bg-secondary)',
-                      border: `1px solid ${isPrivate ? 'color-mix(in srgb, var(--warning) 22%, transparent)' : 'var(--border)'}`,
-                    }}
-                  >
-                    {event.redacted ? (
-                      <span className="text-body italic" style={{ color: 'var(--text-muted)' }}>
-                        This entry was removed.
-                      </span>
-                    ) : (
-                      <EventBody text={description ?? ''} />
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex min-h-[24px] min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-body">
-                  <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>{typeLabel}</span>
-                  {event.redacted ? (
-                    <span className="italic" style={{ color: 'var(--text-muted)' }}>This entry was removed.</span>
-                  ) : (
-                    <span className="min-w-0 break-words" style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{description}</span>
-                  )}
-                  <EventBadges event={event} />
-                  {meta}
-                  {actions}
-                </div>
-              )}
-            </li>
+        {feed.map((item, index) => {
+          const last = index === feed.length - 1 && !query.hasNextPage;
+          return item.kind === 'message' ? (
+            <MessageItem key={item.event.id} event={item.event} last={last} accountId={user?.accountId} viewerName={user?.displayName} resolveName={resolveName} actions={actions} />
+          ) : (
+            <ChangeRun key={item.key} changes={item.changes} last={last} accountId={user?.accountId} resolveName={resolveName} actions={actions} />
           );
         })}
       </ol>
@@ -519,7 +505,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           onClick={() => void query.fetchNextPage()}
           disabled={query.isFetching}
           className="ml-9 mt-1 rounded-lg px-2 py-1 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
-          style={{ color: 'var(--accent)' }}
+          style={{ color: 'var(--accent-text, var(--accent))' }}
         >
           {query.isFetchingNextPage ? 'Loading…' : 'Load older activity'}
         </button>

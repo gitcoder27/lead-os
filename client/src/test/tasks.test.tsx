@@ -347,13 +347,20 @@ describe('TaskTimeline', () => {
     ];
     mockManagerEvents = { pages: [{ events: changes.map((event, index) => makeEvent({ id: index + 1, body: null, author: { type: 'system', id: 'mgr-1' }, ...event })), nextCursor: null }] };
     render(<TaskTimeline taskKey="T-5" mode="manager" />, { wrapper: Wrapper });
+    // docs/56 MDA-02: five changes between messages fold into one line until opened.
+    expect(screen.queryByText('Reassigned from dev-1 to dev-2')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /5 changes/ }));
     for (const description of [
-      'Created Investigate API for dev-1', 'planned → in progress (user)',
-      'dev-1 → dev-2 (in progress → planned)', 'Set as current work on Thu 24 Sep',
-      'Old title → New title', 'follow up at: Not set → Fri 25 Sep',
-      'Added jira: APP-1 (primary)', 'Check-in on Thu 24 Sep for dev-1: Ready for review',
-      'Created from your note Wed 23 Sep: Private context', 'T-9 → T-5 (M-1)',
+      'Created for dev-1', 'Started working on it', 'Reassigned from dev-1 to dev-2',
+      'Renamed from “Old title” to “New title”', 'Follow-up set for Fri 25 Sep', 'Linked APP-1 as primary',
+      'Ready for review', 'Created from your note · Wed 23 Sep', 'Private context', 'Merged T-9 into T-5',
+      'This entry was removed.',
     ]) expect(screen.getByText(description)).toBeInTheDocument();
+    // The focus toggle is the same change as the status it caused: said once.
+    expect(screen.getAllByText(/Started working on it/)).toHaveLength(1);
+    expect(screen.queryByText(/→|\(user\)/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Hide 5 changes/ }));
+    expect(screen.queryByText('Reassigned from dev-1 to dev-2')).not.toBeInTheDocument();
     expect(screen.queryByText(/Hidden old title/)).not.toBeInTheDocument();
     // docs/73 UXD-14: activity reads friendly dates and never "System (id)".
     expect(screen.queryByText(/System \(/)).not.toBeInTheDocument();
@@ -391,7 +398,6 @@ describe('TaskTimeline', () => {
     expect(screen.getByText('Private note')).toBeInTheDocument();
     expect(screen.getByText('Private')).toBeInTheDocument();
     expect(screen.getByText('Blocker')).toBeInTheDocument();
-    expect(screen.getByText('Raised')).toBeInTheDocument();
     expect(screen.getByText('This entry was removed.')).toBeInTheDocument();
   });
 
@@ -459,8 +465,8 @@ describe('TaskTimeline', () => {
     ], nextCursor: null }] };
     const names: Record<string, string> = { 'dev-1': 'Alice', 'dev-2': 'Bob' };
     render(<TaskTimeline taskKey="T-5" mode="manager" resolveName={(id) => names[id]} />, { wrapper: Wrapper });
-    expect(screen.getByText('Created Ship it for Alice')).toBeInTheDocument();
-    expect(screen.getByText('Alice → Bob')).toBeInTheDocument();
+    expect(screen.getByText('Created for Alice')).toBeInTheDocument();
+    expect(screen.getByText('Reassigned from Alice to Bob')).toBeInTheDocument();
     // The app-written event acted for this manager too, so both read as You (docs/73 UXD-14).
     expect(screen.getAllByText('You')).toHaveLength(2);
   });

@@ -16,10 +16,18 @@ describe('activity copy (docs/73 UXD-14)', () => {
 });
 
 describe('activity authors (docs/73 UXD-14)', () => {
-  const event = (type: string, author: { type: string; id?: string }) => ({ type, author } as unknown as TaskEvent);
+  const event = (type: string, author: { type: string; id?: string; displayName?: string }) => ({ type, author } as unknown as TaskEvent);
   it('never says "System (id)"', () => {
     expect(authorLabel(event('note_ref', { type: 'system', id: 'maya' }), 'maya')).toBe('From your note');
     expect(authorLabel(event('created', { type: 'system', id: 'maya' }), 'maya')).toBe('You');
     expect(authorLabel(event('created', { type: 'system', id: 'job' }), 'maya')).toBe('LeadOS');
+  });
+
+  it('reads people by name, never "Manager (id)" (docs/56 MDA-02)', () => {
+    expect(authorLabel(event('update', { type: 'manager', id: 'ayan', displayName: 'Ayan' }), 'dev-1')).toBe('Ayan');
+    expect(authorLabel(event('update', { type: 'manager', id: 'ayan' }), 'dev-1')).toBe('Manager');
+    expect(authorLabel(event('update', { type: 'developer', id: 'dev-1', displayName: 'Priya' }), 'dev-1')).toBe('You');
+    expect(authorLabel(event('focus', { type: 'system', id: 'dev-2', displayName: 'Tom' }), 'maya')).toBe('Tom');
+    expect(authorLabel(event('update', { type: 'copilot', id: 'maya' }), 'maya')).toBe('Copilot');
   });
 });

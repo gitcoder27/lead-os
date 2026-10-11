@@ -30,7 +30,7 @@ describe('Projects browsing and lifecycle', () => {
     expect(screen.queryByRole('button', { name: 'Hiring' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Platform migration' }));
     expect(props.onNavigate).toHaveBeenCalledWith(1);
-    fireEvent.click(screen.getByRole('button', { name: /Next check/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Next check|Check was due/ }));
     expect(props.openTask).toHaveBeenCalledWith('T-9');
     fireEvent.click(screen.getByRole('button', { name: 'Archived', exact: true }));
     expect(props.onArchiveFilter).toHaveBeenCalledWith(true);

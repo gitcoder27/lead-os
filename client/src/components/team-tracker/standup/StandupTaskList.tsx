@@ -58,9 +58,10 @@ export function StandupTaskList({
           />
         </div>
       ) : (
+        // docs/73 UXD-23: one work card — the list, then the focused task's update composer as its footer,
+        // instead of a second card that repeats the task's key and title.
+        <div className="overflow-hidden rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
         <div
-          className="overflow-hidden rounded-lg"
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
           role="listbox"
           aria-label={`${ownerName}'s tasks`}
         >
@@ -125,15 +126,15 @@ export function StandupTaskList({
             );
           })}
         </div>
+        {composer && tasks[focusedIndex] && (
+          <div className="flex items-start gap-2 border-t px-3 py-2.5" style={{ borderColor: 'var(--border)' }}>
+            <div className="min-w-0 flex-1">{composer}</div>
+            <button type="button" className="ui-icon-btn shrink-0" aria-label={`Open ${tasks[focusedIndex]!.taskKey}`} title="Open task details" onClick={() => onOpen(tasks[focusedIndex]!.taskKey)}><ArrowUpRight size={16} /></button>
+          </div>
+        )}
+        </div>
       )}
 
-      {composer && tasks[focusedIndex] && <div className="mt-3 border-l-2 pl-3" style={{ borderColor: 'var(--accent)' }}>
-        <div className="flex items-center gap-2 text-ui leading-4">
-          <span className="min-w-0 flex-1 break-words" style={{ color: 'var(--text-secondary)' }}>{tasks[focusedIndex]!.taskKey} · {tasks[focusedIndex]!.title}</span>
-          <button type="button" className="ui-icon-btn shrink-0" aria-label={`Open ${tasks[focusedIndex]!.taskKey}`} title="Open task details" onClick={() => onOpen(tasks[focusedIndex]!.taskKey)}><ArrowUpRight size={16} /></button>
-        </div>
-        {composer}
-      </div>}
 
       {doneToday.length > 0 && (
         <div className="mt-4">

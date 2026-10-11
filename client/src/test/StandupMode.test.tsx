@@ -941,8 +941,31 @@ describe('StandupMode', () => {
     it('keeps person status and work without a repeated metric strip', () => {
       renderStandup();
       expect(screen.queryByTestId('standup-day-strip')).not.toBeInTheDocument();
-      expect(screen.getByLabelText('Set developer status')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Set developer status/ })).toBeInTheDocument();
       expect(screen.getByText('No developer check-in today')).toBeInTheDocument();
+    });
+
+    it('sets status from a menu, not a native select (docs/73 UXD-23)', () => {
+      renderStandup();
+      expect(document.querySelector('select')).toBeNull();
+      const trigger = screen.getByRole('button', { name: /^Set developer status/ });
+      expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+      fireEvent.click(trigger);
+      const menu = screen.getByRole('menu', { name: 'Developer status' });
+      const items = within(menu).getAllByRole('menuitemradio');
+      expect(items.map((item) => item.textContent?.replace(/[a-z]$/, ''))).toEqual(expect.arrayContaining([expect.stringMatching(/^On track/), expect.stringMatching(/^Blocked/)]));
+      expect(items.filter((item) => item.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+    });
+
+    it('shows the focused task once — no second card repeating its key and title (docs/73 UXD-23)', () => {
+      renderStandup();
+      const list = screen.getByRole('listbox', { name: /'s tasks$/ });
+      const focused = within(list).getAllByRole('option').find((option) => option.getAttribute('aria-selected') === 'true');
+      expect(focused).toBeDefined();
+      const key = focused!.textContent?.match(/[A-Z]+-\d+/)?.[0];
+      expect(key).toBeDefined();
+      expect(screen.queryByText(new RegExp(`^${key} · `))).toBeNull();
+      expect(screen.getAllByRole('button', { name: `Open ${key}` }).length).toBeGreaterThan(0);
     });
 
     it('solo: the day strip shows "Last touched" instead of "None today" (P1-04)', () => {

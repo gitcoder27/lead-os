@@ -1,10 +1,12 @@
-import { TriangleAlert, Bell, BellRing, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { TriangleAlert, Bell, BellRing, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TrackerDeveloperDay, TrackerDeveloperStatus } from '@/types';
 import { cleanFlagReason, type DayStats } from '@/lib/standup';
 import { formatRelativeTime } from '@/lib/utils';
 import { Avatar } from './StandupPrimitives';
 import { YouTag } from '@/components/team-tracker/YouTag';
-import { Select } from '@/components/ui/Select';
+import { DevStatusMark, StatusDot, STATUS_META } from '@/components/ui/DevStatus';
+import { MenuHeading, MenuItem, TaskPopover } from '@/components/ui/Popover';
 
 export const STATUS_OPTIONS: TrackerDeveloperStatus[] = ['on_track', 'at_risk', 'blocked', 'waiting', 'done_for_today'];
 export const STATUS_LABELS: Record<TrackerDeveloperStatus, string> = {
@@ -67,17 +69,7 @@ export function StandupPersonHeader({
             </h2>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Select
-              value={day.status}
-              onChange={(event) => onStatusSelect(event.target.value as TrackerDeveloperStatus)}
-              aria-label="Set developer status"
-            >
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
-                </option>
-              ))}
-            </Select>
+            <StatusMenu status={day.status} suggested={day.statusSuggestion?.status} onSelect={onStatusSelect} />
             {day.nextFollowUpAt && (
               <span className="inline-flex items-center gap-1 text-ui" style={{ color: 'var(--text-muted)' }}>
                 <BellRing size={11} /> Follow-up {formatTime(day.nextFollowUpAt)}
@@ -145,3 +137,66 @@ function NavButton({ label, onClick, disabled, children }: { label: string; onCl
   );
 }
 
+
+/**
+ * docs/73 UXD-23: status as the shared dot-and-label mark that opens a menu — the same control as
+ * the Team drawer — instead of a native select. Accelerator letters match `STATUS_META`.
+ */
+function StatusMenu({ status, suggested, onSelect }: {
+  status: TrackerDeveloperStatus;
+  suggested?: TrackerDeveloperStatus;
+  onSelect: (status: TrackerDeveloperStatus) => void;
+}) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const choose = (next: TrackerDeveloperStatus) => {
+    setAnchor(null);
+    if (next !== status) onSelect(next);
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+        aria-label={`Set developer status (currently ${STATUS_META[status].label})`}
+        aria-haspopup="menu"
+        aria-expanded={Boolean(anchor)}
+        className="group inline-flex min-h-8 items-center gap-1 rounded-full pr-1.5 transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+      >
+        <DevStatusMark status={status} emphasis />
+        <ChevronDown size={12} aria-hidden="true" className="opacity-60 transition-transform group-aria-expanded:rotate-180" style={{ color: 'var(--text-muted)' }} />
+      </button>
+      {anchor && (
+        <TaskPopover
+          anchor={anchor}
+          onClose={() => setAnchor(null)}
+          label="Developer status"
+          width={220}
+          onAccelerator={(key) => {
+            const next = STATUS_OPTIONS.find((candidate) => STATUS_META[candidate].key === key.toLowerCase());
+            if (!next) return false;
+            choose(next);
+            return true;
+          }}
+        >
+          <MenuHeading>Set status</MenuHeading>
+          {STATUS_OPTIONS.map((option) => (
+            <MenuItem
+              key={option}
+              role="menuitemradio"
+              checked={option === status}
+              icon={<StatusDot status={option} size={8} />}
+              label={suggested === option && option !== status ? (
+                <span className="flex items-center gap-1.5">
+                  {STATUS_LABELS[option]}
+                  <span className="text-ui" style={{ color: 'var(--text-muted)' }}>suggested</span>
+                </span>
+              ) : STATUS_LABELS[option]}
+              hint={STATUS_META[option].key}
+              onSelect={() => choose(option)}
+            />
+          ))}
+        </TaskPopover>
+      )}
+    </>
+  );
+}

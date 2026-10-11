@@ -33,6 +33,12 @@ body.standup-open {
   outline: none;
 }
 
+/* docs/73 UXD-23: headings take focus only so screen readers land on the person or the wrap-up;
+   they are not controls, so they draw no ring. */
+.standup-shell [tabindex='-1']:is(h1, h2, h3):focus-visible {
+  outline: none;
+}
+
 /* Text fields show focus with their caret and their container (the composer glows faintly), not an outline. */
 .standup-shell textarea:focus-visible {
   outline: none;

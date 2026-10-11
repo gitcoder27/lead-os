@@ -164,7 +164,7 @@ export function CopilotShowcase() {
         </div>
 
         <div className="lp-copilot-composer" aria-hidden="true">
-          <span className="lp-copilot-input">Ask about your team, work, or desk…</span>
+          <span className="lp-copilot-input">Ask about your team, tasks or notes…</span>
           <span className="lp-copilot-send"><ArrowUp size={14} /></span>
         </div>
       </figure>

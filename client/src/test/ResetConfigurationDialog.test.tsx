@@ -27,7 +27,7 @@ describe('ResetConfigurationDialog (docs/56 P6-06)', () => {
     expect(within(lost).getByText(/Backup schedule, day rhythm, attention rules, team mode/)).toBeInTheDocument();
     expect(within(lost).getByText(/synced Jira issues/)).toBeInTheDocument();
     expect(within(lost).getByText(/Tracked team members/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/your tasks \(and the task-model setup they live in\), notes, Desk items/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/your tasks \(and the task-model setup they live in\), notes, Team board history/)).toBeInTheDocument();
   });
 
   it('keeps the destructive button disabled until the phrase is typed (case-insensitive, trimmed)', () => {

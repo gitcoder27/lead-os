@@ -402,7 +402,7 @@ export function AssistantSection() {
             title="Full access — auto-confirm actions"
             description={
               autoConfirm
-                ? 'On — Copilot runs write actions (desk items, check-ins, Jira changes) immediately, no confirmation asked.'
+                ? 'On — Copilot runs write actions (tasks, check-ins, Jira changes) immediately, no confirmation asked.'
                 : 'Off — Copilot proposes write actions and waits for you to confirm each one.'
             }
             checked={autoConfirm}

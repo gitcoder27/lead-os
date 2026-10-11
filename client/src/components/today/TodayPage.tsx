@@ -3,6 +3,7 @@ import { describeLoadError } from '@/lib/error-copy';
 import { ErrorDetails } from '@/components/ui/QueryReadError';
 import type { AppView } from '@/App';
 import { useToday } from '@/hooks/useToday';
+import { useTasksPhase3 } from '@/hooks/useTasksPhase3';
 import { useTeamMode } from '@/hooks/useTeamMode';
 import { shouldIgnoreShortcutHelp } from '@/lib/keyboard-shortcuts';
 import { useQuickActions } from '@/context/QuickActionsContext';
@@ -634,10 +635,11 @@ function TodayPartialDataNotice({
   isFetching: boolean;
   onRetry: () => void;
 }) {
+  const tasksPhase3 = useTasksPhase3();
   const labels: Record<TodaySourceName, string> = {
     issues: 'Work',
     team: 'Team',
-    desk: 'Desk',
+    desk: tasksPhase3 ? 'Tasks' : 'Desk',
     sync: 'Sync',
     drift: 'Jira drift',
     one_on_one: '1:1s',

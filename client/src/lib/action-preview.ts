@@ -37,7 +37,7 @@ const labels: Record<string, string> = {
   taskKey: 'Task',
   itemId: 'Item',
   trackerItemId: 'Team item',
-  managerDeskItemId: 'Desk item',
+  managerDeskItemId: 'Task',
 };
 const words: Record<string, string> = {
   indeterminate: 'In progress',

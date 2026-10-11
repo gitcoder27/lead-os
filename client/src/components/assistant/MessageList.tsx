@@ -174,7 +174,7 @@ export function MessageList({
       {isEmpty ? (
         <div className="space-y-3 pt-6">
           <p className="text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
-            Ask about your team, work, or desk — or let Copilot propose an action for you to confirm.
+            Ask about your team, tasks or notes, or let Copilot propose an action for you to confirm.
           </p>
           <SuggestionChips currentView={currentView} items={emptySuggestions} onPick={onPickSuggestion} />
         </div>

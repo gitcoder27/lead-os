@@ -646,3 +646,19 @@ Deviations from §8 found while building, and open items noticed but left out of
     - The same map covers two read surfaces the brief didn't list: the Task drawer's failed load and the Projects directory, which showed the raw message.
   - **Left alone:** mutation toasts keep the server's text, since those are usually actionable validation messages ("name already exists").
 - **UXD-28:** the chevron summary disclosure had already landed with UXD-05. In `ProjectFactsRow`, a check whose time has passed reads "Check was due · Fri 9 Oct, 10:00 · T-19" in `--warning-text` (with `data-past`); the words change too, so the colour isn't the only signal. A future check stays the quiet "Next check · Tue 13 Oct, 10:00 · T-21". Both use the app's one date style (`formatDayTime`), as does the summary's "Updated Sat 10 Oct", which was a locale "Oct 10". Checked in the browser on the project page (project and track facts) at 1440 and 375, light and dark.
+- **UXD-29:** the Copilot placeholder, empty state and landing replica say "Ask about your team, tasks or notes…", following §5.1. Other changes:
+  - the Tasks fallback chip asks "What's planned for me today?";
+  - the Copilot auto-run note lists "(tasks, check-ins, Jira changes)";
+  - a developer's "From your lead" tooltip reads "Assigned by your lead — only they can rename it";
+  - the reset dialog keeps "your tasks…, notes, Team board history and app accounts";
+  - the Copilot action preview labels a `managerDeskItemId` as "Task";
+  - Today's unavailable-source notice names the `desk` source "Tasks" under Phase 3.
+  - `formatRelativeTime` returns "just now" under a minute, so "Updated 0 seconds ago" can't appear anywhere it is used (35 callers). Status labels had already moved to words in UXD-20/21.
+  - **Left alone, because they only render without Phase 3:**
+    - the `/desk` route labels (`nav-pages`, `viewing-label`);
+    - the palette's Desk branches (the server returns no desk results once canonical tasks are on);
+    - `DeskCaptureForm`;
+    - the tracker "Managed from Manager Desk" tooltips (shown only for non-canonical linked items);
+    - the legacy tracker detail drawer.
+  - **Also left alone:** the server-checked phrase `CLEAR MANAGER DESK`, and server error strings on the legacy linked-item paths.
+  - Checked in the browser on Today and Tasks with the Copilot dock open, at 1440 and 375, light and dark. Copilot isn't configured on the scratch DB, so Playwright mocked only the `GET /api/config/ai` read; no provider was called.

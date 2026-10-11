@@ -258,7 +258,7 @@ export function TaskMeta({
         key="delegated"
         className="inline-flex items-center gap-1"
         style={{ color: 'var(--accent-text)' }}
-        title="Assigned from your lead’s desk — rename it there"
+        title="Assigned by your lead — only they can rename it"
       >
         <Link2 size={11} aria-hidden="true" />
         From your lead

@@ -65,7 +65,7 @@ export function ResetConfigurationDialog({ backupBeforeReset, isResetting, error
         </div>
         <p>
           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Kept:</span>{' '}
-          your tasks (and the task-model setup they live in), notes, Desk items, team tracker history and app accounts.
+          your tasks (and the task-model setup they live in), notes, Team board history and app accounts.
         </p>
         <p style={{ color: backupBeforeReset ? 'var(--success)' : 'var(--warning)' }}>
           {backupBeforeReset

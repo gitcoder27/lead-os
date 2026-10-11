@@ -14,7 +14,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatRelativeTime(dateStr: string): string {
   try {
-    return formatDistanceToNowStrict(new Date(dateStr), { addSuffix: true });
+    const date = new Date(dateStr);
+    // docs/73 UXD-29: under a minute reads "just now", never "0 seconds ago".
+    if (Math.abs(Date.now() - date.getTime()) < 60_000) return 'just now';
+    return formatDistanceToNowStrict(date, { addSuffix: true });
   } catch {
     return dateStr;
   }

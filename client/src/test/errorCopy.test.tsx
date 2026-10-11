@@ -42,3 +42,12 @@ describe('TaskListError (docs/73 UXD-27)', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 });
+
+describe('formatRelativeTime (UXD-29)', () => {
+  it('reads "just now" under a minute and relative beyond it', async () => {
+    const { formatRelativeTime } = await import('@/lib/utils');
+    expect(formatRelativeTime(new Date(Date.now() - 5_000).toISOString())).toBe('just now');
+    expect(formatRelativeTime(new Date(Date.now() - 5 * 60_000).toISOString())).toBe('5 minutes ago');
+    expect(formatRelativeTime('not a date')).toBe('not a date');
+  });
+});

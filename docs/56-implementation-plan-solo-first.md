@@ -921,7 +921,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 - [x] UXD-26 — Palette finds projects.
 - [x] UXD-27 — Error and boot states.
 - [x] UXD-28 — Projects polish.
-- [ ] UXD-29 — Copy sweep.
+- [x] UXD-29 — Copy sweep.
 
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
@@ -952,6 +952,7 @@ Review and plan: [docs/73-ui-ux-design-review-and-upgrade-plan.md](73-ui-ux-desi
 | 2026-10-11 | UXD-26 | main (this commit) | Palette finds the manager's own unarchived projects and tracks (workspace and manager scoped, canonical only) and opens ?view=projects&project=[&track=]. New search-projects tests (other manager, other workspace, archived, no manager, wildcards), a positive control in the tenant harness, and search shape tests updated. Browser: 'atlas' finds the project and Enter opens it. Server 1658 and client 2156 green, typecheck and build:check clean. |
 | 2026-10-11 | UXD-27 | main (this commit) | describeLoadError status-to-copy map (headline never the server text; detail behind Details; reason for titled pages); branded BootError page with Retry; Today error gains its reason; Tasks banner, Task drawer and Projects directory use the map. Browser in light and dark: API down cold, Tasks 500 (Details shows 'boom · Status 500'), Today 500. errorCopy tests added, App/ProjectsPanel tests updated; client 2160 green, typecheck and build:check clean. |
 | 2026-10-11 | UXD-28 | main (this commit) | A past project/track check reads 'Check was due · <day, time>' in the warning tone (data-past); future checks stay quiet; checks and the summary's 'Updated' date use the app's one date style. Browser at 1440 and 375, light and dark: 3 past checks and 1 future on Atlas. ProjectFactsRow tests added, ProjectsPanel locator widened; client 2162 green, typecheck clean. |
+| 2026-10-11 | UXD-29 | main (this commit) | Live 'desk' copy now says tasks: the Copilot placeholder and empty state ('Ask about your team, tasks or notes…', also the landing replica), the Tasks suggestion chip, the Copilot auto-run note, a developer's 'From your lead' tooltip, the reset dialog's Kept list, the Copilot preview field label, and Today's unavailable-source label (Tasks under Phase 3). formatRelativeTime reads 'just now' under a minute. The remaining grep hits are the /desk route and strings that only render without Phase 3. Browser at 1440 and 375, light and dark (Copilot config mocked in Playwright to show the composer). Client 2163 green, typecheck and build:check clean. |
 
 ## Self-registration and tenant isolation (docs/72)
 

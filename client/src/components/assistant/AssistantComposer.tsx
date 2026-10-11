@@ -75,7 +75,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
           value={value}
           rows={1}
           disabled={disabled}
-          placeholder="Ask about your team, work, or desk…"
+          placeholder="Ask about your team, tasks or notes…"
           aria-label="Message Copilot"
           onChange={(event) => {
             setValue(event.target.value);

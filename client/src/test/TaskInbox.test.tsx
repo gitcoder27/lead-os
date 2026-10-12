@@ -235,7 +235,8 @@ describe('task inbox', () => {
     expect(opened).toHaveTextContent('Older exact instruction');
     expect(opened).toHaveFocus();
     expect(get).toHaveBeenCalledWith('/task-inbox/events/45?taskKey=T-2', expect.any(Object));
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    // Never scrollIntoView: it also scrolls the overflow-hidden page shell and pushes the Back button out of reach.
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
   it('lets the person dismiss the highlight, which drops the event from the address', async () => {
     window.history.replaceState(null, '', item.href);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Lock, MessageSquarePlus, Send } from 'lucide-react';
+import './task-composer.css';
 import { useToast } from '@/context/ToastContext';
 import { useAddMyDayTaskEvent, useAddTaskEvent } from '@/hooks/useTasks';
 import { useAuthScopeKey } from '@/context/AuthContext';
@@ -46,6 +47,8 @@ interface TaskUpdateComposerProps {
   onEscape?: () => void;
 }
 
+const prefersReducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export function TaskUpdateComposer(props: TaskUpdateComposerProps) {
   const scope = useAuthScopeKey();
   const storageKey = `${taskUpdateDraftPrefix(scope, props.mode, props.via, props.date)}${props.taskKey}`;
@@ -78,6 +81,19 @@ function OwnedTaskUpdateComposer({
   const valueRef = useRef(value);
   const { body: draft, type, blockerAction, private: isPrivate } = value;
   const [expanded, setExpanded] = useState(!collapsed || !!value.body);
+  // Opening and closing the collapsed form is animated: in, out, or settling back to the one-line trigger.
+  const [motion, setMotion] = useState<'idle' | 'in' | 'out' | 'settle'>('idle');
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const expand = useCallback(() => {
+    setMotion(prefersReducedMotion() ? 'idle' : 'in');
+    setExpanded(true);
+    window.setTimeout(() => localRef.current?.focus(), 0);
+  }, []);
+  // An empty form folds back to the trigger; one with a draft stays, so nothing typed is hidden by a stray click.
+  const fold = useCallback((force = false) => {
+    if (!collapsed || (!force && valueRef.current.body.trim())) return;
+    if (prefersReducedMotion()) { setMotion('settle'); setExpanded(false); } else setMotion('out');
+  }, [collapsed]);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(value.submitted);
   const submitting = useRef(false);
@@ -107,11 +123,11 @@ function OwnedTaskUpdateComposer({
       valueRef.current = next;
       setValue(next);
       setFailed(false);
-      if (collapsed && !next.body) setExpanded(false);
+      if (collapsed && !next.body) fold(true);
     };
     window.addEventListener('task-update-saved', saved);
     return () => window.removeEventListener('task-update-saved', saved);
-  }, [storageKey, collapsed, person]);
+  }, [storageKey, collapsed, person, fold]);
 
   const setRefs = (el: HTMLTextAreaElement | null) => {
     localRef.current = el;
@@ -122,18 +138,26 @@ function OwnedTaskUpdateComposer({
 
   useEffect(() => {
     registerComposer?.({
-      expand: () => {
-        setExpanded(true);
-        window.setTimeout(() => localRef.current?.focus(), 0);
-      },
+      expand,
       focus: () => localRef.current?.focus(),
       togglePrivate: () => {
-        setExpanded(true);
+        if (!expanded) expand();
         togglePrivate();
       },
     });
     return () => registerComposer?.(null);
-  }, [registerComposer, togglePrivate]);
+  }, [registerComposer, togglePrivate, expand, expanded]);
+
+  // Clicking or tabbing away from an empty form puts it back to the sleek one-line state.
+  useEffect(() => {
+    if (!collapsed || !expanded || motion === 'out') return;
+    const outside = (event: Event) => {
+      const root = rootRef.current;
+      if (root && event.target instanceof Node && !root.contains(event.target)) fold();
+    };
+    document.addEventListener('pointerdown', outside, true);
+    return () => document.removeEventListener('pointerdown', outside, true);
+  }, [collapsed, expanded, motion, fold]);
 
   const submit = async () => {
     const body = draft.trim();
@@ -183,7 +207,7 @@ function OwnedTaskUpdateComposer({
       event.preventDefault();
       event.stopPropagation();
       event.currentTarget.blur();
-      if (collapsed) setExpanded(false);
+      fold(true);
       onEscape?.();
       return;
     }
@@ -207,10 +231,10 @@ function OwnedTaskUpdateComposer({
     return (
       <button
         type="button"
+        data-motion={motion === 'settle' ? 'settle' : undefined}
         onClick={(event) => {
           event.stopPropagation();
-          setExpanded(true);
-          window.setTimeout(() => localRef.current?.focus(), 0);
+          expand();
         }}
         className={
           quiet
@@ -228,6 +252,16 @@ function OwnedTaskUpdateComposer({
   const types = mode === 'developer' ? DEVELOPER_TYPES : MANAGER_TYPES;
 
   return (
+    <div
+      ref={rootRef}
+      className="task-composer-reveal"
+      data-motion={motion}
+      onAnimationEnd={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (motion === 'out') { setExpanded(false); setMotion('settle'); } else if (motion === 'in') setMotion('idle');
+      }}
+    >
+    <div className="task-composer-body">
     <div
       className="ui-focus-within mt-1 rounded-xl px-2 py-1.5"
       style={{
@@ -315,6 +349,8 @@ function OwnedTaskUpdateComposer({
         </button>
       </div>
       {failed && <p role="alert" className="mt-1 text-ui leading-4">Not acknowledged. Retry to confirm it was saved, or edit this update.</p>}
+    </div>
+    </div>
     </div>
   );
 }

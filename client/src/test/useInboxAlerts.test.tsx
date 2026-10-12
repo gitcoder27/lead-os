@@ -187,6 +187,18 @@ describe('useInboxAlerts', () => {
     view.unmount();
   });
 
+  it('puts the count back in the title if something else rewrote it, when the person returns', async () => {
+    const view = mount();
+    await view.settle();
+    document.title = 'LeadOS';
+    comeBack();
+    await waitFor(() => expect(document.title).toBe('(1) LeadOS'));
+    rows = [];
+    await view.poll();
+    await waitFor(() => expect(document.title).toBe('LeadOS'));
+    view.unmount();
+  });
+
   it('restores the title when it unmounts', async () => {
     const view = mount();
     await waitFor(() => expect(document.title).toBe('(1) LeadOS'));

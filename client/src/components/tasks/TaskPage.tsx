@@ -7,7 +7,7 @@ import { navigateToTaskPage, TaskDetailBody } from './TaskDrawer';
  */
 export function TaskPage({ taskKey, onBack }: { taskKey: string; onBack: () => void }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
       <TaskDetailBody
         taskKey={taskKey}
         fullPage

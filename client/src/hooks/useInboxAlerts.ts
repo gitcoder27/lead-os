@@ -153,11 +153,31 @@ export function useInboxAlerts() {
     };
   }, [qc]);
 
-  // The count in the tab title and a dot on the icon.
+  // The count in the tab title and a dot on the icon. The title is re-asserted from the inbox on every render and
+  // on the way back to the tab, so a stale count (a title written by someone else, a tab that slept) heals itself.
+  const unreadRef = useRef(unread);
+  unreadRef.current = unread;
   useEffect(() => {
-    document.title = titleWithUnread(document.title, unread);
+    const wanted = titleWithUnread(document.title, unread);
+    if (document.title !== wanted) document.title = wanted;
+  });
+  useEffect(() => {
     void setFaviconBadge(unread > 0);
   }, [unread]);
+  useEffect(() => {
+    const sync = () => {
+      const wanted = titleWithUnread(document.title, unreadRef.current);
+      if (document.title !== wanted) document.title = wanted;
+    };
+    window.addEventListener('focus', sync);
+    window.addEventListener('pageshow', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('pageshow', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, []);
   useEffect(() => () => {
     document.title = titleWithUnread(document.title, 0);
     void setFaviconBadge(false);

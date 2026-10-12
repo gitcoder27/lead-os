@@ -178,6 +178,19 @@ const ACTION_BUTTON =
 
 const FOCUSED_LABELS: Partial<Record<TaskEventType, string>> = { instruction: 'Instruction', update: 'Update', created: 'Assignment', assign: 'Assignment', schedule: 'Date change', priority: 'Priority change', status: 'Status change' };
 
+/**
+ * Centres the element inside its own scroll area only. `scrollIntoView` also scrolls `overflow: hidden` ancestors
+ * (the page shell), which slides the toolbar and its Back button out of reach.
+ */
+function centerInScroller(element: HTMLElement) {
+  let scroller = element.parentElement;
+  while (scroller && !(/(auto|scroll)/.test(getComputedStyle(scroller).overflowY) && scroller.scrollHeight > scroller.clientHeight)) scroller = scroller.parentElement;
+  if (!scroller) return;
+  const box = element.getBoundingClientRect();
+  const area = scroller.getBoundingClientRect();
+  scroller.scrollTop += box.top - area.top - Math.max(0, (area.height - box.height) / 2);
+}
+
 export function TaskTimeline(props: TaskTimelineProps) {
   const { user } = useAuth();
   const requestedId = window.location.pathname === `/t/${encodeURIComponent(props.taskKey)}` ? new URLSearchParams(window.location.search).get('event') : null;
@@ -193,7 +206,7 @@ export function TaskTimeline(props: TaskTimelineProps) {
     focusedId.current = event.id;
     ref.current?.focus({ preventScroll: true });
     // Instant, not smooth: this runs as the window comes back from the background, when a smooth scroll can stall.
-    ref.current?.scrollIntoView({ block: 'center' });
+    if (ref.current) centerInScroller(ref.current);
   }, [event]);
   // The highlight is a pointer to the update, not a place to stay: dropping `?event=` puts the page back to normal.
   const dismiss = () => {

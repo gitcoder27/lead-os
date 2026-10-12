@@ -17,6 +17,7 @@
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "build:check": "npm run build:check --workspace=client && npm run build:check --workspace=server",
     "guard:data": "bash scripts/check-db-artifacts.sh",
+    "rebuild:native": "npm rebuild better-sqlite3",
     "backup:restore": "npm run backup:restore --workspace=server --",
     "manager-desk:cleanup-carry-forward": "npm run manager-desk:cleanup-carry-forward --workspace=server --",
     "tasks:cutover": "npm run tasks:cutover --workspace=server --",

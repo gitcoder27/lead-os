@@ -127,7 +127,7 @@ Backend conventions:
 
 Run from repo root:
 
-- Install/dev: `npm install`, `npm run dev`, `npm run dev:server`, `npm run dev:client`.
+- Install/dev: `npm install`, `npm run dev`, `npm run dev:server`, `npm run dev:client`. After switching or upgrading Node, if the API dies with `NODE_MODULE_VERSION` errors from `better-sqlite3`, run `npm run rebuild:native` from the repo root in a shell already using the Node you want.
 - Quality gates: `npm run lint`, `npm run format:check`, `npm run guard:data`.
 - Validate/build: `npm run typecheck`, `npm run build:check`, `npm run build`, `npm run start`.
 - Tests: `npm run test`, `npm run test --workspace=client`, `npm run test:coverage`.

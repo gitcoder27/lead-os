@@ -49,7 +49,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
               <time
                 dateTime={ci.createdAt}
                 title={formatAbsoluteDateTime(ci.createdAt)}
-                className="pt-[1px] text-right text-ui tabular-nums leading-5"
+                className="pt-px text-right text-ui tabular-nums leading-5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 {format(new Date(ci.createdAt), 'h:mm a')}
@@ -57,7 +57,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
 
               <span className="relative flex justify-center" aria-hidden="true">
                 <span
-                  className="relative z-[1] mt-[7px] h-[7px] w-[7px] rounded-full"
+                  className="relative z-1 mt-[7px] h-[7px] w-[7px] rounded-full"
                   style={{
                     background: fromLead || idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
                     boxShadow: idx === 0 ? '0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
@@ -79,7 +79,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                   </div>
                 )}
                 <p
-                  className={`whitespace-pre-line break-words text-body leading-5 ${fromLead ? 'rounded-lg px-2.5 py-1.5' : ''}`}
+                  className={`whitespace-pre-line wrap-break-word text-body leading-5 ${fromLead ? 'rounded-lg px-2.5 py-1.5' : ''}`}
                   style={{
                     color: 'var(--text-primary)',
                     background: fromLead ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : undefined,
@@ -93,7 +93,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                     {(ci.taskKeys ?? []).map((key) => (
                       <span
                         key={key}
-                        className="rounded-md px-1.5 py-[1px] font-mono text-meta font-semibold"
+                        className="rounded-md px-1.5 py-px font-mono text-meta font-semibold"
                         style={{ color: 'var(--text-muted)', background: 'color-mix(in srgb, var(--bg-tertiary) 60%, transparent)', border: `1px solid ${HAIRLINE}` }}
                       >
                         {key}

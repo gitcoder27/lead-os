@@ -214,7 +214,7 @@ function OwnedTaskUpdateComposer({
         }}
         className={
           quiet
-            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-ui outline-none transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] focus-visible:bg-[var(--bg-tertiary)]'
+            ? '-mx-2 mt-0.5 flex w-[calc(100%+1rem)] items-center gap-1.5 rounded-md px-2 py-1 text-left text-ui outline-hidden transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-secondary) focus-visible:bg-(--bg-tertiary)'
             : 'mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-ui transition-colors'
         }
         style={{ color: 'var(--text-muted)', background: quiet ? undefined : 'color-mix(in srgb, var(--bg-tertiary) 40%, transparent)' }}
@@ -246,7 +246,7 @@ function OwnedTaskUpdateComposer({
         rows={1}
         autoFocus={autoFocus}
         placeholder={placeholder ?? (type === 'instruction' ? 'What did you tell them?' : type === 'decision' ? 'What was decided?' : type === 'blocker' ? 'What is blocking this?' : 'Add an update…')}
-        className="w-full resize-none bg-transparent text-body leading-5 outline-none"
+        className="w-full resize-none bg-transparent text-body leading-5 outline-hidden"
         style={{ color: 'var(--text-primary)' }}
         aria-label={`Add an update to ${taskKey}`}
       />

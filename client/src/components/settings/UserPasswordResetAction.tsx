@@ -77,7 +77,7 @@ export function UserPasswordResetAction({ user, onReset }: UserPasswordResetActi
           disabled={submitting}
           aria-label={`New password for ${user.displayName}`}
           placeholder={`New password (min ${MIN_PASSWORD_LENGTH})`}
-          className="h-8 w-48 rounded-lg px-2.5 text-body outline-none"
+          className="h-8 w-48 rounded-lg px-2.5 text-body outline-hidden"
           style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)' }}
         />
         <button

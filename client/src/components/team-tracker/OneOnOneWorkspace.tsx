@@ -253,7 +253,7 @@ function SeriesControls({ detail }: { detail: OneOnOneSeriesDetail }) {
           aria-label={`Preferred weekday: ${weekday.label}`}
           aria-haspopup="menu"
           aria-expanded={Boolean(weekdayAnchor)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--text-secondary)', background: weekdayAnchor ? 'var(--bg-tertiary)' : undefined }}
         >
           <CalendarDays size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />

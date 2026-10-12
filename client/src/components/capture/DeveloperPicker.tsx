@@ -119,7 +119,7 @@ export function DeveloperPicker({ date, selected, onSelect, onClear }: Developer
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search developer…"
-          className="w-full rounded-xl pl-9 pr-3 py-2 text-body outline-none"
+          className="w-full rounded-xl pl-9 pr-3 py-2 text-body outline-hidden"
           style={{
             background: 'var(--bg-elevated)',
             color: 'var(--text-primary)',

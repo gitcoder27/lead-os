@@ -37,7 +37,7 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
           <button className="ui-btn-quiet" onClick={() => onArchive(item, facts, track?.projectId)}>{item.archivedAt ? 'Restore' : 'Archive'}</button>
         </div>
       </div>
-      {item.outcome && <div className="mt-4 max-w-[72ch]"><p className="project-caption">Outcome</p><p className="mt-1 whitespace-pre-wrap break-words text-body leading-relaxed">{item.outcome}</p></div>}
+      {item.outcome && <div className="mt-4 max-w-[72ch]"><p className="project-caption">Outcome</p><p className="mt-1 whitespace-pre-wrap wrap-break-word text-body leading-relaxed">{item.outcome}</p></div>}
       <div className="mt-4"><ProjectFactsRow facts={facts} openTask={openTask} /></div>
       {isArchived && <p className="project-caption mt-3">Open tasks stay actionable. {project.archivedAt && track ? 'Restore the project to add tasks or tracks.' : `Restore this ${track ? 'track' : 'project'} to add new tasks${track ? '.' : ' or tracks.'}`}</p>}
       {item.summary && (
@@ -62,7 +62,7 @@ export const ProjectOverview = ({ detail, trackId, archived, onNavigate, onArchi
               ))}
             </ul>
           ) : <p className="project-caption mt-2">{isArchived ? 'No tracks in this project.' : 'Add tasks directly below. Use tracks to group work, such as Design or Rollout.'}</p>}
-          {detail.tracks.some((entry) => entry.archivedAt) && !project.archivedAt && <label className="project-caption mt-3 flex items-center gap-2"><input type="checkbox" className="accent-[var(--accent-solid)]" checked={archived} onChange={(event) => onArchiveFilter(event.target.checked)} />Show archived tracks</label>}
+          {detail.tracks.some((entry) => entry.archivedAt) && !project.archivedAt && <label className="project-caption mt-3 flex items-center gap-2"><input type="checkbox" className="accent-(--accent-solid)" checked={archived} onChange={(event) => onArchiveFilter(event.target.checked)} />Show archived tracks</label>}
         </section>
       )}
     </section>

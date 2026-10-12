@@ -219,7 +219,7 @@ export function TrackerDrawerItemRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-[1px]" />}
+          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-px" />}
           <div className="min-w-0 flex-1">
             {titleEditing && isTitleEditable ? (
               <div className="flex min-w-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
@@ -241,7 +241,7 @@ export function TrackerDrawerItemRow({
                 <button
                   type="button"
                   onClick={commitTitle}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
                   style={{ color: 'var(--success)' }}
                   title="Save title"
                   aria-label="Save title"
@@ -251,7 +251,7 @@ export function TrackerDrawerItemRow({
                 <button
                   type="button"
                   onClick={cancelTitle}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
                   style={{ color: 'var(--text-muted)' }}
                   title="Cancel"
                   aria-label="Cancel title edit"
@@ -266,17 +266,17 @@ export function TrackerDrawerItemRow({
                   event.stopPropagation();
                   setTitleEditing(true);
                 }}
-                className={`block w-full min-w-0 rounded text-left ${FOCUS_RING}`}
+                className={`block w-full min-w-0 rounded-sm text-left ${FOCUS_RING}`}
                 aria-label={`Edit title: ${item.title}`}
                 title={item.title}
               >
-                <span className={`line-clamp-2 break-words hover:underline ${titleClass}`} style={{ color: titleColor }}>
+                <span className={`line-clamp-2 wrap-break-word hover:underline ${titleClass}`} style={{ color: titleColor }}>
                   {item.title}
                 </span>
               </button>
             ) : (
               <span
-                className={`line-clamp-2 break-words ${titleClass}`}
+                className={`line-clamp-2 wrap-break-word ${titleClass}`}
                 style={{ color: titleColor, textDecoration: titleDecoration }}
                 title={item.title}
               >
@@ -300,7 +300,7 @@ export function TrackerDrawerItemRow({
         {item.note && !isHistory && (
           <div className="mt-1.5 flex items-start gap-1.5">
             <StickyNote size={12} className="mt-[3px] shrink-0" style={{ color: 'var(--text-muted)' }} />
-            <span className="line-clamp-2 whitespace-pre-line break-words text-body leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
+            <span className="line-clamp-2 whitespace-pre-line wrap-break-word text-body leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
               {item.note}
             </span>
           </div>
@@ -375,7 +375,7 @@ function LeadingGlyph({
       data-drag-handle
       onClick={(event) => event.stopPropagation()}
       onPointerDown={onDragHandlePointerDown}
-      className={`${box} relative cursor-grab touch-none rounded active:cursor-grabbing`}
+      className={`${box} relative cursor-grab touch-none rounded-sm active:cursor-grabbing`}
       style={{ color: 'var(--text-muted)' }}
       title="Drag to reorder"
     >

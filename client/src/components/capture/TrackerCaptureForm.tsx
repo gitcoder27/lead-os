@@ -141,7 +141,7 @@ export function TrackerCaptureForm({
                 : 'Select a developer first…'
             }
             disabled={!developer}
-            className="w-full rounded-xl px-3.5 py-2.5 text-body outline-none transition-all disabled:opacity-40"
+            className="w-full rounded-xl px-3.5 py-2.5 text-body outline-hidden transition-all disabled:opacity-40"
             style={{
               background: 'var(--bg-elevated)',
               color: 'var(--text-primary)',
@@ -290,7 +290,7 @@ export function TrackerCaptureForm({
                   value={jiraSearch}
                   onChange={(e) => setJiraSearch(e.target.value)}
                   placeholder="Search by key or summary…"
-                  className="w-full rounded-xl pl-9 pr-3 py-2.5 text-body outline-none"
+                  className="w-full rounded-xl pl-9 pr-3 py-2.5 text-body outline-hidden"
                   style={{
                     background: 'var(--bg-elevated)',
                     color: 'var(--text-primary)',
@@ -382,7 +382,7 @@ export function TrackerCaptureForm({
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               placeholder="Context, links, what done looks like — shared with the developer"
-              className="w-full rounded-xl px-3.5 py-2.5 text-body outline-none resize-none"
+              className="w-full rounded-xl px-3.5 py-2.5 text-body outline-hidden resize-none"
               style={{
                 background: 'var(--bg-elevated)',
                 color: 'var(--text-primary)',

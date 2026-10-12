@@ -32,7 +32,7 @@ export function InlineEditDueDate({ issueKey, currentValue, onClose }: InlineEdi
       onSave={save}
       onClose={onClose}
       label={`Due date for ${issueKey}`}
-      className="text-body px-1.5 py-0.5 rounded cursor-pointer font-mono"
+      className="text-body px-1.5 py-0.5 rounded-sm cursor-pointer font-mono"
       style={{
         background: 'var(--bg-tertiary)',
         color: 'var(--text-primary)',

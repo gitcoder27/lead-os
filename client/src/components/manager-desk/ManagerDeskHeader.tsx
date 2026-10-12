@@ -36,7 +36,7 @@ export function ManagerDeskHeader({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 2xl:grid-cols-[auto_minmax(0,1fr)_auto] 2xl:items-center">
           <div className="flex min-w-0 items-center gap-2">
             <div
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
               style={{ background: 'var(--md-accent-glow)', color: 'var(--md-accent)' }}
             >
               <Briefcase size={13} />
@@ -46,7 +46,7 @@ export function ManagerDeskHeader({
               Desk
             </h1>
 
-            <div className="h-4 w-px flex-shrink-0 hidden sm:block" style={{ background: 'var(--border)' }} />
+            <div className="h-4 w-px shrink-0 hidden sm:block" style={{ background: 'var(--border)' }} />
 
             <div
               className="flex items-center rounded-lg border px-0.5 py-0.5"
@@ -76,7 +76,7 @@ export function ManagerDeskHeader({
             </span>
 
             <span
-              className="rounded-md px-1.5 py-0.5 text-meta font-semibold uppercase tracking-[0.1em]"
+              className="rounded-md px-1.5 py-0.5 text-meta font-semibold uppercase tracking-widest"
               style={{
                 background: viewMode === 'history' ? 'rgba(59,130,246,0.10)' : viewMode === 'planning' ? 'rgba(6,182,212,0.10)' : 'var(--md-accent-glow)',
                 color: viewMode === 'history' ? 'var(--info)' : viewMode === 'planning' ? 'var(--accent)' : 'var(--md-accent)',
@@ -124,7 +124,7 @@ function ActionBtn({ children, label, disabled = false, onClick }: { children: R
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-6 items-center gap-1 rounded-md border px-2 text-meta font-semibold uppercase tracking-[0.1em] transition-colors disabled:opacity-50"
+      className="flex h-6 items-center gap-1 rounded-md border px-2 text-meta font-semibold uppercase tracking-widest transition-colors disabled:opacity-50"
       style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       aria-label={label}
       title={label}

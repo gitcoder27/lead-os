@@ -22,7 +22,7 @@ export function TriagePanelHeader({ issue, jiraBaseUrl, onClose }: TriagePanelHe
       <button
         type="button"
         onClick={onClose}
-        className="p-1.5 -ml-1 rounded-lg transition-colors duration-150 hover:bg-[var(--bg-tertiary)]"
+        className="p-1.5 -ml-1 rounded-lg transition-colors duration-150 hover:bg-(--bg-tertiary)"
         title="Close (Esc)"
         aria-label="Close"
       >
@@ -43,7 +43,7 @@ export function TriagePanelHeader({ issue, jiraBaseUrl, onClose }: TriagePanelHe
             href={jiraBaseUrl ? `${jiraBaseUrl}/browse/${issue.jiraKey}` : undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1 rounded-md transition-colors duration-150 hover:bg-[var(--bg-tertiary)]"
+            className="p-1 rounded-md transition-colors duration-150 hover:bg-(--bg-tertiary)"
             title="Open in Jira"
             style={{
               pointerEvents: jiraBaseUrl ? 'auto' : 'none',

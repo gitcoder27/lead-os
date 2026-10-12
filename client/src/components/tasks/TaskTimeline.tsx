@@ -124,7 +124,7 @@ function EventBody({ text }: { text: string }) {
   return (
     <>
       <div
-        className={`whitespace-pre-wrap break-words text-body leading-[1.6] ${long && !expanded ? 'line-clamp-6' : ''}`}
+        className={`whitespace-pre-wrap wrap-break-word text-body leading-[1.6] ${long && !expanded ? 'line-clamp-6' : ''}`}
         style={{ color: 'var(--text-primary)', overflowWrap: 'anywhere' }}
       >
         {text}
@@ -133,7 +133,7 @@ function EventBody({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1 text-ui font-medium outline-none hover:underline focus-visible:underline"
+          className="mt-1 text-ui font-medium outline-hidden hover:underline focus-visible:underline"
           style={{ color: 'var(--accent-text, var(--accent))' }}
           aria-expanded={expanded}
         >
@@ -174,7 +174,7 @@ export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
 }
 
 const ACTION_BUTTON =
-  'flex h-6 w-6 items-center justify-center rounded-md outline-none transition-opacity hover:bg-[var(--bg-tertiary)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--border-active)] group-hover/event:opacity-100 group-focus-within/event:opacity-100 [@media(hover:hover)]:opacity-0';
+  'flex h-6 w-6 items-center justify-center rounded-md outline-hidden transition-opacity hover:bg-(--bg-tertiary) focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--border-active) group-hover/event:opacity-100 group-focus-within/event:opacity-100 [@media(hover:hover)]:opacity-0';
 
 const FOCUSED_LABELS: Partial<Record<TaskEventType, string>> = { instruction: 'Instruction', update: 'Update', created: 'Assignment', assign: 'Assignment' };
 
@@ -197,9 +197,9 @@ export function TaskTimeline(props: TaskTimelineProps) {
   return (
     <>
       {eventId && target.isLoading ? <p role="status">Opening update…</p> : null}
-      {eventId && target.enabled && target.isError ? <p role="alert">This update is unavailable. <button type="button" className="min-h-[44px] rounded-md px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]" onClick={() => void target.refetch()}>Retry</button></p> : null}
+      {eventId && target.enabled && target.isError ? <p role="alert">This update is unavailable. <button type="button" className="min-h-[44px] rounded-md px-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)" onClick={() => void target.refetch()}>Retry</button></p> : null}
       {event ? (
-        <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" style={{ borderColor: 'var(--accent)' }}>
+        <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-hidden focus-visible:ring-2 focus-visible:ring-(--focus-ring)" style={{ borderColor: 'var(--accent)' }}>
           <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
           <p className="mb-2 mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
           <EventBody text={messageBody(event, props.resolveName)} />
@@ -259,7 +259,7 @@ function MessageItem({ event, last, accountId, viewerName, resolveName, actions 
   return (
     <li className={`group/event relative flex gap-3 ${last ? '' : 'pb-5'}`}>
       <Rail last={last} />
-      <span className="relative z-[1] h-6 shrink-0 self-start rounded-full" style={{ background: 'var(--bg-primary)' }}>
+      <span className="relative z-1 h-6 shrink-0 self-start rounded-full" style={{ background: 'var(--bg-primary)' }}>
         <MessageAvatar event={event} label={label} viewerName={viewerName} />
       </span>
       <div className="min-w-0 flex-1">
@@ -298,7 +298,7 @@ function ChangeLine({ change, accountId, actions }: { change: ActivityChange; ac
   return (
     <div className="flex min-h-[24px] min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-ui">
       <span
-        className={`min-w-0 break-words ${change.event.redacted ? 'italic' : ''}`}
+        className={`min-w-0 wrap-break-word ${change.event.redacted ? 'italic' : ''}`}
         style={{ color: change.event.redacted ? 'var(--text-muted)' : 'var(--text-secondary)', overflowWrap: 'anywhere' }}
       >
         {change.text}
@@ -318,7 +318,7 @@ function ChangeLine({ change, accountId, actions }: { change: ActivityChange; ac
 
 function ChangeDot() {
   return (
-    <span aria-hidden="true" className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center">
+    <span aria-hidden="true" className="relative z-1 flex h-6 w-6 shrink-0 items-center justify-center">
       <span className="h-[7px] w-[7px] rounded-full" style={{ background: 'var(--bg-primary)', border: '1.5px solid var(--text-muted)' }} />
     </span>
   );
@@ -348,7 +348,7 @@ function ChangeRun({ changes, last, accountId, actions }: ItemProps & { changes:
               type="button"
               aria-expanded
               onClick={() => setOpen(false)}
-              className={`-mx-1.5 inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`-mx-1.5 inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               style={{ color: 'var(--text-muted)' }}
             >
               <ChevronDown size={12} className="rotate-180" aria-hidden="true" />
@@ -365,7 +365,7 @@ function ChangeRun({ changes, last, accountId, actions }: ItemProps & { changes:
   return (
     <li className={`relative flex gap-3 ${last ? '' : 'pb-2.5'}`}>
       <Rail last={last} />
-      <span aria-hidden="true" className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center">
+      <span aria-hidden="true" className="relative z-1 flex h-6 w-6 shrink-0 items-center justify-center">
         <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full" style={{ background: 'var(--bg-primary)', border: '1.5px solid var(--text-muted)' }}>
           <span className="h-[3px] w-[3px] rounded-full" style={{ background: 'var(--text-muted)' }} />
         </span>
@@ -374,7 +374,7 @@ function ChangeRun({ changes, last, accountId, actions }: ItemProps & { changes:
         type="button"
         aria-expanded={false}
         onClick={() => setOpen(true)}
-        className={`-mx-1.5 flex min-h-[24px] min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`-mx-1.5 flex min-h-[24px] min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 text-left text-ui transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
       >
         <span className="shrink-0 font-medium" style={{ color: 'var(--text-secondary)' }}>{changes.length} changes</span>
         <span className="min-w-0 truncate" style={{ color: 'var(--text-muted)' }}>
@@ -422,8 +422,8 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           <div key={index} className="flex gap-3">
             <span className="h-6 w-6 shrink-0 animate-pulse rounded-full" style={{ background: 'var(--bg-tertiary)' }} />
             <div className="flex-1 space-y-1.5 pt-1">
-              <span className="block h-2.5 w-24 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)' }} />
-              <span className="block h-2.5 w-3/4 animate-pulse rounded" style={{ background: 'var(--bg-tertiary)', opacity: 0.7 }} />
+              <span className="block h-2.5 w-24 animate-pulse rounded-sm" style={{ background: 'var(--bg-tertiary)' }} />
+              <span className="block h-2.5 w-3/4 animate-pulse rounded-sm" style={{ background: 'var(--bg-tertiary)', opacity: 0.7 }} />
             </div>
           </div>
         ))}
@@ -504,7 +504,7 @@ function TaskTimelineBody({ taskKey, mode, emptyLabel = 'No activity yet.', reso
           type="button"
           onClick={() => void query.fetchNextPage()}
           disabled={query.isFetching}
-          className="ml-9 mt-1 rounded-lg px-2 py-1 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+          className="ml-9 mt-1 rounded-lg px-2 py-1 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) disabled:opacity-40"
           style={{ color: 'var(--accent-text, var(--accent))' }}
         >
           {query.isFetchingNextPage ? 'Loading…' : 'Load older activity'}

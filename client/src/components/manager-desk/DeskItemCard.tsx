@@ -43,7 +43,7 @@ export function DeskItemCard({
           onSelect();
         }
       }}
-      className="group relative min-h-[70px] cursor-pointer overflow-hidden rounded-lg border px-3 py-3 outline-none transition-[background-color,box-shadow,opacity,transform] duration-150 hover:-translate-y-[1px] focus-visible:ring-1 focus-visible:ring-[color-mix(in_srgb,var(--md-accent)_48%,transparent)] active:scale-[0.995] sm:px-3.5"
+      className="group relative min-h-[70px] cursor-pointer overflow-hidden rounded-lg border px-3 py-3 outline-hidden transition-[background-color,box-shadow,opacity,transform] duration-150 hover:-translate-y-px focus-visible:ring-1 focus-visible:ring-[color-mix(in_srgb,var(--md-accent)_48%,transparent)] active:scale-[0.995] sm:px-3.5"
       role="button"
       tabIndex={0}
       aria-label={`Open ${item.title}`}

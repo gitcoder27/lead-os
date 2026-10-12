@@ -47,7 +47,7 @@ export function ProjectFilterChip({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Project filter: ${label}`}
-        className="task-toolbar-chip flex h-8 max-w-[240px] items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+        className="task-toolbar-chip flex h-8 max-w-[240px] items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
         style={{ color: active ? 'var(--accent-text)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}
       >
         <FolderKanban size={12} aria-hidden="true" />

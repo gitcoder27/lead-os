@@ -114,7 +114,7 @@ export function ManagerDeskCommandBar({
                 >
                   <span>{label}</span>
                   <span
-                    className="rounded px-1 font-mono text-ui font-semibold tabular-nums"
+                    className="rounded-sm px-1 font-mono text-ui font-semibold tabular-nums"
                     style={{
                       background: quickFilter === key ? 'color-mix(in srgb, var(--md-accent) 14%, transparent)' : 'color-mix(in srgb, var(--bg-tertiary) 72%, transparent)',
                       color: quickFilter === key ? 'var(--md-accent)' : 'var(--text-muted)',
@@ -135,7 +135,7 @@ export function ManagerDeskCommandBar({
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
                 placeholder="Search…"
-                className="h-7 min-w-0 flex-1 bg-transparent text-ui outline-none placeholder:text-placeholder"
+                className="h-7 min-w-0 flex-1 bg-transparent text-ui outline-hidden placeholder:text-placeholder"
                 style={{ color: 'var(--text-primary)' }}
                 aria-label="Search manager desk tasks"
               />
@@ -224,7 +224,7 @@ function StructuredFilters({
       <button
         type="button"
         onClick={onClear}
-        className="self-end rounded-lg border px-2 py-1.5 text-ui font-semibold uppercase tracking-[0.1em]"
+        className="self-end rounded-lg border px-2 py-1.5 text-ui font-semibold uppercase tracking-widest"
         style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
       >
         Clear
@@ -245,12 +245,12 @@ function SelectControl({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-0.5 text-meta font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--text-muted)' }}>
+    <label className="flex flex-col gap-0.5 text-meta font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="rounded-lg border px-2 py-1.5 text-ui font-medium outline-none"
+        className="rounded-lg border px-2 py-1.5 text-ui font-medium outline-hidden"
         style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
       >
         <option value="">All</option>

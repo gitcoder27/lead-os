@@ -338,7 +338,7 @@ export function CommandPalette({ onClose, onOpenTarget, onViewChange }: CommandP
             }}
             onKeyDown={handleInputKeyDown}
             placeholder={`Search, or type to add to ${surfaceLabel}…`}
-            className="flex-1 bg-transparent text-title-sm outline-none placeholder:text-placeholder"
+            className="flex-1 bg-transparent text-title-sm outline-hidden placeholder:text-placeholder"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Search"
             role="combobox"

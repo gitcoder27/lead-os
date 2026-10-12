@@ -132,7 +132,7 @@ export function TaskLabelPicker({ labels, onChange, disabled = false }: TaskLabe
             }
           }}
           placeholder={labels.length ? '' : 'Add label…'}
-          className="min-w-[72px] flex-1 rounded-md bg-transparent px-1 py-0.5 text-ui outline-none"
+          className="min-w-[72px] flex-1 rounded-md bg-transparent px-1 py-0.5 text-ui outline-hidden"
           style={{ color: 'var(--text-primary)' }}
           aria-label="Add a label"
         />

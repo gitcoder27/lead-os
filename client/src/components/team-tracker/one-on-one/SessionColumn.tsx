@@ -347,7 +347,7 @@ function LiveSession({
             aria-haspopup="dialog"
             aria-expanded={Boolean(dateAnchor)}
             title="Reschedule"
-            className={`-ml-1.5 flex min-w-0 items-baseline gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`-ml-1.5 flex min-w-0 items-baseline gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           >
             <span className="truncate text-title-sm font-semibold tracking-[-0.01em]" style={{ color: 'var(--text-primary)' }}>
               {date.label}
@@ -466,14 +466,14 @@ function LiveSession({
         }}
       >
         <div
-          className="flex items-center gap-2 rounded-lg pl-2.5 pr-1 transition-[border-color,box-shadow] focus-within:border-[var(--border-active)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_10%,transparent)]"
+          className="flex items-center gap-2 rounded-lg pl-2.5 pr-1 transition-[border-color,box-shadow] focus-within:border-(--border-active) focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_10%,transparent)]"
           style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)' }}
         >
           <input
             value={actionDraft}
             onChange={(event) => setActionDraft(event.target.value)}
             placeholder="Action item…"
-            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
+            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-hidden placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Add action item"
           />

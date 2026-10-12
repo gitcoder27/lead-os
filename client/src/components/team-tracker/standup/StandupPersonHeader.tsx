@@ -63,7 +63,7 @@ export function StandupPersonHeader({
         <Avatar name={day.developer.displayName} seed={day.developer.accountId} size={42} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 data-standup-person tabIndex={-1} className="break-words text-title font-semibold leading-7 outline-none" style={{ color: 'var(--text-primary)' }}>
+            <h2 data-standup-person tabIndex={-1} className="wrap-break-word text-title font-semibold leading-7 outline-hidden" style={{ color: 'var(--text-primary)' }}>
               {day.developer.displayName}
               <YouTag show={day.developer.isSelf} />
             </h2>
@@ -127,7 +127,7 @@ function NavButton({ label, onClick, disabled, children }: { label: string; onCl
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex h-10 w-10 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-30 disabled:hover:bg-transparent"
+      className="flex h-10 w-10 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) disabled:opacity-30 disabled:hover:bg-transparent"
       style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
       aria-label={label}
       title={label}
@@ -160,7 +160,7 @@ function StatusMenu({ status, suggested, onSelect }: {
         aria-label={`Set developer status (currently ${STATUS_META[status].label})`}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
-        className="group inline-flex min-h-8 items-center gap-1 rounded-full pr-1.5 transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+        className="group inline-flex min-h-8 items-center gap-1 rounded-full pr-1.5 transition-colors hover:bg-(--bg-tertiary) focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--border-active)"
       >
         <DevStatusMark status={status} emphasis />
         <ChevronDown size={12} aria-hidden="true" className="opacity-60 transition-transform group-aria-expanded:rotate-180" style={{ color: 'var(--text-muted)' }} />

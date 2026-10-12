@@ -41,7 +41,7 @@ export function StandupActionBar({ groups }: { groups: StandupActionGroup[] }) {
                 onClick={action.onRun}
                 disabled={action.disabled}
                 title={`${action.label} (${action.keys.join(' / ')})`}
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:pointer-events-none disabled:opacity-35"
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) disabled:pointer-events-none disabled:opacity-35"
                 style={{ color: action.emphasis ? 'var(--accent)' : 'var(--text-secondary)' }}
               >
                 <span className="hint-fine-only flex items-center gap-0.5">

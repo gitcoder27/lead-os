@@ -26,7 +26,7 @@ export function CommentForm({ issueKey }: CommentFormProps) {
         onChange={(e) => setBody(e.target.value)}
         placeholder="Add a Jira comment…"
         rows={2}
-        className="flex-1 px-3 py-2 rounded-lg text-body resize-none focus:outline-none focus:ring-1 leading-relaxed"
+        className="flex-1 px-3 py-2 rounded-lg text-body resize-none focus:outline-hidden focus:ring-1 leading-relaxed"
         style={{
           background: 'var(--bg-tertiary)',
           color: 'var(--text-primary)',

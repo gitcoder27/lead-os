@@ -573,7 +573,7 @@ export function HistorySection({ title, items, open, onToggle }: HistorySectionP
         type="button"
         onClick={hasItems ? onToggle : undefined}
         disabled={!hasItems}
-        className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors enabled:hover:bg-[var(--bg-tertiary)] disabled:cursor-default ${FOCUS_RING}`}
+        className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors enabled:hover:bg-(--bg-tertiary) disabled:cursor-default ${FOCUS_RING}`}
         aria-expanded={hasItems ? open : undefined}
         aria-controls={hasItems ? regionId : undefined}
       >
@@ -680,7 +680,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
       )}
       <span
         aria-hidden="true"
-        className="relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+        className="relative z-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
         style={{
           color: author.color,
           background: `color-mix(in srgb, ${author.color} 14%, var(--bg-primary))`,
@@ -722,7 +722,7 @@ function CheckInEntry({ checkIn, showDate = false, last }: { checkIn: TrackerChe
           className="mt-1.5 rounded-xl px-3 py-2.5"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
         >
-          <p className="whitespace-pre-wrap break-words text-body leading-5" style={{ color: 'var(--text-primary)' }}>
+          <p className="whitespace-pre-wrap wrap-break-word text-body leading-5" style={{ color: 'var(--text-primary)' }}>
             {checkIn.summary}
           </p>
           {rationale && (

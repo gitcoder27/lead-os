@@ -320,7 +320,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
         <div
           ref={highlightRef}
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-body leading-relaxed"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap wrap-break-word rounded-xl px-3 py-2 text-body leading-relaxed"
           style={{ color: 'var(--text-primary)', border: '1px solid transparent' }}
         >
           {highlightSpans()}
@@ -357,7 +357,7 @@ export function CaptureBox({ prefill = '', assignee, onClose, onCaptured, defaul
           placeholder="What do you need to do?"
           aria-describedby={hintId}
           aria-label="Capture"
-          className="capture-title-input relative w-full resize-none rounded-xl px-3 py-2 text-body leading-relaxed outline-none"
+          className="capture-title-input relative w-full resize-none rounded-xl px-3 py-2 text-body leading-relaxed outline-hidden"
           style={{
             background: 'transparent',
             color: 'transparent',

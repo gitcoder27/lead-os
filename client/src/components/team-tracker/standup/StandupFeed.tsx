@@ -83,7 +83,7 @@ export function StandupFeed({
                 onClick={onCollapse}
                 aria-label="Hide feed"
                 title="Hide feed"
-                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-[var(--bg-tertiary)]"
+                className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-(--bg-tertiary)"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <PanelRightClose size={13} aria-hidden="true" />
@@ -165,12 +165,12 @@ function FeedGroupCard({
               title={`Focus ${group.taskKey}`}
             >
               <span className="shrink-0 font-mono text-ui font-semibold" style={{ color: 'var(--accent)' }}>{group.taskKey}</span>
-              <span className="break-words text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
+              <span className="wrap-break-word text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{group.title}</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenTask(group.taskKey!)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-(--bg-tertiary)"
               style={{ color: 'var(--text-muted)' }}
               aria-label={`Open ${group.taskKey}`}
               title="Open task"
@@ -207,7 +207,7 @@ function FeedGroupCard({
                   </span>
                 </div>
                 {view.text && (
-                  <p className="whitespace-pre-line break-words text-body leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
+                  <p className="whitespace-pre-line wrap-break-word text-body leading-[1.45]" style={{ color: 'var(--text-secondary)' }}>
                     {view.text}
                   </p>
                 )}
@@ -228,7 +228,7 @@ export function StandupFeedRail({ count, onExpand }: { count: number | undefined
       onClick={onExpand}
       aria-label={count ? `Show feed (${count} since last standup)` : 'Show feed'}
       title="Show feed"
-      className="flex h-9 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg hover:bg-[var(--bg-tertiary)]"
+      className="flex h-9 w-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg hover:bg-(--bg-tertiary)"
       style={{ color: 'var(--text-muted)' }}
     >
       <PanelRightOpen size={14} aria-hidden="true" />

@@ -83,7 +83,7 @@ export function AddTrackerItemForm({
         onClick={() => setOpen(true)}
         data-task-shortcut="n"
         title="Add a planned task (A)"
-        className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-body transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-secondary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
       >
         <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -137,7 +137,7 @@ export function AddTrackerItemForm({
           <button
             type="button"
             onClick={() => setJiraPickerOpen((current) => !current)}
-            className={`rounded-md px-2 py-0.5 text-ui font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+            className={`rounded-md px-2 py-0.5 text-ui font-medium transition-colors hover:bg-(--accent-glow) ${FOCUS_RING}`}
             style={{ color: 'var(--accent)' }}
             aria-expanded={jiraPickerOpen}
           >
@@ -214,7 +214,7 @@ export function AddTrackerItemForm({
                 {filteredIssues.map((issue) => (
                   <div
                     key={issue.jiraKey}
-                    className="px-2.5 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
+                    className="px-2.5 py-2 transition-colors hover:bg-(--bg-tertiary)"
                     style={{ borderBottom: '1px solid var(--border)' }}
                   >
                     <div className="flex items-center gap-2">
@@ -269,7 +269,7 @@ export function AddTrackerItemForm({
         <button
           type="button"
           onClick={resetForm}
-          className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--text-secondary)' }}
         >
           Cancel

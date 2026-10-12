@@ -77,7 +77,7 @@ export function LabelsSection() {
             }}
             placeholder="New label name…"
             aria-label="New label name"
-            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+            className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
             style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
           />
         </div>
@@ -130,7 +130,7 @@ export function LabelsSection() {
                       if (event.key === 'Enter') handleRename(label);
                       if (event.key === 'Escape') setEditing(null);
                     }}
-                    className="min-w-0 flex-1 rounded-lg px-2 py-1 text-body outline-none"
+                    className="min-w-0 flex-1 rounded-lg px-2 py-1 text-body outline-hidden"
                     style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                     aria-label={`Rename ${label.name}`}
                   />

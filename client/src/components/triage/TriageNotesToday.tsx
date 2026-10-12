@@ -71,7 +71,7 @@ export function TriageNotesToday({ value, dateLabel, onChange, onBlur, readOnly 
         onBlur={() => { isFocusedRef.current = false; setIsFocused(false); onBlur(); }}
         readOnly={readOnly}
         placeholder="Add today's analysis, findings, or handoff…"
-        className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.7] focus:outline-none read-only:cursor-default"
+        className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.7] focus:outline-hidden read-only:cursor-default"
         style={{ color: 'var(--text-primary)', minHeight: 56, maxHeight: 200, fontFamily: "'Geist Variable', sans-serif" }}
       />
     </div>

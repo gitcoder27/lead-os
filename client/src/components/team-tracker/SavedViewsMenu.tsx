@@ -203,7 +203,7 @@ const NameInput = forwardRef<HTMLInputElement, {
       onKeyDown={(e) => { if (e.key === 'Enter') onSubmit(); if (e.key === 'Escape') onCancel(); }}
       placeholder={placeholder}
       maxLength={120}
-      className="flex-1 bg-transparent text-body outline-none placeholder:text-placeholder"
+      className="flex-1 bg-transparent text-body outline-hidden placeholder:text-placeholder"
       style={{ color: 'var(--text-primary)' }}
     />
     <button

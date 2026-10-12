@@ -19,7 +19,7 @@ export function TrackerItemRowDetails({ regionId, title, note }: TrackerItemRowD
       <div className="ui-label">
         Full title
       </div>
-      <div className="mt-1 text-body leading-5 break-words" style={{ color: 'var(--text-primary)' }}>
+      <div className="mt-1 text-body leading-5 wrap-break-word" style={{ color: 'var(--text-primary)' }}>
         {title}
       </div>
       {note && (
@@ -27,7 +27,7 @@ export function TrackerItemRowDetails({ regionId, title, note }: TrackerItemRowD
           <div className="ui-label mt-2">
             Notes
           </div>
-          <div className="mt-1 whitespace-pre-wrap break-words text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
+          <div className="mt-1 whitespace-pre-wrap wrap-break-word text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
             {note}
           </div>
         </>

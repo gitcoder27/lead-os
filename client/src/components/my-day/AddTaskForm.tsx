@@ -17,7 +17,7 @@ interface AddTaskFormProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const ghostButton = `inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`;
+const ghostButton = `inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`;
 
 export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpenChange }: AddTaskFormProps) {
   const [openState, setOpenState] = useState(false);
@@ -88,10 +88,10 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
         className={`group/add flex w-full items-center gap-3 px-3 py-2.5 text-left text-body transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_35%,transparent)] disabled:opacity-50 sm:px-4 ${FOCUS_RING} focus-visible:ring-inset`}
         style={{ color: 'var(--text-muted)' }}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors group-hover/add:text-[var(--accent)]">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors group-hover/add:text-(--accent)">
           <Plus size={15} aria-hidden="true" />
         </span>
-        <span className="flex-1 transition-colors group-hover/add:text-[var(--text-secondary)]">Add task</span>
+        <span className="flex-1 transition-colors group-hover/add:text-(--text-secondary)">Add task</span>
         <span className="hidden sm:inline-flex" aria-hidden="true"><Kbd>n</Kbd></span>
       </button>
     );
@@ -131,7 +131,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
               }
             }}
             placeholder="What’s next? One line is enough"
-            className="w-full bg-transparent text-body font-medium leading-6 outline-none placeholder:font-normal placeholder:text-[var(--text-placeholder)]"
+            className="w-full bg-transparent text-body font-medium leading-6 outline-hidden placeholder:font-normal placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
           />
 
@@ -156,7 +156,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                   setSelectedIssue(null);
                   setJiraSearch('');
                 }}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${FOCUS_RING}`}
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm ${FOCUS_RING}`}
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Remove linked Jira"
               >
@@ -184,7 +184,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                   disabled={disabled}
                   placeholder="Search by key or summary..."
                   aria-label="Search Jira issues"
-                  className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none focus:border-[var(--border-active)]"
+                  className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden focus:border-(--border-active)"
                   style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
                 />
               </div>
@@ -197,7 +197,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                   {filteredIssues.map((issue, position) => (
                     <div
                       key={issue.jiraKey}
-                      className="px-3 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
+                      className="px-3 py-2 transition-colors hover:bg-(--bg-tertiary)"
                       style={{ borderTop: position > 0 ? `1px solid ${HAIRLINE}` : undefined }}
                     >
                       <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                         <button
                           type="button"
                           onClick={() => selectIssue(issue)}
-                          className="min-w-0 flex-1 truncate text-left text-body outline-none focus-visible:underline"
+                          className="min-w-0 flex-1 truncate text-left text-body outline-hidden focus-visible:underline"
                           style={{ color: 'var(--text-secondary)' }}
                         >
                           {issue.summary}
@@ -251,7 +251,7 @@ export function AddTaskForm({ onAdd, isPending, disabled, open: openProp, onOpen
                 disabled={disabled}
                 rows={3}
                 placeholder="Context, links, what done looks like (optional)"
-                className="w-full resize-none rounded-lg px-2.5 py-1.5 text-body outline-none focus:border-[var(--border-active)]"
+                className="w-full resize-none rounded-lg px-2.5 py-1.5 text-body outline-hidden focus:border-(--border-active)"
                 style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
               />
             </div>

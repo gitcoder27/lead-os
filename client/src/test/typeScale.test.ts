@@ -22,8 +22,9 @@ describe('type scale (docs/73 UXD-02)', () => {
   it('defines the six size tokens and maps them in Tailwind', () => {
     const index = read('index.css');
     for (const px of [11, 12, 13, 15, 19, 24]) expect(index).toContain(`--fs-${px}: ${px}px;`);
-    const tailwind = readFileSync(resolve(root, '..', 'tailwind.config.ts'), 'utf8');
-    for (const name of ['meta', 'ui', 'body', "'title-sm'", 'title', 'display']) expect(tailwind).toMatch(new RegExp(`${name}: 'var\\(--fs-\\d+\\)'`));
+    for (const [name, px] of Object.entries({ meta: 11, ui: 12, body: 13, 'title-sm': 15, title: 19, display: 24 })) {
+      expect(index).toContain(`--text-${name}: var(--fs-${px});`);
+    }
   });
 
   it('uses no arbitrary or default Tailwind font sizes outside the landing page', () => {

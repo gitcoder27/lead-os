@@ -61,7 +61,7 @@ export function TagManagementSection() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search tags…"
               aria-label="Search tags"
-              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
             />
           </div>
@@ -255,7 +255,7 @@ function DeleteTagDialog({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 md:p-6">
+    <div className="fixed inset-0 z-110 flex items-center justify-center p-3 sm:p-4 md:p-6">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

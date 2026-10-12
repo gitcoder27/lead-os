@@ -19,6 +19,11 @@ Jira defects remain a first-class workflow, but the product direction is broader
 - Service-layer unit tests for workload/alerts/automation/issues
 - Phase 1 product reframe toward LeadOS navigation and naming
 
+## Browser support
+
+The Tailwind 4 frontend requires Safari 16.4+, Chrome 111+, or Firefox 128+.
+See the [Tailwind upgrade guide](https://tailwindcss.com/docs/upgrade-guide#browser-requirements).
+
 ## Repository Layout
 
 ```text

@@ -96,7 +96,7 @@ export function Header({ activeView, onViewChange, onOpenActionTarget, captureCo
               aria-label="LeadOS, go to Today"
               onClick={(event) => { if (onViewChange) interceptWorkspaceLink(event, () => onViewChange('today')); }}
             >
-              <span className="h-8 w-8 md:h-11 md:w-11 rounded-[12px] flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
+              <span className="h-8 w-8 md:h-11 md:w-11 rounded-[12px] flex items-center justify-center shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>
                 <LeadOSMark size={32} />
               </span>
               <span className="font-sans text-title-sm font-semibold leading-tight truncate md:hidden lg:inline" style={{ color: 'var(--text-primary)' }}>

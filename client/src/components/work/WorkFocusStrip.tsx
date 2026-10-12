@@ -97,7 +97,7 @@ export function WorkFocusStrip({ activeFilter, onFilterChange, actions, leading 
                 type="button"
                 onClick={() => onFilterChange(signal.filter)}
                 aria-pressed={active}
-                className="group flex h-9 shrink-0 items-center justify-between gap-2.5 rounded-lg border px-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] active:scale-[0.99]"
+                className="group flex h-9 shrink-0 items-center justify-between gap-2.5 rounded-lg border px-2.5 text-left transition-colors hover:bg-(--bg-tertiary) active:scale-[0.99]"
                 style={{
                   borderColor: active ? `color-mix(in srgb, ${signal.color} 42%, var(--border))` : 'var(--border)',
                   background: active ? `color-mix(in srgb, ${signal.color} 10%, var(--bg-primary))` : 'color-mix(in srgb, var(--bg-primary) 66%, transparent)',

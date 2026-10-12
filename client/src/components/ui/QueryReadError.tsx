@@ -26,7 +26,7 @@ export function QueryReadError({ message, onRetry, retrying = false, detail }: {
 
 export function ErrorDetails({ detail }: { detail: string }) {
   return (
-    <Disclosure summary="Details" className="text-ui" panelClassName="mt-1 max-w-[60ch] break-words text-ui">
+    <Disclosure summary="Details" className="text-ui" panelClassName="mt-1 max-w-[60ch] wrap-break-word text-ui">
       <p style={{ color: 'var(--text-muted)' }}>{detail}</p>
     </Disclosure>
   );

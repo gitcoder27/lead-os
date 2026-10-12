@@ -206,7 +206,7 @@ export function AssignMenu({ anchor, developers, onClose, onSelect }: {
         }}
         placeholder="Assign to…"
         aria-label="Filter people"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-hidden"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {options.map((option) => (
@@ -257,7 +257,7 @@ export function WaitingMenu({ anchor, developers, contacts, current, onClose, on
         }}
         placeholder="Waiting on…"
         aria-label="Waiting on"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-hidden"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {options.map((option) => (
@@ -339,7 +339,7 @@ export function LabelMenu({ anchor, labels, stateFor, onClose, onToggle }: {
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Filter labels…"
         aria-label="Filter labels"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-hidden"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {visible.map((label) => {

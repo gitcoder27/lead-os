@@ -34,7 +34,7 @@ export const ProjectDirectory = ({ today, archived, query, searchRef, onQuery, o
         </div>
         <label className="project-search flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 max-sm:w-full" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <Search size={14} aria-hidden="true" />
-          <input ref={searchRef} aria-label="Search projects" placeholder="Search projects…" value={query} onChange={(event) => onQuery(event.target.value)} className="min-w-0 bg-transparent text-body outline-none" style={{ color: 'var(--text-primary)' }} />
+          <input ref={searchRef} aria-label="Search projects" placeholder="Search projects…" value={query} onChange={(event) => onQuery(event.target.value)} className="min-w-0 bg-transparent text-body outline-hidden" style={{ color: 'var(--text-primary)' }} />
           {query && <button className="ui-icon-btn" aria-label="Clear project search" onClick={() => onQuery('')}><X size={13} /></button>}
         </label>
       </div>

@@ -87,7 +87,7 @@ export function AssistantComposer({ disabled, streaming, currentView, expanded, 
               send();
             }
           }}
-          className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-body leading-5 outline-none disabled:opacity-50"
+          className="max-h-32 min-w-0 flex-1 resize-none bg-transparent px-1 py-1 text-body leading-5 outline-hidden disabled:opacity-50"
           style={{ color: 'var(--text-primary)' }}
         />
         {streaming ? (

@@ -69,7 +69,7 @@ export function MyDayReadOnlyBanner({ reason, onToday }: { reason?: MyDayReadOnl
         <button
           type="button"
           onClick={onToday}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-lg px-3 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)] sm:self-auto ${FOCUS_RING}`}
+          className={`inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-lg px-3 text-ui font-semibold transition-colors hover:bg-(--bg-tertiary) sm:self-auto ${FOCUS_RING}`}
           style={{ color: 'var(--text-primary)', border: '1px solid var(--border)' }}
         >
           Back to today

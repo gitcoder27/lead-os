@@ -141,7 +141,7 @@ export function SectionTitle({
           onClick={onToggle}
           aria-expanded={open}
           aria-controls={itemsId}
-          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left outline-none transition-[background-color,color] duration-150 hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] focus-visible:ring-1 focus-visible:ring-[color:var(--md-accent)]"
+          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-left outline-hidden transition-[background-color,color] duration-150 hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] focus-visible:ring-1 focus-visible:ring-(--md-accent)"
           style={{ font: 'inherit', color: 'inherit' }}
         >
           {iconBadge}

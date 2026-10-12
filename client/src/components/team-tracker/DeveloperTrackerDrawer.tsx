@@ -317,7 +317,7 @@ export function DeveloperTrackerDrawer({
             animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
             transition={{ type: 'spring', damping: 34, stiffness: 340 }}
-            className="workspace-shell-drawer fixed right-0 z-drawer flex w-full max-w-[680px] flex-col overflow-hidden outline-none"
+            className="workspace-shell-drawer fixed right-0 z-drawer flex w-full max-w-[680px] flex-col overflow-hidden outline-hidden"
             style={{
               background: 'var(--bg-primary)',
               borderLeft: '1px solid var(--border)',
@@ -725,7 +725,7 @@ function CheckInComposer({
             }}
             data-task-shortcut="c"
             placeholder={noun === 'note' ? 'Add a note…' : 'Add a check-in note…'}
-            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-hidden placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
           />
           <button
@@ -875,7 +875,7 @@ function OneOnOneSectionBody({
           <button
             type="button"
             onClick={() => onOpenWorkspace(accountId)}
-            className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+            className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--accent-glow) ${FOCUS_RING}`}
             style={{ color: 'var(--accent)' }}
             data-testid="one-on-one-open-workspace"
           >

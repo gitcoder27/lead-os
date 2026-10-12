@@ -178,7 +178,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               value={toDate}
               min={minDate}
               onChange={(event) => setToDate(event.target.value)}
-              className="w-full rounded-xl px-3 py-2 text-body outline-none"
+              className="w-full rounded-xl px-3 py-2 text-body outline-hidden"
               style={{
                 background: 'var(--bg-tertiary)',
                 color: 'var(--text-primary)',
@@ -200,7 +200,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
             }}
           >
             <Clock size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--md-accent)' }} />
-            <div className="text-ui leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
+            <div className="text-ui leading-normal" style={{ color: 'var(--text-secondary)' }}>
               Scheduled times are rebased to the new day — the original time-of-day is preserved.
             </div>
           </div>
@@ -214,7 +214,7 @@ export function RescheduleItemDialog({ item, isPending, onConfirm, onClose }: Pr
               }}
             >
               <User size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--warning)' }} />
-              <div className="text-ui leading-[1.5]" style={{ color: 'var(--text-secondary)' }}>
+              <div className="text-ui leading-normal" style={{ color: 'var(--text-secondary)' }}>
                 Delegated to {assigneeName}. The linked team task moves to {formattedToDate ?? 'the new day'} and
                 restarts as planned.
               </div>

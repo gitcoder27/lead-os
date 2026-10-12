@@ -246,7 +246,7 @@ export function MyDayPage() {
     <>
       <MyDayTaskDetailContext.Provider value={taskDetailActions}>
       {/* docs/56 MDA-06: My Day has no app shell, so it owns the page's one <main>. */}
-      <main id="main" tabIndex={-1} className="h-full overflow-y-auto outline-none" style={{ background: 'var(--bg-canvas)' }}>
+      <main id="main" tabIndex={-1} className="h-full overflow-y-auto outline-hidden" style={{ background: 'var(--bg-canvas)' }}>
         <div className="mx-auto w-full max-w-[1160px] px-4 pb-16 pt-6 sm:px-6 md:pt-10 lg:px-10">
           <MyDayHeader
             inbox={<TaskInboxPopover />}
@@ -380,7 +380,7 @@ export function MyDayPage() {
                 readOnly={isReadOnly}
               >
                 <div
-                  className="overflow-hidden rounded-2xl ring-0 ring-[var(--border-active)] transition-shadow focus-within:ring-1"
+                  className="overflow-hidden rounded-2xl ring-0 ring-(--border-active) transition-shadow focus-within:ring-1"
                   style={surfaceStyle}
                 >
                   <div className="p-1.5">

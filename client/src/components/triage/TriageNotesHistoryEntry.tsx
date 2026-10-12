@@ -97,7 +97,7 @@ export function TriageNotesHistoryEntry({
             onBlur={() => { isFocusedRef.current = false; onBlur(); }}
             readOnly={readOnly}
             placeholder="Notes for this day…"
-            className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.65] focus:outline-none read-only:cursor-default"
+            className="w-full resize-none bg-transparent px-0 py-0 text-body leading-[1.65] focus:outline-hidden read-only:cursor-default"
             style={{ color: 'var(--text-primary)', minHeight: 48, maxHeight: 180, fontFamily: "'Geist Variable', sans-serif" }}
           />
         </div>

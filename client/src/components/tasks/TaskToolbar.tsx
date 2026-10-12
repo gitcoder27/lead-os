@@ -169,7 +169,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
                 }}
                 placeholder={projectContext ? 'Search project tasks…' : 'Search this view'}
                 aria-label="Search tasks"
-                className="min-w-0 flex-1 bg-transparent text-body outline-none"
+                className="min-w-0 flex-1 bg-transparent text-body outline-hidden"
                 style={{ color: 'var(--text-primary)' }}
               />
               {query ? (
@@ -181,7 +181,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
             {projectFilter}
 
             <button ref={optionsRef} type="button" onClick={open('options')} aria-haspopup="menu" aria-label={`View options${activeFilterCount ? ` (${activeFilterCount})` : ''}`} aria-describedby={activeFilterCount ? 'task-options-summary' : undefined}
-              className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
               style={{ color: activeFilterCount ? 'var(--accent)' : 'var(--text-secondary)', border: '1px solid var(--border)' }}>
               <SlidersHorizontal size={12} /><span className="hidden sm:inline">View options</span>{activeFilterCount ? <span className="tabular-nums">{` (${activeFilterCount})`}</span> : ''}
             </button>
@@ -190,7 +190,7 @@ export const TaskToolbar = forwardRef<HTMLInputElement, TaskToolbarProps>(functi
               type="button"
               onClick={(event) => onShowShortcuts(event.currentTarget)}
               data-shortcuts-anchor=""
-              className="hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] md:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) md:flex"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Keyboard shortcuts"
               title="Keyboard shortcuts (?)"

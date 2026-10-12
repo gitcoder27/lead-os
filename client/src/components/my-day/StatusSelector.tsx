@@ -42,7 +42,7 @@ export function StatusSelector({ current, onUpdate, isPending, disabled }: Statu
             aria-label={cfg.label}
             title={cfg.description}
             className={`relative flex h-[50px] min-w-0 flex-col items-center justify-center gap-1 rounded-[9px] px-1 text-ui font-medium transition-colors disabled:cursor-not-allowed ${
-              isActive ? '' : 'hover:text-[var(--text-primary)]'
+              isActive ? '' : 'hover:text-(--text-primary)'
             } ${FOCUS_RING}`}
             style={{ color: isActive ? cfg.textColor : 'var(--text-muted)' }}
           >

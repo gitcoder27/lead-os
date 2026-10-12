@@ -743,7 +743,7 @@ export function StandupMode({ date, board, onClose, onOpenTask, suspended = fals
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: reduceMotion ? 0 : 0.12, ease: 'easeOut' }}
-      className="standup-shell fixed inset-0 flex flex-col outline-none"
+      className="standup-shell fixed inset-0 flex flex-col outline-hidden"
       style={{ background: 'var(--bg-primary)' }}
       role="dialog"
       aria-modal="true"
@@ -1088,7 +1088,7 @@ function TopButton({
       aria-label={label}
       aria-pressed={pressed}
       title={label}
-      className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
       style={{
         color: pressed || accent ? 'var(--accent)' : 'var(--text-secondary)',
         border: `1px solid ${pressed || accent ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)'}`,

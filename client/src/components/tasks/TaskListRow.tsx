@@ -197,7 +197,7 @@ export const TaskListRow = memo(function TaskListRow({
               ? <button key={signal.label} type="button" className="task-row-inline flex items-center" style={{ color: signal.color }}
                   aria-label="High priority" title="High priority — change (p)" onClick={(event) => openInline('priority', event.currentTarget)}>{signal.icon}</button>
               : <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
-            {jira && <span className="hidden rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
+            {jira && <span className="hidden rounded-sm px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
             {outcomeAction && (
               // docs/73 UXD-12: the meeting's one action; the warning dot says it is owed.
               <button type="button" className="task-row-outcome ui-row-action"

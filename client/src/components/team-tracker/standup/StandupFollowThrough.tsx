@@ -27,7 +27,7 @@ export function StandupFollowThrough({ days, session, disabled, onToggle, onPlan
       const plan = followUpPlan(day, session);
       const concern = wrapUpConcern(day, session);
       return <div key={id} className="standup-action-row">
-        <div className="flex items-center gap-2"><Flag size={14} className="shrink-0 text-[var(--accent)]" /><button type="button" disabled={disabled} className="standup-person-link" onClick={() => onJump(id)} aria-label={`Go to ${day.developer.displayName}`}>{day.developer.displayName}</button>
+        <div className="flex items-center gap-2"><Flag size={14} className="shrink-0 text-(--accent)" /><button type="button" disabled={disabled} className="standup-person-link" onClick={() => onJump(id)} aria-label={`Go to ${day.developer.displayName}`}>{day.developer.displayName}</button>
           {!disabled && <button type="button" className="standup-text-button ml-auto" onClick={() => onToggle?.(id)} aria-label={`Remove follow-up for ${day.developer.displayName}`}>Remove</button>}
         </div>
         {concern && <p className="standup-concern">{concern}</p>}

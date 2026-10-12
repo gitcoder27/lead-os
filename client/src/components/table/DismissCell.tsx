@@ -61,7 +61,7 @@ export function DismissCell({ issueKey, onConfirm }: DismissCellProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 rounded-md flex items-center justify-center transition-colors opacity-0 group-hover/row:opacity-50 hover:!opacity-100 hover:bg-[var(--bg-tertiary)]"
+            className="absolute inset-0 rounded-md flex items-center justify-center transition-colors opacity-0 group-hover/row:opacity-50 hover:opacity-100! hover:bg-(--bg-tertiary)"
             style={{ color: 'var(--text-muted)' }}
             title="Dismiss — stop tracking this defect"
             aria-label={`Dismiss ${issueKey}`}

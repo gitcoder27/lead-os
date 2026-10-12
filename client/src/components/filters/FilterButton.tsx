@@ -27,7 +27,7 @@ export function FilterButton({ label, count, isActive, onClick, shortcut, isIdle
       <span className="flex items-center gap-2 min-w-0">
         {icon && (
           <span
-            className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
             style={{
               background: isActive ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
               color: isActive ? 'var(--accent)' : 'var(--text-muted)',

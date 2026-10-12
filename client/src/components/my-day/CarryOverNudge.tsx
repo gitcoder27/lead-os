@@ -80,7 +80,7 @@ export function CarryOverNudge({ items, viewDate, onCheckIn }: {
               type="button"
               onClick={() => item.taskKey && openTask(item.taskKey)}
               disabled={!item.taskKey}
-              className={`inline-flex h-7 max-w-[240px] items-center gap-1.5 rounded-lg px-2 text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`inline-flex h-7 max-w-[240px] items-center gap-1.5 rounded-lg px-2 text-ui transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
               title={item.title}
             >
@@ -102,7 +102,7 @@ export function CarryOverNudge({ items, viewDate, onCheckIn }: {
         onClick={dismiss}
         aria-label="Dismiss for today"
         title="Dismiss for today"
-        className={`-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
       >
         <X size={15} />

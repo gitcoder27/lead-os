@@ -68,14 +68,14 @@ export function SavedViewItem({
         <div className="flex items-center gap-1">
           <button
             onClick={onConfirmDelete}
-            className="text-ui font-medium px-1.5 py-0.5 rounded"
+            className="text-ui font-medium px-1.5 py-0.5 rounded-sm"
             style={{ color: 'var(--danger)' }}
           >
             Delete
           </button>
           <button
             onClick={onCancelDelete}
-            className="text-ui px-1.5 py-0.5 rounded"
+            className="text-ui px-1.5 py-0.5 rounded-sm"
             style={{ color: 'var(--text-muted)' }}
           >
             Cancel
@@ -109,7 +109,7 @@ export function SavedViewItem({
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={(e) => { e.stopPropagation(); onStartRename(); }}
-          className="rounded p-1 transition-colors"
+          className="rounded-sm p-1 transition-colors"
           style={{ color: 'var(--text-muted)' }}
           title="Rename"
         >
@@ -117,7 +117,7 @@ export function SavedViewItem({
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onStartDelete(); }}
-          className="rounded p-1 transition-colors"
+          className="rounded-sm p-1 transition-colors"
           style={{ color: 'var(--text-muted)' }}
           title="Delete"
         >

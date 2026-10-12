@@ -74,7 +74,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
         <div
-          className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
           style={{ background: 'var(--md-accent-glow)', color: 'var(--md-accent)' }}
         >
           <Plus size={11} />
@@ -98,7 +98,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
           onKeyDown={handleKeyDown}
           placeholder="Quick capture..."
           aria-label="Quick capture title"
-          className="flex-1 bg-transparent outline-none text-ui font-medium placeholder:font-normal"
+          className="flex-1 bg-transparent outline-hidden text-ui font-medium placeholder:font-normal"
           style={{
             color: 'var(--text-primary)',
             caretColor: 'var(--md-accent)',
@@ -111,7 +111,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
         <button
           onClick={handleSubmit}
           disabled={!title.trim() || isPending || disabled}
-          className="h-5 rounded px-2 text-meta font-semibold uppercase tracking-wide transition-all disabled:opacity-30"
+          className="h-5 rounded-sm px-2 text-meta font-semibold uppercase tracking-wide transition-all disabled:opacity-30"
           style={{
             background: 'var(--md-accent)',
             color: '#000',
@@ -135,7 +135,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
               aria-label="Quick capture kind"
               value={kind}
               onChange={e => setKind(e.target.value as ManagerDeskItemKind | '')}
-              className="bg-transparent text-ui font-medium outline-none cursor-pointer"
+              className="bg-transparent text-ui font-medium outline-hidden cursor-pointer"
               style={{ color: kind ? 'var(--text-primary)' : 'var(--text-muted)' }}
             >
               <option value="">Kind…</option>
@@ -153,7 +153,7 @@ export function QuickCapture({ onCapture, isPending, disabled = false, disabledL
               aria-label="Quick capture category"
               value={category}
               onChange={e => setCategory(e.target.value as ManagerDeskCategory | '')}
-              className="bg-transparent text-ui font-medium outline-none cursor-pointer"
+              className="bg-transparent text-ui font-medium outline-hidden cursor-pointer"
               style={{ color: category ? 'var(--text-primary)' : 'var(--text-muted)' }}
             >
               <option value="">Category…</option>

@@ -2,7 +2,7 @@
  * docs/54 V8: one avatar for a person everywhere — a hue-hashed initials disc
  * seeded by account id, so the same person is the same colour on Tasks,
  * Standup, the Team board and Today. `tone` adds a status ring (Today's
- * people rows); `ring` marks the current/selected person (Standup rail).
+ * people rows); `ring-3` marks the current/selected person (Standup rail).
  */
 
 export function initials(name: string): string {

@@ -946,7 +946,7 @@ function StepContent(props: StepContentProps) {
                     value={option.value}
                     checked={selected}
                     onChange={() => props.setWorkspaceKind(option.value)}
-                    className="mt-0.5 accent-[var(--accent-solid)]"
+                    className="mt-0.5 accent-(--accent-solid)"
                   />
                   <span>
                     <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{option.title}</span>
@@ -1071,7 +1071,7 @@ function StepContent(props: StepContentProps) {
                 props.setIncludeManagerJira(e.target.checked);
                 if (!e.target.checked) props.setSelectedManagerJiraAccountId('');
               }}
-              className="mt-0.5 accent-[var(--accent-solid)]"
+              className="mt-0.5 accent-(--accent-solid)"
             />
             <span>
               <span className="block text-title-sm font-semibold" style={{ color: 'var(--text-primary)' }}>

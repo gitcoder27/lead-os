@@ -333,7 +333,7 @@ function ReviewSession({
       {sheet?.kind === 'keys' ? <ShortcutSheet anchor={sheet.anchor} groups={sheetGroups} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === 'steps' ? (
         <TaskPopover anchor={sheet.anchor} role="dialog" label="Review steps" width={260} onClose={() => setSheet(null)}>
-          <div data-autofocus="" tabIndex={-1} className="outline-none">
+          <div data-autofocus="" tabIndex={-1} className="outline-hidden">
             <ReviewStepsRail
               variant="list"
               steps={railSteps}

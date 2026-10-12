@@ -60,7 +60,7 @@ export function DeskItemCardContent({ item, variant, isDone, isOverdue, readOnly
     <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3.5">
         <span
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
           style={{ background: getKindBackground(variant), color: getKindColor(variant, item.status) }}
           title={phase3 ? (item.kind === 'meeting' ? KIND_LABELS.meeting : 'Task') : KIND_LABELS[item.kind]}
         >

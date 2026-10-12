@@ -34,7 +34,7 @@ function LabeledInput({ label, id, children }: { label: string; id?: string; chi
   );
 }
 
-const inputClass = 'w-full rounded-lg px-3 py-1.5 text-body outline-none';
+const inputClass = 'w-full rounded-lg px-3 py-1.5 text-body outline-hidden';
 const inputStyle = {
   background: 'var(--settings-input-bg)',
   color: 'var(--text-primary)',
@@ -790,7 +790,7 @@ export function AssistantSection() {
                     aria-label={`Delete memory "${memory.text}"`}
                     onClick={() => void deleteMemory.mutateAsync(memory.id)}
                     disabled={deleteMemory.isPending}
-                    className="shrink-0 rounded p-1 transition-colors disabled:opacity-50"
+                    className="shrink-0 rounded-sm p-1 transition-colors disabled:opacity-50"
                     style={{ color: 'var(--text-muted)' }}
                   >
                     <Trash2 size={12} />

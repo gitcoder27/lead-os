@@ -87,7 +87,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
         aria-label="Quick update"
         disabled={disabled}
         rows={1}
-        className="block w-full resize-none bg-transparent text-body leading-[22px] outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed"
+        className="block w-full resize-none bg-transparent text-body leading-[22px] outline-hidden placeholder:text-(--text-placeholder) disabled:cursor-not-allowed"
         style={{ color: 'var(--text-primary)', maxHeight: MAX_HEIGHT }}
       />
 

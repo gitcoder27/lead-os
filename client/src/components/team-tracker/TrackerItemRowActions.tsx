@@ -52,7 +52,7 @@ export function TrackerItemRowActions({
     // stays put on touch screens), so the list reads as text until needed.
     return (
       <div
-        className="pointer-events-none absolute right-1.5 top-1.5 z-[2] flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+        className="pointer-events-none absolute right-1.5 top-1.5 z-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
         style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--soft-shadow)' }}
       >
         {onToggleTitleEditor && (
@@ -174,7 +174,7 @@ export function ToolbarButton({ label, title, onClick, disabled, children }: { l
         onClick();
       }}
       disabled={disabled}
-      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 ${FOCUS_RING}`}
+      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) disabled:opacity-40 ${FOCUS_RING}`}
       title={title ?? label}
       aria-label={label}
     >

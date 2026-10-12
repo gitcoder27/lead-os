@@ -47,7 +47,7 @@ export function WorkAttentionSignals({ onOpenTarget }: { onOpenTarget?: (target:
               type="button"
               onClick={() => runDismiss(signals.map((alert) => alert.id))}
               disabled={dismiss.isPending}
-              className="rounded px-1.5 py-0.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
+              className="rounded-sm px-1.5 py-0.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) disabled:opacity-45"
               style={{ color: 'var(--text-muted)' }}
             >
               Clear all

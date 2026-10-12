@@ -101,7 +101,7 @@ export function TriageTrackerSection({
               onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
               placeholder="Task description…"
               aria-label="Task"
-              className="flex-1 rounded-md px-2.5 py-1.5 text-body outline-none transition-colors"
+              className="flex-1 rounded-md px-2.5 py-1.5 text-body outline-hidden transition-colors"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             />
             <button

@@ -74,7 +74,7 @@ export function EditableTitle({
         <button
           type="button"
           onClick={commit}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--success)' }}
           title="Save title"
           aria-label="Save title"
@@ -84,7 +84,7 @@ export function EditableTitle({
         <button
           type="button"
           onClick={cancel}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--text-muted)' }}
           title="Cancel"
           aria-label="Cancel title edit"
@@ -108,7 +108,7 @@ export function EditableTitle({
         title="Click to rename"
       >
         <span
-          className={`line-clamp-2 break-words decoration-[var(--border-strong)] decoration-1 underline-offset-4 hover:underline ${className}`}
+          className={`line-clamp-2 wrap-break-word decoration-(--border-strong) decoration-1 underline-offset-4 hover:underline ${className}`}
           style={{ color }}
         >
           {item.title}
@@ -119,7 +119,7 @@ export function EditableTitle({
 
   return (
     <span
-      className={`line-clamp-2 min-w-0 flex-1 break-words ${className}`}
+      className={`line-clamp-2 min-w-0 flex-1 wrap-break-word ${className}`}
       style={{ color, textDecoration: strike ? 'line-through' : 'none' }}
       title={item.title}
     >
@@ -175,7 +175,7 @@ export function TaskTitle({
       aria-haspopup="dialog"
     >
       <span
-        className={`line-clamp-2 break-words decoration-[var(--border-strong)] decoration-1 underline-offset-4 hover:underline ${className}`}
+        className={`line-clamp-2 wrap-break-word decoration-(--border-strong) decoration-1 underline-offset-4 hover:underline ${className}`}
         style={{ color, textDecoration: strike ? 'line-through' : undefined }}
       >
         {item.title}
@@ -328,7 +328,7 @@ export function TaskNote({ note, className, clamp = true }: { note?: string; cla
     <div className={`flex items-start gap-1.5 ${className ?? ''}`}>
       <StickyNote size={12} className="mt-[3px] shrink-0" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
       <span
-        className={`whitespace-pre-line break-words text-body leading-[18px] ${clamp ? 'line-clamp-3' : ''}`}
+        className={`whitespace-pre-line wrap-break-word text-body leading-[18px] ${clamp ? 'line-clamp-3' : ''}`}
         style={{ color: 'var(--text-secondary)' }}
       >
         {note}
@@ -352,7 +352,7 @@ export function OpenTaskButton({ taskKey, label = 'Details', className = '' }: {
         event.stopPropagation();
         openTask(taskKey);
       }}
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-ui transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING} ${className}`}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-ui transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-secondary) ${FOCUS_RING} ${className}`}
       style={{ color: 'var(--text-muted)' }}
     >
       <PanelRight size={12} aria-hidden="true" />
@@ -420,7 +420,7 @@ export function InlineTaskActions({
         }}
         aria-label={`Add an update to ${taskKey}`}
         aria-expanded={composerOpen}
-        className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-secondary)] ${FOCUS_RING}`}
+        className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-ui transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-secondary) ${FOCUS_RING}`}
         style={{ color: composerOpen ? 'var(--text-secondary)' : 'var(--text-muted)' }}
       >
         <MessageSquarePlus size={12} aria-hidden="true" />
@@ -451,7 +451,7 @@ export function RowComposer({ taskKey, viewDate, onClose }: { taskKey: string; v
         onClick={onClose}
         aria-label="Close update"
         title="Close (Esc)"
-        className={`mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`mt-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
       >
         <X size={13} />

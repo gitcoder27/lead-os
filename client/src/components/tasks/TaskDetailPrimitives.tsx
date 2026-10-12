@@ -71,7 +71,7 @@ export const PropertyButton = forwardRef<HTMLButtonElement, PropertyButtonProps>
       aria-expanded={expanded}
       title={title}
       data-task-shortcut={shortcut}
-      className={`group/prop flex min-h-[32px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`group/prop flex min-h-[32px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-body transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
       style={{ color: 'var(--text-primary)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
@@ -229,7 +229,7 @@ export function InlineTextField({ value, placeholder, onCommit, ariaLabel, multi
     placeholder,
     'aria-label': ariaLabel,
     onBlur: commit,
-    className: `w-full rounded-lg bg-transparent px-2 py-1.5 text-body transition-colors placeholder:text-[var(--text-placeholder)] hover:bg-[var(--bg-tertiary)] focus:bg-[var(--bg-tertiary)] ${FOCUS_RING} ${className}`,
+    className: `w-full rounded-lg bg-transparent px-2 py-1.5 text-body transition-colors placeholder:text-(--text-placeholder) hover:bg-(--bg-tertiary) focus:bg-(--bg-tertiary) ${FOCUS_RING} ${className}`,
     style: { color: 'var(--text-primary)' },
   };
 

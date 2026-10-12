@@ -127,7 +127,7 @@ export function NoteCaptureForm({ date, formattedDate, onClose, onOpenNotes }: N
           }}
           placeholder="Jot it down before it slips…"
           rows={4}
-          className="notes-capture-textarea w-full rounded-xl px-3.5 py-2.5 text-body outline-none resize-y disabled:opacity-60"
+          className="notes-capture-textarea w-full rounded-xl px-3.5 py-2.5 text-body outline-hidden resize-y disabled:opacity-60"
           style={{
             background: 'var(--bg-tertiary)',
             color: 'var(--text-primary)',

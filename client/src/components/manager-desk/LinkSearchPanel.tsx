@@ -66,7 +66,7 @@ export function LinkSearchPanel({
             if (e.key === 'Enter' && type === 'external') addExternal();
           }}
           placeholder={placeholderByType[type]}
-          className="flex-1 bg-transparent text-body outline-none"
+          className="flex-1 bg-transparent text-body outline-hidden"
           style={{ color: 'var(--text-primary)' }}
         />
         <button onClick={onClose} style={{ color: 'var(--text-muted)' }} aria-label="Close link search">

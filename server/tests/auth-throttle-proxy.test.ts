@@ -97,6 +97,23 @@ describe("login throttle behind a reverse proxy (TRUST_PROXY)", () => {
     expect(attempt.status).toBe(429);
   });
 
+  it.each(["::ffff:10.0.0.0/8", "::/1"])("%s does not trust unrelated IPv4 peers or let them evade the login throttle", async (subnet) => {
+    // GHSA-jqcg-44mw-7w3h: these IPv6 ranges used to match every IPv4 peer.
+    const app = buildApp(parseTrustProxy(subnet));
+    await failFiveTimes(app, (index) => ({ remoteAddress: "198.51.100.7", forwardedFor: `203.0.113.${index}` }));
+
+    const attempt = await login(app, { password: "secret123", remoteAddress: "198.51.100.7", forwardedFor: "203.0.113.200" });
+    expect(attempt.status).toBe(429);
+  });
+
+  it("a correctly mapped IPv4 trust subnet still separates forwarded clients", async () => {
+    const app = buildApp(parseTrustProxy("::ffff:10.0.0.0/104"));
+    await failFiveTimes(app, { remoteAddress: "10.1.2.3", forwardedFor: "203.0.113.5" });
+
+    expect((await login(app, { remoteAddress: "10.1.2.3", forwardedFor: "203.0.113.5" })).status).toBe(429);
+    expect((await login(app, { password: "secret123", remoteAddress: "10.1.2.3", forwardedFor: "203.0.113.99" })).status).toBe(200);
+  });
+
   it("reads TRUST_PROXY from the environment when no option is passed", async () => {
     process.env.TRUST_PROXY = "loopback";
     const app = buildApp();

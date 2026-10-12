@@ -53,7 +53,7 @@ export function WorkSyncControls() {
         type="button"
         onClick={() => triggerSync.mutate()}
         disabled={isSyncing}
-        className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+        className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) disabled:opacity-50"
         title="Manual sync (r)"
         aria-label="Manual sync"
       >

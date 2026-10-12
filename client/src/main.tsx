@@ -4,6 +4,8 @@ import { MotionConfig } from 'framer-motion';
 import App from './App';
 import { RootErrorBoundary } from '@/components/layout/RootErrorBoundary';
 import { installPreloadErrorReload } from '@/lib/chunk-reload';
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import './index.css';
 
 // A stale tab after a deploy 404s on old chunk hashes; reload once to pick up the new build.

@@ -102,7 +102,7 @@ export function PlacementDialog({
         <label className="flex items-center gap-2 text-body leading-5">
           <input
             type="checkbox"
-            className="accent-[var(--accent-solid)]"
+            className="accent-(--accent-solid)"
             checked={includeSubtasks}
             disabled={write.isPending}
             onChange={(event) => { setIncludeSubtasks(event.target.checked); setTouched(true); }}
@@ -111,9 +111,9 @@ export function PlacementDialog({
         </label>
         <section className="rounded-lg border p-3" aria-label="Move preview" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
           <p className="text-body font-medium" role="status">{preview ? `${countLabel} will ${placement ? 'move' : 'have no project'}` : 'Checking affected tasks…'}</p>
-          <p className="project-field-hint mt-1 break-words">Destination: {destinationName}</p>
+          <p className="project-field-hint mt-1 wrap-break-word">Destination: {destinationName}</p>
           <ul className="mt-3 max-h-36 space-y-2 overflow-auto text-ui" style={{ color: 'var(--text-secondary)' }}>
-            {preview?.tasks.map((task) => <li key={task.taskKey} className="break-words"><span className="mr-2 font-mono" style={{ color: 'var(--text-muted)' }}>{task.taskKey}</span>{task.title}{!preview.keys.includes(task.taskKey) && <span className="project-field-hint ml-2">Subtask</span>}</li>)}
+            {preview?.tasks.map((task) => <li key={task.taskKey} className="wrap-break-word"><span className="mr-2 font-mono" style={{ color: 'var(--text-muted)' }}>{task.taskKey}</span>{task.title}{!preview.keys.includes(task.taskKey) && <span className="project-field-hint ml-2">Subtask</span>}</li>)}
           </ul>
           <p className="project-field-hint mt-3">Only project organization changes. You can undo this move.</p>
         </section>

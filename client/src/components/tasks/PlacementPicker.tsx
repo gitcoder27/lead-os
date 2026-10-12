@@ -24,7 +24,7 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
         <legend className="mb-2 text-body font-medium">Project</legend>
         <label className="project-search flex items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
           <Search size={14} aria-hidden="true" />
-          <input aria-label="Search projects" placeholder="Search projects…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-body outline-none" style={{ color: 'var(--text-primary)' }} />
+          <input aria-label="Search projects" placeholder="Search projects…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-w-0 flex-1 bg-transparent text-body outline-hidden" style={{ color: 'var(--text-primary)' }} />
         </label>
         <div className="placement-options mt-2 max-h-52 overflow-y-auto rounded-lg border p-1" style={{ borderColor: 'var(--border)' }}>
           <label className="placement-option" data-selected={!value}>
@@ -34,7 +34,7 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
           {options.map((project) => (
             <label key={project.id} className="placement-option" data-selected={value?.projectId === project.id}>
               <input type="radio" name={groupId} checked={value?.projectId === project.id} onChange={() => onChange({ projectId: project.id, trackId: null })} />
-              <span className="min-w-0 flex-1"><span className="block break-words font-medium">{project.name}</span>{project.outcome && <span className="project-field-hint block truncate" title={project.outcome}>{project.outcome}</span>}</span>
+              <span className="min-w-0 flex-1"><span className="block wrap-break-word font-medium">{project.name}</span>{project.outcome && <span className="project-field-hint block truncate" title={project.outcome}>{project.outcome}</span>}</span>
               <Folder size={14} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
             </label>
           ))}
@@ -44,7 +44,7 @@ export function PlacementPicker({ value, onChange, today, disabled = false }: {
       </fieldset>
       {value && (
         <div className="space-y-2">
-          <p className="project-field-hint break-words">Selected: <strong style={{ color: 'var(--text-secondary)' }}>{selected?.name ?? 'Selected project'}</strong>{selected?.archivedAt ? ' · Archived' : ''}</p>
+          <p className="project-field-hint wrap-break-word">Selected: <strong style={{ color: 'var(--text-secondary)' }}>{selected?.name ?? 'Selected project'}</strong>{selected?.archivedAt ? ' · Archived' : ''}</p>
           <label className="flex flex-col gap-2 text-body font-medium">
             Track (optional)
             <Select className="w-full" aria-label="Track (optional)" disabled={disabled || detail.isLoading || Boolean(selected?.archivedAt)} value={value.trackId ?? ''} onChange={(event) => onChange({ projectId: value.projectId, trackId: event.target.value ? Number(event.target.value) : null })}>

@@ -123,7 +123,7 @@ function SidebarSection({ title, open, onToggle, onClear, showClear = false, cle
           <button
             type="button"
             onClick={onClear}
-            className="h-7 w-7 rounded-lg transition-colors flex items-center justify-center flex-shrink-0"
+            className="h-7 w-7 rounded-lg transition-colors flex items-center justify-center shrink-0"
             title={clearLabel}
             aria-label={clearLabel}
             style={{ background: 'var(--bg-tertiary)' }}
@@ -133,7 +133,7 @@ function SidebarSection({ title, open, onToggle, onClear, showClear = false, cle
         ) : (
           <div
             aria-hidden="true"
-            className="h-7 w-7 flex-shrink-0"
+            className="h-7 w-7 shrink-0"
           />
         )}
       </div>

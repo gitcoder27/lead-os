@@ -50,7 +50,7 @@ export function ShortcutSheet({ anchor, groups, footnote, onClose, width = 300 }
   return (
     <TaskPopover anchor={anchor} role="dialog" label="Keyboard shortcuts" width={width} onClose={close}>
       {/* Focus lands in the sheet so Esc and Tab belong to it. */}
-      <div className="px-1 pb-1.5 pt-1 outline-none" tabIndex={-1} data-autofocus="">
+      <div className="px-1 pb-1.5 pt-1 outline-hidden" tabIndex={-1} data-autofocus="">
         <div className="flex items-center justify-between px-2 pb-1.5">
           <p className="text-ui font-semibold" style={{ color: 'var(--text-primary)' }}>Keyboard shortcuts</p>
           <button type="button" className="ui-icon-btn" aria-label="Close keyboard shortcuts" onClick={close}>×</button>

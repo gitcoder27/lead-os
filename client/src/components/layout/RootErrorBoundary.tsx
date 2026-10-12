@@ -11,7 +11,7 @@ interface RootErrorBoundaryState {
 }
 
 const ACTION_CLASS =
-  'rounded-lg px-4 py-2 text-body font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]';
+  'rounded-lg px-4 py-2 text-body font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-(--accent)';
 
 /**
  * Last-resort recovery screen. It is deliberately static: no router, providers,
@@ -69,7 +69,7 @@ export class RootErrorBoundary extends Component<RootErrorBoundaryProps, RootErr
           </div>
           {error.message ? (
             <Disclosure className="mt-4" summary="Error details">
-              <pre className="mt-2 whitespace-pre-wrap break-words text-ui" style={{ color: 'var(--text-muted)' }}>{error.message}</pre>
+              <pre className="mt-2 whitespace-pre-wrap wrap-break-word text-ui" style={{ color: 'var(--text-muted)' }}>{error.message}</pre>
             </Disclosure>
           ) : null}
         </div>

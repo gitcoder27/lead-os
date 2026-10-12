@@ -317,7 +317,7 @@ function MaintenanceActionCard({
             value={confirmationText}
             onChange={(event) => onChangeConfirmation(event.target.value)}
             placeholder={expectedText}
-            className="w-full rounded-lg px-3 py-2 text-body outline-none"
+            className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
             style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
             aria-label={`Confirmation text for ${title}`}
           />

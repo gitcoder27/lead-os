@@ -299,7 +299,7 @@ export function ManagerActionInbox({
         <Popover.Trigger asChild>
           <button
             type="button"
-            className="task-inbox-trigger relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-elevated)]"
+            className="task-inbox-trigger relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-elevated)"
             style={{
               background: open ? 'var(--bg-elevated)' : 'transparent',
               boxShadow: open ? 'var(--soft-shadow)' : 'none',
@@ -332,7 +332,7 @@ export function ManagerActionInbox({
             aria-label={updatesOnly ? 'Updates inbox' : 'Action inbox'}
             align="end"
             sideOffset={10}
-            className="z-popover w-[min(calc(100vw-24px),430px)] rounded-lg border p-0 outline-none"
+            className="z-popover w-[min(calc(100vw-24px),430px)] rounded-lg border p-0 outline-hidden"
             style={{
               background: 'color-mix(in srgb, var(--bg-primary) 94%, transparent)',
               borderColor: 'var(--border-strong)',
@@ -356,7 +356,7 @@ export function ManagerActionInbox({
                     setOpen(false);
                     onViewChange('today');
                   }}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-(--bg-tertiary)"
                   style={{ color: 'var(--accent)' }}
                 >
                   Today
@@ -398,7 +398,7 @@ export function ManagerActionInbox({
                           type="button"
                           onClick={clearSignals}
                           disabled={dismissAlerts.isPending}
-                          className="rounded px-1.5 py-0.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-45"
+                          className="rounded-sm px-1.5 py-0.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) disabled:opacity-45"
                           style={{ color: 'var(--text-muted)' }}
                         >
                           Clear all
@@ -445,7 +445,7 @@ function ManagerActionInboxRow({
 
   return (
     <div
-      className="mx-1.5 grid grid-cols-[30px_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="mx-1.5 grid grid-cols-[30px_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-(--bg-tertiary)"
       style={{ boxShadow: 'inset 0 -1px 0 color-mix(in srgb, var(--border) 42%, transparent)' }}
     >
       <button
@@ -471,7 +471,7 @@ function ManagerActionInboxRow({
         type="button"
         onClick={() => onRunCommand(item.primaryAction)}
         disabled={isPending}
-        className="h-7 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-[var(--bg-elevated)] disabled:opacity-45"
+        className="h-7 rounded-md px-2 text-ui font-semibold transition-colors hover:bg-(--bg-elevated) disabled:opacity-45"
         style={{ color: 'var(--accent)' }}
       >
         {isPending ? 'Working' : item.primaryAction.label}
@@ -479,13 +479,13 @@ function ManagerActionInboxRow({
 
       <details className="relative">
         <summary
-          className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-elevated)] [&::-webkit-details-marker]:hidden"
+          className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md transition-colors hover:bg-(--bg-elevated) [&::-webkit-details-marker]:hidden"
           aria-label="More actions"
         >
           <MoreHorizontal size={14} style={{ color: 'var(--text-secondary)' }} />
         </summary>
         <div
-          className="absolute right-0 top-8 z-[630] min-w-[148px] overflow-hidden rounded-lg border py-1"
+          className="absolute right-0 top-8 z-630 min-w-[148px] overflow-hidden rounded-lg border py-1"
           style={{
             background: 'var(--bg-primary)',
             borderColor: 'var(--border-strong)',
@@ -501,7 +501,7 @@ function ManagerActionInboxRow({
                   key={`${action.kind}-${action.label}`}
                   type="button"
                   onClick={() => onRunCommand(action)}
-                  className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {action.label}
@@ -512,7 +512,7 @@ function ManagerActionInboxRow({
             <button
               type="button"
               onClick={() => onOpenTarget(item.target)}
-              className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="block w-full px-3 py-2 text-left text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
               style={{ color: 'var(--text-secondary)' }}
             >
               Open
@@ -538,7 +538,7 @@ function SnoozeActions({
           key={preset}
           type="button"
           onClick={() => onRunCommand(action, preset)}
-          className="block w-full px-3 py-1.5 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="block w-full px-3 py-1.5 text-left text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
           style={{ color: 'var(--text-secondary)' }}
         >
           {label}
@@ -595,7 +595,7 @@ export function SignalRow({
 
   return (
     <div
-      className="mx-1.5 grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="mx-1.5 grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-(--bg-tertiary)"
       style={{ boxShadow: 'inset 0 -1px 0 color-mix(in srgb, var(--border) 42%, transparent)' }}
     >
       <button
@@ -623,7 +623,7 @@ export function SignalRow({
           event.stopPropagation();
           onDismiss();
         }}
-        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-elevated)]"
+        className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-(--bg-elevated)"
         style={{ color: 'var(--text-muted)' }}
         aria-label={`Dismiss ${meta.label} signal`}
         title="Dismiss signal"

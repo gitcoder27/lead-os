@@ -95,7 +95,7 @@ export function MyDayTaskRow({
       {/* Touch screens show the toolbar permanently — keep titles clear of it. */}
       <div className={`min-w-0 flex-1 ${readOnly ? '' : closed ? '[@media(hover:none)]:pr-9' : '[@media(hover:none)]:pr-[92px]'}`}>
         <div className="flex min-w-0 items-start gap-2">
-          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-[1px]" />}
+          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-px" />}
           <TaskTitle
             item={item}
             editable={canRenameItem(item, readOnly, Boolean(onUpdateTitle))}
@@ -177,7 +177,7 @@ function RowActions({
 
   return (
     <div
-      className="pointer-events-none absolute right-2.5 top-2 z-[2] flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
+      className="pointer-events-none absolute right-2.5 top-2 z-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
       style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--soft-shadow)' }}
     >
       {visible}
@@ -204,7 +204,7 @@ function LeadingGlyph({
   onMove?: (id: number, direction: 'up' | 'down') => void;
   onDragHandlePointerDown?: (event: PointerEvent<HTMLButtonElement>) => void;
 }) {
-  const box = 'mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center';
+  const box = 'mt-px flex h-5 w-5 shrink-0 items-center justify-center';
 
   // docs/54 V7: closed work wears the same glyph it has on Tasks and Standup.
   if (variant === 'done' || variant === 'dropped') {

@@ -351,8 +351,8 @@ function TodayBootLoading() {
         <div className="flex items-center gap-3">
           <div className="h-11 w-11 animate-pulse rounded-[14px] motion-reduce:animate-none" style={{ background: 'var(--accent-glow)' }} />
           <div>
-            <div className="h-4 w-20 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
-            <div className="mt-2 h-3 w-40 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+            <div className="h-4 w-20 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+            <div className="mt-2 h-3 w-40 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
           </div>
         </div>
         <div className="hidden items-center gap-2 md:flex">
@@ -369,14 +369,14 @@ function TodayBootLoading() {
         <div className="grid shrink-0 gap-2 border-b px-3 py-3 md:grid-cols-[190px_repeat(4,minmax(0,1fr))]" style={{ borderColor: 'var(--border)' }}>
           {[0, 1, 2, 3, 4].map((item) => (
             <div key={item} className="min-h-[56px] rounded-lg px-3 py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="h-4 w-20 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
-              <div className="mt-2 h-3 w-28 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+              <div className="h-4 w-20 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+              <div className="mt-2 h-3 w-28 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
             </div>
           ))}
         </div>
         <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
           <div className="border-b px-6 py-6 lg:border-b-0 lg:border-r" style={{ borderColor: 'var(--border)' }}>
-            <div className="h-5 w-32 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+            <div className="h-5 w-32 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
             <div className="mt-5 space-y-3">
               {[0, 1, 2, 3, 4].map((item) => (
                 <div key={item} className="h-12 animate-pulse rounded-md motion-reduce:animate-none" style={{ background: 'var(--bg-secondary)' }} />
@@ -384,7 +384,7 @@ function TodayBootLoading() {
             </div>
           </div>
           <div className="px-6 py-6">
-            <div className="h-5 w-28 animate-pulse rounded-sm motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
+            <div className="h-5 w-28 animate-pulse rounded-xs motion-reduce:animate-none" style={{ background: 'var(--bg-tertiary)' }} />
             <div className="mt-5 space-y-3">
               {[0, 1, 2, 3].map((item) => (
                 <div key={item} className="h-10 animate-pulse rounded-md motion-reduce:animate-none" style={{ background: 'var(--bg-secondary)' }} />
@@ -459,7 +459,7 @@ function WorkspaceShell({ activeView, onViewChange, onOpenActionTarget, children
         <main
           id="main"
           tabIndex={-1}
-          className="h-full min-h-0 rounded-[16px] border overflow-hidden flex flex-col outline-none"
+          className="h-full min-h-0 rounded-[16px] border overflow-hidden flex flex-col outline-hidden"
           style={{
             borderColor: 'var(--border-strong)',
             background: 'color-mix(in srgb, var(--bg-primary) 84%, transparent)',

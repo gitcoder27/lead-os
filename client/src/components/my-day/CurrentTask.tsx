@@ -97,7 +97,7 @@ export function CurrentTask({
             <button
               type="button"
               onClick={onAddTask}
-              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-body font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-body font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               style={{ color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
             >
               <Plus size={14} aria-hidden="true" />
@@ -168,7 +168,7 @@ const FocusCard = forwardRef<HTMLElement, FocusCardProps>(function FocusCard(
                 <button
                   type="button"
                   onClick={() => onDrop(item.id)}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] sm:px-2.5 ${FOCUS_RING}`}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary) sm:px-2.5 ${FOCUS_RING}`}
                   style={{ color: 'var(--text-secondary)' }}
                   aria-label={`Drop ${item.title}`}
                   title="Drop from today — it moves to Done as dropped; Undo or reopen any time"
@@ -223,7 +223,7 @@ function DetailsExcerpt({ details }: { details?: string }) {
   if (!details) return null;
   return (
     <p
-      className="mt-2.5 line-clamp-3 whitespace-pre-line break-words border-l-2 pl-3 text-body leading-[19px]"
+      className="mt-2.5 line-clamp-3 whitespace-pre-line wrap-break-word border-l-2 pl-3 text-body leading-[19px]"
       style={{ color: 'var(--text-secondary)', borderColor: 'color-mix(in srgb, var(--accent) 30%, var(--border))' }}
     >
       {details}

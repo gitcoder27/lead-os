@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 const SKELETON_TITLE_WIDTHS = ['46%', '32%', '54%', '38%', '28%', '44%'];
 
 function Bone({ className = '', style }: { className?: string; style?: CSSProperties }) {
-  return <span className={`block animate-pulse rounded motion-reduce:animate-none ${className}`} style={{ background: 'var(--bg-tertiary)', ...style }} />;
+  return <span className={`block animate-pulse rounded-sm motion-reduce:animate-none ${className}`} style={{ background: 'var(--bg-tertiary)', ...style }} />;
 }
 
 /**

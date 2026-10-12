@@ -143,7 +143,7 @@ export function StatusControl({ task, editable, onPatch }: { task: TaskDetailRes
         onClick={() => onPatch({ status: open ? 'done' : 'open' })}
         title={open ? 'Mark done (E)' : 'Reopen (E)'}
         data-task-shortcut="e"
-        className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-ui font-semibold transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
         style={{ color: open ? 'var(--text-secondary)' : 'var(--text-muted)', border: '1px solid var(--border)' }}
       >
         {open ? <Check size={12} style={{ color: 'var(--success)' }} /> : <RotateCcw size={12} />}
@@ -218,7 +218,7 @@ export function TaskProperties({ task, mode, readOnly, onPatch, people }: TaskPr
       {(manager || task.priority === 'high') && <PriorityRow task={task} editable={editable} onPatch={onPatch} />}
       {manager ? (
         <PropertyRow icon={<Tag size={14} />} label="Labels" align="start">
-          <div data-task-shortcut="l" className="min-h-[32px] rounded-lg px-1.5 py-[5px] transition-colors hover:bg-[var(--bg-tertiary)] focus-within:bg-[var(--bg-tertiary)]">
+          <div data-task-shortcut="l" className="min-h-[32px] rounded-lg px-1.5 py-[5px] transition-colors hover:bg-(--bg-tertiary) focus-within:bg-(--bg-tertiary)">
             <TaskLabelPicker
               labels={'labels' in task ? task.labels : []}
               disabled={readOnly}
@@ -618,7 +618,7 @@ function LinkifiedText({ text }: { text: string }) {
             target="_blank"
             rel="noreferrer noopener"
             onClick={(event) => event.stopPropagation()}
-            className="break-all underline decoration-[color-mix(in_srgb,var(--accent)_45%,transparent)] underline-offset-2 hover:decoration-[var(--accent)]"
+            className="break-all underline decoration-[color-mix(in_srgb,var(--accent)_45%,transparent)] underline-offset-2 hover:decoration-(--accent)"
             style={{ color: 'var(--accent)' }}
           >
             {part}
@@ -727,7 +727,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
               discard();
             }
           }}
-          className="block max-h-[60vh] min-h-[96px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-body leading-[21px] outline-none placeholder:text-[var(--text-placeholder)]"
+          className="block max-h-[60vh] min-h-[96px] w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 text-body leading-[21px] outline-hidden placeholder:text-(--text-placeholder)"
           style={{ color: 'var(--text-primary)' }}
         />
         <div className="flex items-center gap-2 px-2 pt-1">
@@ -739,7 +739,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={discard}
-              className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               style={{ color: 'var(--text-secondary)' }}
             >
               Cancel
@@ -767,7 +767,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             if ((event.target as HTMLElement).closest('a')) return;
             startEditing();
           }}
-          className={`-mx-2 whitespace-pre-wrap break-words rounded-lg px-2 py-1.5 text-body leading-[21px] transition-colors ${editable ? 'cursor-text hover:bg-[var(--bg-secondary)]' : ''} ${folded ? 'max-h-[210px] overflow-hidden' : ''}`}
+          className={`-mx-2 whitespace-pre-wrap wrap-break-word rounded-lg px-2 py-1.5 text-body leading-[21px] transition-colors ${editable ? 'cursor-text hover:bg-(--bg-secondary)' : ''} ${folded ? 'max-h-[210px] overflow-hidden' : ''}`}
           style={{
             color: 'var(--text-primary)',
             ...(folded ? { maskImage: 'linear-gradient(180deg, #000 70%, transparent)', WebkitMaskImage: 'linear-gradient(180deg, #000 70%, transparent)' } : {}),
@@ -780,7 +780,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             type="button"
             onClick={() => setExpanded((open) => !open)}
             aria-expanded={expanded}
-            className={`-ml-1 mt-0.5 inline-flex h-6 items-center rounded-md px-1 text-ui font-medium transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
+            className={`-ml-1 mt-0.5 inline-flex h-6 items-center rounded-md px-1 text-ui font-medium transition-colors hover:text-(--text-primary) ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             {expanded ? 'Show less' : 'Show more'}
@@ -794,7 +794,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
         type="button"
         onClick={startEditing}
         data-task-shortcut="d"
-        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
       >
         <AlignLeft size={13} />
@@ -816,7 +816,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
             onClick={startEditing}
             data-task-shortcut="d"
             title="Edit details (D)"
-            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <Pencil size={12} />

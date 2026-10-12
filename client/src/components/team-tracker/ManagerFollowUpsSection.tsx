@@ -62,7 +62,7 @@ function ManagerFollowUpItem({ item, onComplete }: { item: ManagerDeskItem; onCo
           title="Mark complete"
         >
           <span
-            className="flex h-4 w-4 items-center justify-center rounded-full transition-colors group-hover/check:border-[var(--success)] group-hover/check:text-[var(--success)]"
+            className="flex h-4 w-4 items-center justify-center rounded-full transition-colors group-hover/check:border-(--success) group-hover/check:text-(--success)"
             style={{ border: '1.5px solid var(--border-strong)', color: 'transparent' }}
           >
             <Check size={10} strokeWidth={3} />
@@ -115,7 +115,7 @@ export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCaptur
         <button
           type="button"
           onClick={onCapture}
-          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--accent-glow)] ${FOCUS_RING}`}
+          className={`inline-flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--accent-glow) ${FOCUS_RING}`}
           style={{ color: 'var(--accent-text)' }}
           title={`Capture a private follow-up linked to ${day.developer.displayName}`}
         >
@@ -129,7 +129,7 @@ export function ManagerFollowUpRow({ day, items, isLoading, onComplete, onCaptur
           {[0, 1].map((index) => (
             <div key={index} className="flex items-center gap-2.5">
               <span className="h-4 w-4 animate-pulse rounded-full" style={{ background: 'var(--bg-tertiary)' }} />
-              <span className="h-2.5 animate-pulse rounded" style={{ width: `${55 - index * 15}%`, background: 'var(--bg-tertiary)' }} />
+              <span className="h-2.5 animate-pulse rounded-sm" style={{ width: `${55 - index * 15}%`, background: 'var(--bg-tertiary)' }} />
             </div>
           ))}
           <span className="sr-only">Loading follow-ups</span>

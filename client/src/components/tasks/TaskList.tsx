@@ -167,7 +167,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
         onClick={onToggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.label}`}
-        className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
+        className="flex h-6 w-6 items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary)"
         style={{ color: 'var(--text-muted)' }}
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -197,7 +197,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
     <header
       ref={measureRef}
       data-index={virtualIndex}
-      className="sticky top-0 z-[1] flex h-9 items-center gap-2 border-b px-2"
+      className="sticky top-0 z-1 flex h-9 items-center gap-2 border-b px-2"
       // Translucent + blur so the stuck label matches the panel's tint while rows scroll under it.
       style={{ background: 'color-mix(in srgb, var(--bg-primary) 90%, transparent)', backdropFilter: 'blur(8px)', borderColor: RULE }}
     >
@@ -217,7 +217,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
         <button
           type="button"
           onClick={() => onMoveOverdueToToday(movable)}
-          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-semibold transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="flex h-6 items-center gap-1 rounded-md px-1.5 text-ui font-semibold transition-colors hover:bg-(--bg-tertiary)"
           style={{ color: 'var(--accent)' }}
         >
           <CalendarClock size={12} /> Move all to today
@@ -227,7 +227,7 @@ function GroupLabel({ group, headerId, collapsed, today, ownerName, onAdd, onMov
         <button
           type="button"
           onClick={onAdd}
-          className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-[var(--bg-tertiary)] focus-visible:opacity-100 group-hover/section:opacity-100 [@media(hover:none)]:opacity-100"
+          className="flex h-6 w-6 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-(--bg-tertiary) focus-visible:opacity-100 group-hover/section:opacity-100 [@media(hover:none)]:opacity-100"
           style={{ color: 'var(--text-secondary)' }}
           aria-label={`Add task to ${group.label}`}
           title="Add task (n)"
@@ -253,7 +253,7 @@ export function InlineAddRow({ active, onStart, onCancel, onSubmit, groupLabel, 
       <button
         type="button"
         onClick={onStart}
-        className="flex h-11 w-full items-center gap-2 px-2 text-left text-ui transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-[var(--text-secondary)]"
+        className="flex h-11 w-full items-center gap-2 px-2 text-left text-ui transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] hover:text-(--text-secondary)"
         style={{ color: 'var(--text-muted)' }}
         aria-label={groupLabel ? `Add task to ${groupLabel}` : 'Add task'}
       >
@@ -327,7 +327,7 @@ function InlineAddForm({ onCancel, onSubmit, groupLabel, defaults }: {
         placeholder={`New task${groupLabel ? ` in ${groupLabel}` : ''} — @person !date +label · Enter to add, Esc to close`}
         aria-label={groupLabel ? `New task in ${groupLabel}` : 'New task'}
         readOnly={pending}
-        className="min-w-0 flex-1 bg-transparent text-body outline-none"
+        className="min-w-0 flex-1 bg-transparent text-body outline-hidden"
         style={{ color: 'var(--text-primary)' }}
       />
       {typeahead.open && typeahead.fragment ? (

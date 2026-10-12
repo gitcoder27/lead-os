@@ -128,7 +128,7 @@ export function TaskDrawer({ taskKey, onClose, onNavigateTask, orderedKeys, onSt
           animate={reduceMotion ? { opacity: 1 } : { x: 0 }}
           exit={reduceMotion ? { opacity: 0 } : { x: '100%' }}
           transition={{ type: 'spring', damping: 34, stiffness: 340 }}
-          className={`workspace-shell-drawer fixed right-0 top-0 bottom-0 ${stacked ? 'z-drawer-stacked' : 'z-drawer'} flex w-full max-w-[680px] flex-col overflow-hidden outline-none`}
+          className={`workspace-shell-drawer fixed right-0 top-0 bottom-0 ${stacked ? 'z-drawer-stacked' : 'z-drawer'} flex w-full max-w-[680px] flex-col overflow-hidden outline-hidden`}
           style={{
             background: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border)',
@@ -552,7 +552,7 @@ function DetailToolbar({ fullPage, onBack, leading, actions }: {
           <button
             type="button"
             onClick={onBack}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <ArrowLeft size={14} />
@@ -631,7 +631,7 @@ function TitleField({ task, editable, onPatch, size }: {
           event.currentTarget.blur();
         }
       }}
-      className={`-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden rounded-lg bg-transparent px-2 py-0.5 font-semibold transition-colors hover:bg-[var(--bg-secondary)] focus:bg-[var(--bg-secondary)] ${FOCUS_RING} ${typography}`}
+      className={`-mx-2 block w-[calc(100%+1rem)] resize-none overflow-hidden rounded-lg bg-transparent px-2 py-0.5 font-semibold transition-colors hover:bg-(--bg-secondary) focus:bg-(--bg-secondary) ${FOCUS_RING} ${typography}`}
       style={{ color: 'var(--text-primary)' }}
       aria-label="Task title"
     />
@@ -678,7 +678,7 @@ function MoreActions({ task, canDelete, onDelete, onOpenFullPage }: {
                   type="button"
                   role="menuitem"
                   onClick={() => setConfirming(false)}
-                  className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+                  className={`h-7 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   Cancel

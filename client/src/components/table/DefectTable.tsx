@@ -565,7 +565,7 @@ export function DefectTable({
               onSelectIssue(info.row.original.jiraKey);
             }}
             aria-label={`Open triage for ${info.row.original.jiraKey}: ${info.getValue()}`}
-            className="text-body truncate block max-w-[420px] text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            className="text-body truncate block max-w-[420px] text-left rounded-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--focus-ring)"
             title={info.getValue()}
             style={{ color: 'var(--text-primary)' }}
           >
@@ -614,7 +614,7 @@ export function DefectTable({
               type="button"
               data-inline-edit-trigger="assignee"
               onClick={(e) => handleCellClick(issue.jiraKey, 'assignee', e)}
-              className="block min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+              className="block min-w-0 rounded-md text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--border-active)"
               aria-label={`Edit assignee for ${issue.jiraKey}`}
             >
               <AssigneeCell name={info.getValue() ?? undefined} accountId={issue.assigneeId ?? undefined} />
@@ -642,7 +642,7 @@ export function DefectTable({
               type="button"
               data-inline-edit-trigger="dueDate"
               onClick={(e) => handleCellClick(issue.jiraKey, 'dueDate', e)}
-              className="block min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+              className="block min-w-0 rounded-md text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--border-active)"
               aria-label={`Edit due date for ${issue.jiraKey}`}
             >
               <DueDateCell date={effectiveDueDate ?? undefined} />
@@ -682,7 +682,7 @@ export function DefectTable({
                   clearStatusFilter();
                 }}
                 onMouseDown={(event) => event.stopPropagation()}
-                className="h-6 w-6 inline-flex items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-tertiary)]"
+                className="h-6 w-6 inline-flex items-center justify-center rounded-md transition-colors hover:bg-(--bg-tertiary)"
                 style={{
                   color: 'var(--danger)',
                   background: 'color-mix(in srgb, var(--danger) 16%, transparent)',
@@ -711,7 +711,7 @@ export function DefectTable({
                       clearStatusFilter();
                     }}
                     onMouseDown={(event) => event.stopPropagation()}
-                    className="h-6 w-6 inline-flex items-center justify-center rounded-md hover:bg-[var(--bg-tertiary)]"
+                    className="h-6 w-6 inline-flex items-center justify-center rounded-md hover:bg-(--bg-tertiary)"
                     style={{ color: 'var(--text-muted)' }}
                     aria-label="Clear status filter"
                   >
@@ -970,7 +970,7 @@ export function DefectTable({
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-          className="h-8 rounded-lg px-2.5 flex items-center justify-center transition-colors hover:bg-[var(--bg-tertiary)] gap-1.5"
+          className="h-8 rounded-lg px-2.5 flex items-center justify-center transition-colors hover:bg-(--bg-tertiary) gap-1.5"
             style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}
             aria-label="Open defect search"
             title="Search defects"
@@ -990,7 +990,7 @@ export function DefectTable({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID or title..."
-              className="flex-1 text-body bg-transparent outline-none"
+              className="flex-1 text-body bg-transparent outline-hidden"
               style={{ color: 'var(--text-primary)' }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -1012,7 +1012,7 @@ export function DefectTable({
             <button
               type="button"
               onClick={closeSearch}
-              className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors hover:bg-(--bg-tertiary)"
               style={{ color: 'var(--text-muted)' }}
               aria-label="Clear defect search"
             >
@@ -1141,7 +1141,7 @@ export function DefectTable({
                             <button
                               type="button"
                               onClick={header.column.getToggleSortingHandler()}
-                              className="flex items-center gap-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-active)]"
+                              className="flex items-center gap-1 rounded-xs text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--border-active)"
                             >
                               {flexRender(header.column.columnDef.header, header.getContext())}
                               <ArrowUpDown size={10} style={{ opacity: sortState ? 0.8 : 0.4 }} />

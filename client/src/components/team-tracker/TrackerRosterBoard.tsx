@@ -181,7 +181,7 @@ function CurrentWork({
         onOpenTaskDetail(item.id, item.managerDeskItemId);
       }}
       onKeyDown={(event) => event.stopPropagation()}
-      className={`-mx-1.5 block min-w-0 max-w-full rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`-mx-1.5 block min-w-0 max-w-full rounded-md px-1.5 py-0.5 text-left transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
       title={`Open ${item.title}`}
     >
       {content}
@@ -354,7 +354,7 @@ function RosterRow({
       // opens the person; a click anywhere else on the row does the same for pointer users.
       data-attention={attention.rail ?? undefined}
       onClick={() => onOpenDrawer(day.developer.accountId)}
-      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${rosterGrid(solo)}`}
+      className={`group relative grid cursor-pointer items-center gap-3 gap-y-2 border-t px-4 py-2.5 text-left outline-hidden transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)] ui-row-focus md:min-h-[60px] ${attention.rail === 'danger' ? 'bg-[color-mix(in_srgb,var(--danger)_4%,transparent)]' : ''} ${rosterGrid(solo)}`}
       style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
     >
       {railColor && (
@@ -372,7 +372,7 @@ function RosterRow({
             <a
               href={`/team?dev=${encodeURIComponent(day.developer.accountId)}`}
               data-roster-row=""
-              className="roster-row-link outline-none hover:underline"
+              className="roster-row-link outline-hidden hover:underline"
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -440,7 +440,7 @@ function RosterRow({
               onCaptureFollowUp(day);
             }}
             onKeyDown={(event) => event.stopPropagation()}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-[opacity,background-color] hover:bg-[var(--bg-elevated)] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${FOCUS_RING}`}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-[opacity,background-color] hover:bg-(--bg-elevated) md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:focus-visible:opacity-100 [@media(hover:none)]:opacity-100 ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
             aria-label={`Capture follow-up for ${name}`}
             title={`Capture follow-up for ${name}`}

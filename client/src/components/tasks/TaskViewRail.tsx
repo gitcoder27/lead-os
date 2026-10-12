@@ -99,7 +99,7 @@ export function TaskViewRail({
               onClick={() => onSelect(view.id)}
               aria-current={selected ? 'page' : undefined}
               aria-label={counts?.[view.id] ? `${view.name}, ${value} task${value === 1 ? '' : 's'}` : view.name}
-              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-ui transition-colors hover:text-[var(--text-primary)]"
+              className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-ui transition-colors hover:text-(--text-primary)"
               style={{ color: selected ? 'var(--accent-text)' : 'var(--text-secondary)', fontWeight: selected ? 600 : 500 }}
             >
               <span className="truncate">{view.name}</span>
@@ -124,13 +124,13 @@ export function TaskViewRail({
                     setEditingId(view.id);
                     setEditingName(view.name);
                   }}
-                  className="flex h-5 w-5 items-center justify-center rounded"
+                  className="flex h-5 w-5 items-center justify-center rounded-sm"
                   style={{ color: 'var(--text-muted)' }}
                   aria-label={`Rename ${view.name}`}
                 >
                   <Pencil size={10} />
                 </button>
-                <button type="button" onClick={() => onDelete(view)} className="flex h-5 w-5 items-center justify-center rounded" style={{ color: 'var(--text-muted)' }} aria-label={`Delete ${view.name}`}>
+                <button type="button" onClick={() => onDelete(view)} className="flex h-5 w-5 items-center justify-center rounded-sm" style={{ color: 'var(--text-muted)' }} aria-label={`Delete ${view.name}`}>
                   <Trash2 size={10} />
                 </button>
               </span>

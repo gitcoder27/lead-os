@@ -538,7 +538,7 @@ export function TeamTrackerPage({
                 type="button"
                 onClick={workflow.handleRefresh}
                 disabled={isRefreshing}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-default ${FOCUS_RING}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary) disabled:cursor-default ${FOCUS_RING}`}
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Refresh team tracker"
                 title={isRefreshing ? 'Refreshing…' : 'Refresh team tracker'}
@@ -550,7 +550,7 @@ export function TeamTrackerPage({
                 ref={shortcutsButtonRef}
                 type="button"
                 onClick={(event) => openKeyboardShortcuts ? openKeyboardShortcuts(event.currentTarget) : setShortcutsAnchor(event.currentTarget)}
-                className={`hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] md:flex ${FOCUS_RING}`}
+                className={`hidden h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary) md:flex ${FOCUS_RING}`}
                 style={{ color: 'var(--text-muted)' }}
                 aria-label="Keyboard shortcuts"
                 aria-expanded={shortcutsAnchor !== null}
@@ -896,7 +896,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
     input.focus();
   };
 
-  const stepClass = `flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:pointer-events-none disabled:opacity-30 ${FOCUS_RING}`;
+  const stepClass = `flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-(--bg-elevated) hover:text-(--text-primary) disabled:pointer-events-none disabled:opacity-30 ${FOCUS_RING}`;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -904,7 +904,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
         <button
           type="button"
           onClick={() => onChange(getLocalIsoDate())}
-          className={`h-8 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`h-8 rounded-lg px-2.5 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           Today
@@ -928,7 +928,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
           <button
             type="button"
             onClick={openPicker}
-            className={`flex h-7 min-w-[112px] items-center justify-center gap-1.5 rounded-md px-2 text-ui font-medium tabular-nums transition-colors hover:bg-[var(--bg-elevated)] ${FOCUS_RING}`}
+            className={`flex h-7 min-w-[112px] items-center justify-center gap-1.5 rounded-md px-2 text-ui font-medium tabular-nums transition-colors hover:bg-(--bg-elevated) ${FOCUS_RING}`}
             style={{ color: 'var(--text-primary)' }}
             aria-label={`Choose date, ${label}`}
             title="Choose date"
@@ -965,7 +965,7 @@ function BoardDateNav({ date, isToday, onChange }: { date: string; isToday: bool
 }
 
 function Bone({ className }: { className: string }) {
-  return <span className={`block animate-pulse rounded ${className}`} style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' }} />;
+  return <span className={`block animate-pulse rounded-sm ${className}`} style={{ background: 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' }} />;
 }
 
 function ToolbarSkeleton() {
@@ -996,7 +996,7 @@ function TeamTrackerSkeleton() {
             style={{ borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)' }}
           >
             <div className="flex items-center gap-3">
-              <Bone className="h-[30px] w-[30px] shrink-0 !rounded-full" />
+              <Bone className="h-[30px] w-[30px] shrink-0 rounded-full!" />
               <div className="space-y-1.5">
                 <Bone className="h-3 w-28" />
                 <Bone className="h-2.5 w-14" />

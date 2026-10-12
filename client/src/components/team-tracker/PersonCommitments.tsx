@@ -43,7 +43,7 @@ export function PersonCommitments({ accountId, onCapture, isSelf = false }: { ac
             <ul className="space-y-1">
               {group.tasks.map((task) => (
                 <li key={task.taskKey}>
-                  <button type="button" onClick={() => setTaskKey(task.taskKey)} className={`min-h-11 w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}>
+                  <button type="button" onClick={() => setTaskKey(task.taskKey)} className={`min-h-11 w-full rounded-lg px-2 py-2 text-left hover:bg-(--bg-secondary) ${FOCUS_RING}`}>
                     <span className="block text-body" style={{ color: 'var(--text-primary)' }}>{task.taskKey} · {task.title}</span>
                     <span className="block text-ui" style={{ color: 'var(--text-muted)' }}>
                       {commitmentMeta(task)}

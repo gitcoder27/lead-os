@@ -65,7 +65,7 @@ export function StandupWrapUp({
       data-testid="standup-wrapup"
     >
       <span className="standup-eyebrow">Standup · Wrap-up</span>
-      <h2 data-standup-person tabIndex={-1} className="standup-wrapup-title outline-none">{session.receipt ? 'Round saved' : 'Finish standup'}</h2>
+      <h2 data-standup-person tabIndex={-1} className="standup-wrapup-title outline-hidden">{session.receipt ? 'Round saved' : 'Finish standup'}</h2>
       <p className="standup-wrapup-intro">Review team work and choose follow-ups before saving the round.</p>
       <div className="standup-wrapup-coverage">
         <p className="text-body leading-5" style={{ color: 'var(--text-secondary)' }}>{visited.length} of {days.length} people visited</p>
@@ -90,7 +90,7 @@ export function StandupWrapUp({
       </section>}
       {!session.receipt && <p className="mt-6 text-body leading-5" style={{ color: 'var(--text-muted)' }}>{outcome}</p>}
       <label className="mt-2 flex w-fit cursor-pointer flex-wrap items-center gap-2 text-body leading-5" style={{ color: 'var(--text-secondary)' }}>
-        <input type="checkbox" checked={saveToNote} onChange={(event) => onSaveToNoteChange?.(event.target.checked)} disabled={sealing} className="h-3.5 w-3.5 accent-[var(--accent)]" />
+        <input type="checkbox" checked={saveToNote} onChange={(event) => onSaveToNoteChange?.(event.target.checked)} disabled={sealing} className="h-3.5 w-3.5 accent-(--accent)" />
         Add summary to Notes <span style={{ color: 'var(--text-muted)' }}>— standup archive, not your scratchpad</span>
       </label>
       {blockedReason && <p id="standup-finish-blocked" role="status" className="mt-3 text-body leading-5" style={{ color: 'var(--warning, var(--text-secondary))' }}>{blockedReason}</p>}

@@ -89,7 +89,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
             onClick={(event) => openKinds(event.currentTarget)}
             aria-haspopup="menu"
             aria-expanded={menu?.kind === 'kinds'}
-            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-7 items-center gap-1 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
             style={{ color: 'var(--text-secondary)' }}
           >
             <Plus size={13} />
@@ -116,7 +116,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
         <button
           type="button"
           onClick={(event) => openKinds(event.currentTarget)}
-          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-ui transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
         >
           <Link2 size={13} />
@@ -150,7 +150,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
               }
             }}
             placeholder={kindMeta(adding).placeholder}
-            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-1 text-body outline-hidden placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
             aria-label={`${adding} link`}
           />
@@ -165,7 +165,7 @@ export function TaskLinksSection({ task, mode, readOnly, onNavigateTask, people 
           <button
             type="button"
             onClick={() => { setAdding(null); setDraft(''); }}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
             style={{ color: 'var(--text-muted)' }}
             aria-label="Cancel adding link"
           >
@@ -226,13 +226,13 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
     );
   } else if (link.kind === 'task') {
     body = (
-      <button type="button" onClick={() => onNavigateTask(link.ref)} className={`${rowClass} font-mono hover:underline ${FOCUS_RING} rounded`} style={{ color: 'var(--accent)' }}>
+      <button type="button" onClick={() => onNavigateTask(link.ref)} className={`${rowClass} font-mono hover:underline ${FOCUS_RING} rounded-sm`} style={{ color: 'var(--accent)' }}>
         {link.ref}
       </button>
     );
   } else if (link.kind === 'external' && isHttpUrl(link.ref)) {
     body = (
-      <a href={link.ref} target="_blank" rel="noopener noreferrer" className={`${rowClass} hover:underline ${FOCUS_RING} rounded`} style={{ color: 'var(--text-primary)' }} title={link.ref}>
+      <a href={link.ref} target="_blank" rel="noopener noreferrer" className={`${rowClass} hover:underline ${FOCUS_RING} rounded-sm`} style={{ color: 'var(--text-primary)' }} title={link.ref}>
         {prettyUrl(link.ref)}
         <ExternalLink size={11} className="ml-1 inline align-[-1px] opacity-50" />
       </a>
@@ -242,7 +242,7 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
   }
 
   return (
-    <li className="group flex min-h-[36px] items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-[var(--bg-secondary)]">
+    <li className="group flex min-h-[36px] items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-(--bg-secondary)">
       {link.kind === 'person' ? (
         <Avatar name={personName} seed={link.ref} size={22} />
       ) : (
@@ -265,7 +265,7 @@ function LinkRow({ link, people, onNavigateTask, onRemove }: {
         <button
           type="button"
           onClick={onRemove}
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-[var(--bg-tertiary)] group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0 ${FOCUS_RING}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-(--bg-tertiary) group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:opacity-0 ${FOCUS_RING}`}
           style={{ color: 'var(--text-muted)' }}
           aria-label={`Remove link ${link.ref}`}
         >
@@ -299,7 +299,7 @@ function PersonPicker({ anchor, people, onClose, onSelect }: {
         }}
         placeholder="Link a developer…"
         aria-label="Filter developers"
-        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-none"
+        className="mb-1 w-full rounded-lg px-2 py-1.5 text-body outline-hidden"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {visible.map((dev) => (
@@ -388,7 +388,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
       {canAdd && <Disclosure open={showPlacement} onOpenChange={setShowPlacement} summary={<span title="Subtasks use this task's project unless you pick another">Put new subtasks in another project</span>}>{showPlacement && <PlacementPicker today={today} value={placement === undefined ? ('placement' in task ? task.placement : null) : placement} onChange={setPlacement} />}</Disclosure>}
       {canAdd && (
         <form
-          className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-[var(--bg-secondary)]"
+          className="relative flex items-center gap-2 rounded-lg px-2 transition-colors focus-within:bg-(--bg-secondary)"
           onSubmit={(event) => { event.preventDefault(); void submit(); }}
         >
           <Plus size={14} style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
@@ -408,7 +408,7 @@ export function TaskChildrenSection({ task, mode, readOnly, onNavigateTask, peop
               }
             }}
             placeholder={isMeeting ? 'Add an action item — @dev for owner, !fri for a date…' : 'Add subtask — @dev for owner, !fri for a date…'}
-            className="min-w-0 flex-1 bg-transparent py-2 text-body outline-none placeholder:text-[var(--text-placeholder)]"
+            className="min-w-0 flex-1 bg-transparent py-2 text-body outline-hidden placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
             readOnly={attempt.isPending}
             aria-label={isMeeting ? 'New action item' : 'New subtask'}
@@ -449,12 +449,12 @@ function ChildRow({ child, people, onOpen }: { child: TaskChildRef; people: Task
       <button
         type="button"
         onClick={() => onOpen(child.taskKey)}
-        className={`group flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors hover:bg-[var(--bg-secondary)] ${FOCUS_RING}`}
+        className={`group flex min-h-[36px] w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors hover:bg-(--bg-secondary) ${FOCUS_RING}`}
       >
         <TaskStatusGlyph status={child.status} size={14} />
         <span className="shrink-0 font-mono text-ui font-semibold" style={{ color: 'var(--text-muted)' }}>{child.taskKey}</span>
         <span
-          className={`min-w-0 flex-1 truncate text-body ${closed ? 'line-through decoration-[var(--text-disabled)]' : ''}`}
+          className={`min-w-0 flex-1 truncate text-body ${closed ? 'line-through decoration-(--text-disabled)' : ''}`}
           style={{ color: closed ? 'var(--text-muted)' : 'var(--text-primary)' }}
         >
           {child.title}
@@ -472,7 +472,7 @@ export function ParentCrumb({ parent, onOpen }: { parent: TaskChildRef; onOpen: 
     <button
       type="button"
       onClick={() => onOpen(parent.taskKey)}
-      className={`flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-ui transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`flex min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-ui transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
       style={{ color: 'var(--text-muted)' }}
       title={`Parent: ${parent.taskKey} ${parent.title}`}
       aria-label={`Open parent task ${parent.taskKey}`}

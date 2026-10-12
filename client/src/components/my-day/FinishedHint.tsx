@@ -57,7 +57,7 @@ export function FinishedHint({ item, onMarkDone, className }: {
         <button
           type="button"
           onClick={dismiss}
-          className={`rounded-md px-1.5 font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`rounded-md px-1.5 font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--text-muted)' }}
         >
           Not yet

@@ -28,7 +28,7 @@ function renderInline(text: string, opts: MarkdownLiteOptions, keyPrefix: string
       nodes.push(
         <code
           key={key}
-          className="rounded px-1 py-px font-mono text-[0.85em]"
+          className="rounded-sm px-1 py-px font-mono text-[0.85em]"
           style={{ background: 'var(--bg-tertiary)', color: 'var(--accent)' }}
         >
           {token.slice(1, -1)}

@@ -61,7 +61,7 @@ export function StandupRail({
               tabIndex={active ? 0 : -1}
               title={day.developer.displayName}
               onClick={() => onSelect(id)}
-              className="relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left outline-none transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="relative mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left outline-hidden transition-colors hover:bg-(--bg-tertiary)"
               style={{ background: active ? 'color-mix(in srgb, var(--bg-tertiary) 80%, transparent)' : undefined }}
             >
               {active && (

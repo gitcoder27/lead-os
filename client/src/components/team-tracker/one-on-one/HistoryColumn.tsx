@@ -121,7 +121,7 @@ function LastTime({
         <button
           type="button"
           onClick={() => setShowAll((value) => !value)}
-          className={`mt-1 rounded text-ui font-medium ${FOCUS_RING}`}
+          className={`mt-1 rounded-sm text-ui font-medium ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           {showAll ? 'Show less' : 'Read all notes'}
@@ -149,7 +149,7 @@ function TopicList({ topics, onOpenTask, limit }: { topics: OneOnOneAgendaItem[]
           <button
             type="button"
             onClick={() => onOpenTask?.(item.task.taskKey)}
-            className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+            className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
             title={`${item.task.taskKey} — ${item.task.title}`}
           >
             <TaskStatusGlyph status={item.task.status} size={12} />
@@ -169,7 +169,7 @@ function TopicList({ topics, onOpenTask, limit }: { topics: OneOnOneAgendaItem[]
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className={`rounded px-1 text-ui font-medium ${FOCUS_RING}`}
+            className={`rounded-sm px-1 text-ui font-medium ${FOCUS_RING}`}
             style={{ color: 'var(--accent)' }}
           >
             +{topics.length - limit} more
@@ -198,7 +198,7 @@ function HistoryRow({
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className={`flex w-full items-center gap-2 rounded text-left ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-2 rounded-sm text-left ${FOCUS_RING}`}
         aria-expanded={expanded}
       >
         {expanded ? <ChevronDown size={12} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={12} style={{ color: 'var(--text-muted)' }} />}

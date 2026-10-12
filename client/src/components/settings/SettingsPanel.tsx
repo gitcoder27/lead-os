@@ -876,7 +876,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
           onChange={(e) => setManualMemberName(e.target.value)}
           placeholder="Display name"
           aria-label="Manual team member name"
-          className="w-full rounded-lg px-3 py-2 text-body outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <input
@@ -885,7 +885,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
           onChange={(e) => setManualMemberEmail(e.target.value)}
           placeholder="Email optional"
           aria-label="Manual team member email"
-          className="w-full rounded-lg px-3 py-2 text-body outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <input
@@ -894,7 +894,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
           onChange={(e) => setManualMemberJiraAccountId(e.target.value)}
           placeholder="Jira account ID optional"
           aria-label="Manual team member Jira account ID"
-          className="w-full rounded-lg px-3 py-2 text-body outline-none"
+          className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
         />
         <button
@@ -992,7 +992,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
             style={{ borderColor: 'var(--border-strong)' }}
           >
             <div
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
               style={{ background: 'var(--settings-accent-soft-bg)', color: 'var(--accent)', border: 'var(--settings-accent-soft-border)' }}
             >
               <Globe size={11} />
@@ -1028,7 +1028,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                     paddingRight: '10px',
                   }}
                 >
-                  <span className="mt-[1px] shrink-0" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
+                  <span className="mt-px shrink-0" style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}>
                     {item.icon}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1204,7 +1204,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                           value={jiraBaseUrl}
                           onChange={(e) => setJiraBaseUrl(e.target.value)}
                           placeholder="https://tenant.atlassian.net"
-                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
+                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-hidden"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </SettingsLabeledInput>
@@ -1215,7 +1215,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                           value={jiraProjectKey}
                           onChange={(e) => setJiraProjectKey(e.target.value)}
                           placeholder="AM"
-                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
+                          className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-hidden"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </SettingsLabeledInput>
@@ -1228,7 +1228,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                             onChange={(e) => setJiraEmail(e.target.value)}
                             placeholder="manager@example.com"
                             autoComplete="email"
-                            className="w-full rounded-lg px-3 py-1.5 text-body outline-none"
+                            className="w-full rounded-lg px-3 py-1.5 text-body outline-hidden"
                             style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                           />
                         </SettingsLabeledInput>
@@ -1250,7 +1250,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                         onChange={(e) => setJiraApiTokenInput(e.target.value)}
                         placeholder={config?.jiraApiToken ? 'New API token' : 'API token'}
                         autoComplete="off"
-                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-body outline-none"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1.5 font-mono text-body outline-hidden"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                       <button
@@ -1294,7 +1294,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                         value={managerJiraAccountId}
                         onChange={(e) => setManagerJiraAccountId(e.target.value)}
                         placeholder="Paste or edit the Jira account id"
-                        className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-none"
+                        className="w-full rounded-lg px-3 py-1.5 font-mono text-body outline-hidden"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                       <div className="relative">
@@ -1304,7 +1304,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                           value={managerSearch}
                           onChange={(e) => setManagerSearch(e.target.value)}
                           placeholder="Filter known Jira people"
-                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </div>
@@ -1512,13 +1512,13 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                       onChange={(e) => setJql(e.target.value)}
                       rows={7}
                       spellCheck={false}
-                      className="w-full resize-y rounded-lg px-3 py-2.5 font-mono text-body leading-relaxed outline-none"
+                      className="w-full resize-y rounded-lg px-3 py-2.5 font-mono text-body leading-relaxed outline-hidden"
                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)', minHeight: '120px' }}
                       placeholder="project = PROJ AND issuetype = Bug AND statusCategory != Done"
                     />
                     <p className="mt-2 text-ui" style={{ color: 'var(--text-muted)' }}>
                       Use{' '}
-                      <code className="rounded px-1 py-0.5 font-mono text-ui" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
+                      <code className="rounded-sm px-1 py-0.5 font-mono text-ui" style={{ background: 'var(--settings-code-bg)', color: 'var(--accent)' }}>
                         {'{ PROJECT_KEY }'}
                       </code>{' '}
                       to insert the configured project key dynamically.
@@ -1573,7 +1573,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                               value={fieldSearch}
                               onChange={(e) => setFieldSearch(e.target.value)}
                               placeholder="Search fields…"
-                              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+                              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </div>
@@ -1634,7 +1634,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                         onChange={(e) => setTeamSearch(e.target.value)}
                         placeholder="Search team"
                         aria-label="Search current team"
-                        className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+                        className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
                         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                       />
                     </div>
@@ -1665,7 +1665,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                       value={editingMemberName}
                                       onChange={(e) => setEditingMemberName(e.target.value)}
                                       aria-label="Edit team member name"
-                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-hidden"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                     <input
@@ -1674,7 +1674,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                       onChange={(e) => setEditingMemberEmail(e.target.value)}
                                       placeholder="Email optional"
                                       aria-label="Edit team member email"
-                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-hidden"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                     <input
@@ -1683,7 +1683,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                       onChange={(e) => setEditingMemberJiraAccountId(e.target.value)}
                                       placeholder="Jira account ID optional"
                                       aria-label="Edit team member Jira account ID"
-                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-none"
+                                      className="w-full rounded-md px-2 py-1.5 text-ui outline-hidden"
                                       style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                                     />
                                   </div>
@@ -1782,7 +1782,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                           onChange={(e) => setDiscoveredSearch(e.target.value)}
                           placeholder="Search Jira users"
                           aria-label="Search discoverable Jira users"
-                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-none"
+                          className="w-full rounded-lg py-1.5 pl-8 pr-3 text-body outline-hidden"
                           style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                         />
                       </div>
@@ -1833,7 +1833,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                 style={{ background: idx % 2 === 0 ? 'var(--settings-row-even-bg)' : 'var(--settings-row-odd-bg)', borderTop: idx > 0 ? 'var(--settings-row-divider)' : 'none' }}
                               >
                                 <span
-                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-ui font-semibold"
+                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-ui font-semibold"
                                   style={{
                                     borderWidth: 1, borderStyle: 'solid',
                                     borderColor: isAlready || isSel ? 'color-mix(in srgb, var(--accent) 26%, var(--border-strong))' : 'color-mix(in srgb, var(--border-strong) 88%, transparent)',
@@ -2055,7 +2055,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                               onChange={(e) => setNewUsername(e.target.value)}
                               placeholder="username"
                               autoComplete="off"
-                              className="w-full rounded-lg px-3 py-2 text-body outline-none"
+                              className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </SettingsLabeledInput>
@@ -2067,7 +2067,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                               onChange={(e) => setNewDisplayName(e.target.value)}
                               placeholder="Full name"
                               autoComplete="off"
-                              className="w-full rounded-lg px-3 py-2 text-body outline-none"
+                              className="w-full rounded-lg px-3 py-2 text-body outline-hidden"
                               style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                             />
                           </SettingsLabeledInput>
@@ -2080,7 +2080,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 placeholder="Password"
                                 autoComplete="new-password"
-                                className="w-full rounded-lg py-2 pl-3 pr-20 font-mono text-body outline-none"
+                                className="w-full rounded-lg py-2 pl-3 pr-20 font-mono text-body outline-hidden"
                                 style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
                               />
                               <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
@@ -2125,7 +2125,7 @@ const SECTION_LABELS: Record<SectionId, { title: string; description: string }> 
                                   <input
                                     type="range" min={8} max={32} value={pwLength}
                                     onChange={(e) => { const len = Number(e.target.value); setPwLength(len); setNewPassword(generateStrongPassword(len, pwUppercase, pwLowercase, pwDigits, pwSymbols)); setShowNewPw(true); setCopiedPw(false); }}
-                                    className="mt-1 w-full accent-[var(--accent)]"
+                                    className="mt-1 w-full accent-(--accent)"
                                   />
                                   <div className="flex justify-between text-meta" style={{ color: 'var(--text-muted)' }}><span>8</span><span>32</span></div>
                                 </div>
@@ -2352,7 +2352,7 @@ function CompactFieldRow({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md px-2.5 py-1.5 font-mono text-body outline-none"
+        className="w-full rounded-md px-2.5 py-1.5 font-mono text-body outline-hidden"
         style={{ background: 'var(--settings-input-bg)', color: 'var(--text-primary)', border: 'var(--settings-input-border)' }}
       />
     </div>
@@ -2643,7 +2643,7 @@ function ToggleChip({
       }}
     >
       <span
-        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-meta transition-colors"
+        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm text-meta transition-colors"
         style={{
           background: checked ? 'var(--accent)' : 'transparent',
           border: checked ? 'none' : '1.5px solid var(--border-strong)',

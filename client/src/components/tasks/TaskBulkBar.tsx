@@ -56,7 +56,7 @@ function BulkButton({ label, hint, onClick, danger, children }: {
       onClick={onClick}
       title={hint ? `${label} (${hint})` : label}
       aria-label={hint ? `${label} (${hint})` : label}
-      className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+      className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-ui font-medium transition-colors hover:bg-(--bg-tertiary)"
       style={{ color: danger ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
       {children}

@@ -72,7 +72,7 @@ export function TagFilterSection({
         {hasActiveFilters ? (
           <button
             onClick={onClear}
-            className="h-7 w-7 rounded-lg transition-colors flex items-center justify-center flex-shrink-0"
+            className="h-7 w-7 rounded-lg transition-colors flex items-center justify-center shrink-0"
             title="Clear tag filters"
             aria-label="Clear tag filters"
             style={{ background: 'var(--bg-tertiary)' }}
@@ -82,7 +82,7 @@ export function TagFilterSection({
         ) : (
           <div
             aria-hidden="true"
-            className="h-7 w-7 flex-shrink-0"
+            className="h-7 w-7 shrink-0"
           />
         )}
       </div>
@@ -115,7 +115,7 @@ export function TagFilterSection({
               >
                 <span className="flex items-center gap-3 min-w-0">
                   <span
-                    className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+                    className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: `${tag.color}22` }}
                   >
                     <span
@@ -150,7 +150,7 @@ export function TagFilterSection({
           >
             <span className="flex items-center gap-3 min-w-0">
               <span
-                className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+                className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: 'var(--bg-tertiary)' }}
               >
                 <span

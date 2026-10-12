@@ -219,7 +219,7 @@ function SeriesRow({ series, onOpen }: { series: OneOnOneSeriesSummary; onOpen: 
         </div>
         {series.openAgendaCount > 0 && (
           <span
-            className="rounded px-1.5 py-0.5 text-meta"
+            className="rounded-sm px-1.5 py-0.5 text-meta"
             style={{ background: 'var(--bg-tertiary)', color: 'var(--text-muted)' }}
             title="Open agenda items"
           >

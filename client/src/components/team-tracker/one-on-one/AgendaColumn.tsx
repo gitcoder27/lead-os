@@ -105,7 +105,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
         }}
       >
         <div
-          className="flex items-center gap-2 rounded-lg pl-2.5 pr-1 transition-[border-color,box-shadow] focus-within:border-[var(--border-active)] focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_10%,transparent)]"
+          className="flex items-center gap-2 rounded-lg pl-2.5 pr-1 transition-[border-color,box-shadow] focus-within:border-(--border-active) focus-within:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_10%,transparent)]"
           style={{ background: 'var(--bg-primary)', border: '1px solid var(--border)' }}
         >
           <Plus size={13} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
@@ -113,7 +113,7 @@ export function AgendaColumn({ detail, onOpenTask }: { detail: OneOnOneSeriesDet
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Add a topic…"
-            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
+            className="h-8 min-w-0 flex-1 bg-transparent text-body outline-hidden placeholder:text-(--text-placeholder)"
             style={{ color: 'var(--text-primary)' }}
             aria-label="Add to agenda"
           />
@@ -239,7 +239,7 @@ function AgendaRow({
       }}
       // docs/54 D2/D3: the shared list-row idiom — hairline dividers, tint on
       // hover, keyboard ring on focus.
-      className="group flex min-h-[40px] items-start gap-2 border-b px-1.5 py-2 outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] ui-row-focus"
+      className="group flex min-h-[40px] items-start gap-2 border-b px-1.5 py-2 outline-hidden transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] ui-row-focus"
       style={{
         borderColor: 'color-mix(in srgb, var(--border) 70%, transparent)',
         background: dragId === item.id ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : undefined,
@@ -248,7 +248,7 @@ function AgendaRow({
       data-testid={`agenda-item-${item.id}`}
     >
       <GripVertical size={12} className="mt-[3px] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-60 [@media(hover:none)]:opacity-40" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
-      <span className="mt-[1px] shrink-0">
+      <span className="mt-px shrink-0">
         <TaskStatusGlyph status={item.task.status} size={14} />
       </span>
       <button
@@ -305,7 +305,7 @@ function ResolvedGroup({ items, onOpenTask }: { items: OneOnOneAgendaItem[]; onO
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -319,7 +319,7 @@ function ResolvedGroup({ items, onOpenTask }: { items: OneOnOneAgendaItem[]; onO
               <button
                 type="button"
                 onClick={() => onOpenTask?.(item.task.taskKey)}
-                className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+                className={`flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               >
                 <TaskStatusGlyph status={item.task.status} size={13} />
                 <span className="min-w-0 truncate text-body" style={{ color: 'var(--text-secondary)' }}>{item.task.title}</span>
@@ -408,7 +408,7 @@ function Suggestions({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className={`mt-0.5 rounded-md px-1.5 py-1 text-ui font-medium transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+          className={`mt-0.5 rounded-md px-1.5 py-1 text-ui font-medium transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
           style={{ color: 'var(--accent)' }}
         >
           Show {hidden} more
@@ -466,10 +466,10 @@ function SuggestionRow({
 }) {
   return (
     <li className="group flex items-start gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)]">
-      <span className="mt-[1px] shrink-0 opacity-70">{glyph}</span>
+      <span className="mt-px shrink-0 opacity-70">{glyph}</span>
       <div className="min-w-0 flex-1">
         {onOpen ? (
-          <button type="button" onClick={onOpen} className={`block max-w-full truncate rounded text-left text-ui leading-[18px] ${FOCUS_RING}`} style={{ color: 'var(--text-secondary)' }}>
+          <button type="button" onClick={onOpen} className={`block max-w-full truncate rounded-sm text-left text-ui leading-[18px] ${FOCUS_RING}`} style={{ color: 'var(--text-secondary)' }}>
             {title}
           </button>
         ) : (

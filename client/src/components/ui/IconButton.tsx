@@ -15,7 +15,7 @@ export function IconButton({ label, hint, onClick, children, expanded, tone, pop
     <button
       type="button"
       onClick={(event) => onClick(event.currentTarget)}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
       style={{ color: tone === 'danger' ? 'var(--danger)' : 'var(--text-secondary)', background: expanded ? 'var(--bg-tertiary)' : undefined }}
       title={hint ? `${label} (${hint})` : label}
       aria-label={label}

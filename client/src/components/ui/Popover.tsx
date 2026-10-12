@@ -191,7 +191,7 @@ export function MenuItem({
       aria-disabled={disabled || undefined}
       disabled={disabled}
       onClick={onSelect}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-ui outline-none transition-colors hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)] disabled:opacity-40"
+      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-ui outline-hidden transition-colors hover:bg-(--bg-tertiary) focus-visible:bg-(--bg-tertiary) disabled:opacity-40"
       style={{ color: tone === 'danger' ? 'var(--danger)' : 'var(--text-secondary)' }}
     >
       {role !== 'menuitem' && (

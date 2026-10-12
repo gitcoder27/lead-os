@@ -114,7 +114,7 @@ export function CheckInForm({
         }}
         rows={3}
         placeholder={note ? 'Add a note — saved on today’s record…' : 'General remark — lands as a check-in on today’s record…'}
-        className="w-full resize-none rounded-lg px-3 py-2 text-body leading-5 outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        className="w-full resize-none rounded-lg px-3 py-2 text-body leading-5 outline-hidden focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       {!note && (
@@ -158,7 +158,7 @@ export function ReassignList({
           type="button"
           onClick={() => onPick(dev)}
           disabled={pending}
-          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-body transition-colors hover:bg-(--bg-tertiary) disabled:opacity-50"
           style={{ color: 'var(--text-primary)' }}
         >
           <Avatar name={dev.displayName} seed={dev.accountId} size={24} />
@@ -208,7 +208,7 @@ export function FlagForm({
           }
         }}
         placeholder="e.g. waiting on design review"
-        className="w-full rounded-lg px-3 py-2 text-body outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        className="w-full rounded-lg px-3 py-2 text-body outline-hidden focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       />
       <div className="flex items-center justify-between">

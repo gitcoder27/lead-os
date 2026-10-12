@@ -99,7 +99,7 @@ export function IconAction({
       aria-label={label}
       aria-pressed={pressed}
       title={title ?? label}
-      className={`flex shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 ${
+      className={`flex shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary) disabled:opacity-40 ${
         size === 'sm' ? 'h-7 w-7' : 'h-8 w-8'
       } ${FOCUS_RING} ${className ?? ''}`}
       style={{ color: tone ?? 'var(--text-secondary)' }}

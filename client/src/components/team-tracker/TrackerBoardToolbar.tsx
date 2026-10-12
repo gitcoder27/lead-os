@@ -169,7 +169,7 @@ function ToolbarButton({
       aria-expanded={expanded}
       title={title}
       className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-ui font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        tinted ? 'hover:brightness-110' : 'hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
+        tinted ? 'hover:brightness-110' : 'hover:bg-(--bg-tertiary) hover:text-(--text-primary)'
       } ${FOCUS_RING}`}
       style={{
         color: tinted ? 'var(--accent)' : 'var(--text-secondary)',
@@ -195,7 +195,7 @@ const SearchInput = forwardRef<HTMLInputElement, {
   placeholder?: string;
 }>(({ value, onChange, onClear, placeholder = 'Search people, tasks, Jira keys…' }, ref) => (
   <label
-    className="flex h-8 min-w-[112px] max-w-[340px] flex-1 cursor-text md:min-w-[200px] items-center gap-2 rounded-lg border px-2.5 transition-colors focus-within:!border-[color:var(--border-active)]"
+    className="flex h-8 min-w-[112px] max-w-[340px] flex-1 cursor-text md:min-w-[200px] items-center gap-2 rounded-lg border px-2.5 transition-colors focus-within:border-(--border-active)!"
     style={{
       background: 'color-mix(in srgb, var(--bg-tertiary) 70%, transparent)',
       borderColor: value ? 'color-mix(in srgb, var(--accent) 40%, transparent)' : 'var(--border)',
@@ -216,14 +216,14 @@ const SearchInput = forwardRef<HTMLInputElement, {
           onClear();
         }
       }}
-      className="min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-[var(--text-placeholder)]"
+      className="min-w-0 flex-1 bg-transparent text-body outline-hidden placeholder:text-(--text-placeholder)"
       style={{ color: 'var(--text-primary)' }}
     />
     {value && (
       <button
         type="button"
         onClick={onClear}
-        className={`shrink-0 rounded-md p-0.5 transition-colors hover:text-[var(--text-primary)] ${FOCUS_RING}`}
+        className={`shrink-0 rounded-md p-0.5 transition-colors hover:text-(--text-primary) ${FOCUS_RING}`}
         style={{ color: 'var(--text-muted)' }}
         aria-label="Clear search"
       >
@@ -336,7 +336,7 @@ function OptionGroup({
               role="radio"
               aria-checked={active}
               onClick={() => onSelect(option.value)}
-              className={`flex h-8 items-center justify-between rounded-lg px-2 text-left text-body transition-colors hover:bg-[var(--bg-tertiary)] ${FOCUS_RING}`}
+              className={`flex h-8 items-center justify-between rounded-lg px-2 text-left text-body transition-colors hover:bg-(--bg-tertiary) ${FOCUS_RING}`}
               style={{
                 color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontWeight: active ? 600 : 400,

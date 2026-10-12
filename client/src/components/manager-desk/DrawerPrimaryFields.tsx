@@ -130,7 +130,7 @@ function InlineSelect<T extends string>({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="w-full cursor-pointer rounded-lg px-2.5 py-2 text-body font-medium outline-none disabled:cursor-not-allowed disabled:opacity-70"
+        className="w-full cursor-pointer rounded-lg px-2.5 py-2 text-body font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-70"
         style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
       >
         {emptyLabel && <option value="">{emptyLabel}</option>}
@@ -183,7 +183,7 @@ function DraftTextArea({
         readOnly={readOnly}
         placeholder={placeholder}
         rows={3}
-        className="w-full resize-none rounded-lg px-3 py-2 text-body leading-relaxed outline-none read-only:cursor-default"
+        className="w-full resize-none rounded-lg px-3 py-2 text-body leading-relaxed outline-hidden read-only:cursor-default"
         style={{
           background: 'color-mix(in srgb, var(--bg-primary) 72%, transparent)',
           color: 'var(--text-primary)',

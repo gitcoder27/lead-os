@@ -159,7 +159,7 @@ export function TrackerTaskExecutionPanel({
               type="button"
               aria-label="Cancel reassign"
               onClick={() => setReassignOpen(false)}
-              className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="flex h-6 w-6 items-center justify-center rounded-lg transition-colors hover:bg-(--bg-tertiary)"
               style={{ color: 'var(--text-secondary)' }}
             >
               <X size={12} />

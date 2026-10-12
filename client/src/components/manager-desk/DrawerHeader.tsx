@@ -150,7 +150,7 @@ export function DrawerHeader({
         onBlur={commitTitle}
         onKeyDown={(e) => e.key === 'Enter' && commitTitle()}
         readOnly={readOnly}
-        className="mt-2 w-full bg-transparent text-title-sm font-semibold leading-snug outline-none"
+        className="mt-2 w-full bg-transparent text-title-sm font-semibold leading-snug outline-hidden"
         style={{ color: 'var(--text-primary)', caretColor: 'var(--md-accent)' }}
         maxLength={200}
         aria-label="Item title"
@@ -242,7 +242,7 @@ function DelegatedActionMenu({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -4, scale: 0.97 }}
       transition={{ duration: 0.12 }}
-      className="absolute right-0 top-full z-[60] mt-1 w-[300px] overflow-hidden rounded-xl"
+      className="absolute right-0 top-full z-60 mt-1 w-[300px] overflow-hidden rounded-xl"
       style={{
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border)',

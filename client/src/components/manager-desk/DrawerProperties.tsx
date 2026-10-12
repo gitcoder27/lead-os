@@ -65,7 +65,7 @@ function InlineSelect<T extends string>({ label, value, options, onChange, empty
   return (
     <div>
       <label htmlFor={id} className="mb-0.5 block text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="w-full cursor-pointer rounded-lg px-2 py-1.5 text-ui font-medium outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="w-full cursor-pointer rounded-lg px-2 py-1.5 text-ui font-medium outline-hidden disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
         {emptyLabel && <option value="">{emptyLabel}</option>}
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -82,7 +82,7 @@ function InlineText({ label, value, placeholder, onChange, className, disabled =
   return (
     <div className={className}>
       <label htmlFor={id} className="mb-0.5 block text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
-      <input id={id} type="text" value={local} onChange={(e) => setLocal(e.target.value)} onBlur={() => { if (local !== value) onChange(local); }} placeholder={placeholder} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-ui outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
+      <input id={id} type="text" value={local} onChange={(e) => setLocal(e.target.value)} onBlur={() => { if (local !== value) onChange(local); }} placeholder={placeholder} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-ui outline-hidden disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
     </div>
   );
 }
@@ -108,7 +108,7 @@ function InlineDatetime({ label, value, onChange, className, disabled = false }:
   return (
     <div className={className}>
       <label htmlFor={id} className="mb-0.5 block text-meta font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>{label}</label>
-      <input id={id} type="datetime-local" value={localValue} onChange={(e) => onChange(fromLocalDateTimeInputValue(e.target.value))} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-ui outline-none disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
+      <input id={id} type="datetime-local" value={localValue} onChange={(e) => onChange(fromLocalDateTimeInputValue(e.target.value))} disabled={disabled} className="w-full rounded-lg px-2 py-1.5 text-ui outline-hidden disabled:cursor-not-allowed disabled:opacity-70" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }} />
     </div>
   );
 }

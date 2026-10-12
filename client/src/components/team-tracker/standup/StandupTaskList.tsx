@@ -86,7 +86,7 @@ export function StandupTaskList({
                 // The selected task is a soft tint with a thin accent bar on the left. Keyboard focus now lands on it
                 // as soon as you move to a person, so a full ring (which :focus-visible would draw permanently)
                 // was far too loud; the tint + bar is the focus indicator, rendered from state so it also follows j/k.
-                className="standup-task-row relative block w-full px-3 text-left outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] [&:not(:first-child)]:border-t"
+                className="standup-task-row relative block w-full px-3 text-left outline-hidden transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_70%,transparent)] not-first:border-t"
                 style={{
                   borderColor: 'var(--border)',
                   background: focused ? 'color-mix(in srgb, var(--accent) 8%, var(--bg-tertiary))' : undefined,
@@ -98,7 +98,7 @@ export function StandupTaskList({
                   <span className="shrink-0 font-mono text-ui tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {task.taskKey}
                   </span>
-                  <span className="min-w-0 flex-1 break-words py-2 text-body font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <span className="min-w-0 flex-1 wrap-break-word py-2 text-body font-medium" style={{ color: 'var(--text-primary)' }}>
                     {task.title}
                   </span>
                   {isNew && (
@@ -109,7 +109,7 @@ export function StandupTaskList({
                   )}
                   {task.highPriority && <Flag size={12} fill="currentColor" style={{ color: 'var(--text-primary)' }} aria-label="High priority" />}
                   {task.jiraKey && (
-                    <span className="hidden shrink-0 rounded px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    <span className="hidden shrink-0 rounded-sm px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
                       {task.jiraKey}
                     </span>
                   )}
@@ -154,7 +154,7 @@ export function StandupTaskList({
                   <button
                     type="button"
                     onClick={() => onOpen(task.taskKey)}
-                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-[var(--bg-secondary)]"
+                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-(--bg-secondary)"
                   >
                     <TaskStatusGlyph status="done" size={14} />
                     <span className="w-12 shrink-0 font-mono text-ui" style={{ color: 'var(--text-disabled)' }}>{task.taskKey}</span>

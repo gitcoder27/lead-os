@@ -78,7 +78,7 @@ export function TriageProperties({ issue, jiraAspenSeverityField }: TriageProper
                 {issue.labels.map((label) => (
                   <span
                     key={label}
-                    className="text-ui px-1.5 py-[1px] rounded-full"
+                    className="text-ui px-1.5 py-px rounded-full"
                     style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
                   >
                     {label}

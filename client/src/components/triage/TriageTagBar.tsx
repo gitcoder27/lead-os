@@ -47,7 +47,7 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
         </div>
         <button
           onClick={() => setExpanded((p) => !p)}
-          className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-[var(--bg-tertiary)]"
+          className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-(--bg-tertiary)"
           title={expanded ? 'Close' : 'Manage tags'}
         >
           {expanded ? <X size={12} style={{ color: 'var(--text-muted)' }} /> : <Plus size={12} style={{ color: 'var(--text-muted)' }} />}
@@ -91,13 +91,13 @@ export function TriageTagBar({ tags, allTags, assignedTagIds, isPending, onToggl
                 }
               }}
               placeholder="New tag…"
-              className="flex-1 text-ui px-2 py-0.5 rounded focus:outline-none focus:ring-1"
+              className="flex-1 text-ui px-2 py-0.5 rounded-sm focus:outline-hidden focus:ring-1"
               style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', outlineColor: 'var(--accent)' }}
             />
             <button
               onClick={() => onCreate(newTagName, { onSuccess: () => setNewTagName('') })}
               disabled={!newTagName.trim() || isPending}
-              className="text-ui px-2 py-0.5 rounded font-medium disabled:opacity-30"
+              className="text-ui px-2 py-0.5 rounded-sm font-medium disabled:opacity-30"
               style={{ background: 'var(--accent-solid)', color: 'var(--on-accent)' }}
             >
               Add

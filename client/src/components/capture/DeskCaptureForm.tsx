@@ -119,7 +119,7 @@ export function DeskCaptureForm({
             }
           }}
           placeholder="What needs to land on your desk?"
-          className="w-full rounded-xl px-3.5 py-2.5 text-body outline-none"
+          className="w-full rounded-xl px-3.5 py-2.5 text-body outline-hidden"
           style={{
             background: 'var(--bg-tertiary)',
             color: 'var(--text-primary)',
@@ -202,7 +202,7 @@ export function DeskCaptureForm({
                 onChange={(e) => setContextNote(e.target.value)}
                 rows={2}
                 placeholder="Quick context so future-you remembers why..."
-                className="w-full rounded-lg px-2.5 py-2 text-body outline-none resize-y"
+                className="w-full rounded-lg px-2.5 py-2 text-body outline-hidden resize-y"
                 style={{
                   background: 'var(--bg-tertiary)',
                   color: 'var(--text-primary)',

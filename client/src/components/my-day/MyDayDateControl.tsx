@@ -23,7 +23,7 @@ export function MyDayDateControl({ date, setDate }: MyDayDateControlProps) {
   const isToday = date === today;
   const label = relativeDayLabel(date, today);
 
-  const stepButton = `flex h-8 w-8 items-center justify-center rounded-[9px] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] ${FOCUS_RING}`;
+  const stepButton = `flex h-8 w-8 items-center justify-center rounded-[9px] transition-colors hover:bg-(--bg-tertiary) hover:text-(--text-primary) ${FOCUS_RING}`;
 
   return (
     <div
@@ -46,7 +46,7 @@ export function MyDayDateControl({ date, setDate }: MyDayDateControlProps) {
         type="button"
         onClick={() => setDate(today)}
         disabled={isToday}
-        className={`h-8 min-w-[92px] rounded-[9px] px-2.5 text-body font-medium tabular-nums transition-colors enabled:hover:bg-[var(--bg-tertiary)] disabled:cursor-default ${FOCUS_RING}`}
+        className={`h-8 min-w-[92px] rounded-[9px] px-2.5 text-body font-medium tabular-nums transition-colors enabled:hover:bg-(--bg-tertiary) disabled:cursor-default ${FOCUS_RING}`}
         style={{ color: isToday ? 'var(--text-primary)' : 'var(--accent)' }}
         aria-label={isToday ? 'Viewing today' : `Viewing ${label} — jump to today`}
         title={isToday ? undefined : 'Jump to today ( T )'}

@@ -137,7 +137,7 @@ function ClassicTrackerItemRow({
         <div
           data-drag-handle
           onClick={(event) => event.stopPropagation()}
-          className="cursor-grab active:cursor-grabbing touch-none shrink-0 flex items-center justify-center h-5 w-5 rounded"
+          className="cursor-grab active:cursor-grabbing touch-none shrink-0 flex items-center justify-center h-5 w-5 rounded-sm"
           style={{ color: 'var(--text-muted)' }}
           title="Drag to reorder"
         >
@@ -149,7 +149,7 @@ function ClassicTrackerItemRow({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-1.5">
-          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-[1px]" />}
+          {item.taskKey && <TaskKeyChip taskKey={item.taskKey} className="mt-px" />}
           <div className="flex-1 min-w-0">
             {titleEditing && isTitleEditable ? (
               <div className="flex items-center gap-1 min-w-0">
@@ -164,11 +164,11 @@ function ClassicTrackerItemRow({
                       setTitleEditing(false);
                     }
                   }}
-                  className="flex-1 min-w-0 rounded px-1.5 py-0.5 text-body outline-none"
+                  className="flex-1 min-w-0 rounded-sm px-1.5 py-0.5 text-body outline-hidden"
                   style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', border: '1px solid var(--border-active)' }}
                   aria-label="Edit title"
                 />
-                <button onClick={commitTitle} className="h-5 w-5 rounded flex items-center justify-center shrink-0" style={{ color: 'var(--success)' }} title="Save title">
+                <button onClick={commitTitle} className="h-5 w-5 rounded-sm flex items-center justify-center shrink-0" style={{ color: 'var(--success)' }} title="Save title">
                   <Check size={10} />
                 </button>
                 <button
@@ -176,7 +176,7 @@ function ClassicTrackerItemRow({
                     setDraftTitle(item.title);
                     setTitleEditing(false);
                   }}
-                  className="h-5 w-5 rounded flex items-center justify-center shrink-0"
+                  className="h-5 w-5 rounded-sm flex items-center justify-center shrink-0"
                   style={{ color: 'var(--text-muted)' }}
                   title="Cancel"
                 >
@@ -222,7 +222,7 @@ function ClassicTrackerItemRow({
                   toggleDetails();
                 }
               }}
-              className="mt-[1px] h-5 w-5 shrink-0 rounded flex items-center justify-center"
+              className="mt-px h-5 w-5 shrink-0 rounded-sm flex items-center justify-center"
               style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
               aria-expanded={detailsOpen}
               aria-controls={detailsRegionId}

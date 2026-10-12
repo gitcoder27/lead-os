@@ -116,6 +116,9 @@ function scheduleChange(meta: Record<string, unknown>, resolveName?: NameResolve
       if (!to) return 'Unscheduled';
       if (via === 'carry_forward') return `Carried over to ${day(to)}`;
       return str(meta, 'from') ? `Moved to ${day(to)}` : `Scheduled for ${day(to)}`;
+    case 'due_at':
+      if (!to) return 'Due date cleared';
+      return str(meta, 'from') ? `Due date moved to ${day(to)}` : `Due ${day(to)}`;
     case 'follow_up_at':
       if (!to) return 'Follow-up cleared';
       return via === 'snooze' ? `Snoozed until ${day(to)}` : `Follow-up set for ${day(to)}`;
@@ -165,6 +168,7 @@ export function describeChange(event: TaskEvent, resolveName?: NameResolver): st
       return from ? `Renamed from “${from}” to “${str(meta, 'to') ?? ''}”` : `Renamed to “${str(meta, 'to') ?? ''}”`;
     }
     case 'schedule': return scheduleChange(meta, resolveName);
+    case 'priority': return meta.to === 'high' ? 'Priority raised to High' : 'Priority back to Normal';
     case 'link': return linkChange(meta, resolveName);
     case 'merged': return `Merged ${str(meta, 'mergedKey') ?? 'a task'} into ${str(meta, 'survivorKey') ?? 'this task'}`;
     case 'blocker': return blockerAction(event) === 'cleared' ? 'Blocker cleared' : 'Blocker raised';

@@ -51,6 +51,7 @@ const SYSTEM_EVENT_LABELS: Record<TaskEventType, string> = {
   focus: 'Focus changed',
   title: 'Renamed',
   schedule: 'Rescheduled',
+  priority: 'Priority changed',
   link: 'Linked',
   checkin_ref: 'Mentioned in a check-in',
   note_ref: 'Mentioned in a note',

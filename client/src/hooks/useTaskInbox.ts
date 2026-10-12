@@ -11,11 +11,14 @@ import type { TaskEvent, TaskInboxReadRequest, TaskInboxResponse } from '@/types
 export function useTaskInboxLatest(unreadOnly = true) {
   const scope = useAuthScopeKey();
   const { user, features } = useAuth();
-  const enabled = Boolean(user && features?.tasksPhase3 && features.teamMode === 'collab' && (user.role === 'manager' || user.role === 'developer'));
+  const enabled = Boolean(user && features?.tasksPhase3 && (user.role === 'manager' || user.role === 'developer'));
   const query = useQuery({
     queryKey: ['task-inbox', scope, 'latest', unreadOnly],
     queryFn: ({ signal }) => api.get<TaskInboxResponse>(`/task-inbox?unread=${unreadOnly}&limit=20`, { signal }),
     enabled, retry: false, staleTime: 10_000, refetchInterval: 30_000,
+    // A hidden tab is exactly where an update goes unseen; keep asking so the title count and desktop alert can fire.
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: 'always',
   });
   return { ...query, data: isTaskActivityAccessLoss(query.error) ? undefined : query.data, enabled: enabled && query.data?.enabled !== false };
 }
@@ -108,7 +111,6 @@ export function useInboxTargetEvent(taskKey: string, eventId: number | undefined
   const enabled = Boolean(
     user &&
     features?.tasksPhase3 &&
-    features.teamMode === 'collab' &&
     eventId &&
     (user.role === 'manager' || user.role === 'developer'),
   );

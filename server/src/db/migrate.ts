@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS task_inbox (
   recipient_user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
   event_id INTEGER NOT NULL,
   actor_user_id INTEGER,
-  kind TEXT NOT NULL CHECK (kind IN ('assignment', 'instruction', 'reply', 'blocker', 'blocker_cleared')),
+  kind TEXT NOT NULL CHECK (kind IN ('assignment', 'instruction', 'reply', 'blocker', 'blocker_cleared', 'schedule', 'priority')),
   created_at TEXT NOT NULL,
   read_at TEXT
 );
@@ -1361,6 +1361,24 @@ const workspaceKeyRebuilds: RebuildSpec[] = [
         created_at         TEXT NOT NULL,
         updated_at         TEXT NOT NULL,
         UNIQUE(workspace_id, date, manager_account_id)
+      )
+    `,
+  },
+  {
+    // Plan-date, due-date and priority updates widened the allowed delivery kinds; older databases carry the narrower CHECK.
+    tableName: "task_inbox",
+    expectedSqlFragment: "'schedule', 'priority')",
+    columns: ["id", "workspace_id", "recipient_user_id", "event_id", "actor_user_id", "kind", "created_at", "read_at"],
+    createSql: (tableName) => `
+      CREATE TABLE ${quoteIdentifier(tableName)} (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id      TEXT NOT NULL,
+        recipient_user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+        event_id          INTEGER NOT NULL,
+        actor_user_id     INTEGER,
+        kind              TEXT NOT NULL CHECK (kind IN ('assignment', 'instruction', 'reply', 'blocker', 'blocker_cleared', 'schedule', 'priority')),
+        created_at        TEXT NOT NULL,
+        read_at           TEXT
       )
     `,
   },

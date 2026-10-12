@@ -56,7 +56,7 @@ Feature folders under `client/src/components/`:
 
 - `layout/`: shell, header, navigation, dashboard layout.
 - `ui/`: shared primitives: `Dialog` (the one modal shell, focus-trapped, portal), `Popover`, `Kbd`, `ShortcutSheet`, `EmptyState`.
-- `actions/`: manager action inbox (header).
+- `actions/`: manager action inbox (header), the personal updates inbox (bell) and desktop alerts (`useInboxAlerts`, `useDesktopAlerts`; docs/66).
 - `today/`: manager daily command view.
 - `work/`, `filters/`, `table/`, `triage/`, `alerts/`, `workload/`: Work dashboard and defect triage.
 - `team-tracker/`: manager team board and developer day tracking.

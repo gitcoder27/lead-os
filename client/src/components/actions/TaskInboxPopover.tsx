@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Bell } from 'lucide-react';
+import { OPEN_INBOX_EVENT } from '@/hooks/useInboxAlerts';
 import { useTaskInboxLatest } from '@/hooks/useTaskInbox';
 import { TaskInboxContent } from './TaskInboxContent';
 
@@ -8,14 +9,32 @@ import { TaskInboxContent } from './TaskInboxContent';
 export function TaskInboxPopover() {
   const [open, setOpen] = useState(false);
   const query = useTaskInboxLatest();
-  if (!query.enabled) return null;
   const count = query.data?.unreadCount ?? 0;
+  const [ping, setPing] = useState(false);
+  const previous = useRef<number | null>(null);
+  // Ring when the count goes up while the page is open, never for what was already waiting.
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = count;
+    if (before === null || count <= before) return;
+    setPing(true);
+    const timer = window.setTimeout(() => setPing(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [count]);
+  // "View" on a toast or a clicked desktop notification brings the person here.
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(OPEN_INBOX_EVENT, show);
+    return () => window.removeEventListener(OPEN_INBOX_EVENT, show);
+  }, []);
+  if (!query.enabled) return null;
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
           type="button"
           className="task-inbox-trigger"
+          data-ping={ping}
           aria-label={`Updates${count ? `, ${count} unread` : ''}${query.isError ? ', unavailable' : ''}`}
         >
           <Bell size={16} />

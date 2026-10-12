@@ -27,6 +27,11 @@ describe('activity changes in plain words (docs/56 MDA-02)', () => {
     expect(describeChange(event('schedule', { field: 'day', from: '2026-10-10', to: '2026-10-11', via: 'carry_forward' }))).toBe('Carried over to Sun 11 Oct');
     expect(describeChange(event('schedule', { field: 'day', from: '2026-10-10', to: '2026-10-13', via: 'reschedule' }))).toBe('Moved to Tue 13 Oct');
     expect(describeChange(event('schedule', { field: 'follow_up_at', from: null, to: null, via: 'edit' }))).toBe('Follow-up cleared');
+    expect(describeChange(event('schedule', { field: 'due_at', from: null, to: '2026-10-16', via: 'edit' }))).toBe('Due Fri 16 Oct');
+    expect(describeChange(event('schedule', { field: 'due_at', from: '2026-10-16', to: '2026-10-20', via: 'edit' }))).toBe('Due date moved to Tue 20 Oct');
+    expect(describeChange(event('schedule', { field: 'due_at', from: '2026-10-16', to: null, via: 'edit' }))).toBe('Due date cleared');
+    expect(describeChange(event('priority', { from: 'normal', to: 'high' }))).toBe('Priority raised to High');
+    expect(describeChange(event('priority', { from: 'high', to: 'normal' }))).toBe('Priority back to Normal');
     expect(describeChange(event('link', { action: 'removed', kind: 'jira', ref: 'APP-2' }))).toBe('Unlinked APP-2');
     expect(describeChange(event('link', { action: 'added', kind: 'person', ref: 'dev-2' }), (id) => (id === 'dev-2' ? 'Tom' : undefined))).toBe('Linked Tom');
     expect(describeChange(event('focus', { action: 'set_current', date: '2026-10-11' }))).toBe('Started working on it');

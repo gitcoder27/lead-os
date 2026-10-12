@@ -193,7 +193,7 @@ function taskGuardFields(changes) {
 }
 exports.TASK_EVENT_TYPES = [
     "created", "update", "instruction", "decision", "blocker", "status", "assign",
-    "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
+    "focus", "title", "schedule", "priority", "link", "checkin_ref", "note_ref", "merged",
 ];
 exports.ONE_ON_ONE_NO_CHECK_IN_DAYS = 3;
 exports.ONE_ON_ONE_SUGGESTION_LIMIT = 6;

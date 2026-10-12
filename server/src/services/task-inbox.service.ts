@@ -1,16 +1,24 @@
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
-import type { AuthUser, TaskEvent, TaskInboxKind, TaskInboxReadRequest, TaskInboxResponse } from "shared/types";
+import type { AuthUser, TaskEvent, TaskInboxChange, TaskInboxKind, TaskInboxReadRequest, TaskInboxResponse } from "shared/types";
 import { db } from "../db/connection";
 import { appUsers, taskInbox, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
-import { SettingsService } from "./settings.service";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
 import { normalizeWorkspaceId } from "./workspace.service";
 
+/** Plan date, due date and priority are shared task facts; nothing else is lifted out of event metadata. */
+function changeOf(kind: string, metaJson: string | null): TaskInboxChange | undefined {
+  if (kind !== "schedule" && kind !== "priority") return undefined;
+  const meta = JSON.parse(metaJson ?? "null") as { field?: string; from?: unknown; to?: unknown } | null;
+  const field = kind === "priority" ? "priority" : meta?.field;
+  if (field !== "day" && field !== "due_at" && field !== "priority") return undefined;
+  const text = (value: unknown) => (typeof value === "string" ? value : null);
+  return { field, from: text(meta?.from), to: text(meta?.to) };
+}
+
 export class TaskInboxService {
-  private readonly settings = new SettingsService();
   private readonly keys = new TaskKeysService();
   private readonly events = new TaskEventsService();
   private async scope(user: AuthUser) {
@@ -30,8 +38,8 @@ export class TaskInboxService {
       .limit(1);
     if (!recipient || user.accountId !== (recipient.developerAccountId ?? recipient.username))
       throw new HttpError(401, "Account unavailable");
-    const enabled =
-      (await this.settings.getTeamMode(workspaceId)) === "collab" && (await this.keys.canonicalEnabled(workspaceId));
+    // Solo workspaces get updates too: a developer with a login should hear about their own work.
+    const enabled = await this.keys.canonicalEnabled(workspaceId);
     const developerAccess = and(
       eq(tasks.ownerType, "developer"),
       eq(tasks.ownerId, user.accountId),
@@ -88,7 +96,12 @@ export class TaskInboxService {
             ? "Status changed to blocked"
             : delivery.kind === "blocker_cleared"
               ? "Blocker cleared"
-              : "Assignment changed"),
+              : delivery.kind === "schedule"
+                ? "Date changed"
+                : delivery.kind === "priority"
+                  ? "Priority changed"
+                  : "Assignment changed"),
+        ...(changeOf(delivery.kind, event.metaJson) && { change: changeOf(delivery.kind, event.metaJson) }),
         occurredAt: event.occurredAt,
         readAt: delivery.readAt,
         href: `/t/${encodeURIComponent(task.taskKey)}?event=${event.id}`,
@@ -107,7 +120,7 @@ export class TaskInboxService {
       throw new HttpError(400, "Choose 1–100 distinct updates");
     return runInTransaction(async () => {
       const scope = await this.scope(user);
-      if (!scope.enabled) throw new HttpError(409, "Updates are available in collaborative mode");
+      if (!scope.enabled) throw new HttpError(409, "Updates are not available in this workspace");
       const found = await this.events.inboxDeliveries(scope, input.ids);
       if (found.length !== input.ids.length) throw new HttpError(404, "Update unavailable. Refresh the inbox.");
       await db

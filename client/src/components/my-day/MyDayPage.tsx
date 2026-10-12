@@ -18,6 +18,7 @@ import { useMyDayHandlers } from './useMyDayHandlers';
 import { useMyDayShortcuts } from './useMyDayShortcuts';
 import { MyDayHeader } from './MyDayHeader';
 import { TaskInboxPopover } from '@/components/actions/TaskInboxPopover';
+import { DesktopAlertsPrompt } from '@/components/actions/DesktopAlertsControls';
 import { MyDayInactiveBanner, MyDayReadOnlyBanner } from './MyDayInactiveBanner';
 import { StatusSelector } from './StatusSelector';
 import { QuickUpdates } from './QuickUpdates';
@@ -277,6 +278,8 @@ export function MyDayPage() {
                   {!isInactive && <MyDayReadOnlyBanner reason={readOnlyReason} onToday={goToday} />}
                 </motion.div>
               )}
+
+              {isToday && <DesktopAlertsPrompt />}
 
               {!isReadOnly && (
                 <CarryOverNudge

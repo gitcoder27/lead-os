@@ -201,21 +201,53 @@ describe("durable task inbox", () => {
     expect(await db.select().from(taskInbox)).toHaveLength(1);
   });
 
-  it("keeps solo and nonparticipating behavior, without retrospective delivery on mode changes", async () => {
+  it("delivers in solo workspaces too, and still skips inactive accounts and roster records", async () => {
     await db.update(configTable).set({ value: "solo" }).where(eq(configTable.key, "team_mode"));
     const task = await assign();
     await instruction(task.taskKey);
-    expect(await inbox.list(dev)).toMatchObject({ enabled: false, unreadCount: 0, events: [] });
-    expect(await db.select().from(taskInbox)).toEqual([]);
-    await db.update(configTable).set({ value: "collab" }).where(eq(configTable.key, "team_mode"));
-    expect((await inbox.list(dev)).events).toEqual([]);
+    expect(await inbox.list(dev)).toMatchObject({ enabled: true, unreadCount: 2 });
+    expect((await inbox.list(dev)).events.map((item) => item.kind)).toEqual(["instruction", "assignment"]);
+    expect((await inbox.list(lead)).events).toEqual([]);
     await db.update(appUsers).set({ isActive: 0 }).where(eq(appUsers.username, dev.username));
     await instruction(task.taskKey);
-    expect(await db.select().from(taskInbox)).toEqual([]);
+    expect(await db.select().from(taskInbox)).toHaveLength(2);
     await expect(inbox.list(dev)).rejects.toMatchObject({ status: 401 });
     await db.update(appUsers).set({ isActive: 1 }).where(eq(appUsers.username, dev.username));
     await db.update(developers).set({ isActive: 0 }).where(eq(developers.accountId, "dev-1"));
     await instruction(task.taskKey);
+    expect(await db.select().from(taskInbox)).toHaveLength(2);
+  });
+
+  it("tells the owner when the plan date, due date or priority changes, and nobody else", async () => {
+    await db.update(configTable).set({ value: "solo" }).where(eq(configTable.key, "team_mode"));
+    const task = await assign();
+    await service.update(task.taskKey, { scheduledOn: "2026-10-14" }, manager);
+    await service.update(task.taskKey, { dueAt: "2026-10-16T17:00:00.000Z" }, manager);
+    await service.update(task.taskKey, { dueAt: "2026-10-17T17:00:00.000Z", priority: "high" }, manager);
+    // Private or routine movement stays quiet: follow-ups and a title edit.
+    await service.update(task.taskKey, { followUpAt: "2026-10-20T09:00:00.000Z" }, manager);
+    await service.update(task.taskKey, { title: "Ship the release" }, manager);
+    const response = await inbox.list(dev);
+    expect(response.events.map((item) => [item.kind, item.change])).toEqual([
+      ["priority", { field: "priority", from: "normal", to: "high" }],
+      ["schedule", { field: "due_at", from: "2026-10-16T17:00:00.000Z", to: "2026-10-17T17:00:00.000Z" }],
+      ["schedule", { field: "due_at", from: null, to: "2026-10-16T17:00:00.000Z" }],
+      ["schedule", { field: "day", from: service.today(), to: "2026-10-14" }],
+      ["assignment", undefined],
+    ]);
+    expect(JSON.stringify(response)).not.toContain("Private next action");
+    expect(JSON.stringify(response)).not.toContain("2026-10-20");
+    expect((await inbox.list(lead)).events).toEqual([]);
+    expect((await inbox.list(other)).events).toEqual([]);
+    const target = await inbox.targetEvent(dev, response.events[0]!.eventId, task.taskKey);
+    expect(target.event).toMatchObject({ type: "priority", meta: { from: "normal", to: "high" } });
+    await service.update(task.taskKey, { priority: "high" }, manager);
+    expect((await inbox.list(dev)).events).toHaveLength(5);
+  });
+
+  it("does not tell a manager about changes to the manager's own task", async () => {
+    const own = await service.create({ title: "Mine", ownerType: "manager", ownerId: "lead" }, manager);
+    await service.update(own.taskKey, { dueAt: "2026-10-16T17:00:00.000Z", priority: "high" }, manager);
     expect(await db.select().from(taskInbox)).toEqual([]);
   });
 

@@ -471,9 +471,10 @@ export class TaskService {
         await this.emit(next, { type: "status", body: null, meta: { domain: "task_status", from: before.status, to: next.status, reason: reassigned ? "reassigned" : "user" } }, principal);
         if (before.status === "active" || next.status === "active") await this.emit(next, { type: "focus", body: null, meta: { action: next.status === "active" ? "set_current" : "unset_current", date: todayIsoDate() } }, principal);
       }
-      for (const [field, eventField] of [["scheduledOn", "day"], ["startsAt", "planned_start_at"], ["endsAt", "planned_end_at"], ["followUpAt", "follow_up_at"], ["waitingOnLabel", "waiting_on"]] as const) {
+      for (const [field, eventField] of [["scheduledOn", "day"], ["dueAt", "due_at"], ["startsAt", "planned_start_at"], ["endsAt", "planned_end_at"], ["followUpAt", "follow_up_at"], ["waitingOnLabel", "waiting_on"]] as const) {
         if (before[field] !== next[field]) await this.emit(next, { type: "schedule", body: null, meta: { field: eventField, from: before[field], to: next[field], via: field === "scheduledOn" ? "reschedule" : "edit" } }, principal);
       }
+      if (before.priority !== next.priority) await this.emit(next, { type: "priority", body: null, meta: { from: before.priority as "normal" | "high", to: next.priority as "normal" | "high" } }, principal);
       if (data.scheduledOn) await this.focus(next, data.scheduledOn);
       return next;
     });
@@ -641,9 +642,10 @@ export class TaskService {
         const meta = JSON.parse(event.metaJson ?? "{}") as Record<string, unknown>;
         if (event.type === "status" && typeof meta.from === "string") projected.status = statusFromLegacy(meta.from);
         if (event.type === "title" && typeof meta.from === "string") projected.title = meta.from;
+        if (event.type === "priority" && typeof meta.from === "string") projected.priority = meta.from;
         if (event.type === "assign") { projected.ownerId = typeof meta.fromId === "string" ? meta.fromId : null; projected.ownerType = typeof meta.fromType === "string" ? meta.fromType : null; }
         if (event.type === "schedule") {
-          const field = ({ day: "scheduledOn", follow_up_at: "followUpAt", planned_start_at: "startsAt", planned_end_at: "endsAt" } as const)[meta.field as "day"];
+          const field = ({ day: "scheduledOn", due_at: "dueAt", follow_up_at: "followUpAt", planned_start_at: "startsAt", planned_end_at: "endsAt" } as const)[meta.field as "day"];
           if (field) projected[field] = typeof meta.from === "string" ? meta.from : null;
         }
       }

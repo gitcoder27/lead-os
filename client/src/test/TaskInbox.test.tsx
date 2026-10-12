@@ -19,10 +19,11 @@ let user: AuthUser = {
   workspaceId: 'default',
 };
 let teamMode: 'solo' | 'collab' = 'collab';
+let tasksPhase3 = true;
 const addToast = vi.fn();
 const onOpen = vi.fn();
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user, features: { tasksPhase3: true, teamMode } }),
+  useAuth: () => ({ user, features: { tasksPhase3, teamMode } }),
   useAuthScopeKey: () => `${user.workspaceId}:${user.username}:${user.role}`,
 }));
 vi.mock('@/context/ToastContext', () => ({ useToast: () => ({ addToast }) }));
@@ -56,6 +57,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   user = { username: 'lead', accountId: 'lead', displayName: 'Lead', role: 'manager', workspaceId: 'default' };
   teamMode = 'collab';
+  tasksPhase3 = true;
   rows = [{ ...item }];
   get.mockImplementation(async (url) => {
     const unread = url.includes('unread=true');
@@ -171,13 +173,17 @@ describe('task inbox', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('link', { name: /Release checklist/ })).toBeInTheDocument();
   });
-  it('keeps solo quiet and lets developers read only their personal endpoint', async () => {
+  it('serves solo workspaces too, and lets developers read only their personal endpoint', async () => {
     teamMode = 'solo';
     const solo = mount(<TaskInboxPopover />);
-    expect(screen.queryByRole('button', { name: /Updates/ })).not.toBeInTheDocument();
-    expect(get).not.toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Updates, 1 unread' })).toBeInTheDocument();
     solo.unmount();
-    teamMode = 'collab';
+    tasksPhase3 = false;
+    const old = mount(<TaskInboxPopover />);
+    expect(screen.queryByRole('button', { name: /Updates/ })).not.toBeInTheDocument();
+    old.unmount();
+    tasksPhase3 = true;
+    get.mockClear();
     user = { ...user, username: 'dev', role: 'developer', accountId: 'dev-1', developerAccountId: 'dev-1' };
     mount(<TaskInboxPopover />);
     fireEvent.click(await screen.findByRole('button', { name: 'Updates, 1 unread' }));
@@ -238,7 +244,7 @@ describe('task inbox', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /Updates/ })).not.toBeInTheDocument());
   });
 
-  it('retries an unavailable exact event and hides its cached card when collaboration ends', async () => {
+  it('retries an unavailable exact event and hides its cached card when updates become unavailable', async () => {
     window.history.replaceState(null, '', item.href);
     get.mockRejectedValueOnce(new Error('Unavailable'));
     const view = mount(<TaskTimeline taskKey="T-2" mode="manager" />);
@@ -258,7 +264,7 @@ describe('task inbox', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('region', { name: 'Opened task update' })).toHaveTextContent('Priya Rao');
-    teamMode = 'solo';
+    tasksPhase3 = false;
     view.rerender(
       <QueryClientProvider client={view.qc}>
         <TaskTimeline taskKey="T-2" mode="manager" />

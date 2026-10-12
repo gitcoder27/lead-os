@@ -2,7 +2,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { TaskInboxKind } from "shared/types";
 import { db } from "../db/connection";
 import { appUsers, developers, managerSelfLinks, oneOnOneAgendaItems, taskInbox, tasks } from "../db/schema";
-import { SettingsService } from "./settings.service";
 import { TaskKeysService } from "./task-keys.service";
 import type { EventRow } from "./task-events.service";
 
@@ -17,7 +16,7 @@ export async function deliverTaskEvent(
     !event.taskId ||
     event.visibility !== "shared" ||
     event.redactedAt ||
-    !["created", "assign", "instruction", "update", "blocker", "status"].includes(event.type)
+    !["created", "assign", "instruction", "update", "blocker", "status", "schedule", "priority"].includes(event.type)
   )
     return;
   const meta = JSON.parse(event.metaJson ?? "null") as Record<string, unknown> | null;
@@ -31,7 +30,10 @@ export async function deliverTaskEvent(
     return;
   if (event.type === "status" && (meta?.to !== "blocked" || meta?.from === "blocked" || meta?.reason !== "user"))
     return;
-  if ((await new SettingsService().getTeamMode(event.workspaceId)) !== "collab") return;
+  // Only the plan date and due date reach the owner; follow-ups, waiting-on and meeting times stay private or quiet,
+  // and carry-forward is the developer's own routine rather than news.
+  if (event.type === "schedule" && (!["day", "due_at"].includes(String(meta?.field)) || meta?.via === "carry_forward"))
+    return;
   if (!(await new TaskKeysService().canonicalEnabled(event.workspaceId))) return;
   const [task] = await db
     .select()
@@ -103,9 +105,18 @@ export async function deliverTaskEvent(
             : "blocker"
           : event.type === "status"
             ? "blocker"
-            : "reply";
+            : event.type === "schedule" || event.type === "priority"
+              ? event.type
+              : "reply";
+  // A changed date or priority is news for whoever owns the work, not for the other managers.
   const recipients =
-    kind === "assignment" ? [...ownerUsers, ...managers] : developerAuthor ? managers : [...ownerUsers, ...managers];
+    kind === "schedule" || kind === "priority"
+      ? ownerUsers
+      : kind === "assignment"
+        ? [...ownerUsers, ...managers]
+        : developerAuthor
+          ? managers
+          : [...ownerUsers, ...managers];
   const actorPersonId =
     author?.role === "developer"
       ? author.developerAccountId

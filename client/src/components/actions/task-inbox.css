@@ -66,6 +66,21 @@
   color: var(--text-secondary);
   font-size: var(--fs-12);
 }
+.task-inbox-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.task-inbox-meta svg {
+  flex: none;
+  color: var(--accent-text);
+}
+.task-inbox li[data-kind='blocker'] .task-inbox-meta svg {
+  color: var(--danger);
+}
+.task-inbox li[data-kind='blocker_cleared'] .task-inbox-meta svg {
+  color: var(--success);
+}
 .task-inbox a:hover,
 .task-inbox button:hover,
 .task-inbox-trigger:hover {
@@ -86,7 +101,7 @@
   justify-content: center;
   min-width: 32px;
 }
-.task-inbox-trigger span {
+.task-inbox-trigger > span {
   position: absolute;
   right: -5px;
   top: -4px;
@@ -101,5 +116,33 @@
   .task-inbox-trigger {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* A new update makes the bell ring once; the badge pops in behind it. */
+.task-inbox-trigger[data-ping='true'] svg {
+  transform-origin: 50% 0;
+  animation: task-inbox-ring 0.9s ease-in-out 1;
+}
+.task-inbox-trigger[data-ping='true'] > span {
+  animation: task-inbox-pop 0.35s ease-out 1;
+}
+@keyframes task-inbox-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+  75% { transform: rotate(2deg); }
+}
+@keyframes task-inbox-pop {
+  0% { transform: scale(0.4); }
+  70% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-inbox-trigger[data-ping='true'] svg,
+  .task-inbox-trigger[data-ping='true'] > span {
+    animation: none;
   }
 }

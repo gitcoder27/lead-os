@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider, useToast } from '@/context/ToastContext';
+import { InboxAlerts } from '@/components/actions/InboxAlerts';
 import { AuthProvider, useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { QuickActionsProvider, type QuickActionsValue } from '@/context/QuickActionsContext';
 import { AssistantProvider } from '@/context/AssistantContext';
@@ -258,7 +259,12 @@ function AuthSessionBoundary({ children }: { children: ReactNode }) {
     }
   }, [authScopeKey, clearToasts]);
 
-  return <>{children}</>;
+  return (
+    <>
+      <InboxAlerts />
+      {children}
+    </>
+  );
 }
 
 type ViewParams = Record<string, string | undefined>;

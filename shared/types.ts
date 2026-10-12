@@ -1650,11 +1650,17 @@ export function taskGuardFields(changes: UpdateTaskRequest): TaskGuardField[] {
 }
 export const TASK_EVENT_TYPES = [
   "created", "update", "instruction", "decision", "blocker", "status", "assign",
-  "focus", "title", "schedule", "link", "checkin_ref", "note_ref", "merged",
+  "focus", "title", "schedule", "priority", "link", "checkin_ref", "note_ref", "merged",
 ] as const;
 export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
 /** R12: delivery/read state references canonical events; it never owns task content. */
-export type TaskInboxKind = "assignment" | "instruction" | "reply" | "blocker" | "blocker_cleared";
+export type TaskInboxKind = "assignment" | "instruction" | "reply" | "blocker" | "blocker_cleared" | "schedule" | "priority";
+/** Shared task facts only (plan date, due date, priority): what an update changed, so clients can word it in the viewer's own time zone. */
+export interface TaskInboxChange {
+  field: "day" | "due_at" | "priority";
+  from: string | null;
+  to: string | null;
+}
 export interface TaskInboxItem {
   id: number;
   eventId: number;
@@ -1666,6 +1672,8 @@ export interface TaskInboxItem {
   occurredAt: string;
   readAt: string | null;
   href: string;
+  /** Present on `schedule` and `priority` updates. */
+  change?: TaskInboxChange;
 }
 export interface TaskInboxResponse {
   enabled: boolean;

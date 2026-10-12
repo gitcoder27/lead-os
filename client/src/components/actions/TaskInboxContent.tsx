@@ -1,16 +1,21 @@
 import { useState } from 'react';
+import { CalendarClock, CircleCheck, Flag, MessageSquare, OctagonAlert, Reply, UserPlus, type LucideIcon } from 'lucide-react';
 import type { TaskInboxItem, TaskInboxKind } from '@/types';
 import { useMarkTaskInboxRead, useTaskInbox } from '@/hooks/useTaskInbox';
+import { describeInboxChange, INBOX_KIND_LABELS as labels } from '@/lib/inbox-alerts';
 import { navigateToTaskPage } from '@/lib/task-nav';
 import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
+import { DesktopAlertsSwitch } from './DesktopAlertsControls';
 import './task-inbox.css';
 
-const labels: Record<TaskInboxKind, string> = {
-  assignment: 'Assignment changed',
-  instruction: 'Instruction',
-  reply: 'Reply',
-  blocker: 'Blocker raised',
-  blocker_cleared: 'Blocker cleared',
+const icons: Record<TaskInboxKind, LucideIcon> = {
+  assignment: UserPlus,
+  instruction: MessageSquare,
+  reply: Reply,
+  blocker: OctagonAlert,
+  blocker_cleared: CircleCheck,
+  schedule: CalendarClock,
+  priority: Flag,
 };
 
 export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
@@ -83,8 +88,10 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
         </button>
       ) : null}
       <ul>
-        {items.map((item) => (
-          <li key={item.id} data-unread={!item.readAt}>
+        {items.map((item) => {
+          const Icon = icons[item.kind];
+          return (
+          <li key={item.id} data-unread={!item.readAt} data-kind={item.kind}>
             <a
               href={item.href}
               onClick={(event) => {
@@ -94,13 +101,16 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
               }}
             >
               <span className="task-inbox-meta">
-                {labels[item.kind]} · {item.actorName}
-                {!item.readAt ? ' · Unread' : ''}
+                <Icon size={13} aria-hidden="true" />
+                <span>
+                  {labels[item.kind]} · {item.actorName}
+                  {!item.readAt ? ' · Unread' : ''}
+                </span>
               </span>
               <strong>
                 {item.taskKey} · {item.title}
               </strong>
-              <span>{item.excerpt}</span>
+              <span>{describeInboxChange(item) ?? item.excerpt}</span>
               <time dateTime={item.occurredAt} title={formatAbsoluteDateTime(item.occurredAt)}>
                 {formatRelativeTime(item.occurredAt)}
               </time>
@@ -114,13 +124,15 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
               {item.readAt ? 'Mark unread' : 'Mark read'}
             </button>
           </li>
-        ))}
+          );
+        })}
       </ul>
       {query.hasNextPage && !query.historyError && !query.accessLost ? (
         <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
           {query.isFetchingNextPage ? 'Loading…' : 'Older updates'}
         </button>
       ) : null}
+      <DesktopAlertsSwitch />
     </section>
   );
 }

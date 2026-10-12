@@ -1,8 +1,7 @@
 import { isTaskActivityAccessLoss } from '@/lib/task-activity-recovery';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useReducedMotion } from 'framer-motion';
 import { useInboxTargetEvent } from '@/hooks/useTaskInbox';
-import { ChevronDown, ClipboardCheck, Eye, EyeOff, History, Lock, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, ClipboardCheck, Eye, EyeOff, History, Lock, NotebookPen, Sparkles, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -26,6 +25,7 @@ import {
   type NameResolver,
 } from '@/lib/task-activity';
 import type { TaskEvent, TaskEventType } from '@/types';
+import './task-opened-update.css';
 
 export { friendlyEventValue, plainExcerpt } from '@/lib/task-activity';
 
@@ -176,7 +176,7 @@ export function TaskTimelineDisclosure({ taskKey, mode }: TaskTimelineProps) {
 const ACTION_BUTTON =
   'flex h-6 w-6 items-center justify-center rounded-md outline-hidden transition-opacity hover:bg-(--bg-tertiary) focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--border-active) group-hover/event:opacity-100 group-focus-within/event:opacity-100 [@media(hover:hover)]:opacity-0';
 
-const FOCUSED_LABELS: Partial<Record<TaskEventType, string>> = { instruction: 'Instruction', update: 'Update', created: 'Assignment', assign: 'Assignment' };
+const FOCUSED_LABELS: Partial<Record<TaskEventType, string>> = { instruction: 'Instruction', update: 'Update', created: 'Assignment', assign: 'Assignment', schedule: 'Date change', priority: 'Priority change', status: 'Status change' };
 
 export function TaskTimeline(props: TaskTimelineProps) {
   const { user } = useAuth();
@@ -185,23 +185,40 @@ export function TaskTimeline(props: TaskTimelineProps) {
   const target = useInboxTargetEvent(props.taskKey, eventId);
   const ref = useRef<HTMLElement>(null);
   const focusedId = useRef<number>();
-  const reducedMotion = useReducedMotion();
-  const event = target.enabled && !target.isError ? target.data?.event : undefined;
+  const [dismissed, setDismissed] = useState<number>();
+  const event = target.enabled && !target.isError && target.data?.event.id !== dismissed ? target.data?.event : undefined;
   const focusedLabel = !event ? '' : event.type === 'blocker' ? (blockerAction(event) === 'cleared' ? 'Blocker cleared' : 'Blocker raised') : FOCUSED_LABELS[event.type] ?? messageTag(event)?.label ?? 'Change';
   useEffect(() => {
     if (!event || focusedId.current === event.id) return;
     focusedId.current = event.id;
     ref.current?.focus({ preventScroll: true });
-    ref.current?.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' });
-  }, [event, reducedMotion]);
+    // Instant, not smooth: this runs as the window comes back from the background, when a smooth scroll can stall.
+    ref.current?.scrollIntoView({ block: 'center' });
+  }, [event]);
+  // The highlight is a pointer to the update, not a place to stay: dropping `?event=` puts the page back to normal.
+  const dismiss = () => {
+    if (!event) return;
+    setDismissed(event.id);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('event');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  };
   return (
     <>
       {eventId && target.isLoading ? <p role="status">Opening update…</p> : null}
       {eventId && target.enabled && target.isError ? <p role="alert">This update is unavailable. <button type="button" className="min-h-[44px] rounded-md px-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-(--focus-ring)" onClick={() => void target.refetch()}>Retry</button></p> : null}
       {event ? (
-        <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="mb-5 rounded-lg border-2 p-3 outline-hidden focus-visible:ring-2 focus-visible:ring-(--focus-ring)" style={{ borderColor: 'var(--accent)' }}>
-          <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>Opened update · {focusedLabel}</p>
-          <p className="mb-2 mt-1 text-ui" style={{ color: 'var(--text-secondary)' }}>{authorLabel(event, user?.accountId)} · {formatAbsoluteDateTime(event.occurredAt)}</p>
+        <section ref={ref} id={`task-update-${event.id}`} tabIndex={-1} aria-label="Opened task update" className="task-opened-update">
+          <div className="task-opened-update-head">
+            <span className="task-opened-update-kind">{focusedLabel}</span>
+            <span className="task-opened-update-meta">
+              {authorLabel(event, user?.accountId)} ·{' '}
+              <time dateTime={event.occurredAt} title={formatAbsoluteDateTime(event.occurredAt)}>{formatRelativeTime(event.occurredAt)}</time>
+            </span>
+            <button type="button" className="task-opened-update-close" aria-label="Dismiss highlight" title="Dismiss" onClick={dismiss}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
           <EventBody text={messageBody(event, props.resolveName)} />
         </section>
       ) : null}

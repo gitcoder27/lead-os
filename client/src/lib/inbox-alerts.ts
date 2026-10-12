@@ -37,6 +37,35 @@ export function describeInboxChange(item: Pick<TaskInboxItem, 'change'>): string
   }
 }
 
+/** The one line under a task in the inbox: who did what, as briefly as it can be said. */
+export function inboxSummary(item: TaskInboxItem): string {
+  const who = firstName(item.actorName);
+  const change = describeInboxChange(item);
+  switch (item.kind) {
+    case 'assignment': return `${who} assigned this`;
+    case 'instruction':
+    case 'reply': return `${who}: ${item.excerpt}`;
+    case 'blocker': return `${who} raised a blocker · ${item.excerpt}`;
+    case 'blocker_cleared': return `${who} cleared the blocker`;
+    case 'schedule':
+    case 'priority': return `${who} · ${change ?? INBOX_KIND_LABELS[item.kind]}`;
+  }
+}
+
+/** "now", "5m", "3h", "2d", then a date: short enough to sit beside a title. */
+export function compactAge(iso: string, now = Date.now()): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const minutes = Math.max(0, Math.round((now - then) / 60_000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(then).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
 /** What a single update says in a desktop notification or toast: who, what, which task. */
 export function describeInboxAlert(item: TaskInboxItem): InboxAlertText {
   const who = firstName(item.actorName);

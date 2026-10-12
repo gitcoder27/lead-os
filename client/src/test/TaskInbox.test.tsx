@@ -237,6 +237,18 @@ describe('task inbox', () => {
     expect(get).toHaveBeenCalledWith('/task-inbox/events/45?taskKey=T-2', expect.any(Object));
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
+  it('lets the person dismiss the highlight, which drops the event from the address', async () => {
+    window.history.replaceState(null, '', item.href);
+    get.mockResolvedValueOnce({
+      event: { id: 45, taskKey: 'T-2', type: 'instruction', body: 'Exact instruction', visibility: 'shared', author: { type: 'manager', displayName: 'Priya Rao' }, occurredAt: item.occurredAt, approximateTime: false },
+    });
+    mount(<TaskTimeline taskKey="T-2" mode="manager" />);
+    const opened = await screen.findByRole('region', { name: 'Opened task update' });
+    expect(opened).toHaveTextContent('Instruction');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss highlight' }));
+    expect(screen.queryByRole('region', { name: 'Opened task update' })).not.toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe('/t/T-2');
+  });
   it('hides the inbox when the server disables collaboration before the session refreshes', async () => {
     get.mockResolvedValueOnce({ enabled: false, events: [], unreadCount: 0, nextCursor: null });
     mount(<TaskInboxPopover />);

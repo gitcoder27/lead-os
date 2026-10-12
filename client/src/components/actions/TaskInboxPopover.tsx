@@ -33,12 +33,14 @@ export function TaskInboxPopover() {
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="task-inbox-trigger"
+          className="task-inbox-bell"
           data-ping={ping}
+          data-unread={count > 0}
+          title="Updates"
           aria-label={`Updates${count ? `, ${count} unread` : ''}${query.isError ? ', unavailable' : ''}`}
         >
-          <Bell size={16} />
-          {count > 0 ? <span>{count > 99 ? '99+' : count}</span> : null}
+          <Bell size={16} aria-hidden="true" />
+          {count > 0 ? <span aria-hidden="true">{count > 99 ? '99+' : count}</span> : null}
         </button>
       </Popover.Trigger>
       <Popover.Portal>

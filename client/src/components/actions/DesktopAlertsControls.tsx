@@ -38,10 +38,10 @@ export function DesktopAlertsSwitch() {
         <span id="desktop-alerts-label">Desktop alerts</span>
         <span id="desktop-alerts-hint">
           {blocked
-            ? 'Blocked in this browser. Allow notifications for this site, then come back.'
+            ? 'Blocked in this browser. Allow notifications for this site.'
             : alerts.enabled
-              ? 'On. You hear about changes even when this tab is in the background.'
-              : 'Get notified about changes even when this tab is in the background.'}
+              ? 'On. You’ll hear about changes when this tab is in the background.'
+              : 'Get notified when this tab is in the background.'}
         </span>
       </div>
       {!blocked && (

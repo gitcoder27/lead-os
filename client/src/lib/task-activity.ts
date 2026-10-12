@@ -37,7 +37,8 @@ export function friendlyEventValue(value: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return format(parseISO(value), 'EEE d MMM');
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
     const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) return format(date, 'EEE d MMM, HH:mm');
+    // A due date is stored as the end of its day (23:59); the time says nothing, so only the day is shown.
+    if (!Number.isNaN(date.getTime())) return date.getHours() === 23 && date.getMinutes() === 59 ? format(date, 'EEE d MMM') : format(date, 'EEE d MMM, HH:mm');
   }
   return value;
 }

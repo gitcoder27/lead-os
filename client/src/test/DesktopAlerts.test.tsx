@@ -85,7 +85,7 @@ describe('DesktopAlertsSwitch', () => {
     render(<DesktopAlertsSwitch />);
     const toggle = screen.getByRole('switch', { name: 'Desktop alerts' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(toggle).toHaveAccessibleDescription(/Get notified about changes/);
+    expect(toggle).toHaveAccessibleDescription(/Get notified when this tab is in the background/);
     fireEvent.click(toggle);
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Desktop alerts' })).toHaveAttribute('aria-checked', 'true'));
     expect(screen.getByRole('switch')).toHaveAccessibleDescription(/On\./);

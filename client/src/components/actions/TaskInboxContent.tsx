@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { CalendarClock, CircleCheck, Flag, MessageSquare, OctagonAlert, Reply, UserPlus, type LucideIcon } from 'lucide-react';
+import { CalendarClock, CheckCheck, CircleCheck, Flag, Inbox, MessageSquare, OctagonAlert, RefreshCw, Reply, UserPlus, type LucideIcon } from 'lucide-react';
 import type { TaskInboxItem, TaskInboxKind } from '@/types';
 import { useMarkTaskInboxRead, useTaskInbox } from '@/hooks/useTaskInbox';
-import { describeInboxChange, INBOX_KIND_LABELS as labels } from '@/lib/inbox-alerts';
+import { compactAge, inboxSummary, INBOX_KIND_LABELS as labels } from '@/lib/inbox-alerts';
 import { navigateToTaskPage } from '@/lib/task-nav';
-import { formatAbsoluteDateTime, formatRelativeTime } from '@/lib/utils';
+import { formatAbsoluteDateTime } from '@/lib/utils';
 import { DesktopAlertsSwitch } from './DesktopAlertsControls';
 import './task-inbox.css';
 
@@ -41,10 +41,38 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
   if (!query.enabled) return null;
   return (
     <section className="task-inbox" aria-label="Task updates">
-      <div className="task-inbox-heading">
-        <h2>Updates{unreadCount !== undefined ? ` · ${unreadCount} unread` : ''}</h2>
-        <div className="task-inbox-tabs" aria-label="Show updates">
-          <button type="button" disabled={query.isRefreshing} onClick={() => void query.refetch()}>Refresh updates</button>
+      <div className="task-inbox-toolbar">
+        <div className="task-inbox-heading">
+          <h2 aria-label={`Updates${unreadCount !== undefined ? ` · ${unreadCount} unread` : ''}`}>
+            Updates
+            {unreadCount ? <span className="task-inbox-count" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
+          </h2>
+          <div className="task-inbox-tools">
+            <button
+              type="button"
+              className="task-inbox-icon-button"
+              aria-label="Refresh updates"
+              title="Refresh updates"
+              disabled={query.isRefreshing}
+              onClick={() => void query.refetch()}
+            >
+              <RefreshCw size={14} className={query.isRefreshing ? 'task-inbox-spin' : undefined} aria-hidden="true" />
+            </button>
+            {shownUnread.length > 0 ? (
+              <button
+                type="button"
+                className="task-inbox-text-button"
+                aria-label={shownUnread.length > 100 ? 'Mark first 100 shown as read' : 'Mark shown as read'}
+                disabled={markRead.isPending}
+                onClick={() => changeRead(shownUnread.slice(0, 100).map((item) => item.id), true)}
+              >
+                <CheckCheck size={14} aria-hidden="true" />
+                Mark all read
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="task-inbox-tabs" role="group" aria-label="Show updates">
           <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>
             Unread
           </button>
@@ -53,9 +81,14 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
           </button>
         </div>
       </div>
-      {query.isLoading ? <p aria-live="polite">Loading updates…</p> : null}
+      {query.isLoading ? (
+        <div className="task-inbox-skeleton" aria-live="polite">
+          <span className="sr-only">Loading updates…</span>
+          <span /><span /><span />
+        </div>
+      ) : null}
       {query.latestError ? (
-        <p role="alert">
+        <p className="task-inbox-note" role="alert">
           {query.data ? 'Could not refresh latest updates.' : 'Updates unavailable.'}{' '}
           <button type="button" disabled={query.isRefreshing} onClick={() => void query.retryLatest()}>
             {query.data ? 'Retry latest updates' : 'Retry'}
@@ -63,72 +96,66 @@ export function TaskInboxContent({ onOpen }: { onOpen: () => void }) {
         </p>
       ) : null}
       {query.historyError ? (
-        <p role="alert">
+        <p className="task-inbox-note" role="alert">
           Could not load older updates.{' '}
           <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.retryOlder()}>Retry older updates</button>
         </p>
       ) : null}
-      {query.isFetchingNextPage ? <p role="status">Loading older updates…</p> : null}
-      {query.isRefreshing && !query.isLoading ? <p role="status">Refreshing latest updates…</p> : null}
+      {query.isFetchingNextPage ? <p className="task-inbox-note" role="status">Loading older updates…</p> : null}
+      {query.isRefreshing && !query.isLoading ? <p className="sr-only" role="status">Refreshing latest updates…</p> : null}
       {!query.isLoading && !query.isError && !items.length ? (
-        <p>{unreadOnly ? 'No unread updates.' : 'No updates yet.'}</p>
+        <div className="task-inbox-empty">
+          <Inbox size={20} aria-hidden="true" />
+          <p>{unreadOnly ? 'No unread updates.' : 'No updates yet.'}</p>
+          <span>{unreadOnly ? 'You’re all caught up.' : 'Changes to your tasks will show up here.'}</span>
+        </div>
       ) : null}
-      {shownUnread.length > 0 ? (
-        <button
-          type="button"
-          disabled={markRead.isPending}
-          onClick={() =>
-            changeRead(
-              shownUnread.slice(0, 100).map((item) => item.id),
-              true,
-            )
-          }
-        >
-          {shownUnread.length > 100 ? 'Mark first 100 shown as read' : 'Mark shown as read'}
-        </button>
-      ) : null}
-      <ul>
+      <ul className="task-inbox-list">
         {items.map((item) => {
           const Icon = icons[item.kind];
+          const unread = !item.readAt;
           return (
-          <li key={item.id} data-unread={!item.readAt} data-kind={item.kind}>
-            <a
-              href={item.href}
-              onClick={(event) => {
-                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                event.preventDefault();
-                openItem(item);
-              }}
-            >
-              <span className="task-inbox-meta">
-                <Icon size={13} aria-hidden="true" />
-                <span>
-                  {labels[item.kind]} · {item.actorName}
-                  {!item.readAt ? ' · Unread' : ''}
+            <li key={item.id} className="task-inbox-item" data-unread={unread} data-kind={item.kind}>
+              <a
+                href={item.href}
+                className="task-inbox-link"
+                onClick={(event) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  openItem(item);
+                }}
+              >
+                <span className="task-inbox-icon" aria-hidden="true" title={labels[item.kind]}>
+                  <Icon size={14} />
                 </span>
-              </span>
-              <strong>
-                {item.taskKey} · {item.title}
-              </strong>
-              <span>{describeInboxChange(item) ?? item.excerpt}</span>
-              <time dateTime={item.occurredAt} title={formatAbsoluteDateTime(item.occurredAt)}>
-                {formatRelativeTime(item.occurredAt)}
-              </time>
-            </a>
-            <button
-              type="button"
-              disabled={markRead.isPending}
-              aria-label={`Mark ${item.taskKey} update ${item.readAt ? 'unread' : 'read'}`}
-              onClick={() => changeRead([item.id], !item.readAt)}
-            >
-              {item.readAt ? 'Mark unread' : 'Mark read'}
-            </button>
-          </li>
+                <span className="task-inbox-main">
+                  <span className="sr-only">{unread ? 'Unread. ' : ''}{labels[item.kind]} from {item.actorName}. </span>
+                  <span className="task-inbox-head">
+                    <span className="task-inbox-key">{item.taskKey}</span>
+                    <span className="task-inbox-title">{item.title}</span>
+                  </span>
+                  <span className="task-inbox-detail" title={inboxSummary(item)}>{inboxSummary(item)}</span>
+                </span>
+                <time className="task-inbox-time" dateTime={item.occurredAt} title={formatAbsoluteDateTime(item.occurredAt)}>
+                  {compactAge(item.occurredAt)}
+                </time>
+              </a>
+              <button
+                type="button"
+                className="task-inbox-read"
+                disabled={markRead.isPending}
+                aria-label={`Mark ${item.taskKey} update ${item.readAt ? 'unread' : 'read'}`}
+                title={item.readAt ? 'Mark unread' : 'Mark read'}
+                onClick={() => changeRead([item.id], !item.readAt)}
+              >
+                <span aria-hidden="true" />
+              </button>
+            </li>
           );
         })}
       </ul>
       {query.hasNextPage && !query.historyError && !query.accessLost ? (
-        <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
+        <button type="button" className="task-inbox-more" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
           {query.isFetchingNextPage ? 'Loading…' : 'Older updates'}
         </button>
       ) : null}

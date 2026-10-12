@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeInboxAlert, describeInboxBatch, describeInboxChange, titleWithUnread } from '@/lib/inbox-alerts';
+import { compactAge, describeInboxAlert, describeInboxBatch, describeInboxChange, inboxSummary, titleWithUnread } from '@/lib/inbox-alerts';
 import type { TaskInboxItem } from '@/types';
 
 const base: TaskInboxItem = {
@@ -61,5 +61,29 @@ describe('titleWithUnread', () => {
     expect(titleWithUnread('(3) LeadOS', 4)).toBe('(4) LeadOS');
     expect(titleWithUnread('(4) LeadOS', 0)).toBe('LeadOS');
     expect(titleWithUnread('LeadOS', 250)).toBe('(99+) LeadOS');
+  });
+});
+
+describe('inboxSummary', () => {
+  it('says who did what in one short line', () => {
+    expect(inboxSummary(with_({ kind: 'assignment' }))).toBe('Priya assigned this');
+    expect(inboxSummary(base)).toBe('Priya: Check the release key');
+    expect(inboxSummary(with_({ kind: 'blocker', excerpt: 'Missing key' }))).toBe('Priya raised a blocker · Missing key');
+    expect(inboxSummary(with_({ kind: 'blocker_cleared' }))).toBe('Priya cleared the blocker');
+    expect(inboxSummary(with_({ kind: 'schedule', change: { field: 'due_at', from: null, to: '2026-10-16' } }))).toBe('Priya · Due Fri 16 Oct');
+    expect(inboxSummary(with_({ kind: 'priority', change: { field: 'priority', from: 'normal', to: 'high' } }))).toBe('Priya · Now high priority');
+  });
+});
+
+describe('compactAge', () => {
+  const now = new Date('2026-10-12T12:00:00Z').getTime();
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+  it('keeps it to a couple of characters beside the title', () => {
+    expect(compactAge(ago(20_000), now)).toBe('now');
+    expect(compactAge(ago(5 * 60_000), now)).toBe('5m');
+    expect(compactAge(ago(3 * 3_600_000), now)).toBe('3h');
+    expect(compactAge(ago(2 * 86_400_000), now)).toBe('2d');
+    expect(compactAge(ago(30 * 86_400_000), now)).toMatch(/Sep/);
+    expect(compactAge('not a date', now)).toBe('');
   });
 });

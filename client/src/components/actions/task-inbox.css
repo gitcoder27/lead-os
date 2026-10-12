@@ -1,130 +1,53 @@
-.task-inbox-popover {
-  width: min(calc(100vw - 24px), 430px);
-  max-height: min(80vh, 620px);
-  overflow: auto;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  box-shadow: var(--overlay-shadow);
-}
-.task-inbox {
-  padding: 12px;
-  color: var(--text-primary);
-  font-size: var(--fs-13);
-}
-.task-inbox-heading {
-  display: flex;
-  flex-wrap: wrap;
+/* ── Bell ─────────────────────────────────────────────────────────────────
+   Same 32px ghost button as its neighbours in the header; the count is a small
+   pill tucked into the corner instead of hanging off it. */
+.task-inbox-bell {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.task-inbox h2 {
-  font-weight: 600;
-}
-.task-inbox-tabs {
-  display: flex;
-  gap: 4px;
-}
-.task-inbox button,
-.task-inbox-trigger {
-  min-height: 32px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  color: var(--text-secondary);
-}
-.task-inbox button[aria-pressed='true'] {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-}
-.task-inbox p {
-  padding: 12px 0;
-  color: var(--text-secondary);
-}
-.task-inbox ul {
-  list-style: none;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   padding: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.task-inbox li {
-  border-top: 1px solid var(--border);
-  padding: 8px 0;
+.task-inbox-bell:hover,
+.task-inbox-bell[data-state='open'] {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
-.task-inbox li[data-unread='true'] {
-  border-left: 3px solid var(--accent);
-  padding-left: 8px;
+.task-inbox-bell[data-unread='true'] {
+  color: var(--text-primary);
 }
-.task-inbox a {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 4px;
-  border-radius: 4px;
-  overflow-wrap: anywhere;
-}
-.task-inbox-meta,
-.task-inbox time {
-  color: var(--text-secondary);
-  font-size: var(--fs-12);
-}
-.task-inbox-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.task-inbox-meta svg {
-  flex: none;
-  color: var(--accent-text);
-}
-.task-inbox li[data-kind='blocker'] .task-inbox-meta svg {
-  color: var(--danger);
-}
-.task-inbox li[data-kind='blocker_cleared'] .task-inbox-meta svg {
-  color: var(--success);
-}
-.task-inbox a:hover,
-.task-inbox button:hover,
-.task-inbox-trigger:hover {
-  background: var(--bg-elevated);
-}
-.task-inbox button:disabled {
-  opacity: 0.5;
-}
-.task-inbox :is(button, a):focus-visible,
-.task-inbox-trigger:focus-visible {
+.task-inbox-bell:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-.task-inbox-trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-}
-.task-inbox-trigger > span {
+.task-inbox-bell > span {
   position: absolute;
-  right: -5px;
-  top: -4px;
-  background: var(--danger);
-  color: var(--on-danger);
+  top: 1px;
+  right: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 99px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-canvas, var(--bg-primary));
+  color: var(--on-accent);
   font-size: var(--fs-11);
-  padding: 1px 4px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-@media (pointer: coarse), (max-width: 640px) {
-  .task-inbox button,
-  .task-inbox-trigger {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* A new update makes the bell ring once; the badge pops in behind it. */
-.task-inbox-trigger[data-ping='true'] svg {
+.task-inbox-bell[data-ping='true'] svg {
   transform-origin: 50% 0;
   animation: task-inbox-ring 0.9s ease-in-out 1;
 }
-.task-inbox-trigger[data-ping='true'] > span {
+.task-inbox-bell[data-ping='true'] > span {
   animation: task-inbox-pop 0.35s ease-out 1;
 }
 @keyframes task-inbox-ring {
@@ -140,9 +63,351 @@
   70% { transform: scale(1.2); }
   100% { transform: scale(1); }
 }
+
+/* The manager header keeps its own trigger styling; it only shares the focus ring. */
+.task-inbox-trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────────── */
+.task-inbox-popover {
+  width: min(calc(100vw - 24px), 380px);
+  max-height: min(72vh, 560px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: var(--overlay-shadow);
+}
+.task-inbox-popover[data-state='open'] {
+  animation: task-inbox-in 0.14s ease-out;
+  transform-origin: var(--radix-popover-content-transform-origin, top right);
+}
+@keyframes task-inbox-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.task-inbox {
+  color: var(--text-primary);
+  font-size: var(--fs-13);
+}
+.task-inbox button:disabled {
+  opacity: 0.5;
+}
+.task-inbox :is(button, a):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Toolbar stays put while the list scrolls under it. */
+.task-inbox-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 12px 0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+.task-inbox-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+.task-inbox h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.task-inbox-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-text);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.task-inbox-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.task-inbox-icon-button,
+.task-inbox-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+  font-weight: 500;
+}
+.task-inbox-icon-button {
+  justify-content: center;
+  width: 28px;
+}
+.task-inbox-text-button {
+  padding: 0 8px;
+}
+.task-inbox-icon-button:hover,
+.task-inbox-text-button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.task-inbox-spin {
+  animation: task-inbox-rotate 0.9s linear infinite;
+}
+@keyframes task-inbox-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* Unread | All as quiet underlined tabs. */
+.task-inbox-tabs {
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
+}
+.task-inbox-tabs button {
+  position: relative;
+  height: 30px;
+  padding: 0 1px;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.task-inbox-tabs button:hover {
+  color: var(--text-primary);
+}
+.task-inbox-tabs button[aria-pressed='true'] {
+  color: var(--text-primary);
+}
+.task-inbox-tabs button[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ── Rows: two lines, one dot ──────────────────────────────────────────── */
+.task-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.task-inbox-item {
+  position: relative;
+}
+.task-inbox-item[data-unread='true'] {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.task-inbox-item + .task-inbox-item {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.task-inbox-link {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 9px 40px 9px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.task-inbox-item:hover {
+  background: var(--bg-secondary);
+}
+.task-inbox-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.task-inbox-item[data-unread='true'] .task-inbox-icon {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent-text);
+}
+.task-inbox-item[data-unread='true'][data-kind='blocker'] .task-inbox-icon {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+.task-inbox-item[data-unread='true'][data-kind='blocker_cleared'] .task-inbox-icon {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success-text);
+}
+.task-inbox-item[data-unread='true'][data-kind='priority'] .task-inbox-icon,
+.task-inbox-item[data-unread='true'][data-kind='schedule'] .task-inbox-icon {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning-text);
+}
+.task-inbox-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.task-inbox-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+.task-inbox-key {
+  flex: none;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--fs-11);
+  font-weight: 600;
+}
+.task-inbox-title {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-inbox-item[data-unread='true'] .task-inbox-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.task-inbox-detail {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-inbox-item[data-unread='true'] .task-inbox-detail {
+  color: var(--text-secondary);
+}
+.task-inbox-time {
+  padding-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The dot is the read toggle: filled = unread, a ring on hover for read rows. */
+.task-inbox-read {
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+}
+.task-inbox-read span {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.task-inbox-item[data-unread='true'] .task-inbox-read span {
+  background: var(--accent);
+}
+.task-inbox-item[data-unread='false'] .task-inbox-read:hover span,
+.task-inbox-item[data-unread='false'] .task-inbox-read:focus-visible span {
+  box-shadow: inset 0 0 0 1.5px var(--text-muted);
+}
+.task-inbox-item[data-unread='true'] .task-inbox-read:hover span {
+  transform: scale(1.35);
+}
+
+/* ── States ─────────────────────────────────────────────────────────────── */
+.task-inbox-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 28px 16px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.task-inbox-empty svg {
+  margin-bottom: 6px;
+}
+.task-inbox-empty p {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.task-inbox-empty span {
+  font-size: var(--fs-12);
+}
+.task-inbox-note {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+}
+.task-inbox-note button,
+.task-inbox-more {
+  border-radius: 6px;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+.task-inbox-more {
+  display: block;
+  width: calc(100% - 24px);
+  height: 32px;
+  margin: 2px 12px 8px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--fs-12);
+}
+.task-inbox-more:hover {
+  background: var(--bg-secondary);
+}
+.task-inbox-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 12px;
+}
+.task-inbox-skeleton span:not(.sr-only) {
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--bg-elevated), var(--bg-secondary), var(--bg-elevated));
+  background-size: 200% 100%;
+  animation: task-inbox-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes task-inbox-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  .task-inbox-icon-button { width: 36px; height: 36px; }
+  .task-inbox-text-button, .task-inbox-tabs button { min-height: 36px; }
+  .task-inbox-read { width: 44px; height: 44px; right: 0; bottom: 0; }
+  .task-inbox-link { padding-right: 46px; }
+  .task-inbox-bell, .task-inbox-trigger { min-width: 44px; min-height: 44px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .task-inbox-trigger[data-ping='true'] svg,
-  .task-inbox-trigger[data-ping='true'] > span {
+  .task-inbox-popover[data-state='open'],
+  .task-inbox-bell[data-ping='true'] svg,
+  .task-inbox-bell[data-ping='true'] > span,
+  .task-inbox-spin,
+  .task-inbox-skeleton span:not(.sr-only) {
     animation: none;
   }
 }

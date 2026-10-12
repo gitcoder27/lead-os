@@ -131,10 +131,15 @@ describe('useInboxAlerts', () => {
     expect(shown!.close).toHaveBeenCalled();
     expect(window.focus).toHaveBeenCalled();
     await waitFor(() => expect(post).toHaveBeenCalledWith('/task-inbox/read', { ids: [2], read: true }));
-    expect(window.location.pathname).toBe('/t/T-2');
+    // The page changes once the window is visible again, not in the middle of the click.
+    expect(window.location.pathname).toBe('/my-day');
+    visibility = 'visible';
+    focused = true;
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    await waitFor(() => expect(window.location.pathname).toBe('/t/T-2'));
     // …and nothing is repeated when the person arrives.
     rows = [item(1)];
-    comeBack();
+    await new Promise((resolve) => setTimeout(resolve, 900));
     expect(addToast).not.toHaveBeenCalled();
     view.unmount();
   });

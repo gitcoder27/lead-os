@@ -6,6 +6,8 @@ describe('activity copy (docs/73 UXD-14)', () => {
   it('reads dates the manager way, never ISO', () => {
     expect(friendlyEventValue('2026-10-10')).toBe('Sat 10 Oct');
     expect(friendlyEventValue('2026-10-10T09:30:00')).toBe('Sat 10 Oct, 09:30');
+    // End of day is how a due date is stored; the time is not shown.
+    expect(friendlyEventValue('2026-10-10T23:59:00')).toBe('Sat 10 Oct');
     expect(friendlyEventValue('Marcus Lee')).toBe('Marcus Lee');
   });
 

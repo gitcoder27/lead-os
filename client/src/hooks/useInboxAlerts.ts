@@ -15,6 +15,28 @@ export const OPEN_INBOX_EVENT = 'leados-open-inbox';
 const isAway = () => document.visibilityState === 'hidden' || !document.hasFocus();
 
 /**
+ * A notification click arrives while the window is still coming back from the background. Changing the page
+ * (a route change, a focus move, a scroll) in that moment is when browsers are least able to paint it, so wait
+ * until the tab is visible and a frame can run, with a short fallback in case visibility never reports.
+ */
+function whenVisible(run: () => void) {
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    document.removeEventListener('visibilitychange', onChange);
+    window.clearTimeout(fallback);
+    window.setTimeout(run, 0);
+  };
+  const onChange = () => {
+    if (document.visibilityState === 'visible') go();
+  };
+  const fallback = window.setTimeout(go, 1500);
+  if (document.visibilityState === 'visible') go();
+  else document.addEventListener('visibilitychange', onChange);
+}
+
+/**
  * Tells the person when their updates change, wherever they are:
  *  - in the tab: a short toast and the bell pulses;
  *  - in another tab or window: a desktop notification (when they allowed it), the tab title carries the count;
@@ -51,9 +73,11 @@ export function useInboxAlerts() {
     // The page behind the alert should already be current when the person arrives.
     void qc.invalidateQueries({ queryKey: ['my-day'] });
     const { markRead: mark, desktop: alerts, addToast: toast } = latestRef.current;
-    const open = (item: TaskInboxItem) => {
+    const open = (item: TaskInboxItem, fromNotification = false) => {
       mark.mutate({ ids: [item.id], read: true });
-      navigateToTaskPage(item.taskKey, false, item.eventId);
+      const go = () => navigateToTaskPage(item.taskKey, false, item.eventId);
+      if (fromNotification) whenVisible(go);
+      else go();
     };
 
     if (!isAway()) {
@@ -77,41 +101,53 @@ export function useInboxAlerts() {
       onClick: () => {
         // Clicking the notification is the acknowledgement; no "while you were away" line after it.
         missed.current = [];
-        if (single) open(single);
-        else window.dispatchEvent(new Event(OPEN_INBOX_EVENT));
+        if (single) open(single, true);
+        else whenVisible(() => window.dispatchEvent(new Event(OPEN_INBOX_EVENT)));
       },
     });
   }, [items, qc, scope]);
 
   // Coming back: refresh what the page shows and say, once, what was missed.
   useEffect(() => {
+    let lastBack = 0;
+    let timer: number | undefined;
     const back = () => {
       if (isAway()) return;
+      // Focus and visibility both fire on the way back; treat them as one return.
+      const now = Date.now();
+      if (now - lastBack < 1000) return;
+      lastBack = now;
       void qc.invalidateQueries({ queryKey: ['task-inbox'] });
       void qc.invalidateQueries({ queryKey: ['my-day'] });
-      const waiting = missed.current;
-      missed.current = [];
-      if (!waiting.length) return;
-      const only = waiting.length === 1 ? waiting[0]! : undefined;
-      latestRef.current.addToast({
-        type: 'info',
-        title: only ? describeInboxAlert(only).title : `${waiting.length} updates while you were away`,
-        message: only ? describeInboxAlert(only).body.split('\n')[0] : undefined,
-        duration: 8000,
-        action: {
-          label: only ? 'Open' : 'View',
-          onClick: () => {
-            if (only) {
-              latestRef.current.markRead.mutate({ ids: [only.id], read: true });
-              navigateToTaskPage(only.taskKey, false, only.eventId);
-            } else window.dispatchEvent(new Event(OPEN_INBOX_EVENT));
+      // A click on the desktop notification lands just after the window does; give it the chance to
+      // acknowledge the update before a "while you were away" line talks over the page it is opening.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const waiting = missed.current;
+        missed.current = [];
+        if (!waiting.length) return;
+        const only = waiting.length === 1 ? waiting[0]! : undefined;
+        latestRef.current.addToast({
+          type: 'info',
+          title: only ? describeInboxAlert(only).title : `${waiting.length} updates while you were away`,
+          message: only ? describeInboxAlert(only).body.split('\n')[0] : undefined,
+          duration: 8000,
+          action: {
+            label: only ? 'Open' : 'View',
+            onClick: () => {
+              if (only) {
+                latestRef.current.markRead.mutate({ ids: [only.id], read: true });
+                navigateToTaskPage(only.taskKey, false, only.eventId);
+              } else window.dispatchEvent(new Event(OPEN_INBOX_EVENT));
+            },
           },
-        },
-      });
+        });
+      }, 700);
     };
     window.addEventListener('focus', back);
     document.addEventListener('visibilitychange', back);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('focus', back);
       document.removeEventListener('visibilitychange', back);
     };

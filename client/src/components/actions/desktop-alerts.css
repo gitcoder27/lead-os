@@ -1,47 +1,43 @@
-/* Pinned to the bottom of the inbox so it is found however long the list is. */
+/* One quiet line, pinned to the bottom of the inbox so it is found however long the list is. */
 .desktop-alerts-row {
   position: sticky;
   bottom: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  box-shadow: 0 -8px 12px -8px var(--overlay-shadow);
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
   font-size: var(--fs-12);
-}
-.desktop-alerts-row[data-state='on'] .desktop-alerts-icon {
-  color: var(--accent-text);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .desktop-alerts-icon {
   display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 99px;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+}
+.desktop-alerts-row[data-state='on'] .desktop-alerts-icon {
+  color: var(--accent-text);
 }
 .desktop-alerts-copy {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 1px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  line-height: 1.35;
 }
 .desktop-alerts-copy > :first-child {
   color: var(--text-primary);
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
+.desktop-alerts-copy > :last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Doubled selectors beat the inbox's generic `.task-inbox button` sizing and hover fill. */
 .desktop-alerts-row .desktop-alerts-switch,
 .desktop-alerts-row .desktop-alerts-switch:hover {

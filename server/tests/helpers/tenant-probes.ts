@@ -39,7 +39,7 @@ export function foreignTenantProbes(seed: TenantSeed, day: string) {
   for (const url of reads) probes.push(["GET", url]);
 
   // Writes against the owner's ids and keys.
-  probes.push(["GET", `/api/meetings/${k}/workspace`]);
+  probes.push(["GET", `/api/meetings/${k}/workspace`], ["POST", `/api/meetings/${k}/undo`, { requestId: "foreign" }]);
   const writes: Array<[string, string, unknown?]> = [
     ["PUT", `/api/meetings/${k}/workspace`, { agenda: "pwned", notes: "", outcome: "", noDecisions: false, actions: [], revision: 0, documentId: null }],
     ["PATCH", `/api/tasks/${k}`, { title: "pwned" }], ["POST", `/api/tasks/${k}/events`, { type: "update", body: "pwned", requestId: crypto.randomUUID() }],

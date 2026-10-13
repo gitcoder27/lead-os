@@ -1,0 +1,133 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { and, eq } from "drizzle-orm";
+import express from "express";
+import { db, rawDb } from "../src/db/connection";
+import { resetDatabase } from "./helpers/db";
+import { invoke } from "./helpers/http";
+import { configTable, developers, tasks, meetingDocuments, meetingCaptureReceipts, taskEvents } from "../src/db/schema";
+import { CaptureService } from "../src/services/capture.service";
+import { MeetingCaptureService } from "../src/services/meeting-capture.service";
+import { MeetingWorkspaceService, emptyMeetingBody, currentBody } from "../src/services/meeting-workspace.service";
+import { TaskService } from "../src/services/task.service";
+import { TaskEventsService } from "../src/services/task-events.service";
+import { createCaptureRouter } from "../src/routes/capture";
+import { createMeetingsRouter } from "../src/routes/meetings";
+import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
+import { requireManager } from "../src/middleware/auth";
+import { errorHandler } from "../src/middleware/errorHandler";
+import type { MeetingCaptureRequest } from "shared/types";
+import { todayIsoDate } from "../src/utils/date";
+const principal = { type: "manager" as const, accountId: "a", workspaceId: "default" };
+const service = new MeetingCaptureService();
+const workspace = new MeetingWorkspaceService();
+const taskService = new TaskService();
+const auth = new AuthService();
+const app = express();
+app.use(express.json());
+app.use("/api/capture", requireManager(auth), createCaptureRouter(new CaptureService()));
+app.use("/api/meetings", requireManager(auth), createMeetingsRouter());
+app.use(errorHandler);
+let request: MeetingCaptureRequest;
+let headers: { cookie: string };
+const snapshot = () => ['tasks', 'task_events', 'task_inbox', 'task_links', 'meeting_documents', 'meeting_capture_receipts'].map((table) => rawDb.prepare(`SELECT * FROM ${table}`).all());
+beforeEach(async () => {
+  await resetDatabase();
+  await db.insert(configTable).values([{ key: "tasks_phase1_enabled", value: "true" }, { key: "tasks_phase2_stage", value: "2c" }, { key: "tasks_phase3_enabled", value: "true" }]);
+  await db.insert(developers).values({ accountId: "dev-alex", displayName: "Alex", isActive: 1 });
+  await auth.createUser({ username: "a", displayName: "A", password: "secret123", role: "manager" });
+  const session = await auth.authenticate("a", "secret123");
+  headers = { cookie: serializeSessionCookie(session.sessionId, auth.sessionMaxAgeSeconds) };
+  const meeting = await taskService.create({ title: "Private review", kind: "meeting", participants: "Display only" }, principal);
+  const document = await workspace.save(meeting.taskKey, { ...emptyMeetingBody(), agenda: "SECRET agenda", notes: "SECRET notes", outcome: "SECRET outcome", actions: [{ id: 'a1', text: "Send report", ownerAccountId: "dev-alex" }, { id: 'a2', text: "My action" }], documentId: null, revision: 0 }, principal);
+  request = { operation: "meeting-finish", meetingKey: meeting.taskKey, documentId: document.id, revision: document.revision, requestId: crypto.randomUUID(), clientToday: todayIsoDate(new Date(), "UTC"), tz: "UTC" };
+});
+
+describe("atomic meeting capture", () => {
+  it("finishes privately, creates independent children, and retries the original receipt after edits and Undo", async () => {
+    const result = await invoke(app, { method: "POST", url: "/api/capture", headers, body: request });
+    expect(result.status).toBe(200);
+    expect(result.body.task.status).toBe("done");
+    expect(result.body.actions).toHaveLength(2);
+    expect(result.body.actions.map((row: { status: string; scheduledOn: string | null }) => [row.status, row.scheduledOn])).toEqual([["open", null], ["open", null]]);
+    const devAction = result.body.actions[0];
+    const developer = { type: "developer" as const, accountId: "dev-alex", workspaceId: "default" };
+    const detail = await taskService.detail(devAction.taskKey, developer);
+    expect(detail).toMatchObject({ parent: null });
+    const events = await new TaskEventsService().list(devAction.taskKey, { kind: "developer", accountId: "dev-alex", workspaceId: "default" });
+    expect(JSON.stringify([detail, events])).not.toMatch(/SECRET|Private review|parentKey/);
+    const taskRows = await db.select().from(tasks);
+    const eventRows = await db.select().from(taskEvents);
+    expect(JSON.stringify([taskRows, eventRows])).not.toContain("SECRET");
+    const retry = await new MeetingCaptureService().run(request, principal);
+    expect(retry).toEqual(result.body);
+    const undo = await invoke(app, { method: "POST", url: `/api/meetings/${request.meetingKey}/undo`, headers, body: { requestId: request.requestId } });
+    expect(undo.status).toBe(200);
+    expect((await taskService.requireTask(request.meetingKey, principal)).status).toBe("open");
+    expect((await workspace.get(request.meetingKey, principal)).document?.actions).toHaveLength(2);
+    expect(await service.run(request, principal)).toEqual(result.body);
+    expect((await taskService.getByKey(devAction.taskKey, "default"))?.deletedAt).toBeTruthy();
+  });
+  it("rolls back every table when a later action fails", async () => {
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, actions: [doc.actions[0]!, { id: 'a2', text: "Fail", ownerAccountId: "unknown" }] }, principal);
+    request.revision += 1;
+    const before = snapshot();
+    await expect(service.run(request, principal)).rejects.toMatchObject({ status: 400 });
+    expect(snapshot()).toEqual(before);
+  });
+  it("coalesces concurrent requests, rejects concurrent independent finishes and incompatible IDs", async () => {
+    const [one, two] = await Promise.all([service.run(request, principal), new MeetingCaptureService().run(request, principal)]);
+    expect(two).toEqual(one);
+    expect((await db.select().from(tasks)).length).toBe(3);
+    await expect(service.run({ ...request, requestId: "different" }, principal)).rejects.toMatchObject({ status: 409 });
+    await expect(service.run({ ...request, confirm: true }, principal)).rejects.toMatchObject({ status: 409 });
+  });
+  it("requires an outcome, preserves diagnostics, and refuses note/update commands", async () => {
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    const next = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, outcome: "", actions: [] }, principal);
+    request.revision = next.revision;
+    await expect(service.run(request, principal)).rejects.toMatchObject({ status: 400 });
+    const warning = await workspace.save(request.meetingKey, { ...currentBody(next), revision: next.revision, documentId: next.id, noDecisions: true, actions: [{ id: 'a1', text: 'Send @alex,' }] }, principal);
+    request.revision = warning.revision;
+    const result = await service.run(request, principal);
+    expect(result.confirmRequired).toBe(true);
+    expect(result.diagnostics.some((row) => row.code === 'malformed-mention')).toBe(true);
+    expect((await taskService.requireTask(request.meetingKey, principal)).status).toBe('open');
+    expect((await service.run({ ...request, confirm: true }, principal)).task?.status).toBe('done');
+    for (const text of ['/note SECRET', `${request.meetingKey}: update`]) {
+      const saved = (await workspace.get(request.meetingKey, principal)).document!;
+      const changed = await workspace.save(request.meetingKey, { ...currentBody(saved), revision: saved.revision, documentId: saved.id, actions: [{ id: 'a1', text }] }, principal);
+      await expect(service.run({ ...request, documentId: changed.id, revision: changed.revision, requestId: crypto.randomUUID() }, principal)).rejects.toMatchObject({ status: 400 });
+    }
+  });
+  it("guards Undo against subsequent action changes and rejects stale document identities", async () => {
+    const result = await service.run(request, principal);
+    await new TaskEventsService().append({ taskKey: result.actions![0]!.taskKey, workspaceId: 'default', type: 'update', body: 'I started', meta: null }, { type: 'developer', accountId: 'dev-alex' });
+    await expect(service.undo(request.meetingKey, request.requestId, principal)).rejects.toMatchObject({ status: 409 });
+    await expect(service.run({ ...request, documentId: 'replacement', requestId: 'new' }, principal)).rejects.toMatchObject({ status: 409 });
+  });
+  it("allows later outcomes and new actions without recreating saved actions", async () => {
+    await service.run(request, principal);
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    const next = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, outcome: 'Updated private outcome', actions: [{ id: 'a3', text: 'Another action' }] }, principal);
+    const result = await service.run({ ...request, revision: next.revision, requestId: 'later' }, principal);
+    expect(result.actions).toHaveLength(1);
+    expect((await db.select().from(tasks)).length).toBe(4);
+    expect((await db.select().from(meetingCaptureReceipts)).length).toBe(2);
+  });
+  it("repeats only explicit completed meetings, retaining open actions by reference", async () => {
+    const finished = await service.run(request, principal);
+    const document = finished.document!;
+    const nextRequest: MeetingCaptureRequest = { ...request, operation: 'meeting-repeat', documentId: document.id, revision: document.revision, requestId: 'next', scheduledOn: '2026-12-01' };
+    const next = await service.run(nextRequest, principal);
+    expect(next.document).toMatchObject({ agenda: 'SECRET agenda', notes: '', outcome: '', actions: [], previousMeetingKey: request.meetingKey });
+    const context = (await workspace.get(next.task!.taskKey, principal)).context!;
+    expect(context.previous?.outcome).toBe('SECRET outcome');
+    expect(context.openActions).toHaveLength(2);
+    expect(context.openActions.every((row) => row.parentId === finished.task!.id)).toBe(true);
+    expect(await service.run(nextRequest, principal)).toEqual(next);
+    expect((await db.select().from(tasks)).length).toBe(4);
+    expect((await db.select().from(meetingDocuments)).length).toBe(2);
+    await expect(service.run({ ...nextRequest, requestId: 'invalid', scheduledOn: '2026-02-30' }, principal)).rejects.toMatchObject({ status: 400 });
+  });
+});

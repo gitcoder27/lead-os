@@ -96,6 +96,21 @@ export class CaptureService {
     }
   }
 
+  /** Preflight a compound action without writes; finish commits only after all diagnostics pass. */
+  async prepareCreate(input: CaptureRequestBody, principal: TaskPrincipal) {
+    await this.keys.assertPhase3Enabled(principal.workspaceId);
+    if (!isValidTimeZone(input.tz)) throw new HttpError(400, "A valid time zone is required");
+    const tz = input.tz!;
+    const reference = todayIsoDate(new Date(), tz);
+    const today = input.clientToday ?? reference;
+    if (Math.abs(Date.parse(`${reference}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) > 86_400_000 || !Number.isFinite(Date.parse(`${today}T00:00:00Z`))) throw new HttpError(400, "Client today is out of sync");
+    const parsed = parseCapture(input.text, today);
+    if (parsed.intent !== "create") throw new HttpError(400, "Meeting actions must create a task");
+    const resolved = await this.resolve(parsed, normalizeWorkspaceId(principal.workspaceId), principal.accountId);
+    if (resolved.parentKey || resolved.meeting || resolved.later) throw new HttpError(400, "Meeting actions must be ordinary child tasks; remove parent, meeting or Later commands");
+    return { resolved, clock: { today, tz } };
+  }
+
   /** Fetch the candidates the shared resolver needs, then resolve synchronously. */
   private async resolve(parsed: ParsedCapture, workspaceId: string, managerAccountId: string): Promise<ResolvedCapture> {
     const keys = [
@@ -171,7 +186,7 @@ export class CaptureService {
    * typed always wins: an `@owner`, a `!date`, `/later`, `/w`, `/m`, `!!`,
    * `^parent`, `!due:` and `/f !date` each beat the matching default.
    */
-  private async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string, defaults: CaptureDefaults, clock: { today: string; tz: string }) {
+  async applyCreate(resolved: ResolvedCapture, principal: TaskPrincipal, requestId: string, defaults: CaptureDefaults, clock: { today: string; tz: string }) {
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const existing = await this.events.getByRequestId(requestId, { kind: "manager", accountId: principal.accountId, workspaceId: scope });
     if (existing?.event.type === "created" && existing.event.taskKey) {

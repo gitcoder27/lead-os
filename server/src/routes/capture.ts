@@ -1,3 +1,4 @@
+import { MeetingCaptureService } from "../services/meeting-capture.service";
 import { placementSchema } from "../services/projects.service";
 import { Router } from "express";
 import { z } from "zod";
@@ -51,17 +52,25 @@ const bodySchema = z.object({
   requestId: z.string().min(1).max(100).optional(),
 }).strict();
 
+export const meetingCaptureSchema = z.object({
+  operation: z.enum(["meeting-finish", "meeting-repeat"]), meetingKey: taskKey,
+  documentId: z.string().nullable(), revision: z.number().int().min(0), requestId: z.string().min(1).max(100),
+  clientToday: isoDate, tz: z.string().min(1).max(64), confirm: z.boolean().optional(),
+  scheduledOn: isoDate.optional(), startsAt: timestamp.nullable().optional(), endsAt: timestamp.nullable().optional(),
+}).strict();
+
 /**
  * Phase 3 (P3-D8, §4.3): `POST /api/capture` — the single capture endpoint.
  * Manager-only; the service gates on `tasks_phase3_enabled`.
  */
-export function createCaptureRouter(capture: CaptureService): Router {
+export function createCaptureRouter(capture: CaptureService, meetings = new MeetingCaptureService(undefined, capture)): Router {
   const router = Router();
 
-  router.post("/", validate(z.object({ body: bodySchema, params: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
+  router.post("/", validate(z.object({ body: z.union([bodySchema, meetingCaptureSchema]), params: z.any().optional(), query: z.any().optional() })), async (req, res, next) => {
     try {
       const user = req.auth!.user;
-      res.json(await capture.run(req.body, { type: "manager", accountId: user.accountId, workspaceId: user.workspaceId }));
+      const principal = { type: "manager" as const, accountId: user.accountId, workspaceId: user.workspaceId };
+      res.json(req.body.operation ? await meetings.run(req.body, principal) : await capture.run(req.body, principal));
     } catch (error) { next(error); }
   });
 

@@ -1,3 +1,4 @@
+import { meetingDocuments } from "../db/schema";
 import { visibleTaskRows } from "./task-visibility";
 import { TaskPlacementsService, readTaskPlacements } from "./task-placements.service";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
@@ -228,12 +229,13 @@ export class TaskService {
     if (!rows.length) return [];
     const scope = normalizeWorkspaceId(principal.workspaceId);
     const ids = rows.map((row) => row.id);
-    const [linkRows, mappedRows, placements] = await Promise.all([
+    const [linkRows, mappedRows, placements, privateOutcomes] = await Promise.all([
       this.listLinks(ids, scope),
       principal.type === "developer"
         ? Promise.resolve([])
         : db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, scope), inArray(taskLegacyMap.taskId, ids), eq(taskLegacyMap.sourceTable, "manager_desk_items"), eq(taskLegacyMap.role, "canonical"))),
       readTaskPlacements(principal, ids),
+      this.privateMeetingOutcomes(rows, principal),
     ]);
     const linksByTask = new Map<number, TaskLinkRow[]>();
     for (const link of linkRows) {
@@ -242,7 +244,14 @@ export class TaskService {
       else linksByTask.set(link.taskId, [link]);
     }
     const legacyByTask = new Map(mappedRows.map((entry) => [entry.taskId, entry.sourceId]));
-    return rows.map((row) => ({ ...this.rowToDto(row, linksByTask.get(row.id) ?? [], legacyByTask.get(row.id), principal), ...(principal.type !== "developer" && { placement: placements.get(row.id) ?? null }) }));
+    return rows.map((row) => ({ ...this.rowToDto(row, linksByTask.get(row.id) ?? [], legacyByTask.get(row.id), principal), ...(principal.type !== "developer" && { placement: placements.get(row.id) ?? null, hasPrivateMeetingOutcome: privateOutcomes.has(row.id) }) }));
+  }
+
+  private async privateMeetingOutcomes(rows: TaskRow[], principal: TaskPrincipal): Promise<Set<number>> {
+    const ids = rows.filter((row) => row.kind === "meeting").map((row) => row.id);
+    if (principal.type === "developer" || !ids.length) return new Set();
+    const documents = await db.select({ taskId: meetingDocuments.taskId, bodyJson: meetingDocuments.bodyJson }).from(meetingDocuments).where(and(eq(meetingDocuments.workspaceId, normalizeWorkspaceId(principal.workspaceId)), eq(meetingDocuments.managerAccountId, principal.accountId), inArray(meetingDocuments.taskId, ids)));
+    return new Set(documents.filter((doc) => { const body = JSON.parse(doc.bodyJson) as { outcome: string; noDecisions: boolean }; return body.outcome.trim() || body.noDecisions; }).map((doc) => doc.taskId));
   }
 
   async list(principal: TaskPrincipal, filter: { view?: "desk" | "follow-ups" | "meetings" | "developer" | "all"; ownerId?: string; date?: string; closedFrom?: string; closedTo?: string } = {}): Promise<TaskRow[]> {
@@ -390,7 +399,7 @@ export class TaskService {
         const placement = options.placement !== undefined ? options.placement : inherited ? { projectId: inherited.projectId, trackId: inherited.trackId } : null;
         if (placement) await new TaskPlacementsService().set(principal, row.id, placement);
       }
-      await this.emit(row, { type: "created", body: null, requestId: options.requestId, meta: { source: options.source ?? (principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk"), ownerType, ownerId, title: row.title, ...(parent && { parentKey: parent.taskKey }) } }, principal);
+      await this.emit(row, { type: "created", body: null, requestId: options.requestId, meta: { source: options.source ?? (principal.type === "developer" ? "my_day" : principal.type === "copilot" ? "copilot" : "desk"), ownerType, ownerId, title: row.title, ...(parent && !(parent.kind === "meeting" && row.ownerType === "developer" && (parent.ownerType !== "developer" || parent.ownerId !== row.ownerId)) && { parentKey: parent.taskKey }) } }, principal);
       if (row.status !== "open") await this.emit(row, { type: "status", body: null, meta: { domain: "task_status", from: "open", to: row.status, reason: "user" } }, principal);
       if (row.status === "active") await this.emit(row, { type: "focus", body: null, meta: { action: "set_current", date: todayIsoDate() } }, principal);
       return row;
@@ -588,7 +597,7 @@ export class TaskService {
     }
     const dto = await this.toDto(row, principal);
     const scope = row.workspaceId;
-    const visibleIds = principal.type !== "developer" ? new Set((await visibleTaskRows(principal)).map((task) => task.id)) : null;
+    const visibleIds = new Set((await visibleTaskRows(principal)).map((task) => task.id));
     const childRows = (await db.select().from(tasks).where(and(
       eq(tasks.workspaceId, scope), eq(tasks.parentId, row.id), isNull(tasks.deletedAt),
       principal.type === "developer" ? and(eq(tasks.ownerType, "developer"), eq(tasks.ownerId, principal.accountId)) : undefined,
@@ -737,7 +746,7 @@ export class TaskService {
     const ids = rows.map((row) => row.id);
     const developerOwnerIds = [...new Set(rows.filter((row) => row.ownerType === "developer" && row.ownerId).map((row) => row.ownerId!))];
     const viewer = { kind: options.principal.type === "developer" ? "developer" as const : "manager" as const, accountId: options.principal.accountId, workspaceId: scope };
-    const [linkRows, mappingRows, focusRows, originRows, latestEvents, developerRows, availabilityByAccountId] = await Promise.all([
+    const [linkRows, mappingRows, focusRows, originRows, latestEvents, developerRows, availabilityByAccountId, privateOutcomes] = await Promise.all([
       this.listLinks(ids, scope),
       db.select().from(taskLegacyMap).where(and(eq(taskLegacyMap.workspaceId, scope), inArray(taskLegacyMap.taskId, ids))),
       developerOwnerIds.length
@@ -754,6 +763,7 @@ export class TaskService {
       developerOwnerIds.length
         ? new DeveloperAvailabilityService().getAvailabilityMapForDate(developerOwnerIds, options.date, scope)
         : Promise.resolve(new Map<string, never>()),
+      this.privateMeetingOutcomes(rows, options.principal),
     ]);
 
     const linksByTask = new Map<number, TaskLinkRow[]>();
@@ -820,7 +830,7 @@ export class TaskService {
       };
       if (options.principal.type === "developer") return { ...shared, ...extras } satisfies DeveloperSurfaceTask;
       const ownsPrivate = row.trackedByManagerId === options.principal.accountId || (row.ownerType === "manager" && row.ownerId === options.principal.accountId);
-      const managerDto: ManagerTask = { ...shared, legacyDeskItemId: mappedByTaskSource.get(`manager_desk_items:${row.id}`) ?? row.id, later: row.later === 1, parentId: row.parentId, schedulePosition: row.schedulePosition,
+      const managerDto: ManagerTask = { ...shared, hasPrivateMeetingOutcome: privateOutcomes.has(row.id), legacyDeskItemId: mappedByTaskSource.get(`manager_desk_items:${row.id}`) ?? row.id, later: row.later === 1, parentId: row.parentId, schedulePosition: row.schedulePosition,
         trackedByManagerId: ownsPrivate ? row.trackedByManagerId : null,
         labels: ownsPrivate ? JSON.parse(row.labelsJson ?? "[]") as string[] : [], nextAction: ownsPrivate ? row.nextAction : null, followUpAt: ownsPrivate ? row.followUpAt : null,
         ...triageFields(row, ownsPrivate) };

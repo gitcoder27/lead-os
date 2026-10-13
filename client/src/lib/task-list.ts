@@ -88,7 +88,7 @@ export interface RelativeTaskDate {
 
 /** docs/49 §5.1: the row's relative date label. */
 export function relativeTaskDate(
-  task: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status' | 'closedAt'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'startsAt'>>,
+  task: Pick<ManagerTask, 'scheduledOn' | 'dueAt' | 'status' | 'closedAt'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'hasPrivateMeetingOutcome' | 'startsAt'>>,
   today: string,
 ): RelativeTaskDate | null {
   if (!isOpenStatus(task.status) && task.closedAt) {
@@ -116,10 +116,10 @@ export function relativeTaskDate(
 
 /** docs/56 UX-08: an open meeting whose day has passed with no outcome recorded. */
 export function meetingNeedsOutcome(
-  task: Pick<ManagerTask, 'scheduledOn' | 'status'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'startsAt'>>,
+  task: Pick<ManagerTask, 'scheduledOn' | 'status'> & Partial<Pick<ManagerTask, 'kind' | 'outcome' | 'hasPrivateMeetingOutcome' | 'startsAt'>>,
   today: string,
 ): boolean {
-  if (task.kind !== 'meeting' || !isOpenStatus(task.status) || task.outcome?.trim()) return false;
+  if (task.kind !== 'meeting' || !isOpenStatus(task.status) || task.outcome?.trim() || task.hasPrivateMeetingOutcome) return false;
   const day = localDateOf(task.startsAt ?? null) ?? task.scheduledOn;
   return Boolean(day && day < today);
 }

@@ -832,6 +832,7 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
 // ── Meeting outcome ─────────────────────────────────────────────────
 
 export function MeetingOutcome({ task, editable, onPatch }: { task: TaskDetailResponse; editable: boolean; onPatch: Patch }) {
+  if ('hasPrivateMeetingOutcome' in task && task.hasPrivateMeetingOutcome) return <p className="text-ui" style={{ color: 'var(--text-secondary)' }}>Outcome saved in your private meeting workspace.</p>;
   return (
     <div
       className="rounded-xl px-2 py-2"

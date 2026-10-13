@@ -1116,6 +1116,8 @@ export interface PersonCommitmentsResponse {
   tasks: ManagerTask[];
 }
 export interface ManagerTask extends DeveloperTask {
+  /** Presence only; private document text never belongs to shared task payloads. */
+  hasPrivateMeetingOutcome?: boolean;
   placement?: TaskPlacementContext | null;
   /** Compatibility surface ID: mapped legacy desk ID, or canonical task ID when no mapping exists. */
   legacyDeskItemId?: number;

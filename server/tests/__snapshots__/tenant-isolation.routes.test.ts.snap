@@ -758,6 +758,11 @@ exports[`permanent tenant isolation guard > keeps all owner table families priva
     "scope": "workspace manager",
   },
   {
+    "proof": "direct-id/scoped API probe",
+    "route": "POST /api/meetings/:key/undo",
+    "scope": "workspace manager",
+  },
+  {
     "proof": "skipped: focused /api/my-day route tests; no valid fixture in this matrix",
     "route": "POST /api/my-day/checkins",
     "scope": "developer",

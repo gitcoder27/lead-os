@@ -1105,7 +1105,7 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 
 - [x] MP-01 — Private documents, contracts, access checks and preparation context.
 - [x] MP-02 — Focused workspace, serialized autosave and recoverable drafts.
-- [ ] MP-03 — Atomic finish/action capture, durable receipts and guarded Undo.
+- [x] MP-03 — Atomic finish/action capture, durable receipts and guarded Undo.
 - [ ] MP-04 — Repeat flow and Today/Tasks entry points with return navigation.
 - [ ] MP-05 — Automated and browser/accessibility verification; pilot handoff.
 
@@ -1113,3 +1113,4 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 |---|---|---|
 | 2026-10-13 | MP-01 | Additive private document and receipt storage with account/reset cleanup. Phase 3 manager gate and visible-task access. Explicit repeat history, linked people commitments, project blockers and Jira context; context failure does not block the document. Revision + identity checks prevent stale overwrites. Meeting workspace route tests and server typecheck. |
 | 2026-10-13 | MP-02 | Focused responsive page at `/t/:key?mode=meeting`; existing notes editor with private action selection and publish commands omitted. 800 ms serialized saves, scoped device recovery, revision/identity conflict reconciliation, auth-epoch guards and honest save states. Four hook lifecycle tests pass; client typecheck passes. |
+| 2026-10-13 | MP-03 | Capture now accepts typed compound meeting operations. Finish preflights grammar and commits child tasks, private outcome and completion with a durable payload-bound receipt. Six-second Undo guards task/event/link/placement/document changes; later actions remain independent. Developer detail omits inaccessible parents and new meeting-action events omit their private parent key. Owner/date/More controls, warning confirmation, auth-safe callbacks and persisted retry identity. Seven service/route operation tests, existing capture tests and seven frontend lifecycle/receipt tests pass; typecheck passes. Repeat storage/receipt foundation is included for MP-04. |

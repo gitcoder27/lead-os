@@ -16,7 +16,7 @@ export const meetingBodySchema = z.object({
   agenda: z.string().max(50000), notes: z.string().max(50000), outcome: z.string().max(4000),
   noDecisions: z.boolean(),
   actions: z.array(z.object({
-    id: z.string().min(1).max(100), text: z.string().min(1).max(4000),
+    id: z.string().min(1).max(100), text: z.string().max(4000),
     ownerAccountId: z.string().min(1).max(200).nullable().optional(), scheduledOn: date.nullable().optional(),
     dueAt: z.string().datetime({ offset: true }).nullable().optional(), followUpAt: z.string().datetime({ offset: true }).nullable().optional(),
     waitingOn: z.object({ type: z.enum(["developer", "contact", "text"]), ref: z.string().nullable().optional(), label: z.string().nullable().optional() }).strict().nullable().optional(),

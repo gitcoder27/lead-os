@@ -203,10 +203,10 @@ export const MEETING_GROUP_ORDER: MeetingBucket[] = ['Today', 'Upcoming', 'Needs
  * Needs outcome. A past meeting is never "Upcoming". Undated meetings are upcoming.
  */
 export function meetingBucket(
-  task: Pick<ManagerTask, 'status' | 'outcome' | 'startsAt' | 'scheduledOn'>,
+  task: Pick<ManagerTask, 'status' | 'outcome' | 'startsAt' | 'scheduledOn'> & Pick<ManagerTask, 'hasPrivateMeetingOutcome'>,
   today: string,
 ): MeetingBucket {
-  if (!isOpenStatus(task.status) || task.outcome?.trim()) return 'Recent';
+  if (!isOpenStatus(task.status) || task.outcome?.trim() || task.hasPrivateMeetingOutcome) return 'Recent';
   const day = localDateOf(task.startsAt) ?? task.scheduledOn;
   if (!day) return 'Upcoming';
   if (day < today) return 'Needs outcome';

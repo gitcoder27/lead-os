@@ -6,12 +6,13 @@ import { Readable, Writable } from "node:stream";
 import { createTeamTrackerRouter } from "../src/routes/team-tracker";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskEventsService } from "../src/services/task-events.service";
+import { TaskService } from "../src/services/task.service";
 import { TeamTrackerService } from "../src/services/team-tracker.service";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { resetDatabase, db } from "./helpers/db";
 import { enableCollabParticipation } from "./helpers/team-mode";
 import { pinAttentionTimeZone } from "./helpers/attention";
-import { checkinTaskRefs, configTable, developerAvailabilityPeriods, developers, issues, managerDeskItems, teamTrackerSavedViews } from "../src/db/schema";
+import { checkinTaskRefs, configTable, developerAvailabilityPeriods, developers, issues, managerDeskItems, tasks, taskEvents, teamTrackerSavedViews } from "../src/db/schema";
 
 const trackerService = new TeamTrackerService();
 const managerDeskService = new ManagerDeskService(trackerService);
@@ -1449,5 +1450,38 @@ describe("team tracker routes", () => {
       expect(res.status).toBe(400);
       expect(res.body?.error).toBe("Task is not owned by this developer");
     });
+  });
+});
+
+
+describe("canonical carry-forward (R2)", () => {
+  it("agrees with its disabled preview and never rewrites source, overdue, future, undated or closed work", async () => {
+    await resetDatabase();
+    await seedDevelopers();
+    await db.insert(configTable).values([
+      { key: "tasks_phase1_enabled", value: "true" },
+      { key: "tasks_phase2_stage", value: "2c" },
+      { key: "tasks_phase3_enabled", value: "true" },
+    ]);
+    const service = new TaskService();
+    const principal = { type: "manager" as const, accountId: "manager-1" };
+    const rows = [];
+    for (const scheduledOn of ["2026-03-06", "2026-03-05", "2026-03-23", null]) {
+      rows.push(await service.create({ title: `Work ${scheduledOn}`, ownerType: "developer", ownerId: "dev-1", scheduledOn }, principal));
+    }
+    rows.push(await service.create({ title: "Closed", ownerType: "developer", ownerId: "dev-1", scheduledOn: "2026-03-06", status: "done" }, principal));
+    await db.insert(developerAvailabilityPeriods).values({ developerAccountId: "dev-1", createdAt: "2026-03-06T08:00:00Z", updatedAt: "2026-03-06T08:00:00Z", startDate: "2026-03-07", endDate: "2026-03-08", note: "Away" });
+    const before = await db.select().from(tasks);
+    const eventsBefore = await db.select().from(taskEvents);
+    const app = createTestApp();
+    const preview = await invoke(app, { method: "GET", url: "/api/team-tracker/carry-forward-preview?fromDate=2026-03-06&toDate=2026-03-07" });
+    expect(preview.body).toMatchObject({ carryable: 0, developers: [] });
+    for (const itemIds of [undefined, [rows[0]!.id], [rows[2]!.id], [rows[0]!.id, rows[0]!.id]]) {
+      const response = await invoke(app, { method: "POST", url: "/api/team-tracker/carry-forward", body: { fromDate: "2026-03-06", toDate: "2026-03-07", ...(itemIds ? { itemIds } : {}) } });
+      expect(response.status).toBe(409);
+    }
+    await expect(trackerService.carryForward("2026-03-06", "2026-03-07")).rejects.toMatchObject({ status: 409 });
+    expect(await db.select().from(tasks)).toEqual(before);
+    expect(await db.select().from(taskEvents)).toEqual(eventsBefore);
   });
 });

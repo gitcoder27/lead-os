@@ -1061,3 +1061,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R1 | AccountWriteContinuations, useDailyNotes, AuthContext and WeeklyReviewMode: 42 tests passed; typecheck and build:check passed. Actual AuthProvider cleanup is exercised with deferred mocked transport, failed logout, B login and return to A; no full browser run. Commit: this item’s task-scoped commit. |
+- [x] **R2** Canonical Team carry-forward now rejects with 409, matching its disabled preview/context; canonical unfinished work already remains visible on the board and is scheduled through Tasks. Legacy carry-forward is unchanged.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R2 | Team Tracker route/service suites: 126 tests passed; typecheck and build:check passed. Regression checks bulk and explicit IDs, duplicate selection, source/overdue/future/undated/closed tasks and destination leave; task rows and events remain identical. Commit: this item’s task-scoped commit. |

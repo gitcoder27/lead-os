@@ -2638,17 +2638,7 @@ export class TeamTrackerService {
     assertForwardDateRange(fromDate, toDate);
     return runInTransaction(async () => {
     if (await this.taskKeys.canonicalEnabled(workspaceId)) {
-      const principal = this.tasks.principal(workspaceId, options?.actor);
-      const rows = options?.itemIds
-        ? await Promise.all(options.itemIds.map((id) => this.tasks.resolve("team_tracker_items", id, workspaceId)))
-        : await this.tasks.list(principal, { view: "developer", date: fromDate });
-      let moved = 0;
-      for (const row of rows) {
-        if (["done", "dropped"].includes(row.status)) continue;
-        await this.tasks.update(row.taskKey, { scheduledOn: toDate }, principal);
-        moved++;
-      }
-      return moved;
+      throw new HttpError(409, "Team carry-forward is unavailable for canonical tasks. Use Tasks to schedule work; unfinished work remains visible automatically.");
     }
     const plan = await this.buildCarryForwardPlan(fromDate, toDate, workspaceId);
     const selectedEntries = await this.selectCarryForwardEntries(

@@ -3004,7 +3004,9 @@ export type AssistantToolCallStatus =
   | "pending"
   | "confirmed"
   | "cancelled"
-  | "failed";
+  | "failed"
+  | "executing"
+  | "uncertain";
 
 /** One tool call recorded on an assistant message (`assistant_messages.tool_calls`). */
 export interface AssistantToolCallRecord {

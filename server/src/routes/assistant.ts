@@ -71,6 +71,7 @@ async function streamEvents(
   });
 
   const emit = (event: AssistantStreamEvent): void => {
+    if (res.destroyed || res.writableEnded) return;
     if (!streaming) {
       streaming = true;
       res.status(200);

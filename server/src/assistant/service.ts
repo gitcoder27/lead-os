@@ -1,3 +1,4 @@
+import { withConversationMutation } from "./conversation-mutations";
 import { TaskKeysService } from "../services/task-keys.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
@@ -161,34 +162,46 @@ export class AssistantService {
       throw new HttpError(400, "message is required");
     }
     const conversation = await this.loadOrCreateConversation(auth, request);
-    if (request.retry) {
-      const lastUser = await this.getLastMessageByRole(conversation.id, "user");
-      if (!lastUser) {
-        throw new HttpError(400, "Nothing to retry");
+    return withConversationMutation(conversation.id, async () => {
+      await this.getOwnedConversation(auth, conversation.id);
+      if (signal?.aborted) throw new HttpError(409, "Request cancelled before execution");
+      const rows = db.select().from(assistantMessages).where(eq(assistantMessages.conversationId, conversation.id)).all();
+      if (rows.some(row => parseToolCalls(row.toolCalls).some(record => record.status === "executing" || record.status === "uncertain"))) {
+        throw new HttpError(409, "An action's outcome is unknown. Check the affected work before continuing.");
       }
-      // Drop the previous assistant turn; the loop re-answers the last user message.
-      await db
-        .delete(assistantMessages)
-        .where(and(eq(assistantMessages.conversationId, conversation.id), gt(assistantMessages.id, lastUser.id)));
-    } else {
-      await this.cancelPendingProposals(conversation.id, "user sent a new message");
-      await this.appendMessage(conversation.id, "user", request.message!.trim());
-    }
-    const budget = this.createBudget(signal);
-    try {
-      await this.runLoop(
-        auth,
-        conversation.id,
-        request.date,
-        request.currentView,
-        config,
-        emit,
-        budget.signal,
-        request.pageContext?.params
-      );
-    } finally {
-      budget.dispose();
-    }
+      if (request.retry) {
+        const lastUser = await this.getLastMessageByRole(conversation.id, "user");
+        if (!lastUser) {
+          throw new HttpError(400, "Nothing to retry");
+        }
+        const turn = rows.filter(row => row.id > lastUser.id);
+        if (turn.some(row => parseToolCalls(row.toolCalls).some(record => record.confirm === "always" && !["pending", "cancelled"].includes(record.status)))) {
+          throw new HttpError(409, "A write was already attempted in this turn. Check its result instead of retrying.");
+        }
+        // Drop the previous assistant turn; the loop re-answers the last user message.
+        await db
+          .delete(assistantMessages)
+          .where(and(eq(assistantMessages.conversationId, conversation.id), gt(assistantMessages.id, lastUser.id)));
+      } else {
+        await this.cancelPendingProposals(conversation.id, "user sent a new message");
+        await this.appendMessage(conversation.id, "user", request.message!.trim());
+      }
+      const budget = this.createBudget(signal);
+      try {
+        await this.runLoop(
+          auth,
+          conversation.id,
+          request.date,
+          request.currentView,
+          config,
+          emit,
+          budget.signal,
+          request.pageContext?.params
+        );
+      } finally {
+        budget.dispose();
+      }
+    });
   }
 
   async confirmAction(
@@ -200,59 +213,87 @@ export class AssistantService {
     const config = await this.assertConfigured(auth.workspaceId);
     this.assertRateLimit(auth.workspaceId, auth.managerAccountId);
     const conversation = await this.getOwnedConversation(auth, request.conversationId);
-    const lastAssistant = await this.getLastAssistantMessage(conversation.id);
-    const records = lastAssistant?.toolCalls ?? [];
-    const record = records.find((entry) => entry.id === request.toolCallId && entry.status === "pending");
-    if (!lastAssistant || !record) {
-      throw new HttpError(404, "Proposal not found or already resolved");
-    }
-    const tool = this.toolByName.get(record.name);
-
-    if (request.decision === "cancel") {
-      record.status = "cancelled";
-      await this.updateToolCallRecords(lastAssistant.id, records);
-      await this.appendMessage(
-        conversation.id,
-        "tool",
-        JSON.stringify({ cancelled: true, reason: "user declined" }),
-        { toolCallId: record.id }
-      );
-      if (records.some((entry) => entry.status === "pending")) {
-        emit({ type: "done", conversationId: conversation.id, status: "awaiting_confirmation" });
+    return withConversationMutation(conversation.id, async () => {
+      await this.getOwnedConversation(auth, conversation.id);
+      const rows = db.select().from(assistantMessages).where(eq(assistantMessages.conversationId, conversation.id)).orderBy(desc(assistantMessages.id)).all();
+      const proposalRow = rows.find(row => parseToolCalls(row.toolCalls).some(entry => entry.id === request.toolCallId));
+      const lastAssistant = proposalRow ? toAssistantMessage(proposalRow) : undefined;
+      const records = lastAssistant?.toolCalls ?? [];
+      const record = records.find(entry => entry.id === request.toolCallId);
+      if (!lastAssistant || !record) throw new HttpError(404, "Proposal not found");
+      const tool = this.toolByName.get(record.name);
+      if (record.status !== "pending") {
+        if (record.status === "cancelled") {
+          emit({ type: "message", message: lastAssistant });
+        } else {
+          emit({ type: "action_executed", conversationId: conversation.id, toolCallId: record.id, tool: record.name,
+            ok: record.status === "confirmed" || record.status === "executed",
+            summary: record.resultSummary ?? record.error ?? "Execution outcome unknown; check the affected work. This action will not be replayed.",
+            invalidate: tool?.invalidate ?? [] });
+        }
+        emit({ type: "done", conversationId: conversation.id, status: records.some(entry => entry.status === "pending") ? "awaiting_confirmation" : "complete" });
         return;
       }
-      const row = await this.appendMessage(conversation.id, "assistant", "Cancelled — nothing was changed.");
-      emit({ type: "message", message: toAssistantMessage(row) });
-      emit({ type: "done", conversationId: conversation.id, status: "complete" });
+      if (signal?.aborted) throw new HttpError(409, "Request cancelled before execution");
+      // The persisted pending -> executing/cancelled CAS precedes every side effect.
+      record.status = request.decision === "cancel" ? "cancelled" : "executing";
+      const claimed = db.update(assistantMessages).set({ toolCalls: JSON.stringify(records) })
+        .where(and(eq(assistantMessages.id, proposalRow!.id), eq(assistantMessages.toolCalls, proposalRow!.toolCalls!)))
+        .returning({ id: assistantMessages.id }).all();
+      if (!claimed.length) throw new HttpError(409, "Proposal changed; reload its current state");
+
+      if (request.decision === "cancel") {
+        record.status = "cancelled";
+        await this.updateToolCallRecords(lastAssistant.id, records);
+        await this.appendMessage(
+          conversation.id,
+          "tool",
+          JSON.stringify({ cancelled: true, reason: "user declined" }),
+          { toolCallId: record.id }
+        );
+        if (records.some((entry) => entry.status === "pending")) {
+          emit({ type: "done", conversationId: conversation.id, status: "awaiting_confirmation" });
+          return;
+        }
+        const row = await this.appendMessage(conversation.id, "assistant", "Cancelled — nothing was changed.");
+        emit({ type: "message", message: toAssistantMessage(row) });
+        emit({ type: "done", conversationId: conversation.id, status: "complete" });
+        return;
+      }
+
+      const outcome = await this.executeToolCall(
+        tool,
+        record.id,
+        record.name,
+        record.arguments,
+        this.toolContext(auth, request.date),
+        conversation.id,
+        emit
+      );
+      record.status = outcome.ok ? "confirmed" : tool?.jiraMutating ? "uncertain" : "failed";
+      if (!outcome.ok && tool?.jiraMutating) outcome.summary = `Outcome unknown; check Jira before taking further action. ${outcome.summary}`;
+      if (outcome.ok) {
+        record.resultSummary = outcome.summary;
+      } else {
+        record.error = outcome.summary;
+      }
+      await this.updateToolCallRecords(lastAssistant.id, records);
+      await this.appendMessage(conversation.id, "tool", JSON.stringify(outcome.result), { toolCallId: record.id });
+      emit({
+        type: "action_executed",
+        conversationId: conversation.id,
+        toolCallId: record.id,
+        tool: record.name,
+        ok: outcome.ok,
+        summary: outcome.summary,
+        invalidate: tool?.invalidate ?? [],
+    });
+
+    if (record.status === "uncertain") {
+      emit({ type: "message", message: toAssistantMessage((await this.getMessageRow(lastAssistant.id))!) });
+      emit({ type: "done", conversationId: conversation.id, status: "error" });
       return;
     }
-
-    const outcome = await this.executeToolCall(
-      tool,
-      record.id,
-      record.name,
-      record.arguments,
-      this.toolContext(auth, request.date),
-      conversation.id,
-      emit
-    );
-    record.status = outcome.ok ? "confirmed" : "failed";
-    if (outcome.ok) {
-      record.resultSummary = outcome.summary;
-    } else {
-      record.error = outcome.summary;
-    }
-    await this.updateToolCallRecords(lastAssistant.id, records);
-    await this.appendMessage(conversation.id, "tool", JSON.stringify(outcome.result), { toolCallId: record.id });
-    emit({
-      type: "action_executed",
-      conversationId: conversation.id,
-      toolCallId: record.id,
-      tool: record.name,
-      ok: outcome.ok,
-      summary: outcome.summary,
-      invalidate: tool?.invalidate ?? [],
-    });
 
     if (records.some((entry) => entry.status === "pending")) {
       emit({ type: "done", conversationId: conversation.id, status: "awaiting_confirmation" });
@@ -265,6 +306,7 @@ export class AssistantService {
     } finally {
       budget.dispose();
     }
+    });
   }
 
   async listConversations(auth: AssistantAuth): Promise<AssistantConversation[]> {
@@ -329,8 +371,10 @@ export class AssistantService {
   }
 
   async deleteConversation(auth: AssistantAuth, conversationId: number): Promise<void> {
-    const conversation = await this.getOwnedConversation(auth, conversationId);
-    await db.delete(assistantConversations).where(eq(assistantConversations.id, conversation.id));
+    await withConversationMutation(conversationId, async () => {
+      const conversation = await this.getOwnedConversation(auth, conversationId);
+      await db.delete(assistantConversations).where(eq(assistantConversations.id, conversation.id));
+    });
   }
 
   async listMemories(auth: AssistantAuth): Promise<AssistantMemory[]> {
@@ -777,8 +821,11 @@ export class AssistantService {
           continue;
         }
 
+        if (signal.aborted) throw new HttpError(409, "Request cancelled before execution");
+        record.status = "executing";
+        await this.updateToolCallRecords(assistantRow.id, records);
         const outcome = await this.executeToolCall(tool, call.id, call.name, call.arguments, context, conversationId, emit);
-        record.status = outcome.ok ? "executed" : "failed";
+        record.status = outcome.ok ? "executed" : tool?.jiraMutating ? "uncertain" : "failed";
         if (outcome.ok) {
           record.resultSummary = outcome.summary;
         } else {
@@ -796,6 +843,7 @@ export class AssistantService {
             invalidate: tool.invalidate,
           });
         }
+        if (record.status === "uncertain") break;
       }
 
       await this.updateToolCallRecords(assistantRow.id, records);
@@ -805,6 +853,11 @@ export class AssistantService {
       const persistedRow = await this.getMessageRow(assistantRow.id);
       if (persistedRow) {
         emit({ type: "message", message: toAssistantMessage(persistedRow) });
+      }
+
+      if (records.some(record => record.status === "uncertain")) {
+        emit({ type: "done", conversationId, status: "error" });
+        return;
       }
 
       if (hasProposals) {

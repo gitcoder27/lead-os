@@ -142,6 +142,7 @@ describe("AssistantService", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -310,7 +311,79 @@ describe("AssistantService", () => {
     expect(day.items.map((item) => item.title)).toContain("Follow up with Alice");
   });
 
-  it("cancels a proposal without writing and 404s on repeat", async () => {
+  it.each(["confirm", "cancel", "chat", "retry", "delete"])("coordinates a blocked Jira confirmation with overlapping %s across service instances", async mutation => {
+    const scripted = createScriptedClient([
+      { toolCalls: [{ id: "comment-1", name: "add_issue_comment", arguments: { jiraKey: "TEST-1", text: "fixture" } }] },
+      { content: "Comment posted." },
+    ]);
+    const service = buildService(scripted.client);
+    const second = buildService(scripted.client);
+    await service.chat(AUTH, { message: "comment", date: DATE }, collectEvents().emit);
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const write = vi.spyOn(IssueService.prototype, "addComment").mockImplementation(async () => { entered(); await blocked; });
+    const request = { conversationId: 1, toolCallId: "comment-1", decision: "confirm" as const, date: DATE };
+    const first = service.confirmAction(AUTH, request, collectEvents().emit);
+    await started;
+    const records = JSON.parse(db.select().from(assistantMessages).all().find(row => row.toolCalls)!.toolCalls!);
+    expect(records[0].status).toBe("executing");
+    const repeated = collectEvents();
+    const overlapping = mutation === "chat" || mutation === "retry"
+      ? second.chat(AUTH, { conversationId: 1, message: "next", retry: mutation === "retry", date: DATE }, repeated.emit)
+      : mutation === "delete" ? second.deleteConversation(AUTH, 1)
+      : second.confirmAction(AUTH, { ...request, decision: mutation }, repeated.emit);
+    const outcome = overlapping.then(() => "ok", error => error.status);
+    await Promise.resolve();
+    expect(write).toHaveBeenCalledTimes(1);
+    release();
+    await first;
+    expect(await outcome).toBe(mutation === "retry" ? 409 : "ok");
+    expect(write).toHaveBeenCalledTimes(1);
+    if (mutation === "confirm" || mutation === "cancel") expect(repeated.events[0]).toMatchObject({ type: "action_executed", ok: true, summary: "Commented on TEST-1" });
+  });
+
+  it("cancel winning the claim prevents confirmation from executing", async () => {
+    const scripted = createScriptedClient([{ toolCalls: [{ id: "comment-1", name: "add_issue_comment", arguments: { jiraKey: "TEST-1", text: "fixture" } }] }]);
+    const service = buildService(scripted.client);
+    const write = vi.spyOn(IssueService.prototype, "addComment").mockResolvedValue();
+    await service.chat(AUTH, { message: "comment", date: DATE }, collectEvents().emit);
+    const request = { conversationId: 1, toolCallId: "comment-1", date: DATE };
+    await Promise.all([service.confirmAction(AUTH, { ...request, decision: "cancel" }, collectEvents().emit), service.confirmAction(AUTH, { ...request, decision: "confirm" }, collectEvents().emit)]);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("persists uncertain external outcomes and never replays after duplicate confirmation or retry", async () => {
+    const scripted = createScriptedClient([{ toolCalls: [{ id: "comment-1", name: "add_issue_comment", arguments: { jiraKey: "TEST-1", text: "fixture" } }] }]);
+    const service = buildService(scripted.client);
+    const write = vi.spyOn(IssueService.prototype, "addComment").mockRejectedValue(new Error("connection lost after write"));
+    await service.chat(AUTH, { message: "comment", date: DATE }, collectEvents().emit);
+    const request = { conversationId: 1, toolCallId: "comment-1", decision: "confirm" as const, date: DATE };
+    const first = collectEvents();
+    await service.confirmAction(AUTH, request, first.emit);
+    expect(first.events.at(-1)).toMatchObject({ type: "done", status: "error" });
+    const reloaded = buildService(scripted.client);
+    const second = collectEvents();
+    await reloaded.confirmAction(AUTH, request, second.emit);
+    expect(second.events[0]).toMatchObject({ type: "action_executed", ok: false });
+    await expect(reloaded.chat(AUTH, { conversationId: 1, retry: true, date: DATE }, collectEvents().emit)).rejects.toMatchObject({ status: 409 });
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(scripted.calls).toHaveLength(1);
+  });
+
+  it("does not replay a durable executing claim left by an interrupted server", async () => {
+    const scripted = createScriptedClient([{ toolCalls: [{ id: "comment-1", name: "add_issue_comment", arguments: { jiraKey: "TEST-1", text: "fixture" } }] }]);
+    const service = buildService(scripted.client);
+    const write = vi.spyOn(IssueService.prototype, "addComment").mockResolvedValue();
+    await service.chat(AUTH, { message: "comment", date: DATE }, collectEvents().emit);
+    rawDb.prepare("UPDATE assistant_messages SET tool_calls = replace(tool_calls, 'pending', 'executing') WHERE tool_calls IS NOT NULL").run();
+    await buildService(scripted.client).confirmAction(AUTH, { conversationId: 1, toolCallId: "comment-1", decision: "confirm", date: DATE }, collectEvents().emit);
+    expect(write).not.toHaveBeenCalled();
+    await expect(service.chat(AUTH, { conversationId: 1, message: "next", date: DATE }, collectEvents().emit)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("cancels a proposal without writing and returns its state on repeat", async () => {
     const { client } = createScriptedClient([
       {
         toolCalls: [
@@ -344,13 +417,9 @@ describe("AssistantService", () => {
       ?.toolCalls?.find((entry) => entry.id === "call-1");
     expect(record?.status).toBe("cancelled");
 
-    await expect(
-      service.confirmAction(
-        AUTH,
-        { conversationId: 1, toolCallId: "call-1", decision: "cancel", date: DATE },
-        collectEvents().emit
-      )
-    ).rejects.toMatchObject({ status: 404 });
+    const repeated = collectEvents();
+    await service.confirmAction(AUTH, { conversationId: 1, toolCallId: "call-1", decision: "cancel", date: DATE }, repeated.emit);
+    expect(repeated.events.at(-1)).toMatchObject({ type: "done", status: "complete" });
   });
 
   it("auto-cancels a pending proposal when a new chat message arrives", async () => {

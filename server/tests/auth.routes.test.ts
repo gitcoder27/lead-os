@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { eq } from "drizzle-orm";
 import { createAuthRouter } from "../src/routes/auth";
@@ -140,6 +140,27 @@ describe("auth routes", () => {
 
     expect(firstTouch).not.toBe("2020-01-01T00:00:00.000Z");
     expect(secondTouch).toBe(firstTouch);
+  });
+
+  it("limits password-change spraying by IP before service calls and expires the window", async () => {
+    const app = createTestApp();
+    const change = vi.spyOn(authService, "changePassword");
+    const attempt = (username: string, remoteAddress = "192.0.2.1") => invoke(app, {
+      method: "POST", url: "/api/auth/change-password", remoteAddress,
+      body: { username, currentPassword: "wrong-password", newPassword: "new-password" },
+    });
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      for (let i = 0; i < 30; i++) expect((await attempt(`unknown-${i}`)).status).toBe(401);
+      const limited = await attempt("unknown-31");
+      expect(limited.status).toBe(429);
+      expect(limited.headers["retry-after"]).toBe("900");
+      expect(change).toHaveBeenCalledTimes(30);
+      expect((await attempt("other", "192.0.2.2")).status).toBe(401);
+      clock.mockReturnValue(now + 15 * 60_000);
+      expect((await attempt("fresh-window")).status).toBe(401);
+    } finally { change.mockRestore(); clock.mockRestore(); }
   });
 
   it("POST /api/auth/login throttles repeated failed attempts by username and address", async () => {

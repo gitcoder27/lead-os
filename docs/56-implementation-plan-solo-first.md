@@ -1035,7 +1035,7 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 - [x] CR-03 — Bind Jira and Copilot sockets to vetted DNS addresses.
 - [x] CR-04 — Claim proposals atomically and coordinate conversation mutations.
 - [x] CR-05 — Guard note identity across deletion/recreation and reconcile remote changes.
-- [ ] CR-06 — Bound public password-change IP and account throttles.
+- [x] CR-06 — Bound public password-change IP and account throttles.
 - [ ] CR-07 — Keep Jira deadlines active through bodies and retries.
 - [ ] CR-08 — Fetch relevant historical events and group once per task.
 
@@ -1046,3 +1046,4 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 | 2026-10-13 | CR-03 | main (this commit) | Shared Undici dispatcher vets DNS in its connector and drains response bodies on close. 82 existing outbound/Jira/LLM/config tests and 3 socket tests pass: public-to-private rebinding blocked before connection; actual Jira/Copilot HTTPS uses fixture DNS with ordinary DNS poisoned, preserves Host/SNI and rejects a wrong-host certificate. Operator exceptions and redirects retained; TLS verification enabled. |
 | 2026-10-13 | CR-04 | main (this commit) | Durable pending→executing CAS, shared per-conversation mutation queue, idempotent confirmations/cancellations and write-aware retry refusal. Jira errors stop the model loop as uncertain; orphan executing claims cannot replay. Actual comment tool mocked behind a gate exercises duplicate confirm, cancel, new chat, retry and deletion across two service instances. 34 server service/route and 20 client dock/history tests pass; server types pass. |
 | 2026-10-13 | CR-05 | main (this commit) | Note saves now check row identity before same-body retries, deletes or updates; shared save contract, route, Copilot, unload writes and persisted drafts carry noteId. Same-revision replacements and remote deletions adopt into clean editors and conflict with dirty drafts; legacy drafts require a decision. One service and five hook regressions failed before the fix. 157 backend note/task/Copilot and 64 frontend editor/query/draft tests pass; typecheck passes. |
+| 2026-10-13 | CR-06 | main (this commit) | Password-change uses the existing 30-attempt/15-minute IP middleware before validation/service work. Account throttle is capped at 10,000 entries; one unref cleanup timer expires never-reused keys and stops when empty. Route spraying/window reset, capacity, idle expiry, per-IP separation and admin reset tests pass: 62 focused auth/registration tests. |

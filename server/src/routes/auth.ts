@@ -1,3 +1,4 @@
+import { AuthAttemptThrottle } from "../middleware/auth-attempt-throttle";
 import { config } from "../config";
 import { RegistrationService } from "../services/registration.service";
 import { authIpLimit } from "../middleware/auth-ip-limit";
@@ -87,46 +88,6 @@ const resetPasswordSchema = z.object({
   }),
   query: z.any().optional(),
 });
-
-class AuthAttemptThrottle {
-  private readonly attempts = new Map<string, { failures: number; lockedUntil?: number; lastFailureAt: number }>();
-
-  assertAllowed(key: string): void {
-    const attempt = this.attempts.get(key);
-    if (!attempt?.lockedUntil) {
-      return;
-    }
-    if (attempt.lockedUntil <= Date.now()) {
-      this.attempts.delete(key);
-      return;
-    }
-    throw new HttpError(429, "Too many failed attempts. Try again later.");
-  }
-
-  recordSuccess(key: string): void {
-    this.attempts.delete(key);
-  }
-
-  /** Forget every client's failures for one username (used after an admin reset). */
-  clearUsername(username: string): void {
-    const normalized = normalizeThrottleUsername(username);
-    for (const key of this.attempts.keys()) {
-      if ((JSON.parse(key) as [string, string])[1] === normalized) this.attempts.delete(key);
-    }
-  }
-
-  recordFailure(key: string): void {
-    const now = Date.now();
-    const previous = this.attempts.get(key);
-    const failures = previous && now - previous.lastFailureAt < 15 * 60_000
-      ? previous.failures + 1
-      : 1;
-    const lockedUntil = failures >= 5
-      ? now + Math.min(15 * 60_000, (failures - 4) * 30_000)
-      : undefined;
-    this.attempts.set(key, { failures, lockedUntil, lastFailureAt: now });
-  }
-}
 
 function normalizeThrottleUsername(username: string): string {
   return username.trim().toLowerCase();
@@ -250,7 +211,7 @@ export function createAuthRouter(authService: AuthService): Router {
     }
   });
 
-  router.post("/change-password", validate(changePasswordSchema), async (req, res, next) => {
+  router.post("/change-password", authIpLimit(30), validate(changePasswordSchema), async (req, res, next) => {
     try {
       const { username, currentPassword, newPassword } = req.body;
       const key = throttleKey(req, username);

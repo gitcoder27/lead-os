@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/lib/api';
+import { authEpoch } from '@/lib/auth-epoch';
 import { blankSavedState } from '@/lib/weekly-review';
 import { getLocalTimeZone } from '@/lib/utils';
 import type { SaveWeeklyReviewRequest, SaveWeeklyReviewResponse, WeeklyReviewResponse, WeeklyReviewSavedState, WeeklyReviewWeeksResponse } from '@/types';
@@ -49,6 +50,8 @@ function merge(pending: SaveWeeklyReviewRequest, next: SaveWeeklyReviewRequest):
  */
 export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedState | null) {
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
+  const epoch = useRef<number | null>(null);
   const [saved, setSaved] = useState<WeeklyReviewSavedState>(() => initial ?? blankSavedState(weekStart));
   const pending = useRef<SaveWeeklyReviewRequest>({});
   const timer = useRef<number | null>(null);
@@ -57,6 +60,8 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
 
   const flush = useCallback(async (): Promise<WeeklyReviewSavedState | null> => {
     if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null; }
+    epoch.current ??= authEpoch(queryClient);
+    if (authEpoch(queryClient) !== epoch.current) { pending.current = {}; return null; }
     if (inFlight.current) {
       const result = await inFlight.current;
       // A failed attempt leaves the payload pending for an explicit retry or the next edit.
@@ -67,10 +72,12 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
     if (Object.keys(body).length === 0) return acknowledged.current;
     pending.current = {};
     const request = api.put<SaveWeeklyReviewResponse>(`/review/week/${weekStart}`, body).then(({ saved: result }) => {
+      if (authEpoch(queryClient) !== epoch.current) return null;
       acknowledged.current = result;
       setSaved((current) => ({ ...current, completedAt: result.completedAt, dismissedAt: result.dismissedAt, updatedAt: result.updatedAt }));
       return result;
     }).catch((error: Error) => {
+      if (authEpoch(queryClient) !== epoch.current) return null;
       pending.current = merge(body, pending.current);
       delete pending.current.completed;
       addToast({ type: 'error', title: "Couldn't save your review progress", message: error.message });
@@ -81,9 +88,11 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
     inFlight.current = null;
     if (result && Object.keys(pending.current).length > 0) return flush();
     return result;
-  }, [addToast, weekStart]);
+  }, [addToast, weekStart, queryClient, epoch]);
 
   const patch = useCallback((change: SaveWeeklyReviewRequest) => {
+    epoch.current ??= authEpoch(queryClient);
+    if (authEpoch(queryClient) !== epoch.current) return;
     setSaved((current) => ({
       ...current,
       ...(change.step !== undefined && { step: change.step }),
@@ -98,7 +107,7 @@ export function useReviewProgress(weekStart: string, initial: WeeklyReviewSavedS
     pending.current = merge(pending.current, change);
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(flush, REVIEW_SAVE_DELAY_MS);
-  }, [flush]);
+  }, [flush, queryClient, epoch]);
 
   // Leaving the review (Esc, back, a route change) writes what is waiting.
   useEffect(() => () => { void flush(); }, [flush]);

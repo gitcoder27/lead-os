@@ -1,3 +1,4 @@
+import { TestWrapper } from './wrapper';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useReviewProgress, REVIEW_SAVE_DELAY_MS } from '@/hooks/useWeeklyReview';
@@ -22,7 +23,7 @@ describe('acknowledged review progress', () => {
         }),
       )
       .mockResolvedValueOnce({ saved: { ...blankSavedState('2026-09-28'), reportMarkdown: 'Newer' } });
-    const { result } = renderHook(() => useReviewProgress('2026-09-28', null));
+    const { result } = renderHook(() => useReviewProgress('2026-09-28', null), { wrapper: TestWrapper });
     act(() => result.current.patch({ reportMarkdown: 'First' }));
     await act(() => vi.advanceTimersByTimeAsync(REVIEW_SAVE_DELAY_MS));
     act(() => result.current.patch({ reportMarkdown: 'Newer' }));
@@ -39,7 +40,7 @@ describe('acknowledged review progress', () => {
   });
   it('keeps failures without a retry loop and never completes later through an ordinary edit', async () => {
     put.mockRejectedValueOnce(new Error('Offline')).mockResolvedValue({ saved: blankSavedState('2026-09-28') });
-    const { result } = renderHook(() => useReviewProgress('2026-09-28', null));
+    const { result } = renderHook(() => useReviewProgress('2026-09-28', null), { wrapper: TestWrapper });
     await act(async () => {
       await expect(result.current.saveNow({ reportMarkdown: 'Kept', completed: true })).rejects.toThrow(
         "Couldn't save",
@@ -60,7 +61,7 @@ describe('acknowledged review progress', () => {
         resolve = done;
       }),
     );
-    const { result } = renderHook(() => useReviewProgress('2026-09-28', null));
+    const { result } = renderHook(() => useReviewProgress('2026-09-28', null), { wrapper: TestWrapper });
     let completion!: Promise<unknown>;
     act(() => {
       completion = result.current.saveNow({ reportMarkdown: 'Finished', completed: true });

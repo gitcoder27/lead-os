@@ -1051,3 +1051,13 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 | 2026-10-13 | CR-06 | [73c22fc](https://github.com/gitcoder27/lead-os/commit/73c22fc) | Password-change uses the existing 30-attempt/15-minute IP middleware before validation/service work. Account throttle is capped at 10,000 entries; one unref cleanup timer expires never-reused keys and stops when empty. Route spraying/window reset, capacity, idle expiry, per-IP separation and admin reset tests pass: 62 focused auth/registration tests. |
 | 2026-10-13 | CR-07 | [e5ef9a6](https://github.com/gitcoder27/lead-os/commit/e5ef9a6) | One 30-second deadline spans address vetting, headers, body reads and retry wait. Abort errors are normalized; unused 429/error/204 bodies are cancelled. Five regressions failed before the fix; mocked non-cooperative bodies and a real loopback response that never finishes now time out. Retry receives only the remaining budget. 33 Jira/socket/boundary/execution tests pass. |
 | 2026-10-13 | CR-08 | main (this commit) | Manager and developer historical projections fetch only post-cutoff reconstruction events, grouped once with descending timestamp/id order retained. 69 focused tests pass; the synthetic 4,000-task / 40,000-event fixture returns 4,000 relevant events and reads their task IDs exactly once. Final gates: typecheck, build:check, guard:data, diff check and lint pass (0 errors, 607 warnings, including the preserved .claude tree). Full suites pass: 127 server files / 1703 tests and 166 client files / 2219 tests. format:check fails only on pre-existing untracked .claude/settings.local.json and .claude/worktrees/quizzical-poincare-598d8e/.claude/settings.local.json. Shared JS artifacts match fresh temporary compilation byte-for-byte. Node 24.14.1; no runtime data, real providers, push or deployment. |
+
+## Confirmed review remediation (2026-10-13)
+
+Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed scratchpad concerns are excluded. Sequential commits on main; isolated databases and mocked integrations only.
+
+- [x] **R1** Review flushes and every note capture retry/confirmation now require the initiating auth epoch; note continuations also require the original mounted scope. Same-account navigation still flushes review edits.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R1 | AccountWriteContinuations, useDailyNotes, AuthContext and WeeklyReviewMode: 42 tests passed; typecheck and build:check passed. Actual AuthProvider cleanup is exercised with deferred mocked transport, failed logout, B login and return to A; no full browser run. Commit: this item’s task-scoped commit. |

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
+import { authEpoch } from '@/lib/auth-epoch';
 import { api } from '@/lib/api';
 import { CaptureRejectedError, createTaskViaCapture, postCapture, type CreateViaCapture } from '@/hooks/useCapture';
 import type {
@@ -174,15 +175,19 @@ function useMutationScopeGuard(): (scopeAtSend: string) => boolean {
  * words themselves are kept exactly; nobody is assigned by guesswork, and an
  * ambiguous name still rejects so the manager chooses.
  */
-async function createFromNote(input: CreateViaCapture) {
+async function createFromNote(input: CreateViaCapture, isCurrent: () => boolean) {
+  const post = (body: Parameters<typeof postCapture>[0]) => {
+    if (!isCurrent()) throw new Error("The account changed. Reopen the note to create this task.");
+    return postCapture(body);
+  };
   try {
-    return await createTaskViaCapture(postCapture, input);
+    return await createTaskViaCapture(post, input);
   } catch (error) {
     if (!(error instanceof CaptureRejectedError)) throw error;
     const errors = error.diagnostics.filter((entry) => entry.severity === 'error');
     if (errors.length === 0 || !errors.every((entry) => (entry.code === 'unknown-person' || entry.code === 'malformed-mention') && entry.token)) throw error;
     const text = errors.reduce((current, entry) => current.replace(entry.token!, entry.token!.replace(/^([([{"'`]*)@/, '$1')), input.text);
-    return createTaskViaCapture(postCapture, { ...input, text });
+    return createTaskViaCapture(post, { ...input, text });
   }
 }
 
@@ -222,6 +227,8 @@ export function useCreateDailyNoteFollowUp(noteDate: string) {
     // through the shared grammar, and the note reference is written with the task.
     mutationFn: async (payload: CreateDailyNoteFollowUpPayload): Promise<DailyNoteFollowUp> => {
       scopeAtSendRef.current = authScopeKey;
+      const epoch = authEpoch(qc);
+      const scopeAtSend = authScopeKey;
       const { task } = await createFromNote({
         text: payload.title,
         requestId: payload.requestId,
@@ -231,7 +238,7 @@ export function useCreateDailyNoteFollowUp(noteDate: string) {
           labels: ['category:follow_up'],
           source: { type: 'note', noteDate, ...(payload.kind ? { noteKind: payload.kind } : {}) },
         },
-      });
+      }, () => authEpoch(qc) === epoch && stillCurrent(scopeAtSend));
       return { itemId: task.id, title: task.title, date: payload.date, status: 'planned', followUpAt: task.followUpAt ?? undefined, taskKey: task.taskKey };
     },
     onSuccess: () => {
@@ -294,6 +301,8 @@ export function useCreateDailyNoteTask(noteDate: string) {
       kind?: DailyNoteKind;
     }): Promise<Pick<TaskResolution, 'taskKey' | 'title'>> => {
       scopeAtSendRef.current = authScopeKey;
+      const epoch = authEpoch(qc);
+      const scopeAtSend = authScopeKey;
       const { task } = await createFromNote({
         text: payload.title,
         requestId: payload.requestId,
@@ -303,7 +312,7 @@ export function useCreateDailyNoteTask(noteDate: string) {
           ...(payload.context ? { contextNote: payload.context } : {}),
           source: { type: 'note', noteDate, ...(payload.kind ? { noteKind: payload.kind } : {}) },
         },
-      });
+      }, () => authEpoch(qc) === epoch && stillCurrent(scopeAtSend));
       return { taskKey: task.taskKey, title: task.title };
     },
     onSuccess: () => {

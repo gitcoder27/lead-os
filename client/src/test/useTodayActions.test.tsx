@@ -178,3 +178,10 @@ describe('useTodayActions — mutation truth (docs/63 #1)', () => {
     expect(mockPost).toHaveBeenCalledTimes(2);
   });
 });
+
+it('sends canonical meeting next-action ownership to the command endpoint (R6)', async () => {
+  const { hook } = setup();
+  mockPost.mockResolvedValue({ success: true, command: 'capture_meeting_outcome' });
+  await act(async () => { await hook.result.current.runActionAsync({ kind: 'capture_meeting_outcome', label: 'Outcome', target: { type: 'meeting', view: 'tasks', taskKey: 'T-1' } }, { outcome: 'Agreed', nextAction: 'Assigned action', nextActionOwnerAccountId: 'dev-1' }); });
+  expect(mockPost).toHaveBeenCalledWith('/manager-actions/commands', expect.objectContaining({ outcome: 'Agreed', nextAction: 'Assigned action', nextActionOwnerAccountId: 'dev-1' }));
+});

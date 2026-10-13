@@ -142,3 +142,9 @@ Revalidated against current code before editing. Today follow-up, route and serv
 Meeting outcome/status updates and optional next-action creation now share one transaction in canonical and legacy paths; a failure rolls back all task, history, link and inbox writes.
 
 Revalidated against current code before editing. Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Original review evidence above is preserved.
+
+## Remediation — R6 (2026-10-13)
+
+Canonical meeting next actions pass selected ownership as capture defaults, retain typed-token precedence and manager ownership for You, and no longer substitute a person link. The client dispatches canonical task-key meeting actions to the command endpoint.
+
+Revalidated against current code before editing. Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Original review evidence above is preserved.

@@ -757,7 +757,7 @@ export interface ManagerActionCommandRequest {
   tz?: string;
   /** docs/53 F14: capture_meeting_outcome — optional follow-up created with the outcome. */
   nextAction?: string;
-  /** docs/53 F14: developer who owns the next action (linked on the follow-up). */
+  /** docs/53 F14: developer who owns the next action; omitted means the current manager. */
   nextActionOwnerAccountId?: string;
   /** docs/53 F11: kind === "restore" — the inverse patch issued by a prior response. */
   restore?: ManagerActionRestore;

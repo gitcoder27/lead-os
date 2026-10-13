@@ -1081,3 +1081,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R5 | Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Commit: this item’s task-scoped commit. |
+- [x] **R6** Canonical meeting next actions pass selected ownership as capture defaults, retain typed-token precedence and manager ownership for You, and no longer substitute a person link. The client dispatches canonical task-key meeting actions to the command endpoint.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R6 | Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Commit: this item’s task-scoped commit. |

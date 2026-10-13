@@ -852,6 +852,7 @@ export class TodayService {
     const meetingTarget = request.command.target;
     const ownerId = request.nextActionOwnerAccountId?.trim() || undefined;
     const canonical = await new TaskKeysService().canonicalEnabled(workspaceId);
+    const useCapture = await new TaskKeysService().phase3Enabled(workspaceId);
     const followUp = await this.createFollowUpTask(
       managerAccountId,
       {
@@ -864,7 +865,8 @@ export class TodayService {
         followUpAt: buildSnoozeIso(request.date, "tomorrow", tz),
         // Canonical tasks link by parent (below); legacy rows carry a note.
         ...(!canonical && meetingTarget.managerDeskItemId ? { contextNote: `Next action from meeting #${meetingTarget.managerDeskItemId}` } : {}),
-        links: ownerId ? [{ linkType: "developer", developerAccountId: ownerId }] : [],
+        ...(useCapture && ownerId ? { ownerAccountId: ownerId } : {}),
+        links: !useCapture && ownerId ? [{ linkType: "developer", developerAccountId: ownerId }] : [],
         source: "today",
       },
       canonical ? meetingTarget.taskKey : undefined,
@@ -906,6 +908,7 @@ export class TodayService {
           ...(clock ? { tz: clock.tz, clientToday: clock.today } : {}),
           defaults: {
             scheduledOn: params.date,
+            ...(params.ownerAccountId ? { ownerAccountId: params.ownerAccountId } : {}),
             labels: ["category:follow_up"],
             followUpAt: params.followUpAt,
             ...(params.contextNote ? { contextNote: params.contextNote } : {}),
@@ -2672,6 +2675,7 @@ function restoreRequest(date: string, actionTarget: ManagerActionTarget, restore
 }
 
 interface FollowUpCreateParams {
+  ownerAccountId?: string;
   date: string;
   title: string;
   kind: "action";

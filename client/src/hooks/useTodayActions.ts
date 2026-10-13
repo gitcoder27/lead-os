@@ -255,7 +255,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         return postCommand({ command });
       }
 
-      if (command.kind === 'capture_meeting_outcome' && target.managerDeskItemId) {
+      if (command.kind === 'capture_meeting_outcome' && (target.managerDeskItemId || target.taskKey)) {
         if (!outcome?.trim()) {
           return { cancelled: true };
         }

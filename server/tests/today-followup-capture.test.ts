@@ -1,3 +1,4 @@
+import { MyDayService } from "../src/services/my-day.service";
 import { workspaceSnapshot } from "./helpers/tenants";
 import { rawDb } from "../src/db/connection";
 import express from "express";
@@ -7,7 +8,7 @@ import { invoke } from "./helpers/http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers, issues, dailyNotes, taskEvents, tasks } from "../src/db/schema";
+import { configTable, developers, issues, developerAvailabilityPeriods, dailyNotes, taskEvents, tasks } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskService } from "../src/services/task.service";
@@ -220,13 +221,42 @@ describe("Today follow-ups through capture (P3-05)", () => {
 
       const nextKey = (response.undo!.request.restore as { alsoDeleteTaskKey: string }).alsoDeleteTaskKey;
       const next = await taskByKey(nextKey);
-      expect(next).toMatchObject({ title: "Draft the rollback plan", parentId: row.id, followUpAt: "2026-03-09T03:30:00.000Z" });
+      expect(next).toMatchObject({ ownerType: "developer", ownerId: "dev-1", trackedByManagerId: "manager-1", title: "Draft the rollback plan", parentId: row.id, followUpAt: "2026-03-09T03:30:00.000Z" });
       expect(JSON.parse(next.labelsJson ?? "[]")).toContain("category:follow_up");
       expect((await taskByKey(row.taskKey)).outcome).toBe("Go for Friday");
 
       await service.executeCommand("manager-1", response.undo!.request, manager);
       expect((await taskByKey(nextKey)).deletedAt).not.toBeNull();
       expect((await taskByKey(row.taskKey)).outcome).toBeNull();
+    });
+
+    it.each(["you", "selected", "typed"])("respects %s next-action ownership and developer My Day visibility (R6)", async (mode) => {
+      await db.insert(developers).values({ accountId: "dev-2", displayName: "Bob", isActive: 1 });
+      const row = await meeting();
+      const service = todayService();
+      const app = express();
+      app.use((req, _res, next) => { req.auth = { sessionId: "fixture", user: { username: "manager-1", accountId: "manager-1", displayName: "Manager", role: "manager", workspaceId: "default" } }; next(); });
+      app.use("/api/manager-actions", createManagerActionsRouter(service)); app.use(errorHandler);
+      const request = outcome(row.taskKey, { nextActionOwnerAccountId: mode === "you" ? undefined : "dev-1", nextAction: mode === "typed" ? "Draft plan @dev-2" : "Draft plan" });
+      const response = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: request });
+      expect(response.status).toBe(200);
+      const nextKey = response.body.undo.request.restore.alsoDeleteTaskKey;
+      const child = await taskByKey(nextKey);
+      const ownerId = mode === "you" ? "manager-1" : mode === "typed" ? "dev-2" : "dev-1";
+      expect(child).toMatchObject({ ownerType: mode === "you" ? "manager" : "developer", ownerId, trackedByManagerId: "manager-1", parentId: row.id });
+      const day = await new MyDayService(trackerService).getMyDay(mode === "typed" ? "dev-2" : "dev-1", "2026-03-08");
+      expect(day.tasks?.some((task) => task.taskKey === nextKey) ?? false).toBe(mode !== "you");
+      await service.executeCommand("manager-1", response.body.undo.request, manager);
+      expect((await taskByKey(nextKey)).deletedAt).not.toBeNull();
+      expect((await taskByKey(row.taskKey)).outcome).toBeNull();
+    });
+    it.each(["unknown", "inactive", "leave"])("rejects %s selected owner and rolls back the meeting (R6)", async (mode) => {
+      if (mode === "inactive") await db.update(developers).set({ isActive: 0 });
+      if (mode === "leave") await db.insert(developerAvailabilityPeriods).values({ developerAccountId: "dev-1", startDate: "2026-03-08", endDate: "2026-03-08", createdAt: "2026-03-08T00:00:00Z", updatedAt: "2026-03-08T00:00:00Z" });
+      const row = await meeting();
+      const before = workspaceSnapshot("default");
+      await expect(todayService().executeCommand("manager-1", outcome(row.taskKey, { nextActionOwnerAccountId: mode === "unknown" ? "missing" : "dev-1" }), manager)).rejects.toThrow();
+      expect(workspaceSnapshot("default")).toEqual(before);
     });
 
     it("makes no follow-up without a next action", async () => {

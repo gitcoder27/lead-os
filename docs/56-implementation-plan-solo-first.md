@@ -1060,34 +1060,41 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R1 | AccountWriteContinuations, useDailyNotes, AuthContext and WeeklyReviewMode: 42 tests passed; typecheck and build:check passed. Actual AuthProvider cleanup is exercised with deferred mocked transport, failed logout, B login and return to A; no full browser run. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R1 | AccountWriteContinuations, useDailyNotes, AuthContext and WeeklyReviewMode: 42 tests passed; typecheck and build:check passed. Actual AuthProvider cleanup is exercised with deferred mocked transport, failed logout, B login and return to A; no full browser run. Commit: `f187c22`. |
 - [x] **R2** Canonical Team carry-forward now rejects with 409, matching its disabled preview/context; canonical unfinished work already remains visible on the board and is scheduled through Tasks. Legacy carry-forward is unchanged.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R2 | Team Tracker route/service suites: 126 tests passed; typecheck and build:check passed. Regression checks bulk and explicit IDs, duplicate selection, source/overdue/future/undated/closed tasks and destination leave; task rows and events remain identical. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R2 | Team Tracker route/service suites: 126 tests passed; typecheck and build:check passed. Regression checks bulk and explicit IDs, duplicate selection, source/overdue/future/undated/closed tasks and destination leave; task rows and events remain identical. Commit: `639377f`. |
 - [x] **R3** Jira discovery resolves URL, email, project and stored credentials through SettingsService. Sync and reconciliation consume scoped query/custom-field values without downstream install-env fallbacks.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R3 | jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R3 | jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Commit: `564d8e2`. |
 - [x] **R4** Today follow-up and next-action fields reject non-create grammar intents before invoking capture or mutating a meeting; the creation helper also enforces the restriction.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R4 | Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R4 | Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Commit: `1b91a61`. |
 - [x] **R5** Meeting outcome/status updates and optional next-action creation now share one transaction in canonical and legacy paths; a failure rolls back all task, history, link and inbox writes.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R5 | Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R5 | Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Commit: `475b90c`. |
 - [x] **R6** Canonical meeting next actions pass selected ownership as capture defaults, retain typed-token precedence and manager ownership for You, and no longer substitute a person link. The client dispatches canonical task-key meeting actions to the command endpoint.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R6 | Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R6 | Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Commit: `72cf32e`. |
 - [x] **R7** Today dialogs retain a requestId until closed; shared contracts and route validation carry it to manager/workspace-scoped durable command receipts. Capture also receives a manager-namespaced identity. Receipts store the complete result and undo in the write transaction, coalesce overlapping attempts, reject incompatible reuse, survive undo, and are removed with account/reset data.
 
 | Date | Item | Progress / verification |
 |---|---|---|
-| 2026-10-13 | R7 | Targeted server suites including tenant/registration isolation and migrations: 84 tests passed; strengthened capture/account-deletion regressions: 33 passed; TodayCaptureReplay/useTodayActions/TodayPage: 68 passed; typecheck and build:check passed. Lost-response replay, compound rollback, overlapping requests, edited payloads, fresh dialogs and manager/workspace isolation are covered. Shared additions are type-only; no runtime artifact regeneration required. Commit: this item’s task-scoped commit. |
+| 2026-10-13 | R7 | Targeted server suites including tenant/registration isolation and migrations: 84 tests passed; strengthened capture/account-deletion regressions: 33 passed; TodayCaptureReplay/useTodayActions/TodayPage: 68 passed; typecheck and build:check passed. Lost-response replay, compound rollback, overlapping requests, edited payloads, fresh dialogs and manager/workspace isolation are covered. Shared additions are type-only; no runtime artifact regeneration required. Commit: `ca20bc7`. |
+- [x] **R8** Logout cleanup retains only desktop-alert choice and prompt preferences in per-user local storage while deleting drafts/cached content. Session cleanup revokes active notifications, saved click callbacks, queued navigation and pending permission continuations, including a return to the same account.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R8 | DesktopAlertAuth, DesktopAlerts, useInboxAlerts, AuthContext and AccountWriteContinuations: 35 tests passed. Auth-plus-alert regressions cover remembered enabled/disabled choices, B isolation, sensitive draft removal, failed logout, revoked clicks and delayed permission results after returning to A. Full static/build and suite results are recorded below. Commit: this item’s task-scoped commit. |
+
+Final R1–R8 verification: server **128 files / 1,725 tests**, client **169 files / 2,231 tests** passed. Typecheck, build:check, data guard and shared artifact comparison passed; lint has **0 errors / 607 baseline warnings**. Format check still fails only on the two pre-existing untracked `.claude/**/settings.local.json` files, which were preserved. R1’s older standalone review fixtures now use the app’s QueryClient provider (45 targeted tests pass); R8 has 35 final targeted tests passing. No runtime data, live integrations, push or deploy. Validation used Node 24.14.1 and mocked browser APIs; full browser / Node 20 / coverage-threshold validation was not run.

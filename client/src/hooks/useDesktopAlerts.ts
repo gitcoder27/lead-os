@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import {
   DESKTOP_ALERTS_EVENT,
+  desktopAlertGeneration,
   readAlertPermission,
   readStored,
   requestAlertPermission,
@@ -30,6 +31,10 @@ const subscribe = (onChange: () => void) => {
 export function useDesktopAlerts() {
   const choiceKey = useScopedStorageKey('desktop-alerts');
   const promptKey = useScopedStorageKey('desktop-alerts-prompt');
+  const currentKey = useRef(choiceKey);
+  currentKey.current = choiceKey;
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const snapshot = useSyncExternalStore(
     subscribe,
     () => `${readAlertPermission()}|${readStored(choiceKey) ?? ''}|${readStored(promptKey) ?? ''}`,
@@ -38,7 +43,9 @@ export function useDesktopAlerts() {
   const [permission, choice, prompt] = snapshot.split('|') as [AlertPermission, string, string];
 
   const enable = useCallback(async (): Promise<AlertPermission> => {
+    const generation = desktopAlertGeneration();
     const result = readAlertPermission() === 'default' ? await requestAlertPermission() : readAlertPermission();
+    if (!mounted.current || currentKey.current !== choiceKey || generation !== desktopAlertGeneration()) return 'unsupported';
     // Asking is a decision either way: a refusal should not bring the prompt back on the next visit.
     writeStored(choiceKey, result === 'granted' ? 'on' : 'off');
     writeStored(promptKey, 'seen');

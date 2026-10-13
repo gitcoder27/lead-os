@@ -1,6 +1,15 @@
 export type AlertPermission = 'unsupported' | 'default' | 'granted' | 'denied';
 
 export const DESKTOP_ALERTS_EVENT = 'leados-desktop-alerts';
+let generation = 0;
+const revokers = new Set<() => void>();
+export const desktopAlertGeneration = () => generation;
+/** Session cleanup closes visible alerts and invalidates permission continuations and saved click callbacks. */
+export function revokeDesktopAlerts() {
+  generation++;
+  for (const revoke of revokers) revoke();
+  revokers.clear();
+}
 
 export function readAlertPermission(): AlertPermission {
   if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
@@ -50,7 +59,18 @@ export function showDesktopAlert({ title, body, tag, onClick }: DesktopAlert): b
   if (readAlertPermission() !== 'granted') return false;
   try {
     const notification = new Notification(title, { body, tag, icon: '/favicon.svg', lang: document.documentElement.lang || 'en' });
+    let revoked = false;
+    const revoke = () => {
+      revoked = true;
+      notification.onclick = null;
+      try { notification.close(); } catch { /* Browser cleanup cannot block logout. */ }
+    };
+    revokers.add(revoke);
+    notification.onclose = () => { revoked = true; notification.onclick = null; revokers.delete(revoke); };
     notification.onclick = () => {
+      if (revoked) return;
+      revoked = true;
+      revokers.delete(revoke);
       notification.close();
       try {
         window.focus();

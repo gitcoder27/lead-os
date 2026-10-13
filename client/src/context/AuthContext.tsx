@@ -1,5 +1,6 @@
 import { clearTaskUpdateDraftsForScope } from '@/lib/task-update-drafts';
 import { clearScopedStorageForUser } from '@/lib/scoped-storage';
+import { revokeDesktopAlerts } from '@/lib/desktop-alerts';
 import { advanceAuthEpoch } from '@/lib/auth-epoch';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetCurrentScope = useCallback(() => {
     const scope = getAuthScopeKey(userRef.current);
     advanceAuthEpoch(queryClient);
+    revokeDesktopAlerts();
     void queryClient.cancelQueries();
     queryClient.clear();
     clearTaskUpdateDraftsForScope(scope); clearTodaySnapshotsForScope(scope);

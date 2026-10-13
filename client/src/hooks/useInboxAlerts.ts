@@ -1,3 +1,4 @@
+import { authEpoch } from '@/lib/auth-epoch';
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
@@ -73,9 +74,12 @@ export function useInboxAlerts() {
     // The page behind the alert should already be current when the person arrives.
     void qc.invalidateQueries({ queryKey: ['my-day'] });
     const { markRead: mark, desktop: alerts, addToast: toast } = latestRef.current;
+    const epoch = authEpoch(qc);
+    const isCurrent = () => authEpoch(qc) === epoch && seen.current?.scope === scope;
     const open = (item: TaskInboxItem, fromNotification = false) => {
+      if (!isCurrent()) return;
       mark.mutate({ ids: [item.id], read: true });
-      const go = () => navigateToTaskPage(item.taskKey, false, item.eventId);
+      const go = () => { if (isCurrent()) navigateToTaskPage(item.taskKey, false, item.eventId); };
       if (fromNotification) whenVisible(go);
       else go();
     };
@@ -86,7 +90,7 @@ export function useInboxAlerts() {
         const { title, body } = describeInboxAlert(first);
         toast({ type: 'info', title, message: body.split('\n')[0], duration: 7000, action: { label: 'Open', onClick: () => open(first) } });
       } else {
-        toast({ type: 'info', title: `${fresh.length} new updates`, duration: 7000, action: { label: 'View', onClick: () => window.dispatchEvent(new Event(OPEN_INBOX_EVENT)) } });
+        toast({ type: 'info', title: `${fresh.length} new updates`, duration: 7000, action: { label: 'View', onClick: () => { if (isCurrent()) window.dispatchEvent(new Event(OPEN_INBOX_EVENT)); } } });
       }
       return;
     }
@@ -99,10 +103,11 @@ export function useInboxAlerts() {
       ...text,
       tag: single ? `leados-${single.taskKey}` : 'leados-updates',
       onClick: () => {
+        if (!isCurrent()) return;
         // Clicking the notification is the acknowledgement; no "while you were away" line after it.
         missed.current = [];
         if (single) open(single, true);
-        else whenVisible(() => window.dispatchEvent(new Event(OPEN_INBOX_EVENT)));
+        else whenVisible(() => { if (isCurrent()) window.dispatchEvent(new Event(OPEN_INBOX_EVENT)); });
       },
     });
   }, [items, qc, scope]);

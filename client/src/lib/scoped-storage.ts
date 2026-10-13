@@ -19,12 +19,19 @@ export function useScopedStorageKey(baseKey: string): string {
   );
 }
 
-/** Remove user-keyed capture, standup and view state when a browser changes account. */
+/** Clear account content while retaining the explicit per-person browser alert preferences. */
 export function clearScopedStorageForUser(user: AuthUser | null): void {
   if (!user) return;
   const prefix = `lead-os:${user.workspaceId}:${user.username}:`;
+  const preferences = new Set(['desktop-alerts', 'desktop-alerts-prompt']);
   for (const name of ['localStorage', 'sessionStorage'] as const) {
-    try { const storage = window[name]; for (const key of Object.keys(storage)) if (key.startsWith(prefix)) storage.removeItem(key); }
-    catch { /* Session/cache reset still succeeds when storage is unavailable. */ }
+    try {
+      const storage = window[name];
+      for (const key of Object.keys(storage)) {
+        if (!key.startsWith(prefix)) continue;
+        if (name === 'localStorage' && preferences.has(key.slice(prefix.length))) continue;
+        storage.removeItem(key);
+      }
+    } catch { /* Session/cache reset still succeeds when storage is unavailable. */ }
   }
 }

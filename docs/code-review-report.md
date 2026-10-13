@@ -154,3 +154,31 @@ Revalidated against current code before editing. Today server suites: 61 tests p
 Today dialogs retain a requestId until closed; shared contracts and route validation carry it to manager/workspace-scoped durable command receipts. Capture also receives a manager-namespaced identity. Receipts store the complete result and undo in the write transaction, coalesce overlapping attempts, reject incompatible reuse, survive undo, and are removed with account/reset data.
 
 Revalidated against current code before editing. Targeted server suites including tenant/registration isolation and migrations: 84 tests passed; strengthened capture/account-deletion regressions: 33 passed; TodayCaptureReplay/useTodayActions/TodayPage: 68 passed; typecheck and build:check passed. Lost-response replay, compound rollback, overlapping requests, edited payloads, fresh dialogs and manager/workspace isolation are covered. Shared additions are type-only; no runtime artifact regeneration required. Original review evidence above is preserved.
+
+## Remediation — R8 (2026-10-13)
+
+Logout cleanup retains only desktop-alert choice and prompt preferences in per-user local storage while deleting drafts/cached content. Session cleanup revokes active notifications, saved click callbacks, queued navigation and pending permission continuations, including a return to the same account.
+
+Revalidated against current code before editing. DesktopAlertAuth, DesktopAlerts, useInboxAlerts, AuthContext and AccountWriteContinuations: 35 tests passed. Auth-plus-alert regressions cover remembered enabled/disabled choices, B isolation, sensitive draft removal, failed logout, revoked clicks and delayed permission results after returning to A. Full static/build and suite results are recorded below. Original review evidence above is preserved.
+
+## Final remediation verification (2026-10-13)
+
+All eight confirmed findings R1–R8 are resolved. Remediation began from `f9a07f9` on `main`; the review’s original evidence above is retained unchanged. Work remained sequential, with one final task-scoped commit per finding, and no unconfirmed scratchpad concerns were implemented.
+
+| Check | Remediation result |
+|---|---|
+| Full server suite | 128 files / 1,725 tests passed using the run’s unique temporary database |
+| Full client suite (`--maxWorkers=2`) | 169 files / 2,231 tests passed; shared tests overlap with server totals |
+| R1 final targeted regressions | 45 tests passed; older `useReviewProgress` fixtures now provide the QueryClient used by the application |
+| R8 final targeted regressions | 35 tests passed after the final storage cleanup changes |
+| `npm run typecheck` | Passed |
+| `npm run build:check` | Passed; client output in a temporary directory, server no emit |
+| `npm run lint` | Zero errors / 607 baseline warnings |
+| `npm run guard:data` | Passed |
+| `npm run format:check` | Same two pre-existing untracked `.claude/**/settings.local.json` failures; files preserved |
+| Shared runtime artifacts | Fresh compilation of `types.ts` and `capture-grammar.ts` matched both committed JavaScript files byte for byte |
+| `git diff --check` | Passed |
+
+The first full client run identified three older review-hook fixtures without a QueryClientProvider. Those fixtures were corrected and folded into R1; the final full suite passed. All task-specific regression suites passed before their commits.
+
+The regression coverage uses actual auth cleanup with deferred mocked transports, actual SQLite transactions/migrations on isolated databases, and mocked Jira/browser APIs. No runtime data or real Jira/Copilot calls, push or deploy occurred. `.claude/` and `review-scratchpad.md` were preserved. Validation ran on Node 24.14.1; Node 20, a full two-account browser session, production migration rehearsal and coverage-threshold runs were not exercised. Canonical Team’s legacy carry-forward endpoint now returns 409 consistently with its disabled preview; unfinished work remains visible automatically and Tasks remains the scheduling path. Older command callers without a requestId retain backward-compatible behavior; the Today dialogs now always supply one.

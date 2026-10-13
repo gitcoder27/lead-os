@@ -1071,3 +1071,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R3 | jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Commit: this item’s task-scoped commit. |
+- [x] **R4** Today follow-up and next-action fields reject non-create grammar intents before invoking capture or mutating a meeting; the creation helper also enforces the restriction.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R4 | Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Commit: this item’s task-scoped commit. |

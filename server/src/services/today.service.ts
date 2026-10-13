@@ -1,3 +1,4 @@
+import { parseCapture } from "shared/capture-grammar";
 import { addTodayProjectContext } from "./today-project-context";
 import { TaskKeysService } from "./task-keys.service";
 import { TaskService } from "./task.service";
@@ -663,6 +664,15 @@ export class TodayService {
     const { target: actionTarget } = command;
     const tz = resolveTimeZone(request.tz);
 
+    // These surfaces promise creation, so reject other intents before any meeting write.
+    if ((command.kind === "capture_follow_up" || command.kind === "capture_meeting_outcome") && await new TaskKeysService().phase3Enabled(workspaceId)) {
+      const text = command.kind === "capture_follow_up" ? request.title
+        : command.kind === "capture_meeting_outcome" ? request.nextAction : undefined;
+      if (text?.trim() && parseCapture(text, date).intent !== "create") {
+        throw new HttpError(400, 'Start with a task title; task updates and /note belong in Capture.');
+      }
+    }
+
     if (command.kind === "restore") {
       return this.executeRestore(managerAccountId, request, workspaceId);
     }
@@ -876,6 +886,9 @@ export class TodayService {
   ): Promise<CreatedFollowUp> {
     const taskKeys = new TaskKeysService();
     if (await taskKeys.phase3Enabled(workspaceId).catch(() => false)) {
+      if (parseCapture(params.title, clock?.today ?? params.date).intent !== "create") {
+        throw new HttpError(400, "The follow-up must create a task");
+      }
       const malformed = malformedMentionMessage(params.title);
       if (malformed) throw new HttpError(400, malformed);
       const links = params.links ?? [];

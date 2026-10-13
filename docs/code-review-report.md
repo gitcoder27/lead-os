@@ -130,3 +130,9 @@ Revalidated against current code before editing. Team Tracker route/service suit
 Jira discovery resolves URL, email, project and stored credentials through SettingsService. Sync and reconciliation consume scoped query/custom-field values without downstream install-env fallbacks.
 
 Revalidated against current code before editing. jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Original review evidence above is preserved.
+
+## Remediation — R4 (2026-10-13)
+
+Today follow-up and next-action fields reject non-create grammar intents before invoking capture or mutating a meeting; the creation helper also enforces the restriction.
+
+Revalidated against current code before editing. Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Original review evidence above is preserved.

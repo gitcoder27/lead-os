@@ -1,7 +1,11 @@
+import express from "express";
+import { createManagerActionsRouter } from "../src/routes/manager-actions";
+import { errorHandler } from "../src/middleware/errorHandler";
+import { invoke } from "./helpers/http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers, issues, taskEvents, tasks } from "../src/db/schema";
+import { configTable, developers, issues, dailyNotes, taskEvents, tasks } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskService } from "../src/services/task.service";
@@ -57,6 +61,25 @@ describe("Today follow-ups through capture (P3-05)", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it.each(["update", "note"])("rejects %s intent in follow-ups and next actions without side effects (R4)", async (intent) => {
+    const unrelated = await taskService.create({ title: "Unrelated task" }, principal);
+    const meeting = await taskService.create({ title: "Meeting", kind: "meeting", outcome: "Original" }, principal);
+    const text = intent === "update" ? `${unrelated.taskKey}: private unintended update` : "/note private unintended note";
+    const service = todayService();
+    const app = express();
+    app.use((req, _res, next) => { req.auth = { sessionId: "fixture", user: { username: "manager-1", accountId: "manager-1", displayName: "Manager", role: "manager", workspaceId: "default" } }; next(); });
+    app.use("/api/manager-actions", createManagerActionsRouter(service)); app.use(errorHandler);
+    const before = { tasks: await db.select().from(tasks), events: await db.select().from(taskEvents), notes: await db.select().from(dailyNotes) };
+    for (const request of [followUpCommand(text), command({ outcome: "Changed", nextAction: text, command: { kind: "capture_meeting_outcome", label: "Outcome", target: { type: "meeting", view: "tasks", taskKey: meeting.taskKey } } })]) {
+      await expect(service.executeCommand("manager-1", request, manager)).rejects.toMatchObject({ status: 400 });
+      const response = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: request });
+      expect(response.status).toBe(400);
+      expect(await db.select().from(tasks)).toEqual(before.tasks);
+      expect(await db.select().from(taskEvents)).toEqual(before.events);
+      expect(await db.select().from(dailyNotes)).toEqual(before.notes);
+    }
   });
 
   it("keeps a blocker reason from the row as the follow-up's context (UX-02)", async () => {

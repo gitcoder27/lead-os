@@ -1076,3 +1076,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R4 | Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Commit: this item’s task-scoped commit. |
+- [x] **R5** Meeting outcome/status updates and optional next-action creation now share one transaction in canonical and legacy paths; a failure rolls back all task, history, link and inbox writes.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R5 | Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Commit: this item’s task-scoped commit. |

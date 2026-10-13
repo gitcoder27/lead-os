@@ -136,3 +136,9 @@ Revalidated against current code before editing. jira-workspace-settings, sync.e
 Today follow-up and next-action fields reject non-create grammar intents before invoking capture or mutating a meeting; the creation helper also enforces the restriction.
 
 Revalidated against current code before editing. Today follow-up, route and service suites: 51 tests passed; typecheck and build:check passed. Service and route regressions submit T-n updates and /note to both fields and assert unchanged tasks, events, notes and meeting outcome. Original review evidence above is preserved.
+
+## Remediation — R5 (2026-10-13)
+
+Meeting outcome/status updates and optional next-action creation now share one transaction in canonical and legacy paths; a failure rolls back all task, history, link and inbox writes.
+
+Revalidated against current code before editing. Today follow-up, route and service suites: 55 tests passed; typecheck and build:check passed. Whole-workspace snapshots remain identical after service and route failures for unknown people, invalid parents, forced SQLite child failure and supported legacy child failure. Original review evidence above is preserved.

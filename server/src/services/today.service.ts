@@ -1,3 +1,4 @@
+import { runInTransaction } from "../db/transaction";
 import { parseCapture } from "shared/capture-grammar";
 import { addTodayProjectContext } from "./today-project-context";
 import { TaskKeysService } from "./task-keys.service";
@@ -649,7 +650,10 @@ export class TodayService {
     actor: { type: UserRole; accountId?: string },
     workspaceId?: string,
   ): Promise<ManagerActionCommandResponse> {
-    const response = await this.executeCommandInternal(managerAccountId, request, actor, workspaceId);
+    const execute = () => this.executeCommandInternal(managerAccountId, request, actor, workspaceId);
+    const response = request.command.kind === "capture_meeting_outcome"
+      ? await runInTransaction(execute)
+      : await execute();
     this.clearTodayCache(workspaceId);
     return response;
   }

@@ -1,3 +1,5 @@
+import { workspaceSnapshot } from "./helpers/tenants";
+import { rawDb } from "../src/db/connection";
 import express from "express";
 import { createManagerActionsRouter } from "../src/routes/manager-actions";
 import { errorHandler } from "../src/middleware/errorHandler";
@@ -60,6 +62,8 @@ describe("Today follow-ups through capture (P3-05)", () => {
   });
 
   afterEach(() => {
+    rawDb.exec("DROP TRIGGER IF EXISTS reject_next_action");
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -80,6 +84,29 @@ describe("Today follow-ups through capture (P3-05)", () => {
       expect(await db.select().from(taskEvents)).toEqual(before.events);
       expect(await db.select().from(dailyNotes)).toEqual(before.notes);
     }
+  });
+
+  it.each(["unknown person", "invalid parent", "database failure", "legacy failure"])("rolls back meeting outcome and all child writes on %s (R5)", async (failure) => {
+    const legacy = failure === "legacy failure";
+    if (legacy) await db.update(configTable).set({ value: "off" }).where(eq(configTable.key, "tasks_phase2_stage"));
+    const meeting = legacy
+      ? await managerDeskService.createItem("manager-1", { date: "2026-03-08", title: "Meeting", kind: "meeting", outcome: "Original", status: "planned" })
+      : await taskService.create({ title: "Meeting", kind: "meeting", outcome: "Original" }, principal);
+    const target = legacy ? { type: "meeting" as const, view: "meetings" as const, managerDeskItemId: meeting.id } : { type: "meeting" as const, view: "tasks" as const, taskKey: meeting.taskKey };
+    const nextAction = failure === "unknown person" ? "Ask @absentperson" : failure === "invalid parent" ? "Action ^T-999" : "Action";
+    if (failure === "database failure") rawDb.exec("CREATE TRIGGER reject_next_action BEFORE INSERT ON tasks WHEN NEW.kind = 'task' BEGIN SELECT RAISE(ABORT, 'fixture child failure'); END");
+    if (legacy) vi.spyOn(managerDeskService, "createItem").mockRejectedValue(new Error("fixture child failure"));
+    const service = todayService();
+    const app = express();
+    app.use((req, _res, next) => { req.auth = { sessionId: "fixture", user: { username: "manager-1", accountId: "manager-1", displayName: "Manager", role: "manager", workspaceId: "default" } }; next(); });
+    app.use("/api/manager-actions", createManagerActionsRouter(service)); app.use(errorHandler);
+    const before = workspaceSnapshot("default");
+    const request = command({ outcome: "Rejected outcome", nextAction, command: { kind: "capture_meeting_outcome", label: "Outcome", target } });
+    await expect(service.executeCommand("manager-1", request, manager)).rejects.toThrow();
+    expect(workspaceSnapshot("default")).toEqual(before);
+    const response = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: request });
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(workspaceSnapshot("default")).toEqual(before);
   });
 
   it("keeps a blocker reason from the row as the follow-up's context (UX-02)", async () => {

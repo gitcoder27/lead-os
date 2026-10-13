@@ -1,5 +1,5 @@
 import { deliverTaskEvent } from "./task-inbox-delivery";
-import { and, desc, eq, inArray, isNull, like, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, like, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { TaskEvent, TaskEventSummary, TaskEventType, TaskEventVisibility } from "shared/types";
 import { db } from "../db/connection";
@@ -398,6 +398,16 @@ export class TaskEventsService {
 
   async listRawForWorkspace(workspaceId?: string): Promise<EventRow[]> {
     return db.select().from(taskEvents).where(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)));
+  }
+
+  /** Only state-changing, unredacted events at/after the historical cutoff. */
+  async reconstructionForTasks(taskIds: number[], since: string, workspaceId?: string, types = ["status", "title", "priority", "assign", "schedule"]) {
+    if (!taskIds.length) return [];
+    return db.select({ taskId: taskEvents.taskId, type: taskEvents.type, metaJson: taskEvents.metaJson })
+      .from(taskEvents).where(and(
+        eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), inArray(taskEvents.taskId, taskIds),
+        gte(taskEvents.occurredAt, since), isNull(taskEvents.redactedAt), inArray(taskEvents.type, types)
+      )).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id));
   }
 
   async historyForTasks(taskIds: number[], workspaceId?: string): Promise<EventRow[]> {

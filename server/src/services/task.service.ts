@@ -630,15 +630,29 @@ export class TaskService {
     });
   }
 
+  private async reconstructionByTask(taskIds: number[], end: string, scope: string, types?: string[]) {
+    const events = await this.events.reconstructionForTasks(taskIds, end, scope, types);
+    const grouped = new Map<number, typeof events>();
+    // The query is reverse chronological, including the id tie-break. Preserve
+    // that order within each bucket so later changes are undone first.
+    for (const event of events) {
+      const id = event.taskId!;
+      const bucket = grouped.get(id) ?? [];
+      bucket.push(event);
+      grouped.set(id, bucket);
+    }
+    return grouped;
+  }
+
   async history(managerId: string, date: string, workspaceId?: string): Promise<TaskRow[]> {
     const scope = normalizeWorkspaceId(workspaceId);
     const end = dayEnd(parseInput(dateOnly, date));
     const rows = await db.select().from(tasks).where(and(eq(tasks.workspaceId, scope), eq(tasks.trackedByManagerId, managerId)));
-    const events = await this.events.historyForTasks(rows.map((row) => row.id), scope);
-    return rows.flatMap((row) => {
-      if (row.createdAt >= end || (row.deletedAt && row.deletedAt < end)) return [];
+    const candidates = rows.filter(row => row.createdAt < end && (!row.deletedAt || row.deletedAt >= end));
+    const events = await this.reconstructionByTask(candidates.map(row => row.id), end, scope);
+    return candidates.flatMap((row) => {
       const projected = { ...row };
-      for (const event of events.filter((entry) => entry.taskId === row.id && entry.occurredAt >= end && !entry.redactedAt)) {
+      for (const event of events.get(row.id) ?? []) {
         const meta = JSON.parse(event.metaJson ?? "{}") as Record<string, unknown>;
         if (event.type === "status" && typeof meta.from === "string") projected.status = statusFromLegacy(meta.from);
         if (event.type === "title" && typeof meta.from === "string") projected.title = meta.from;
@@ -904,12 +918,12 @@ export class TaskService {
         eq(dayFocus.date, date)
       ))
       .orderBy(dayFocus.position, dayFocus.id);
-    const history = await this.events.historyForTasks(rows.map((row) => row.task.id), scope);
     const end = zonedTimeToUtc(addDaysToIsoDay(date, 1), 0, 0, resolveTimeZone(timeZone)).toISOString();
-    return rows.flatMap(({ task }) => {
-      if (task.createdAt >= end || (task.deletedAt && task.deletedAt < end)) return [];
+    const candidates = rows.filter(({ task }) => task.createdAt < end && (!task.deletedAt || task.deletedAt >= end));
+    const history = await this.reconstructionByTask(candidates.map(row => row.task.id), end, scope, ["status", "title", "assign"]);
+    return candidates.flatMap(({ task }) => {
       const projected = { ...task };
-      for (const event of history.filter((entry) => entry.taskId === task.id && entry.occurredAt >= end && !entry.redactedAt)) {
+      for (const event of history.get(task.id) ?? []) {
         const meta = JSON.parse(event.metaJson ?? "{}") as Record<string, unknown>;
         if (event.type === "status" && typeof meta.from === "string") projected.status = statusFromLegacy(meta.from);
         if (event.type === "title" && typeof meta.from === "string") projected.title = meta.from;

@@ -28,7 +28,7 @@ export function useMeetingDocument(taskKey: string) {
   const mounted = useRef(true);
   const lease = useRef(authEpoch(qc));
   const current = () => mounted.current && authEpoch(qc) === lease.current;
-  const query = useQuery({ queryKey: ['meeting-workspace', scope, taskKey], queryFn: ({ signal }) => api.get<MeetingWorkspaceResponse>(meetingPath(taskKey), { signal }), retry: false, refetchInterval: 30000 });
+  const query = useQuery({ queryKey: ['meeting-workspace', scope, taskKey], queryFn: ({ signal }) => api.get<MeetingWorkspaceResponse>(meetingPath(taskKey), { signal }), retry: false, staleTime: 0, refetchOnMount: 'always', refetchInterval: 30000 });
   const persist = () => {
     if (!current()) return;
     try {

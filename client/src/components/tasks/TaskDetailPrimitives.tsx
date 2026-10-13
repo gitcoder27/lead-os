@@ -118,7 +118,7 @@ export interface DatePreset {
  * then an exact value that only commits on Apply/Enter — native date inputs
  * fire `change` mid-typing, so committing on change would PATCH garbage.
  */
-export function DatePickerPopover({ anchor, label, kind, value, presets, onCommit, onClose, clearLabel = 'Clear', onAccelerator }: {
+export function DatePickerPopover({ anchor, label, kind, value, presets, onCommit, onClose, clearLabel = 'Clear', onAccelerator, className }: {
   anchor: HTMLElement;
   label: string;
   kind: 'date' | 'datetime-local';
@@ -128,6 +128,7 @@ export function DatePickerPopover({ anchor, label, kind, value, presets, onCommi
   onCommit: (value: string | null) => void;
   onClose: () => void;
   clearLabel?: string | null;
+  className?: string;
   /** Single-key preset shortcuts; return true when handled. */
   onAccelerator?: (key: string) => boolean;
 }) {
@@ -138,7 +139,7 @@ export function DatePickerPopover({ anchor, label, kind, value, presets, onCommi
   const showMenu = presets.length > 0 || Boolean(value && clearLabel);
 
   return (
-    <TaskPopover anchor={anchor} onClose={onClose} label={label} width={248} role="dialog" onAccelerator={onAccelerator}>
+    <TaskPopover anchor={anchor} onClose={onClose} label={label} width={248} role="dialog" className={className} onAccelerator={onAccelerator}>
       {showMenu && (
       <div role="menu" aria-label={`${label} presets`}>
         {presets.map((preset) => (

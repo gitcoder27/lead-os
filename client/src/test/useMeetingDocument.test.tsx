@@ -5,7 +5,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { useMeetingDocument, meetingBody } from '@/hooks/useMeetingDocument';
 import { authEpoch, advanceAuthEpoch } from '@/lib/auth-epoch';
 import { ApiRequestError } from '@/lib/api';
-import type { MeetingDocument } from '@/types';
+import type { ManagerTask, MeetingDocument } from '@/types';
 const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
 vi.mock('@/lib/api', async () => ({ ...await vi.importActual('@/lib/api'), api: mocks }));
 vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'ws:a:manager:', useAuth: () => ({ user: { username: 'a', workspaceId: 'ws' } }) }));
@@ -18,6 +18,19 @@ function mount(qc = new QueryClient({ defaultOptions: { queries: { retry: false 
 beforeEach(() => { localStorage.clear(); mocks.get.mockReset().mockResolvedValue(response(doc())); mocks.put.mockReset(); });
 afterEach(() => vi.useRealTimers());
 describe('meeting draft lifecycle', () => {
+  it('refreshes agreed actions immediately on reopening even within the application cache window', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10000 } } });
+    const action = { taskKey: 'T-2', status: 'open' } as ManagerTask;
+    mocks.get.mockResolvedValue({ ...response(doc()), actions: [action] });
+    const one = mount(qc);
+    await waitFor(() => expect(one.result.current.query.data?.actions[0]?.status).toBe('open'));
+    one.unmount();
+    mocks.get.mockResolvedValue({ ...response(doc()), actions: [{ ...action, status: 'done' }] });
+    const two = mount(qc);
+    await waitFor(() => expect(two.result.current.query.data?.actions[0]?.status).toBe('done'));
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    two.unmount();
+  });
   it('autosaves after 800 ms and reports storage failures honestly', async () => {
     mocks.put.mockResolvedValue({ document: doc(2, 'Typed') });
     const hook = mount();
@@ -54,12 +67,13 @@ describe('meeting draft lifecycle', () => {
   it('recovers after navigation and preserves both versions on conflict', async () => {
     const one = mount();
     await waitFor(() => expect(one.result.current.status).toBe('Saved'));
-    act(() => one.result.current.change({ ...one.result.current.body, notes: 'My draft' }));
+    act(() => one.result.current.change({ ...one.result.current.body, notes: 'My draft', actions: [{ id: 'draft', text: 'Send report', ownerAccountId: 'alex' }] }));
     one.unmount();
     mocks.get.mockResolvedValue(response(doc(2, 'Other device')));
     const two = mount();
     await waitFor(() => expect(two.result.current.conflict?.notes).toBe('Other device'));
     expect(two.result.current.body.notes).toBe('My draft');
+    expect(two.result.current.body.actions).toEqual([{ id: 'draft', text: 'Send report', ownerAccountId: 'alex' }]);
     expect(await two.result.current.flush()).toBe(false);
     expect(mocks.put).not.toHaveBeenCalled();
     two.unmount();

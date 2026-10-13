@@ -1,3 +1,4 @@
+import { ManagerActionReplayService } from "./manager-action-replay.service";
 import { runInTransaction } from "../db/transaction";
 import { parseCapture } from "shared/capture-grammar";
 import { addTodayProjectContext } from "./today-project-context";
@@ -651,9 +652,10 @@ export class TodayService {
     workspaceId?: string,
   ): Promise<ManagerActionCommandResponse> {
     const execute = () => this.executeCommandInternal(managerAccountId, request, actor, workspaceId);
-    const response = request.command.kind === "capture_meeting_outcome"
-      ? await runInTransaction(execute)
-      : await execute();
+    const apply = () => request.command.kind === "capture_meeting_outcome" ? runInTransaction(execute) : execute();
+    const response = request.requestId && ["capture_follow_up", "capture_meeting_outcome"].includes(request.command.kind)
+      ? await new ManagerActionReplayService().run(managerAccountId, request, workspaceId, apply)
+      : await apply();
     this.clearTodayCache(workspaceId);
     return response;
   }
@@ -779,7 +781,7 @@ export class TodayService {
           { ...buildFollowUpCreateParams(date, actionTarget, title, request.preset, tz), source: "today" },
           undefined,
           workspaceId,
-          { tz, today: date },
+          { tz, today: date, requestId: request.requestId },
         );
         return commandResponse(command.kind, actionTarget, followUp.result, {
           label: "Undo",
@@ -871,7 +873,7 @@ export class TodayService {
       },
       canonical ? meetingTarget.taskKey : undefined,
       workspaceId,
-      { tz, today: request.date },
+      { tz, today: request.date, requestId: request.requestId },
     );
     return followUp;
   }
@@ -888,7 +890,7 @@ export class TodayService {
     params: FollowUpCreateParams,
     parentTaskKey: string | undefined,
     workspaceId?: string,
-    clock?: { tz: string; today: string },
+    clock?: { tz: string; today: string; requestId?: string },
   ): Promise<CreatedFollowUp> {
     const taskKeys = new TaskKeysService();
     if (await taskKeys.phase3Enabled(workspaceId).catch(() => false)) {
@@ -903,6 +905,7 @@ export class TodayService {
       const res = await new CaptureService().run(
         {
           text: params.title,
+          ...(clock?.requestId ? { requestId: `today:${JSON.stringify([managerAccountId, clock.requestId])}` } : {}),
           confirm: true,
           // The manager's zone and day, so a typed `tomorrow`/`fri` resolves where they are, not where the server is.
           ...(clock ? { tz: clock.tz, clientToday: clock.today } : {}),

@@ -24,6 +24,7 @@ interface UseTodayActionsOptions {
 
 type TodayActionVariables = {
   command: TodayActionCommand;
+  requestId?: string;
   title?: string;
   outcome?: string;
   preset?: 'later_today' | 'tomorrow' | 'next_week';
@@ -211,7 +212,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
     });
 
   const mutation = useMutation({
-    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, visibility, nextAction, nextActionOwnerAccountId }: TodayActionVariables) => {
+    mutationFn: async ({ command, outcome, preset, summary, title, taskKeys, visibility, nextAction, nextActionOwnerAccountId, requestId }: TodayActionVariables) => {
       const { target } = command;
 
       if (command.kind === 'mark_done' && (target.managerDeskItemId || target.taskKey)) {
@@ -248,7 +249,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         if (!title?.trim()) {
           return { cancelled: true };
         }
-        return postCommand({ command, title: title.trim(), preset });
+        return postCommand({ command, title: title.trim(), preset, requestId });
       }
 
       if (command.kind === 'carry_forward' && (target.managerDeskItemId || target.taskKey)) {
@@ -261,6 +262,7 @@ export function useTodayActions({ date, onOpenTarget }: UseTodayActionsOptions) 
         }
         return postCommand({
           command,
+          requestId,
           outcome: outcome.trim(),
           nextAction: nextAction?.trim() || undefined,
           nextActionOwnerAccountId: nextAction?.trim() ? nextActionOwnerAccountId || undefined : undefined,

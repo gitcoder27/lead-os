@@ -808,3 +808,13 @@ export const registrationInvites = sqliteTable("registration_invites", {
   usedByUserId: integer("used_by_user_id").references(() => appUsers.id, { onDelete: "set null" }),
   revokedAt: text("revoked_at"),
 });
+
+/** Complete Today creation receipts, including the compound result and its original undo. */
+export const managerActionReceipts = sqliteTable("manager_action_receipts", {
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  requestId: text("request_id").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  responseJson: text("response_json").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.managerAccountId, table.requestId] })]);

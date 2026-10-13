@@ -118,6 +118,7 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM issues;
     DELETE FROM developers;
     DELETE FROM sync_log;
+    DELETE FROM manager_action_receipts;
     DELETE FROM config;
     DELETE FROM workspaces WHERE id <> 'default';
     DELETE FROM assistant_messages;

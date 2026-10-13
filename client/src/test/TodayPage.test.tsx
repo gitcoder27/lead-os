@@ -1228,6 +1228,12 @@ describe('TodayPage V2', () => {
     expect(await screen.findByText('Desk unavailable')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: /capture follow-up/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Follow-up title')).toHaveValue('Check API rollout');
+    const submissions = () => fetchMock.mock.calls.filter(([url]) => String(url) === '/api/manager-actions/commands').map(([, init]) => JSON.parse(String(init?.body)));
+    const firstId = submissions()[0].requestId;
+    expect(firstId).toMatch(/^[\da-f-]{36}$/);
+    fireEvent.click(screen.getByRole('button', { name: /save follow-up/i }));
+    await waitFor(() => expect(submissions()).toHaveLength(2));
+    expect(submissions()[1].requestId).toBe(firstId);
   });
 
   it('keeps the check-in dialog open with an inline error when the command fails (docs/53 F9)', async () => {

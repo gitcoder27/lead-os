@@ -8,7 +8,7 @@ import { invoke } from "./helpers/http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, resetDatabase } from "./helpers/db";
-import { configTable, developers, issues, developerAvailabilityPeriods, dailyNotes, taskEvents, tasks } from "../src/db/schema";
+import { configTable, developers, issues, developerAvailabilityPeriods, dailyNotes, managerActionReceipts, taskEvents, tasks } from "../src/db/schema";
 import { IssueService } from "../src/services/issue.service";
 import { ManagerDeskService } from "../src/services/manager-desk.service";
 import { TaskService } from "../src/services/task.service";
@@ -108,6 +108,60 @@ describe("Today follow-ups through capture (P3-05)", () => {
     const response = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: request });
     expect(response.status).toBeGreaterThanOrEqual(400);
     expect(workspaceSnapshot("default")).toEqual(before);
+  });
+
+  it.each(["follow-up", "meeting", "legacy"])("replays %s after a lost response with the same result and undo (R7)", async (kind) => {
+    if (kind === "legacy") await db.update(configTable).set({ value: "off" }).where(eq(configTable.key, "tasks_phase2_stage"));
+    const meeting = kind === "meeting" ? await taskService.create({ title: "Meeting", kind: "meeting" }, principal) : undefined;
+    const request: ManagerActionCommandRequest = meeting
+      ? command({ requestId: "lost-response", outcome: "Agreed", nextAction: "Action", nextActionOwnerAccountId: "dev-1", command: { kind: "capture_meeting_outcome", label: "Outcome", target: { type: "meeting", view: "tasks", taskKey: meeting.taskKey } } })
+      : { ...followUpCommand("Follow up"), requestId: "lost-response" };
+    const original = await todayService().executeCommand("manager-1", request, manager);
+    // Discard the transport response, then retry against a fresh service instance and the route.
+    const afterCommit = workspaceSnapshot("default");
+    expect(await todayService().executeCommand("manager-1", request, manager)).toEqual(original);
+    const service = todayService();
+    const app = express();
+    app.use((req, _res, next) => { req.auth = { sessionId: "fixture", user: { username: "manager-1", accountId: "manager-1", displayName: "Manager", role: "manager", workspaceId: "default" } }; next(); });
+    app.use("/api/manager-actions", createManagerActionsRouter(service)); app.use(errorHandler);
+    const retry = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: request });
+    expect(retry.status).toBe(200); expect(retry.body).toEqual(JSON.parse(JSON.stringify(original)));
+    expect(workspaceSnapshot("default")).toEqual(afterCommit);
+    const changed = { ...request, ...(meeting ? { nextAction: "Edited after lost response" } : { title: "Edited after lost response" }) };
+    const conflict = await invoke(app, { method: "POST", url: "/api/manager-actions/commands", body: changed });
+    expect(conflict.status).toBe(409); expect(workspaceSnapshot("default")).toEqual(afterCommit);
+    await service.executeCommand("manager-1", original.undo!.request, manager);
+    // Undo does not erase the receipt and accidentally recreate the task on a late retry.
+    const afterUndo = workspaceSnapshot("default");
+    expect(await service.executeCommand("manager-1", request, manager)).toEqual(original);
+    expect(workspaceSnapshot("default")).toEqual(afterUndo);
+  });
+  it("coalesces overlapping attempts, rejects incompatible in-flight reuse and scopes receipts to their manager/workspace (R7)", async () => {
+    const service = todayService();
+    const request = { ...followUpCommand("Action"), requestId: "overlap" };
+    const first = service.executeCommand("manager-1", request, manager);
+    const same = todayService().executeCommand("manager-1", request, manager);
+    await expect(service.executeCommand("manager-1", { ...request, title: "Different" }, manager)).rejects.toMatchObject({ status: 409 });
+    expect(await same).toEqual(await first);
+    expect(await db.select().from(tasks)).toHaveLength(1);
+    expect(await db.select().from(managerActionReceipts)).toHaveLength(1);
+    const other = await service.executeCommand("manager-2", request, { type: "manager", accountId: "manager-2" });
+    expect(other.result).toMatchObject({ ownerId: "manager-2" });
+    await db.insert(configTable).values([{ workspaceId: "friend", key: "tasks_phase1_enabled", value: "true" }, { workspaceId: "friend", key: "tasks_phase2_stage", value: "2c" }, { workspaceId: "friend", key: "tasks_phase3_enabled", value: "true" }]);
+    const friend = await service.executeCommand("manager-1", request, manager, "friend");
+    expect(friend.result).toMatchObject({ ownerId: "manager-1" });
+    expect((await db.select().from(tasks)).filter((row) => row.workspaceId === "friend")).toHaveLength(1);
+    expect(await db.select().from(managerActionReceipts)).toHaveLength(3);
+  });
+  it("retains no receipt after compound failure and permits a corrected retry (R7)", async () => {
+    const row = await taskService.create({ title: "Meeting", kind: "meeting" }, principal);
+    const request = command({ requestId: "failed", outcome: "Agreed", nextAction: "Action @missing", command: { kind: "capture_meeting_outcome", label: "Outcome", target: { type: "meeting", view: "tasks", taskKey: row.taskKey } } });
+    const before = workspaceSnapshot("default");
+    await expect(todayService().executeCommand("manager-1", request, manager)).rejects.toThrow();
+    expect(workspaceSnapshot("default")).toEqual(before);
+    await todayService().executeCommand("manager-1", { ...request, nextAction: "Corrected" }, manager);
+    expect(await db.select().from(tasks)).toHaveLength(2);
+    expect(await db.select().from(managerActionReceipts)).toHaveLength(1);
   });
 
   it("keeps a blocker reason from the row as the follow-up's context (UX-02)", async () => {

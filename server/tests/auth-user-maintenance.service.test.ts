@@ -12,6 +12,7 @@ import {
   teamTrackerItems,
   teamTrackerSavedViews,
   weeklyReviews,
+  managerActionReceipts,
   workspaces,
 } from "../src/db/schema";
 import { AuthService } from "../src/services/auth.service";
@@ -41,6 +42,8 @@ describe("auth user maintenance", () => {
       workspaceId: owner.workspaceId,
     });
     await authService.authenticate("shared-manager", "secret123");
+    await db.insert(managerActionReceipts).values(["shared-manager", "owner"].map((managerAccountId) => ({ workspaceId: owner.workspaceId, managerAccountId, requestId: "same-id", payloadHash: "fixture", responseJson: "{\"private\":\"snapshot\"}", createdAt: "2026-10-13T00:00:00Z" })));
+
 
     const preview = await maintenance.getDeletionPreview({
       username: "shared-manager",
@@ -61,6 +64,7 @@ describe("auth user maintenance", () => {
     const sessions = await db.select().from(appSessions);
     expect(users.map((user) => user.username)).toEqual(["owner"]);
     expect(sessions).toEqual([]);
+    expect((await db.select().from(managerActionReceipts)).map((row) => row.managerAccountId)).toEqual(["owner"]);
   });
 
   it("rejects deleting the workspace owner manager account", async () => {

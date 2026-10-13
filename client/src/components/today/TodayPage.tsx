@@ -581,6 +581,7 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
           onSave={(value, extras?: TodayCaptureExtras) => {
             void actions
               .runActionAsync(textDraft.command, {
+                requestId: extras?.requestId,
                 title: textDraft.command.kind === 'capture_follow_up' ? value : undefined,
                 outcome: textDraft.command.kind === 'capture_meeting_outcome' ? value : undefined,
                 preset: textDraft.command.kind === 'capture_follow_up' ? textDraft.preset : undefined,

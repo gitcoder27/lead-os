@@ -20,6 +20,7 @@ import {
   teamTrackerItems,
   teamTrackerSavedViews,
   weeklyReviews,
+  managerActionReceipts,
   tasks,
   developerNotes, contacts } from "../db/schema";
 import { BackupService } from "./backup.service";
@@ -77,6 +78,9 @@ export class WorkspaceMaintenanceService {
       : null;
 
     await runInTransaction(async () => {
+      await db.delete(managerActionReceipts).where(target === "workspace"
+        ? eq(managerActionReceipts.workspaceId, normalizedWorkspaceId)
+        : and(eq(managerActionReceipts.workspaceId, normalizedWorkspaceId), eq(managerActionReceipts.managerAccountId, managerAccountId)));
       if (target !== "team_tracker") await clearProjectData(normalizedWorkspaceId, target === "workspace" ? undefined : managerAccountId);
       if (await new TaskKeysService().canonicalEnabled(normalizedWorkspaceId)) {
         const rows = await db.select().from(tasks).where(eq(tasks.workspaceId, normalizedWorkspaceId));

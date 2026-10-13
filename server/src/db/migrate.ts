@@ -7,6 +7,12 @@ import { startCanonicalTasksForEmptyWorkspaces } from "./canonical-start";
 const DEFAULT_WORKSPACE_ID = "default";
 
 const ddl = `
+CREATE TABLE IF NOT EXISTS manager_action_receipts (
+ workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL, request_id TEXT NOT NULL,
+ payload_hash TEXT NOT NULL, response_json TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY (workspace_id, manager_account_id, request_id)
+);
+
 CREATE TABLE IF NOT EXISTS projects (
  id INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL,
  name TEXT NOT NULL, outcome TEXT, summary TEXT, summary_updated_at TEXT, archived_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,

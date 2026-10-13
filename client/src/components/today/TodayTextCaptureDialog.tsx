@@ -5,6 +5,7 @@ import { Select } from '@/components/ui/Select';
 export type TodayCapturePreset = 'later_today' | 'tomorrow' | 'next_week';
 
 export interface TodayCaptureExtras {
+  requestId: string;
   nextAction?: string;
   nextActionOwnerAccountId?: string;
 }
@@ -51,6 +52,7 @@ export function TodayTextCaptureDialog({
   onClose,
   onSave,
 }: TodayTextCaptureDialogProps) {
+  const [requestId] = useState(() => crypto.randomUUID());
   const [value, setValue] = useState(defaultValue);
   const [nextAction, setNextAction] = useState('');
   const [ownerId, setOwnerId] = useState(defaultNextActionOwnerId ?? '');
@@ -63,9 +65,7 @@ export function TodayTextCaptureDialog({
     if (!canSave) return;
     onSave(
       value,
-      withNextAction && nextAction.trim()
-        ? { nextAction: nextAction.trim(), nextActionOwnerAccountId: ownerId || undefined }
-        : undefined,
+      { requestId, ...(withNextAction && nextAction.trim() ? { nextAction: nextAction.trim(), nextActionOwnerAccountId: ownerId || undefined } : {}) },
     );
   };
 

@@ -112,6 +112,7 @@ const commandSchema = z.object({
   query: z.any().optional(),
   params: z.any().optional(),
   body: z.object({
+    requestId: z.string().trim().min(1).max(128).optional(),
     command: actionCommandSchema,
     date: realDate("date must be YYYY-MM-DD"),
     title: z.string().optional(),

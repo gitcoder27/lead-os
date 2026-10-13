@@ -744,6 +744,8 @@ export interface ManagerActionResponse {
 }
 
 export interface ManagerActionCommandRequest {
+  /** Stable identity for a Today creation, retained until the dialog is closed. */
+  requestId?: string;
   command: ManagerActionCommand;
   date: string;
   title?: string;

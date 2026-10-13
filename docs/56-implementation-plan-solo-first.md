@@ -1086,3 +1086,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R6 | Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Commit: this item’s task-scoped commit. |
+- [x] **R7** Today dialogs retain a requestId until closed; shared contracts and route validation carry it to manager/workspace-scoped durable command receipts. Capture also receives a manager-namespaced identity. Receipts store the complete result and undo in the write transaction, coalesce overlapping attempts, reject incompatible reuse, survive undo, and are removed with account/reset data.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R7 | Targeted server suites including tenant/registration isolation and migrations: 84 tests passed; strengthened capture/account-deletion regressions: 33 passed; TodayCaptureReplay/useTodayActions/TodayPage: 68 passed; typecheck and build:check passed. Lost-response replay, compound rollback, overlapping requests, edited payloads, fresh dialogs and manager/workspace isolation are covered. Shared additions are type-only; no runtime artifact regeneration required. Commit: this item’s task-scoped commit. |

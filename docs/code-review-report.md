@@ -148,3 +148,9 @@ Revalidated against current code before editing. Today follow-up, route and serv
 Canonical meeting next actions pass selected ownership as capture defaults, retain typed-token precedence and manager ownership for You, and no longer substitute a person link. The client dispatches canonical task-key meeting actions to the command endpoint.
 
 Revalidated against current code before editing. Today server suites: 61 tests passed; useTodayActions/TodayPage: 66 tests passed; typecheck and build:check passed. Route assertions cover owner/tracking manager/parent, developer My Day visibility and undo; unknown/inactive/leave owners roll back. Shared change is documentation/type-only, so JavaScript artifact is unchanged. Original review evidence above is preserved.
+
+## Remediation — R7 (2026-10-13)
+
+Today dialogs retain a requestId until closed; shared contracts and route validation carry it to manager/workspace-scoped durable command receipts. Capture also receives a manager-namespaced identity. Receipts store the complete result and undo in the write transaction, coalesce overlapping attempts, reject incompatible reuse, survive undo, and are removed with account/reset data.
+
+Revalidated against current code before editing. Targeted server suites including tenant/registration isolation and migrations: 84 tests passed; strengthened capture/account-deletion regressions: 33 passed; TodayCaptureReplay/useTodayActions/TodayPage: 68 passed; typecheck and build:check passed. Lost-response replay, compound rollback, overlapping requests, edited payloads, fresh dialogs and manager/workspace isolation are covered. Shared additions are type-only; no runtime artifact regeneration required. Original review evidence above is preserved.

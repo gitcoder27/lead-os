@@ -52,6 +52,9 @@ describe("atomic meeting capture", () => {
     expect(result.body.task.status).toBe("done");
     expect(result.body.actions).toHaveLength(2);
     expect(result.body.actions.map((row: { status: string; scheduledOn: string | null }) => [row.status, row.scheduledOn])).toEqual([["open", null], ["open", null]]);
+    const reopened = await invoke(app, { method: "GET", url: `/api/meetings/${request.meetingKey}/workspace`, headers });
+    expect(reopened.body.document.actions).toEqual([]);
+    expect(reopened.body.actions).toEqual(result.body.actions);
     const devAction = result.body.actions[0];
     const developer = { type: "developer" as const, accountId: "dev-alex", workspaceId: "default" };
     const detail = await taskService.detail(devAction.taskKey, developer);
@@ -135,6 +138,9 @@ describe("atomic meeting capture", () => {
     const next = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, outcome: 'Updated private outcome', actions: [{ id: 'a3', text: 'Another action' }] }, principal);
     const result = await service.run({ ...request, revision: next.revision, requestId: 'later' }, principal);
     expect(result.actions).toHaveLength(1);
+    const reopened = await workspace.get(request.meetingKey, principal);
+    expect(reopened.document?.actions).toEqual([]);
+    expect(reopened.actions.map((action) => action.title)).toEqual(['Send report', 'My action', 'Another action']);
     expect((await db.select().from(tasks)).length).toBe(4);
     expect((await db.select().from(meetingCaptureReceipts)).length).toBe(2);
   });

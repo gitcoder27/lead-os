@@ -4,6 +4,7 @@ import { RepeatMeetingDialog } from './RepeatMeetingDialog';
 import { navigateToMeeting, backFromMeeting } from '@/lib/meeting-nav';
 import { useMeetingCapture } from '@/hooks/useMeetingCapture';
 import { MeetingActions } from './MeetingActions';
+import { MeetingSavedActions } from './MeetingSavedActions';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth, useAuthScopeKey } from '@/context/AuthContext';
 import { useMeetingDocument } from '@/hooks/useMeetingDocument';
@@ -25,7 +26,7 @@ function MeetingWorkspaceDocument({ taskKey }: { taskKey: string }) {
   const capture = useMeetingCapture(taskKey, editor);
   const locked = capture.isPending || Boolean(capture.pending);
   const noteRef = useRef<NoteEditorHandle>(null);
-  const developers = useDevelopers();
+  const developers = useDevelopers(undefined, { includeUnavailable: true });
   const { features } = useAuth();
   const [drawer, setDrawer] = useState<string | null>(null);
   const [repeatOpen, setRepeatOpen] = useState(false);
@@ -61,6 +62,7 @@ function MeetingWorkspaceDocument({ taskKey }: { taskKey: string }) {
       <section><label className="meeting-section-title" htmlFor="meeting-agenda">Agenda</label><textarea id="meeting-agenda" rows={4} maxLength={50000} placeholder="Talking points and questions" value={editor.body.agenda} onChange={(e) => editor.change({ ...editor.body, agenda: e.target.value })} onBlur={() => void editor.flush()} /></section>
       <section><h2>Notes <span className="meeting-muted">Private to you</span></h2><NoteEditor ref={noteRef} value={editor.body.notes} onChange={(notes) => editor.change({ ...editor.body, notes })} onBlur={() => void editor.flush()} handlers={handlers} entityContext={{ developers: developers.data ?? [], refs: new Map() }} placeholder="Record what happened…" ariaLabel="Private meeting notes" selectionClassName="meeting-selection-bubble" omit={['update', 'follow-up', 'wrap-up']} actionsDisabled={locked || editor.conflict !== undefined || editor.body.actions.length >= 30} /><button className="ui-btn-ghost" onMouseDown={(e) => e.preventDefault()} onClick={addAction}>Add selection as action draft</button></section>
       <section><label className="meeting-section-title" htmlFor="meeting-outcome">Outcome</label>{data.task.outcome && !editor.body.outcome && <p className="meeting-muted">Existing outcome: {data.task.outcome}</p>}<textarea id="meeting-outcome" rows={2} maxLength={4000} placeholder="Decisions and next steps" value={editor.body.outcome} onChange={(e) => editor.change({ ...editor.body, outcome: e.target.value })} /><label className="meeting-check"><input type="checkbox" checked={editor.body.noDecisions} onChange={(e) => editor.change({ ...editor.body, noDecisions: e.target.checked })} />No decisions to record</label></section>
+      <MeetingSavedActions actions={data.actions} people={developers.data ?? []} onOpen={setDrawer} />
       <MeetingActions actions={editor.body.actions} people={developers.data ?? []} onChange={(actions) => editor.change({ ...editor.body, actions })} />
       </div>
       {capture.problem && <p role="alert">{capture.problem}</p>}

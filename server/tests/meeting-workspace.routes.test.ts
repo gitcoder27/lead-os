@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
-import { configTable, developers } from "../src/db/schema";
+import { configTable, developers, tasks } from "../src/db/schema";
 import { requireManager } from "../src/middleware/auth";
 import { errorHandler } from "../src/middleware/errorHandler";
 import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
@@ -61,13 +62,33 @@ describe("private meeting workspace", () => {
     expect((await service.get(key, principal)).context?.commitments).toEqual([]);
     await taskService.addLink(key, { kind: 'person', ref: 'person-one' }, principal);
     expect((await service.get(key, principal)).context?.commitments).toHaveLength(1);
+    const meeting = await taskService.requireTask(key, principal);
+    const action = await taskService.create({ title: 'Saved action', parentId: meeting.id }, principal);
     const failure = vi.spyOn(service.tasks, 'personCommitments').mockRejectedValue(new Error('Context unavailable'));
     const degraded = await service.get(key, principal);
     expect(degraded.context).toBeNull(); expect(degraded.contextError).toBeTruthy();
+    expect(degraded.actions.map((row) => row.taskKey)).toEqual([action.taskKey]);
     await service.save(key, body, principal);
     expect((await service.get(key, principal)).document?.agenda).toBe('PRIVATE agenda');
     failure.mockRestore();
     expect((await service.get(key, principal)).context?.commitments).toHaveLength(1);
+  });
+  it("returns all saved child statuses, excluding deleted, unrelated and inaccessible work", async () => {
+    const tasksService = new TaskService();
+    const meeting = await tasksService.requireTask(key, principal);
+    await db.insert(developers).values({ accountId: 'alex', displayName: 'Alex', isActive: 1 });
+    const assigned = await tasksService.create({ title: 'Assigned action', parentId: meeting.id, ownerType: 'developer', ownerId: 'alex' }, principal);
+    const completed = await tasksService.create({ title: 'Completed action', parentId: meeting.id }, principal);
+    await tasksService.update(completed.taskKey, { status: 'done' }, principal);
+    const dropped = await tasksService.create({ title: 'Dropped action', parentId: meeting.id }, principal);
+    await tasksService.update(dropped.taskKey, { status: 'dropped' }, principal);
+    const deleted = await tasksService.create({ title: 'Deleted action', parentId: meeting.id }, principal);
+    await db.update(tasks).set({ deletedAt: new Date().toISOString() }).where(eq(tasks.id, deleted.id));
+    await tasksService.create({ title: 'Unrelated work' }, principal);
+    const privateChild = await tasksService.create({ title: 'Another manager', parentId: meeting.id }, principal);
+    await db.update(tasks).set({ trackedByManagerId: 'b', ownerType: 'manager', ownerId: 'b' }).where(eq(tasks.id, privateChild.id));
+    const response = await invoke(app, { method: 'GET', url: `/api/meetings/${key}/workspace`, headers });
+    expect(response.body.actions.map((row: { taskKey: string; status: string }) => [row.taskKey, row.status])).toEqual([[assigned.taskKey, 'open'], [completed.taskKey, 'done'], [dropped.taskKey, 'dropped']]);
   });
   it("keeps legacy outcomes readable and uses explicit history only", async () => {
     await new TaskService().update(key, { outcome: "Legacy outcome" }, principal);

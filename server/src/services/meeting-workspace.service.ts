@@ -86,12 +86,13 @@ export class MeetingWorkspaceService {
     const row = await this.requireMeeting(key, principal);
     const document = await this.document(row.id, principal);
     const task = await this.tasks.toDto(row, principal) as ManagerTask;
-    try { return { task, document, context: await this.context(task, document, principal), contextError: null }; }
-    catch { return { task, document, context: null, contextError: "Could not load preparation context." }; }
+    const visible = await visibleTaskRows(principal);
+    const actions = await this.tasks.toDtos(visible.filter((child) => child.parentId === row.id), principal) as ManagerTask[];
+    try { return { task, document, actions, context: await this.context(task, document, principal, visible), contextError: null }; }
+    catch { return { task, document, actions, context: null, contextError: "Could not load preparation context." }; }
   }
 
-  private async context(task: ManagerTask, document: MeetingDocument | null, principal: TaskPrincipal): Promise<MeetingContext> {
-    const visible = await visibleTaskRows(principal);
+  private async context(task: ManagerTask, document: MeetingDocument | null, principal: TaskPrincipal, visible: Awaited<ReturnType<typeof visibleTaskRows>>): Promise<MeetingContext> {
     const byKey = new Map(visible.map((row) => [row.taskKey, row]));
     const history = new Set([task.id]);
     let previous: MeetingContext["previous"] = null;

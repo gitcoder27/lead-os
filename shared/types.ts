@@ -3514,6 +3514,8 @@ export interface MeetingContext {
 }
 export interface MeetingWorkspaceResponse {
   task: ManagerTask;
+  /** Canonical children of this meeting, including completed and dropped actions. */
+  actions: ManagerTask[];
   document: MeetingDocument | null;
   context: MeetingContext | null;
   contextError: string | null;

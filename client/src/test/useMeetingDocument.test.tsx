@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
 vi.mock('@/lib/api', async () => ({ ...await vi.importActual('@/lib/api'), api: mocks }));
 vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'ws:a:manager:', useAuth: () => ({ user: { username: 'a', workspaceId: 'ws' } }) }));
 const doc = (revision = 1, notes = 'Saved'): MeetingDocument => ({ ...meetingBody(), id: 'd', revision, notes, previousMeetingKey: null, updatedAt: '2026-10-13T00:00:00Z' });
-const response = (document: MeetingDocument | null) => ({ task: { taskKey: 'T-1' }, document, context: null, contextError: null });
+const response = (document: MeetingDocument | null) => ({ task: { taskKey: 'T-1' }, actions: [], document, context: null, contextError: null });
 function mount(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
   return { ...renderHook(() => useMeetingDocument('T-1'), { wrapper }), qc };

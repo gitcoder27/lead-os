@@ -44,3 +44,9 @@
 .meeting-page .notes-editor .cm-content{min-height:180px;}.meeting-page .notes-editor .cm-editor.cm-focused{outline:2px solid var(--accent);outline-offset:4px;}
 
 .meeting-selection-bubble button{min-height:44px;min-width:44px;}
+
+.meeting-saved-action {display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:12px 0;text-align:left;border-bottom:1px solid var(--border);}
+.meeting-saved-action-copy {display:flex;flex-direction:column;gap:4px;min-width:0;}
+.meeting-saved-action-title {font-size:var(--fs-13);font-weight:500;overflow-wrap:anywhere;}
+.meeting-saved-action>span:last-child {flex-shrink:0;}
+@media(max-width:480px){.meeting-saved-action{gap:8px;}.meeting-saved-action-copy .meeting-muted{font-size:var(--fs-12);}}

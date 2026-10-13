@@ -1104,7 +1104,7 @@ Final R1–R8 verification: server **128 files / 1,725 tests**, client **169 fil
 Sequential work on main; synthetic data and mocked integrations only. Calendar, Copilot, automatic scheduling, and templates are deferred; existing 1:1 workspace remains the bridge.
 
 - [x] MP-01 — Private documents, contracts, access checks and preparation context.
-- [ ] MP-02 — Focused workspace, serialized autosave and recoverable drafts.
+- [x] MP-02 — Focused workspace, serialized autosave and recoverable drafts.
 - [ ] MP-03 — Atomic finish/action capture, durable receipts and guarded Undo.
 - [ ] MP-04 — Repeat flow and Today/Tasks entry points with return navigation.
 - [ ] MP-05 — Automated and browser/accessibility verification; pilot handoff.
@@ -1112,3 +1112,4 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | MP-01 | Additive private document and receipt storage with account/reset cleanup. Phase 3 manager gate and visible-task access. Explicit repeat history, linked people commitments, project blockers and Jira context; context failure does not block the document. Revision + identity checks prevent stale overwrites. Meeting workspace route tests and server typecheck. |
+| 2026-10-13 | MP-02 | Focused responsive page at `/t/:key?mode=meeting`; existing notes editor with private action selection and publish commands omitted. 800 ms serialized saves, scoped device recovery, revision/identity conflict reconciliation, auth-epoch guards and honest save states. Four hook lifecycle tests pass; client typecheck passes. |

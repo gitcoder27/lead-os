@@ -1,0 +1,79 @@
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { useMeetingDocument, meetingBody } from '@/hooks/useMeetingDocument';
+import { authEpoch, advanceAuthEpoch } from '@/lib/auth-epoch';
+import { ApiRequestError } from '@/lib/api';
+import type { MeetingDocument } from '@/types';
+const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
+vi.mock('@/lib/api', async () => ({ ...await vi.importActual('@/lib/api'), api: mocks }));
+vi.mock('@/context/AuthContext', () => ({ useAuthScopeKey: () => 'ws:a:manager:', useAuth: () => ({ user: { username: 'a', workspaceId: 'ws' } }) }));
+const doc = (revision = 1, notes = 'Saved'): MeetingDocument => ({ ...meetingBody(), id: 'd', revision, notes, previousMeetingKey: null, updatedAt: '2026-10-13T00:00:00Z' });
+const response = (document: MeetingDocument | null) => ({ task: { taskKey: 'T-1' }, document, context: null, contextError: null });
+function mount(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+  return { ...renderHook(() => useMeetingDocument('T-1'), { wrapper }), qc };
+}
+beforeEach(() => { localStorage.clear(); mocks.get.mockReset().mockResolvedValue(response(doc())); mocks.put.mockReset(); });
+afterEach(() => vi.useRealTimers());
+describe('meeting draft lifecycle', () => {
+  it('serializes overlapping saves and submits the latest body against the acknowledged revision', async () => {
+    let resolve!: (value: { document: MeetingDocument }) => void;
+    mocks.put.mockImplementationOnce(() => new Promise((done) => { resolve = done; })).mockResolvedValueOnce({ document: doc(3, 'Latest') });
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.status).toBe('Saved'));
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'First' }));
+    let first!: Promise<boolean>;
+    act(() => { first = hook.result.current.flush(); });
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledTimes(1));
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'Latest' }));
+    await act(async () => { resolve({ document: doc(2, 'First') }); await first; });
+    expect(mocks.put).toHaveBeenCalledTimes(2);
+    expect(mocks.put.mock.calls[1]![1]).toMatchObject({ notes: 'Latest', documentId: 'd', revision: 2 });
+    expect(hook.result.current.status).toBe('Saved');
+    hook.unmount();
+  });
+  it('recovers after navigation and preserves both versions on conflict', async () => {
+    const one = mount();
+    await waitFor(() => expect(one.result.current.status).toBe('Saved'));
+    act(() => one.result.current.change({ ...one.result.current.body, notes: 'My draft' }));
+    one.unmount();
+    mocks.get.mockResolvedValue(response(doc(2, 'Other device')));
+    const two = mount();
+    await waitFor(() => expect(two.result.current.conflict?.notes).toBe('Other device'));
+    expect(two.result.current.body.notes).toBe('My draft');
+    expect(await two.result.current.flush()).toBe(false);
+    expect(mocks.put).not.toHaveBeenCalled();
+    two.unmount();
+  });
+  it('keeps failed saves recoverable and rejects identity replacement', async () => {
+    mocks.put.mockRejectedValue(new Error('Offline'));
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.status).toBe('Saved'));
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'Draft' }));
+    await act(async () => { expect(await hook.result.current.flush()).toBe(false); });
+    expect(hook.result.current.status).toBe('Saved on this device');
+    mocks.put.mockRejectedValue(new ApiRequestError('changed', 409));
+    mocks.get.mockResolvedValue(response({ ...doc(1), id: 'replacement' }));
+    await act(async () => { await hook.result.current.retry(); });
+    expect(hook.result.current.conflict?.id).toBe('replacement');
+    expect(hook.result.current.body.notes).toBe('Draft');
+    hook.unmount();
+  });
+  it('ignores pending acknowledgements after auth cleanup', async () => {
+    let resolve!: (value: { document: MeetingDocument }) => void;
+    mocks.put.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.status).toBe('Saved'));
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'Private' }));
+    let pending!: Promise<boolean>;
+    act(() => { pending = hook.result.current.flush(); });
+    await waitFor(() => expect(mocks.put).toHaveBeenCalled());
+    expect(authEpoch(hook.qc)).toBe(0);
+    advanceAuthEpoch(hook.qc); localStorage.clear();
+    await act(async () => { resolve({ document: doc(2, 'Private') }); expect(await pending).toBe(false); });
+    expect(localStorage.length).toBe(0);
+    hook.unmount();
+  });
+});

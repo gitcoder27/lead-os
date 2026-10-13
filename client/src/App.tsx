@@ -1,3 +1,4 @@
+import { MeetingWorkspace } from '@/components/meetings/MeetingWorkspace';
 import { BootError } from '@/components/layout/BootError';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -1233,7 +1234,7 @@ function AppContent() {
       };
       const page = (
         <Suspense fallback={<FullPageLoading />}>
-          <TaskPage taskKey={taskKey} onBack={goBack} />
+          {user.role === 'manager' && new URLSearchParams(window.location.search).get('mode') === 'meeting' ? <MeetingWorkspace taskKey={taskKey} /> : <TaskPage taskKey={taskKey} onBack={goBack} />}
         </Suspense>
       );
       if (user.role !== 'manager') {

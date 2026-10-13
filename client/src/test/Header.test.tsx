@@ -44,7 +44,9 @@ vi.mock('@/components/capture/GlobalCaptureDialog', () => ({
 }));
 
 vi.mock('@/components/actions/ManagerActionInbox', () => ({
-  ManagerActionInbox: ({ updatesOnly }: { updatesOnly?: boolean }) => <div data-testid="manager-action-inbox" data-updates-only={String(Boolean(updatesOnly))}>Action Inbox</div>,
+  ManagerActionInbox: ({ updatesOnly, onlyWithUnread }: { updatesOnly?: boolean; onlyWithUnread?: boolean }) => (
+    <div data-testid="manager-action-inbox" data-updates-only={String(Boolean(updatesOnly))} data-only-with-unread={String(Boolean(onlyWithUnread))}>Action Inbox</div>
+  ),
 }));
 
 const signOutMock = vi.fn();
@@ -345,6 +347,18 @@ describe('Header', () => {
     expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-updates-only', 'true');
     rerender(<Header activeView="notes" onViewChange={vi.fn()} />);
     expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-updates-only', 'true');
+  });
+
+  it('asks a solo workspace to show the bell only while updates are unread', () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, features: { tasksPhase3: true, teamMode: 'solo' } });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-only-with-unread', 'true');
+  });
+
+  it('keeps the bell unconditional in collaborative mode', () => {
+    useAuthMock.mockReturnValue({ user: { role: 'manager' }, features: { tasksPhase3: true, teamMode: 'collab' } });
+    render(<Header activeView="work" onViewChange={vi.fn()} />);
+    expect(screen.getByTestId('manager-action-inbox')).toHaveAttribute('data-only-with-unread', 'false');
   });
 
   it('shows only the durable inbox on Today in collaborative mode', () => {

@@ -130,9 +130,12 @@ export function Header({ activeView, onViewChange, onOpenActionTarget, captureCo
 
             <div className="flex items-center gap-1 lg:gap-1.5">
               {/* docs/56 UX-30: Today's count rides on the nav's Today tab; the updates inbox shows on every page.
-                  Jira attention signals live on Work. The inbox steps aside below 480px. */}
-              {user?.role === 'manager' && onViewChange && features?.tasksPhase3 && features.teamMode === 'collab' ? (
-                <span className="header-wide-only"><ManagerActionInbox updatesOnly onOpenTarget={openActionTarget} onViewChange={onViewChange} /></span>
+                  Jira attention signals live on Work. The inbox steps aside below 480px. A solo workspace shows the
+                  bell only while updates are unread, because the tab title and favicon count them either way. */}
+              {user?.role === 'manager' && onViewChange && features?.tasksPhase3 ? (
+                <span className="header-wide-only">
+                  <ManagerActionInbox updatesOnly onlyWithUnread={features.teamMode !== 'collab'} onOpenTarget={openActionTarget} onViewChange={onViewChange} />
+                </span>
               ) : null}
 
               {canQuickCapture && (

@@ -15,6 +15,12 @@ let mockActionsData:
 let mockAlerts: Alert[] = [];
 
 const useManagerActionsSpy = vi.fn();
+let mockUnread = 0;
+
+vi.mock('@/hooks/useTaskInbox', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useTaskInboxLatest: () => ({ enabled: true, isError: false, data: { enabled: true, unreadCount: mockUnread, events: [], nextCursor: null } }),
+}));
 
 vi.mock('@/hooks/useManagerActions', () => ({
   useManagerActions: (options: { enabled?: boolean }) => {
@@ -106,6 +112,7 @@ describe('ManagerActionInbox', () => {
     vi.clearAllMocks();
     mockActionsData = { actions: [makeAction()], urgentCount: 1, totalCount: 1 };
     mockAlerts = [];
+    mockUnread = 0;
   });
 
   it('shows the badge with only the urgent action count when there are no signals', () => {
@@ -221,5 +228,45 @@ describe('ManagerActionInbox', () => {
 
     expect(screen.queryByText('No manager actions right now.')).not.toBeInTheDocument();
     expect(screen.getByText('Issue AM-2 is blocked.')).toBeInTheDocument();
+  });
+  describe('onlyWithUnread (solo workspaces)', () => {
+    function renderUpdates(onlyWithUnread: boolean) {
+      const ui = (flag: boolean) => (
+        <QueryClientProvider client={queryClient}>
+          <ManagerActionInbox updatesOnly onlyWithUnread={flag} onOpenTarget={vi.fn()} onViewChange={vi.fn()} />
+        </QueryClientProvider>
+      );
+      const queryClient = createTestQueryClient();
+      const view = render(ui(onlyWithUnread));
+      return { ...view, again: () => view.rerender(ui(onlyWithUnread)) };
+    }
+
+    it('renders nothing while no update is unread', () => {
+      renderUpdates(true);
+      expect(screen.queryByRole('button', { name: /Updates/ })).not.toBeInTheDocument();
+    });
+
+    it('shows the bell with the unread count once an update arrives', () => {
+      mockUnread = 2;
+      renderUpdates(true);
+      expect(screen.getByRole('button', { name: 'Updates, 2 unread updates' })).toBeInTheDocument();
+    });
+
+    it('stays while open after the last update is read, then steps aside on close', () => {
+      mockUnread = 1;
+      const view = renderUpdates(true);
+      fireEvent.click(screen.getByRole('button', { name: 'Updates, 1 unread updates' }));
+      mockUnread = 0;
+      view.again();
+      const bell = screen.getByRole('button', { name: 'Updates' });
+      fireEvent.click(bell);
+      view.again();
+      expect(screen.queryByRole('button', { name: 'Updates' })).not.toBeInTheDocument();
+    });
+
+    it('always renders for a collaborative workspace', () => {
+      renderUpdates(false);
+      expect(screen.getByRole('button', { name: 'Updates' })).toBeInTheDocument();
+    });
   });
 });

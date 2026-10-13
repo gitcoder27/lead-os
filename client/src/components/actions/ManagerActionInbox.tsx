@@ -49,6 +49,8 @@ interface ManagerActionInboxProps {
   enabled?: boolean;
   /** Today already owns the attention queue; only durable updates appear there. */
   updatesOnly?: boolean;
+  /** With `updatesOnly`: render nothing while there is nothing unread (a solo workspace), but stay put while open. */
+  onlyWithUnread?: boolean;
   onOpenTarget: (target: ManagerActionTarget) => void;
   onViewChange: (view: AppView) => void;
 }
@@ -78,6 +80,7 @@ export function ManagerActionInbox({
   date = getLocalIsoDate(),
   enabled = true,
   updatesOnly = false,
+  onlyWithUnread = false,
   onOpenTarget,
   onViewChange,
 }: ManagerActionInboxProps) {
@@ -292,6 +295,7 @@ export function ManagerActionInbox({
     );
 
   if (updatesOnly && !updates.enabled) return null;
+  if (updatesOnly && onlyWithUnread && unreadCount === 0 && !open) return null;
 
   return (
     <>

@@ -568,7 +568,7 @@ describe("Phase 2 backfill", () => {
     expect((await myDay.getMyDay("dev-1", taskService.today())).currentItem).toMatchObject({ taskKey: item.taskKey, canonicalTask: true });
     await myDay.addCheckIn("dev-1", taskService.today(), { summary: "Progress", taskKeys: [item.taskKey!] });
     const notes = new DailyNotesService();
-    await notes.save("mgr-1", taskService.today(), { body: "Follow up", revision: 0 }, "default");
+    await notes.save("mgr-1", taskService.today(), { noteId: null, body: "Follow up", revision: 0 }, "default");
     const followUpInput = { date: taskService.today(), title: "After cutover", requestId: crypto.randomUUID() };
     const followUp = await notes.createFollowUp("mgr-1", taskService.today(), followUpInput, "default");
     const day = await devDay(D(5));

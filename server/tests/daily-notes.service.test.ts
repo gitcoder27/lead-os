@@ -45,7 +45,7 @@ async function saveNote(
   body: string,
   overrides: { manager?: string; workspace?: string; date?: string; revision?: number } = {}
 ) {
-  return service.save(overrides.manager ?? MANAGER, overrides.date ?? DATE, {
+  return service.save(overrides.manager ?? MANAGER, overrides.date ?? DATE, { noteId: (overrides.revision ?? 0) === 0 ? null : (await service.getDay(overrides.manager ?? MANAGER, overrides.date ?? DATE, overrides.workspace ?? WS)).note?.id ?? null,
     body,
     revision: overrides.revision ?? 0,
   }, overrides.workspace ?? WS);
@@ -56,6 +56,19 @@ beforeEach(async () => {
 });
 
 describe("DailyNotesService.getDay/save", () => {
+  it("rejects stale note identities after clear/recreate, even at the same revision/body", async () => {
+    const first = await service.save(MANAGER, DATE, { body: "original", revision: 0, noteId: null }, WS);
+    await service.save(MANAGER, DATE, { body: "", revision: 1, noteId: first.note!.id }, WS);
+    await expect(service.save(MANAGER, DATE, { body: "stale", revision: 1, noteId: first.note!.id }, WS)).rejects.toMatchObject({ status: 409 });
+    const replacement = await service.save(MANAGER, DATE, { body: "original", revision: 0, noteId: null }, WS);
+    expect(replacement.note!.revision).toBe(1);
+    expect(replacement.note!.id).not.toBe(first.note!.id);
+    for (const body of ["stale", "original", ""]) {
+      await expect(service.save(MANAGER, DATE, { body, revision: 1, noteId: first.note!.id }, WS)).rejects.toMatchObject({ status: 409 });
+    }
+    expect((await service.getDay(MANAGER, DATE, WS)).note!.body).toBe("original");
+  });
+
   it("returns null for a blank day without inserting a row", async () => {
     const result = await service.getDay(MANAGER, DATE, WS);
 
@@ -64,7 +77,7 @@ describe("DailyNotesService.getDay/save", () => {
   });
 
   it("does not persist a whitespace-only first save", async () => {
-    const result = await service.save(MANAGER, DATE, { body: "   \n\t  ", revision: 0 }, WS);
+    const result = await service.save(MANAGER, DATE, { noteId: null, body: "   \n\t  ", revision: 0 }, WS);
 
     expect(result.note).toBeNull();
     expect(result.followUps).toEqual([]);
@@ -91,7 +104,7 @@ describe("DailyNotesService.getDay/save", () => {
 
   it("editing a historical note creates no Desk or Today work", async () => {
     await saveNote("retro note", { date: "2026-03-01" });
-    await service.save(MANAGER, "2026-03-01", { body: "retro note edited", revision: 1 }, WS);
+    await service.save(MANAGER, "2026-03-01", { noteId: (await service.getDay(MANAGER, "2026-03-01", WS)).note?.id ?? null, body: "retro note edited", revision: 1 }, WS);
 
     expect(await db.select().from(managerDeskDays)).toHaveLength(0);
     expect(await db.select().from(managerDeskItems)).toHaveLength(0);
@@ -99,11 +112,11 @@ describe("DailyNotesService.getDay/save", () => {
 
   it("updates and clears an existing note — clearing deletes the row (F13)", async () => {
     await saveNote("v1");
-    const updated = await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+    const updated = await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "v2", revision: 1 }, WS);
     expect(updated.note?.body).toBe("v2");
     expect(updated.note?.revision).toBe(2);
 
-    const cleared = await service.save(MANAGER, DATE, { body: "", revision: 2 }, WS);
+    const cleared = await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "", revision: 2 }, WS);
     expect(cleared.note).toBeNull();
     expect(cleared.refs).toEqual([]);
     expect(await noteRows()).toHaveLength(0);
@@ -127,7 +140,7 @@ describe("DailyNotesService.getDay/save", () => {
     const before = await service.getDay(MANAGER, "2026-03-01", WS);
     expect(before.followUps).toHaveLength(1);
 
-    const cleared = await service.save(MANAGER, "2026-03-01", { body: "", revision: before.note!.revision }, WS);
+    const cleared = await service.save(MANAGER, "2026-03-01", { noteId: before.note!.id, body: "", revision: before.note!.revision }, WS);
     expect(cleared.note).toBeNull();
     expect(await db.select().from(dailyNoteFollowUps)).toHaveLength(0);
     expect(await db.select().from(dailyNoteTaskRefs)).toHaveLength(0);
@@ -136,20 +149,20 @@ describe("DailyNotesService.getDay/save", () => {
 
   it("clears with a stale revision still conflict rather than deleting", async () => {
     await saveNote("v1");
-    await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+    await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "v2", revision: 1 }, WS);
 
     await expect(
-      service.save(MANAGER, DATE, { body: "", revision: 1 }, WS)
+      service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "", revision: 1 }, WS)
     ).rejects.toMatchObject({ status: 409 });
     expect((await service.getDay(MANAGER, DATE, WS)).note?.body).toBe("v2");
   });
 
   it("rejects a stale update without overwriting newer content", async () => {
     await saveNote("v1");
-    await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+    await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "v2", revision: 1 }, WS);
 
     await expect(
-      service.save(MANAGER, DATE, { body: "stale write", revision: 1 }, WS)
+      service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "stale write", revision: 1 }, WS)
     ).rejects.toMatchObject({ status: 409 });
 
     const current = await service.getDay(MANAGER, DATE, WS);
@@ -159,9 +172,9 @@ describe("DailyNotesService.getDay/save", () => {
 
   it("treats a same-body save as an idempotent retry with no revision churn", async () => {
     await saveNote("v1");
-    await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+    await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "v2", revision: 1 }, WS);
 
-    const retry = await service.save(MANAGER, DATE, { body: "v2", revision: 1 }, WS);
+    const retry = await service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "v2", revision: 1 }, WS);
     expect(retry.note?.revision).toBe(2);
     expect(retry.note?.body).toBe("v2");
   });
@@ -170,7 +183,7 @@ describe("DailyNotesService.getDay/save", () => {
     await saveNote("first");
 
     await expect(
-      service.save(MANAGER, DATE, { body: "second", revision: 0 }, WS)
+      service.save(MANAGER, DATE, { noteId: null, body: "second", revision: 0 }, WS)
     ).rejects.toMatchObject({ status: 409 });
 
     const current = await service.getDay(MANAGER, DATE, WS);
@@ -179,7 +192,7 @@ describe("DailyNotesService.getDay/save", () => {
 
   it("rejects an update revision for a note that does not exist", async () => {
     await expect(
-      service.save(MANAGER, DATE, { body: "ghost", revision: 3 }, WS)
+      service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "ghost", revision: 3 }, WS)
     ).rejects.toMatchObject({ status: 409 });
     expect(await noteRows()).toHaveLength(0);
   });
@@ -200,7 +213,7 @@ describe("DailyNotesService.getDay/save", () => {
     await expect(service.getDay(MANAGER, DATE, "")).rejects.toMatchObject({ status: 403 });
     await expect(service.list("", {}, WS)).rejects.toMatchObject({ status: 403 });
     await expect(
-      service.save(MANAGER, DATE, { body: "x", revision: 0 }, "")
+      service.save(MANAGER, DATE, { noteId: null, body: "x", revision: 0 }, "")
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       service.append("", DATE, { text: "x", requestId: randomUUID() }, WS)
@@ -211,11 +224,11 @@ describe("DailyNotesService.getDay/save", () => {
 
 describe("DailyNotesService note kinds", () => {
   it("lets a scratchpad and a standup note coexist for the same day", async () => {
-    const scratchpad = await service.save(MANAGER, DATE, { body: "private scratchpad", revision: 0 }, WS);
+    const scratchpad = await service.save(MANAGER, DATE, { noteId: null, body: "private scratchpad", revision: 0 }, WS);
     const standup = await service.save(
       MANAGER,
       DATE,
-      { body: "Standup 2026-03-08", revision: 0 },
+      { noteId: null, body: "Standup 2026-03-08", revision: 0 },
       WS,
       "standup"
     );
@@ -230,16 +243,16 @@ describe("DailyNotesService note kinds", () => {
   });
 
   it("honors the payload's kind and keeps revision chains per kind", async () => {
-    const standup = await service.save(MANAGER, DATE, { body: "v1", revision: 0, kind: "standup" }, WS);
+    const standup = await service.save(MANAGER, DATE, { noteId: null, body: "v1", revision: 0, kind: "standup" }, WS);
     expect(standup.note?.kind).toBe("standup");
 
     // Each kind has its own revision chain — a scratchpad write starts at 0.
-    const scratchpad = await service.save(MANAGER, DATE, { body: "pad", revision: 0 }, WS);
+    const scratchpad = await service.save(MANAGER, DATE, { noteId: null, body: "pad", revision: 0 }, WS);
     expect(scratchpad.note?.kind).toBe("scratchpad");
 
     // A stale scratchpad revision must not collide with the standup note.
     await expect(
-      service.save(MANAGER, DATE, { body: "stale", revision: 5 }, WS)
+      service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "stale", revision: 5 }, WS)
     ).rejects.toMatchObject({ status: 409 });
     expect((await service.getDay(MANAGER, DATE, WS, "standup")).note?.body).toBe("v1");
   });
@@ -273,8 +286,8 @@ describe("DailyNotesService note kinds", () => {
 
   it("filters list results by kind and defaults to scratchpad", async () => {
     await saveNote("scratchpad body");
-    await service.save(MANAGER, DATE, { body: "standup body", revision: 0 }, WS, "standup");
-    await service.save(MANAGER, "2026-03-07", { body: "earlier standup", revision: 0 }, WS, "standup");
+    await service.save(MANAGER, DATE, { noteId: null, body: "standup body", revision: 0 }, WS, "standup");
+    await service.save(MANAGER, "2026-03-07", { noteId: null, body: "earlier standup", revision: 0 }, WS, "standup");
 
     const defaults = await service.list(MANAGER, {}, WS);
     expect(defaults.notes).toHaveLength(1);
@@ -416,7 +429,7 @@ describe("DailyNotesService.list", () => {
 
   it("keeps the FTS index in sync across edits", async () => {
     await saveNote("alpha keyword", { date: "2026-03-01" });
-    await service.save(MANAGER, "2026-03-01", { body: "beta keyword", revision: 1 }, WS);
+    await service.save(MANAGER, "2026-03-01", { noteId: (await service.getDay(MANAGER, "2026-03-01", WS)).note?.id ?? null, body: "beta keyword", revision: 1 }, WS);
 
     expect((await service.list(MANAGER, { q: "alpha" }, WS)).notes).toHaveLength(0);
     expect((await service.list(MANAGER, { q: "beta" }, WS)).notes.map((note) => note.date)).toEqual(["2026-03-01"]);
@@ -444,7 +457,7 @@ describe("DailyNotesService.append", () => {
     await service.append(MANAGER, DATE, { text: "capture", requestId: randomUUID() }, WS);
 
     await expect(
-      service.save(MANAGER, DATE, { body: "editor overwrite", revision: 1 }, WS)
+      service.save(MANAGER, DATE, { noteId: (await service.getDay(MANAGER, DATE, WS)).note?.id ?? null, body: "editor overwrite", revision: 1 }, WS)
     ).rejects.toMatchObject({ status: 409 });
   });
 
@@ -498,7 +511,7 @@ describe("DailyNotesService.createFollowUp/getSources", () => {
   const FOLLOW_UP_AT = "2026-03-10T09:00:00.000Z";
 
   async function seedNote(body = "source note body") {
-    await service.save(MANAGER, NOTE_DATE, { body, revision: 0 }, WS);
+    await service.save(MANAGER, NOTE_DATE, { noteId: null, body, revision: 0 }, WS);
   }
 
   function payload(overrides: Partial<{ title: string; requestId: string; date: string }> = {}) {
@@ -807,7 +820,7 @@ describe("DailyNotesService refs[] + day context", () => {
     const item = await tracker.addItem("dev-1", DATE, { title: "Queue review" });
     await saveNote(`watching ${item.taskKey}`);
     const saved = await service.getDay(MANAGER, DATE, WS);
-    await service.save(MANAGER, DATE, { body: `watching ${item.taskKey} plus more`, revision: saved.note!.revision }, WS);
+    await service.save(MANAGER, DATE, { noteId: saved.note!.id, body: `watching ${item.taskKey} plus more`, revision: saved.note!.revision }, WS);
 
     const mentioned = (await db.select().from(dailyNoteTaskRefs)).filter((row) => row.relation === "mentioned");
     expect(mentioned).toHaveLength(1);
@@ -926,7 +939,7 @@ describe("daily notes migration", () => {
       followUpAt: "2026-03-10T09:00:00.000Z",
       requestId: randomUUID(),
     };
-    await service.save(MANAGER, "2026-03-01", { body: "source", revision: 0 }, WS);
+    await service.save(MANAGER, "2026-03-01", { noteId: null, body: "source", revision: 0 }, WS);
     const followUp = await service.createFollowUp(MANAGER, "2026-03-01", followUpInput, WS);
 
     migrate(rawDb);

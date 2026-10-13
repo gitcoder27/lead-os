@@ -71,7 +71,7 @@ describe("canonical tasks", () => {
   it("creates canonical note follow-ups and resolves their source without Desk rows", async () => {
     const notes = new DailyNotesService();
     const date = service.today();
-    await notes.save(manager.accountId, date, { body: "Follow up tomorrow", revision: 0 }, "default");
+    await notes.save(manager.accountId, date, { noteId: null, body: "Follow up tomorrow", revision: 0 }, "default");
     const input = { title: "Check release", date, followUpAt: "2026-10-01T09:00:00Z", requestId: crypto.randomUUID() };
     const created = await notes.createFollowUp(manager.accountId, date, input, "default");
     expect(await notes.createFollowUp(manager.accountId, date, input, "default")).toMatchObject({ itemId: created.itemId });

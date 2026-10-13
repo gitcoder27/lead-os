@@ -1910,7 +1910,7 @@ export function createAssistantTools(canonical = false, { phase3 = true, oneOnOn
         const response = await ctx.services.dailyNotesService.save(
           ctx.managerAccountId,
           date,
-          { body: args.body, revision: current.note?.revision ?? 0 },
+          { body: args.body, revision: current.note?.revision ?? 0, noteId: current.note?.id ?? null },
           ctx.workspaceId
         );
         return {

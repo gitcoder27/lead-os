@@ -21,8 +21,8 @@ describe("note task references", () => {
   it("preserves Jira links and checks the original complete task request on replay", async () => {
     const now = new Date().toISOString();
     await db.insert(issues).values({ jiraKey: "APP-1", summary: "Issue", priorityName: "Medium", priorityId: "3", statusName: "Open", statusCategory: "new", createdAt: now, updatedAt: now, syncedAt: now });
-    await service.save("manager-a", date, { revision: 0, body: "Scratchpad" }, "default");
-    await service.save("manager-a", "2026-09-23", { revision: 0, body: "Other note" }, "default");
+    await service.save("manager-a", date, { noteId: null, revision: 0, body: "Scratchpad" }, "default");
+    await service.save("manager-a", "2026-09-23", { noteId: null, revision: 0, body: "Other note" }, "default");
     const input = { title: "From note", jiraKey: "APP-1", context: "Private context", requestId: randomUUID() };
     const created = await service.createTask("manager-a", date, input, "default");
     expect(await db.select().from(managerDeskLinks)).toEqual([expect.objectContaining({ itemId: created.managerDeskItemId, issueKey: "APP-1" })]);
@@ -40,8 +40,8 @@ describe("note task references", () => {
 
   it("records mentions once, keeps them after edits, and hides private excerpts", async () => {
     const item = await new TeamTrackerService().addItem("dev-1", date, { title: "Review" });
-    await service.save("manager-a", date, { revision: 0, body: `See ${item.taskKey} for private plans. And t-99999 is unknown.` }, "default");
-    await service.save("manager-a", date, { revision: 1, body: `No mention remains` }, "default");
+    await service.save("manager-a", date, { noteId: null, revision: 0, body: `See ${item.taskKey} for private plans. And t-99999 is unknown.` }, "default");
+    await service.save("manager-a", date, { noteId: (await service.getDay("manager-a", date, "default")).note?.id ?? null, revision: 1, body: `No mention remains` }, "default");
     expect((await db.select().from(dailyNoteTaskRefs)).map((ref) => ref.taskKey)).toEqual([item.taskKey]);
     const own = await events.list(item.taskKey!, { kind: "manager", accountId: "manager-a" });
     expect(own.events[0]).toMatchObject({ type: "note_ref", visibility: "private", meta: { relation: "mentioned" } });
@@ -51,7 +51,7 @@ describe("note task references", () => {
 
   it("dedupes task updates, rejects reused IDs, and links a new task to its source note", async () => {
     const item = await new TeamTrackerService().addItem("dev-1", date, { title: "Review" });
-    await service.save("manager-a", date, { revision: 0, body: "Scratchpad" }, "default");
+    await service.save("manager-a", date, { noteId: null, revision: 0, body: "Scratchpad" }, "default");
     const requestId = randomUUID();
     const payload = { taskKey: item.taskKey!, text: "Only I can see this", requestId };
     const first = await service.addTaskUpdate("manager-a", date, payload, "default");

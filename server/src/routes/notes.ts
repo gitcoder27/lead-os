@@ -60,6 +60,7 @@ const saveNoteSchema = z.object({
   body: z.object({
     body: z.string().max(MAX_BODY_LENGTH),
     revision: z.number().int().min(0),
+    noteId: z.number().int().positive().nullable().default(null),
     kind: noteKindSchema.optional(),
   }),
   query: z.object({ kind: noteKindSchema.optional() }).optional(),

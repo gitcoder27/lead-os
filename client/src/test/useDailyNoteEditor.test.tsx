@@ -101,13 +101,53 @@ describe('useDailyNoteEditor', () => {
     apiMocks.put.mockReset();
     apiMocks.post.mockReset();
     apiMocks.get.mockResolvedValue(dayResponse(null));
-    apiMocks.put.mockImplementation(async (_url: string, payload: { body: string; revision: number }) =>
-      dayResponse(note({ body: payload.body, revision: payload.revision + 1 })),
+    apiMocks.put.mockImplementation(async (_url: string, payload: { body: string; revision: number; noteId: number | null }) =>
+      dayResponse(note({ id: payload.noteId ?? 7, body: payload.body, revision: payload.revision + 1 })),
     );
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it.each([false, true])('reconciles a replacement at the same revision (dirty=%s)', async dirty => {
+    const queryClient = createQueryClient();
+    apiMocks.get.mockResolvedValue(dayResponse(note()));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper(queryClient) });
+    await until(() => result.current.saveState === 'idle');
+    if (dirty) act(() => result.current.changeBody('local draft'));
+    act(() => queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE, 'scratchpad'], dayResponse(note({ id: 8, body: 'replacement' }))));
+    await until(() => dirty ? result.current.saveState === 'conflict' : result.current.body === 'replacement');
+    expect(result.current.body).toBe(dirty ? 'local draft' : 'replacement');
+    await advance(1000);
+    expect(apiMocks.put).not.toHaveBeenCalled();
+    if (dirty) act(() => result.current.keepBoth());
+    else act(() => result.current.changeBody('replacement edited'));
+    await advance(700);
+    expect(apiMocks.put.mock.calls.at(-1)?.[1]).toMatchObject({ noteId: 8, revision: 1 });
+  });
+
+  it.each([false, true])('reconciles remote deletion (dirty=%s)', async dirty => {
+    const queryClient = createQueryClient();
+    apiMocks.get.mockResolvedValue(dayResponse(note()));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper(queryClient) });
+    await until(() => result.current.saveState === 'idle');
+    if (dirty) act(() => result.current.changeBody('local draft'));
+    act(() => queryClient.setQueryData(['daily-notes', SCOPE, 'day', DATE, 'scratchpad'], dayResponse(null)));
+    await until(() => dirty ? result.current.saveState === 'conflict' : result.current.body === '');
+    expect(result.current.body).toBe(dirty ? 'local draft' : '');
+    await advance(1000);
+    expect(apiMocks.put).not.toHaveBeenCalled();
+  });
+
+  it('requires a decision for a legacy draft with no document identity', async () => {
+    writeDailyNoteDraft(SCOPE, DATE, { body: 'legacy draft', baseBody: 'saved body', revision: 1 });
+    apiMocks.get.mockResolvedValue(dayResponse(note()));
+    const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
+    await until(() => result.current.saveState === 'conflict');
+    await advance(1000);
+    expect(result.current.body).toBe('legacy draft');
+    expect(apiMocks.put).not.toHaveBeenCalled();
   });
 
   it('does not write when the day is empty and untouched', async () => {
@@ -129,27 +169,27 @@ describe('useDailyNoteEditor', () => {
 
     await advance(700);
 
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { body: 'morning notes', revision: 0 });
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: null, body: 'morning notes', revision: 0 });
     expect(result.current.saveState).toBe('saved');
     expect(readDailyNoteDraft(SCOPE, DATE)).toBeNull();
   });
 
   it('restores a session draft after remount and queues the autosave', async () => {
     apiMocks.get.mockResolvedValue(dayResponse(note()));
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'unsynced draft', baseBody: 'saved body', revision: 1 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'unsynced draft', baseBody: 'saved body', revision: 1 });
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
 
     await until(() => result.current.body === 'unsynced draft');
     await advance(10);
 
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { body: 'unsynced draft', revision: 1 });
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'unsynced draft', revision: 1 });
     await until(() => result.current.saveState === 'saved');
   });
 
   it('surfaces a conflict when the draft diverges from the server body', async () => {
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'changed elsewhere', revision: 4 })));
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'local draft', baseBody: 'old base', revision: 2 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'local draft', baseBody: 'old base', revision: 2 });
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
 
@@ -165,7 +205,7 @@ describe('useDailyNoteEditor', () => {
     // Draft base has three shared lines; remote edited line 3, draft edited line 1
     // — non-adjacent hunks merge cleanly and each shared line appears once.
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'shared one\nshared two\nremote three', revision: 4 })));
-    writeDailyNoteDraft(SCOPE, DATE, {
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7,
       body: 'local one\nshared two\nshared three',
       baseBody: 'shared one\nshared two\nshared three',
       revision: 2,
@@ -179,7 +219,7 @@ describe('useDailyNoteEditor', () => {
     expect(result.current.saveState).toBe('dirty');
 
     await advance(700);
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, {
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7,
       body: 'local one\nshared two\nremote three',
       revision: 4,
     });
@@ -187,7 +227,7 @@ describe('useDailyNoteEditor', () => {
 
   it('keep-both preserves both sides of a genuinely overlapping edit', async () => {
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'shared\nremote middle', revision: 4 })));
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'shared\nlocal middle', baseBody: 'shared\nbase middle', revision: 2 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'shared\nlocal middle', baseBody: 'shared\nbase middle', revision: 2 });
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
     await until(() => result.current.saveState === 'conflict');
@@ -219,7 +259,7 @@ describe('useDailyNoteEditor', () => {
 
     // The rebased draft persists immediately rather than waiting for a keystroke.
     await advance(1);
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, {
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7,
       body: 'morning notes\n\nlocal typing\n\nstandup summary',
       revision: 2,
     });
@@ -239,7 +279,7 @@ describe('useDailyNoteEditor', () => {
     for (let i = 0; i < 50 && apiMocks.put.mock.calls.length < 2; i += 1) {
       await advance(1);
     }
-    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, {
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { noteId: 7,
       body: 'base note\n\nlocal\n\nremote appended',
       revision: 2,
     });
@@ -262,7 +302,7 @@ describe('useDailyNoteEditor', () => {
     await advance(2000);
     await until(() => apiMocks.put.mock.calls.length === 2);
     await until(() => result.current.saveState === 'saved');
-    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, {
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { noteId: 7,
       body: 'typed while offline-ish',
       revision: 1,
     });
@@ -270,7 +310,7 @@ describe('useDailyNoteEditor', () => {
 
   it('keeps both versions on conflict resolution', async () => {
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'server text', revision: 4 })));
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'local draft', baseBody: 'old base', revision: 2 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'local draft', baseBody: 'old base', revision: 2 });
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
     await until(() => result.current.saveState === 'conflict');
@@ -280,7 +320,7 @@ describe('useDailyNoteEditor', () => {
     expect(result.current.saveState).toBe('dirty');
 
     await advance(700);
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, {
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7,
       body: 'server text\n\nlocal draft',
       revision: 4,
     });
@@ -288,7 +328,7 @@ describe('useDailyNoteEditor', () => {
 
   it('adopts the saved version on conflict resolution', async () => {
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'server text', revision: 4 })));
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'local draft', baseBody: 'old base', revision: 2 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'local draft', baseBody: 'old base', revision: 2 });
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
     await until(() => result.current.saveState === 'conflict');
@@ -331,7 +371,7 @@ describe('useDailyNoteEditor', () => {
     act(() => result.current.retrySave());
     await advance(10);
     await until(() => result.current.saveState === 'saved');
-    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { body: 'typed offline', revision: 1 });
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'typed offline', revision: 1 });
   });
 
   it('queues edits made while a save is in flight', async () => {
@@ -356,7 +396,7 @@ describe('useDailyNoteEditor', () => {
     await until(() => result.current.saveState === 'dirty');
     await advance(700);
 
-    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { body: 'first plus more', revision: 2 });
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'first plus more', revision: 2 });
   });
 
   it('does not fire a follow-on write after unmount', async () => {
@@ -403,7 +443,7 @@ describe('useDailyNoteEditor', () => {
     });
 
     expect(flushed).toBe(true);
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { body: 'flush me', revision: 1 });
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'flush me', revision: 1 });
   });
 
   it('adopts remote changes when clean and conflicts when dirty', async () => {
@@ -448,13 +488,13 @@ describe('useDailyNoteEditor', () => {
     unmount();
 
     const draft = readDailyNoteDraft(SCOPE, DATE);
-    expect(draft).toEqual({ body: 'local draft v2', baseBody: 'saved body', revision: 1 });
+    expect(draft).toEqual({ noteId: 7, body: 'local draft v2', baseBody: 'saved body', revision: 1 });
     await advance(2000);
     expect(apiMocks.put).not.toHaveBeenCalled();
   });
 
   it('does not silently overwrite the server after remounting a conflicted draft', async () => {
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'local work', baseBody: 'saved body', revision: 1 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'local work', baseBody: 'saved body', revision: 1 });
     apiMocks.get.mockResolvedValue(dayResponse(note({ body: 'remote rewrite', revision: 2 })));
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
@@ -467,7 +507,7 @@ describe('useDailyNoteEditor', () => {
   });
 
   it('stays in conflict when the remote note has been deleted', async () => {
-    writeDailyNoteDraft(SCOPE, DATE, { body: 'local work', baseBody: 'saved body', revision: 1 });
+    writeDailyNoteDraft(SCOPE, DATE, { noteId: 7, body: 'local work', baseBody: 'saved body', revision: 1 });
     apiMocks.get.mockResolvedValue(dayResponse(null));
 
     const { result } = renderHook(() => useDailyNoteEditor(DATE), { wrapper: createWrapper() });
@@ -489,8 +529,8 @@ describe('useDailyNoteEditor', () => {
     apiMocks.put.mockImplementationOnce(
       () => new Promise<DailyNoteResponse>((resolve) => { releaseFirst = resolve; }),
     );
-    apiMocks.put.mockImplementation(async (_url: string, payload: { body: string; revision: number }) =>
-      dayResponse(note({ body: payload.body, revision: payload.revision + 1 })),
+    apiMocks.put.mockImplementation(async (_url: string, payload: { body: string; revision: number; noteId: number | null }) =>
+      dayResponse(note({ id: payload.noteId ?? 7, body: payload.body, revision: payload.revision + 1 })),
     );
 
     act(() => result.current.changeBody('edited version'));
@@ -517,7 +557,7 @@ describe('useDailyNoteEditor', () => {
     });
 
     await until(() => apiMocks.put.mock.calls.length === 2);
-    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { body: 'saved body', revision: 2 });
+    expect(apiMocks.put).toHaveBeenLastCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'saved body', revision: 2 });
     await until(() => flushDone === true);
     expect(flushResult).toBe(true);
   });
@@ -575,7 +615,7 @@ describe('useDailyNoteEditor', () => {
 
     act(() => result.current.changeBody('trimmed down'));
     await advance(700);
-    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { body: 'trimmed down', revision: 1 });
+    expect(apiMocks.put).toHaveBeenCalledWith(`/notes/${DATE}`, { noteId: 7, body: 'trimmed down', revision: 1 });
   });
 
   it('ignores a late response after unmount without touching cache or drafts', async () => {

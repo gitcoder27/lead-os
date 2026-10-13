@@ -74,6 +74,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
   const bodyRef = useRef(body);
   const baseBodyRef = useRef('');
   const baseRevisionRef = useRef(0);
+  const baseNoteIdRef = useRef<number | null>(null);
   const saveStateRef = useRef<DailyNoteSaveState>('loading');
   const initializedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -103,6 +104,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
         body: nextBody,
         baseBody: baseBodyRef.current,
         revision: baseRevisionRef.current,
+        noteId: baseNoteIdRef.current,
       }, kind, () => {
         if (mountedRef.current && scopeRef.current === scope) setRecoveryUnavailable(true);
       });
@@ -115,6 +117,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
       const nextBody = note?.body ?? '';
       baseBodyRef.current = nextBody;
       baseRevisionRef.current = note?.revision ?? 0;
+      baseNoteIdRef.current = note?.id ?? null;
       setLatest(note);
       setBody(nextBody);
       bodyRef.current = nextBody;
@@ -163,6 +166,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
     (acknowledgedBody: string, acknowledgedRevision: number, note: DailyNote | null, res: DailyNoteResponse) => {
       baseBodyRef.current = acknowledgedBody;
       baseRevisionRef.current = acknowledgedRevision;
+      baseNoteIdRef.current = note?.id ?? null;
       retryCountRef.current = 0;
       listViewsStaleRef.current = true;
       setLatest(note);
@@ -192,8 +196,13 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
    */
   const reconcileRemote = useCallback(
     (note: DailyNote | null): 'merged' | 'conflict' | 'ignored' => {
-      if (!note) {
-        enterConflict(null);
+      if ((note?.id ?? null) !== baseNoteIdRef.current || !note) {
+        if (bodyRef.current === baseBodyRef.current) {
+          adoptServerNote(note);
+          setStatus('idle');
+          return 'ignored';
+        }
+        enterConflict(note);
         return 'conflict';
       }
       if (note.body === baseBodyRef.current) {
@@ -252,6 +261,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
 
     const submittedBody = bodyRef.current;
     const submittedRevision = baseRevisionRef.current;
+    const submittedNoteId = baseNoteIdRef.current;
     const scopeAtSend = scopeRef.current;
 
     if (submittedBody.length > DAILY_NOTE_MAX_LENGTH) {
@@ -270,6 +280,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
         const res = await api.put<DailyNoteResponse>(dailyNoteDayPath(date, kind), {
           body: submittedBody,
           revision: submittedRevision,
+          noteId: submittedNoteId,
         });
         if (!mountedRef.current || scopeRef.current !== scopeAtSend) {
           return;
@@ -365,7 +376,9 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
       }
 
       setLatest(note);
-      if (draft.baseBody === serverBody) {
+      baseNoteIdRef.current = draft.noteId ?? null;
+      const sameDocument = draft.noteId === (note?.id ?? null) || (draft.noteId === undefined && draft.revision === 0 && !note);
+      if (sameDocument && draft.baseBody === serverBody) {
         baseBodyRef.current = draft.baseBody;
         baseRevisionRef.current = Math.max(note?.revision ?? 0, draft.revision);
         setBody(draft.body);
@@ -386,10 +399,11 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
       return;
     }
 
-    if (!note || note.revision <= baseRevisionRef.current) {
+    const sameDocument = (note?.id ?? null) === baseNoteIdRef.current;
+    if (sameDocument && (!note || note.revision <= baseRevisionRef.current)) {
       return;
     }
-    if (note.body === baseBodyRef.current) {
+    if (sameDocument && note && note.body === baseBodyRef.current) {
       setLatest(note);
       baseRevisionRef.current = note.revision;
       return;
@@ -449,7 +463,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
             method: 'PUT',
             keepalive: true,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ body: bodyRef.current, revision: baseRevisionRef.current }),
+            body: JSON.stringify({ body: bodyRef.current, revision: baseRevisionRef.current, noteId: baseNoteIdRef.current }),
           }).catch(() => undefined);
         } catch {
           // best-effort only — the local draft remains as the fallback
@@ -544,6 +558,7 @@ export function useDailyNoteEditor(date: string, kind: DailyNoteKind = 'scratchp
     }
     baseBodyRef.current = remoteBody;
     baseRevisionRef.current = remote?.revision ?? 0;
+    baseNoteIdRef.current = remote?.id ?? null;
     setLatest(remote);
     setConflict(null);
     setError(null);

@@ -11,6 +11,8 @@ export interface DailyNoteDraft {
   body: string;
   baseBody: string;
   revision: number;
+  /** Missing only on pre-identity drafts; these require an explicit reconciliation. */
+  noteId?: number | null;
 }
 
 export interface DailyNoteCaptureDraft {
@@ -63,7 +65,8 @@ function isDailyNoteDraftFields(value: unknown): value is DailyNoteDraft {
     typeof draft.body === 'string' &&
     typeof draft.baseBody === 'string' &&
     Number.isInteger(draft.revision) &&
-    draft.revision >= 0
+    draft.revision >= 0 &&
+    (draft.noteId === undefined || draft.noteId === null || (Number.isSafeInteger(draft.noteId) && draft.noteId > 0))
   );
 }
 
@@ -247,7 +250,7 @@ export function readDailyNoteDraft(scope: string, date: string, kind: DailyNoteK
   const pending = pendingDrafts.get(draftKey(scope, date, kind));
   if (pending) return pending.draft;
   const draft = readStored(draftKey(scope, date, kind), isDailyNoteDraftFields);
-  return draft ? { body: draft.body, baseBody: draft.baseBody, revision: draft.revision } : null;
+  return draft ? { body: draft.body, baseBody: draft.baseBody, revision: draft.revision, ...(draft.noteId !== undefined ? { noteId: draft.noteId } : {}) } : null;
 }
 
 export function writeDailyNoteDraft(scope: string, date: string, draft: DailyNoteDraft, kind: DailyNoteKind = 'scratchpad'): boolean {

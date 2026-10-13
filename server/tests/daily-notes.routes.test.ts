@@ -446,6 +446,20 @@ describe("notes routes validation", () => {
     }
   });
 
+  it("guards document identity across deletion and same-revision replacement at the HTTP boundary", async () => {
+    const app = createTestApp();
+    const cookie = await loginCookie("manager");
+    const save = (body: unknown) => invoke(app, { method: "PUT", url: `/api/notes/${DATE}`, headers: { cookie }, body });
+    const original = await save({ body: "original", revision: 0, noteId: null });
+    const id = original.body.note.id;
+    expect((await save({ body: "", revision: 1, noteId: id })).status).toBe(200);
+    const replacement = await save({ body: "replacement", revision: 0, noteId: null });
+    expect(replacement.body.note.revision).toBe(1);
+    for (const body of ["stale", "replacement", ""]) expect((await save({ body, revision: 1, noteId: id })).status).toBe(409);
+    expect((await save({ body: "missing identity", revision: 1 })).status).toBe(409);
+    expect((await save({ body: "valid", revision: 1, noteId: replacement.body.note.id })).status).toBe(200);
+  });
+
   it("rejects invalid save payloads", async () => {
     const app = createTestApp();
     const cookie = await loginCookie("manager");
@@ -455,6 +469,8 @@ describe("notes routes validation", () => {
       { body: "x", revision: -1 },
       { body: "x", revision: 1.5 },
       { body: "x", revision: "0" },
+      { body: "x", revision: 0, noteId: -1 },
+      { body: "x", revision: 0, noteId: "7" },
       { revision: 0 },
       { body: "x".repeat(50001), revision: 0 },
     ];

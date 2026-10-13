@@ -981,6 +981,9 @@ export class DailyNotesService {
     if (!Number.isInteger(input.revision) || input.revision < 0) {
       throw new HttpError(400, "revision must be a non-negative integer");
     }
+    if (input.noteId != null && (!Number.isSafeInteger(input.noteId) || input.noteId <= 0)) {
+      throw new HttpError(400, "noteId must be a positive integer or null");
+    }
     if (input.body.length > MAX_BODY_LENGTH) {
       throw new HttpError(400, `Note body must be ${MAX_BODY_LENGTH} characters or fewer`);
     }
@@ -1002,7 +1005,7 @@ export class DailyNotesService {
         .get();
 
       if (!current) {
-        if (input.revision !== 0) {
+        if (input.revision !== 0 || input.noteId != null) {
           throw new HttpError(409, NOTE_CONFLICT_MESSAGE);
         }
         if (input.body.trim().length === 0) {
@@ -1029,6 +1032,7 @@ export class DailyNotesService {
         return;
       }
 
+      if (input.noteId !== current.id) throw new HttpError(409, NOTE_CONFLICT_MESSAGE);
       previousBody = current.body;
       if (input.body === current.body) {
         return;

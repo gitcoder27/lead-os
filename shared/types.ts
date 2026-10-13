@@ -2619,6 +2619,8 @@ export interface DailyNotesResponse {
 }
 
 export interface SaveDailyNotePayload {
+  /** Identity read with the revision; null only for a new/empty document. */
+  noteId: number | null;
   body: string;
   revision: number;
   kind?: DailyNoteKind;

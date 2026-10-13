@@ -3,7 +3,6 @@ import { promisify } from "node:util";
 import { and, eq, inArray } from "drizzle-orm";
 import type { AuthUser as PublicAuthUser, UserRole } from "shared/types";
 import { db, rawDb } from "../db/connection";
-import { runInTransaction } from "../db/transaction";
 import { appSessions, appUsers, developers } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId, WorkspaceService } from "./workspace.service";
@@ -239,20 +238,24 @@ export class AuthService {
     if (!row || !validPassword) {
       throw new HttpError(401, "Invalid username or password");
     }
-    // Same generic error: don't reveal that the account exists but was removed.
-    if (row.role === "developer" && !(await this.isActiveDeveloper(row.workspaceId, row.developerAccountId))) {
-      throw new HttpError(401, "Invalid username or password");
-    }
-
     const now = nowIso();
     const sessionId = randomBytes(32).toString("hex");
-    await db.insert(appSessions).values({
-      id: sessionId,
-      userId: row.id,
-      createdAt: now,
-      expiresAt: addSeconds(now, this.sessionMaxAgeSeconds),
-      lastSeenAt: now,
-    });
+    // No async gap between revalidation and session insertion. A reset/deactivation
+    // that completed during scrypt must invalidate this verified snapshot.
+    rawDb.transaction(() => {
+      const current = db.select().from(appUsers).where(and(
+        eq(appUsers.id, row.id), eq(appUsers.passwordHash, row.passwordHash), eq(appUsers.isActive, 1)
+      )).get();
+      const developerActive = current?.role !== "developer" || db.select().from(developers).where(and(
+        eq(developers.workspaceId, current.workspaceId),
+        eq(developers.accountId, current.developerAccountId ?? ""), eq(developers.isActive, 1)
+      )).get();
+      if (!current || !developerActive) throw new HttpError(401, "Invalid username or password");
+      db.insert(appSessions).values({
+        id: sessionId, userId: row.id, createdAt: now,
+        expiresAt: addSeconds(now, this.sessionMaxAgeSeconds), lastSeenAt: now,
+      }).run();
+    })();
 
     return {
       sessionId,
@@ -376,16 +379,6 @@ export class AuthService {
     return rows.map((row) => row.id);
   }
 
-  private async isActiveDeveloper(workspaceId: string, developerAccountId: string | null): Promise<boolean> {
-    if (!developerAccountId) return false;
-    const rows = await db
-      .select({ isActive: developers.isActive })
-      .from(developers)
-      .where(and(eq(developers.workspaceId, workspaceId), eq(developers.accountId, developerAccountId)))
-      .limit(1);
-    return rows[0]?.isActive === 1;
-  }
-
   async getUserCount(): Promise<number> {
     const rows = await db
       .select({ id: appUsers.id })
@@ -434,10 +427,14 @@ export class AuthService {
       throw new HttpError(401, "Invalid username or current password");
     }
 
-    await db
-      .update(appUsers)
-      .set({ passwordHash: await hashPassword(newPassword), updatedAt: nowIso() })
-      .where(eq(appUsers.id, row.id));
+    const passwordHash = await hashPassword(newPassword);
+    rawDb.transaction(() => {
+      const changed = db.update(appUsers)
+        .set({ passwordHash, updatedAt: nowIso() })
+        .where(and(eq(appUsers.id, row.id), eq(appUsers.passwordHash, row.passwordHash), eq(appUsers.isActive, 1)))
+        .returning({ id: appUsers.id }).all();
+      if (!changed.length) throw new HttpError(401, "Invalid username or current password");
+    })();
   }
 
   /**
@@ -484,11 +481,11 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(newPassword);
-    return runInTransaction(async () => {
-      await db.update(appUsers).set({ passwordHash, updatedAt: nowIso() }).where(eq(appUsers.id, row.id));
-      const revoked = await db.delete(appSessions).where(eq(appSessions.userId, row.id)).returning({ id: appSessions.id });
+    return rawDb.transaction(() => {
+      db.update(appUsers).set({ passwordHash, updatedAt: nowIso() }).where(eq(appUsers.id, row.id)).run();
+      const revoked = db.delete(appSessions).where(eq(appSessions.userId, row.id)).returning({ id: appSessions.id }).all();
       return { username: row.username, role, sessionsRevoked: revoked.length };
-    });
+    })();
   }
 
   async deleteUser(username: string, workspaceId?: string): Promise<void> {

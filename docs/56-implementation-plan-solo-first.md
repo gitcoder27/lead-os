@@ -1032,7 +1032,7 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 
 - [x] CR-01 — Atomically revalidate credentials and active state after asynchronous password checks.
 - [x] CR-02 — Revoke sessions on password change and retain the sign-in flow.
-- [ ] CR-03 — Bind Jira and Copilot sockets to vetted DNS addresses.
+- [x] CR-03 — Bind Jira and Copilot sockets to vetted DNS addresses.
 - [ ] CR-04 — Claim proposals atomically and coordinate conversation mutations.
 - [ ] CR-05 — Guard note identity across deletion/recreation and reconcile remote changes.
 - [ ] CR-06 — Bound public password-change IP and account throttles.
@@ -1043,3 +1043,4 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 | --- | --- | --- | --- |
 | 2026-10-13 | CR-01 | main (this commit) | Four scrypt-gated reset/deactivation regressions failed before the fix. Synchronous credential CAS/session transactions reject stale checks; reset hash update and revocation also use a synchronous transaction. Auth race, timing, reset and route suites pass. |
 | 2026-10-13 | CR-02 | main (this commit) | Password change revokes all account sessions in the credential CAS transaction; route clears the cookie. Route regression verifies failure retains sessions, success revokes both devices, other accounts survive and fresh login works. 32 backend and 4 SignInForm tests pass. |
+| 2026-10-13 | CR-03 | main (this commit) | Shared Undici dispatcher vets DNS in its connector and drains response bodies on close. 82 existing outbound/Jira/LLM/config tests and 3 socket tests pass: public-to-private rebinding blocked before connection; actual Jira/Copilot HTTPS uses fixture DNS with ordinary DNS poisoned, preserves Host/SNI and rejects a wrong-host certificate. Operator exceptions and redirects retained; TLS verification enabled. |

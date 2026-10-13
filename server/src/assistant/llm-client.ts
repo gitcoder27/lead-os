@@ -1,4 +1,4 @@
-import { assertAllowedOutboundUrl } from "../net/outbound-guard";
+import { outboundFetch } from "../net/outbound-fetch";
 import { HttpError } from "../middleware/errorHandler";
 
 export type LlmRole = "system" | "user" | "assistant" | "tool";
@@ -334,8 +334,7 @@ export class OpenAiCompatibleClient implements LlmClient {
     for (let attempt = 0; ; attempt += 1) {
       const canRetry = attempt < this.maxRetries;
       try {
-        await assertAllowedOutboundUrl(`${this.baseUrl}/chat/completions`, "ai");
-        const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        const response = await outboundFetch(`${this.baseUrl}/chat/completions`, "ai", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${this.apiKey}`,

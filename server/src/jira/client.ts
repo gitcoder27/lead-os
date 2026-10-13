@@ -1,4 +1,4 @@
-import { assertAllowedOutboundUrl } from "../net/outbound-guard";
+import { outboundFetch } from "../net/outbound-fetch";
 import { logger } from "../utils/logger";
 import { JiraIssue, JiraSearchResult, JiraUser, JiraTransition } from "./types";
 
@@ -43,7 +43,6 @@ export class JiraClient {
       throw new Error("Invalid Jira request URL");
     }
 
-    await assertAllowedOutboundUrl(requestUrl, "jira");
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort(new DOMException("Jira request timed out", "TimeoutError"));
@@ -51,7 +50,7 @@ export class JiraClient {
 
     let response: Response;
     try {
-      response = await fetch(requestUrl, {
+      response = await outboundFetch(requestUrl, "jira", {
         ...init,
         headers: {
           Authorization: this.authHeader,

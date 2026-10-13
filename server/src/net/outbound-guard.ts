@@ -18,6 +18,16 @@ export function isPublicOutboundAddress(address: string): boolean {
   return ipaddr.process(address).range() === "unicast";
 }
 
+/** Used again by the socket resolver; operator exceptions still require https above. */
+export function assertAllowedOutboundAddresses(host: string, addresses: string[]): void {
+  if (!addresses.length) throw denied();
+  if (config.NODE_ENV !== "production") return;
+  const exceptions = hostRules(process.env.OUTBOUND_ALLOWED_HOSTS);
+  const normalized = host.toLowerCase().replace(/\.$/, "");
+  if (exceptions.some(rule => matchesOutboundHost(normalized, rule))) return;
+  if (addresses.some(address => !isPublicOutboundAddress(address))) throw denied();
+}
+
 /** Save, test and request paths share this policy; redirects are refused by callers. */
 export async function assertAllowedOutboundUrl(value: string, purpose: OutboundPurpose): Promise<void> {
   let url: URL;
@@ -36,5 +46,5 @@ export async function assertAllowedOutboundUrl(value: string, purpose: OutboundP
   try {
     addresses = isIP(host) ? [host] : (await lookup(host, { all: true, verbatim: true })).map((answer) => answer.address);
   } catch { throw denied(); }
-  if (!addresses.length || addresses.some((address) => !isPublicOutboundAddress(address))) throw denied();
+  assertAllowedOutboundAddresses(host, addresses);
 }

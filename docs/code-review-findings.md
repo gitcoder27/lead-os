@@ -78,4 +78,5 @@ Reviewed `db344c7` on 2026-10-13. Eight confirmed findings are ordered by severi
 Original evidence above is preserved. Commit subjects identify the remediation commits in `git log --grep=CR-` (one per finding); validation uses isolated databases and synthetic credentials.
 
 - **1 / CR-01 ([e0ec00d](../../commit/e0ec00d)):** `fix(auth): reject stale credential checks (CR-01)` — synchronous hash/active-state revalidation before final writes; four gated race regressions plus auth timing, reset and route tests.
-- **2 / CR-02:** `fix(auth): revoke sessions on password change (CR-02)` — atomic revocation, expired cookie and fresh sign-in; 32 backend tests and 4 SignInForm tests pass.
+- **2 / CR-02 ([9625894](../../commit/9625894)):** `fix(auth): revoke sessions on password change (CR-02)` — atomic revocation, expired cookie and fresh sign-in; 32 backend tests and 4 SignInForm tests pass.
+- **3 / CR-03:** `fix(net): bind provider sockets to vetted DNS (CR-03)` — shared connector address enforcement for Jira/Copilot. 82 existing tests and 3 disposable loopback/TLS socket regressions pass, including wrong-host certificate rejection.

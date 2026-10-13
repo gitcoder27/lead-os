@@ -4,8 +4,31 @@ import { JiraIssue, JiraSearchResult, JiraUser, JiraTransition } from "./types";
 
 const JIRA_REQUEST_TIMEOUT_MS = 30_000;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Also bounds synthetic/non-cooperative body readers; real fetch is aborted too. */
+async function withinDeadline<T>(work: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted();
+  let onAbort!: () => void;
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      onAbort = () => reject(signal.reason);
+      signal.addEventListener("abort", onAbort, { once: true });
+      work().then(resolve, reject);
+    });
+  } finally { signal.removeEventListener("abort", onAbort); }
+}
+
+async function waitForRetry(ms: number, signal: AbortSignal): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { await withinDeadline(() => new Promise<void>(resolve => { timer = setTimeout(resolve, ms); }), signal); }
+  finally { clearTimeout(timer); }
+}
+
+function retryWait(value: string | null): number {
+  if (value === null) return 1000;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : 1000;
 }
 
 function normalizeBaseUrl(rawBaseUrl: string): string {
@@ -44,61 +67,62 @@ export class JiraClient {
     }
 
     const controller = new AbortController();
+    const deadline = Date.now() + JIRA_REQUEST_TIMEOUT_MS;
     const timeout = setTimeout(() => {
       controller.abort(new DOMException("Jira request timed out", "TimeoutError"));
     }, JIRA_REQUEST_TIMEOUT_MS);
-
-    let response: Response;
+    const onCallerAbort = () => controller.abort(init?.signal?.reason ?? new DOMException("Jira request aborted", "AbortError"));
+    if (init?.signal?.aborted) onCallerAbort();
+    else init?.signal?.addEventListener("abort", onCallerAbort, { once: true });
+    let response: Response | undefined;
+    const cancelUnusedBody = () => {
+      void response?.body?.cancel().catch(() => undefined);
+      response = undefined;
+    };
     try {
-      response = await outboundFetch(requestUrl, "jira", {
-        ...init,
-        headers: {
-          Authorization: this.authHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          ...(init?.headers ?? {}),
-        },
-        signal: controller.signal,
-        redirect: "manual",
-      });
+      for (let attempt = 0; ; attempt++) {
+        response = await withinDeadline(() => outboundFetch(requestUrl, "jira", {
+          ...init,
+          headers: {
+            Authorization: this.authHeader,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...(init?.headers ?? {}),
+          },
+          signal: controller.signal,
+          redirect: "manual",
+        }), controller.signal);
+        if (response.status === 429 && allowRetry && attempt === 0) {
+          const delay = Math.min(retryWait(response.headers.get("Retry-After")), Math.max(0, deadline - Date.now()));
+          logger.warn({ retryWaitMs: delay }, "Jira rate-limited; retrying once within request deadline");
+          cancelUnusedBody();
+          await waitForRetry(delay, controller.signal);
+          continue;
+        }
+        if (!response.ok) {
+          const status = response.status;
+          cancelUnusedBody();
+          if (status === 401) throw new Error("Jira authentication failed (401)");
+          if (status === 403) throw new Error("Jira access denied (403)");
+          if (status === 404) throw new Error("Jira resource not found (404)");
+          throw new Error(`Jira API error (${status})`);
+        }
+        if (response.status === 204) {
+          cancelUnusedBody();
+          return undefined as T;
+        }
+        return await withinDeadline(() => response!.json() as Promise<T>, controller.signal);
+      }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "TimeoutError") {
-        throw new Error(`Jira request timed out after ${JIRA_REQUEST_TIMEOUT_MS}ms`);
-      }
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new Error(`Jira request was aborted`);
-      }
+      cancelUnusedBody();
+      const reason = controller.signal.aborted ? controller.signal.reason : error;
+      if (reason instanceof Error && reason.name === "TimeoutError") throw new Error(`Jira request timed out after ${JIRA_REQUEST_TIMEOUT_MS}ms`);
+      if (reason instanceof Error && reason.name === "AbortError") throw new Error("Jira request was aborted");
       throw error;
     } finally {
       clearTimeout(timeout);
+      init?.signal?.removeEventListener("abort", onCallerAbort);
     }
-
-    if (response.status === 429 && allowRetry) {
-      const retryAfter = Number(response.headers.get("Retry-After") ?? "1");
-      logger.warn({ retryAfter }, "Jira rate-limited; retrying once");
-      await sleep(retryAfter * 1000);
-      return this.request<T>(path, init, false);
-    }
-
-    if (!response.ok) {
-      void response.body?.cancel().catch(() => undefined);
-      if (response.status === 401) {
-        throw new Error("Jira authentication failed (401)");
-      }
-      if (response.status === 403) {
-        throw new Error("Jira access denied (403)");
-      }
-      if (response.status === 404) {
-        throw new Error("Jira resource not found (404)");
-      }
-      throw new Error(`Jira API error (${response.status})`);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
   }
 
   async searchIssues(jql: string, fields: string[], maxResults = 100): Promise<JiraIssue[]> {

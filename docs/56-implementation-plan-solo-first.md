@@ -1036,7 +1036,7 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 - [x] CR-04 — Claim proposals atomically and coordinate conversation mutations.
 - [x] CR-05 — Guard note identity across deletion/recreation and reconcile remote changes.
 - [x] CR-06 — Bound public password-change IP and account throttles.
-- [ ] CR-07 — Keep Jira deadlines active through bodies and retries.
+- [x] CR-07 — Keep Jira deadlines active through bodies and retries.
 - [ ] CR-08 — Fetch relevant historical events and group once per task.
 
 | Date | Item | Commit | Validation / progress |
@@ -1047,3 +1047,4 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 | 2026-10-13 | CR-04 | main (this commit) | Durable pending→executing CAS, shared per-conversation mutation queue, idempotent confirmations/cancellations and write-aware retry refusal. Jira errors stop the model loop as uncertain; orphan executing claims cannot replay. Actual comment tool mocked behind a gate exercises duplicate confirm, cancel, new chat, retry and deletion across two service instances. 34 server service/route and 20 client dock/history tests pass; server types pass. |
 | 2026-10-13 | CR-05 | main (this commit) | Note saves now check row identity before same-body retries, deletes or updates; shared save contract, route, Copilot, unload writes and persisted drafts carry noteId. Same-revision replacements and remote deletions adopt into clean editors and conflict with dirty drafts; legacy drafts require a decision. One service and five hook regressions failed before the fix. 157 backend note/task/Copilot and 64 frontend editor/query/draft tests pass; typecheck passes. |
 | 2026-10-13 | CR-06 | main (this commit) | Password-change uses the existing 30-attempt/15-minute IP middleware before validation/service work. Account throttle is capped at 10,000 entries; one unref cleanup timer expires never-reused keys and stops when empty. Route spraying/window reset, capacity, idle expiry, per-IP separation and admin reset tests pass: 62 focused auth/registration tests. |
+| 2026-10-13 | CR-07 | main (this commit) | One 30-second deadline spans address vetting, headers, body reads and retry wait. Abort errors are normalized; unused 429/error/204 bodies are cancelled. Five regressions failed before the fix; mocked non-cooperative bodies and a real loopback response that never finishes now time out. Retry receives only the remaining budget. 33 Jira/socket/boundary/execution tests pass. |

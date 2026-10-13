@@ -99,6 +99,7 @@ export function surfaceTaskToDeskItem(task: ManagerSurfaceTask, developerNames?:
     participants: task.participants ?? undefined,
     nextAction: task.nextAction ?? undefined,
     outcome: task.outcome ?? undefined,
+    hasPrivateMeetingOutcome: task.hasPrivateMeetingOutcome,
     plannedStartAt: task.startsAt ?? undefined,
     plannedEndAt: task.endsAt ?? undefined,
     followUpAt: task.followUpAt ?? undefined,

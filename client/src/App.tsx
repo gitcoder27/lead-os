@@ -1,4 +1,4 @@
-import { MeetingWorkspace } from '@/components/meetings/MeetingWorkspace';
+import { restoreMeetingScroll } from '@/lib/meeting-nav';
 import { BootError } from '@/components/layout/BootError';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -111,6 +111,7 @@ const TasksPage = lazy(async () => {
   return { default: module.TasksPage };
 });
 
+const MeetingWorkspace = lazy(() => import('@/components/meetings/MeetingWorkspace').then((m) => ({ default: m.MeetingWorkspace })));
 const TaskPage = lazy(async () => {
   const module = await loadTaskPage();
   return { default: module.TaskPage };
@@ -542,6 +543,7 @@ function AppContent() {
       : undefined,
   );
   const [tasksUrlNonce, setTasksUrlNonce] = useState(0);
+  const [taskLocation, setTaskLocation] = useState(() => window.location.pathname + window.location.search);
   const [deskDateParam, setDeskDateParam] = useState<string | undefined>(() =>
     pathToView(window.location.pathname) === 'desk'
       ? deskDateFromParams(new URLSearchParams(window.location.search))
@@ -900,6 +902,7 @@ function AppContent() {
       const nextView = pathToView(window.location.pathname);
       const params = new URLSearchParams(window.location.search);
       setActiveView(nextView);
+      setTaskLocation(window.location.pathname + window.location.search);
       if (nextView === 'work') {
         setDashboardFilterState(dashboardFilterStateFromParams(params));
       }
@@ -934,6 +937,7 @@ function AppContent() {
         setNotesKind(notesKindFromParams(params) ?? 'scratchpad');
       }
       replaceLegacyPathIfNeeded();
+      restoreMeetingScroll();
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -1220,7 +1224,7 @@ function AppContent() {
   }
 
   if (activeView === 'task') {
-    const taskKey = TASK_LINK_PATH_PATTERN.exec(window.location.pathname)?.[1];
+    const taskKey = TASK_LINK_PATH_PATTERN.exec(taskLocation.split('?')[0]!)?.[1];
     // Phase 3 (P3-D2): `/t/:key` renders the shared task detail as a full page.
     // Flag off keeps the Phase 2 deep-link resolver behaviour.
     if (features?.tasksPhase3) {
@@ -1234,7 +1238,7 @@ function AppContent() {
       };
       const page = (
         <Suspense fallback={<FullPageLoading />}>
-          {user.role === 'manager' && new URLSearchParams(window.location.search).get('mode') === 'meeting' ? <MeetingWorkspace taskKey={taskKey} /> : <TaskPage taskKey={taskKey} onBack={goBack} />}
+          {user.role === 'manager' && new URLSearchParams(taskLocation.split('?')[1]).get('mode') === 'meeting' ? <MeetingWorkspace taskKey={taskKey} /> : <TaskPage taskKey={taskKey} onBack={goBack} />}
         </Suspense>
       );
       if (user.role !== 'manager') {

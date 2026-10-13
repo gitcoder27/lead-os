@@ -1,3 +1,4 @@
+import { mergeNoteBodies } from '@/lib/daily-note-merge';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthScopeKey } from '@/context/AuthContext';
@@ -131,6 +132,21 @@ export function useMeetingDocument(taskKey: string) {
     query, body, change, status, error, conflict, recoveryAvailable, flush,
     retry: () => saveRef.current(), document: () => state.current.document,
     useSaved: () => adopt(conflict ?? null),
+    keepBoth: () => {
+      const local = state.current.body;
+      const remote = meetingBody(conflict);
+      const base = state.current.base;
+      const merge = (field: 'agenda' | 'notes' | 'outcome') => mergeNoteBodies(base[field], local[field], remote[field]).merged;
+      const actions = [...remote.actions];
+      for (const action of local.actions) {
+        const saved = actions.find((row) => row.id === action.id);
+        if (!saved) actions.push(action);
+        else if (JSON.stringify(saved) !== JSON.stringify(action)) actions.push({ ...action, id: crypto.randomUUID() });
+      }
+      state.current.document = conflict ?? null; state.current.base = remote; state.current.blocked = false;
+      state.current.body = { agenda: merge('agenda'), notes: merge('notes'), outcome: merge('outcome'), noDecisions: local.noDecisions || remote.noDecisions, actions };
+      setBody(state.current.body); setConflict(undefined); persist(); schedule();
+    },
     keepDraft: () => {
       state.current.document = conflict ?? null; state.current.base = meetingBody(conflict);
       state.current.blocked = false; setConflict(undefined); persist(); schedule();

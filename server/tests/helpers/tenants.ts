@@ -106,6 +106,9 @@ export async function seedTenants(options: { backupService?: BackupServiceType }
   const c1 = await seedCall("POST", "/api/capture", { text: `${MARK} task alpha`, clientToday: day, tz: "UTC" });
   seed.taskKey = JSON.stringify(c1.body).match(/T-\d+/)?.[0] ?? "T-1";
   await seedCall("POST", "/api/capture", { text: `${MARK} task beta`, clientToday: day, tz: "UTC", defaults: { ownerAccountId: seed.devId } });
+  const meeting = await seedCall("POST", "/api/capture", { text: `/m ${MARK} meeting`, clientToday: day, tz: "UTC" });
+  seed.meetingKey = meeting.body.task.taskKey;
+  await seedCall("PUT", `/api/meetings/${seed.meetingKey}/workspace`, { agenda: `${MARK} agenda`, notes: `${MARK} meeting notes`, outcome: `${MARK} outcome`, noDecisions: false, actions: [], documentId: null, revision: 0 });
   await seedCall("POST", `/api/tasks/${seed.taskKey}/events`, { type: "update", body: `${MARK} private update`, visibility: "private", requestId: crypto.randomUUID() });
   await seedCall("PUT", `/api/notes/${day}`, { body: `${MARK} private note`, revision: 0 });
   const ct = await seedCall("POST", "/api/contacts", { displayName: `${MARK} Contact`, handle: "ownersecretcontact" });

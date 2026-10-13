@@ -43,7 +43,7 @@ export function TodayCompactRow({ title, placement, detail, severity, target, pr
           </button>
         ) : null}
         <button type="button" className="ui-row-action" onClick={() => onRunCommand(primary)}>
-          {primary.label}
+          {target.type === 'meeting' && target.taskKey ? primary.kind === 'capture_meeting_outcome' ? 'Record outcome' : 'Prepare' : primary.label}
         </button>
       </span>
     </div>

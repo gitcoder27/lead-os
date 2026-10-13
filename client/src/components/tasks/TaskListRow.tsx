@@ -1,3 +1,4 @@
+import { navigateToMeeting } from '@/lib/meeting-nav';
 import { TaskPlacementLabel } from './TaskPlacementLabel';
 import { memo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Bell, BellRing, Ellipsis, Flag, GitCompareArrows, Hourglass } from 'lucide-react';
@@ -198,15 +199,11 @@ export const TaskListRow = memo(function TaskListRow({
                   aria-label="High priority" title="High priority — change (p)" onClick={(event) => openInline('priority', event.currentTarget)}>{signal.icon}</button>
               : <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded-sm px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
-            {outcomeAction && (
-              // docs/73 UXD-12: the meeting's one action; the warning dot says it is owed.
-              <button type="button" className="task-row-outcome ui-row-action"
-                aria-label={`Capture outcome for ${task.taskKey}`}
-                onClick={() => { handlers.onFocusRow(task.taskKey); handlers.onCaptureOutcome?.(task.taskKey); }}>
-                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warning)' }} />
-                Capture outcome
-              </button>
-            )}
+            {task.kind === 'meeting' && <button type="button" className="task-row-outcome ui-row-action"
+              aria-label={`${closed ? 'Review' : meetingNeedsOutcome(task, today) ? 'Record outcome for' : 'Prepare'} ${task.taskKey}`}
+              onClick={() => { handlers.onFocusRow(task.taskKey); navigateToMeeting(task.taskKey); }}>
+              {closed ? 'Review' : meetingNeedsOutcome(task, today) ? 'Record outcome' : 'Prepare'}
+            </button>}
             {showOwner && (closed
               ? <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>
               // docs/73 UXD-13: the owner opens the assign menu (a).

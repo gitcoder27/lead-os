@@ -141,7 +141,7 @@ describe("task detail payload (P3-D2)", () => {
     expect(detail.parent).toBeNull();
 
     const ownDetail = await service.detail(own.taskKey, developer);
-    expect(ownDetail.parent?.taskKey).toBe(parent.taskKey);
+    expect(ownDetail.parent).toBeNull();
 
     const parentForDev = await service.detail(parent.taskKey, manager);
     expect(parentForDev.children.length).toBe(2);

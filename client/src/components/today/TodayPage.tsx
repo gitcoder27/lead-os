@@ -1,3 +1,4 @@
+import { navigateToMeeting } from '@/lib/meeting-nav';
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { describeLoadError } from '@/lib/error-copy';
 import { ErrorDetails } from '@/components/ui/QueryReadError';
@@ -78,6 +79,7 @@ const stageLabels: Record<TodayRhythmStage, string> = {
 };
 
 export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget }: TodayPageProps) {
+  const meetingWorkspaceEnabled = useTasksPhase3();
   const date = useLocalDate();
   const [checkInDraft, setCheckInDraft] = useState<{
     command: TodayActionCommand;
@@ -267,6 +269,10 @@ export function TodayPage({ onViewChange, onSelectWorkFilter, onOpenTodayTarget 
   };
 
   const runCommand = (command: TodayActionCommand, preset?: SnoozePreset) => {
+    if (meetingWorkspaceEnabled && command.target.type === 'meeting' && command.target.taskKey && (command.kind === 'open' || command.kind === 'capture_meeting_outcome')) {
+      navigateToMeeting(command.target.taskKey);
+      return;
+    }
     // A group row's primary ("Ask all") fans out to each member.
     // A group row's primary ("Ask all", "Done all") fans out to each member.
     const group = groupByCommand.get(command);

@@ -107,13 +107,14 @@ export class MeetingWorkspaceService {
     const open = visible.filter((row) => !["done", "dropped"].includes(row.status));
     const actions = open.filter((row) => row.parentId && history.has(row.parentId));
     const people = new Set(task.links.filter((link) => link.kind === "person").map((link) => link.ref));
-    const commitments = open.filter((row) => row.id !== task.id && row.ownerType === "developer" && people.has(row.ownerId ?? ""));
+    const linkedCommitments = await Promise.all([...people].map((id) => this.tasks.personCommitments(id, principal)));
+    const commitments = [...new Map(linkedCommitments.flat().filter((row) => row.id !== task.id && byKey.has(row.taskKey)).map((row) => [row.taskKey, row])).values()];
     const dto = await this.tasks.toDtos(open.filter((row) => row.status === "blocked" && row.id !== task.id), principal) as ManagerTask[];
     const jiraKeys = task.links.filter((link) => link.kind === "jira").map((link) => link.ref);
     const issueRows = jiraKeys.length ? await db.select().from(issues).where(and(eq(issues.workspaceId, normalizeWorkspaceId(principal.workspaceId)), inArray(issues.jiraKey, jiraKeys))) : [];
     return {
       previous, openActions: await this.tasks.toDtos(actions, principal) as ManagerTask[],
-      commitments: await this.tasks.toDtos(commitments, principal) as ManagerTask[],
+      commitments,
       blockers: dto.filter((row) => task.links.some((link) => link.kind === "task" && link.ref === row.taskKey) || Boolean(task.placement && row.placement?.projectId === task.placement.projectId)),
       issues: issueRows.map((row) => ({ key: row.jiraKey, summary: row.summary, status: row.statusName })),
     };

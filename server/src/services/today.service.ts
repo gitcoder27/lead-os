@@ -1931,7 +1931,7 @@ function getMeetingPrompts(items: ManagerDeskItem[], clock: DayClock): ManagerDe
   return items
     .filter((item) => isOpenDeskItem(item))
     .filter((item) => item.kind === "meeting")
-    .filter((item) => !item.outcome?.trim())
+    .filter((item) => !item.outcome?.trim() && !item.hasPrivateMeetingOutcome)
     .filter((item) => !isAfterDay(item.originDate, clock))
     // docs/56 UX-08: a meeting that starts on a later day has nothing to record yet.
     .filter((item) => !isAfterDay(item.plannedStartAt, clock))

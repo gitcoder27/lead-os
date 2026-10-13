@@ -1,3 +1,4 @@
+import { navigateToMeeting } from '@/lib/meeting-nav';
 import type { ManagerTask , TaskDetailResponse, UpdateTaskRequest } from '@/types';
 import { describeLoadError } from '@/lib/error-copy';
 import { ErrorDetails } from '@/components/ui/QueryReadError';
@@ -427,6 +428,7 @@ function TaskDetailView({ task, mode, people, fullPage, onPatch, onDelete, onClo
           Open the 1:1 workspace with {oneOnOneWith.displayName}
         </a>
       ) : null}
+      {!oneOnOneWith && managerEditable && <button className="ui-btn-ghost" onClick={() => navigateToMeeting(task.taskKey)}>Open meeting workspace</button>}
       <MeetingOutcome task={task} editable={managerEditable} onPatch={onPatch} />
     </>
   );

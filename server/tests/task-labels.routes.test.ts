@@ -122,7 +122,7 @@ describe("task detail routes under Phase 3 (P3-D2/D3)", () => {
     const detail = await invoke(app, { method: "GET", url: `/api/my-day/tasks/${owned.body.taskKey}/detail`, headers: devHeaders });
     expect(detail.status).toBe(200);
     expect(detail.body.taskKey).toBe(owned.body.taskKey);
-    expect(detail.body.parent.taskKey).toBe(parent.body.taskKey);
+    expect(detail.body.parent).toBeNull();
     expect(detail.body).not.toHaveProperty("labels");
     expect(detail.body).not.toHaveProperty("nextAction");
     expect(detail.body).not.toHaveProperty("trackedByManagerId");

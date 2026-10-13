@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { deliverTaskEvent } from "./task-inbox-delivery";
 import { and, desc, eq, gte, inArray, isNull, like, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
@@ -323,6 +324,12 @@ export class TaskEventsService {
     const deleted = await db.delete(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.visibility, "private"), eq(taskEvents.authorId, accountId))).returning({ id: taskEvents.id });
     await this.pruneInbox(workspaceId);
     return deleted.length;
+  }
+
+  /** Guard compound Undo against edits, redaction and even same-millisecond event appends. */
+  async mutationFingerprint(workspaceId: string, taskId: number): Promise<string> {
+    const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)), eq(taskEvents.taskId, taskId))).orderBy(taskEvents.id);
+    return createHash("sha256").update(JSON.stringify(rows)).digest("hex");
   }
 
   async deleteForTasks(workspaceId: string, taskIds: number[]): Promise<void> {

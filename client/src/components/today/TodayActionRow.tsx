@@ -128,11 +128,11 @@ export const TodayActionRow = memo(function TodayActionRow({
           className={`${primaryIsOpen && item.type !== 'standup' ? 'ui-btn-ghost' : 'ui-row-action'} today-row-primary`}
           onClick={() => onRunCommand(item.primaryAction)}
           disabled={isPending}
-          aria-label={item.primaryAction.label}
-          title={item.primaryAction.label}
+          aria-label={item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}
+          title={item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}
         >
           {isPending ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <PrimaryIcon kind={item.primaryAction.kind} />}
-          <span className="today-row-primary-label">{item.primaryAction.label}</span>
+          <span className="today-row-primary-label">{item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}</span>
         </button>
         <TodayActionMenu
           label={item.title}
@@ -191,11 +191,11 @@ export function TodayGroupRow({ item, group, expanded, featured = false, isActiv
             type="button"
             className={`${item.primaryAction.kind === 'open' ? 'ui-btn-ghost' : 'ui-row-action'} today-row-primary`}
             onClick={() => onRunCommand(item.primaryAction)}
-            aria-label={item.primaryAction.label}
-            title={item.primaryAction.label}
+            aria-label={item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}
+            title={item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}
           >
             <PrimaryIcon kind={item.primaryAction.kind} />
-            <span className="today-row-primary-label">{item.primaryAction.label}</span>
+            <span className="today-row-primary-label">{item.type === 'meeting_outcome' && item.target.taskKey ? 'Record outcome' : item.primaryAction.label}</span>
           </button>
         </span>
       </div>

@@ -837,7 +837,7 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       expect(within(row('T-11')).queryByTestId('meeting-actions')).toBeNull();
     });
 
-    it('a past meeting reads Needs outcome, not overdue, and Capture outcome saves it (UX-08)', async () => {
+    it('a past meeting offers Record outcome and opens its focused workspace', async () => {
       window.history.replaceState(null, '', '/tasks?view=today');
       mockUseTaskViewTasks.mockImplementation((definition?: { filters?: { closed?: unknown } }) => definition?.filters?.closed ? tasksResult([]) : tasksResult([
         meeting({ id: 12, taskKey: 'T-12', title: 'Architecture sync', scheduledOn: '2026-09-21' }),
@@ -848,12 +848,10 @@ describe('TasksPage keyboard, actions, and lingering (docs/49 §6–§8)', () =>
       // docs/73 UXD-12: one action per meeting row — the outcome button replaces the "Needs outcome" label.
       expect(within(row('T-12')).queryByText('Needs outcome')).toBeNull();
       expect(within(row('T-12')).getAllByRole('button', { name: /outcome/i })).toHaveLength(1);
-      fireEvent.click(within(row('T-12')).getByRole('button', { name: 'Capture outcome for T-12' }));
-      const dialog = screen.getByRole('dialog', { name: /capture outcome/i });
-      fireEvent.change(within(dialog).getByLabelText('Meeting outcome'), { target: { value: 'Go with Redis' } });
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Save outcome' }));
-      await waitFor(() => expect(mockApply).toHaveBeenCalled());
-      expect(mockApply.mock.calls[0]![0][0].changes).toEqual({ outcome: 'Go with Redis', status: 'done' });
+      fireEvent.click(within(row('T-12')).getByRole('button', { name: 'Record outcome for T-12' }));
+      expect(window.location.pathname + window.location.search).toBe('/t/T-12?mode=meeting');
+      expect(window.history.state.meetingOrigin).toBe('/tasks?view=today');
+      expect(mockApply).not.toHaveBeenCalled();
     });
 
     it('edits a row in place: the date reschedules, the owner reassigns, the flag sets priority, m moves to a project (docs/73 UXD-13)', () => {

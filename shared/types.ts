@@ -2258,6 +2258,7 @@ export interface ManagerDeskAssignee {
 }
 
 export interface ManagerDeskItem {
+  hasPrivateMeetingOutcome?: boolean;
   canonicalTask?: boolean;
   id: number;
   dayId: number;

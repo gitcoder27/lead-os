@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 export interface TenantSeed {
   devId: string;
   taskKey: string;
+  meetingKey: string;
   contactId: number;
   projectId: number;
   trackId: number;
@@ -39,9 +40,11 @@ export function foreignTenantProbes(seed: TenantSeed, day: string) {
   for (const url of reads) probes.push(["GET", url]);
 
   // Writes against the owner's ids and keys.
-  probes.push(["GET", `/api/meetings/${k}/workspace`], ["POST", `/api/meetings/${k}/undo`, { requestId: "foreign" }]);
+  probes.push(["GET", `/api/meetings/${seed.meetingKey}/workspace`], ["POST", `/api/meetings/${seed.meetingKey}/undo`, { requestId: "foreign" }]);
   const writes: Array<[string, string, unknown?]> = [
-    ["PUT", `/api/meetings/${k}/workspace`, { agenda: "pwned", notes: "", outcome: "", noDecisions: false, actions: [], revision: 0, documentId: null }],
+    ["POST", "/api/capture", { operation: "meeting-finish", meetingKey: seed.meetingKey, documentId: null, revision: 0, requestId: "foreign", clientToday: day, tz: "UTC" }],
+    ["POST", "/api/capture", { operation: "meeting-repeat", meetingKey: seed.meetingKey, documentId: null, revision: 0, requestId: "foreign-repeat", clientToday: day, tz: "UTC", scheduledOn: day }],
+    ["PUT", `/api/meetings/${seed.meetingKey}/workspace`, { agenda: "pwned", notes: "", outcome: "", noDecisions: false, actions: [], revision: 0, documentId: null }],
     ["PATCH", `/api/tasks/${k}`, { title: "pwned" }], ["POST", `/api/tasks/${k}/events`, { type: "update", body: "pwned", requestId: crypto.randomUUID() }],
     ["POST", `/api/tasks/${k}/links`, { kind: "url", ref: "https://x.example" }], ["DELETE", `/api/tasks/${k}`],
     ["POST", "/api/tasks/bulk", { keys: [k], action: "close" }], ["PUT", "/api/today/top3", { date: day, taskKeys: [k] }],

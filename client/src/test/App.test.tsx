@@ -141,6 +141,8 @@ vi.mock('@/components/tasks/TasksPage', () => ({
   TasksPage: () => <div>Tasks loaded</div>,
 }));
 
+vi.mock('@/components/meetings/MeetingWorkspace', () => ({ MeetingWorkspace: ({ taskKey }: { taskKey: string }) => <div>Meeting workspace {taskKey}</div> }));
+
 vi.mock('@/components/tasks/TaskPage', () => ({
   TaskPage: () => <div>Task page loaded</div>,
 }));
@@ -515,6 +517,18 @@ describe('App', () => {
         logout: vi.fn(),
         refreshSession: vi.fn(),
       });
+
+    it('updates meeting identity and mode between task URLs on popstate', async () => {
+      asManager();
+      window.history.replaceState(null, '', '/t/T-1?mode=meeting');
+      render(<App />);
+      expect(await screen.findByText('Meeting workspace T-1')).toBeInTheDocument();
+      act(() => { window.history.pushState(null, '', '/t/T-2?mode=meeting'); window.dispatchEvent(new PopStateEvent('popstate')); });
+      expect(await screen.findByText('Meeting workspace T-2')).toBeInTheDocument();
+      expect(screen.queryByText('Meeting workspace T-1')).toBeNull();
+      act(() => { window.history.pushState(null, '', '/t/T-2'); window.dispatchEvent(new PopStateEvent('popstate')); });
+      expect(await screen.findByText('Task page loaded')).toBeInTheDocument();
+    });
 
     it.each([
       ['/follow-ups', 'waiting'],

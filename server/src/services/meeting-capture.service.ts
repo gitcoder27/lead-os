@@ -1,8 +1,9 @@
+import { TaskEventsService } from "./task-events.service";
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { ManagerTask, MeetingActionDraft, MeetingCaptureRequest, MeetingCaptureResponse, MeetingDocument } from "shared/types";
 import { db } from "../db/connection";
-import { meetingCaptureReceipts, taskEvents, taskLinks, taskPlacements, tasks } from "../db/schema";
+import { meetingCaptureReceipts, taskLinks, taskPlacements, tasks } from "../db/schema";
 import { runInTransaction } from "../db/transaction";
 import { HttpError } from "../middleware/errorHandler";
 import { CaptureService } from "./capture.service";
@@ -87,7 +88,7 @@ export class MeetingCaptureService {
   private async fingerprint(key: string, principal: TaskPrincipal) {
     const row = await this.workspace.tasks.requireTask(key, principal);
     const scope = normalizeWorkspaceId(principal.workspaceId);
-    const events = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, scope), eq(taskEvents.taskId, row.id)));
+    const events = await new TaskEventsService().mutationFingerprint(scope, row.id);
     const links = await db.select().from(taskLinks).where(and(eq(taskLinks.workspaceId, scope), eq(taskLinks.taskId, row.id)));
     const placements = await db.select().from(taskPlacements).where(and(eq(taskPlacements.workspaceId, scope), eq(taskPlacements.taskId, row.id)));
     const children = await db.select().from(tasks).where(and(eq(tasks.workspaceId, scope), eq(tasks.parentId, row.id)));

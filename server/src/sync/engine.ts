@@ -4,7 +4,6 @@ import { developers, issues, issueScopeHistory, syncLog, workspaces } from "../d
 import { JiraClient } from "../jira/client";
 import { buildScopedJql } from "../jira/jql";
 import { JiraIssue } from "../jira/types";
-import { config } from "../config";
 import { logger } from "../utils/logger";
 import { SettingsService } from "../services/settings.service";
 import { normalizeWorkspaceId } from "../services/workspace.service";
@@ -158,7 +157,7 @@ export class SyncEngine {
       const dbJql = await this.settings.getJiraSyncJql(normalizedWorkspaceId);
       const syncScopeMode = await this.settings.getJiraSyncScopeMode(normalizedWorkspaceId);
       const teamAccountIds = await this.getScopedTeamAccountIds(normalizedWorkspaceId);
-      const jql = buildScopedJql(project, dbJql ?? config.JIRA_SYNC_JQL, teamAccountIds, syncScopeMode);
+      const jql = buildScopedJql(project, dbJql, teamAccountIds, syncScopeMode);
       const devDueDateField = await this.settings.getJiraDevDueDateField(normalizedWorkspaceId);
       const aspenSeverityField = await this.settings.getJiraAspenSeverityField(normalizedWorkspaceId);
       const jiraClient = await this.settings.createJiraClient(normalizedWorkspaceId);
@@ -254,9 +253,9 @@ export class SyncEngine {
   ): typeof issues.$inferInsert {
     const labels = item.fields.labels ?? [];
     const flagged = Array.isArray(item.fields.customfield_10021) && item.fields.customfield_10021.some((it) => it.id === "10019");
-    const devDueDateField = devDueDateFieldOverride ?? config.JIRA_DEV_DUE_DATE_FIELD;
-    const aspenSeverityField = aspenSeverityFieldOverride || config.JIRA_ASPEN_SEVERITY_FIELD;
-    const developmentDueDate = this.toDateValue(item.fields[devDueDateField]);
+    const devDueDateField = devDueDateFieldOverride;
+    const aspenSeverityField = aspenSeverityFieldOverride;
+    const developmentDueDate = devDueDateField ? this.toDateValue(item.fields[devDueDateField]) : null;
     const aspenSeverity = aspenSeverityField ? this.toDbTextValue(item.fields[aspenSeverityField]) : null;
     const dueDate = this.toDateValue(item.fields.duedate);
     const assigneeId = this.toDbTextValue(item.fields.assignee?.accountId);
@@ -463,8 +462,8 @@ export class SyncEngine {
         "updated",
         "resolutiondate",
         "customfield_10021",
-        devDueDateFieldOverride ?? config.JIRA_DEV_DUE_DATE_FIELD,
-        aspenSeverityFieldOverride || config.JIRA_ASPEN_SEVERITY_FIELD,
+        devDueDateFieldOverride,
+        aspenSeverityFieldOverride,
       ].filter((field): field is string => Boolean(field));
       const issuesFromJira = await jiraClient.searchIssues(batchJql, fields);
 

@@ -124,3 +124,9 @@ Revalidated against current code before editing. AccountWriteContinuations, useD
 Canonical Team carry-forward now rejects with 409, matching its disabled preview/context; canonical unfinished work already remains visible on the board and is scheduled through Tasks. Legacy carry-forward is unchanged.
 
 Revalidated against current code before editing. Team Tracker route/service suites: 126 tests passed; typecheck and build:check passed. Regression checks bulk and explicit IDs, duplicate selection, source/overdue/future/undated/closed tasks and destination leave; task rows and events remain identical. Original review evidence above is preserved.
+
+## Remediation — R3 (2026-10-13)
+
+Jira discovery resolves URL, email, project and stored credentials through SettingsService. Sync and reconciliation consume scoped query/custom-field values without downstream install-env fallbacks.
+
+Revalidated against current code before editing. jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Original review evidence above is preserved.

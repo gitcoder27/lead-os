@@ -1066,3 +1066,8 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-13 | R2 | Team Tracker route/service suites: 126 tests passed; typecheck and build:check passed. Regression checks bulk and explicit IDs, duplicate selection, source/overdue/future/undated/closed tasks and destination leave; task rows and events remain identical. Commit: this item’s task-scoped commit. |
+- [x] **R3** Jira discovery resolves URL, email, project and stored credentials through SettingsService. Sync and reconciliation consume scoped query/custom-field values without downstream install-env fallbacks.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | R3 | jira-workspace-settings, sync.engine and team.routes: 22 tests passed; typecheck and build:check passed. Mocked Jira validates friend destination/token, absent/blank/custom queries, custom-field import and reconciliation; default workspace env fallback remains supported. Commit: this item’s task-scoped commit. |

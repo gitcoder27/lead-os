@@ -7,11 +7,9 @@ import type { AuthService } from "../services/auth.service";
 import { runInTransaction } from "../db/transaction";
 import { JiraClient } from "../jira/client";
 import { db } from "../db/connection";
-import { configTable, developers as developersTable, issues } from "../db/schema";
+import { developers as developersTable, issues } from "../db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { config } from "../config";
-import { getJiraApiToken } from "../runtime-credentials";
-import { getPersistedJiraApiToken } from "../services/jira-credentials.service";
+import { SettingsService } from "../services/settings.service";
 import { getParticipatingDeveloperIds } from "../services/developer-participation.service";
 import type { Developer } from "shared/types";
 import { SelfIdentityService } from "../services/self-identity.service";
@@ -140,15 +138,6 @@ const discoverSchema = z.object({
   query: z.any().optional(),
 });
 
-async function getConfigValue(key: string, workspaceId: string): Promise<string | undefined> {
-  const rows = await db
-    .select()
-    .from(configTable)
-    .where(and(eq(configTable.workspaceId, workspaceId), eq(configTable.key, key)))
-    .limit(1);
-  return rows[0]?.value;
-}
-
 function makeManualAccountId(displayName: string): string {
   const slug = displayName
     .trim()
@@ -207,10 +196,12 @@ export function createTeamRouter(workloadService: WorkloadService, authService: 
   router.post("/discover", validate(discoverSchema), async (req, res, next) => {
     try {
       const workspaceId = req.auth!.user.workspaceId;
-      const jiraBaseUrl = (await getConfigValue("jira_base_url", workspaceId)) ?? config.JIRA_BASE_URL ?? "";
-      const jiraEmail = (await getConfigValue("jira_email", workspaceId)) ?? config.JIRA_EMAIL ?? "";
-      const projectKey = (await getConfigValue("jira_project_key", workspaceId)) ?? config.JIRA_PROJECT_KEY ?? "";
-      const token = req.body.jiraApiToken ?? (await getPersistedJiraApiToken(workspaceId)) ?? getJiraApiToken(workspaceId) ?? config.JIRA_API_TOKEN ?? "";
+      const settings = new SettingsService();
+      const [jiraBaseUrl, jiraEmail, projectKey, storedToken] = await Promise.all([
+        settings.getJiraBaseUrl(workspaceId), settings.getJiraEmail(workspaceId),
+        settings.getJiraProjectKey(workspaceId), settings.getJiraToken(workspaceId),
+      ]);
+      const token = req.body.jiraApiToken ?? storedToken;
       const query = (req.body.query as string | undefined)?.trim() || undefined;
       const startAt = (req.body.startAt as number | undefined) ?? 0;
       const maxResults = (req.body.maxResults as number | undefined) ?? 50;
@@ -237,8 +228,8 @@ export function createTeamRouter(workloadService: WorkloadService, authService: 
         return;
       }
 
-      const client = new JiraClient(jiraBaseUrl, jiraEmail, token);
-      const users = await client.getAssignableUsers(projectKey, {
+      const client = new JiraClient(jiraBaseUrl!, jiraEmail!, token!);
+      const users = await client.getAssignableUsers(projectKey!, {
         query,
         startAt,
         maxResults,

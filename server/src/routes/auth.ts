@@ -257,6 +257,7 @@ export function createAuthRouter(authService: AuthService): Router {
       throttle.assertAllowed(key);
       await authService.changePassword(username, currentPassword, newPassword);
       throttle.recordSuccess(key);
+      res.setHeader("Set-Cookie", clearSessionCookie());
       res.json({ ok: true });
     } catch (error) {
       if (req.body?.username && error instanceof HttpError && error.status === 401) {

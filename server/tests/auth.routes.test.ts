@@ -98,6 +98,27 @@ describe("auth routes", () => {
     expect(res.headers["set-cookie"]).toContain("HttpOnly");
   });
 
+  it("password change revokes every old session, clears the cookie, and requires a fresh login", async () => {
+    await authService.createUser({ username: "manager", displayName: "Manager", password: "secret123", role: "manager" });
+    await authService.createUser({ username: "other", displayName: "Other", password: "secret123", role: "manager" });
+    const sessions = await Promise.all([authService.authenticate("manager", "secret123"), authService.authenticate("manager", "secret123")]);
+    const other = await authService.authenticate("other", "secret123");
+    const app = createTestApp();
+    const failed = await invoke(app, { method: "POST", url: "/api/auth/change-password", body: { username: "manager", currentPassword: "wrong", newPassword: "new-secret-123" } });
+    expect(failed.status).toBe(401);
+    expect(await authService.getUserForSession(sessions[0]!.sessionId)).toBeDefined();
+    const changed = await invoke(app, { method: "POST", url: "/api/auth/change-password", body: { username: "manager", currentPassword: "secret123", newPassword: "new-secret-123" } });
+    expect(changed.status).toBe(200);
+    expect(changed.headers["set-cookie"]).toContain("Max-Age=0");
+    for (const session of sessions) {
+      const result = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: `${SESSION_COOKIE_NAME}=${session.sessionId}` } });
+      expect(result.status).toBe(401);
+    }
+    expect(await authService.getUserForSession(other.sessionId)).toBeDefined();
+    await expect(authService.authenticate("manager", "secret123")).rejects.toMatchObject({ status: 401 });
+    await expect(authService.authenticate("manager", "new-secret-123")).resolves.toBeDefined();
+  });
+
   it("touches an active session at most once every five minutes", async () => {
     await authService.createUser({
       username: "manager",

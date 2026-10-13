@@ -1031,7 +1031,7 @@ Owner review of the developer My Day page and the shared task activity timeline,
 Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes on main; isolated test databases and mocked providers only.
 
 - [x] CR-01 — Atomically revalidate credentials and active state after asynchronous password checks.
-- [ ] CR-02 — Revoke sessions on password change and retain the sign-in flow.
+- [x] CR-02 — Revoke sessions on password change and retain the sign-in flow.
 - [ ] CR-03 — Bind Jira and Copilot sockets to vetted DNS addresses.
 - [ ] CR-04 — Claim proposals atomically and coordinate conversation mutations.
 - [ ] CR-05 — Guard note identity across deletion/recreation and reconcile remote changes.
@@ -1042,3 +1042,4 @@ Evidence: [code-review-findings.md](code-review-findings.md). Sequential fixes o
 | Date | Item | Commit | Validation / progress |
 | --- | --- | --- | --- |
 | 2026-10-13 | CR-01 | main (this commit) | Four scrypt-gated reset/deactivation regressions failed before the fix. Synchronous credential CAS/session transactions reject stale checks; reset hash update and revocation also use a synchronous transaction. Auth race, timing, reset and route suites pass. |
+| 2026-10-13 | CR-02 | main (this commit) | Password change revokes all account sessions in the credential CAS transaction; route clears the cookie. Route regression verifies failure retains sessions, success revokes both devices, other accounts survive and fresh login works. 32 backend and 4 SignInForm tests pass. |

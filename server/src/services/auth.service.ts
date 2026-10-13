@@ -434,6 +434,7 @@ export class AuthService {
         .where(and(eq(appUsers.id, row.id), eq(appUsers.passwordHash, row.passwordHash), eq(appUsers.isActive, 1)))
         .returning({ id: appUsers.id }).all();
       if (!changed.length) throw new HttpError(401, "Invalid username or current password");
+      db.delete(appSessions).where(eq(appSessions.userId, row.id)).run();
     })();
   }
 

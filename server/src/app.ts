@@ -145,7 +145,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     app.set("trust proxy", trustProxy);
     logger.info({ trustProxy }, "Express trust proxy enabled");
   }
-  app.use("/api/meetings", express.json({ limit: "512kb" }));
+  app.use("/api/meetings", express.json({ limit: "2mb" }));
   app.use("/api/notes", express.json({ limit: "512kb" }));
   app.use(express.json());
 

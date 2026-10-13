@@ -1,4 +1,4 @@
-import { navigateToMeeting } from '@/lib/meeting-nav';
+import { navigateToMeeting, meetingWorkspaceLabel } from '@/lib/meeting-nav';
 import { TaskPlacementLabel } from './TaskPlacementLabel';
 import { memo, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Bell, BellRing, Ellipsis, Flag, GitCompareArrows, Hourglass } from 'lucide-react';
@@ -88,6 +88,7 @@ export const TaskListRow = memo(function TaskListRow({
   handlers: TaskRowHandlers;
 }) {
   const closed = !isOpenStatus(task.status);
+  const meetingAction = meetingWorkspaceLabel(task, today);
   const waitingLens = context.mode === 'party' || definition?.filters?.waiting === true;
   const meta = impliedMeta(definition, context, task, today);
   // docs/73 UXD-12: in the Waiting lens my own name says nothing, and a check-by date is the one lateness signal.
@@ -200,9 +201,9 @@ export const TaskListRow = memo(function TaskListRow({
               : <SignalIcon key={signal.label} label={signal.label} color={signal.color}>{signal.icon}</SignalIcon>)}
             {jira && <span className="hidden rounded-sm px-1 py-px font-mono text-meta font-semibold lg:inline" style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}>{jira.ref}</span>}
             {task.kind === 'meeting' && <button type="button" className="task-row-outcome ui-row-action"
-              aria-label={`${closed ? 'Review' : meetingNeedsOutcome(task, today) ? 'Record outcome for' : 'Prepare'} ${task.taskKey}`}
+              aria-label={`${meetingAction === 'Record outcome' ? 'Record outcome for' : meetingAction} ${task.taskKey}`}
               onClick={() => { handlers.onFocusRow(task.taskKey); navigateToMeeting(task.taskKey); }}>
-              {closed ? 'Review' : meetingNeedsOutcome(task, today) ? 'Record outcome' : 'Prepare'}
+              {meetingAction}
             </button>}
             {showOwner && (closed
               ? <span className="task-row-owner text-ui" aria-label={`Owner: ${owner}`} title={owner} style={{ color: 'var(--text-secondary)' }}>{owner}</span>

@@ -1,5 +1,8 @@
+import { TaskPhase2ExportService } from "../src/services/task-phase2-export.service";
+import { WeeklyReviewService } from "../src/services/weekly-review.service";
+import { AuthUserMaintenanceService } from "../src/services/auth-user-maintenance.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import express from "express";
 import { db, rawDb } from "../src/db/connection";
 import { resetDatabase } from "./helpers/db";
@@ -67,6 +70,16 @@ describe("atomic meeting capture", () => {
     expect(await service.run(request, principal)).toEqual(result.body);
     expect((await taskService.getByKey(devAction.taskKey, "default"))?.deletedAt).toBeTruthy();
   });
+  it("redacts inaccessible parent metadata in existing child events, including event deep links", async () => {
+    const result = await service.run(request, principal);
+    const child = result.actions![0]!;
+    const old = await new TaskEventsService().append({ workspaceId: 'default', taskKey: child.taskKey, type: 'created', body: null, meta: { source: 'capture', ownerType: 'developer', ownerId: 'dev-alex', title: child.title, parentKey: request.meetingKey } }, { type: 'system', originType: 'manager', accountId: 'a' });
+    const viewer = { kind: 'developer' as const, accountId: 'dev-alex', workspaceId: 'default' };
+    const events = new TaskEventsService();
+    expect((await events.get(old.id, viewer)).meta).not.toHaveProperty('parentKey');
+    expect(JSON.stringify(await events.list(child.taskKey, viewer))).not.toContain('parentKey');
+    expect((await events.get(old.id, { ...viewer, kind: 'manager', accountId: 'a' })).meta).toHaveProperty('parentKey', request.meetingKey);
+  });
   it("rolls back every table when a later action fails", async () => {
     const doc = (await workspace.get(request.meetingKey, principal)).document!;
     await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, actions: [doc.actions[0]!, { id: 'a2', text: "Fail", ownerAccountId: "unknown" }] }, principal);
@@ -106,6 +119,16 @@ describe("atomic meeting capture", () => {
     await expect(service.undo(request.meetingKey, request.requestId, principal)).rejects.toMatchObject({ status: 409 });
     await expect(service.run({ ...request, documentId: 'replacement', requestId: 'new' }, principal)).rejects.toMatchObject({ status: 409 });
   });
+  it("keeps capture identities distinct when request and draft IDs contain separators", async () => {
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    const saved = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, actions: [{ id: 'b', text: 'First action' }] }, principal);
+    const first = await service.run({ ...request, revision: saved.revision, requestId: 'compound:a' }, principal);
+    const nextDoc = first.document!;
+    const next = await workspace.save(request.meetingKey, { ...currentBody(nextDoc), revision: nextDoc.revision, documentId: nextDoc.id, actions: [{ id: 'a:b', text: 'Second action' }] }, principal);
+    const second = await service.run({ ...request, revision: next.revision, requestId: 'compound' }, principal);
+    expect(second.actions![0]!.title).toBe('Second action');
+    expect(second.actions![0]!.taskKey).not.toBe(first.actions![0]!.taskKey);
+  });
   it("allows later outcomes and new actions without recreating saved actions", async () => {
     await service.run(request, principal);
     const doc = (await workspace.get(request.meetingKey, principal)).document!;
@@ -114,6 +137,61 @@ describe("atomic meeting capture", () => {
     expect(result.actions).toHaveLength(1);
     expect((await db.select().from(tasks)).length).toBe(4);
     expect((await db.select().from(meetingCaptureReceipts)).length).toBe(2);
+  });
+  it("resolves action dates on the manager's day and expires Undo after six seconds", async () => {
+    const tz = 'Pacific/Kiritimati';
+    const day = todayIsoDate(new Date(), tz);
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    const saved = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, actions: [{ id: 'zone', text: 'Send notes !today !due:today' }] }, principal);
+    const result = await service.run({ ...request, revision: saved.revision, tz, clientToday: day }, principal);
+    expect(result.actions![0]!.scheduledOn).toBe(day);
+    expect(todayIsoDate(new Date(result.actions![0]!.dueAt!), tz)).toBe(day);
+    const before = snapshot();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(Date.parse(result.undo!.expiresAt) + 1));
+      await expect(service.undo(request.meetingKey, request.requestId, principal)).rejects.toMatchObject({ status: 409 });
+      expect(snapshot()).toEqual(before);
+    } finally { vi.useRealTimers(); }
+  });
+  it("supports empty actionless meetings and legacy outcomes without migrating shared text", async () => {
+    const meeting = await taskService.create({ title: 'Empty meeting', kind: 'meeting', outcome: 'Existing shared outcome' }, principal);
+    const legacy = await service.run({ ...request, meetingKey: meeting.taskKey, documentId: null, revision: 0, requestId: 'legacy' }, principal);
+    expect(legacy.actions).toEqual([]);
+    expect(legacy.document?.outcome).toBe('');
+    expect(legacy.task?.outcome).toBe('Existing shared outcome');
+    const empty = await taskService.create({ title: 'No decisions', kind: 'meeting' }, principal);
+    const doc = await workspace.save(empty.taskKey, { ...emptyMeetingBody(), documentId: null, revision: 0, noDecisions: true }, principal);
+    const done = await service.run({ ...request, meetingKey: empty.taskKey, documentId: doc.id, revision: doc.revision, requestId: 'empty' }, principal);
+    expect(done.actions).toEqual([]);
+    expect(done.task).toMatchObject({ status: 'done', hasPrivateMeetingOutcome: true, outcome: null });
+  });
+  it("rejects unavailable assignment, invalid dates and task commands without partial writes", async () => {
+    await db.update(developers).set({ isActive: 0 }).where(eq(developers.accountId, 'dev-alex'));
+    const before = snapshot();
+    await expect(service.run(request, principal)).rejects.toMatchObject({ status: 400 });
+    expect(snapshot()).toEqual(before);
+    await db.update(developers).set({ isActive: 1 }).where(eq(developers.accountId, 'dev-alex'));
+    const doc = (await workspace.get(request.meetingKey, principal)).document!;
+    const next = await workspace.save(request.meetingKey, { ...currentBody(doc), revision: doc.revision, documentId: doc.id, actions: [{ id: 'invalid-date', text: 'Bad plan date', scheduledOn: '2026-02-30' }] }, principal);
+    const snap = snapshot();
+    await expect(service.run({ ...request, revision: next.revision }, principal)).rejects.toMatchObject({ status: 400 });
+    expect(snapshot()).toEqual(snap);
+  });
+  it("keeps private content out of manager exports and weekly reports and removes it with account cleanup", async () => {
+    await service.run(request, principal);
+    const exported = await new TaskPhase2ExportService().plan('default');
+    const report = await new WeeklyReviewService().build(principal, { week: todayIsoDate(new Date(), 'UTC'), tz: 'UTC' });
+    expect(JSON.stringify([exported, report])).not.toContain('SECRET');
+    await auth.createUser({ username: 'another-manager', displayName: 'Another', password: 'secret123', role: 'manager', workspaceId: 'default' });
+    const other = { ...principal, accountId: 'another-manager' };
+    const meeting = await taskService.create({ title: 'Other meeting', kind: 'meeting' }, other);
+    const privateDoc = await workspace.save(meeting.taskKey, { ...emptyMeetingBody(), notes: 'Other private notes', noDecisions: true, documentId: null, revision: 0 }, other);
+    await service.run({ ...request, meetingKey: meeting.taskKey, documentId: privateDoc.id, revision: privateDoc.revision, requestId: 'other-receipt' }, other);
+    await new AuthUserMaintenanceService().deleteUser({ username: 'another-manager', workspaceId: 'default', role: 'manager', purgePrivateData: true });
+    expect(await db.select().from(meetingDocuments).where(eq(meetingDocuments.managerAccountId, 'another-manager'))).toEqual([]);
+    expect(await db.select().from(meetingCaptureReceipts).where(eq(meetingCaptureReceipts.managerAccountId, 'another-manager'))).toEqual([]);
+    expect((await workspace.get(request.meetingKey, principal)).document?.notes).toBe('SECRET notes');
   });
   it("repeats only explicit completed meetings, retaining open actions by reference", async () => {
     const finished = await service.run(request, principal);

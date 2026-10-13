@@ -1,0 +1,21 @@
+# Meeting preparation and follow-through
+
+Managers on Phase 3 open Prepare, Record outcome or Review from Today/Tasks, or Open meeting workspace from a task drawer. The focused page is `/t/T-n?mode=meeting`. Existing enabled 1:1 meetings bridge to their current Team workspace.
+
+Agenda, notes, outcome and action drafts are private to the signed-in manager and workspace. Participant names are display text; use Meeting properties to confirm people and work links. Preparation context includes the explicit previous meeting, open actions across its repeat history, linked people commitments, project/task blockers and linked Jira issues. Each group initially shows five rows with its total and Show more.
+
+Edits autosave after 800 ms, one save at a time. Device drafts survive refresh and navigation. Saving, Saved, Saved on this device and Could not save distinguish acknowledgement from recovery storage. Conflicting edits require a decision: compare the saved version, use it, keep both versions, or explicitly replace it with the draft. Private notes cannot publish shared task updates through editor commands.
+
+Actions stay as drafts until Finish meeting (or Save outcome and new actions after completion). A brief outcome, an existing outcome, or No decisions to record is required. Ownership defaults to You; dates are optional. Explicit developer assignments show their audience. Title capture tokens retain their normal precedence and diagnostics. Update/note/meeting/Later/parent commands cannot replace action creation. Outcome, actions and meeting completion commit together; any action failure rolls back everything. Child actions remain open and independently actionable. Retries reuse the same persisted request; payload changes cannot reuse a completed ID.
+
+Undo lasts six seconds and refuses if any affected task, event, links, placement or private document changed. Meet again copies title, agenda, participants, confirmed links and placement, then starts empty notes/outcome/actions. It links to the previous meeting and references earlier commitments without moving or copying them. Matching titles do not establish history.
+
+Implementation is additive: `meeting_documents`, `meeting_capture_receipts`; manager-only GET/PUT `/api/meetings/:key/workspace`, POST `/api/meetings/:key/undo`, and typed `meeting-finish` / `meeting-repeat` operations on POST `/api/capture`. Existing single capture is unchanged. Documents require both identity and revision. Receipts and document bodies remain outside shared task text/activity and developer/report/export payloads. Account and workspace cleanup removes the new storage.
+
+## Verification and pilot handoff
+
+Automated checks use isolated test databases and mocked integrations. Browser checks use a fresh synthetic API with the sync scheduler disabled and a Jira stub that refuses sync. Desktop (1440 × 900) and phone (375 × 812), light/dark themes, reduced motion, labelled controls, keyboard Tab into notes, overflow and axe WCAG A/AA are checked. Flows cover save/refresh, finish, undated independent actions, repeat, explicit history and Back. Regression suites cover conflicts/recovery, auth changes, atomic rollback, concurrent finish/replay, later actions, unavailable owners, grammar confirmation, local-day dates, guarded/expired Undo, foreign IDs, account cleanup and private-text exclusion from exports/reports.
+
+The one-week pilot has **not been run**. Deployment and real participants are separate follow-up work; do not contact managers or use runtime data without authorization.
+
+After an authorized deployment, invite 3–5 managers to use an ordinary meeting (existing 1:1s continue in their current workspace). Record preparation and outcome/action-entry times without collecting private document text. Targets: preparation under 120 seconds; capture under 60 seconds. During the week, exercise a repeated meeting, an undated action, an assigned action, a save failure/recovery and Undo. Ask about finding prior context, trust in save status, and locating actions afterwards. At the end, record observed timings, completion rates, defects and the release decision in docs/56. Calendar, Copilot, automatic scheduling and template libraries remain deferred.

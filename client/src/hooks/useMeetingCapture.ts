@@ -22,7 +22,7 @@ export function useMeetingCapture(taskKey: string, editor: { flush: () => Promis
   const [problem, setProblem] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<MeetingCaptureResponse | null>(null);
   const clear = () => { request.current = null; setPending(null); try { localStorage.removeItem(storageKey); } catch { /* memory receipt remains stable */ } };
-  const refresh = () => { invalidateTaskSurfaces(qc, scope); void qc.invalidateQueries({ queryKey: ['meeting-workspace', scope] }); };
+  const refresh = () => { invalidateTaskSurfaces(qc, scope); };
   const mutation = useMutation({ mutationFn: async (options: { operation?: MeetingCaptureRequest['operation']; confirm?: boolean; scheduledOn?: string; startsAt?: string | null; endsAt?: string | null } = {}) => {
     if (busy.current) return undefined;
     busy.current = true;

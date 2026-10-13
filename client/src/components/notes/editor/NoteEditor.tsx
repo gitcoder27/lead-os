@@ -55,6 +55,8 @@ interface NoteEditorProps {
   /** Hide the selection bubble's actions (e.g. while a conflict is unresolved). */
   actionsDisabled?: boolean;
   mobile?: boolean;
+  /** Host-specific touch target styling for the portalled selection toolbar. */
+  selectionClassName?: string;
   /** Line actions / commands this surface does not offer (fixed at mount). */
   omit?: readonly NoteEditorCommand[];
 }
@@ -83,7 +85,7 @@ const BUBBLE_ACTIONS: Array<{ action: NoteLineAction; label: string; icon: typeo
 ];
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
-  { value, onChange, onBlur, handlers, entityContext, placeholder, ariaLabel, actionsDisabled = false, mobile = false, omit },
+  { value, onChange, onBlur, handlers, entityContext, placeholder, ariaLabel, actionsDisabled = false, mobile = false, omit, selectionClassName },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -327,7 +329,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       {bubble && !actionsDisabled
         ? createPortal(
             <div
-              className="notes-selection-bubble"
+              className={`notes-selection-bubble${selectionClassName ? ` ${selectionClassName}` : ''}`}
               role="toolbar"
               aria-label="Turn selection into"
               style={{ top: bubble.top, left: bubble.left }}

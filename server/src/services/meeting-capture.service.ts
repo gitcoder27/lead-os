@@ -47,7 +47,7 @@ export class MeetingCaptureService {
         this.workspace.assertRevision(await this.workspace.document(before.id, principal), input);
         const actions: ManagerTask[] = [];
         for (const { action, resolved, clock } of prepared) {
-          actions.push(await this.capture.applyCreate(resolved, principal, `meeting:${principal.accountId}:${input.requestId}:${action.id}`, {
+          actions.push(await this.capture.applyCreate(resolved, principal, `meeting:${hash([normalizeWorkspaceId(principal.workspaceId), principal.accountId, input.requestId, action.id])}`, {
             parentKey: before.taskKey, scheduledOn: action.scheduledOn ?? null,
             ...(action.ownerAccountId ? { ownerAccountId: action.ownerAccountId } : {}),
             dueAt: action.dueAt ?? null, followUpAt: action.followUpAt ?? null, waitingOn: action.waitingOn ?? null,

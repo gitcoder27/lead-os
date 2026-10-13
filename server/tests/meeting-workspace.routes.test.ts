@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
@@ -12,7 +12,7 @@ import { emptyMeetingBody, MeetingWorkspaceService } from "../src/services/meeti
 const auth = new AuthService();
 const service = new MeetingWorkspaceService();
 const app = express();
-app.use(express.json({ limit: "512kb" }));
+app.use(express.json({ limit: "2mb" }));
 app.use("/api/meetings", requireManager(auth), createMeetingsRouter(service));
 app.use(errorHandler);
 const principal = { type: "manager" as const, accountId: "a", workspaceId: "default" };
@@ -52,6 +52,22 @@ describe("private meeting workspace", () => {
     const session = await auth.authenticate("d", "secret123");
     const response = await invoke(app, { method: "GET", url: `/api/meetings/${key}/workspace`, headers: { cookie: serializeSessionCookie(session.sessionId, auth.sessionMaxAgeSeconds) } });
     expect(response.status).toBe(403);
+  });
+  it("keeps document editing usable if context fails and never guesses participant records", async () => {
+    const taskService = new TaskService();
+    await taskService.update(key, { participants: 'One' }, principal);
+    await db.insert(developers).values({ accountId: 'person-one', displayName: 'One', isActive: 1 });
+    await taskService.create({ title: 'Person work', ownerType: 'developer', ownerId: 'person-one' }, principal);
+    expect((await service.get(key, principal)).context?.commitments).toEqual([]);
+    await taskService.addLink(key, { kind: 'person', ref: 'person-one' }, principal);
+    expect((await service.get(key, principal)).context?.commitments).toHaveLength(1);
+    const failure = vi.spyOn(service.tasks, 'personCommitments').mockRejectedValue(new Error('Context unavailable'));
+    const degraded = await service.get(key, principal);
+    expect(degraded.context).toBeNull(); expect(degraded.contextError).toBeTruthy();
+    await service.save(key, body, principal);
+    expect((await service.get(key, principal)).document?.agenda).toBe('PRIVATE agenda');
+    failure.mockRestore();
+    expect((await service.get(key, principal)).context?.commitments).toHaveLength(1);
   });
   it("keeps legacy outcomes readable and uses explicit history only", async () => {
     await new TaskService().update(key, { outcome: "Legacy outcome" }, principal);

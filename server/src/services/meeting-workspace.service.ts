@@ -19,7 +19,7 @@ export const meetingBodySchema = z.object({
     id: z.string().min(1).max(100), text: z.string().max(4000),
     ownerAccountId: z.string().min(1).max(200).nullable().optional(), scheduledOn: date.nullable().optional(),
     dueAt: z.string().datetime({ offset: true }).nullable().optional(), followUpAt: z.string().datetime({ offset: true }).nullable().optional(),
-    waitingOn: z.object({ type: z.enum(["developer", "contact", "text"]), ref: z.string().nullable().optional(), label: z.string().nullable().optional() }).strict().nullable().optional(),
+    waitingOn: z.object({ type: z.enum(["developer", "contact", "text"]), ref: z.string().max(128).nullable().optional(), label: z.string().max(200).nullable().optional() }).strict().nullable().optional(),
   }).strict()).max(30).refine((rows) => new Set(rows.map((row) => row.id)).size === rows.length, "Duplicate action ids"),
 }).strict();
 export const meetingSaveSchema = meetingBodySchema.extend({ documentId: z.string().nullable(), revision: z.number().int().min(0) }).strict();

@@ -42,3 +42,5 @@
 .meeting-touch{min-height:44px;}
 
 .meeting-page .notes-editor .cm-content{min-height:180px;}.meeting-page .notes-editor .cm-editor.cm-focused{outline:2px solid var(--accent);outline-offset:4px;}
+
+.meeting-selection-bubble button{min-height:44px;min-width:44px;}

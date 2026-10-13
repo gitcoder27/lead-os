@@ -18,6 +18,23 @@ function mount(qc = new QueryClient({ defaultOptions: { queries: { retry: false 
 beforeEach(() => { localStorage.clear(); mocks.get.mockReset().mockResolvedValue(response(doc())); mocks.put.mockReset(); });
 afterEach(() => vi.useRealTimers());
 describe('meeting draft lifecycle', () => {
+  it('autosaves after 800 ms and reports storage failures honestly', async () => {
+    mocks.put.mockResolvedValue({ document: doc(2, 'Typed') });
+    const hook = mount();
+    await waitFor(() => expect(hook.result.current.status).toBe('Saved'));
+    vi.useFakeTimers();
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'Typed' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(799); });
+    expect(mocks.put).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(mocks.put).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.status).toBe('Saved');
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Unavailable'); });
+    act(() => hook.result.current.change({ ...hook.result.current.body, notes: 'Unsaved' }));
+    expect(hook.result.current.status).toBe('Could not save');
+    expect(hook.result.current.recoveryAvailable).toBe(false);
+    storage.mockRestore(); hook.unmount();
+  });
   it('serializes overlapping saves and submits the latest body against the acknowledged revision', async () => {
     let resolve!: (value: { document: MeetingDocument }) => void;
     mocks.put.mockImplementationOnce(() => new Promise((done) => { resolve = done; })).mockResolvedValueOnce({ document: doc(3, 'Latest') });
@@ -60,6 +77,24 @@ describe('meeting draft lifecycle', () => {
     expect(hook.result.current.conflict?.id).toBe('replacement');
     expect(hook.result.current.body.notes).toBe('Draft');
     hook.unmount();
+  });
+  it('keeps both conflicting text versions and action drafts before explicitly saving the merge', async () => {
+    const one = mount();
+    await waitFor(() => expect(one.result.current.status).toBe('Saved'));
+    act(() => one.result.current.change({ ...one.result.current.body, notes: 'My edits', actions: [{ id: 'a1', text: 'Local action' }] }));
+    one.unmount();
+    const remote = { ...doc(2, 'Their edits'), actions: [{ id: 'a1', text: 'Remote action' }] };
+    mocks.get.mockResolvedValue(response(remote));
+    mocks.put.mockImplementation((_path, body) => Promise.resolve({ document: { ...body, id: 'd', revision: 3, previousMeetingKey: null } }));
+    const two = mount();
+    await waitFor(() => expect(two.result.current.conflict).toBeTruthy());
+    act(() => two.result.current.keepBoth());
+    expect(two.result.current.body.notes).toContain('My edits');
+    expect(two.result.current.body.notes).toContain('Their edits');
+    expect(two.result.current.body.actions.map((row) => row.text)).toEqual(['Remote action', 'Local action']);
+    await act(async () => { expect(await two.result.current.flush()).toBe(true); });
+    expect(mocks.put.mock.calls[0]![1]).toMatchObject({ documentId: 'd', revision: 2 });
+    two.unmount();
   });
   it('ignores pending acknowledgements after auth cleanup', async () => {
     let resolve!: (value: { document: MeetingDocument }) => void;

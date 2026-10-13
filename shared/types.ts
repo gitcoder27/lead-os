@@ -3533,7 +3533,7 @@ export interface MeetingCaptureRequest {
 }
 export interface MeetingCaptureResponse {
   operation: MeetingCaptureRequest['operation'];
-  diagnostics: Array<{ code: string; message: string }>;
+  diagnostics: import("./capture-grammar").CaptureDiagnostic[];
   blocked?: boolean;
   confirmRequired?: boolean;
   task?: ManagerTask;

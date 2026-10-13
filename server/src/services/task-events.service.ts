@@ -154,6 +154,21 @@ export class TaskEventsService {
     });
   }
 
+  /** Old created events may still name an inaccessible manager-owned meeting parent. */
+  private async projectForViewer(events: TaskEvent[], viewer: TaskViewer): Promise<TaskEvent[]> {
+    if (viewer.kind !== "developer") return events;
+    const parentKeys = events.flatMap((event) => event.meta && typeof event.meta === "object" && "parentKey" in event.meta && typeof event.meta.parentKey === "string" ? [event.meta.parentKey] : []);
+    if (!parentKeys.length) return events;
+    const accessible = await db.select({ taskKey: tasks.taskKey }).from(tasks).where(and(eq(tasks.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(tasks.ownerType, "developer"), eq(tasks.ownerId, viewer.accountId), isNull(tasks.deletedAt), inArray(tasks.taskKey, parentKeys)));
+    const allowed = new Set(accessible.map((row) => row.taskKey));
+    return events.map((event) => {
+      if (!event.meta || typeof event.meta !== "object" || !("parentKey" in event.meta) || typeof event.meta.parentKey !== "string" || allowed.has(event.meta.parentKey)) return event;
+      const meta: Record<string, unknown> = { ...event.meta };
+      delete meta.parentKey;
+      return { ...event, meta };
+    });
+  }
+
   private async visibility(viewer: TaskViewer) {
     if (viewer.kind === "developer" && await this.keys.canonicalEnabled(viewer.workspaceId)) {
       // Phase 3 (P3-D15): shared events on owned tasks, plus the developer's
@@ -230,14 +245,14 @@ export class TaskEventsService {
     if (cursor !== undefined && (!Number.isSafeInteger(cursor) || cursor < 1)) throw new HttpError(400, "Invalid cursor");
     const identity = await this.identity(key, viewer.workspaceId);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), identity, await this.visibility(viewer), cursor ? lt(taskEvents.id, cursor) : undefined)).orderBy(desc(taskEvents.id)).limit(limit + 1);
-    return { events: await withAuthorNames(rows.slice(0, limit).map(mapEvent), viewer.workspaceId), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
+    return { events: await withAuthorNames(await this.projectForViewer(rows.slice(0, limit).map(mapEvent), viewer), viewer.workspaceId), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
   }
 
   async latestOfType(taskKey: string, type: TaskEventType, viewer: TaskViewer): Promise<TaskEvent | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
     if (viewer.kind === "developer") await this.assertDeveloperCanRead(taskKey, viewer);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), await this.identity(taskKey, viewer.workspaceId), eq(taskEvents.type, type), await this.visibility(viewer))).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(1);
-    return rows[0] ? mapEvent(rows[0]) : null;
+    return rows[0] ? (await this.projectForViewer([mapEvent(rows[0])], viewer))[0]! : null;
   }
 
   async latestForKey(taskKey: string, workspaceId?: string, type?: TaskEventType): Promise<TaskEvent | null> {
@@ -248,14 +263,14 @@ export class TaskEventsService {
   async getByRequestId(requestId: string, viewer: TaskViewer): Promise<{ event: TaskEvent; sourceId: number | null } | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.dedupeKey, `req:${requestId}`), await this.visibility(viewer))).limit(1);
-    return rows[0] ? { event: mapEvent(rows[0]), sourceId: rows[0].sourceId } : null;
+    return rows[0] ? { event: (await this.projectForViewer([mapEvent(rows[0])], viewer))[0]!, sourceId: rows[0].sourceId } : null;
   }
 
   async get(eventId: number, viewer: TaskViewer): Promise<TaskEvent> {
     await this.keys.assertEnabled(viewer.workspaceId);
     const rows = await db.select().from(taskEvents).where(and(eq(taskEvents.workspaceId, normalizeWorkspaceId(viewer.workspaceId)), eq(taskEvents.id, eventId), await this.visibility(viewer))).limit(1);
     if (!rows[0]) throw new HttpError(404, "Event not found");
-    return (await withAuthorNames([mapEvent(rows[0])], viewer.workspaceId))[0]!;
+    return (await withAuthorNames(await this.projectForViewer([mapEvent(rows[0])], viewer), viewer.workspaceId))[0]!;
   }
 
   async searchBodies(viewer: TaskViewer, pattern: string, limit: number): Promise<{ taskKey: string; excerpt: string }[]> {

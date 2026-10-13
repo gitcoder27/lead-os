@@ -31,7 +31,7 @@ export function invalidateTaskDetails(client: QueryClient, scope: string, keys?:
 /** Task domain writes refresh scoped facts now and coalesce manager rail counts. */
 export function invalidateTaskSurfaces(client: QueryClient, scope: string, keys?: readonly string[], extra: string[] = [], recount = true) {
   invalidateTaskDetails(client, scope, keys);
-  invalidateTaskQueries(client, scope, ['tasks', 'task-inbox', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload', ...extra]);
+  invalidateTaskQueries(client, scope, ['tasks', 'meeting-workspace', 'task-inbox', 'today', 'manager-desk', 'team-tracker', 'my-day', 'workload', ...extra]);
   if (!scope.includes(':developer:') && scope !== 'anonymous') invalidateTaskQueries(client, scope, ['projects', 'project']);
   if (recount) invalidateTaskViewCounts(client, scope);
 }

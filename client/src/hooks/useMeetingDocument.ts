@@ -1,3 +1,4 @@
+import { invalidateTaskSurfaces } from '@/lib/task-query-invalidation';
 import { mergeNoteBodies } from '@/lib/daily-note-merge';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -33,7 +34,8 @@ export function useMeetingDocument(taskKey: string) {
     try {
       localStorage.setItem(storageKey, JSON.stringify({ ...state.current.body, revision: state.current.document?.revision ?? 0, documentId: state.current.document?.id ?? null, base: state.current.base }));
       setRecoveryAvailable(true);
-    } catch { setRecoveryAvailable(false); }
+      return true;
+    } catch { setRecoveryAvailable(false); return false; }
   };
   const clear = () => { try { localStorage.removeItem(storageKey); } catch { /* retained status reports storage failure */ } };
   const adopt = (doc: MeetingDocument | null) => {
@@ -52,14 +54,14 @@ export function useMeetingDocument(taskKey: string) {
     timer.current = setTimeout(() => { timer.current = null; void saveRef.current(); }, 800);
   };
   const change = (next: MeetingDocumentBody) => {
-    state.current.body = next; setBody(next); persist();
-    if (!state.current.blocked) { setStatus('Saved on this device'); setError(null); schedule(); }
+    state.current.body = next; setBody(next); const stored = persist();
+    if (!state.current.blocked) { setStatus(stored ? 'Saved on this device' : 'Could not save'); setError(null); schedule(); }
   };
   const save = async (): Promise<boolean> => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     if (flight.current) { await flight.current; return current() ? saveRef.current() : false; }
     if (!current() || !state.current.initialized || state.current.blocked) return false;
-    if (equal(state.current.body, state.current.base)) return true;
+    if (equal(state.current.body, state.current.base)) { clear(); setStatus('Saved'); return true; }
     const submitted = state.current.body;
     const document = state.current.document;
     setStatus('Saving');
@@ -69,10 +71,11 @@ export function useMeetingDocument(taskKey: string) {
         if (!current()) return false;
         // Do not acknowledge over a remote conflict observed while this save was pending.
         if (state.current.blocked) return false;
+        if (Boolean(document?.outcome.trim() || document?.noDecisions) !== Boolean(result.document.outcome.trim() || result.document.noDecisions)) invalidateTaskSurfaces(qc, scope, [taskKey]);
         state.current.document = result.document;
         state.current.base = meetingBody(result.document);
         if (equal(state.current.body, submitted)) { clear(); setStatus('Saved'); }
-        else { persist(); setStatus('Saved on this device'); schedule(); }
+        else { setStatus(persist() ? 'Saved on this device' : 'Could not save'); schedule(); }
         setError(null);
         return true;
       } catch (err) {
@@ -100,11 +103,12 @@ export function useMeetingDocument(taskKey: string) {
       let draft: (MeetingDocumentSave & { base: MeetingDocumentBody }) | null = null;
       try { draft = JSON.parse(localStorage.getItem(storageKey) ?? 'null'); } catch { setRecoveryAvailable(false); }
       adopt(remote);
-      if (!draft || equal(draft, meetingBody(remote))) return;
+      if (!draft) return;
       const recovered: MeetingDocumentBody = { agenda: draft.agenda, notes: draft.notes, outcome: draft.outcome, noDecisions: draft.noDecisions, actions: draft.actions };
       if (typeof recovered.agenda !== 'string' || typeof recovered.notes !== 'string' || !Array.isArray(recovered.actions)) return;
       state.current.body = recovered; setBody(recovered);
       if (equal(recovered, meetingBody(remote))) return;
+      state.current.base = draft.base ?? meetingBody();
       persist();
       if (draft.documentId === (remote?.id ?? null) && equal(draft.base, meetingBody(remote))) { setStatus('Saved on this device'); schedule(); }
       else reconcile(remote);

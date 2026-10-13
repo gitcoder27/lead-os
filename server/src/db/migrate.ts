@@ -7,6 +7,19 @@ import { startCanonicalTasksForEmptyWorkspaces } from "./canonical-start";
 const DEFAULT_WORKSPACE_ID = "default";
 
 const ddl = `
+CREATE TABLE IF NOT EXISTS meeting_documents (
+ id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL,
+ task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+ body_json TEXT NOT NULL, revision INTEGER NOT NULL, previous_meeting_key TEXT, updated_at TEXT NOT NULL,
+ UNIQUE(workspace_id, manager_account_id, task_id)
+);
+CREATE TABLE IF NOT EXISTS meeting_capture_receipts (
+ workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL, request_id TEXT NOT NULL,
+ task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+ payload_hash TEXT NOT NULL, response_json TEXT NOT NULL, undo_json TEXT NOT NULL, undone_at TEXT,
+ PRIMARY KEY(workspace_id, manager_account_id, request_id)
+);
+
 CREATE TABLE IF NOT EXISTS manager_action_receipts (
  workspace_id TEXT NOT NULL, manager_account_id TEXT NOT NULL, request_id TEXT NOT NULL,
  payload_hash TEXT NOT NULL, response_json TEXT NOT NULL, created_at TEXT NOT NULL,

@@ -21,6 +21,8 @@ import {
   teamTrackerSavedViews,
   weeklyReviews,
   managerActionReceipts,
+  meetingDocuments,
+  meetingCaptureReceipts,
   tasks,
   developerNotes, contacts } from "../db/schema";
 import { BackupService } from "./backup.service";
@@ -78,6 +80,7 @@ export class WorkspaceMaintenanceService {
       : null;
 
     await runInTransaction(async () => {
+      for (const table of [meetingCaptureReceipts, meetingDocuments]) await db.delete(table).where(target === "workspace" ? eq(table.workspaceId, normalizedWorkspaceId) : and(eq(table.workspaceId, normalizedWorkspaceId), eq(table.managerAccountId, managerAccountId)));
       await db.delete(managerActionReceipts).where(target === "workspace"
         ? eq(managerActionReceipts.workspaceId, normalizedWorkspaceId)
         : and(eq(managerActionReceipts.workspaceId, normalizedWorkspaceId), eq(managerActionReceipts.managerAccountId, managerAccountId)));

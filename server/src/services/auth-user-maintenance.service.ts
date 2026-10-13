@@ -15,6 +15,8 @@ import {
   teamTrackerSavedViews,
   weeklyReviews,
   managerActionReceipts,
+  meetingDocuments,
+  meetingCaptureReceipts,
   workspaces,
   tasks,
 } from "../db/schema";
@@ -136,6 +138,7 @@ export class AuthUserMaintenanceService {
         await this.purgePrivateData(user);
       }
 
+      for (const table of [meetingCaptureReceipts, meetingDocuments]) await db.delete(table).where(and(eq(table.workspaceId, user.workspaceId), eq(table.managerAccountId, user.username)));
       await db.delete(managerActionReceipts).where(and(eq(managerActionReceipts.workspaceId, user.workspaceId), eq(managerActionReceipts.managerAccountId, user.username)));
       await db.delete(appSessions).where(eq(appSessions.userId, user.id));
       await db.delete(appUsers).where(eq(appUsers.id, user.id));

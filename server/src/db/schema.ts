@@ -818,3 +818,24 @@ export const managerActionReceipts = sqliteTable("manager_action_receipts", {
   responseJson: text("response_json").notNull(),
   createdAt: text("created_at").notNull(),
 }, (table) => [primaryKey({ columns: [table.workspaceId, table.managerAccountId, table.requestId] })]);
+
+export const meetingDocuments = sqliteTable("meeting_documents", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  bodyJson: text("body_json").notNull(),
+  revision: integer("revision").notNull(),
+  previousMeetingKey: text("previous_meeting_key"),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [uniqueIndex("meeting_document_owner").on(table.workspaceId, table.managerAccountId, table.taskId)]);
+export const meetingCaptureReceipts = sqliteTable("meeting_capture_receipts", {
+  workspaceId: text("workspace_id").notNull(),
+  managerAccountId: text("manager_account_id").notNull(),
+  requestId: text("request_id").notNull(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  payloadHash: text("payload_hash").notNull(),
+  responseJson: text("response_json").notNull(),
+  undoJson: text("undo_json").notNull(),
+  undoneAt: text("undone_at"),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.managerAccountId, table.requestId] })]);

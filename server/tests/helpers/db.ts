@@ -92,6 +92,8 @@ export async function resetDatabase(): Promise<void> {
     DELETE FROM task_placements;
     DELETE FROM project_tracks;
     DELETE FROM projects;
+    DELETE FROM meeting_capture_receipts;
+    DELETE FROM meeting_documents;
     DELETE FROM tasks;
     DELETE FROM contacts;
     DELETE FROM user_nav_preferences;

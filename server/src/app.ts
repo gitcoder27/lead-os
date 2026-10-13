@@ -1,3 +1,4 @@
+import { createMeetingsRouter } from "./routes/meetings";
 import { createTaskPlacementsRouter } from "./routes/task-placements";
 import { createProjectsRouter, createProjectTracksRouter } from "./routes/projects";
 import { createTaskInboxRouter } from "./routes/task-inbox";
@@ -144,6 +145,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
     app.set("trust proxy", trustProxy);
     logger.info({ trustProxy }, "Express trust proxy enabled");
   }
+  app.use("/api/meetings", express.json({ limit: "512kb" }));
   app.use("/api/notes", express.json({ limit: "512kb" }));
   app.use(express.json());
 
@@ -226,6 +228,7 @@ export function createApp(services: AppServices, options: AppOptions = {}) {
   // docs/48: 1:1 workspace API — manager-only mount, flag-gated to 404 inside.
   app.use("/api/one-on-ones", requireManager(services.authService), createOneOnOnesRouter(services.oneOnOneService));
   app.use("/api/task-labels", requireManager(services.authService), createTaskLabelsRouter(new TaskLabelsService()));
+  app.use("/api/meetings", requireManager(services.authService), clearTodayCacheOnWrite, createMeetingsRouter());
   app.use("/api/capture", requireManager(services.authService), clearTodayCacheOnWrite, createCaptureRouter(new CaptureService()));
   app.use("/api/task-views", requireManager(services.authService), createTaskViewsRouter(taskKeysService));
   app.use("/api/review", requireManager(services.authService), clearTodayCacheOnWrite, createReviewRouter(taskKeysService, new WeeklyReviewService(undefined, undefined, undefined, services.oneOnOneService)));

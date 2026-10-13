@@ -1098,3 +1098,17 @@ Scope: R1–R8 in [code-review-report.md](code-review-report.md); unconfirmed sc
 | 2026-10-13 | R8 | DesktopAlertAuth, DesktopAlerts, useInboxAlerts, AuthContext and AccountWriteContinuations: 35 tests passed. Auth-plus-alert regressions cover remembered enabled/disabled choices, B isolation, sensitive draft removal, failed logout, revoked clicks and delayed permission results after returning to A. Full static/build and suite results are recorded below. Commit: this item’s task-scoped commit. |
 
 Final R1–R8 verification: server **128 files / 1,725 tests**, client **169 files / 2,231 tests** passed. Typecheck, build:check, data guard and shared artifact comparison passed; lint has **0 errors / 607 baseline warnings**. Format check still fails only on the two pre-existing untracked `.claude/**/settings.local.json` files, which were preserved. R1’s older standalone review fixtures now use the app’s QueryClient provider (45 targeted tests pass); R8 has 35 final targeted tests passing. No runtime data, live integrations, push or deploy. Validation used Node 24.14.1 and mocked browser APIs; full browser / Node 20 / coverage-threshold validation was not run.
+
+## Meeting preparation and follow-through (2026-10-13)
+
+Sequential work on main; synthetic data and mocked integrations only. Calendar, Copilot, automatic scheduling, and templates are deferred; existing 1:1 workspace remains the bridge.
+
+- [x] MP-01 — Private documents, contracts, access checks and preparation context.
+- [ ] MP-02 — Focused workspace, serialized autosave and recoverable drafts.
+- [ ] MP-03 — Atomic finish/action capture, durable receipts and guarded Undo.
+- [ ] MP-04 — Repeat flow and Today/Tasks entry points with return navigation.
+- [ ] MP-05 — Automated and browser/accessibility verification; pilot handoff.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-13 | MP-01 | Additive private document and receipt storage with account/reset cleanup. Phase 3 manager gate and visible-task access. Explicit repeat history, linked people commitments, project blockers and Jira context; context failure does not block the document. Revision + identity checks prevent stale overwrites. Meeting workspace route tests and server typecheck. |

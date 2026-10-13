@@ -254,6 +254,11 @@ exports[`permanent tenant isolation guard > keeps all owner table families priva
   },
   {
     "proof": "direct-id/scoped API probe",
+    "route": "GET /api/meetings/:key/workspace",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
     "route": "GET /api/my-day",
     "scope": "developer",
   },
@@ -975,6 +980,11 @@ exports[`permanent tenant isolation guard > keeps all owner table families priva
   {
     "proof": "skipped: focused /api/config route tests; no valid fixture in this matrix",
     "route": "PUT /api/config/team-mode",
+    "scope": "workspace manager",
+  },
+  {
+    "proof": "direct-id/scoped API probe",
+    "route": "PUT /api/meetings/:key/workspace",
     "scope": "workspace manager",
   },
   {

@@ -3474,3 +3474,67 @@ export interface IssueSuggestion {
   developmentDueDate?: string | null;
 }
 export interface IssueSuggestionsResponse { issues: IssueSuggestion[] }
+
+/** Manager-private meeting preparation; never a task description or event body. */
+export interface MeetingActionDraft {
+  id: string;
+  text: string;
+  ownerAccountId?: string | null;
+  scheduledOn?: string | null;
+  dueAt?: string | null;
+  followUpAt?: string | null;
+  waitingOn?: TaskWaitingOnInput | null;
+}
+export interface MeetingDocumentBody {
+  agenda: string;
+  notes: string;
+  outcome: string;
+  noDecisions: boolean;
+  actions: MeetingActionDraft[];
+}
+export interface MeetingDocument extends MeetingDocumentBody {
+  id: string;
+  revision: number;
+  previousMeetingKey: string | null;
+  updatedAt: string;
+}
+export interface MeetingDocumentSave extends MeetingDocumentBody {
+  documentId: string | null;
+  revision: number;
+}
+export interface MeetingContext {
+  previous: { taskKey: string; title: string; outcome: string; noDecisions: boolean } | null;
+  openActions: ManagerTask[];
+  commitments: ManagerTask[];
+  blockers: ManagerTask[];
+  issues: Array<{ key: string; summary: string; status: string }>;
+}
+export interface MeetingWorkspaceResponse {
+  task: ManagerTask;
+  document: MeetingDocument | null;
+  context: MeetingContext | null;
+  contextError: string | null;
+}
+export interface MeetingCaptureRequest {
+  operation: 'meeting-finish' | 'meeting-repeat';
+  meetingKey: string;
+  documentId: string | null;
+  revision: number;
+  requestId: string;
+  clientToday: string;
+  tz: string;
+  confirm?: boolean;
+  scheduledOn?: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+export interface MeetingCaptureResponse {
+  operation: MeetingCaptureRequest['operation'];
+  diagnostics: Array<{ code: string; message: string }>;
+  blocked?: boolean;
+  confirmRequired?: boolean;
+  task?: ManagerTask;
+  actions?: ManagerTask[];
+  document?: MeetingDocument;
+  undo?: { requestId: string; expiresAt: string };
+}

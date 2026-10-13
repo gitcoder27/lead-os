@@ -1,0 +1,66 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import express from "express";
+import { db, resetDatabase } from "./helpers/db";
+import { invoke } from "./helpers/http";
+import { configTable, developers } from "../src/db/schema";
+import { requireManager } from "../src/middleware/auth";
+import { errorHandler } from "../src/middleware/errorHandler";
+import { AuthService, serializeSessionCookie } from "../src/services/auth.service";
+import { TaskService } from "../src/services/task.service";
+import { createMeetingsRouter } from "../src/routes/meetings";
+import { emptyMeetingBody, MeetingWorkspaceService } from "../src/services/meeting-workspace.service";
+const auth = new AuthService();
+const service = new MeetingWorkspaceService();
+const app = express();
+app.use(express.json({ limit: "512kb" }));
+app.use("/api/meetings", requireManager(auth), createMeetingsRouter(service));
+app.use(errorHandler);
+const principal = { type: "manager" as const, accountId: "a", workspaceId: "default" };
+let headers: { cookie: string };
+let key: string;
+const body = { ...emptyMeetingBody(), agenda: "PRIVATE agenda", documentId: null, revision: 0 };
+beforeEach(async () => {
+  await resetDatabase();
+  await db.insert(configTable).values([{ key: "tasks_phase1_enabled", value: "true" }, { key: "tasks_phase2_stage", value: "2c" }, { key: "tasks_phase3_enabled", value: "true" }]);
+  await auth.createUser({ username: "a", displayName: "A", password: "secret123", role: "manager" });
+  const session = await auth.authenticate("a", "secret123");
+  headers = { cookie: serializeSessionCookie(session.sessionId, auth.sessionMaxAgeSeconds) };
+  key = (await new TaskService().create({ title: "Review", kind: "meeting" }, principal)).taskKey;
+});
+describe("private meeting workspace", () => {
+  it("loads an empty document and saves with identity and revision guards", async () => {
+    const empty = await invoke(app, { method: "GET", url: `/api/meetings/${key}/workspace`, headers });
+    expect(empty.status).toBe(200);
+    expect(empty.body.document).toBeNull();
+    const saved = await invoke(app, { method: "PUT", url: `/api/meetings/${key}/workspace`, headers, body });
+    expect(saved.status).toBe(200);
+    expect(saved.body.document).toMatchObject({ agenda: "PRIVATE agenda", revision: 1 });
+    expect((await invoke(app, { method: "PUT", url: `/api/meetings/${key}/workspace`, headers, body })).status).toBe(409);
+    const documentId = saved.body.document.id;
+    await service.save(key, { ...body, documentId, revision: 1, notes: "New saved notes" }, principal);
+    expect((await invoke(app, { method: "PUT", url: `/api/meetings/${key}/workspace`, headers, body: { ...body, documentId, revision: 1, notes: "Stale" } })).status).toBe(409);
+    expect((await service.get(key, principal)).document?.notes).toBe("New saved notes");
+  });
+  it("scopes documents to the manager and workspace, and rejects non-meetings", async () => {
+    await service.save(key, body, principal);
+    await expect(service.get(key, { ...principal, accountId: "b" })).rejects.toMatchObject({ status: 404 });
+    await expect(service.get(key, { ...principal, workspaceId: "foreign" })).rejects.toMatchObject({ status: 404 });
+    const task = await new TaskService().create({ title: "Ordinary task" }, principal);
+    await expect(service.get(task.taskKey, principal)).rejects.toMatchObject({ status: 404 });
+    await db.insert(developers).values({ accountId: "d", displayName: "D" });
+    await auth.createUser({ username: "d", displayName: "D", password: "secret123", role: "developer", developerAccountId: "d" });
+    const session = await auth.authenticate("d", "secret123");
+    const response = await invoke(app, { method: "GET", url: `/api/meetings/${key}/workspace`, headers: { cookie: serializeSessionCookie(session.sessionId, auth.sessionMaxAgeSeconds) } });
+    expect(response.status).toBe(403);
+  });
+  it("keeps legacy outcomes readable and uses explicit history only", async () => {
+    await new TaskService().update(key, { outcome: "Legacy outcome" }, principal);
+    const earlier = await new TaskService().create({ title: "Review", kind: "meeting" }, principal);
+    await new TaskService().create({ title: "Unfinished action", parentId: earlier.id }, principal);
+    const current = await new TaskService().requireTask(key, principal);
+    await service.write(current.id, principal, emptyMeetingBody(), null, earlier.taskKey);
+    expect((await service.get(key, principal)).context?.openActions.map((row) => row.title)).toEqual(["Unfinished action"]);
+    const unrelated = await new TaskService().create({ title: "Review", kind: "meeting" }, principal);
+    expect((await service.get(unrelated.taskKey, principal)).context?.openActions).toEqual([]);
+  });
+});

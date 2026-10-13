@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUp, Check } from 'lucide-react';
 import type { TrackerDeveloperStatus } from '@/types';
 import { FOCUS_RING } from '@/components/ui/focus';
+import { useAuth } from '@/context/AuthContext';
 import { parseTaskKeys, taskKeysForSubmit, type TaskPickerTask } from '@/components/tasks/TaskPicker';
 import { getStatusInfo } from './status-config';
 import { HAIRLINE, Kbd } from './MyDayUI';
@@ -26,6 +27,7 @@ interface QuickUpdatesProps {
 const MAX_HEIGHT = 168;
 
 export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', isPending, disabled, inputRef }: QuickUpdatesProps) {
+  const { workspaceManager } = useAuth();
   const [draft, setDraft] = useState('');
   const [taskKeys, setTaskKeys] = useState<string[]>([]);
   const [focused, setFocused] = useState(false);
@@ -110,7 +112,7 @@ export function QuickUpdates({ onAddCheckIn, tasks = [], status = 'on_track', is
           {justSent ? (
             <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: 'var(--success)' }}>
               <Check size={13} aria-hidden="true" />
-              Sent to your lead
+              {workspaceManager ? `Update shared with ${workspaceManager.displayName}` : 'Update shared'}
             </span>
           ) : disabled ? null : (
             <span className="hidden items-center gap-1.5 sm:inline-flex">

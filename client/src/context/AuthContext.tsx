@@ -9,12 +9,13 @@ import { clearDailyNoteDraftsForScope } from '@/lib/daily-note-drafts';
 import { clearNavPreferencesCacheForScope } from '@/lib/nav-preferences-cache';
 import { clearTodaySnapshotsForScope } from '@/lib/today-snapshot-cache';
 import { setSessionHint } from '@/lib/session-hint';
-import { DEFAULT_TEAM_MODE, type AuthUser, type AuthSessionResponse, type SessionFeatures, type SignUpRequest } from '@/types';
+import { DEFAULT_TEAM_MODE, type AuthUser, type AuthSessionResponse, type SessionFeatures, type SignUpRequest, type WorkspaceManager } from '@/types';
 
 const DEFAULT_FEATURES: SessionFeatures = { tasksPhase3: false, teamMode: DEFAULT_TEAM_MODE };
 
 interface AuthContextValue {
   user: AuthUser | null;
+  workspaceManager?: WorkspaceManager;
   features: SessionFeatures;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -46,6 +47,7 @@ export function getAuthScopeKey(user: AuthUser | null | undefined): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [workspaceManager, setWorkspaceManager] = useState<WorkspaceManager>();
   const [features, setFeatures] = useState<SessionFeatures>(DEFAULT_FEATURES);
   const [isLoading, setIsLoading] = useState(true);
   const userRef = useRef<AuthUser | null>(null);
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (getAuthScopeKey(userRef.current) !== getAuthScopeKey(res.user)) resetCurrentScope();
       userRef.current = res.user;
       setUser(res.user);
+      setWorkspaceManager(res.workspaceManager);
       setFeatures(res.features ?? DEFAULT_FEATURES);
       setSessionHint(res.user !== null);
       return res.user;
@@ -78,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userRef.current) resetCurrentScope();
       userRef.current = null;
       setUser(null);
+      setWorkspaceManager(undefined);
       setFeatures(DEFAULT_FEATURES);
       return null;
     }
@@ -91,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionGeneration.current++;
     resetCurrentScope(); userRef.current = res.user;
     setSessionHint(true); setUser(res.user); setFeatures(res.features ?? DEFAULT_FEATURES);
+    setWorkspaceManager(res.workspaceManager);
   }, [resetCurrentScope]);
   const login = useCallback(async (username: string, password: string) => {
     acceptSession(await api.post<AuthSessionResponse>('/auth/login', { username, password }));
@@ -102,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionGeneration.current++;
     resetCurrentScope(); userRef.current = null;
     setSessionHint(false); setUser(null); setFeatures(DEFAULT_FEATURES);
+    setWorkspaceManager(undefined);
     await api.post('/auth/logout');
   }, [resetCurrentScope]);
 
@@ -109,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        workspaceManager,
         features,
         isLoading,
         isAuthenticated: user !== null,

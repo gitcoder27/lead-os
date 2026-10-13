@@ -114,6 +114,22 @@ describe("my day routes", () => {
     vi.useRealTimers();
   });
 
+  it("daily activity names the actual manager author within the workspace and keeps private check-ins hidden", async () => {
+    const colleague = await authService.createUser({ username: "colleague", displayName: "Mira", password: "secret123", role: "manager", workspaceId: "default" });
+    const foreign = await authService.createUser({ username: "foreign", displayName: "Foreign private name", password: "secret123", role: "manager" });
+    await trackerService.addCheckIn("dev-1", "2026-03-07", { summary: "Shared instruction" }, { type: "manager", accountId: colleague.accountId });
+    await trackerService.addCheckIn("dev-1", "2026-03-07", { summary: "Private instruction", visibility: "private" }, { type: "manager", accountId: "manager" });
+    // A malformed historical author id must never resolve a name from another workspace.
+    await trackerService.addCheckIn("dev-1", "2026-03-07", { summary: "Unknown author" }, { type: "manager", accountId: foreign.accountId });
+    const res = await invoke(createTestApp(), { method: "GET", url: "/api/my-day?date=2026-03-07", headers: { cookie: await loginCookie("alice", "secret123") } });
+    expect(res.status).toBe(200);
+    expect(res.body.checkIns).toHaveLength(2);
+    expect(res.body.checkIns.find((entry: { summary: string }) => entry.summary === "Shared instruction").authorDisplayName).toBe("Mira");
+    expect(res.body.checkIns.find((entry: { summary: string }) => entry.summary === "Unknown author")).not.toHaveProperty("authorDisplayName");
+    expect(JSON.stringify(res.body)).not.toContain("Foreign private name");
+    expect(JSON.stringify(res.body)).not.toContain("Private instruction");
+  });
+
   it("GET /api/my-day returns the authenticated developer day and omits manager notes", async () => {
     await trackerService.updateDay("dev-1", "2026-03-07", {
       status: "blocked",

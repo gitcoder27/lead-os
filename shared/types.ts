@@ -1009,6 +1009,13 @@ export interface SessionFeatures {
 export interface AuthSessionResponse {
   user: AuthUser;
   features?: SessionFeatures;
+  /** Developer sessions: the owning manager of this workspace, when available. */
+  workspaceManager?: WorkspaceManager;
+}
+
+export interface WorkspaceManager {
+  accountId: string;
+  displayName: string;
 }
 
 /** Registration is an install setting and defaults closed. */
@@ -1738,6 +1745,7 @@ export interface TrackerCheckIn {
   createdAt: string;
   authorType?: UserRole;
   authorAccountId?: string;
+  authorDisplayName?: string;
   status?: TrackerDeveloperStatus;
   rationale?: string;
   nextFollowUpAt?: string;

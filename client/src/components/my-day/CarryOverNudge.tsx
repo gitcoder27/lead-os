@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { History, X } from 'lucide-react';
 import { FOCUS_RING } from '@/components/ui/focus';
+import { useAuth } from '@/context/AuthContext';
 import { useScopedStorageKey } from '@/lib/scoped-storage';
 import type { TrackerWorkItem } from '@/types';
 import { carriedDays } from './MyDayTaskParts';
@@ -30,6 +31,7 @@ export function CarryOverNudge({ items, viewDate, onCheckIn }: {
   onCheckIn?: () => void;
 }) {
   const { openTask } = useMyDayTaskDetail();
+  const { workspaceManager } = useAuth();
   const stale = items
     .map((item) => ({ item, days: carriedDays(item, viewDate) }))
     .filter(({ days }) => days >= CARRY_NUDGE_DAYS)
@@ -71,7 +73,7 @@ export function CarryOverNudge({ items, viewDate, onCheckIn }: {
       <div className="min-w-0 flex-1">
         <p className="text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{headline}</p>
         <p className="mt-0.5 text-ui leading-[18px]" style={{ color: 'var(--text-secondary)' }}>
-          Still the plan? Finish, drop or move {one ? 'it' : 'them'}, or tell your lead what’s holding {one ? 'it' : 'them'} up.
+          Still the plan? Finish, drop or move {one ? 'it' : 'them'}, or {workspaceManager ? `tell ${workspaceManager.displayName}` : 'share'} what’s holding {one ? 'it' : 'them'} up.
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {stale.slice(0, 4).map(({ item, days }) => (

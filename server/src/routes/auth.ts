@@ -23,6 +23,7 @@ import { TaskKeysService } from "../services/task-keys.service";
 import { SettingsService } from "../services/settings.service";
 import { OneOnOneService } from "../services/one-on-one.service";
 import { HttpError } from "../middleware/errorHandler";
+import { WorkspaceService } from "../services/workspace.service";
 
 const signUpSchema = z.object({
   body: z.object({
@@ -104,8 +105,10 @@ export function createAuthRouter(authService: AuthService): Router {
   const taskKeys = new TaskKeysService();
   const oneOnOnes = new OneOnOneService();
   const settings = new SettingsService();
+  const workspaces = new WorkspaceService();
   const sessionResponse = async (user: AuthUser): Promise<AuthSessionResponse> => ({
     user: publicAuthUser(user),
+    ...(user.role === "developer" ? { workspaceManager: workspaces.getManager(user.workspaceId) } : {}),
     // docs/48: `oneOnOne` is manager-only — developer sessions never receive it.
     features: {
       tasksPhase3: await taskKeys.phase3Enabled(user.workspaceId),

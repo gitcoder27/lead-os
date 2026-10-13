@@ -34,11 +34,12 @@ function createQueryClient() {
 }
 
 function AuthProbe() {
-  const { user, login, logout, refreshSession, signUp } = useAuth();
+  const { user, login, logout, refreshSession, signUp, workspaceManager } = useAuth();
 
   return (
     <div>
       <button onClick={() => void refreshSession()}>Refresh session</button>
+      <span data-testid="workspace-manager">{workspaceManager?.displayName ?? 'none'}</span>
       <span data-testid="user">{user?.username ?? 'anonymous'}</span>
       <button type="button" onClick={() => void login('manager-a', 'secret123')}>
         Login
@@ -71,6 +72,28 @@ describe('AuthProvider cache isolation', () => {
       }
       return Promise.resolve(undefined);
     });
+  });
+
+  it('loads and refreshes manager names and clears them across login, logout, and session loss', async () => {
+    const developer = { ...managerA, role: 'developer', accountId: 'dev-1', developerAccountId: 'dev-1' };
+    apiMocks.get.mockResolvedValue({ user: developer, workspaceManager: { accountId: 'manager-a', displayName: 'Ayan' } });
+    renderAuthProbe(createQueryClient());
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('Ayan'));
+    apiMocks.get.mockResolvedValue({ user: developer, workspaceManager: { accountId: 'manager-a', displayName: 'Ayan Updated' } });
+    fireEvent.click(screen.getByText('Refresh session'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('Ayan Updated'));
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('none'));
+    apiMocks.post.mockResolvedValueOnce({ user: developer, workspaceManager: { accountId: 'manager-a', displayName: 'Ayan' } });
+    fireEvent.click(screen.getByText('Login'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('Ayan'));
+    fireEvent.click(screen.getByText('Logout'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('none'));
+    fireEvent.click(screen.getByText('Refresh session'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('Ayan Updated'));
+    apiMocks.get.mockRejectedValue(new Error('Session lost'));
+    fireEvent.click(screen.getByText('Refresh session'));
+    await waitFor(() => expect(screen.getByTestId('workspace-manager')).toHaveTextContent('none'));
   });
 
   it('clears React Query cache when login switches from anonymous to a workspace user', async () => {

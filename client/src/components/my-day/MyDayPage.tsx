@@ -48,12 +48,12 @@ function readOnlyReasonFor(day: MyDayResponse | undefined): MyDayReadOnlyReason 
 }
 
 /**
- * The developer's side of the dev ↔ lead link. Reads top to bottom as the
+ * The developer's side of the developer ↔ manager link. Reads top to bottom as the
  * day itself: how it's going, what you're on, what's next, what's done —
- * with the running log beside it. Everything here lands on the lead's board.
+ * with the running log beside it. Everything here lands on the manager's board.
  */
 export function MyDayPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, workspaceManager } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { addToast } = useToast();
   const [date, setDate] = useState(() => getLocalIsoDate());
@@ -357,7 +357,7 @@ export function MyDayPage() {
               )}
             </div>
 
-            {/* Side column: an optional line to the lead, and the day's log. */}
+            {/* Side column: an optional update, and the day's log. */}
             <aside className="flex min-w-0 flex-col gap-7 lg:sticky lg:top-6 lg:-mx-1 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto lg:px-1 lg:pb-4">
               <MyDaySection
                 id="check-in"
@@ -370,7 +370,7 @@ export function MyDayPage() {
                       Due for an update
                     </span>
                   ) : (
-                    'For your lead · optional'
+                    workspaceManager ? `For ${workspaceManager.displayName} · optional` : 'Share an update · optional'
                   )
                 }
                 action={

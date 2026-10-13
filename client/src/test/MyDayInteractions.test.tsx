@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { StatusSelector } from '@/components/my-day/StatusSelector';
+import { RecentActivity } from '@/components/my-day/RecentActivity';
+import { LoginPage } from '@/components/my-day/LoginPage';
 import { QuickUpdates } from '@/components/my-day/QuickUpdates';
 import { CurrentTask } from '@/components/my-day/CurrentTask';
 import { PlannedQueue } from '@/components/my-day/PlannedQueue';
@@ -11,6 +13,7 @@ import { useMyDayShortcuts } from '@/components/my-day/useMyDayShortcuts';
 import { TestWrapper } from '@/test/wrapper';
 import type { MyDayResponse, TrackerWorkItem } from '@/types';
 
+let mockWorkspaceManager: { accountId: string; displayName: string } | undefined = { accountId: 'manager-a', displayName: 'Ayan' };
 const mockAddToast = vi.fn();
 const mockUpdateItemMutate = vi.fn();
 const mockAddCheckInMutate = vi.fn();
@@ -20,7 +23,7 @@ vi.mock('@/context/ToastContext', () => ({
 }));
 
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: { displayName: 'Alice Smith', role: 'developer', developerAccountId: 'dev-1' } }),
+  useAuth: () => ({ workspaceManager: mockWorkspaceManager, user: { displayName: 'Alice Smith', role: 'developer', developerAccountId: 'dev-1' } }),
   useAuthScopeKey: () => 'dev-1',
 }));
 
@@ -118,7 +121,7 @@ describe('My Day quick update', () => {
       onAddCheckIn.mock.calls[0]![3].onSuccess();
     });
     expect(input).toHaveValue('');
-    expect(screen.getByText('Sent to your lead')).toBeInTheDocument();
+    expect(screen.getByText('Update shared with Ayan')).toBeInTheDocument();
   });
 
   it('stays closed on read-only days', () => {
@@ -302,5 +305,40 @@ describe('My Day shortcuts and dates', () => {
     fireEvent.keyDown(input, { key: 'n' });
     input.remove();
     expect(handlers.onAddTask).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('My Day manager names', () => {
+  beforeEach(() => { mockWorkspaceManager = { accountId: 'manager-a', displayName: 'Ayan' }; });
+
+  it('keeps developer sign-in copy neutral before a workspace is known', () => {
+    render(<LoginPage role="developer" />);
+    expect(screen.getByText('Your current task, your plan for today and updates shared with your team.')).toBeInTheDocument();
+    expect(screen.getByText('No account yet? Ask the person who invited you for access.')).toBeInTheDocument();
+    expect(screen.queryByText(/Ayan|your lead/)).not.toBeInTheDocument();
+  });
+
+  it('uses the actual author for replies and does not attribute unknown authors to the workspace owner', () => {
+    render(<RecentActivity checkIns={[
+      { id: 1, dayId: 1, summary: 'Owner reply', createdAt: '2026-03-10T09:00:00Z', authorType: 'manager', authorAccountId: 'manager-a', taskKeys: [] },
+      { id: 2, dayId: 1, summary: 'Colleague reply', createdAt: '2026-03-10T09:01:00Z', authorType: 'manager', authorAccountId: 'manager-b', authorDisplayName: 'Mira', taskKeys: [] },
+      { id: 3, dayId: 1, summary: 'Historical reply', createdAt: '2026-03-10T09:02:00Z', authorType: 'manager', taskKeys: [] },
+    ]} />);
+    expect(screen.getByText('From Ayan')).toBeInTheDocument();
+    expect(screen.getByText('From Mira')).toBeInTheDocument();
+    expect(screen.getByText('Shared update')).toBeInTheDocument();
+    expect(screen.queryByText(/your lead/i)).not.toBeInTheDocument();
+  });
+
+  it('uses neutral activity and success copy without a manager name', () => {
+    mockWorkspaceManager = undefined;
+    const onAddCheckIn = vi.fn();
+    render(<><RecentActivity checkIns={[]} /><QuickUpdates onAddCheckIn={onAddCheckIn} /></>);
+    expect(screen.getByText('Updates you send show up here — and on the team board.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Quick update'), { target: { value: 'Progress' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    act(() => { onAddCheckIn.mock.calls[0]![3].onSuccess(); });
+    expect(screen.getByText('Update shared')).toBeInTheDocument();
+    expect(screen.queryByText(/your lead/i)).not.toBeInTheDocument();
   });
 });

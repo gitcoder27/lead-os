@@ -60,17 +60,17 @@ type Patch = (updates: UpdateTaskRequest) => void;
 
 export interface TaskPeople {
   developers: { accountId: string; displayName: string }[];
-  /** Display name for an account id: "You" for the signed-in user, the developer name, else undefined. */
+  /** Display name for a known account id, or "You" for the signed-in user. */
   nameFor: (id: string | null | undefined) => string | undefined;
   userId: string | undefined;
   /** Name used for "You" avatars. */
   userName: string;
-  /** Developers only know their lead by role: their roster has no manager names. */
+  workspaceManagerName?: string;
   viewer?: TaskDetailMode;
 }
 
 export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
-  const { user } = useAuth();
+  const { user, workspaceManager } = useAuth();
   // Manager-only endpoint (P3 §3.3): developers skip the request.
   const developers = useDevelopers(undefined, { enabled: mode === 'manager' });
   const list = developers.data;
@@ -79,6 +79,7 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
   return useMemo(() => {
     const byId = new Map<string, string>();
     for (const dev of list ?? []) byId.set(dev.accountId, dev.displayName);
+    if (mode === 'developer' && workspaceManager) byId.set(workspaceManager.accountId, workspaceManager.displayName);
     return {
       // docs/51 F3: my linked developer account is me — the "Me" option
       // already covers it, so the assign menu doesn't list self twice.
@@ -87,8 +88,9 @@ export function useTaskPeople(mode: TaskDetailMode): TaskPeople {
       userId,
       userName,
       viewer: mode,
+      workspaceManagerName: mode === 'developer' ? workspaceManager?.displayName : undefined,
     };
-  }, [list, userId, userName, isSelf, mode]);
+  }, [list, userId, userName, isSelf, mode, workspaceManager]);
 }
 
 // ── Status ──────────────────────────────────────────────────────────
@@ -688,7 +690,8 @@ export function TaskDetailsSection({ task, mode, editable, onPatch, people }: {
   };
 
   const ownerName = task.ownerType === 'developer' && task.ownerId ? people.nameFor(task.ownerId) : undefined;
-  const hint = mode === 'developer' ? 'Shared with your lead' : ownerName && ownerName !== 'You' ? `Shared with ${ownerName}` : undefined;
+  const developerHint = people.workspaceManagerName ? `Shared with ${people.workspaceManagerName}` : 'Shared details';
+  const hint = mode === 'developer' ? developerHint : ownerName && ownerName !== 'You' ? `Shared with ${ownerName}` : undefined;
   const long = value.length > DETAILS_FOLD_CHARS || value.split('\n').length > DETAILS_FOLD_LINES;
   const folded = long && !expanded;
 
@@ -854,8 +857,7 @@ export function MeetingOutcome({ task, editable, onPatch }: { task: TaskDetailRe
 // ── Metadata ────────────────────────────────────────────────────────
 
 export function taskMetaEntries(task: TaskDetailResponse, people: TaskPeople): [string, string][] {
-  const creator = (task.createdById ? people.nameFor(task.createdById) : undefined)
-    ?? (people.viewer === 'developer' && task.createdByType === 'manager' ? 'Your lead' : undefined);
+  const creator = task.createdById ? people.nameFor(task.createdById) : undefined;
   const createdBy = creator ?? `${task.createdByType.charAt(0).toUpperCase()}${task.createdByType.slice(1)}${task.createdById && task.createdByType !== 'manager' ? ` (${task.createdById})` : ''}`;
   const entries: [string, string][] = [
     ['Created by', createdBy],

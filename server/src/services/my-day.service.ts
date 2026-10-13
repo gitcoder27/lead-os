@@ -1,18 +1,24 @@
 import type {
   DeveloperSurfaceTask,
+  CreateTaskRequest,
   MyDayReadOnlyReason,
   MyDayResponse,
   TrackerCheckIn,
   TrackerDeveloperStatus,
   TrackerWorkItem,
+  TaskEvent,
+  TaskStatus,
+  UpdateTaskRequest,
 } from "shared/types";
-import { TeamTrackerService } from "./team-tracker.service";
+import type { TeamTrackerService } from "./team-tracker.service";
 import { HttpError } from "../middleware/errorHandler";
 import { TaskEventsService } from "./task-events.service";
 import { TaskKeysService } from "./task-keys.service";
-import type { TaskEvent, TaskStatus } from "shared/types";
 import { TaskService } from "./task.service";
-import type { CreateTaskRequest, UpdateTaskRequest } from "shared/types";
+import { and, eq, inArray } from "drizzle-orm";
+import { db } from "../db/connection";
+import { appUsers } from "../db/schema";
+import { normalizeWorkspaceId } from "../workspace-scope";
 
 interface AddMyDayItemParams {
   date: string;
@@ -82,7 +88,7 @@ export class MyDayService {
       availability: day.availability,
       isReadOnly: readOnlyReason !== undefined,
       lastCheckInAt: day.lastCheckInAt,
-      checkIns: day.checkIns,
+      checkIns: await this.withCheckInAuthorNames(day.checkIns, workspaceId),
       isStale: day.isStale,
     };
 
@@ -218,6 +224,18 @@ export class MyDayService {
       return "future";
     }
     return undefined;
+  }
+
+  private async withCheckInAuthorNames(checkIns: TrackerCheckIn[], workspaceId?: string): Promise<TrackerCheckIn[]> {
+    const ids = [...new Set(checkIns.flatMap(checkIn => checkIn.authorType === "manager" && checkIn.authorAccountId ? [checkIn.authorAccountId] : []))];
+    if (!ids.length) return checkIns;
+    const authors = await db.select({ id: appUsers.username, name: appUsers.displayName }).from(appUsers)
+      .where(and(eq(appUsers.workspaceId, normalizeWorkspaceId(workspaceId)), eq(appUsers.role, "manager"), inArray(appUsers.username, ids)));
+    const names = new Map(authors.map(author => [author.id, author.name.trim()]));
+    return checkIns.map(checkIn => ({
+      ...checkIn,
+      authorDisplayName: checkIn.authorType === "manager" && checkIn.authorAccountId ? names.get(checkIn.authorAccountId) || undefined : undefined,
+    }));
   }
 
   private async assertWritable(accountId: string, date: string, workspaceId?: string): Promise<void> {

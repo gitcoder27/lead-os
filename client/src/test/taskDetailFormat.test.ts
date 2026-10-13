@@ -21,8 +21,9 @@ describe('plan dates in the drawer (docs/56 MDA-04)', () => {
 describe('drawer footer creator (docs/56 MDA-04)', () => {
   const people = (viewer: 'manager' | 'developer') => ({ developers: [], nameFor: () => undefined, userId: 'dev-1', userName: 'Priya', viewer });
   const task = { createdById: 'maya', createdByType: 'manager', createdAt: '2026-10-10T11:37:00.000Z', updatedAt: '2026-10-10T11:37:00.000Z', kind: 'task' } as unknown as TaskDetailResponse;
-  it('names the lead for a developer instead of a bare role', () => {
-    expect(taskMetaEntries(task, people('developer'))[0]).toEqual(['Created by', 'Your lead']);
+  it('uses a known creator name and falls back to the role without inventing an author', () => {
+    expect(taskMetaEntries(task, { ...people('developer'), nameFor: (id) => id === 'maya' ? 'Maya' : undefined })[0]).toEqual(['Created by', 'Maya']);
+    expect(taskMetaEntries(task, people('developer'))[0]).toEqual(['Created by', 'Manager']);
     expect(taskMetaEntries(task, people('manager'))[0]).toEqual(['Created by', 'Manager']);
   });
 });

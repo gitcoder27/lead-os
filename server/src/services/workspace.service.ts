@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import type { WorkspaceManager } from "shared/types";
 import { startCanonicalTasksIfEmpty } from "../db/canonical-start";
 import { db, rawDb } from "../db/connection";
-import { configTable, workspaces } from "../db/schema";
+import { appUsers, configTable, workspaces } from "../db/schema";
 import { HttpError } from "../middleware/errorHandler";
 
 import { DEFAULT_WORKSPACE_ID, normalizeWorkspaceId } from "../workspace-scope";
@@ -13,6 +14,16 @@ function nowIso(): string {
 }
 
 export class WorkspaceService {
+  getManager(workspaceId: string): WorkspaceManager | undefined {
+    const manager = db.select({ accountId: appUsers.username, displayName: appUsers.displayName })
+      .from(workspaces)
+      .innerJoin(appUsers, and(eq(appUsers.username, workspaces.ownerAccountId), eq(appUsers.workspaceId, workspaces.id)))
+      .where(and(eq(workspaces.id, workspaceId), eq(appUsers.role, "manager"), eq(appUsers.isActive, 1)))
+      .limit(1).get();
+    if (!manager?.displayName.trim()) return undefined;
+    return { ...manager, displayName: manager.displayName.trim() };
+  }
+
   ensureDefaultWorkspace(ownerAccountId?: string): string {
     const now = nowIso();
     db

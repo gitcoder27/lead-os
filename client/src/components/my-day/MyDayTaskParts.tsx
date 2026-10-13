@@ -9,6 +9,7 @@ import { TaskUpdateComposer } from '@/components/tasks/TaskUpdateComposer';
 import { RelatedIssueChips } from '@/components/team-tracker/RelatedIssueChips';
 import { continuedDays, describeLatestEvent, formatCompactRelative } from '@/components/team-tracker/trackerItemFormat';
 import { useMyDayTaskDetail } from './MyDayTaskDetailContext';
+import { useAuth } from '@/context/AuthContext';
 
 /** Days carried before the provenance turns amber — matches the manager's drawer. */
 
@@ -215,6 +216,10 @@ export function TaskMeta({
   className?: string;
 }) {
   const meta: ReactNode[] = [];
+  const { workspaceManager } = useAuth();
+  const managerName = workspaceManager && (
+    !item.createdBy?.id || (item.createdBy.type === 'manager' && item.createdBy.id === workspaceManager.accountId)
+  ) ? workspaceManager.displayName : undefined;
   // docs/56 UX-29: work planned for a later day says so; it is not "continued" from anywhere.
   const plannedLater = Boolean(viewDate && item.scheduledOn && item.scheduledOn > viewDate);
   const isContinued = !plannedLater && Boolean(viewDate && item.originDate && item.originDate !== viewDate);
@@ -265,10 +270,10 @@ export function TaskMeta({
         key="delegated"
         className="inline-flex items-center gap-1"
         style={{ color: 'var(--accent-text)' }}
-        title="Assigned by your lead — only they can rename it"
+        title={managerName ? `Assigned by ${managerName} — only the creator can rename it` : 'Assigned task — only the creator can rename it'}
       >
         <Link2 size={11} aria-hidden="true" />
-        From your lead
+        {managerName ? `From ${managerName}` : 'Assigned task'}
       </span>
     );
   }

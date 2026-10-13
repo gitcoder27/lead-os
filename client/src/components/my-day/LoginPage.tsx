@@ -20,8 +20,8 @@ const ROLE_COPY = {
   },
   developer: {
     title: 'Sign in to My Day',
-    lede: 'Your current task, your plan for today and check-ins with your lead.',
-    footnote: 'No account yet? Ask your lead for access.',
+    lede: 'Your current task, your plan for today and updates shared with your team.',
+    footnote: 'No account yet? Ask the person who invited you for access.',
   },
 } as const;
 

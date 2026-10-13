@@ -18,6 +18,7 @@ const mockSetCurrentMutate = vi.fn();
 const mockAddCheckInMutate = vi.fn();
 const mockAddMyDayTaskEventMutate = vi.fn();
 
+let mockWorkspaceManager: { accountId: string; displayName: string } | undefined;
 let mockDay: MyDayResponse;
 let mockResolution: { data: unknown; isError: boolean; isLoading: boolean } = { data: undefined, isError: false, isLoading: false };
 
@@ -42,6 +43,7 @@ vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({
     user: { displayName: 'Alice Smith', role: 'developer', developerAccountId: 'dev-1' },
     logout: mockLogout,
+    workspaceManager: mockWorkspaceManager,
   }),
   useAuthScopeKey: () => 'dev-1',
 }));
@@ -210,6 +212,7 @@ vi.mock('framer-motion', async () => {
 describe('MyDayPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWorkspaceManager = { accountId: 'manager-a', displayName: 'Ayan' };
     mockResolution = { data: undefined, isError: false, isLoading: false };
     mockDay = {
       date: '2026-03-10',
@@ -416,7 +419,24 @@ describe('MyDayPage', () => {
     expect(within(now).getByRole('button', { name: 'Drop Review PR comments' })).toHaveTextContent('Drop');
     expect(within(now).getByRole('button', { name: 'Mark Review PR comments done' })).toHaveTextContent('Done');
     expect(within(now).getByText('Update on this task…')).toBeInTheDocument();
-    expect(screen.getByText('For your lead · optional')).toBeInTheDocument();
+    expect(screen.getByText('For Ayan · optional')).toBeInTheDocument();
+  });
+
+  it('personalizes assigned work and carry-over copy, with neutral copy when the manager is unavailable', () => {
+    mockDay.currentItem = undefined;
+    mockDay.plannedItems = [createItem({ id: 12, managerDeskItemId: 7, title: 'Assigned work', originDate: shiftLocalIsoDate(mockDay.date, -8) })];
+    mockDay.checkIns = [];
+    const { rerender } = render(<MyDayPage />, { wrapper: TestWrapper });
+    expect(screen.getByText('For Ayan · optional')).toBeInTheDocument();
+    expect(screen.getByText('From Ayan')).toHaveAttribute('title', 'Assigned by Ayan — only the creator can rename it');
+    expect(screen.getByText(/tell Ayan what’s holding it up/)).toBeInTheDocument();
+    expect(screen.getByText(/team board for Ayan/)).toBeInTheDocument();
+    expect(screen.queryByText(/your lead/i)).not.toBeInTheDocument();
+    mockWorkspaceManager = undefined;
+    rerender(<MyDayPage />);
+    expect(screen.getByText('Share an update · optional')).toBeInTheDocument();
+    expect(screen.getByText('Assigned task')).toBeInTheDocument();
+    expect(screen.queryByText(/Ayan|your lead/)).not.toBeInTheDocument();
   });
 
   it('owns the page landmark and folds the key legend once a shortcut is used (MDA-06)', () => {

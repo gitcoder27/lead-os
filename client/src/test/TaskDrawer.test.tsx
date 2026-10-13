@@ -10,11 +10,12 @@ const mockUseTaskDetail = vi.fn();
 const mockMutate = vi.fn();
 const mockDelete = vi.fn();
 const mockUser = vi.fn();
+const mockWorkspaceManager = vi.fn();
 const mockToast = vi.fn();
 
 const mockFeatures = vi.hoisted(() => vi.fn((): Record<string, unknown> | undefined => undefined));
 vi.mock('@/context/AuthContext', () => ({
-  useAuth: () => ({ user: mockUser(), features: mockFeatures() }),
+  useAuth: () => ({ user: mockUser(), features: mockFeatures(), workspaceManager: mockWorkspaceManager() }),
   useAuthScopeKey: () => 'ws:manager:manager',
 }));
 
@@ -114,6 +115,7 @@ function queryFor(task: TaskDetailResponse) {
 }
 
 beforeEach(() => {
+  mockWorkspaceManager.mockReturnValue(undefined);
   clearTaskUpdateDraftsForScope('ws:manager:manager');
   mockMutate.mockReset();
   mockDelete.mockReset();
@@ -642,11 +644,14 @@ describe('TaskDrawer details (shared description)', () => {
 
   it('lets the owning developer edit details and status, with nothing manager-private', () => {
     mockUser.mockReturnValue({ accountId: 'u-dev', role: 'developer', developerAccountId: 'dev-1' });
+    mockWorkspaceManager.mockReturnValue({ accountId: 'manager-a', displayName: 'Ayan' });
     const task = { ...managerTask({ details: 'Lead wrote this' }), ownerType: 'developer' as const, ownerId: 'dev-1' } as TaskDetailResponse;
     for (const field of ['trackedByManagerId', 'labels', 'nextAction', 'followUpAt', 'later']) delete (task as Record<string, unknown>)[field];
     mockUseTaskDetail.mockReturnValue(queryFor(task));
     render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
-    expect(screen.getByText('Shared with your lead')).toBeTruthy();
+    expect(screen.getByText('Shared with Ayan')).toBeTruthy();
+    expect(screen.getByText('Ayan')).toBeTruthy();
+    expect(screen.queryByText(/your lead/i)).toBeNull();
     // Manager-created: the title is locked, status and details are not.
     expect(screen.queryByLabelText('Task title')).toBeNull();
     expect(screen.getByRole('button', { name: 'Task status: Active' })).toBeTruthy();
@@ -658,6 +663,15 @@ describe('TaskDrawer details (shared description)', () => {
     expect(screen.queryByText('Tracked by')).toBeNull();
     expect(screen.queryByText('Follow-up')).toBeNull();
     expect(screen.queryByText('Labels')).toBeNull();
+  });
+
+  it('uses neutral shared-details copy and creator role when the manager name is unavailable', () => {
+    mockUser.mockReturnValue({ accountId: 'dev-1', role: 'developer', developerAccountId: 'dev-1' });
+    mockUseTaskDetail.mockReturnValue(queryFor({ ...managerTask({ details: 'Shared context' }), ownerType: 'developer', ownerId: 'dev-1' } as TaskDetailResponse));
+    render(<TaskDetailBody taskKey="T-7" onNavigateTask={() => {}} />);
+    expect(screen.getByText('Shared details')).toBeTruthy();
+    expect(screen.getByText('Manager')).toBeTruthy();
+    expect(screen.queryByText(/your lead/i)).toBeNull();
   });
 
   it('is read-only on deleted tasks and hidden when empty', () => {

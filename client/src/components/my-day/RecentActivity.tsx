@@ -4,6 +4,7 @@ import type { TrackerCheckIn } from '@/types';
 import { formatAbsoluteDateTime } from '@/lib/utils';
 import { getStatusInfo } from './status-config';
 import { HAIRLINE } from './MyDayUI';
+import { useAuth } from '@/context/AuthContext';
 
 interface RecentActivityProps {
   checkIns: TrackerCheckIn[];
@@ -11,10 +12,11 @@ interface RecentActivityProps {
 }
 
 /**
- * The day's check-in log — what you told your lead, and anything your lead
+ * The day's check-in log — your updates, and anything your manager
  * wrote back. A thin rail with time on the left keeps it scannable.
  */
 export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps) {
+  const { workspaceManager } = useAuth();
   if (checkIns.length === 0) {
     return (
       <div className="px-4 py-5">
@@ -23,7 +25,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
         </p>
         {isToday && (
           <p className="mt-1 text-body leading-[18px]" style={{ color: 'var(--text-muted)' }}>
-            Updates you send show up here — and on your lead’s team board.
+            {workspaceManager ? `Updates you send show up here — and on the team board for ${workspaceManager.displayName}.` : 'Updates you send show up here — and on the team board.'}
           </p>
         )}
       </div>
@@ -34,7 +36,8 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
     <ol className="relative px-4 py-3" aria-label="Check-ins">
       <AnimatePresence initial={false}>
         {checkIns.map((ci, idx) => {
-          const fromLead = ci.authorType === 'manager';
+          const fromManager = ci.authorType === 'manager';
+          const authorName = ci.authorDisplayName || (ci.authorAccountId === workspaceManager?.accountId ? workspaceManager?.displayName : undefined);
           const status = ci.status ? getStatusInfo(ci.status) : null;
           const isLast = idx === checkIns.length - 1;
           return (
@@ -59,7 +62,7 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                 <span
                   className="relative z-1 mt-[7px] h-[7px] w-[7px] rounded-full"
                   style={{
-                    background: fromLead || idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
+                    background: fromManager || idx === 0 ? 'var(--accent)' : 'var(--border-strong)',
                     boxShadow: idx === 0 ? '0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
                   }}
                 />
@@ -67,9 +70,9 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
               </span>
 
               <div className={`min-w-0 ${isLast ? '' : 'pb-4'}`}>
-                {(fromLead || status) && (
+                {(fromManager || status) && (
                   <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-ui font-medium leading-5">
-                    {fromLead && <span style={{ color: 'var(--accent-text)' }}>From your lead</span>}
+                    {fromManager && <span style={{ color: 'var(--accent-text)' }}>{authorName ? `From ${authorName}` : 'Shared update'}</span>}
                     {status && (
                       <span className="inline-flex items-center gap-1" style={{ color: status.color }}>
                         <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.color }} aria-hidden="true" />
@@ -79,11 +82,11 @@ export function RecentActivity({ checkIns, isToday = true }: RecentActivityProps
                   </div>
                 )}
                 <p
-                  className={`whitespace-pre-line wrap-break-word text-body leading-5 ${fromLead ? 'rounded-lg px-2.5 py-1.5' : ''}`}
+                  className={`whitespace-pre-line wrap-break-word text-body leading-5 ${fromManager ? 'rounded-lg px-2.5 py-1.5' : ''}`}
                   style={{
                     color: 'var(--text-primary)',
-                    background: fromLead ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : undefined,
-                    border: fromLead ? '1px solid color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
+                    background: fromManager ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : undefined,
+                    border: fromManager ? '1px solid color-mix(in srgb, var(--accent) 18%, transparent)' : undefined,
                   }}
                 >
                   {ci.summary}

@@ -13,7 +13,7 @@ export interface StatusInfo {
   /** The tone at a readable contrast for text on a tinted fill. */
   textColor: string;
   icon: typeof Zap;
-  /** Composer placeholder while this status is set — asks the question a lead would ask. */
+  /** Composer placeholder while this status is set — asks the question a manager would ask. */
   prompt: string;
 }
 

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { createAuthRouter } from "../src/routes/auth";
 import { notFoundHandler, errorHandler } from "../src/middleware/errorHandler";
 import { AuthService, PASSWORD_MIN_LENGTH, SESSION_COOKIE_NAME } from "../src/services/auth.service";
-import { appSessions, developers } from "../src/db/schema";
+import { appSessions, appUsers, developers, workspaces } from "../src/db/schema";
 import { db, resetDatabase } from "./helpers/db";
 import { invoke } from "./helpers/http";
 
@@ -96,6 +96,40 @@ describe("auth routes", () => {
     });
     expect(res.headers["set-cookie"]).toContain(`${SESSION_COOKIE_NAME}=`);
     expect(res.headers["set-cookie"]).toContain("HttpOnly");
+  });
+
+  it("developer login and session refresh resolve only their workspace owner and expose no account secrets", async () => {
+    // resetDatabase retains the default workspace; clear its previous test owner.
+    await db.update(workspaces).set({ ownerAccountId: null }).where(eq(workspaces.id, "default"));
+    await authService.createUser({ username: "ayan", displayName: "Ayan", password: "secret123", role: "manager" });
+    const friend = await authService.createUser({ username: "friend", displayName: "Mira", password: "secret123", role: "manager" });
+    await seedDeveloper();
+    await db.insert(developers).values({ workspaceId: friend.workspaceId, accountId: "dev-1", displayName: "Friend developer", isActive: 1 });
+    await authService.createUser({ username: "alice", displayName: "Alice", password: "secret123", role: "developer", developerAccountId: "dev-1" });
+    await authService.createUser({ username: "friend-dev", displayName: "Friend developer", password: "secret123", role: "developer", developerAccountId: "dev-1", workspaceId: friend.workspaceId });
+    const app = createTestApp();
+    for (const [username, expected] of [["alice", { accountId: "ayan", displayName: "Ayan" }], ["friend-dev", { accountId: "friend", displayName: "Mira" }]] as const) {
+      const login = await invoke(app, { method: "POST", url: "/api/auth/login", body: { username, password: "secret123" } });
+      expect(login.status).toBe(200);
+      expect(login.body.workspaceManager).toEqual(expected);
+      const cookie = login.headers["set-cookie"]!.split(";")[0]!;
+      const me = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie } });
+      expect(me.body.workspaceManager).toEqual(expected);
+    }
+    const manager = await authService.authenticate("ayan", "secret123");
+    const me = await invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: `${SESSION_COOKIE_NAME}=${manager.sessionId}` } });
+    expect(me.body).not.toHaveProperty("workspaceManager");
+    await db.update(appUsers).set({ displayName: "Ayan Updated" }).where(eq(appUsers.username, "ayan"));
+    const developer = await authService.authenticate("alice", "secret123");
+    const refresh = () => invoke(app, { method: "GET", url: "/api/auth/me", headers: { cookie: `${SESSION_COOKIE_NAME}=${developer.sessionId}` } });
+    expect((await refresh()).body.workspaceManager).toEqual({ accountId: "ayan", displayName: "Ayan Updated" });
+    await db.update(appUsers).set({ isActive: 0 }).where(eq(appUsers.username, "ayan"));
+    expect((await refresh()).body).not.toHaveProperty("workspaceManager");
+    await db.update(appUsers).set({ isActive: 1 }).where(eq(appUsers.username, "ayan"));
+    for (const ownerAccountId of [null, "missing", "friend", "alice"]) {
+      await db.update(workspaces).set({ ownerAccountId }).where(eq(workspaces.id, "default"));
+      expect((await refresh()).body).not.toHaveProperty("workspaceManager");
+    }
   });
 
   it("password change revokes every old session, clears the cookie, and requires a fresh login", async () => {

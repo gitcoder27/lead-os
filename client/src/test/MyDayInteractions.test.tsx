@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { StatusSelector } from '@/components/my-day/StatusSelector';
 import { RecentActivity } from '@/components/my-day/RecentActivity';
 import { LoginPage } from '@/components/my-day/LoginPage';
@@ -328,6 +328,24 @@ describe('My Day manager names', () => {
     expect(screen.getByText('From Mira')).toBeInTheDocument();
     expect(screen.getByText('Shared update')).toBeInTheDocument();
     expect(screen.queryByText(/your lead/i)).not.toBeInTheDocument();
+  });
+
+  it('merges task updates and blockers into the log newest first', () => {
+    render(<RecentActivity
+      checkIns={[{ id: 1, dayId: 1, summary: 'Morning check-in', createdAt: '2026-03-10T09:00:00Z', authorType: 'developer', taskKeys: [] }]}
+      taskUpdates={[
+        { id: 7, taskKey: 'T-56', type: 'update', body: 'Wired the endpoint', occurredAt: '2026-03-10T11:00:00Z' },
+        { id: 8, taskKey: 'T-69', type: 'blocker', blockerAction: 'raised', body: 'Need access', occurredAt: '2026-03-10T10:00:00Z' },
+      ]}
+    />);
+    const items = within(screen.getByRole('list', { name: 'Check-ins' })).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Wired the endpoint'),
+      expect.stringContaining('Need access'),
+      expect.stringContaining('Morning check-in'),
+    ]);
+    expect(items[0]).toHaveTextContent('T-56');
+    expect(items[1]).toHaveTextContent('Blocker raised');
   });
 
   it('uses neutral activity and success copy without a manager name', () => {

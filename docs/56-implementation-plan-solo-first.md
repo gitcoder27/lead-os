@@ -1129,3 +1129,11 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-14 | MDN-01 | Developer login/session responses expose only the active workspace owner's account ID and display name. My Day check-in hint, send confirmation, carry-over prompt, assigned-work label, daily activity and task drawer use names; pre-sign-in and unavailable-name states use neutral copy. Check-in author names resolve in one workspace-scoped batch after private entries are filtered; task timelines already resolve actual authors. Auth lifecycle clears the manager on account changes, logout and session loss. Focused backend auth/My Day/tenant/registration suites: 64 tests pass; six client suites: 110 tests pass (final drawer rerun: 55). Typecheck, build:check, data guard, diff check and touched-file lint pass (0 lint errors; existing warnings). Backend verification uses TZ=UTC because the existing tenant fixture derives its day in UTC; the default test workspace's retained owner is explicitly cleared in the new auth fixture. Shared additions are type-only; no JavaScript regeneration or schema migration. Synthetic test databases only; no runtime data, live integrations, push or deployment. Commit: this item's task-scoped commit. |
+
+## My Day task activity (2026-10-14)
+
+- [x] MDL-01 — Merge the developer's own shared task updates and blockers into the daily log alongside check-ins.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-14 | MDL-01 | My Day loads workspace-scoped authored task events within the client's local day, excluding redacted events and check-in side effects. The log merges entries newest first with task keys and blocker labels. Typecheck, build:check, data guard and diff check passed; My Day route tests: 40 passed; interaction/hook tests: 25 passed. Shared additions are type-only. Tests use isolated databases; no runtime data or live integrations. |

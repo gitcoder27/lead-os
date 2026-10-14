@@ -58,7 +58,7 @@ describe('useMyDay hooks', () => {
       wrapper: createWrapper(),
     });
 
-    expect(mockGet).toHaveBeenCalledWith('/my-day?date=2026-03-09');
+    expect(mockGet).toHaveBeenCalledWith(`/my-day?${new URLSearchParams({ date: '2026-03-09', tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}`);
     expect(enabled.result.current.data).toEqual({ date: '2026-03-09', items: [] });
     expect(disabled.result.current.fetchStatus).toBe('idle');
   });

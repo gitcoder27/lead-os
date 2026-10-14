@@ -3,6 +3,7 @@ import type {
   CreateTaskRequest,
   MyDayReadOnlyReason,
   MyDayResponse,
+  MyDayTaskUpdate,
   TrackerCheckIn,
   TrackerDeveloperStatus,
   TrackerWorkItem,
@@ -19,6 +20,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/connection";
 import { appUsers } from "../db/schema";
 import { normalizeWorkspaceId } from "../workspace-scope";
+import { addDaysToIsoDay, resolveTimeZone, zonedTimeToUtc } from "./today-clock";
 
 interface AddMyDayItemParams {
   date: string;
@@ -72,7 +74,7 @@ export class MyDayService {
     return this.eventsService.appendWithReplay({ workspaceId, taskKey, type: "update", body: input.body, meta: { via: "my_day" }, requestId: input.requestId }, { type: "developer", accountId });
   }
 
-  async getMyDay(accountId: string, date: string, workspaceId?: string): Promise<MyDayResponse> {
+  async getMyDay(accountId: string, date: string, workspaceId?: string, timeZone?: string): Promise<MyDayResponse> {
     const { day, viewMode } = await this.trackerService.getDeveloperDayView(date, accountId, {
       viewer: { kind: "developer", accountId },
     }, workspaceId);
@@ -89,6 +91,7 @@ export class MyDayService {
       isReadOnly: readOnlyReason !== undefined,
       lastCheckInAt: day.lastCheckInAt,
       checkIns: await this.withCheckInAuthorNames(day.checkIns, workspaceId),
+      taskUpdates: await this.taskUpdatesForDay(accountId, date, workspaceId, timeZone),
       isStale: day.isStale,
     };
 
@@ -114,6 +117,19 @@ export class MyDayService {
       completedItems: day.completedItems.map(safeItem),
       droppedItems: day.droppedItems.map(safeItem),
     };
+  }
+
+  private async taskUpdatesForDay(accountId: string, date: string, workspaceId?: string, timeZone?: string): Promise<MyDayTaskUpdate[]> {
+    const zone = resolveTimeZone(timeZone);
+    const from = zonedTimeToUtc(date, 0, 0, zone).toISOString();
+    const to = zonedTimeToUtc(addDaysToIsoDay(date, 1), 0, 0, zone).toISOString();
+    const events = await this.eventsService.listAuthoredBetween(accountId, workspaceId, from, to);
+    return events.flatMap((event): MyDayTaskUpdate[] => {
+      const action = event.meta && typeof event.meta === "object" && "action" in event.meta ? event.meta.action : undefined;
+      const blockerAction = action === "raised" || action === "cleared" ? action : undefined;
+      if (!event.body || (event.type !== "update" && event.type !== "blocker")) return [];
+      return [{ id: event.id, taskKey: event.taskKey, type: event.type, body: event.body, ...(blockerAction && { blockerAction }), occurredAt: event.occurredAt }];
+    });
   }
 
   async updateStatus(

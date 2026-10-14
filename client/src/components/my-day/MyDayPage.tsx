@@ -235,6 +235,7 @@ export function MyDayPage() {
   const completedItems = day?.completedItems ?? [];
   const droppedItems = day?.droppedItems ?? [];
   const checkIns = day?.checkIns ?? [];
+  const taskUpdates = day?.taskUpdates ?? [];
   const readOnlyReason = readOnlyReasonFor(day);
   const isInactive = day?.availability.state === 'inactive';
   const nudge = Boolean(day?.isStale) && !isReadOnly;
@@ -411,10 +412,10 @@ export function MyDayPage() {
                 id="log"
                 icon={<ScrollText size={14} />}
                 title={isToday ? 'Today’s log' : 'Log'}
-                count={checkIns.length > 0 ? checkIns.length : undefined}
+                count={checkIns.length + taskUpdates.length > 0 ? checkIns.length + taskUpdates.length : undefined}
               >
                 <div className="overflow-hidden rounded-2xl" style={surfaceStyle}>
-                  <RecentActivity checkIns={checkIns} isToday={isToday} />
+                  <RecentActivity checkIns={checkIns} taskUpdates={taskUpdates} isToday={isToday} />
                 </div>
               </MyDaySection>
 

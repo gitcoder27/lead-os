@@ -847,6 +847,36 @@ describe("my day routes", () => {
       expect(res.body.events.every((event: { visibility: string }) => event.visibility === "shared")).toBe(true);
     });
 
+    it("GET /api/my-day lists the developer's own task updates for that day in the client's zone", async () => {
+      await enableTaskKeys();
+      const item = await trackerService.addItem("dev-1", "2026-03-07", { title: "Alice task" });
+      const manager = await authService.createUser({ username: "mgr", displayName: "Manager", password: "secret123", role: "manager" });
+      const developer = { type: "developer" as const, accountId: "dev-1" };
+      await eventsService.append({ taskKey: item.taskKey!, type: "update", body: "Early update", meta: { via: "my_day" }, occurredAt: "2026-03-07T03:00:00.000Z" }, developer);
+      await eventsService.append({ taskKey: item.taskKey!, type: "update", body: "Afternoon update", meta: { via: "my_day" }, occurredAt: "2026-03-07T14:00:00.000Z" }, developer);
+      await eventsService.append({ taskKey: item.taskKey!, type: "blocker", body: "Waiting on infra", meta: { action: "raised" }, occurredAt: "2026-03-07T15:00:00.000Z" }, developer);
+      await eventsService.append({ taskKey: item.taskKey!, type: "update", body: "Check-in side effect", meta: { via: "my_day", checkInId: 9 }, occurredAt: "2026-03-07T16:00:00.000Z" }, developer);
+      await eventsService.append({ taskKey: item.taskKey!, type: "update", body: "Late evening", meta: { via: "my_day" }, occurredAt: "2026-03-08T02:00:00.000Z" }, developer);
+      await eventsService.append({ taskKey: item.taskKey!, type: "update", body: "Manager note", meta: { via: "task_drawer" }, visibility: "shared", occurredAt: "2026-03-07T14:30:00.000Z" }, { type: "manager", accountId: manager.accountId });
+
+      const app = createTestApp();
+      const headers = { cookie: await loginCookie("alice", "secret123") };
+      const utc = await invoke(app, { method: "GET", url: "/api/my-day?date=2026-03-07&tz=UTC", headers });
+      expect(utc.status).toBe(200);
+      expect(utc.body.taskUpdates).toEqual([
+        expect.objectContaining({ taskKey: item.taskKey, type: "blocker", body: "Waiting on infra", blockerAction: "raised" }),
+        expect.objectContaining({ taskKey: item.taskKey, type: "update", body: "Afternoon update" }),
+        expect.objectContaining({ taskKey: item.taskKey, type: "update", body: "Early update" }),
+      ]);
+
+      // In New York 03:00Z on the 7th is still the 6th, and 02:00Z on the 8th is the evening of the 7th.
+      const newYork = await invoke(app, { method: "GET", url: "/api/my-day?date=2026-03-07&tz=America/New_York", headers });
+      expect(newYork.body.taskUpdates.map((update: { body: string }) => update.body)).toEqual(["Late evening", "Waiting on infra", "Afternoon update"]);
+
+      const bad = await invoke(app, { method: "GET", url: "/api/my-day?date=2026-03-07&tz=Nope/Zone", headers });
+      expect(bad.status).toBe(400);
+    });
+
     it("GET /api/my-day/tasks/:key/events returns 404 for a non-owner", async () => {
       await enableTaskKeys();
       const item = await trackerService.addItem("dev-1", "2026-03-07", {

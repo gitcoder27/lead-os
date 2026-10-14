@@ -2115,6 +2115,16 @@ export interface LatestStandupSessionResponse {
   session: StandupSessionDetail | null;
 }
 
+/** A developer's own shared task update or blocker, shown in Today's log beside check-ins. */
+export interface MyDayTaskUpdate {
+  id: number;
+  taskKey: string;
+  type: "update" | "blocker";
+  body: string;
+  blockerAction?: "raised" | "cleared";
+  occurredAt: string;
+}
+
 export interface MyDayResponse {
   date: string;
   viewMode: MyDayViewMode;
@@ -2133,6 +2143,8 @@ export interface MyDayResponse {
   completedItems: TrackerWorkItem[];
   droppedItems: TrackerWorkItem[];
   checkIns: TrackerCheckIn[];
+  /** The developer's own shared task updates and blockers that day (not check-in side effects). */
+  taskUpdates?: MyDayTaskUpdate[];
   isStale: boolean;
 }
 

@@ -248,6 +248,25 @@ export class TaskEventsService {
     return { events: await withAuthorNames(await this.projectForViewer(rows.slice(0, limit).map(mapEvent), viewer), viewer.workspaceId), nextCursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
   }
 
+  /**
+   * The developer's own shared updates and blockers in [from, to), newest first.
+   * Events a check-in produced (`meta.checkInId`) are left out: the check-in
+   * itself already appears in the same log.
+   */
+  async listAuthoredBetween(accountId: string, workspaceId: string | undefined, from: string, to: string): Promise<TaskEvent[]> {
+    const rows = await db.select().from(taskEvents).where(and(
+      eq(taskEvents.workspaceId, normalizeWorkspaceId(workspaceId)),
+      eq(taskEvents.authorType, "developer"),
+      eq(taskEvents.authorId, accountId),
+      eq(taskEvents.visibility, "shared"),
+      inArray(taskEvents.type, ["update", "blocker"]),
+      isNull(taskEvents.redactedAt),
+      gte(taskEvents.occurredAt, from),
+      lt(taskEvents.occurredAt, to),
+    )).orderBy(desc(taskEvents.occurredAt), desc(taskEvents.id)).limit(200);
+    return rows.map(mapEvent).filter((event) => !(event.meta && typeof event.meta === "object" && "checkInId" in event.meta));
+  }
+
   async latestOfType(taskKey: string, type: TaskEventType, viewer: TaskViewer): Promise<TaskEvent | null> {
     await this.keys.assertEnabled(viewer.workspaceId);
     if (viewer.kind === "developer") await this.assertDeveloperCanRead(taskKey, viewer);

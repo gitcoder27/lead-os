@@ -15,7 +15,7 @@ export function useMyDay(date: string, enabled = true) {
 
   return useQuery<MyDayResponse>({
     queryKey: ['my-day', date, authScopeKey],
-    queryFn: () => api.get<MyDayResponse>(`/my-day?date=${date}`),
+    queryFn: () => api.get<MyDayResponse>(`/my-day?${new URLSearchParams({ date, tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}`),
     refetchInterval: 30_000,
     enabled,
     // Phase 2c: canonical transport carries `tasks`; rebuild the item-shaped

@@ -6,6 +6,7 @@ import { HttpError } from "../middleware/errorHandler";
 import { AuthService } from "../services/auth.service";
 import { IssueService } from "../services/issue.service";
 import { MyDayService } from "../services/my-day.service";
+import { isValidTimeZone } from "../services/today-clock";
 import { TaskKeysService } from "../services/task-keys.service";
 import { TASK_DETAILS_MAX, taskCreateSchema, taskUpdateSchema, TaskService, type TaskPrincipal } from "../services/task.service";
 
@@ -14,6 +15,7 @@ const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY
 const dateQuerySchema = z.object({
   query: z.object({
     date: isoDateSchema,
+    tz: z.string().refine(isValidTimeZone, "Invalid timezone").optional(),
   }),
   body: z.any().optional(),
   params: z.any().optional(),
@@ -156,7 +158,7 @@ export function createMyDayRouter(
     try {
       const date = req.query.date as string;
       const accountId = req.auth!.user.developerAccountId!;
-      const day = await myDayService.getMyDay(accountId, date, req.auth!.user.workspaceId);
+      const day = await myDayService.getMyDay(accountId, date, req.auth!.user.workspaceId, req.query.tz as string | undefined);
       if (day.taskModel === "canonical") {
         day.currentItem = undefined;
         day.plannedItems = [];

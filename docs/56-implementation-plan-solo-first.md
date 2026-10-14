@@ -1137,3 +1137,11 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-14 | MDL-01 | My Day loads workspace-scoped authored task events within the client's local day, excluding redacted events and check-in side effects. The log merges entries newest first with task keys and blocker labels. Typecheck, build:check, data guard and diff check passed; My Day route tests: 40 passed; interaction/hook tests: 25 passed. Shared additions are type-only. Tests use isolated databases; no runtime data or live integrations. |
+
+## Review evidence archive (2026-10-14)
+
+- [x] REVIEW-75 — Preserve the existing review scratchpad and its diagnostic evidence.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-14 | REVIEW-75 | Archived docs/review-scratchpad.md with the original review scope, findings, verification and limitations. Historical evidence retained as written; findings were subsequently addressed in R1–R8 above. Documentation-only commit; diff check passed. |

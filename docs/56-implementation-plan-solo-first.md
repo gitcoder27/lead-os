@@ -1145,3 +1145,11 @@ Sequential work on main; synthetic data and mocked integrations only. Calendar, 
 | Date | Item | Progress / verification |
 |---|---|---|
 | 2026-10-14 | REVIEW-75 | Archived docs/review-scratchpad.md with the original review scope, findings, verification and limitations. Historical evidence retained as written; findings were subsequently addressed in R1–R8 above. Documentation-only commit; diff check passed. |
+
+## Deployment test date stability (2026-10-14)
+
+- [x] DEPLOY-01 — Remove the wall-clock dependency from the task inbox plan-date notification test.
+
+| Date | Item | Progress / verification |
+|---|---|---|
+| 2026-10-14 | DEPLOY-01 | Reproduced the production gate failure: task creation defaulted to today, so rescheduling to October 14 became a no-op on October 14 while the assertion expected an event. The fixture now explicitly starts on October 13 and moves to October 14; repeating that date and priority is verified to leave the inbox unchanged. Product behavior is unchanged. Full npm test passed: server 130 files / 1,746 tests, client 174 files / 2,265 tests. Typecheck, build:check, guard:data and diff check passed; lint has 0 errors / 606 existing warnings. Format check flags only the two pre-existing untracked .claude settings files, excluded from commits. Isolated test databases only; no production data, push or deployment. |

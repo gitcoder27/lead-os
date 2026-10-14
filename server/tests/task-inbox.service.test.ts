@@ -220,7 +220,11 @@ describe("durable task inbox", () => {
 
   it("tells the owner when the plan date, due date or priority changes, and nobody else", async () => {
     await db.update(configTable).set({ value: "solo" }).where(eq(configTable.key, "team_mode"));
-    const task = await assign();
+    // Explicit dates keep the reschedule distinct even when today is October 14.
+    const task = await service.create(
+      { title: "Ship release", ownerType: "developer", ownerId: "dev-1", nextAction: "Private next action", scheduledOn: "2026-10-13" },
+      manager,
+    );
     await service.update(task.taskKey, { scheduledOn: "2026-10-14" }, manager);
     await service.update(task.taskKey, { dueAt: "2026-10-16T17:00:00.000Z" }, manager);
     await service.update(task.taskKey, { dueAt: "2026-10-17T17:00:00.000Z", priority: "high" }, manager);
@@ -232,7 +236,7 @@ describe("durable task inbox", () => {
       ["priority", { field: "priority", from: "normal", to: "high" }],
       ["schedule", { field: "due_at", from: "2026-10-16T17:00:00.000Z", to: "2026-10-17T17:00:00.000Z" }],
       ["schedule", { field: "due_at", from: null, to: "2026-10-16T17:00:00.000Z" }],
-      ["schedule", { field: "day", from: service.today(), to: "2026-10-14" }],
+      ["schedule", { field: "day", from: "2026-10-13", to: "2026-10-14" }],
       ["assignment", undefined],
     ]);
     expect(JSON.stringify(response)).not.toContain("Private next action");
@@ -241,7 +245,7 @@ describe("durable task inbox", () => {
     expect((await inbox.list(other)).events).toEqual([]);
     const target = await inbox.targetEvent(dev, response.events[0]!.eventId, task.taskKey);
     expect(target.event).toMatchObject({ type: "priority", meta: { from: "normal", to: "high" } });
-    await service.update(task.taskKey, { priority: "high" }, manager);
+    await service.update(task.taskKey, { scheduledOn: "2026-10-14", priority: "high" }, manager);
     expect((await inbox.list(dev)).events).toHaveLength(5);
   });
 
